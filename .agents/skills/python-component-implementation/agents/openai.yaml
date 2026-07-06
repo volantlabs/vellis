@@ -1,0 +1,6 @@
+interface:
+  display_name: "Python Component Implementation"
+  short_description: "Build Python component classes"
+  default_prompt: "Use $python-component-implementation to implement or revise a Vellis component in Python."
+policy:
+  allow_implicit_invocation: true

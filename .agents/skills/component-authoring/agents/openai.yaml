@@ -1,0 +1,6 @@
+interface:
+  display_name: "Component Authoring"
+  short_description: "Design agent-ready components"
+  default_prompt: "Use $component-authoring to design, draft, or review a black-box component spec with contracts, state, invariants, verification, and agent change rules."
+policy:
+  allow_implicit_invocation: true
