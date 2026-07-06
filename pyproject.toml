@@ -63,7 +63,7 @@ dev = [
     "mcp>=1.28.1,<2",
     "pytest>=8.0",
     "pyyaml>=6.0.3",
-    "ruff>=0.8",
+    "ruff>=0.15.20",
 ]
 
 [tool.basedpyright]
