@@ -19,4 +19,4 @@ Vellis should be a practical, respectful engineering space.
 
 ## Enforcement
 
-Maintainers may remove comments, close discussions, block participation, or take other action needed to keep the project workable. Report conduct issues to the maintainer at <mloumagnuson@gmail.com>.
+Maintainers may remove comments, close discussions, block participation, or take other action needed to keep the project workable. Report conduct issues to the maintainer at <labs@volantpartners.com>.

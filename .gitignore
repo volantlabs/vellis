@@ -8,3 +8,7 @@ dist/
 build/
 *.egg-info/
 .DS_Store
+.mcp.json
+.config/
+.cursor/
+.vscode/

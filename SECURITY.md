@@ -4,7 +4,7 @@ Vellis is beta-stage software and should not be used yet with sensitive producti
 
 ## Reporting
 
-Do not disclose security issues publicly before maintainers have had a chance to respond. Use GitHub private vulnerability reporting on [`volantlabs/vellis`](https://github.com/volantlabs/vellis/security/advisories) when it is enabled for the repository. If private reporting is not available, email the maintainer at <mloumagnuson@gmail.com>.
+Do not disclose security issues publicly before maintainers have had a chance to respond. Use GitHub private vulnerability reporting on [`volantlabs/vellis`](https://github.com/volantlabs/vellis/security/advisories) when it is enabled for the repository. If private reporting is not available, email the maintainer at <labs@volantpartners.com>.
 
 ## Scope
 
