@@ -1,15 +1,16 @@
 # Vellis
 
 Vellis is both a reusable AI-native component library and the first application built from those
-components: a local RTG knowledge system for humans working with AI agents, or for agents working
-on their own.
+components: a local RTG (Reified Typed Graph) knowledge system for humans working with AI agents, 
+or for agents working on their own.
 
 The repository is clone-and-run for beta and open-source evaluation. It gives first-time users two
 entry points:
 
-- **Use Vellis**: run the RTG Knowledge Graph application through MCP as a full-service knowledge
-  substrate with schema, data CRUD, query, validation, migration, audit, snapshots, restore, and
-  replay, plus agent-facing state summaries and usage guides.
+- **Use Vellis**: run the RTG Knowledge Graph application through MCP (Model Context Protocol) 
+  as a full-service knowledge substrate with schema, data CRUD (Create, Read, Update, Delete),
+  query, validation, migration, audit, snapshots, restore, adjust, replay, plus agent-facing state 
+  summaries and usage guides.
 - **Build with the components**: use the storage, RTG graph, schema, migration, validation, query,
   and controller components as reusable building blocks for follow-on applications.
 
@@ -27,8 +28,9 @@ Install prerequisites, clone the repo, and enter the checkout:
 brew install uv just
 
 # or without Homebrew
+# install uv directly
 curl -LsSf https://astral.sh/uv/install.sh | sh
-# just install options: https://just.systems/man/en/packages.html
+# for just install options, see: https://just.systems/man/en/packages.html
 
 git clone https://github.com/volantlabs/vellis.git
 cd vellis
@@ -41,8 +43,8 @@ Create a fresh beta storage root and print copy-pastable MCP client configuratio
 just rtg-eval-info /tmp/vellis-beta-001
 ```
 
-Copy the generated `mcp.client_config` into your MCP client, start the server, then make the first
-tool call:
+Copy the generated `mcp.client_config` into your MCP client, start the server using `just rtg`,
+then make the first tool call:
 
 ```json
 {"tool": "rtg_validate_graph", "arguments": {}}
@@ -56,8 +58,9 @@ agent a state check:
 ```
 
 The state response tells an MCP-only agent whether to bootstrap schema, reuse live schema, inspect
-staged work, or replay the ledger. Then give the agent the default life-graph beta prompt:
+staged work, or replay the ledger. 
 
+Then, give the agent the default life-graph beta prompt:
 ```text
 docs/evals/rtg-individual-life-graph-beta-prompt.md
 ```
