@@ -1,6 +1,6 @@
 [build-system]
 requires = [
-    "setuptools>=77",
+    "setuptools>=83.0.0",
     "wheel",
 ]
 build-backend = "setuptools.build_meta"
@@ -26,7 +26,7 @@ classifiers = [
     "Topic :: Software Development :: Libraries",
 ]
 dependencies = [
-    "fastmcp>=3.4.2,<4",
+    "fastmcp>=3.4.3,<4",
 ]
 
 [project.scripts]
@@ -59,11 +59,11 @@ exclude = [
 
 [dependency-groups]
 dev = [
-    "basedpyright>=1.39.8",
+    "basedpyright>=1.39.9",
     "mcp>=1.28.1,<2",
     "pytest>=8.0",
     "pyyaml>=6.0.3",
-    "ruff>=0.8",
+    "ruff>=0.15.20",
 ]
 
 [tool.basedpyright]
