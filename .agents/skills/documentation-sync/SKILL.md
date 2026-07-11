@@ -22,7 +22,7 @@ invariants.
 1. Identify the canonical model or implementation change.
 2. Run `just model-render` for model-derived views and manifests.
 3. Review generated component pages for public construction and instance actions, exact
-   signatures/defaults, failures, state authority, state effects, requirements, invariants,
+   signatures/defaults, failures, state ownership, state effects, requirements, invariants,
    dependencies, and verification objectives. A fresh but incomplete projection fails sync.
 4. When an accepted source or prior model exists, confirm the projection preserves its public
    meaning unless an explicit contract change was approved.
@@ -31,7 +31,7 @@ invariants.
 6. Update only hand-authored documents whose readers need new context or workflow guidance.
 7. Update AGENTS when repository-wide authoring or realization rules change.
 8. Update reusable skills only for generally applicable workflow improvements; keep product names,
-   migration findings, and repository-specific package maps in repository guidance.
+   project findings, and repository-specific package maps in repository guidance.
 9. Update skill UI metadata when a skill's purpose changes.
 10. Run `just skills-check`, `just model-check`, and the narrowest relevant repository checks.
 

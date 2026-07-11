@@ -31,23 +31,31 @@ components share exactly the same semantics and no component is the natural owne
 Vellis façade values, MCP metadata, Python realization types, or speculative runtime concepts in
 Bibliotek shared values.
 
-The modeling foundation is reusable process vocabulary, not Bibliotek domain vocabulary. Keep
-generic contract, state-authority, realization, and evidence conventions there. Bibliotek-wide
+The modeling foundation is reusable process vocabulary, not Bibliotek domain vocabulary. Keep only
+minimal lifecycle, realization, evidence, and other non-semantic governance conventions there. Bibliotek-wide
 software/domain semantics belong in Bibliotek. Vellis-specific composition, use cases, façade
 contracts, transport mappings, and response policy belong in Vellis packages.
 
-Prefer native SysML semantics over duplicate governance labels. A `perform action` is already a
-provided capability; required features add only the missing required-role/cardinality semantics;
-contract-satisfaction dependencies identify their endpoints directly. Keep implementation bindings
-on concrete realization elements, not reusable logical component definitions. Use exhibited states
-only for actual activated/event-driven state behavior, and use typed ports/interfaces only when a
-connected interaction and its transfers are being modeled.
+Prefer native SysML semantics over duplicate annotations. A `perform action` is already a provided
+operation. An invocation-scoped collaborator is a typed action input. A collaborator retained by a
+component occurrence is a multiplicited `ref part` role; the application may bind that role to the
+actual part usage because both denote the same occurrence. Never bind action usages to mean one
+action calls another. Use ordinary, `derived`, and `ref` features to distinguish owned, derived, and
+independently existing state. Keep implementation bindings on concrete realization elements, not
+reusable logical component definitions. Use exhibited states only for actual activated/event-driven
+state behavior, and use typed ports/interfaces only when a connected interaction and its transfers
+are being modeled.
+
+Use native short names for stable qualified identities and exact external enum spellings. Define a
+calculation only when it has an evaluable result and a constraint only when it is a complete
+predicate. Do not create hollow calculations, constraints, states, ports, or interfaces to hold
+prose. Define viewpoints and views for recurring model concerns; generated Markdown is a projection.
 
 A future message runtime should be modeled as separately packageable Bibliotek runtime contracts
 only after delivery, addressing, routing, correlation, ordering, retry, and idempotency semantics
 are intentionally designed for reuse. Vellis may then add a message-runtime realization that maps
 the same logical component capabilities to ports, messages, and flows. Do not rewrite today's
-component actions or required capabilities merely because their realization changes from direct
+component actions or collaborator roles merely because their realization changes from direct
 calls to messaging.
 
 ## Startup Checks
@@ -79,7 +87,8 @@ component.<domain>.<name>
 ```
 
 Component models are human-owned black-box contracts. They define purpose, public values/items,
-provided and required actions, abstract owned state, action effects, principal failures, invariants,
+performed actions, action-scoped inputs, retained collaborator roles, abstract owned state,
+action effects, principal failures, invariants,
 and verification objectives. Stop at the level needed for composition, substitution, design-level
 reasoning, and black-box verification.
 

@@ -93,25 +93,12 @@ library package BibliotekStorageJsonFile {
         }
     }
 
-    part def JsonFileStorage {
+    part def <'component.storage.json_file'> JsonFileStorage {
         doc /* Own a durable namespace of JSON documents beneath one authoritative filesystem root. */
-        @SpecIdentity {
-            id = "component.storage.json_file";
-            lifecycleStatus = SpecLifecycle::accepted;
-            owner = "humans";
-        }
-        @DependencyPolicy {
-            allowedComponentIds = ();
-            forbiddenComponentIds = ("component.storage.sql", "component.rtg.graph",
-                "component.rtg.schema", "component.rtg.controller");
-        }
+        @SpecificationStatus { lifecycleStatus = SpecLifecycle::accepted; owner = "humans"; }
 
         ref item storageRoot : JsonStorageRoot {
-            @StateAuthority {
-                authority = StateAuthorityKind::canonicalOwner;
-                lifetime = StateLifetime::independent;
-                persistence = StatePersistence::durable;
-            }
+            doc /* Independently durable canonical document state governed through this component. */
         }
 
         perform action write[0..*] : WriteJsonDocument;
@@ -120,16 +107,16 @@ library package BibliotekStorageJsonFile {
         perform action list[0..*] : ListJsonDocuments;
 
         dependency writeStorage from write to storageRoot {
-            @StateAccess { kind = StateAccessKind::write; effect = "replace exactly one normalized JSON document atomically"; }
+            doc /* replace exactly one normalized JSON document atomically. */
         }
         dependency readStorage from read to storageRoot {
-            @StateAccess { kind = StateAccessKind::read; effect = "return one parsed document without changing state"; }
+            doc /* return one parsed document without changing state. */
         }
         dependency deleteStorage from delete to storageRoot {
-            @StateAccess { kind = StateAccessKind::delete; effect = "remove exactly the addressed document"; }
+            doc /* remove exactly the addressed document. */
         }
         dependency listStorage from list to storageRoot {
-            @StateAccess { kind = StateAccessKind::read; effect = "return recursive normalized metadata without parsed values and without changing state"; }
+            doc /* return recursive normalized metadata without parsed values and without changing state. */
         }
     }
 
@@ -143,82 +130,69 @@ library package BibliotekStorageJsonFile {
         }
     }
 
-    requirement writeEffect {
+    requirement <'contract.storage.json_file.write_effect'> writeEffect {
         subject operation : WriteJsonDocument;
         doc /* Success creates or fully replaces the addressed document and leaves every other document unchanged; failure exposes no partial new value. */
-        @StableId { id = "contract.storage.json_file.write_effect"; }
     }
 
-    requirement readEffect {
+    requirement <'contract.storage.json_file.read_effect'> readEffect {
         subject operation : ReadJsonDocument;
         doc /* Success returns the complete parsed value and metadata for the addressed document; success and failure leave storage state unchanged. */
-        @StableId { id = "contract.storage.json_file.read_effect"; }
     }
 
-    requirement deleteEffect {
+    requirement <'contract.storage.json_file.delete_effect'> deleteEffect {
         subject operation : DeleteJsonDocument;
         doc /* Success removes only the addressed document; a rejected delete leaves all documents unchanged. */
-        @StableId { id = "contract.storage.json_file.delete_effect"; }
     }
 
-    requirement listEffect {
+    requirement <'contract.storage.json_file.list_effect'> listEffect {
         subject operation : ListJsonDocuments;
         doc /* Success recursively returns metadata for regular .json documents below the requested directory, never parsed values or files outside the root, and leaves storage state unchanged. */
-        @StableId { id = "contract.storage.json_file.list_effect"; }
     }
 
-    requirement rootContainment {
+    requirement <'invariant.storage.json_file.root_containment'> rootContainment {
         subject storage : JsonFileStorage;
         doc /* No operation shall read, write, list, or delete outside the configured root. */
-        @StableId { id = "invariant.storage.json_file.root_containment"; }
     }
 
-    requirement jsonOnlyDocuments {
+    requirement <'invariant.storage.json_file.json_only_documents'> jsonOnlyDocuments {
         subject storage : JsonFileStorage;
         doc /* Document operations are limited to regular files with normalized .json paths. */
-        @StableId { id = "invariant.storage.json_file.json_only_documents"; }
     }
 
-    requirement validJsonAtRest {
+    requirement <'invariant.storage.json_file.valid_json_at_rest'> validJsonAtRest {
         subject storage : JsonFileStorage;
         doc /* Every successfully written document contains syntactically valid JSON. */
-        @StableId { id = "invariant.storage.json_file.valid_json_at_rest"; }
     }
 
-    requirement atomicFullDocumentWrites {
+    requirement <'invariant.storage.json_file.atomic_full_document_writes'> atomicFullDocumentWrites {
         subject storage : JsonFileStorage;
         doc /* Readers observe the previous complete value, no value, or the complete new value. */
-        @StableId { id = "invariant.storage.json_file.atomic_full_document_writes"; }
     }
 
-    requirement callerSchemaNeutrality {
+    requirement <'invariant.storage.json_file.caller_schema_neutrality'> callerSchemaNeutrality {
         subject storage : JsonFileStorage;
         doc /* Storage preserves caller JSON values without application-schema enforcement. */
-        @StableId { id = "invariant.storage.json_file.caller_schema_neutrality"; }
     }
 
-    requirement noImplicitRootChange {
+    requirement <'invariant.storage.json_file.no_implicit_root_change'> noImplicitRootChange {
         subject storage : JsonFileStorage;
         doc /* A handle bound to one root never redirects operations to a different root. */
-        @StableId { id = "invariant.storage.json_file.no_implicit_root_change"; }
     }
 
-    requirement pathSemantics {
+    requirement <'contract.storage.json_file.path_semantics'> pathSemantics {
         subject storage : JsonFileStorage;
         doc /* Every operation normalizes its relative path before access and rejects absolute paths, parent traversal, symlink traversal, non-JSON document targets, and platform aliases that escape the root. */
-        @StableId { id = "contract.storage.json_file.path_semantics"; }
     }
 
-    requirement directorySemantics {
+    requirement <'contract.storage.json_file.directory_semantics'> directorySemantics {
         subject storage : JsonFileStorage;
         doc /* Writes create valid parent directories as needed. Deletes may remove empty parents, and later valid writes recreate them without exposing directories as stored resources. */
-        @StableId { id = "contract.storage.json_file.directory_semantics"; }
     }
 
-    requirement metadataSemantics {
+    requirement <'contract.storage.json_file.metadata_semantics'> metadataSemantics {
         subject storage : JsonFileStorage;
         doc /* Write, read, delete, and list metadata reports the normalized relative path, serialized filesystem size, and filesystem modification time without a separate metadata index. */
-        @StableId { id = "contract.storage.json_file.metadata_semantics"; }
     }
 
     verification def JsonFileStorageBoundaryVerification {

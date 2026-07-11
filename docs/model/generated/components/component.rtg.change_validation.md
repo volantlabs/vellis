@@ -19,28 +19,24 @@ Generated from textual SysML v2 by `just model-render`; do not edit by hand.
 |---|---|---|---|
 | — | — | — | No package-level construction action. |
 
-## Required capabilities
+## Retained collaborator roles
 
-| Feature | Kind | Required contract | Cardinality |
+| Role | Kind | Referenced type | Multiplicity |
 |---|---|---|---|
-| `requiredGraphSnapshot` | `action` | `ExportGraphSnapshot` | `1..1` |
-| `requiredSchemaSnapshot` | `action` | `ExportSchemaSnapshot` | `1..1` |
-| `requiredConstraintSnapshot` | `action` | `ExportConstraintSnapshot` | `1..1` |
-| `requiredMigrationSnapshot` | `action` | `ExportMigrationSnapshot` | `1..1` |
-| `requiredQueryExecution` | `action` | `ExecuteRtgQuery` | `1..1` |
+| — | — | — | No retained collaborator roles. |
 
 ## Owned state
 
-| State feature | Type | Authority | Lifetime | Persistence |
-|---|---|---|---|---|
-| — | — | — | — | This component owns no abstract state. |
+| State feature | Type | Ownership | Meaning |
+|---|---|---|---|
+| — | — | — | This component owns no abstract state. |
 
 ## Action and state effects
 
-| Action | State / capability | Access | Contract-significant effect |
-|---|---|---|---|
-| `validateBatch` | — | `none` | read supplied views, project selected sections, and return findings without mutation |
-| `validateGraphState` | — | `none` | validate supplied or migration-selected state without mutation |
+| Action | State / collaborator | Modeled effect |
+|---|---|---|
+| `validateBatch` | — | read supplied views, project selected sections, and return findings without mutation. |
+| `validateGraphState` | — | validate supplied or migration-selected state without mutation. |
 
 ## Invariants and behavioral obligations
 

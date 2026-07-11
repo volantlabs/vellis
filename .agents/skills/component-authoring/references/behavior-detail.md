@@ -5,7 +5,7 @@
 For every public action, make these contract-significant facts recoverable from the model:
 
 - legal inputs, defaults, outputs, and principal failures;
-- required capability reads;
+- invocation-scoped collaborator inputs and retained collaborator-role reads;
 - abstract state read/write/create/delete effects or explicit no effect;
 - success and failure postconditions that preserve component invariants;
 - ordering, consistency, or idempotency only when promised to consumers.
@@ -27,6 +27,10 @@ behavior and event-triggered transitions; it is not a richer spelling of a statu
 connects ports and may carry defined flows; it is not a generic software API. A succession constrains
 occurrence ordering; it is not a call graph.
 
+A calculation defines a reusable computation and must return a result. A constraint is a complete
+Boolean predicate. When a rule cannot be expressed completely and correctly with the supported
+expression subset, use a requirement with normative text rather than a hollow formal construct.
+
 ## Leave open
 
 Do not model private helper calls, branch structure, loops, temporary values, algorithms,
@@ -44,7 +48,6 @@ Stop when a reviewer can answer:
 5. What dependencies must a composition provide?
 6. What implementation choices intentionally remain open?
 
-For an existing accepted component, also ask whether an implementer using only the revised model
-would preserve the same legal calls, defaults, results, failures, state effects, and deterministic
-behavior. If not, the revision is incomplete or is a contract change even if its high-level
-description sounds correct.
+Also ask whether two conforming realizations could differ in black-box behavior the design needs to
+settle. If so, formalize that distinction; if the difference is intentionally open, say so once and
+stop modeling deeper.

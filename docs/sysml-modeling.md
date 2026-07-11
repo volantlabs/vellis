@@ -10,12 +10,14 @@ a migration baseline during that interval. New design work belongs in SysML.
 
 ## Model products
 
-- `model/foundation/SoftwareComponentModeling.sysml` defines typed governance, contract, state
-  access, implementation, and evidence metadata using ordinary SysML constructs.
+- `model/foundation/SoftwareComponentModeling.sysml` defines minimal lifecycle, failure,
+  realization, and evidence traceability vocabulary. Logical semantics stay in native SysML.
 - `model/bibliotek/shared-values/` contains the deliberately narrow language-neutral value layer.
 - `model/bibliotek/components/` contains ten reusable black-box component models.
+- `model/bibliotek/views/` contains native viewpoints and views for reusable structure and behavior.
 - `model/vellis/` contains the Vellis application composition, façade, use cases, and current
   Python/MCP realizations.
+- `model/vellis/views/` contains native viewpoints and views for application composition and use cases.
 - `model/implementation-drift.yaml` records the small set of known implementation disagreements
   without promoting current Python behavior into intended design.
 
@@ -64,13 +66,15 @@ the next library or application without carrying Vellis/Bibliotek migration hist
 
 ## Right-sized modeling profile
 
-Every component has a structural contract: identity, lifecycle, public values/items, typed provided
-and required actions, defaults and multiplicities, principal failures, and required provider
-cardinality. Implementation bindings belong to concrete realization packages, so the logical
-component may have multiple conforming realizations.
+Every component has a structural contract: identity, lifecycle, public values/items, typed actions,
+defaults and multiplicities, principal failures, performed operations, and collaborator roles.
+Invocation-scoped collaborators are action inputs. Collaborators retained for the component
+occurrence are referential part roles with explicit multiplicity. Implementation bindings belong to
+concrete realization packages, so the logical component may have multiple conforming realizations.
 
-Stateful components additionally model abstract owned state, authority and lifetime, which actions
-read or mutate it, concise effects, rejected-operation no-effects, and invariant preservation.
+Stateful components additionally model abstract owned, derived, and externally referenced state,
+which actions read or mutate it, concise effects, rejected-operation no-effects, and invariant
+preservation.
 
 Detailed behavior is selective. Model declarative matching rules, transition tables, observable
 ordering, and rollback orchestration only when a consumer must predict them. Calculations are useful
@@ -100,27 +104,33 @@ default mode.
 
 - Use parts for active components and applications, attributes for values, and items for things
   whose identity or lifecycle matters.
-- Give every invocable action explicit multiplicity. Use performed actions for provided
-  capabilities and referential action or part features for required capabilities.
-- Do not duplicate the provided role in metadata: `perform action` already supplies that native
-  meaning. Required-capability metadata adds only provider cardinality that the reference feature
-  does not otherwise express.
-- Relate required capabilities to providers with annotated dependencies. Binding means value equality; it
-  is not a generic dependency-injection relation.
-- Declare provider cardinality for every required capability.
+- Give stable public identities with native SysML short names, including qualified component IDs and
+  exact external enum spellings where needed.
+- Give every invocable action explicit multiplicity. `perform action` is the native
+  provided-operation relationship and needs no duplicate role annotation.
+- Use typed action inputs for invocation-scoped collaborators and multiplicited `ref part` features
+  for collaborators retained by a component occurrence.
+- In an application composition, bind a retained referential role to the actual application part
+  usage when they denote the same occurrence. Binding is identity/equality, not a generic “calls”
+  edge; never bind performed action usages to indicate invocation.
 - Keep construction actions separate from actions performed by an existing component.
-- Record state authority, lifetime, and persistence independently. Durable external state is not
-  automatically composition-owned by a process-lifetime component.
+- Use ordinary owned features for component-owned state, `derived` features for projections, and
+  `ref` features for independently existing durable resources or collaborators.
+- Use dependencies and documentation to expose contract-significant action-to-state and
+  action-to-collaborator relationships; use requirements for exact effects and no-effect guarantees.
 - Use requirements for testable obligations and constraints only for complete predicates. Use an
   enum-valued status plus transition obligations for request-driven record lifecycle; use an
   exhibited state when activated behavior or event-triggered transitions are actually modeled.
+- Use a calculation only when it defines a real reusable computation with an evaluable result.
+  Never use hollow calculations, constraints, states, ports, or interfaces as prose containers.
 - Use cases describe actor-visible value. Ports, interfaces, messages, and flows appear only when
   connection or transfer semantics are part of the current contract.
 - A modeled interface has typed port ends and explicit contract-significant flows. Empty ports are
   not generic software API notation.
+- Define viewpoints for recurring stakeholder concerns and views that expose and filter model
+  elements; generated prose and diagrams remain projections rather than parallel specifications.
 - Bibliotek and Vellis public field names and enum literals encode as `lower_snake_case` by default.
-  `@ExternalName` records exact exceptions such as abbreviated query operators. This mapping is
-  part of the black-box contract and must not be inferred from an implementation language.
+  Native short names record exact exceptions such as abbreviated query operators.
 
 The JSON storage, query, and controller models are the representative patterns: respectively
 durable state, declarative matching, and externally meaningful orchestration.
@@ -128,11 +138,11 @@ durable state, declarative matching, and externally meaningful orchestration.
 ## Generated views and checks
 
 `just model-render` produces one page per Bibliotek component, Bibliotek and Vellis indexes,
-action/state/invariant tables, composition and use-case views, and the static Vellis application
+action/state/invariant tables, composition and use-case projections, and the static Vellis application
 manifest. `just model-check` rejects stale outputs, empty or semantically hollow public actions,
 missing or signature-incompatible protocol operations, accepted Markdown fields/failures/invariants
 that disappeared during shadow migration, requirements without verification objectives, unresolved
-implementation bindings, invalid capability cardinality, the wrong Vellis role/tool surface, and
+implementation bindings, invalid referential-role bindings, the wrong Vellis role/tool surface, and
 unrecorded drift. These shadow comparisons are repository migration gates, not part of the reusable
 component-authoring skills.
 

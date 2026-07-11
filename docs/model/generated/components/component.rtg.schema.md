@@ -28,33 +28,33 @@ Generated from textual SysML v2 by `just model-render`; do not edit by hand.
 | `CreateEmptyRtgSchema` | out `schema: RtgSchema` | None | Return an empty registry with empty derived indexes. |
 | `ImportRtgSchemaSnapshot` | in `snapshot: RtgSchemaSnapshot`; out `schema: RtgSchema` | `RtgSchemaSnapshotInvalid`, `RtgSchemaUuidInvalid`, `RtgSchemaUuidConflict`, `RtgSchemaReferenceInvalid`, `RtgSchemaDefinitionInvalid`, `RtgSchemaSystemValueInvalid`, `RtgSchemaLiveTypeConflict` | Validate every record, UUID, reference, payload, system value, and live uniqueness before rebuilding indexes and exposing the registry. |
 
-## Required capabilities
+## Retained collaborator roles
 
-| Feature | Kind | Required contract | Cardinality |
+| Role | Kind | Referenced type | Multiplicity |
 |---|---|---|---|
-| — | — | — | No required capabilities. |
+| — | — | — | No retained collaborator roles. |
 
 ## Owned state
 
-| State feature | Type | Authority | Lifetime | Persistence |
-|---|---|---|---|---|
-| `definitions` | `RtgSchemaDefinition` | `canonicalOwner` | `componentCoupled` | `ephemeral` |
-| `navigationIndexes` | `JsonObject` | `derived` | `componentCoupled` | `ephemeral` |
+| State feature | Type | Ownership | Meaning |
+|---|---|---|---|
+| `definitions` | `RtgSchemaDefinition` | `owned` | Canonical component-owned schema-definition occurrences. |
+| `navigationIndexes` | `JsonObject` | `derived` | Ephemeral navigation indexes derived from canonical schema definitions. |
 
 ## Action and state effects
 
-| Action | State / capability | Access | Contract-significant effect |
-|---|---|---|---|
-| `exportSnapshot` | `definitions` | `read` | read all canonical definitions |
-| `putDefinition` | `definitions` | `write` | atomically create/replace definition and rebuild affected indexes |
-| `getDefinition` | `definitions` | `read` | read one canonical definition |
-| `listDefinitions` | `navigationIndexes` | `read` | read kind/live indexes |
-| `listDefinitionsByTypeKey` | `navigationIndexes` | `read` | read type-key index |
-| `listAnchorDataTypeKeys` | `navigationIndexes` | `read` | read associated-data index |
-| `listLinkParticipation` | `navigationIndexes` | `read` | read source/target participation indexes |
-| `listAnchorTypeSummaries` | `navigationIndexes` | `read` | read anchor summary index |
-| `getSchemaPack` | `navigationIndexes` | `read` | assemble schema-only pack from canonical definitions and indexes |
-| `deleteDefinition` | `definitions` | `delete` | remove one definition and affected indexes |
+| Action | State / collaborator | Modeled effect |
+|---|---|---|
+| `exportSnapshot` | `definitions` | read all canonical definitions. |
+| `putDefinition` | `definitions` | atomically create/replace definition and rebuild affected indexes. |
+| `getDefinition` | `definitions` | read one canonical definition. |
+| `listDefinitions` | `navigationIndexes` | read kind/live indexes. |
+| `listDefinitionsByTypeKey` | `navigationIndexes` | read type-key index. |
+| `listAnchorDataTypeKeys` | `navigationIndexes` | read associated-data index. |
+| `listLinkParticipation` | `navigationIndexes` | read source/target participation indexes. |
+| `listAnchorTypeSummaries` | `navigationIndexes` | read anchor summary index. |
+| `getSchemaPack` | `navigationIndexes` | assemble schema-only pack from canonical definitions and indexes. |
+| `deleteDefinition` | `definitions` | remove one definition and affected indexes. |
 
 ## Invariants and behavioral obligations
 

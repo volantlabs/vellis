@@ -1,70 +1,70 @@
 # Canonical Component Modeling Pattern
 
-Use one library package per reusable component and preserve its stable `component.*` identity.
+Use one library package per reusable component. Let standard SysML relationships carry the design;
+add metadata only for governance or traceability that SysML does not already express.
 
-## Required model content
+## Component shape
 
-1. Imports of the foundation and owning shared-value packages.
-2. Boundary-crossing `attribute def` values and identity-bearing `item def` records.
-3. `action def` public and construction contracts with exact inputs, outputs, defaults,
-   multiplicity, principal failures, and action-scoped semantics.
-4. A `part def` for the active component with `@SpecIdentity`.
-5. Abstract state features annotated with `@StateAuthority`.
-6. Repeated performed actions for provided contracts; `perform action` is the provided-role
-   semantics and needs no duplicate provided-role annotation.
-7. Referential action features annotated as required capabilities with explicit provider
-   cardinality.
-8. State-access dependencies from every performed action to canonical/derived/external state or an
-   explicit no-state-effect declaration.
-9. Requirements or complete constraints for preconditions, effects, failure effects, and invariants.
-10. Verification cases covering coherent boundary obligations.
+1. Give the component `part def` a stable SysML short name such as
+   `part def <'component.domain.name'> Name`.
+2. Model immutable records, requests, results, options, and failure data with `attribute def`.
+   Use `item def` when occurrence identity or lifecycle matters to the contract.
+3. Define each public invocation with an `action def` and exact typed inputs, outputs, defaults,
+   multiplicities, failures, and observable meaning.
+4. Expose provided operations with explicitly multiplicited `perform action` features.
+5. Model conceptual component state as features of the component definition:
+   ordinary composite features for component-owned state, `derived` features for projections, and
+   `ref` features for independently existing resources or collaborators.
+6. Relate performed actions to the state or collaborators they use with ordinary dependencies and
+   concise semantic documentation. Give reads and rejected mutations explicit no-effect guarantees.
+7. State complete predicates as constraints. State other testable obligations as requirements with
+   the relevant action or component as subject.
+8. Group coherent obligations in verification cases and identify concrete evidence separately.
 
-## State and effects
+## Collaborators and composition
 
-- Model conceptual state, not dictionaries, tables, helper objects, or storage-engine layout.
-- Separate canonical state from derived indexes, caches, snapshots, and external resources.
-- Use `@StateAccess` on a standard dependency to declare read, create, write, or delete access.
-- A read-only action still receives an explicit no-state-effect obligation.
-- Express a complete before/after relation as a constraint when practical; otherwise use a concise
-  normative action-scoped requirement.
-- Do not use state-access metadata on action-to-action dependencies. Use a capability-use
-  dependency for delegation and reserve state access for actual abstract state features.
-- An enum-valued status plus transition requirements is often the right model for a request-driven
-  record lifecycle. Use an exhibited state only when state activation, event-triggered transitions,
-  or state-enabled behavior is actually part of the modeled semantics.
+Choose the required-capability shape by lifetime:
 
-## Required capabilities
+- An invocation-scoped collaborator or read view is a typed action input. The caller supplies one
+  for that occurrence; the component does not retain it.
+- A collaborator retained by a component occurrence is a multiplicited `ref part` role on the
+  component definition.
+- An application declares actual part usages and binds a retained referential role to the same part
+  occurrence, for example `bind coordinator.store = store;`.
 
-Use referential action usages for singular operations. Define a coherent read-view part only when a
-consumer truly requires several operations over one stable view. Satisfy capabilities with directed
-dependencies annotated as contract satisfaction, never value bindings. Do not repeat the provider
-role or composition role as strings when `perform action` and the dependency endpoints already say it.
+Binding asserts identity/equality. It is appropriate when the referential role and application part
+are the same occurrence. Never bind two performed action usages merely to mean “call this provider”;
+an invocation relationship is not equality of every action occurrence.
 
-## Logical contract and realization
+Use a coherent read-view part definition when several operations must observe one logical view.
+Otherwise prefer the smallest public collaborator contract that communicates the need.
 
-Keep implementation bindings in realization packages on concrete specializations or usages, not on
-the reusable logical component definition. A logical component may have several conforming language,
-runtime, deployment, or transport realizations; none is part of its black-box meaning unless that
-choice is itself an observable contract.
+## State and behavior
 
-## Public types and failures
+- Model canonical domain state, not dictionaries, tables, helper objects, or storage layouts.
+- Distinguish owned state, derived features, snapshots, configuration, and independently durable
+  resources using native feature kinds and documentation.
+- Use `calc def` only for a reusable computation with an actual result expression. Use
+  `constraint def` only for a complete Boolean predicate. Never create a hollow calculation,
+  constraint, state, port, or interface as a decorated prose container.
+- Use an enum-valued status plus transition requirements for a record lifecycle unless activation,
+  event-triggered transitions, or state-enabled behavior is intentionally modeled.
+- Decompose actions and add successions only when their ordering is part of the black-box contract.
 
-Model values and concrete failures that cross the component boundary. Do not model Python base
-exception families merely because they organize implementation inheritance.
+## Identity, encoding, and metadata
 
-Make external encodings recoverable from the model. Declare a namespace naming profile when public
-member names or enum literals follow a systematic encoding, and annotate exceptions with an exact
-external name. Do not assume a Rust, Python, JSON, protobuf, or transport generator will infer
-abbreviations or legacy spellings such as `lt`, `data_object`, or `properties_only` correctly.
+- Use SysML short names for stable qualified identities and for external enum spellings that differ
+  from the element name, such as `enum <'properties_only'> propertiesOnly;`.
+- Keep logical names and encodings language-neutral. Model exact serialized names only when they are
+  public interchange semantics.
+- Do not recreate native identity, provided/required role, dependency, state ownership, or endpoint
+  semantics in a project annotation.
+- Keep lifecycle approval, realization links, evidence links, and other project governance metadata
+  small and visibly separate from the logical contract.
 
-Preserve public field names, multiplicity, defaults, and concrete failure distinctions when
-revising an accepted contract. Do not replace a typed public value with `JsonObject` unless JSON itself is the accepted
-semantic type. When callers may omit identity on create but stored results always have identity,
-model distinct request/stored forms or an explicit postcondition.
+## Realization and views
 
-## Verification
-
-A verification case may cover a coherent group of actions and invariants. Evidence identifies the
-boundary suite or artifact; model-level traceability need not mirror individual test functions.
-Every accepted obligation must nevertheless be reachable from a verification objective; grouping
-does not mean leaving obligations unreferenced.
+Put allocations and implementation bindings in realization packages, not reusable logical
+component definitions. Define viewpoints for recurring stakeholder concerns and views that expose
+and filter the relevant model elements. Generated prose and diagrams are projections of these
+elements, never parallel specifications.

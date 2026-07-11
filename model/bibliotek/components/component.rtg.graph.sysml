@@ -5,7 +5,7 @@ library package BibliotekRtgGraph {
 
     enum def RtgObjectKind {
         enum anchor;
-        enum dataObject { @ExternalName { name = "data_object"; } }
+        enum <'data_object'> dataObject;
         enum link;
     }
     enum def RtgLinkDirection { enum source; enum target; enum both; }
@@ -167,71 +167,70 @@ library package BibliotekRtgGraph {
     }
 
     part def RtgGraphReadView {
-        perform action exportSnapshot[0..*] : ExportGraphSnapshot { @StateAccess { kind = StateAccessKind::read; effect = "read complete canonical state"; } }
-        perform action getObject[0..*] : GetGraphObject { @StateAccess { kind = StateAccessKind::read; effect = "direct unfiltered read"; } }
-        perform action listByType[0..*] : ListGraphObjectsByType { @StateAccess { kind = StateAccessKind::read; effect = "read derived type index in stable order"; } }
-        perform action listAnchorData[0..*] : ListAnchorData { @StateAccess { kind = StateAccessKind::read; effect = "read direct anchor-data index"; } }
-        perform action listDataAnchors[0..*] : ListDataAnchors { @StateAccess { kind = StateAccessKind::read; effect = "read inverse direct association index"; } }
-        perform action listIncidentLinks[0..*] : ListIncidentLinks { @StateAccess { kind = StateAccessKind::read; effect = "read derived incident-link index"; } }
-        perform action countByType[0..*] : CountGraphObjectsByType { @StateAccess { kind = StateAccessKind::read; effect = "derive counts from canonical records"; } }
+        perform action exportSnapshot[0..*] : ExportGraphSnapshot { doc /* read complete canonical state. */ }
+        perform action getObject[0..*] : GetGraphObject { doc /* direct unfiltered read. */ }
+        perform action listByType[0..*] : ListGraphObjectsByType { doc /* read derived type index in stable order. */ }
+        perform action listAnchorData[0..*] : ListAnchorData { doc /* read direct anchor-data index. */ }
+        perform action listDataAnchors[0..*] : ListDataAnchors { doc /* read inverse direct association index. */ }
+        perform action listIncidentLinks[0..*] : ListIncidentLinks { doc /* read derived incident-link index. */ }
+        perform action countByType[0..*] : CountGraphObjectsByType { doc /* derive counts from canonical records. */ }
     }
 
-    part def RtgGraph :> RtgGraphReadView {
+    part def <'component.rtg.graph'> RtgGraph :> RtgGraphReadView {
         doc /* Own canonical RTG anchors, data objects, links, direct associations, and derived navigation indexes without schema or lifecycle filtering policy. */
-        @SpecIdentity { id = "component.rtg.graph"; lifecycleStatus = SpecLifecycle::accepted; owner = "humans"; }
-        @DependencyPolicy { allowedComponentIds = (); forbiddenComponentIds = ("component.rtg.schema", "component.rtg.constraints", "component.rtg.migration", "component.rtg.controller"); }
-        item anchors[0..*] : RtgAnchor { @StateAuthority { authority = StateAuthorityKind::canonicalOwner; lifetime = StateLifetime::componentCoupled; persistence = StatePersistence::ephemeral; } }
-        item dataObjects[0..*] : RtgDataObject { @StateAuthority { authority = StateAuthorityKind::canonicalOwner; lifetime = StateLifetime::componentCoupled; persistence = StatePersistence::ephemeral; } }
-        item links[0..*] : RtgLink { @StateAuthority { authority = StateAuthorityKind::canonicalOwner; lifetime = StateLifetime::componentCoupled; persistence = StatePersistence::ephemeral; } }
-        attribute anchorDataAssociations : JsonObject { @StateAuthority { authority = StateAuthorityKind::canonicalOwner; lifetime = StateLifetime::componentCoupled; persistence = StatePersistence::ephemeral; } }
-        attribute derivedIndexes : JsonObject { @StateAuthority { authority = StateAuthorityKind::derived; lifetime = StateLifetime::componentCoupled; persistence = StatePersistence::ephemeral; } }
+        @SpecificationStatus { lifecycleStatus = SpecLifecycle::accepted; owner = "humans"; }
+        item anchors[0..*] : RtgAnchor { doc /* Canonical component-owned anchor occurrences. */ }
+        item dataObjects[0..*] : RtgDataObject { doc /* Canonical component-owned data-object occurrences. */ }
+        item links[0..*] : RtgLink { doc /* Canonical component-owned link occurrences. */ }
+        attribute anchorDataAssociations : JsonObject { doc /* Canonical identity-free direct associations. */ }
+        derived attribute derivedIndexes : JsonObject { doc /* Ephemeral navigation indexes derived from canonical graph state. */ }
         perform action putAnchor[0..*] : PutAnchor; perform action putDataObject[0..*] : PutDataObject; perform action putLink[0..*] : PutLink;
         perform action associateData[0..*] : AssociateData; perform action dissociateData[0..*] : DissociateData;
         perform action deleteAnchor[0..*] : DeleteAnchor; perform action deleteDataObject[0..*] : DeleteDataObject; perform action deleteLink[0..*] : DeleteLink;
-        perform action previewDeleteAnchor[0..*] : PreviewDeleteAnchor { @StateAccess { kind = StateAccessKind::read; effect = "compute exact anchor cascade without mutation"; } }
-        perform action previewDeleteDataObject[0..*] : PreviewDeleteDataObject { @StateAccess { kind = StateAccessKind::read; effect = "compute exact data cascade without mutation"; } }
-        perform action previewDissociateData[0..*] : PreviewDissociateData { @StateAccess { kind = StateAccessKind::read; effect = "compute exact dissociation cascade without mutation"; } }
-        dependency putAnchorState from putAnchor to anchors { @StateAccess { kind = StateAccessKind::write; effect = "atomically create/replace anchor and maintain indexes"; } }
-        dependency putDataState from putDataObject to dataObjects { @StateAccess { kind = StateAccessKind::write; effect = "atomically create/replace data, associations, and indexes"; } }
-        dependency putLinkState from putLink to links { @StateAccess { kind = StateAccessKind::write; effect = "atomically create/replace link and indexes"; } }
-        dependency associateState from associateData to anchorDataAssociations { @StateAccess { kind = StateAccessKind::write; effect = "idempotently add symmetric direct association"; } }
-        dependency dissociateState from dissociateData to anchorDataAssociations { @StateAccess { kind = StateAccessKind::delete; effect = "remove association and complete cascade atomically"; } }
-        dependency deleteAnchorState from deleteAnchor to anchors { @StateAccess { kind = StateAccessKind::delete; effect = "remove anchor and complete cascade atomically"; } }
-        dependency deleteDataState from deleteDataObject to dataObjects { @StateAccess { kind = StateAccessKind::delete; effect = "remove data and complete cascade atomically"; } }
-        dependency deleteLinkState from deleteLink to links { @StateAccess { kind = StateAccessKind::delete; effect = "remove exactly one link and index entries"; } }
+        perform action previewDeleteAnchor[0..*] : PreviewDeleteAnchor { doc /* compute exact anchor cascade without mutation. */ }
+        perform action previewDeleteDataObject[0..*] : PreviewDeleteDataObject { doc /* compute exact data cascade without mutation. */ }
+        perform action previewDissociateData[0..*] : PreviewDissociateData { doc /* compute exact dissociation cascade without mutation. */ }
+        dependency putAnchorState from putAnchor to anchors { doc /* atomically create/replace anchor and maintain indexes. */ }
+        dependency putDataState from putDataObject to dataObjects { doc /* atomically create/replace data, associations, and indexes. */ }
+        dependency putLinkState from putLink to links { doc /* atomically create/replace link and indexes. */ }
+        dependency associateState from associateData to anchorDataAssociations { doc /* idempotently add symmetric direct association. */ }
+        dependency dissociateState from dissociateData to anchorDataAssociations { doc /* remove association and complete cascade atomically. */ }
+        dependency deleteAnchorState from deleteAnchor to anchors { doc /* remove anchor and complete cascade atomically. */ }
+        dependency deleteDataState from deleteDataObject to dataObjects { doc /* remove data and complete cascade atomically. */ }
+        dependency deleteLinkState from deleteLink to links { doc /* remove exactly one link and index entries. */ }
     }
 
     action def CreateEmptyRtgGraph { out part graph : RtgGraph; doc /* Return an empty graph with empty canonical state and derived indexes. */ @FailureContract { errorIds = (); obligation = "Construction has no declared domain failure."; } }
     action def ImportRtgGraphSnapshot { in snapshot : RtgGraphSnapshot; out part graph : RtgGraph; doc /* Validate the whole snapshot, normalize live metadata, rebuild all derived indexes, and expose no partial graph. */ @FailureContract { errorIds = ("RtgGraphSnapshotInvalid", "RtgGraphUuidInvalid", "RtgGraphUuidConflict", "RtgGraphReferenceInvalid", "RtgGraphTypeInvalid", "RtgGraphTypeKindConflict", "RtgGraphJsonValueInvalid", "RtgGraphSystemValueInvalid"); obligation = "Failure returns no partially reconstructed graph."; } }
 
-    requirement putEffect { subject graph : RtgGraph; doc /* Puts generate a UUID when omitted, preserve a supplied valid UUID, normalize missing system.live to true, fully replace the named record fields, preserve unrelated records, and atomically maintain associations and indexes. */ @StableId { id = "contract.rtg.graph.put_effect"; } }
-    requirement associationEffect { subject graph : RtgGraph; doc /* Association is a direct identity-free many-to-many relation. Repeated association is idempotent; removing the last anchor grounds deletion of the data object and its incident links. */ @StableId { id = "contract.rtg.graph.association_effect"; } }
-    requirement deleteEffect { subject graph : RtgGraph; doc /* Deletes return the complete cascade with always-present result lists and leave no dangling links or associations; rejected deletes have no effect. */ @StableId { id = "contract.rtg.graph.delete_effect"; } }
-    requirement previewEffect { subject graph : RtgGraph; doc /* Each preview returns exactly the cascade the paired mutation would produce from the same state and changes no canonical or derived state. */ @StableId { id = "contract.rtg.graph.preview_effect"; } }
-    requirement snapshotEffect { subject graph : RtgGraph; doc /* Export preserves UUIDs, types, endpoints, properties, system metadata, and direct associations without filtering. Import validates the whole candidate and rebuilds derived indexes. */ @StableId { id = "contract.rtg.graph.snapshot_effect"; } }
-    requirement globalUuidUniqueness { subject graph : RtgGraph; doc /* UUIDs are globally unique across graph object kinds. */ @StableId { id = "invariant.rtg.graph.global_uuid_uniqueness"; } }
-    requirement wellFormedUuids { subject graph : RtgGraph; doc /* Every stored identity is a well-formed UUID. */ @StableId { id = "invariant.rtg.graph.well_formed_uuids"; } }
-    requirement uuidGeneration { subject graph : RtgGraph; doc /* Generated identities are UUIDs and valid caller identities are preserved. */ @StableId { id = "invariant.rtg.graph.uuid_generation"; } }
-    requirement wellFormedTypes { subject graph : RtgGraph; doc /* Every object has a non-empty type key. */ @StableId { id = "invariant.rtg.graph.well_formed_types"; } }
-    requirement singleGlobalTypeNamespace { subject graph : RtgGraph; doc /* A type key belongs to only one object kind. */ @StableId { id = "invariant.rtg.graph.single_global_type_namespace"; } }
-    requirement manyToManyDataAssociation { subject graph : RtgGraph; doc /* Anchors and data objects support direct many-to-many association. */ @StableId { id = "invariant.rtg.graph.many_to_many_data_association"; } }
-    requirement noUnassociatedDataObjects { subject graph : RtgGraph; doc /* Every stored data object has at least one anchor. */ @StableId { id = "invariant.rtg.graph.no_unassociated_data_objects"; } }
-    requirement associationIndexesReferenceExistingObjects { subject graph : RtgGraph; doc /* Associations reference existing anchors and data objects. */ @StableId { id = "invariant.rtg.graph.association_indexes_reference_existing_objects"; } }
-    requirement noAssociationObjects { subject graph : RtgGraph; doc /* Direct associations have no object identity, type, metadata, or link representation. */ @StableId { id = "invariant.rtg.graph.no_association_objects"; } }
-    requirement validLinkEndpoints { subject graph : RtgGraph; doc /* Link endpoints exist and are anchors or data objects. */ @StableId { id = "invariant.rtg.graph.valid_link_endpoints"; } }
-    requirement noDanglingReferencesAfterDelete { subject graph : RtgGraph; doc /* Deletes leave no dangling association or link references. */ @StableId { id = "invariant.rtg.graph.no_dangling_references_after_delete"; } }
-    requirement noLinkToLinkEdges { subject graph : RtgGraph; doc /* Links cannot be link endpoints. */ @StableId { id = "invariant.rtg.graph.no_link_to_link_edges"; } }
-    requirement typeIndexesMatchCanonicalMaps { subject graph : RtgGraph; doc /* Derived type indexes equal canonical object membership. */ @StableId { id = "invariant.rtg.graph.type_indexes_match_canonical_maps"; } }
-    requirement associationIndexesAreSymmetric { subject graph : RtgGraph; doc /* Both direct association directions agree. */ @StableId { id = "invariant.rtg.graph.association_indexes_are_symmetric"; } }
-    requirement incidentLinkIndexesMatchCanonicalLinks { subject graph : RtgGraph; doc /* Incident-link indexes derive exactly from canonical links. */ @StableId { id = "invariant.rtg.graph.incident_link_indexes_match_canonical_links"; } }
-    requirement jsonSerializablePropertyStores { subject graph : RtgGraph; doc /* Properties and system metadata are JSON-safe. */ @StableId { id = "invariant.rtg.graph.json_serializable_property_stores"; } }
-    requirement systemLiveBoolean { subject graph : RtgGraph; doc /* Missing system.live normalizes to true and supplied live is Boolean. */ @StableId { id = "invariant.rtg.graph.system_live_boolean"; } }
-    requirement schemaNeutrality { subject graph : RtgGraph; doc /* Graph storage does not enforce application schema or ontology meaning. */ @StableId { id = "invariant.rtg.graph.schema_neutrality"; } }
-    requirement anchorDisplayNameNonAuthoritative { subject graph : RtgGraph; doc /* Display name is optional, non-unique, and not identity. */ @StableId { id = "invariant.rtg.graph.anchor_display_name_non_authoritative"; } }
-    requirement unfilteredReads { subject graph : RtgGraph; doc /* Base reads never hide objects by live status, visibility, role, or publication. */ @StableId { id = "invariant.rtg.graph.unfiltered_reads"; } }
-    requirement typeCountsMatchCanonicalMaps { subject graph : RtgGraph; doc /* Counts derive from canonical records and explicit kind/live filters. */ @StableId { id = "invariant.rtg.graph.type_counts_match_canonical_maps"; } }
-    requirement mutationAtomicity { subject graph : RtgGraph; doc /* Each mutation preserves every graph invariant or has no effect. */ @StableId { id = "invariant.rtg.graph.mutation_atomicity"; } }
-    requirement previewMatchesDelete { subject graph : RtgGraph; doc /* Preview cascades match their corresponding mutations. */ @StableId { id = "invariant.rtg.graph.preview_matches_delete"; } }
+    requirement <'contract.rtg.graph.put_effect'> putEffect { subject graph : RtgGraph; doc /* Puts generate a UUID when omitted, preserve a supplied valid UUID, normalize missing system.live to true, fully replace the named record fields, preserve unrelated records, and atomically maintain associations and indexes. */ }
+    requirement <'contract.rtg.graph.association_effect'> associationEffect { subject graph : RtgGraph; doc /* Association is a direct identity-free many-to-many relation. Repeated association is idempotent; removing the last anchor grounds deletion of the data object and its incident links. */ }
+    requirement <'contract.rtg.graph.delete_effect'> deleteEffect { subject graph : RtgGraph; doc /* Deletes return the complete cascade with always-present result lists and leave no dangling links or associations; rejected deletes have no effect. */ }
+    requirement <'contract.rtg.graph.preview_effect'> previewEffect { subject graph : RtgGraph; doc /* Each preview returns exactly the cascade the paired mutation would produce from the same state and changes no canonical or derived state. */ }
+    requirement <'contract.rtg.graph.snapshot_effect'> snapshotEffect { subject graph : RtgGraph; doc /* Export preserves UUIDs, types, endpoints, properties, system metadata, and direct associations without filtering. Import validates the whole candidate and rebuilds derived indexes. */ }
+    requirement <'invariant.rtg.graph.global_uuid_uniqueness'> globalUuidUniqueness { subject graph : RtgGraph; doc /* UUIDs are globally unique across graph object kinds. */ }
+    requirement <'invariant.rtg.graph.well_formed_uuids'> wellFormedUuids { subject graph : RtgGraph; doc /* Every stored identity is a well-formed UUID. */ }
+    requirement <'invariant.rtg.graph.uuid_generation'> uuidGeneration { subject graph : RtgGraph; doc /* Generated identities are UUIDs and valid caller identities are preserved. */ }
+    requirement <'invariant.rtg.graph.well_formed_types'> wellFormedTypes { subject graph : RtgGraph; doc /* Every object has a non-empty type key. */ }
+    requirement <'invariant.rtg.graph.single_global_type_namespace'> singleGlobalTypeNamespace { subject graph : RtgGraph; doc /* A type key belongs to only one object kind. */ }
+    requirement <'invariant.rtg.graph.many_to_many_data_association'> manyToManyDataAssociation { subject graph : RtgGraph; doc /* Anchors and data objects support direct many-to-many association. */ }
+    requirement <'invariant.rtg.graph.no_unassociated_data_objects'> noUnassociatedDataObjects { subject graph : RtgGraph; doc /* Every stored data object has at least one anchor. */ }
+    requirement <'invariant.rtg.graph.association_indexes_reference_existing_objects'> associationIndexesReferenceExistingObjects { subject graph : RtgGraph; doc /* Associations reference existing anchors and data objects. */ }
+    requirement <'invariant.rtg.graph.no_association_objects'> noAssociationObjects { subject graph : RtgGraph; doc /* Direct associations have no object identity, type, metadata, or link representation. */ }
+    requirement <'invariant.rtg.graph.valid_link_endpoints'> validLinkEndpoints { subject graph : RtgGraph; doc /* Link endpoints exist and are anchors or data objects. */ }
+    requirement <'invariant.rtg.graph.no_dangling_references_after_delete'> noDanglingReferencesAfterDelete { subject graph : RtgGraph; doc /* Deletes leave no dangling association or link references. */ }
+    requirement <'invariant.rtg.graph.no_link_to_link_edges'> noLinkToLinkEdges { subject graph : RtgGraph; doc /* Links cannot be link endpoints. */ }
+    requirement <'invariant.rtg.graph.type_indexes_match_canonical_maps'> typeIndexesMatchCanonicalMaps { subject graph : RtgGraph; doc /* Derived type indexes equal canonical object membership. */ }
+    requirement <'invariant.rtg.graph.association_indexes_are_symmetric'> associationIndexesAreSymmetric { subject graph : RtgGraph; doc /* Both direct association directions agree. */ }
+    requirement <'invariant.rtg.graph.incident_link_indexes_match_canonical_links'> incidentLinkIndexesMatchCanonicalLinks { subject graph : RtgGraph; doc /* Incident-link indexes derive exactly from canonical links. */ }
+    requirement <'invariant.rtg.graph.json_serializable_property_stores'> jsonSerializablePropertyStores { subject graph : RtgGraph; doc /* Properties and system metadata are JSON-safe. */ }
+    requirement <'invariant.rtg.graph.system_live_boolean'> systemLiveBoolean { subject graph : RtgGraph; doc /* Missing system.live normalizes to true and supplied live is Boolean. */ }
+    requirement <'invariant.rtg.graph.schema_neutrality'> schemaNeutrality { subject graph : RtgGraph; doc /* Graph storage does not enforce application schema or ontology meaning. */ }
+    requirement <'invariant.rtg.graph.anchor_display_name_non_authoritative'> anchorDisplayNameNonAuthoritative { subject graph : RtgGraph; doc /* Display name is optional, non-unique, and not identity. */ }
+    requirement <'invariant.rtg.graph.unfiltered_reads'> unfilteredReads { subject graph : RtgGraph; doc /* Base reads never hide objects by live status, visibility, role, or publication. */ }
+    requirement <'invariant.rtg.graph.type_counts_match_canonical_maps'> typeCountsMatchCanonicalMaps { subject graph : RtgGraph; doc /* Counts derive from canonical records and explicit kind/live filters. */ }
+    requirement <'invariant.rtg.graph.mutation_atomicity'> mutationAtomicity { subject graph : RtgGraph; doc /* Each mutation preserves every graph invariant or has no effect. */ }
+    requirement <'invariant.rtg.graph.preview_matches_delete'> previewMatchesDelete { subject graph : RtgGraph; doc /* Preview cascades match their corresponding mutations. */ }
 
     verification def RtgGraphBoundaryVerification {
         subject graph : RtgGraph;

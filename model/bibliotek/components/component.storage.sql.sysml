@@ -72,33 +72,23 @@ library package BibliotekStorageSql {
         }
     }
 
-    part def SqlStorage {
+    part def <'component.storage.sql'> SqlStorage {
         doc /* Own a small SQLite-backed SQL execution boundary without application table, ledger, or domain semantics. */
-        @SpecIdentity { id = "component.storage.sql"; lifecycleStatus = SpecLifecycle::accepted; owner = "humans"; }
-        @DependencyPolicy {
-            allowedComponentIds = ();
-            forbiddenComponentIds = ("component.storage.json_file", "component.rtg.graph",
-                "component.rtg.schema", "component.rtg.constraints", "component.rtg.migration",
-                "component.rtg.query", "component.rtg.controller");
-        }
+        @SpecificationStatus { lifecycleStatus = SpecLifecycle::accepted; owner = "humans"; }
         ref item database : SqlDatabase {
-            @StateAuthority {
-                authority = StateAuthorityKind::canonicalOwner;
-                lifetime = StateLifetime::independent;
-                persistence = StatePersistence::durable;
-            }
+            doc /* Independently durable database state governed through this component. */
         }
         perform action execute[0..*] : ExecuteSql;
         perform action query[0..*] : QuerySql;
         perform action transaction[0..*] : ExecuteSqlTransaction;
         dependency executeDatabase from execute to database {
-            @StateAccess { kind = StateAccessKind::write; effect = "apply one caller statement under serialized handle access"; }
+            doc /* apply one caller statement under serialized handle access. */
         }
         dependency queryDatabase from query to database {
-            @StateAccess { kind = StateAccessKind::read; effect = "return database-ordered JSON-compatible rows without mutation"; }
+            doc /* return database-ordered JSON-compatible rows without mutation. */
         }
         dependency transactionDatabase from transaction to database {
-            @StateAccess { kind = StateAccessKind::write; effect = "apply request-ordered operations as one atomic SQLite transaction"; }
+            doc /* apply request-ordered operations as one atomic SQLite transaction. */
         }
     }
 
@@ -113,14 +103,14 @@ library package BibliotekStorageSql {
         }
     }
 
-    requirement executeEffect { subject operation : ExecuteSql; doc /* Success applies exactly one statement and reports affected rows and an optional inserted-row identity; callers use query for rows. */ @StableId { id = "contract.storage.sql.execute_effect"; } }
-    requirement queryEffect { subject operation : QuerySql; doc /* Success returns deterministic column-name keyed rows in database result order; scalar/null values are JSON-compatible and serialized JSON text remains uninterpreted. */ @StableId { id = "contract.storage.sql.query_effect"; } }
-    requirement transactionEffect { subject operation : ExecuteSqlTransaction; doc /* Operations execute and produce results in caller order and either all commit or all roll back. */ @StableId { id = "contract.storage.sql.transaction_effect"; } }
-    requirement serializedHandleAccess { subject storage : SqlStorage; doc /* One opened handle serializes use of its SQLite connection so worker-thread callers do not observe connection thread affinity. */ @StableId { id = "contract.storage.sql.serialized_handle_access"; } }
-    requirement noImplicitDatabaseChange { subject storage : SqlStorage; doc /* A handle never changes databases implicitly. */ @StableId { id = "invariant.storage.sql.no_implicit_database_change"; } }
-    requirement transactionAtomicity { subject storage : SqlStorage; doc /* A transaction commits all operations or none. */ @StableId { id = "invariant.storage.sql.transaction_atomicity"; } }
-    requirement genericStorage { subject storage : SqlStorage; doc /* Storage owns no RTG tables, ledger policy, replay, migrations, authorization, ORM mapping, or domain interpretation. */ @StableId { id = "invariant.storage.sql.generic_storage"; } }
-    requirement jsonCompatibleRows { subject storage : SqlStorage; doc /* Query result rows contain only JSON-compatible scalar values or null. */ @StableId { id = "invariant.storage.sql.json_compatible_rows"; } }
+    requirement <'contract.storage.sql.execute_effect'> executeEffect { subject operation : ExecuteSql; doc /* Success applies exactly one statement and reports affected rows and an optional inserted-row identity; callers use query for rows. */ }
+    requirement <'contract.storage.sql.query_effect'> queryEffect { subject operation : QuerySql; doc /* Success returns deterministic column-name keyed rows in database result order; scalar/null values are JSON-compatible and serialized JSON text remains uninterpreted. */ }
+    requirement <'contract.storage.sql.transaction_effect'> transactionEffect { subject operation : ExecuteSqlTransaction; doc /* Operations execute and produce results in caller order and either all commit or all roll back. */ }
+    requirement <'contract.storage.sql.serialized_handle_access'> serializedHandleAccess { subject storage : SqlStorage; doc /* One opened handle serializes use of its SQLite connection so worker-thread callers do not observe connection thread affinity. */ }
+    requirement <'invariant.storage.sql.no_implicit_database_change'> noImplicitDatabaseChange { subject storage : SqlStorage; doc /* A handle never changes databases implicitly. */ }
+    requirement <'invariant.storage.sql.transaction_atomicity'> transactionAtomicity { subject storage : SqlStorage; doc /* A transaction commits all operations or none. */ }
+    requirement <'invariant.storage.sql.generic_storage'> genericStorage { subject storage : SqlStorage; doc /* Storage owns no RTG tables, ledger policy, replay, migrations, authorization, ORM mapping, or domain interpretation. */ }
+    requirement <'invariant.storage.sql.json_compatible_rows'> jsonCompatibleRows { subject storage : SqlStorage; doc /* Query result rows contain only JSON-compatible scalar values or null. */ }
 
     verification def SqlStorageBoundaryVerification {
         subject storage : SqlStorage;

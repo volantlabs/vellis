@@ -24,29 +24,29 @@ Generated from textual SysML v2 by `just model-render`; do not edit by hand.
 | `CreateEmptyRtgConstraints` | out `constraints: RtgConstraints` | None | Return an empty registry with empty derived indexes. |
 | `ImportRtgConstraintSnapshot` | in `snapshot: RtgConstraintSnapshot`; out `constraints: RtgConstraints` | `RtgConstraintSnapshotInvalid`, `RtgConstraintUuidInvalid`, `RtgConstraintUuidConflict`, `RtgConstraintDefinitionInvalid`, `RtgConstraintSystemValueInvalid` | Validate all identities, records, payloads, bounds, and system values before rebuilding indexes and exposing the registry. |
 
-## Required capabilities
+## Retained collaborator roles
 
-| Feature | Kind | Required contract | Cardinality |
+| Role | Kind | Referenced type | Multiplicity |
 |---|---|---|---|
-| — | — | — | No required capabilities. |
+| — | — | — | No retained collaborator roles. |
 
 ## Owned state
 
-| State feature | Type | Authority | Lifetime | Persistence |
-|---|---|---|---|---|
-| `constraintRecords` | `RtgConstraintDefinition` | `canonicalOwner` | `componentCoupled` | `ephemeral` |
-| `derivedIndexes` | `JsonObject` | `derived` | `componentCoupled` | `ephemeral` |
+| State feature | Type | Ownership | Meaning |
+|---|---|---|---|
+| `constraintRecords` | `RtgConstraintDefinition` | `owned` | Canonical component-owned constraint-definition occurrences. |
+| `derivedIndexes` | `JsonObject` | `derived` | Ephemeral indexes derived from canonical constraint definitions. |
 
 ## Action and state effects
 
-| Action | State / capability | Access | Contract-significant effect |
-|---|---|---|---|
-| `exportSnapshot` | `constraintRecords` | `read` | read all canonical records |
-| `putConstraint` | `constraintRecords` | `write` | atomically create/replace one record and rebuild affected indexes |
-| `getConstraint` | `constraintRecords` | `read` | read one canonical record |
-| `listConstraints` | `derivedIndexes` | `read` | read kind/live indexes |
-| `listConstraintsByTarget` | `derivedIndexes` | `read` | read target/kind/live indexes |
-| `deleteConstraint` | `constraintRecords` | `delete` | remove one record and affected indexes |
+| Action | State / collaborator | Modeled effect |
+|---|---|---|
+| `exportSnapshot` | `constraintRecords` | read all canonical records. |
+| `putConstraint` | `constraintRecords` | atomically create/replace one record and rebuild affected indexes. |
+| `getConstraint` | `constraintRecords` | read one canonical record. |
+| `listConstraints` | `derivedIndexes` | read kind/live indexes. |
+| `listConstraintsByTarget` | `derivedIndexes` | read target/kind/live indexes. |
+| `deleteConstraint` | `constraintRecords` | remove one record and affected indexes. |
 
 ## Invariants and behavioral obligations
 

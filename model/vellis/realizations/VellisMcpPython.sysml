@@ -66,8 +66,8 @@ package VellisMcpPythonRealization {
         port endpoint : ~McpEndpoint;
     }
 
-    part def VellisMcpAdapter {
-        @SpecIdentity { id = "adapter.vellis.mcp"; lifecycleStatus = SpecLifecycle::accepted; owner = "humans"; }
+    part def <'adapter.vellis.mcp'> VellisMcpAdapter {
+        @SpecificationStatus { lifecycleStatus = SpecLifecycle::accepted; owner = "humans"; }
         @ImplementationBinding { language = ImplementationLanguage::python; codeRoot = "apps/rtg_knowledge_graph"; symbol = "apps.rtg_knowledge_graph.mcp_server.build_mcp_server"; realization = "FastMCP"; }
         port endpoint : McpEndpoint;
 
@@ -108,35 +108,29 @@ package VellisMcpPythonRealization {
             connect client.endpoint to adapter.endpoint;
     }
 
-    requirement mcpOutcomeExclusive {
+    requirement <'contract.vellis.mcp.outcome_exclusive'> mcpOutcomeExclusive {
         subject outcome : VellisMcpOutcome;
         doc /* Every completed tool invocation has exactly one success value or one failure value, never both and never neither. */
-        @StableId { id = "contract.vellis.mcp.outcome_exclusive"; }
     }
-    requirement mcpDescriptionAuthority {
+    requirement <'contract.vellis.mcp.description_authority'> mcpDescriptionAuthority {
         subject adapter : VellisMcpAdapter;
         doc /* Each tool description is generated from the documentation of its typed Vellis action contract. descriptionSymbol is a Python realization trace only and never the semantic source. */
-        @StableId { id = "contract.vellis.mcp.description_authority"; }
     }
-    requirement mcpInputEncoding {
+    requirement <'contract.vellis.mcp.input_encoding'> mcpInputEncoding {
         subject adapter : VellisMcpAdapter;
         doc /* MCP arguments use the exact lower_snake_case action input names. Required inputs must be present; omitted optional inputs use modeled defaults. JSON arrays that realize typed list values encode directly as arrays. Decoding rejects unknown fields, wrong kinds, unsupported enum literals, empty required strings/lists, and contradictory option shapes before invoking the action. */
-        @StableId { id = "contract.vellis.mcp.input_encoding"; }
     }
-    requirement mcpResultEncoding {
+    requirement <'contract.vellis.mcp.result_encoding'> mcpResultEncoding {
         subject adapter : VellisMcpAdapter;
         doc /* Every successful action returns exactly {ok:true,result:<lower_snake_case JSON encoding of the modeled action result>}. Result shaping defined by the Vellis action occurs before this envelope and the adapter adds no domain behavior. */
-        @StableId { id = "contract.vellis.mcp.result_encoding"; }
     }
-    requirement mcpFailureEncoding {
+    requirement <'contract.vellis.mcp.failure_encoding'> mcpFailureEncoding {
         subject adapter : VellisMcpAdapter;
         doc /* Every expected or unexpected action failure returns {ok:false,error:{type,message,diagnostic?}} rather than a transport failure. type preserves the concrete failure name. Controller validation failures additionally expose top-level transaction_id and validation_report when present on the source failure. Failure encoding adds no state effect. */
-        @StableId { id = "contract.vellis.mcp.failure_encoding"; }
     }
-    requirement mcpTransportEquivalence {
+    requirement <'contract.vellis.mcp.transport_equivalence'> mcpTransportEquivalence {
         subject adapter : VellisMcpAdapter;
         doc /* The exact same 27 tool contracts, descriptions, argument schemas, results, and failure envelopes are exposed over stdio and localhost HTTP; transport selection does not alter application semantics. */
-        @StableId { id = "contract.vellis.mcp.transport_equivalence"; }
     }
 
     verification def VellisMcpBoundaryVerification {

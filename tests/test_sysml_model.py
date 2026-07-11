@@ -57,7 +57,7 @@ def test_profile_checker_rejects_unbalanced_and_nonbaseline_text(
     assert any("outside the baseline profile" in finding.message for finding in profile_findings)
 
 
-def test_native_style_rejects_logical_bindings_and_state_access_on_capabilities(
+def test_native_style_rejects_realization_leaks_and_semantic_profile_metadata(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     component_root = tmp_path / "bibliotek" / "components"
@@ -83,10 +83,10 @@ def test_native_style_rejects_logical_bindings_and_state_access_on_capabilities(
     findings = model_tool._check_native_modeling_style([model])
 
     assert any("realization bindings" in finding.message for finding in findings)
-    assert any("misuses StateAccess" in finding.message for finding in findings)
+    assert any("duplicates native SysML" in finding.message for finding in findings)
 
 
-def test_contract_checker_rejects_type_and_cardinality_drift(
+def test_contract_checker_rejects_part_role_type_and_cardinality_drift(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     component_root = tmp_path / "bibliotek" / "components"
@@ -94,26 +94,21 @@ def test_contract_checker_rejects_type_and_cardinality_drift(
     component_root.mkdir(parents=True)
     vellis_root.mkdir()
     (component_root / "consumer.sysml").write_text(
-        "part def Consumer {\n"
-        "ref action need[0..*] : RequiredAction { "
-        "@RequiredCapability { providerLowerBound = 1; "
-        "providerUpperBound = 1; } }\n"
-        "}\n",
+        "part def ExpectedProvider;\n"
+        "part def Consumer { ref part provider[1] : ExpectedProvider; }\n",
         encoding="utf-8",
     )
     (component_root / "provider.sysml").write_text(
-        """part def Provider {
-        perform action offer[0..*] : WrongAction;
-    }
-    """,
+        "part def WrongProvider;\n",
         encoding="utf-8",
     )
     (vellis_root / "Vellis.sysml").write_text(
         """part def App {
         part consumer : Consumer;
-        part provider : Provider;
-        dependency mismatch from consumer.need to provider.offer;
-        dependency duplicate from consumer.need to provider.offer;
+        part provider : WrongProvider;
+        part provider2 : WrongProvider;
+        bind consumer.provider = provider;
+        bind consumer.provider = provider2;
     }
     """,
         encoding="utf-8",
@@ -123,8 +118,34 @@ def test_contract_checker_rejects_type_and_cardinality_drift(
 
     findings = model_tool._check_contract_satisfaction()
 
-    assert any("contract type mismatch" in finding.message for finding in findings)
-    assert any("provider cardinality" in finding.message for finding in findings)
+    assert any("binding type mismatch" in finding.message for finding in findings)
+    assert any("requires exactly one bound" in finding.message for finding in findings)
+
+
+def test_native_style_rejects_hollow_calculations(tmp_path: Path) -> None:
+    model = tmp_path / "Hollow.sysml"
+    model.write_text(
+        "calc def Hollow { in value : Integer; out result : Integer; doc /* prose only */ }",
+        encoding="utf-8",
+    )
+
+    findings = model_tool._check_native_modeling_style([model])
+
+    assert any("has no evaluable result" in finding.message for finding in findings)
+
+
+def test_native_view_packages_cover_library_and_application_concerns() -> None:
+    bibliotek_views = (
+        ROOT / "model" / "bibliotek" / "views" / "BibliotekViews.sysml"
+    ).read_text(encoding="utf-8")
+    vellis_views = (ROOT / "model" / "vellis" / "views" / "VellisViews.sysml").read_text(
+        encoding="utf-8"
+    )
+
+    assert "viewpoint def BibliotekComponentStructureViewpoint" in bibliotek_views
+    assert "view bibliotekComponentStructure" in bibliotek_views
+    assert "viewpoint def VellisCompositionViewpoint" in vellis_views
+    assert "view vellisUseCases" in vellis_views
 
 
 def test_generated_artifact_checker_detects_staleness(

@@ -20,25 +20,25 @@ Generated from textual SysML v2 by `just model-render`; do not edit by hand.
 |---|---|---|---|
 | `OpenSqlStorage` | in `databasePath: FileSystemFilePath`; out `storage: SqlStorage` | `SqlStoragePathInvalid`, `SqlStorageUnavailable`, `SqlStoragePermissionDenied` | Open or create one SQLite database and bind the returned handle permanently to that path. |
 
-## Required capabilities
+## Retained collaborator roles
 
-| Feature | Kind | Required contract | Cardinality |
+| Role | Kind | Referenced type | Multiplicity |
 |---|---|---|---|
-| — | — | — | No required capabilities. |
+| — | — | — | No retained collaborator roles. |
 
 ## Owned state
 
-| State feature | Type | Authority | Lifetime | Persistence |
-|---|---|---|---|---|
-| `database` | `SqlDatabase` | `canonicalOwner` | `independent` | `durable` |
+| State feature | Type | Ownership | Meaning |
+|---|---|---|---|
+| `database` | `SqlDatabase` | `referenced` | Independently durable database state governed through this component. |
 
 ## Action and state effects
 
-| Action | State / capability | Access | Contract-significant effect |
-|---|---|---|---|
-| `execute` | `database` | `write` | apply one caller statement under serialized handle access |
-| `query` | `database` | `read` | return database-ordered JSON-compatible rows without mutation |
-| `transaction` | `database` | `write` | apply request-ordered operations as one atomic SQLite transaction |
+| Action | State / collaborator | Modeled effect |
+|---|---|---|
+| `execute` | `database` | apply one caller statement under serialized handle access. |
+| `query` | `database` | return database-ordered JSON-compatible rows without mutation. |
+| `transaction` | `database` | apply request-ordered operations as one atomic SQLite transaction. |
 
 ## Invariants and behavioral obligations
 

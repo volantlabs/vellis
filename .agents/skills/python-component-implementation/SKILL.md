@@ -18,13 +18,14 @@ obligations.
 
 1. Locate the component by stable ID in the repository's canonical model package.
 2. Resolve the accepted library package version and read its imported public values, actions,
-   required capabilities, state, invariants, failures, and
+   action inputs, retained collaborator roles, state, invariants, failures, and
    verification cases.
 3. Locate the matching concrete realization and confirm its code root and symbol from
    `@ImplementationBinding`; do not expect language bindings on the reusable logical component.
 4. Implement or revise the consumer-facing Python protocol.
 5. Encapsulate canonical state and invariant enforcement inside the component root.
-6. Wire only required public capabilities; do not reach through another component's boundary.
+6. Supply action-scoped collaborators and wire retained referential roles only through modeled
+   public boundaries; do not reach through another component's internals.
 7. Add or update black-box tests derived from the model verification cases.
 8. Run the narrowest component tests, `just model-check`, and relevant repository checks.
 
@@ -34,7 +35,8 @@ obligations.
 - Python exception base classes and inheritance are realization structure unless independently modeled.
 - Private helpers, data structures, algorithms, indexes, and performance choices remain implementation-owned.
 - Derived indexes must remain consistent with modeled canonical state but need not be modeled as code structure.
-- Current dependency injection realizes required capabilities; it does not redefine logical contracts.
+- Constructor injection, service lookup, messaging, or another runtime mechanism may realize the
+  same modeled collaborator roles; the mechanism does not redefine the logical contract.
 - Keep application composition and runtime adapters outside the reusable component implementation
   unless the accepted model assigns that behavior to the component.
 - Do not change accepted contracts, ownership, dependencies, lifecycle, or invariants for implementation convenience.

@@ -26,6 +26,7 @@ package SoftwareComponentPattern {
     action def ProcessRequest {
         in request : RequestValue;
         out response : ResponseValue;
+        doc /* Produce a response with the same value as a valid request. */
         @FailureContract {
             errorIds = ("foundation.error.request_invalid");
             obligation = "Invalid requests fail without a partial response.";
@@ -35,56 +36,42 @@ package SoftwareComponentPattern {
     action def DispatchMessage {
         in message : WorkMessage;
         out accepted : Boolean;
+        doc /* Submit one message to the configured durable queue and report acceptance. */
     }
 
     part def Provider {
-        attribute cachedResponse : ResponseValue {
-            @StateAuthority {
-                authority = StateAuthorityKind::derived;
-                lifetime = StateLifetime::componentCoupled;
-                persistence = StatePersistence::ephemeral;
-            }
+        derived attribute cachedResponse : ResponseValue {
+            doc /* Ephemeral response cache derived from the most recent successful processing. */
         }
         ref item queue : DurableQueue {
-            @StateAuthority {
-                authority = StateAuthorityKind::externalReference;
-                lifetime = StateLifetime::independent;
-                persistence = StatePersistence::durable;
-            }
+            doc /* Independently durable queue referenced, but not lifecycle-owned, by the provider. */
         }
         perform action processRequest[0..*] : ProcessRequest;
         perform action dispatch[0..*] : DispatchMessage;
         dependency processCache from processRequest to cachedResponse {
-            @StateAccess { kind = StateAccessKind::write; effect = "cache the most recent successful response"; }
+            doc /* cache the most recent successful response. */
         }
         dependency dispatchQueue from dispatch to queue {
-            @StateAccess { kind = StateAccessKind::write; effect = "submit one message to the external queue"; }
+            doc /* submit one message to the external queue. */
         }
     }
 
     action def OpenProvider {
-        in queue : DurableQueue;
+        in ref queue : DurableQueue;
         out part provider : Provider;
+        doc /* Construct a provider that refers to the supplied independently existing queue. */
+        bind provider.queue = queue;
     }
 
     part def Consumer {
-        ref action requiredProcessRequest[0..*] : ProcessRequest {
-            @RequiredCapability {
-                providerLowerBound = 1;
-                providerUpperBound = 1;
-            }
-        }
+        ref part provider[1] : Provider;
     }
 
     part def ExampleApplication {
         part consumer : Consumer;
         part provider : Provider;
 
-        dependency processRequestSatisfaction
-            from consumer.requiredProcessRequest
-            to provider.processRequest {
-            @ContractSatisfaction;
-        }
+        bind consumer.provider = provider;
     }
 
     part def ExternalActor { doc /* A system-external participant in the fixture use case. */ }
@@ -103,7 +90,7 @@ package SoftwareComponentPattern {
         action process : ProcessRequest;
     }
 
-    requirement processRequestRequirement {
+    requirement <'contract.foundation.process_request'> processRequestRequirement {
         subject application : ExampleApplication;
         doc /* The application shall use a compatible provider for each requested process. */
     }

@@ -1,23 +1,28 @@
 # Application Composition
 
-Model an application separately from reusable components.
+Model an application separately from reusable component libraries.
 
-- Use an ordinary application package that imports reusable component library packages; do not put
-  application roles or workflows in the library umbrella.
-- Use part usages for component roles.
-- Satisfy every required capability with an explicit dependency to a compatible provided feature.
-- Put app-specific request shaping and workflows in application facade actions, not reusable stores.
+- Use an ordinary application package that imports reusable library packages.
+- Use part usages for the component occurrences that play roles in the application.
+- Bind retained `ref part` collaborator roles to the actual application part occurrences. Binding
+  is correct here because both features denote the same occurrence.
+- Supply invocation-scoped dependencies through typed action inputs; do not add a permanent role
+  solely because one operation receives a collaborator.
+- Put application-specific request shaping and workflows in application façade actions, not in
+  reusable stores or registries.
 - Use use cases for actor-visible outcomes rather than method inventories.
-- Use allocation for logical-to-implementation realization.
-- Put implementation bindings on concrete realization definitions/usages and allocations, not on
-  reusable logical component definitions.
-- Keep transports such as MCP, HTTP, CLI, and SDKs in realization packages unless transport is the
-  application's logical purpose.
-- When connected interaction is modeled, type port features with transferred items, define
-  conjugate-compatible interface ends, and state flows that matter. Do not add an empty port or
-  interface merely as a diagrammatic API symbol.
-- Let alternative realization packages map the same logical roles and capabilities to in-process,
-  message-oriented, distributed, or other runtimes without changing the application or component
-  contracts solely because the invocation mechanism differs.
-- Use action successions only where application-visible ordering matters.
-- Keep whole-system invariants with the controller or application that owns their enforcement.
+- Put whole-system invariants with the component or application that has authority to enforce them.
+- Use action decomposition and successions only for externally meaningful application orchestration.
+- Use allocations to map logical elements to implementation, deployment, or runtime realizations.
+- Put implementation bindings on concrete realization definitions/usages, not reusable logical
+  component definitions.
+- Keep transports such as MCP, HTTP, CLI, and SDKs in realization packages unless their interaction
+  semantics are part of the logical application contract.
+- When connected interaction is modeled, define typed ports, interfaces, transferred items, and
+  flows. Do not use an empty port or interface as generic software API notation.
+- Define viewpoints and views for composition, behavior, use cases, verification, and realization
+  concerns that readers need to inspect repeatedly.
+
+Alternative in-process, message-oriented, distributed, or other realizations may map the same
+logical roles and actions without changing the component contracts solely because invocation
+mechanics differ.

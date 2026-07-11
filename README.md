@@ -172,7 +172,7 @@ Manual evaluation prompts include:
 
 Textual SysML v2 under [`model/`](model/) is the authored black-box design for Bibliotek and
 Vellis. It captures typed public actions and values, abstract owned state, action effects,
-principal failures, required capabilities, invariants, application composition, use cases, and
+principal failures, collaborator roles, invariants, application composition, use cases, and
 realizations. Human-readable pages under [`docs/model/generated/`](docs/model/generated/) are
 generated projections and must not be edited as alternate specifications.
 

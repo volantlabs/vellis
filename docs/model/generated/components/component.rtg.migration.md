@@ -26,31 +26,31 @@ Generated from textual SysML v2 by `just model-render`; do not edit by hand.
 | `CreateEmptyRtgMigration` | out `migration: RtgMigration` | None | Return an empty store and status index. |
 | `ImportRtgMigrationSnapshot` | in `snapshot: RtgMigrationSnapshot`; out `migration: RtgMigration` | `RtgMigrationSnapshotInvalid`, `RtgMigrationRecordInvalid`, `RtgMigrationIdConflict`, `RtgMigrationReferenceInvalid` | Validate every record, identity, reference, lifecycle value, and uniqueness rule before rebuilding indexes and exposing the store. |
 
-## Required capabilities
+## Retained collaborator roles
 
-| Feature | Kind | Required contract | Cardinality |
+| Role | Kind | Referenced type | Multiplicity |
 |---|---|---|---|
-| — | — | — | No required capabilities. |
+| — | — | — | No retained collaborator roles. |
 
 ## Owned state
 
-| State feature | Type | Authority | Lifetime | Persistence |
-|---|---|---|---|---|
-| `migrationRecords` | `RtgMigrationRecord` | `canonicalOwner` | `componentCoupled` | `ephemeral` |
-| `statusIndex` | `JsonObject` | `derived` | `componentCoupled` | `ephemeral` |
+| State feature | Type | Ownership | Meaning |
+|---|---|---|---|
+| `migrationRecords` | `RtgMigrationRecord` | `owned` | Canonical component-owned migration occurrences. |
+| `statusIndex` | `JsonObject` | `derived` | Ephemeral status index derived from canonical migration records. |
 
 ## Action and state effects
 
-| Action | State / capability | Access | Contract-significant effect |
-|---|---|---|---|
-| `exportSnapshot` | `migrationRecords` | `read` | return all migration records in migration-ID order |
-| `putMigration` | `migrationRecords` | `write` | create or lifecycle-safe replace one complete record |
-| `setStatus` | `migrationRecords` | `write` | apply one allowed lifecycle transition or same-status metadata update |
-| `addEvidence` | `migrationRecords` | `write` | append one evidence identity not already present |
-| `deleteMigration` | `migrationRecords` | `delete` | remove one terminal applied or abandoned record |
-| `buildCutoverPlan` | `migrationRecords` | `none` | purely copy cutover membership from the supplied record |
-| `getMigration` | `migrationRecords` | `read` | read one canonical record |
-| `listMigrations` | `statusIndex` | `read` | read deterministic status index |
+| Action | State / collaborator | Modeled effect |
+|---|---|---|
+| `exportSnapshot` | `migrationRecords` | return all migration records in migration-ID order. |
+| `putMigration` | `migrationRecords` | create or lifecycle-safe replace one complete record. |
+| `setStatus` | `migrationRecords` | apply one allowed lifecycle transition or same-status metadata update. |
+| `addEvidence` | `migrationRecords` | append one evidence identity not already present. |
+| `deleteMigration` | `migrationRecords` | remove one terminal applied or abandoned record. |
+| `buildCutoverPlan` | `migrationRecords` | purely copy cutover membership from the supplied record. |
+| `getMigration` | `migrationRecords` | read one canonical record. |
+| `listMigrations` | `statusIndex` | read deterministic status index. |
 
 ## Invariants and behavioral obligations
 

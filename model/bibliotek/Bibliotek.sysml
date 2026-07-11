@@ -1,9 +1,5 @@
 library package Bibliotek {
     private import SoftwareComponentModeling::*;
-    @ExternalEncodingProfile {
-        memberNames = ExternalNamingConvention::lowerSnakeCase;
-        enumLiterals = ExternalNamingConvention::lowerSnakeCase;
-    }
     public import BibliotekSoftwareValues::*;
     public import BibliotekStorageJsonFile::*;
     public import BibliotekStorageSql::*;

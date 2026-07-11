@@ -12,9 +12,9 @@ library package BibliotekRtgChangeValidation {
     doc /* Deterministic, read-only validation of proposed RTG changes and supplied RTG state. */
 
     enum def RtgValidationTrack {
-        enum schemaObject { @ExternalName { name = "schema_object"; } }
-        enum constraintNetwork { @ExternalName { name = "constraint_network"; } }
-        enum migrationCutover { @ExternalName { name = "migration_cutover"; } }
+        enum <'schema_object'> schemaObject;
+        enum <'constraint_network'> constraintNetwork;
+        enum <'migration_cutover'> migrationCutover;
     }
     enum def RtgValidationSeverity { enum blocking; enum warning; enum informational; }
     enum def RtgValidationTrackSelection { enum all; enum selected; }
@@ -86,39 +86,32 @@ library package BibliotekRtgChangeValidation {
         @FailureContract { errorIds = ("RtgValidationInputInvalid"); obligation = "Only structurally unusable inputs raise; the supplied component state and query engine remain unchanged."; }
     }
 
-    part def RtgChangeValidator {
+    part def <'component.rtg.change_validation'> RtgChangeValidator {
         doc /* Validate proposed RTG changes through independently selected tracks without owning or mutating RTG state. */
-        @SpecIdentity { id = "component.rtg.change_validation"; lifecycleStatus = SpecLifecycle::accepted; owner = "humans"; }
-        @DependencyPolicy { allowedComponentIds = ("component.rtg.graph", "component.rtg.schema", "component.rtg.constraints", "component.rtg.migration", "component.rtg.query"); forbiddenComponentIds = ("component.rtg.controller"); }
+        @SpecificationStatus { lifecycleStatus = SpecLifecycle::accepted; owner = "humans"; }
 
-        ref action requiredGraphSnapshot[0..*] : ExportGraphSnapshot { @RequiredCapability { providerLowerBound = 1; providerUpperBound = 1; } }
-        ref action requiredSchemaSnapshot[0..*] : ExportSchemaSnapshot { @RequiredCapability { providerLowerBound = 1; providerUpperBound = 1; } }
-        ref action requiredConstraintSnapshot[0..*] : ExportConstraintSnapshot { @RequiredCapability { providerLowerBound = 1; providerUpperBound = 1; } }
-        ref action requiredMigrationSnapshot[0..*] : ExportMigrationSnapshot { @RequiredCapability { providerLowerBound = 1; providerUpperBound = 1; } }
-        ref action requiredQueryExecution[0..*] : ExecuteRtgQuery { @RequiredCapability { providerLowerBound = 1; providerUpperBound = 1; } }
-
-        perform action validateBatch[0..*] : ValidateRtgChangeBatch { @StateAccess { kind = StateAccessKind::none; effect = "read supplied views, project selected sections, and return findings without mutation"; } }
-        perform action validateGraphState[0..*] : ValidateRtgGraphState { @StateAccess { kind = StateAccessKind::none; effect = "validate supplied or migration-selected state without mutation"; } }
+        perform action validateBatch[0..*] : ValidateRtgChangeBatch { doc /* read supplied views, project selected sections, and return findings without mutation. */ }
+        perform action validateGraphState[0..*] : ValidateRtgGraphState { doc /* validate supplied or migration-selected state without mutation. */ }
     }
 
-    requirement referenceSemantics { subject validator : RtgChangeValidator; doc /* Each change reference has exactly one existing/caller identity or one batch-local identity. Local references resolve consistently across the selected projection; unresolved, duplicate, or kind-incompatible references are reported without mutation. */ @StableId { id = "contract.rtg.change_validation.references"; } }
-    requirement projectionSemantics { subject operation : ValidateRtgChangeBatch; doc /* Resolve batch-local references and construct separate proposed graph, schema, constraint, and migration views from public component semantics. Projection never mutates supplied sources. */ @StableId { id = "contract.rtg.change_validation.projection"; } }
-    requirement trackIsolation { subject operation : ValidateRtgChangeBatch; doc /* Select tracks before track-specific reference validation and projection. Each track reads and projects only its required sections and dependencies; malformed unselected sections cannot affect the report. */ @StableId { id = "contract.rtg.change_validation.track_isolation"; } }
-    requirement validationRuleCatalog { subject validator : RtgChangeValidator; doc /* Stable blocking codes are schema_object.unknown_type, undeclared_property, property_kind_mismatch, missing_required_property, missing_required_associated_data, link_endpoint_type_invalid, reference_missing; constraint_network.pattern_unsatisfied, cardinality_out_of_bounds, constraint_target_unknown, constraint_payload_unevaluable; and migration_cutover.reference_missing, wrong_live_state, invalid_status_transition, post_state_invalid. migration_cutover.replacement_type_mismatch is warning. Each code retains this track and severity. */ @StableId { id = "contract.rtg.change_validation.rule_catalog"; } }
-    requirement validationRules { subject validator : RtgChangeValidator; doc /* Schema/object checks public schema compatibility and references; constraint/network evaluates compatible query patterns, cardinalities, targets, and payloads through query; migration/cutover checks membership, replacements, lifecycle, live state, and projected post-state. */ @StableId { id = "contract.rtg.change_validation.rules"; } }
-    requirement reportSemantics { subject validator : RtgChangeValidator; doc /* Findings have stable track/code/reference identity, deterministic order, and deduplication. accepted is false when any produced finding is blocking. A positive limit returns blocking before warning/informational findings and evidence reports total, returned, and truncation without changing acceptance. */ @StableId { id = "contract.rtg.change_validation.report"; } }
+    requirement <'contract.rtg.change_validation.references'> referenceSemantics { subject validator : RtgChangeValidator; doc /* Each change reference has exactly one existing/caller identity or one batch-local identity. Local references resolve consistently across the selected projection; unresolved, duplicate, or kind-incompatible references are reported without mutation. */ }
+    requirement <'contract.rtg.change_validation.projection'> projectionSemantics { subject operation : ValidateRtgChangeBatch; doc /* Resolve batch-local references and construct separate proposed graph, schema, constraint, and migration views from public component semantics. Projection never mutates supplied sources. */ }
+    requirement <'contract.rtg.change_validation.track_isolation'> trackIsolation { subject operation : ValidateRtgChangeBatch; doc /* Select tracks before track-specific reference validation and projection. Each track reads and projects only its required sections and dependencies; malformed unselected sections cannot affect the report. */ }
+    requirement <'contract.rtg.change_validation.rule_catalog'> validationRuleCatalog { subject validator : RtgChangeValidator; doc /* Stable blocking codes are schema_object.unknown_type, undeclared_property, property_kind_mismatch, missing_required_property, missing_required_associated_data, link_endpoint_type_invalid, reference_missing; constraint_network.pattern_unsatisfied, cardinality_out_of_bounds, constraint_target_unknown, constraint_payload_unevaluable; and migration_cutover.reference_missing, wrong_live_state, invalid_status_transition, post_state_invalid. migration_cutover.replacement_type_mismatch is warning. Each code retains this track and severity. */ }
+    requirement <'contract.rtg.change_validation.rules'> validationRules { subject validator : RtgChangeValidator; doc /* Schema/object checks public schema compatibility and references; constraint/network evaluates compatible query patterns, cardinalities, targets, and payloads through query; migration/cutover checks membership, replacements, lifecycle, live state, and projected post-state. */ }
+    requirement <'contract.rtg.change_validation.report'> reportSemantics { subject validator : RtgChangeValidator; doc /* Findings have stable track/code/reference identity, deterministic order, and deduplication. accepted is false when any produced finding is blocking. A positive limit returns blocking before warning/informational findings and evidence reports total, returned, and truncation without changing acceptance. */ }
 
-    requirement noMutation { subject validator : RtgChangeValidator; doc /* Validation does not mutate any source component. */ @StableId { id = "invariant.rtg.change_validation.no_mutation"; } }
-    requirement deterministicReports { subject validator : RtgChangeValidator; doc /* Identical coherent views and requests produce identical ordered reports. */ @StableId { id = "invariant.rtg.change_validation.deterministic_reports"; } }
-    requirement findingsComprehensive { subject validator : RtgChangeValidator; doc /* Acceptance considers every finding produced by executed tracks even when the returned list is limited. */ @StableId { id = "invariant.rtg.change_validation.findings_are_comprehensive"; } }
-    requirement sourceOfTruthExternal { subject validator : RtgChangeValidator; doc /* Source state remains owned by graph, schema, constraints, and migration components. */ @StableId { id = "invariant.rtg.change_validation.source_of_truth_external"; } }
-    requirement blockingFindingsControlAcceptance { subject validator : RtgChangeValidator; doc /* A blocking finding makes the report unaccepted. */ @StableId { id = "invariant.rtg.change_validation.blocking_findings_control_acceptance"; } }
-    requirement findingsAgentActionable { subject validator : RtgChangeValidator; doc /* Findings identify location, reason, and concise repair guidance where known. */ @StableId { id = "invariant.rtg.change_validation.findings_are_agent_actionable"; } }
-    requirement tracksExtractable { subject validator : RtgChangeValidator; doc /* Tracks remain isolated by source, dependencies, options, and findings. */ @StableId { id = "invariant.rtg.change_validation.tracks_are_extractable"; } }
-    requirement batchSectionsExplicit { subject validator : RtgChangeValidator; doc /* Proposed resource categories remain explicit in the change batch. */ @StableId { id = "invariant.rtg.change_validation.batch_sections_explicit"; } }
-    requirement constraintSchemaCompatibility { subject validator : RtgChangeValidator; doc /* Constraint targets and query paths are compatible with projected schema. */ @StableId { id = "invariant.rtg.change_validation.constraint_schema_compatibility"; } }
-    requirement patternEvaluationDelegated { subject validator : RtgChangeValidator; doc /* Query-pattern evaluation uses the public query contract. */ @StableId { id = "invariant.rtg.change_validation.pattern_eval_delegated_to_query"; } }
-    requirement cascadeEffectsFromPreview { subject validator : RtgChangeValidator; doc /* Delete and dissociation projections use graph preview behavior. */ @StableId { id = "invariant.rtg.change_validation.cascade_effects_from_graph_preview"; } }
+    requirement <'invariant.rtg.change_validation.no_mutation'> noMutation { subject validator : RtgChangeValidator; doc /* Validation does not mutate any source component. */ }
+    requirement <'invariant.rtg.change_validation.deterministic_reports'> deterministicReports { subject validator : RtgChangeValidator; doc /* Identical coherent views and requests produce identical ordered reports. */ }
+    requirement <'invariant.rtg.change_validation.findings_are_comprehensive'> findingsComprehensive { subject validator : RtgChangeValidator; doc /* Acceptance considers every finding produced by executed tracks even when the returned list is limited. */ }
+    requirement <'invariant.rtg.change_validation.source_of_truth_external'> sourceOfTruthExternal { subject validator : RtgChangeValidator; doc /* Source state remains owned by graph, schema, constraints, and migration components. */ }
+    requirement <'invariant.rtg.change_validation.blocking_findings_control_acceptance'> blockingFindingsControlAcceptance { subject validator : RtgChangeValidator; doc /* A blocking finding makes the report unaccepted. */ }
+    requirement <'invariant.rtg.change_validation.findings_are_agent_actionable'> findingsAgentActionable { subject validator : RtgChangeValidator; doc /* Findings identify location, reason, and concise repair guidance where known. */ }
+    requirement <'invariant.rtg.change_validation.tracks_are_extractable'> tracksExtractable { subject validator : RtgChangeValidator; doc /* Tracks remain isolated by source, dependencies, options, and findings. */ }
+    requirement <'invariant.rtg.change_validation.batch_sections_explicit'> batchSectionsExplicit { subject validator : RtgChangeValidator; doc /* Proposed resource categories remain explicit in the change batch. */ }
+    requirement <'invariant.rtg.change_validation.constraint_schema_compatibility'> constraintSchemaCompatibility { subject validator : RtgChangeValidator; doc /* Constraint targets and query paths are compatible with projected schema. */ }
+    requirement <'invariant.rtg.change_validation.pattern_eval_delegated_to_query'> patternEvaluationDelegated { subject validator : RtgChangeValidator; doc /* Query-pattern evaluation uses the public query contract. */ }
+    requirement <'invariant.rtg.change_validation.cascade_effects_from_graph_preview'> cascadeEffectsFromPreview { subject validator : RtgChangeValidator; doc /* Delete and dissociation projections use graph preview behavior. */ }
 
     verification def RtgChangeValidationBoundaryVerification {
         subject validator : RtgChangeValidator;

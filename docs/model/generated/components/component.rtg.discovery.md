@@ -20,25 +20,25 @@ Generated from textual SysML v2 by `just model-render`; do not edit by hand.
 |---|---|---|---|
 | `CreateEmptyRtgDiscovery` | out `discovery: RtgDiscovery` | None | Return a registry with no curated views. |
 
-## Required capabilities
+## Retained collaborator roles
 
-| Feature | Kind | Required contract | Cardinality |
+| Role | Kind | Referenced type | Multiplicity |
 |---|---|---|---|
-| — | — | — | No required capabilities. |
+| — | — | — | No retained collaborator roles. |
 
 ## Owned state
 
-| State feature | Type | Authority | Lifetime | Persistence |
-|---|---|---|---|---|
-| `curatedViews` | `RtgDiscoveryView` | `canonicalOwner` | `componentCoupled` | `unspecified` |
+| State feature | Type | Ownership | Meaning |
+|---|---|---|---|
+| `curatedViews` | `RtgDiscoveryView` | `owned` | Canonical component-owned curated discovery views; persistence remains unspecified. |
 
 ## Action and state effects
 
-| Action | State / capability | Access | Contract-significant effect |
-|---|---|---|---|
-| `putView` | `curatedViews` | `write` | create or fully replace one valid view atomically |
-| `listViews` | `curatedViews` | `read` | return full views in view-ID order without mutation |
-| `selectAnchorTypes` | `curatedViews` | `read` | return the stable union and descriptions of selected cells without mutation |
+| Action | State / collaborator | Modeled effect |
+|---|---|---|
+| `putView` | `curatedViews` | create or fully replace one valid view atomically. |
+| `listViews` | `curatedViews` | return full views in view-ID order without mutation. |
+| `selectAnchorTypes` | `curatedViews` | return the stable union and descriptions of selected cells without mutation. |
 
 ## Invariants and behavioral obligations
 

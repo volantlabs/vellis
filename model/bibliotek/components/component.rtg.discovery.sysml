@@ -41,17 +41,16 @@ library package BibliotekRtgDiscovery {
         @FailureContract { errorIds = ("RtgDiscoveryViewNotFound", "RtgDiscoverySelectionInvalid"); obligation = "Unknown views, duplicate/unknown coordinates, or empty selections have no state effect."; }
     }
 
-    part def RtgDiscovery {
+    part def <'component.rtg.discovery'> RtgDiscovery {
         doc /* Own curated navigation metadata while remaining independent of schema contents, graph population, query execution, and transports. */
-        @SpecIdentity { id = "component.rtg.discovery"; lifecycleStatus = SpecLifecycle::draft; owner = "humans"; }
-        @DependencyPolicy { allowedComponentIds = (); forbiddenComponentIds = ("component.rtg.graph", "component.rtg.schema", "component.rtg.query", "component.rtg.controller"); }
-        item curatedViews[0..*] : RtgDiscoveryView { @StateAuthority { authority = StateAuthorityKind::canonicalOwner; lifetime = StateLifetime::componentCoupled; persistence = StatePersistence::unspecified; } }
+        @SpecificationStatus { lifecycleStatus = SpecLifecycle::draft; owner = "humans"; }
+        item curatedViews[0..*] : RtgDiscoveryView { doc /* Canonical component-owned curated discovery views; persistence remains unspecified. */ }
         perform action putView[0..*] : PutDiscoveryView;
         perform action listViews[0..*] : ListDiscoveryViews;
         perform action selectAnchorTypes[0..*] : SelectDiscoveryAnchorTypes;
-        dependency putState from putView to curatedViews { @StateAccess { kind = StateAccessKind::write; effect = "create or fully replace one valid view atomically"; } }
-        dependency listState from listViews to curatedViews { @StateAccess { kind = StateAccessKind::read; effect = "return full views in view-ID order without mutation"; } }
-        dependency selectState from selectAnchorTypes to curatedViews { @StateAccess { kind = StateAccessKind::read; effect = "return the stable union and descriptions of selected cells without mutation"; } }
+        dependency putState from putView to curatedViews { doc /* create or fully replace one valid view atomically. */ }
+        dependency listState from listViews to curatedViews { doc /* return full views in view-ID order without mutation. */ }
+        dependency selectState from selectAnchorTypes to curatedViews { doc /* return the stable union and descriptions of selected cells without mutation. */ }
     }
     action def CreateEmptyRtgDiscovery {
         out part discovery : RtgDiscovery;
@@ -59,13 +58,13 @@ library package BibliotekRtgDiscovery {
         @FailureContract { errorIds = (); obligation = "Construction has no external side effect."; }
     }
 
-    requirement viewValidity { subject operation : PutDiscoveryView; doc /* viewId and label keys are non-empty; row and column label values are strings; each cell coordinate is unique and refers to declared labels; all metadata and descriptions are JSON-safe and anchor type keys preserve caller order. */ @StableId { id = "contract.rtg.discovery.view_validity"; } }
-    requirement replacementEffect { subject operation : PutDiscoveryView; doc /* A valid put stores exactly the supplied view under viewId, replacing any prior version atomically and leaving other views unchanged. */ @StableId { id = "contract.rtg.discovery.replacement"; } }
-    requirement selectionEffect { subject operation : SelectDiscoveryAnchorTypes; doc /* Selection requires an existing view and one or more unique existing coordinates. Results preserve coordinate order, de-duplicate anchor keys by first occurrence, and include descriptions keyed without coordinate ambiguity. */ @StableId { id = "contract.rtg.discovery.selection"; } }
-    requirement deterministicReads { subject discovery : RtgDiscovery; doc /* Listing is ordered by viewId; selection is ordered by request coordinates and cell anchor-key order. Reads never mutate curatedViews. */ @StableId { id = "contract.rtg.discovery.deterministic_reads"; } }
-    requirement viewsNotSchema { subject discovery : RtgDiscovery; doc /* Views organize opaque type keys but do not define or validate schema. */ @StableId { id = "invariant.rtg.discovery.views_not_schema"; } }
-    requirement noGraphDependency { subject discovery : RtgDiscovery; doc /* Selection does not require graph objects or population counts. */ @StableId { id = "invariant.rtg.discovery.no_graph_dependency"; } }
-    requirement knowledgeEngineerCurated { subject discovery : RtgDiscovery; doc /* Curated views are explicit knowledge-engineering records, not inferred search results. */ @StableId { id = "invariant.rtg.discovery.knowledge_engineer_curated"; } }
+    requirement <'contract.rtg.discovery.view_validity'> viewValidity { subject operation : PutDiscoveryView; doc /* viewId and label keys are non-empty; row and column label values are strings; each cell coordinate is unique and refers to declared labels; all metadata and descriptions are JSON-safe and anchor type keys preserve caller order. */ }
+    requirement <'contract.rtg.discovery.replacement'> replacementEffect { subject operation : PutDiscoveryView; doc /* A valid put stores exactly the supplied view under viewId, replacing any prior version atomically and leaving other views unchanged. */ }
+    requirement <'contract.rtg.discovery.selection'> selectionEffect { subject operation : SelectDiscoveryAnchorTypes; doc /* Selection requires an existing view and one or more unique existing coordinates. Results preserve coordinate order, de-duplicate anchor keys by first occurrence, and include descriptions keyed without coordinate ambiguity. */ }
+    requirement <'contract.rtg.discovery.deterministic_reads'> deterministicReads { subject discovery : RtgDiscovery; doc /* Listing is ordered by viewId; selection is ordered by request coordinates and cell anchor-key order. Reads never mutate curatedViews. */ }
+    requirement <'invariant.rtg.discovery.views_not_schema'> viewsNotSchema { subject discovery : RtgDiscovery; doc /* Views organize opaque type keys but do not define or validate schema. */ }
+    requirement <'invariant.rtg.discovery.no_graph_dependency'> noGraphDependency { subject discovery : RtgDiscovery; doc /* Selection does not require graph objects or population counts. */ }
+    requirement <'invariant.rtg.discovery.knowledge_engineer_curated'> knowledgeEngineerCurated { subject discovery : RtgDiscovery; doc /* Curated views are explicit knowledge-engineering records, not inferred search results. */ }
 
     verification def RtgDiscoveryBoundaryVerification {
         subject discovery : RtgDiscovery;

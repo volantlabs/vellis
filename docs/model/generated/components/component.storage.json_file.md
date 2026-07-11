@@ -21,26 +21,26 @@ Generated from textual SysML v2 by `just model-render`; do not edit by hand.
 |---|---|---|---|
 | `OpenJsonFileStorage` | in `rootPath: FileSystemRootPath`; out `storage: JsonFileStorage` | `StorageRootInvalid`, `StorageRootUnavailable`, `StoragePermissionDenied` | Create or open a handle bound to exactly one filesystem root. |
 
-## Required capabilities
+## Retained collaborator roles
 
-| Feature | Kind | Required contract | Cardinality |
+| Role | Kind | Referenced type | Multiplicity |
 |---|---|---|---|
-| — | — | — | No required capabilities. |
+| — | — | — | No retained collaborator roles. |
 
 ## Owned state
 
-| State feature | Type | Authority | Lifetime | Persistence |
-|---|---|---|---|---|
-| `storageRoot` | `JsonStorageRoot` | `canonicalOwner` | `independent` | `durable` |
+| State feature | Type | Ownership | Meaning |
+|---|---|---|---|
+| `storageRoot` | `JsonStorageRoot` | `referenced` | Independently durable canonical document state governed through this component. |
 
 ## Action and state effects
 
-| Action | State / capability | Access | Contract-significant effect |
-|---|---|---|---|
-| `write` | `storageRoot` | `write` | replace exactly one normalized JSON document atomically |
-| `read` | `storageRoot` | `read` | return one parsed document without changing state |
-| `delete` | `storageRoot` | `delete` | remove exactly the addressed document |
-| `list` | `storageRoot` | `read` | return recursive normalized metadata without parsed values and without changing state |
+| Action | State / collaborator | Modeled effect |
+|---|---|---|
+| `write` | `storageRoot` | replace exactly one normalized JSON document atomically. |
+| `read` | `storageRoot` | return one parsed document without changing state. |
+| `delete` | `storageRoot` | remove exactly the addressed document. |
+| `list` | `storageRoot` | return recursive normalized metadata without parsed values and without changing state. |
 
 ## Invariants and behavioral obligations
 

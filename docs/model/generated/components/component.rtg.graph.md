@@ -36,44 +36,44 @@ Generated from textual SysML v2 by `just model-render`; do not edit by hand.
 | `CreateEmptyRtgGraph` | out `graph: RtgGraph` | None | Return an empty graph with empty canonical state and derived indexes. |
 | `ImportRtgGraphSnapshot` | in `snapshot: RtgGraphSnapshot`; out `graph: RtgGraph` | `RtgGraphSnapshotInvalid`, `RtgGraphUuidInvalid`, `RtgGraphUuidConflict`, `RtgGraphReferenceInvalid`, `RtgGraphTypeInvalid`, `RtgGraphTypeKindConflict`, `RtgGraphJsonValueInvalid`, `RtgGraphSystemValueInvalid` | Validate the whole snapshot, normalize live metadata, rebuild all derived indexes, and expose no partial graph. |
 
-## Required capabilities
+## Retained collaborator roles
 
-| Feature | Kind | Required contract | Cardinality |
+| Role | Kind | Referenced type | Multiplicity |
 |---|---|---|---|
-| — | — | — | No required capabilities. |
+| — | — | — | No retained collaborator roles. |
 
 ## Owned state
 
-| State feature | Type | Authority | Lifetime | Persistence |
-|---|---|---|---|---|
-| `anchors` | `RtgAnchor` | `canonicalOwner` | `componentCoupled` | `ephemeral` |
-| `dataObjects` | `RtgDataObject` | `canonicalOwner` | `componentCoupled` | `ephemeral` |
-| `links` | `RtgLink` | `canonicalOwner` | `componentCoupled` | `ephemeral` |
-| `anchorDataAssociations` | `JsonObject` | `canonicalOwner` | `componentCoupled` | `ephemeral` |
-| `derivedIndexes` | `JsonObject` | `derived` | `componentCoupled` | `ephemeral` |
+| State feature | Type | Ownership | Meaning |
+|---|---|---|---|
+| `anchors` | `RtgAnchor` | `owned` | Canonical component-owned anchor occurrences. |
+| `dataObjects` | `RtgDataObject` | `owned` | Canonical component-owned data-object occurrences. |
+| `links` | `RtgLink` | `owned` | Canonical component-owned link occurrences. |
+| `anchorDataAssociations` | `JsonObject` | `owned` | Canonical identity-free direct associations. |
+| `derivedIndexes` | `JsonObject` | `derived` | Ephemeral navigation indexes derived from canonical graph state. |
 
 ## Action and state effects
 
-| Action | State / capability | Access | Contract-significant effect |
-|---|---|---|---|
-| `putAnchor` | `anchors` | `write` | atomically create/replace anchor and maintain indexes |
-| `putDataObject` | `dataObjects` | `write` | atomically create/replace data, associations, and indexes |
-| `putLink` | `links` | `write` | atomically create/replace link and indexes |
-| `associateData` | `anchorDataAssociations` | `write` | idempotently add symmetric direct association |
-| `dissociateData` | `anchorDataAssociations` | `delete` | remove association and complete cascade atomically |
-| `deleteAnchor` | `anchors` | `delete` | remove anchor and complete cascade atomically |
-| `deleteDataObject` | `dataObjects` | `delete` | remove data and complete cascade atomically |
-| `deleteLink` | `links` | `delete` | remove exactly one link and index entries |
-| `exportSnapshot` | — | `read` | read complete canonical state |
-| `getObject` | — | `read` | direct unfiltered read |
-| `listByType` | — | `read` | read derived type index in stable order |
-| `listAnchorData` | — | `read` | read direct anchor-data index |
-| `listDataAnchors` | — | `read` | read inverse direct association index |
-| `listIncidentLinks` | — | `read` | read derived incident-link index |
-| `countByType` | — | `read` | derive counts from canonical records |
-| `previewDeleteAnchor` | — | `read` | compute exact anchor cascade without mutation |
-| `previewDeleteDataObject` | — | `read` | compute exact data cascade without mutation |
-| `previewDissociateData` | — | `read` | compute exact dissociation cascade without mutation |
+| Action | State / collaborator | Modeled effect |
+|---|---|---|
+| `putAnchor` | `anchors` | atomically create/replace anchor and maintain indexes. |
+| `putDataObject` | `dataObjects` | atomically create/replace data, associations, and indexes. |
+| `putLink` | `links` | atomically create/replace link and indexes. |
+| `associateData` | `anchorDataAssociations` | idempotently add symmetric direct association. |
+| `dissociateData` | `anchorDataAssociations` | remove association and complete cascade atomically. |
+| `deleteAnchor` | `anchors` | remove anchor and complete cascade atomically. |
+| `deleteDataObject` | `dataObjects` | remove data and complete cascade atomically. |
+| `deleteLink` | `links` | remove exactly one link and index entries. |
+| `exportSnapshot` | — | read complete canonical state. |
+| `getObject` | — | direct unfiltered read. |
+| `listByType` | — | read derived type index in stable order. |
+| `listAnchorData` | — | read direct anchor-data index. |
+| `listDataAnchors` | — | read inverse direct association index. |
+| `listIncidentLinks` | — | read derived incident-link index. |
+| `countByType` | — | derive counts from canonical records. |
+| `previewDeleteAnchor` | — | compute exact anchor cascade without mutation. |
+| `previewDeleteDataObject` | — | compute exact data cascade without mutation. |
+| `previewDissociateData` | — | compute exact dissociation cascade without mutation. |
 
 ## Invariants and behavioral obligations
 

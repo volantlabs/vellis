@@ -14,10 +14,11 @@ Use SysML packages to make ownership and dependency direction explicit.
 
 Keep these concerns independently packageable:
 
-1. A modeling foundation containing domain-independent conventions and typed metadata.
+1. A modeling foundation containing domain-independent conventions and minimal governance or
+   traceability metadata.
 2. One or more reusable library packages containing component contracts and genuinely shared
    public semantics.
-3. Application packages containing component roles, configuration, capability satisfaction,
+3. Application packages containing component roles, configuration, role bindings,
    application actions, use cases, and application-owned invariants.
 4. Realization packages mapping the logical model to languages, transports, runtimes, deployments,
    and concrete resources.
@@ -26,8 +27,8 @@ Dependencies point downward. A reusable library may import its modeling foundati
 may import libraries. A library must not import an application or an application-specific
 realization.
 
-Keep vocabulary at the narrowest layer that owns its meaning. Generic modeling metadata belongs in
-the foundation; library-domain types belong in the library; a transport binding or tool registration
+Keep vocabulary at the narrowest layer that owns its meaning. Generic governance metadata belongs
+in the foundation; library-domain types belong in the library; a transport binding or tool registration
 profile belongs in its runtime/adapter realization. Do not promote a one-application annotation into
 the foundation merely because tooling consumes it.
 
@@ -59,6 +60,8 @@ the component contract solely because the invocation mechanism changed.
 ## Compatibility and evolution
 
 - Give public model elements stable identities independent of interchange UUIDs.
+- Prefer native SysML short names for those stable identities rather than duplicating them in
+  metadata fields.
 - Treat removal, renaming, multiplicity changes, strengthened preconditions, weakened guarantees,
   and incompatible value changes as library contract changes.
 - Keep deprecated public definitions available while supported consumers remain.

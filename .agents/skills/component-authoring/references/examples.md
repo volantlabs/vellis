@@ -7,12 +7,13 @@ invariants, and write/delete effects. Do not model temporary files or filesystem
 
 ## Declarative query
 
-Model the stable read capability, request/result values, validation obligations, predicate
-calculations, matching and ordering rules, diagnostics, and explicit no mutation. Do not model the
-iteration or indexing algorithm.
+Model the stable read-view action input, request/result values, validation obligations, matching and
+ordering rules, diagnostics, and explicit no mutation. Use a calculation only when its result can be
+defined completely; otherwise use action-scoped requirements. Do not model the iteration or
+indexing algorithm.
 
 ## Controller
 
-Model lower-level component roles, required actions, public intent lanes, cross-component
+Model retained lower-level component roles, application bindings, public intent lanes, cross-component
 invariants, observable validate/apply/restore ordering, and ledger/replay outcomes. Do not model
 private normalized plans or helper decomposition unless exposed as contracts.

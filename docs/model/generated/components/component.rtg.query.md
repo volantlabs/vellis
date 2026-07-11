@@ -18,23 +18,23 @@ Generated from textual SysML v2 by `just model-render`; do not edit by hand.
 |---|---|---|---|
 | — | — | — | No package-level construction action. |
 
-## Required capabilities
+## Retained collaborator roles
 
-| Feature | Kind | Required contract | Cardinality |
+| Role | Kind | Referenced type | Multiplicity |
 |---|---|---|---|
-| `requiredGraphReadView` | `part` | `RtgGraphReadView` | `1..1` |
+| — | — | — | No retained collaborator roles. |
 
 ## Owned state
 
-| State feature | Type | Authority | Lifetime | Persistence |
-|---|---|---|---|---|
-| — | — | — | — | This component owns no abstract state. |
+| State feature | Type | Ownership | Meaning |
+|---|---|---|---|
+| — | — | — | This component owns no abstract state. |
 
 ## Action and state effects
 
-| Action | State / capability | Access | Contract-significant effect |
-|---|---|---|---|
-| `execute` | — | `none` | read only; the supplied graph view is unchanged |
+| Action | State / collaborator | Modeled effect |
+|---|---|---|
+| `execute` | — | read only; the supplied graph view is unchanged. |
 
 ## Invariants and behavioral obligations
 

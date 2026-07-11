@@ -1,6 +1,6 @@
 ---
 name: component-authoring
-description: Design, create, review, revise, extract, split, merge, or validate reusable software components and application compositions as textual SysML v2 black-box models. Use when Codex needs to define public actions and values, required capabilities, abstract owned state, action effects, invariants, lifecycle, verification objectives, component boundaries, or model-to-implementation drift.
+description: Design, create, review, revise, split, merge, or validate reusable software components and application compositions as textual SysML v2 black-box models. Use when Codex needs to define public actions and values, collaborator roles, abstract owned state, action effects, invariants, lifecycle, verification objectives, component boundaries, or system composition.
 ---
 
 # Component Authoring
@@ -46,29 +46,33 @@ implementation fidelity the default completeness criterion.
 
 ## Workflow
 
-1. Locate or create the owning model package, confirm its library/application/realization layer,
-   and inspect any current generated view.
-2. When revising an existing accepted component, preserve its observable public boundary unless a
-   human explicitly approves a contract change.
-3. Inspect current implementations and tests as realization evidence, not automatic contract truth.
-4. Establish the smallest coherent boundary around one responsibility and its invariants.
-5. Define boundary-crossing values or identity-bearing items without changing their public shape.
-   Separate request and stored forms when identity is optional only on creation.
-6. Define every public and construction action with exact typed inputs, outputs, defaults,
+1. Locate or create the owning model package and confirm its library, application, view, or
+   realization layer.
+2. Establish the smallest coherent boundary around one responsibility and its invariants.
+3. Give public elements stable SysML short names where qualified identity or an exact external
+   spelling matters.
+4. Define boundary-crossing values and identity-bearing items. Separate request and stored forms
+   when identity is optional only on creation.
+5. Define every public and construction action with exact typed inputs, outputs, defaults,
    multiplicity, principal failures, and observable result semantics.
-7. Define required capabilities independently of current wiring and declare provider cardinality.
-8. Model abstract canonical, derived, and externally referenced state.
-9. Relate every action to the state or capability it reads, creates, writes, or deletes; state
+6. Model invocation-scoped collaborators as typed action inputs and retained collaborators as
+   multiplicited referential part roles.
+7. Model abstract canonical, derived, and externally referenced state with native feature kinds.
+8. Relate every action to the state or collaborator it reads, creates, writes, or deletes; state
    explicit no-effect behavior for reads, previews, validation, and rejected mutations.
-10. Add concise preconditions, effects, failure effects, ordering, and invariant obligations.
-11. Model lifecycle only when it changes permitted operations or observable results. Use an
+9. Add concise preconditions, effects, failure effects, ordering, and invariant obligations.
+10. Model lifecycle only when it changes permitted operations or observable results. Use an
     enum-valued status and transition obligations for request-driven record lifecycles; use an
     exhibited state only when activation/event semantics are intentionally modeled.
-12. Add verification cases that explicitly cover every accepted obligation, directly or through a
+11. Add verification cases that cover every accepted obligation, directly or through a
    named coherent verification group.
-13. Run the repository's model checks and regenerate human views, then review the complete boundary
+12. For applications, bind retained collaborator roles to actual part occurrences and model
+    actor-visible use cases and application-owned invariants.
+13. Define or update viewpoints and views for recurring structure, behavior, composition, and
+    verification concerns.
+14. Run the repository's model checks and regenerate projections, then review the complete boundary
     rather than only filenames or operation names.
-14. Ask whether a conforming implementation in a different suitable language could be built from
+15. Ask whether a conforming implementation in a different suitable language could be built from
     the model and pass black-box conformance at this boundary. Repair the model if correct callers,
     state effects, results, failures, or composition behavior would still require guessing.
 
@@ -76,8 +80,8 @@ implementation fidelity the default completeness criterion.
 
 Use three levels:
 
-1. Structural contract for every component: types, actions, failures, capabilities, cardinality, roles.
-2. State semantics for every stateful component: state authority, access, effects, failure atomicity,
+1. Structural contract for every component: types, actions, failures, collaborators, multiplicities, roles.
+2. State semantics for every stateful component: state ownership, access, effects, failure atomicity,
    invariant preservation.
 3. Detailed behavior only where consumers must predict it: declarative matching, transition tables,
    observable ordering, or rollback orchestration.
@@ -89,20 +93,13 @@ Compression is allowed only after those facts are preserved. Fewer lines are not
 better model. A compact requirement may replace several prose bullets only when it has the same
 observable meaning and does not permit additional incompatible implementations.
 
-## Contract Preservation
+## Contract Evolution
 
-When revising or re-expressing an accepted component, every contract-significant fact needs one
-disposition:
-
-- represented structurally in SysML;
-- represented by a typed value, enum, state, calculation, constraint, or requirement;
-- intentionally excluded as rationale, private implementation, or non-normative agent guidance;
-- recorded as an explicit contract change requiring human approval.
-
-Do not silently rename fields, collapse error families, change optionality/defaults, replace a
-typed contract with generic JSON, change state ownership, add ordering promises, or substitute a
-different dependency shape. Construction actions such as `open`, `empty`, and `import_snapshot`
-are public contracts and must appear in both the model and generated views.
+Treat an accepted model as the design authority. Change public names, types, multiplicities,
+defaults, failures, state ownership, ordering promises, invariants, or collaborator topology only
+as an intentional reviewed contract change. Construction actions are public contracts when callers
+depend on them. Implementation evidence may reveal a design question; it does not silently redefine
+the model.
 
 ## Hard Stop Rule
 
@@ -110,19 +107,20 @@ Stop adding detail when contract-significant behavior is sufficient for composit
 design reasoning, and black-box verification. Do not pursue direct code generation or eliminate
 intentional implementation freedom.
 
-This stop rule applies only after contract preservation is established. It cannot justify omitting
-accepted inputs, outputs, fields, defaults, failures, state categories, invariants, or observable
-behavior.
+The stop rule cannot justify omitting inputs, outputs, fields, defaults, failures, state categories,
+invariants, or observable behavior that the design intentionally promises.
 
 ## Governance
 
 - Humans approve accepted boundaries, public contracts, state ownership, dependencies, and invariants.
-- Fidelity repairs may translate already-approved meaning without changing it.
-- If model, implementation, and tests disagree, record a compact drift entry; do not silently choose code.
+- If model, implementation, and tests disagree, surface the design decision; do not silently choose code.
 - Keep runtime and language choices outside the logical component unless they are observable contract terms.
 - Put genuinely shared public semantics in an owning library package; do not use an application,
   realization, or global grab bag as the accidental owner of reusable types.
-- Use bindings only for value equality. Use dependencies for capability satisfaction and state access.
+- Use binding only for actual equality or identity, including binding a retained referential role to
+  the application part occurrence it denotes. Never bind action occurrences as a call relationship.
+- Use action inputs for invocation-scoped collaborators and dependencies to make contract-significant
+  action-to-state or action-to-collaborator relationships visible.
 - Let native constructs carry their native meaning: performed actions are provided capabilities,
   interfaces connect ports, exhibited states are activated behavior, and allocations map logical
   elements to realizations. Add metadata only for semantics the language construct does not express.
@@ -133,7 +131,7 @@ For authoring or revision, produce:
 
 1. Updated SysML source.
 2. Updated generated human view.
-3. A concise list of contract decisions or implementation drift, if any.
+3. A concise list of contract decisions or conformance questions, if any.
 4. Verification results.
 
 For review, report material boundary, contract, state, invariant, composition, and verification gaps.

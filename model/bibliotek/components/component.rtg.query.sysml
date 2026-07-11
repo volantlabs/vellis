@@ -8,18 +8,18 @@ library package BibliotekRtgQuery {
 
     enum def RtgQueryOperator {
         enum exists; enum equals;
-        enum notEquals { @ExternalName { name = "not_equals"; } }
-        enum lessThan { @ExternalName { name = "lt"; } }
-        enum lessThanOrEqual { @ExternalName { name = "lte"; } }
-        enum greaterThan { @ExternalName { name = "gt"; } }
-        enum greaterThanOrEqual { @ExternalName { name = "gte"; } }
+        enum <'not_equals'> notEquals;
+        enum <'lt'> lessThan;
+        enum <'lte'> lessThanOrEqual;
+        enum <'gt'> greaterThan;
+        enum <'gte'> greaterThanOrEqual;
         enum contains;
-        enum inSet { @ExternalName { name = "in"; } }
+        enum <'in'> inSet;
         enum substring; enum regex;
     }
-    enum def RtgQueryLiveFilter { enum all; enum live; enum nonLive { @ExternalName { name = "non_live"; } } }
+    enum def RtgQueryLiveFilter { enum all; enum live; enum <'non_live'> nonLive; }
     enum def RtgQueryOrderDirection { enum ascending; enum descending; }
-    enum def RtgQueryUnknownTermGuidance { enum none; enum suggestDiscovery { @ExternalName { name = "suggest_discovery"; } } }
+    enum def RtgQueryUnknownTermGuidance { enum none; enum <'suggest_discovery'> suggestDiscovery; }
     enum def RtgQueryDiagnosticSeverity { enum warning; enum info; }
 
     attribute def RtgQueryAnchorBucket {
@@ -107,27 +107,6 @@ library package BibliotekRtgQuery {
     attribute def RtgQuerySpecInvalid { attribute message : String; attribute diagnostic : JsonObject; }
     attribute def RtgQueryUnsupported { attribute message : String; attribute diagnostic : JsonObject; }
 
-    calc def JsonKindsEqual {
-        in left : JsonValue;
-        in right : JsonValue;
-        out equal : Boolean;
-        doc /* Equal only when JSON kinds agree and values agree; Boolean and number never compare equal, while JSON numbers compare numerically. */
-    }
-
-    calc def QueryOrderingKey {
-        in row : RtgQueryReturnRow;
-        in order : RtgQueryOrderBy;
-        out key : JsonValue;
-        doc /* Resolve the returned property selected by order; missing and incompatible values follow one deterministic total ordering. */
-    }
-
-    calc def JsonArrayContains {
-        in array : JsonValue;
-        in expected : JsonValue;
-        out contains : Boolean;
-        doc /* True only when array is a JSON array containing an element equal under JsonKindsEqual. */
-    }
-
     action def ExecuteRtgQuery {
         in graph : RtgGraphReadView;
         in querySpec : RtgQuerySpec;
@@ -140,94 +119,71 @@ library package BibliotekRtgQuery {
         }
     }
 
-    part def RtgQueryEngine {
+    part def <'component.rtg.query'> RtgQueryEngine {
         doc /* Evaluate declarative RTG queries against one coherent graph read view without mutation. */
-        @SpecIdentity {
-            id = "component.rtg.query";
-            lifecycleStatus = SpecLifecycle::accepted;
-            owner = "humans";
-        }
-        @DependencyPolicy {
-            allowedComponentIds = ("component.rtg.graph");
-            forbiddenComponentIds = ("component.rtg.schema", "component.rtg.controller");
-        }
+        @SpecificationStatus { lifecycleStatus = SpecLifecycle::accepted; owner = "humans"; }
 
-        ref part requiredGraphReadView : RtgGraphReadView {
-            @RequiredCapability { providerLowerBound = 1; providerUpperBound = 1; }
-        }
         perform action execute[0..*] : ExecuteRtgQuery {
-            @StateAccess { kind = StateAccessKind::none; effect = "read only; the supplied graph view is unchanged"; }
+            doc /* read only; the supplied graph view is unchanged. */
         }
     }
 
-    requirement validQuerySpec {
+    requirement <'contract.rtg.query.valid_spec'> validQuerySpec {
         subject operation : ExecuteRtgQuery;
         doc /* Names are unique, references resolve, predicate operands fit their operators, and order_by refers only to returned properties. */
-        @StableId { id = "contract.rtg.query.valid_spec"; }
     }
-    requirement defaultSemantics {
+    requirement <'contract.rtg.query.defaults'> defaultSemantics {
         subject operation : ExecuteRtgQuery;
         doc /* Data requirements default required=true; predicate case sensitivity defaults false; diagnostic inclusion defaults true with suggest-discovery guidance; absent query options mean all live states, empty overlay, and no order_by; absent order direction means ascending. */
-        @StableId { id = "contract.rtg.query.defaults"; }
     }
-    requirement coherentReadView {
+    requirement <'contract.rtg.query.coherent_read_view'> coherentReadView {
         subject operation : ExecuteRtgQuery;
         doc /* All graph reads in one execution observe one coherent logical graph view supplied by the composition. */
-        @StableId { id = "contract.rtg.query.coherent_read_view"; }
     }
-    requirement matchingSemantics {
+    requirement <'contract.rtg.query.matching'> matchingSemantics {
         subject operation : ExecuteRtgQuery;
         doc /* Anchor buckets select matching anchor types; link requirements match directed typed links between bound buckets; data requirements match directly associated typed data objects. Predicates on one data requirement must hold on the same object. */
-        @StableId { id = "contract.rtg.query.matching"; }
     }
-    requirement bindingExpansion {
+    requirement <'contract.rtg.query.binding_expansion'> bindingExpansion {
         subject operation : ExecuteRtgQuery;
         doc /* Independent required matches expand to their Cartesian product. A missing required match removes the candidate row; a missing optional match preserves it without that binding. */
-        @StableId { id = "contract.rtg.query.binding_expansion"; }
     }
-    requirement predicateSemantics {
+    requirement <'contract.rtg.query.predicates'> predicateSemantics {
         subject operation : ExecuteRtgQuery;
         doc /* exists treats missing paths as false. Equality/not-equality and contains/in membership use JSON-kind-aware equality. Relational operators match only two numbers or two strings. Substring defaults case-insensitive. Regex searches strings with only case_insensitive and multiline flags in a deterministic RE2-style subset and rejects backreferences, lookaround, and other unsupported constructs. Unresolved paths are non-matches, not errors. */
-        @StableId { id = "contract.rtg.query.predicates"; }
     }
-    requirement lifecycleFiltering {
+    requirement <'contract.rtg.query.lifecycle_filtering'> lifecycleFiltering {
         subject operation : ExecuteRtgQuery;
         doc /* The default includes live and non-live objects. Explicit filtering may consult a caller overlay, which changes selection only and never canonical graph state. */
-        @StableId { id = "contract.rtg.query.lifecycle_filtering"; }
     }
-    requirement deterministicResult {
+    requirement <'contract.rtg.query.deterministic_result'> deterministicResult {
         subject operation : ExecuteRtgQuery;
         doc /* Base order compares anchor UUIDs in bucket declaration order, then link UUIDs in requirement order, then data UUIDs in requirement order; absent optional data sorts before present UUIDs. order_by applies returned-property keys in caller order and keeps base order as stable tie-breaker; missing/Boolean/object/array keys sort last. rowIndex is zero-based final order. */
-        @StableId { id = "contract.rtg.query.deterministic_result"; }
     }
-    requirement returnShaping {
+    requirement <'contract.rtg.query.return_shaping'> returnShaping {
         subject operation : ExecuteRtgQuery;
         doc /* Return selection never changes matching. Bindings contain names to matched UUIDs; independent matches form a Cartesian product. Returns align one-for-one by rowIndex, include only selected records, and reconstruct selected property paths as nested JSON without delimiter ambiguity. Missing optional bindings or paths are omitted and may produce non-fatal diagnostics. */
-        @StableId { id = "contract.rtg.query.return_shaping"; }
     }
-    requirement diagnosticSemantics {
+    requirement <'contract.rtg.query.diagnostics'> diagnosticSemantics {
         subject operation : ExecuteRtgQuery;
         doc /* Valid queries may return warning/info diagnostics without changing results. Malformed structure, unsupported operators, flags, or ordering references raise declared errors. Stable diagnostic codes distinguish unbound return requirements and unresolved returned property paths and carry generic repair guidance only. */
-        @StableId { id = "contract.rtg.query.diagnostics"; }
     }
-    requirement queryNoMutation {
+    requirement <'invariant.rtg.query.no_mutation'> queryNoMutation {
         subject query : RtgQueryEngine;
         doc /* Query has no owned state and never mutates the supplied graph read view. */
-        @StableId { id = "invariant.rtg.query.no_mutation"; }
     }
-    requirement diagnosticsAreNonMutating {
+    requirement <'invariant.rtg.query.diagnostics_non_mutating'> diagnosticsAreNonMutating {
         subject query : RtgQueryEngine;
         doc /* Diagnostics explain validation or resolution outcomes without changing query matching or graph state. */
-        @StableId { id = "invariant.rtg.query.diagnostics_non_mutating"; }
     }
-    requirement deterministicResults { subject query : RtgQueryEngine; doc /* Identical coherent graph views, specifications, and options produce identical ordered bindings, returns, and diagnostics. */ @StableId { id = "invariant.rtg.query.deterministic_results"; } }
-    requirement deterministicStringMatching { subject query : RtgQueryEngine; doc /* Substring and regex behavior uses the declared case and dialect rules rather than implementation-language-specific extensions. */ @StableId { id = "invariant.rtg.query.deterministic_string_matching"; } }
-    requirement publicGraphReadsOnly { subject query : RtgQueryEngine; doc /* Query consumes only the public coherent graph read-view capability. */ @StableId { id = "invariant.rtg.query.public_graph_reads_only"; } }
-    requirement operatesOverReadView { subject query : RtgQueryEngine; doc /* Live, projected, or alternative providers are substitutable when they satisfy RtgGraphReadView coherently. */ @StableId { id = "invariant.rtg.query.operates_over_read_view"; } }
-    requirement noHiddenLifecycleFilter { subject query : RtgQueryEngine; doc /* Lifecycle filtering occurs only through explicit options and never through hidden live-only defaults. */ @StableId { id = "invariant.rtg.query.no_hidden_lifecycle_filter"; } }
-    requirement overlayFiltersOnly { subject query : RtgQueryEngine; doc /* A live-status overlay affects selection only and never mutates or rewrites returned graph records. */ @StableId { id = "invariant.rtg.query.overlay_filters_only"; } }
-    requirement defaultIncludesNonLive { subject query : RtgQueryEngine; doc /* Absent options include live and non-live objects. */ @StableId { id = "invariant.rtg.query.default_includes_non_live"; } }
-    requirement discoveryIndependent { subject query : RtgQueryEngine; doc /* Query returns its own generic diagnostics and never invokes discovery or embeds application-specific schema answers. */ @StableId { id = "invariant.rtg.query.discovery_independent"; } }
+    requirement <'invariant.rtg.query.deterministic_results'> deterministicResults { subject query : RtgQueryEngine; doc /* Identical coherent graph views, specifications, and options produce identical ordered bindings, returns, and diagnostics. */ }
+    requirement <'invariant.rtg.query.deterministic_string_matching'> deterministicStringMatching { subject query : RtgQueryEngine; doc /* Substring and regex behavior uses the declared case and dialect rules rather than implementation-language-specific extensions. */ }
+    requirement <'invariant.rtg.query.public_graph_reads_only'> publicGraphReadsOnly { subject query : RtgQueryEngine; doc /* Query consumes only the public coherent graph read-view capability. */ }
+    requirement <'invariant.rtg.query.operates_over_read_view'> operatesOverReadView { subject query : RtgQueryEngine; doc /* Live, projected, or alternative providers are substitutable when they satisfy RtgGraphReadView coherently. */ }
+    requirement <'invariant.rtg.query.no_hidden_lifecycle_filter'> noHiddenLifecycleFilter { subject query : RtgQueryEngine; doc /* Lifecycle filtering occurs only through explicit options and never through hidden live-only defaults. */ }
+    requirement <'invariant.rtg.query.overlay_filters_only'> overlayFiltersOnly { subject query : RtgQueryEngine; doc /* A live-status overlay affects selection only and never mutates or rewrites returned graph records. */ }
+    requirement <'invariant.rtg.query.default_includes_non_live'> defaultIncludesNonLive { subject query : RtgQueryEngine; doc /* Absent options include live and non-live objects. */ }
+    requirement <'invariant.rtg.query.discovery_independent'> discoveryIndependent { subject query : RtgQueryEngine; doc /* Query returns its own generic diagnostics and never invokes discovery or embeds application-specific schema answers. */ }
 
     verification def RtgQueryBoundaryVerification {
         subject query : RtgQueryEngine;

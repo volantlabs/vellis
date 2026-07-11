@@ -39,65 +39,120 @@ Generated from textual SysML v2 by `just model-render`; do not edit by hand.
 |---|---|---|---|
 | `OpenRtgController` | in `graph: RtgGraph`; in `schema: RtgSchema`; in `constraints: RtgConstraints`; in `migration: RtgMigration`; in `changeValidator: RtgChangeValidator`; in `queryEngine: RtgQueryEngine`; in `jsonStorage: JsonFileStorage`; in `sqlStorage: SqlStorage`; out `controller: RtgController` | `RtgControllerConfigurationInvalid` | Bind exactly one implementation of each of the eight required Bibliotek roles and initialize or validate the durable ledger schema. |
 
-## Required capabilities
+## Retained collaborator roles
 
-| Feature | Kind | Required contract | Cardinality |
+| Role | Kind | Referenced type | Multiplicity |
 |---|---|---|---|
-| `requiredGraphSnapshot` | `action` | `ExportGraphSnapshot` | `1..1` |
-| `requiredGraphPutAnchor` | `action` | `PutAnchor` | `1..1` |
-| `requiredGraphPutDataObject` | `action` | `PutDataObject` | `1..1` |
-| `requiredGraphPutLink` | `action` | `PutLink` | `1..1` |
-| `requiredGraphDelete` | `action` | `DeleteAnchor` | `1..1` |
-| `requiredGraphPreview` | `action` | `PreviewDeleteAnchor` | `1..1` |
-| `requiredGraphRead` | `action` | `GetGraphObject` | `1..1` |
-| `requiredSchemaSnapshot` | `action` | `ExportSchemaSnapshot` | `1..1` |
-| `requiredSchemaWrite` | `action` | `PutSchemaDefinition` | `1..1` |
-| `requiredSchemaRead` | `action` | `GetSchemaPack` | `1..1` |
-| `requiredConstraintSnapshot` | `action` | `ExportConstraintSnapshot` | `1..1` |
-| `requiredConstraintWrite` | `action` | `PutConstraint` | `1..1` |
-| `requiredMigrationSnapshot` | `action` | `ExportMigrationSnapshot` | `1..1` |
-| `requiredMigrationWrite` | `action` | `PutMigration` | `1..1` |
-| `requiredMigrationRead` | `action` | `GetMigration` | `1..1` |
-| `requiredValidation` | `action` | `ValidateRtgChangeBatch` | `1..1` |
-| `requiredQuery` | `action` | `ExecuteRtgQuery` | `1..1` |
-| `requiredJsonWrite` | `action` | `WriteJsonDocument` | `1..1` |
-| `requiredJsonRead` | `action` | `ReadJsonDocument` | `1..1` |
-| `requiredSqlExecute` | `action` | `ExecuteSql` | `1..1` |
-| `requiredSqlQuery` | `action` | `QuerySql` | `1..1` |
-| `requiredSqlTransaction` | `action` | `ExecuteSqlTransaction` | `1..1` |
+| `graph` | `part` | `RtgGraph` | `[1]` |
+| `schema` | `part` | `RtgSchema` | `[1]` |
+| `constraints` | `part` | `RtgConstraints` | `[1]` |
+| `migration` | `part` | `RtgMigration` | `[1]` |
+| `changeValidator` | `part` | `RtgChangeValidator` | `[1]` |
+| `queryEngine` | `part` | `RtgQueryEngine` | `[1]` |
+| `jsonStorage` | `part` | `JsonFileStorage` | `[1]` |
+| `sqlStorage` | `part` | `SqlStorage` | `[1]` |
 
 ## Owned state
 
-| State feature | Type | Authority | Lifetime | Persistence |
-|---|---|---|---|---|
-| `ledger` | `RtgControllerLedger` | `canonicalOwner` | `independent` | `durable` |
+| State feature | Type | Ownership | Meaning |
+|---|---|---|---|
+| `ledger` | `RtgControllerLedger` | `referenced` | Independently durable canonical controller ledger and degraded-audit queue. |
 
 ## Action and state effects
 
-| Action | State / capability | Access | Contract-significant effect |
-|---|---|---|---|
-| `applyLiveGraphChanges` | `ledger` | `write` | record the resolved request and its applied, rejected, failed, or degraded outcome |
-| `stageKnowledgeChanges` | `ledger` | `write` | record the migration-scoped staging outcome |
-| `applyMigrationCutover` | `ledger` | `write` | record applied or failed cutover status after restoration handling |
-| `replayLedger` | `ledger` | `read` | reconstruct from the selected monotonic ledger window without recording replayed requests again |
-| `restoreFromSnapshot` | `ledger` | `write` | restore the represented cursor and record restoration only when requested |
-| `validateLiveGraphChanges` | — | `none` | read and project dependencies; no component or ledger mutation |
-| `executeQuery` | — | `none` | coherent dependency read; no component or ledger mutation |
-| `getObject` | — | `none` | read graph without mutation or ledger write |
-| `listMigrations` | — | `none` | read migration store without mutation or ledger write |
-| `getMigration` | — | `none` | read migration store without mutation or ledger write |
-| `validateGraph` | — | `none` | read/project dependencies without mutation or ledger write |
-| `discoverAnchorTypes` | — | `none` | compose schema and count reads without mutation |
-| `getSchemaPack` | — | `none` | compose schema and count reads without mutation |
-| `getSystemState` | — | `none` | summarize components, snapshots, and ledger without mutation |
-| `exportSystemSnapshot` | — | `none` | coordinated read of components and ledger cursor |
-| `persistSystemSnapshot` | — | `write` | write one atomic JSON snapshot document and record outcome |
-| `listPersistedSnapshots` | — | `none` | read storage-scoped snapshot metadata without mutation |
-| `loadPersistedSnapshot` | — | `none` | read and decode one snapshot document without restoring it |
-| `abandonMigration` | — | `write` | serialized safe candidate pruning, migration transition, and ledger outcome |
-| `verifyReplayFromLedger` | — | `none` | replay into isolated scratch state and compare without current-state mutation |
-| `listMigrationHistory` | — | `none` | read ordered migration-related ledger events |
-| `flushLedgerFailures` | — | `write` | retry queued durable records and retain only failures |
+| Action | State / collaborator | Modeled effect |
+|---|---|---|
+| `applyLiveGraphChanges` | `graph` | apply the accepted resolved graph change set. |
+| `applyLiveGraphChanges` | `changeValidator` | validate the projected graph state before mutation. |
+| `applyLiveGraphChanges` | `schema` | supply schema state to projection validation. |
+| `applyLiveGraphChanges` | `constraints` | supply constraint state to projection validation. |
+| `applyLiveGraphChanges` | `migration` | supply migration overlays to projection validation. |
+| `applyLiveGraphChanges` | `queryEngine` | supply declarative query evaluation to validation tracks. |
+| `validateLiveGraphChanges` | `graph` | read canonical graph state and build a projection without mutation. |
+| `validateLiveGraphChanges` | `schema` | read schema state required by selected validation tracks. |
+| `validateLiveGraphChanges` | `constraints` | read constraint definitions required by selected tracks. |
+| `validateLiveGraphChanges` | `migration` | read migration state required by selected tracks. |
+| `validateLiveGraphChanges` | `queryEngine` | evaluate validation patterns without mutation. |
+| `validateLiveGraphChanges` | `changeValidator` | validate the resolved projected state. |
+| `stageKnowledgeChanges` | `graph` | create or replace migration-scoped non-live graph candidates. |
+| `stageKnowledgeChanges` | `schema` | create or replace migration-scoped non-live schema candidates. |
+| `stageKnowledgeChanges` | `constraints` | create or replace migration-scoped non-live constraint candidates. |
+| `stageKnowledgeChanges` | `migration` | maintain migration records, membership, evidence, and status. |
+| `stageKnowledgeChanges` | `changeValidator` | validate projected cutover state before staged writes. |
+| `stageKnowledgeChanges` | `queryEngine` | evaluate declarative validation patterns. |
+| `applyMigrationCutover` | `graph` | apply graph live-status changes and restore graph state on failure. |
+| `applyMigrationCutover` | `schema` | apply schema live-status changes and restore schema state on failure. |
+| `applyMigrationCutover` | `constraints` | apply constraint live-status changes and restore constraint state on failure. |
+| `applyMigrationCutover` | `migration` | derive the plan and commit applied or failed lifecycle status. |
+| `applyMigrationCutover` | `changeValidator` | validate projected and actual cutover states. |
+| `applyMigrationCutover` | `queryEngine` | evaluate declarative validation patterns. |
+| `executeQuery` | `graph` | supply one coherent graph read view while writes are excluded. |
+| `executeQuery` | `queryEngine` | evaluate the caller query specification. |
+| `getObject` | `graph` | retrieve one graph object without mutation. |
+| `listMigrations` | `migration` | read deterministic current migration records. |
+| `getMigration` | `migration` | read one current migration record. |
+| `validateGraph` | `graph` | read canonical graph state for validation. |
+| `validateGraph` | `schema` | read schema state for validation. |
+| `validateGraph` | `constraints` | read constraints for validation. |
+| `validateGraph` | `migration` | read migrations and requested overlays for validation. |
+| `validateGraph` | `queryEngine` | evaluate declarative validation patterns. |
+| `validateGraph` | `changeValidator` | execute selected validation tracks. |
+| `discoverAnchorTypes` | `graph` | count current objects by type and lifecycle. |
+| `discoverAnchorTypes` | `schema` | read anchor type keys and descriptions. |
+| `getSchemaPack` | `graph` | read requested live counts. |
+| `getSchemaPack` | `schema` | read the selected schema closure. |
+| `getSystemState` | `graph` | summarize graph population and staged candidates. |
+| `getSystemState` | `schema` | summarize live and non-live schema state. |
+| `getSystemState` | `constraints` | summarize constraint candidates. |
+| `getSystemState` | `migration` | summarize current migration lifecycle state. |
+| `getSystemState` | `jsonStorage` | list storage-scoped persisted snapshots. |
+| `getSystemState` | `sqlStorage` | read durable ledger counts and pointers. |
+| `exportSystemSnapshot` | `graph` | export the graph snapshot. |
+| `exportSystemSnapshot` | `schema` | export the schema snapshot. |
+| `exportSystemSnapshot` | `constraints` | export the constraint snapshot. |
+| `exportSystemSnapshot` | `migration` | export the migration snapshot. |
+| `persistSystemSnapshot` | `graph` | export graph state for the coordinated snapshot. |
+| `persistSystemSnapshot` | `schema` | export schema state for the coordinated snapshot. |
+| `persistSystemSnapshot` | `constraints` | export constraint state for the coordinated snapshot. |
+| `persistSystemSnapshot` | `migration` | export migration state for the coordinated snapshot. |
+| `persistSystemSnapshot` | `jsonStorage` | atomically write the coordinated snapshot document. |
+| `listPersistedSnapshots` | `jsonStorage` | list persisted snapshot metadata. |
+| `loadPersistedSnapshot` | `jsonStorage` | read and validate one persisted snapshot document. |
+| `abandonMigration` | `graph` | prune only safe non-live graph candidates. |
+| `abandonMigration` | `schema` | prune only safe non-live schema candidates. |
+| `abandonMigration` | `constraints` | prune only safe non-live constraint candidates. |
+| `abandonMigration` | `migration` | transition the selected migration to abandoned. |
+| `replayLedger` | `graph` | replace graph state with the reconstructed result. |
+| `replayLedger` | `schema` | replace schema state with the reconstructed result. |
+| `replayLedger` | `constraints` | replace constraint state with the reconstructed result. |
+| `replayLedger` | `migration` | replace migration state with the reconstructed result. |
+| `replayLedger` | `sqlStorage` | read the selected ascending durable ledger window. |
+| `verifyReplayFromLedger` | `graph` | compare current graph summary with isolated replay output without mutation. |
+| `verifyReplayFromLedger` | `schema` | compare current schema summary with isolated replay output without mutation. |
+| `verifyReplayFromLedger` | `constraints` | compare current constraint summary with isolated replay output without mutation. |
+| `verifyReplayFromLedger` | `migration` | compare current migration summary with isolated replay output without mutation. |
+| `verifyReplayFromLedger` | `changeValidator` | validate isolated reconstructed state. |
+| `verifyReplayFromLedger` | `queryEngine` | evaluate validation patterns against isolated state. |
+| `verifyReplayFromLedger` | `sqlStorage` | read the selected ledger window without changing it. |
+| `listMigrationHistory` | `sqlStorage` | read migration-related ledger records in ledger order. |
+| `flushLedgerFailures` | `sqlStorage` | retry queued records against durable ledger storage. |
+| `restoreFromSnapshot` | `graph` | replace graph state from the validated snapshot. |
+| `restoreFromSnapshot` | `schema` | replace schema state from the validated snapshot. |
+| `restoreFromSnapshot` | `constraints` | replace constraint state from the validated snapshot. |
+| `restoreFromSnapshot` | `migration` | replace migration state from the validated snapshot. |
+| `restoreFromSnapshot` | `sqlStorage` | preserve or record the ledger cursor as requested. |
+| `applyLiveGraphChanges` | `ledger` | record the resolved request and its applied, rejected, failed, or degraded outcome. |
+| `stageKnowledgeChanges` | `ledger` | record the migration-scoped staging outcome. |
+| `applyMigrationCutover` | `ledger` | record applied or failed cutover status after restoration handling. |
+| `getSystemState` | `ledger` | report durable and queued ledger state without mutation. |
+| `exportSystemSnapshot` | `ledger` | capture the represented ledger cursor and transaction identity. |
+| `persistSystemSnapshot` | `ledger` | capture the represented cursor and record the persistence outcome. |
+| `abandonMigration` | `ledger` | record the abandonment outcome after candidate handling. |
+| `replayLedger` | `ledger` | reconstruct from the selected monotonic ledger window without recording replayed requests again. |
+| `verifyReplayFromLedger` | `ledger` | read the source replay window without replacing current state or appending replayed activity. |
+| `listMigrationHistory` | `ledger` | return migration events in ledger order without mutation. |
+| `flushLedgerFailures` | `ledger` | remove only queued outcomes that become durable and retain remaining failures. |
+| `restoreFromSnapshot` | `ledger` | restore the represented cursor and record restoration only when requested. |
 
 ## Invariants and behavioral obligations
 
@@ -208,8 +263,8 @@ Generated from textual SysML v2 by `just model-render`; do not edit by hand.
 | `RtgControllerValidationStatus` | `validated` |
 | `RtgControllerReplayVerificationStatus` | `replayVerified` → `replay_verified` |
 | `RtgControllerMutationState` | `notMutated` → `not_mutated` |
-| `RtgControllerStateClassification` | `empty`, `schemaOnly` → `schema_only`, `populated`, `hasStagedWork` → `has_staged_work`, `needsReplay` → `needs_replay` |
-| `RtgControllerWorkflow` | `schemaBootstrap` → `schema_bootstrap`, `dataIngest` → `data_ingest`, `queryAnswer` → `query_answer`, `safeUpdate` → `safe_update`, `snapshotReplayCheck` → `snapshot_replay_check`, `stagedWorkReview` → `staged_work_review`, `replayRecovery` → `replay_recovery` |
+| `RtgControllerStateClassification` | `empty`, `schemaOnly`, `populated`, `hasStagedWork`, `needsReplay` |
+| `RtgControllerWorkflow` | `schemaBootstrap`, `dataIngest`, `queryAnswer`, `safeUpdate`, `snapshotReplayCheck`, `stagedWorkReview`, `replayRecovery` |
 | `RtgControllerMigrationCountScope` | `currentMigrationStore` → `current_migration_store` |
 | `RtgControllerLedgerRecordKind` | `request`, `response`, `error` |
 | `RtgControllerMigrationEventType` | `staged`, `cutoverApplied` → `cutover_applied`, `cutoverFailed` → `cutover_failed`, `abandoned` |
