@@ -41,36 +41,52 @@ Generated from textual SysML v2 by `just model-render`; do not edit by hand.
 
 ## Action and state effects
 
-| Action | State / collaborator | Modeled effect |
+| Action | State / collaborator | Access | Modeled effect |
+|---|---|---|---|
+| `exportSnapshot` | `migrationRecords` | `read` | return all migration records in migration-ID order. |
+| `putMigration` | `migrationRecords` | `write` | create or lifecycle-safe replace one complete record. |
+| `setStatus` | `migrationRecords` | `write` | apply one allowed lifecycle transition or same-status metadata update. |
+| `addEvidence` | `migrationRecords` | `write` | append one evidence identity not already present. |
+| `deleteMigration` | `migrationRecords` | `delete` | remove one terminal applied or abandoned record. |
+| `buildCutoverPlan` | `migrationRecords` | `read` | purely copy cutover membership from the supplied record. |
+| `getMigration` | `migrationRecords` | `read` | read one canonical record. |
+| `listMigrations` | `statusIndex` | `read` | read deterministic status index. |
+
+## Native action behavior
+
+| Public action | Nested semantic actions | Observable successions |
 |---|---|---|
-| `exportSnapshot` | `migrationRecords` | return all migration records in migration-ID order. |
-| `putMigration` | `migrationRecords` | create or lifecycle-safe replace one complete record. |
-| `setStatus` | `migrationRecords` | apply one allowed lifecycle transition or same-status metadata update. |
-| `addEvidence` | `migrationRecords` | append one evidence identity not already present. |
-| `deleteMigration` | `migrationRecords` | remove one terminal applied or abandoned record. |
-| `buildCutoverPlan` | `migrationRecords` | purely copy cutover membership from the supplied record. |
-| `getMigration` | `migrationRecords` | read one canonical record. |
-| `listMigrations` | `statusIndex` | read deterministic status index. |
+| — | — | No action decomposition required at this boundary. |
 
 ## Invariants and behavioral obligations
 
-| Stable ID | Modeled obligation |
-|---|---|
-| `contract.rtg.migration.put_effect` | A new record may begin in any valid status. Replacing an existing ID must preserve status or follow the same transition table as set_status; all other fields are fully replaced. |
-| `contract.rtg.migration.status_transitions` | Allowed changes are draft to ready or abandoned; ready to draft, applied, failed, or abandoned; failed to ready or abandoned. Applied and abandoned are terminal. Same-status update changes metadata only. |
-| `contract.rtg.migration.evidence_effect` | Evidence IDs are unique within a migration; success appends one evidence record and preserves membership and status. |
-| `contract.rtg.migration.delete_effect` | Only applied and abandoned records are deletable. Rejected deletion leaves state unchanged and never removes durable controller history. |
-| `contract.rtg.migration.cutover_plan` | The plan deterministically copies all make-live, make-non-live, and replacement membership without reading or mutating referenced component state. |
-| `invariant.rtg.migration.id_unique` | Migration IDs are unique. |
-| `invariant.rtg.migration.cutover_sets_disjoint` | Make-live and make-non-live sets and replacement sides do not conflict within one resource kind. |
-| `invariant.rtg.migration.not_normal_crud` | Migration records describe coordinated schema, constraint, and non-live graph lifecycle work, not ordinary live graph CRUD. |
-| `invariant.rtg.migration.candidates_are_materialized_v1` | V1 membership references already materialized candidate records and contains no executable transforms or delta objects. |
-| `invariant.rtg.migration.references_are_data` | Referenced records remain owned by their source components; migration stores identities and intent only. |
-| `invariant.rtg.migration.no_store_mutation` | This component does not read or mutate graph, schema, or constraint stores. |
-| `invariant.rtg.migration.status_transition_controlled` | Status changes, including replacement of an existing ID, preserve status or obey the single transition table. |
-| `invariant.rtg.migration.status_is_tracking_not_proof` | Ready status records caller intent and is not proof that referenced cutover state is valid. |
-| `invariant.rtg.migration.completed_history_is_external` | Durable completed history belongs to controller audit. |
-| `invariant.rtg.migration.rollback_is_forward_change_v1` | V1 rollback is represented by a later forward migration, not a special status or reverse executable operation. |
+| Stable ID | Subject | Satisfier | Required constraint |
+|---|---|---|---|
+| `contract.rtg.migration.put_effect` | `PutMigration` | `migration.putMigration` | A new record may begin in any valid status. Replacing an existing ID must preserve status or satisfy MigrationStatusTransitionAllowed for the stored and requested statuses; all other fields are fully replaced. |
+| `contract.rtg.migration.status_transitions` | `SetMigrationStatus` | `migration.setStatus` | The stored and requested statuses must satisfy MigrationStatusTransitionAllowed. Thus draft changes to ready or abandoned; ready to draft, applied, failed, or abandoned; failed to ready or abandoned; applied and abandoned are terminal; and same-status update changes metadata only. |
+| `contract.rtg.migration.evidence_effect` | `AddMigrationEvidence` | `migration.addEvidence` | Evidence IDs are unique within a migration; success appends one evidence record and preserves membership and status. |
+| `contract.rtg.migration.delete_effect` | `DeleteMigration` | `migration.deleteMigration` | Only applied and abandoned records are deletable. Rejected deletion leaves state unchanged and never removes durable controller history. |
+| `contract.rtg.migration.cutover_plan` | `BuildMigrationCutoverPlan` | `migration.buildCutoverPlan` | The plan deterministically copies all make-live, make-non-live, and replacement membership without reading or mutating referenced component state. |
+| `invariant.rtg.migration.id_unique` | `RtgMigration` | `migration` | Migration IDs are unique. |
+| `invariant.rtg.migration.cutover_sets_disjoint` | `RtgMigration` | `migration` | Make-live and make-non-live sets and replacement sides do not conflict within one resource kind. |
+| `invariant.rtg.migration.not_normal_crud` | `RtgMigration` | `migration` | Migration records describe coordinated schema, constraint, and non-live graph lifecycle work, not ordinary live graph CRUD. |
+| `invariant.rtg.migration.candidates_are_materialized_v1` | `RtgMigration` | `migration` | V1 membership references already materialized candidate records and contains no executable transforms or delta objects. |
+| `invariant.rtg.migration.references_are_data` | `RtgMigration` | `migration` | Referenced records remain owned by their source components; migration stores identities and intent only. |
+| `invariant.rtg.migration.no_store_mutation` | `RtgMigration` | `migration` | This component does not read or mutate graph, schema, or constraint stores. |
+| `invariant.rtg.migration.status_transition_controlled` | `RtgMigration` | `migration` | Status changes, including replacement of an existing ID, preserve status or obey the single transition table. |
+| `invariant.rtg.migration.status_is_tracking_not_proof` | `RtgMigration` | `migration` | Ready status records caller intent and is not proof that referenced cutover state is valid. |
+| `invariant.rtg.migration.completed_history_is_external` | `RtgMigration` | `migration` | Durable completed history belongs to controller audit. |
+| `invariant.rtg.migration.rollback_is_forward_change_v1` | `RtgMigration` | `migration` | V1 rollback is represented by a later forward migration, not a special status or reverse executable operation. |
+| `contract.rtg.migration.export_migration_snapshot.failures` | `ExportMigrationSnapshot` | `migration.exportSnapshot` | Export is read-only and has no declared domain failure. |
+| `contract.rtg.migration.put_migration.failures` | `PutMigration` | `migration.putMigration` | Rejected creation or replacement leaves all migration records and indexes unchanged; an existing record may preserve status or follow the lifecycle transition table. |
+| `contract.rtg.migration.get_migration.failures` | `GetMigration` | `migration.getMigration` | Read failure has no effect. |
+| `contract.rtg.migration.list_migrations.failures` | `ListMigrations` | `migration.listMigrations` | Read failure has no effect. |
+| `contract.rtg.migration.set_migration_status.failures` | `SetMigrationStatus` | `migration.setStatus` | A rejected transition changes neither status nor metadata. |
+| `contract.rtg.migration.add_migration_evidence.failures` | `AddMigrationEvidence` | `migration.addEvidence` | Duplicate or invalid evidence changes no record. |
+| `contract.rtg.migration.delete_migration.failures` | `DeleteMigration` | `migration.deleteMigration` | Draft, ready, and failed records are not deleted and rejection has no effect. |
+| `contract.rtg.migration.build_migration_cutover_plan.failures` | `BuildMigrationCutoverPlan` | `migration.buildCutoverPlan` | Plan construction reads and mutates no component store. |
+| `contract.rtg.migration.create_empty_rtg_migration.failures` | `CreateEmptyRtgMigration` | `createEmptyRtgMigrationSubject` | Construction has no declared domain failure. |
+| `contract.rtg.migration.import_rtg_migration_snapshot.failures` | `ImportRtgMigrationSnapshot` | `importRtgMigrationSnapshotSubject` | Failure returns no partially imported store. |
 
 ## Public values and items
 
@@ -96,14 +112,24 @@ Generated from textual SysML v2 by `just model-render`; do not edit by hand.
 
 ## Public enumerations
 
-| Enumeration | Model and external values |
+| Enumeration | Logical literals |
 |---|---|
 | `RtgMigrationStatus` | `draft`, `ready`, `applied`, `failed`, `abandoned` |
 
 ## Verification
 
-| Verification | Objectives | Evidence |
-|---|---|---|
-| `RtgMigrationBoundaryVerification` | `putMigrationEffect`, `statusTransitionTable`, `evidenceEffect`, `deleteEffect`, `cutoverPlanEffect`, `idUnique`, `cutoverSetsDisjoint`, `notNormalCrud`, `candidatesMaterialized`, `referencesAreData`, `noStoreMutation`, `statusTransitionControlled`, `statusTrackingNotProof`, `completedHistoryExternal`, `rollbackForwardChange` | `components/rtg/migration/tests/test_rtg_migration_contract.py` |
+| Verification | Subject | Objectives | Evidence |
+|---|---|---|---|
+| `PutMigrationContractVerification` | `PutMigration` | `putMigrationEffect`, `putMigrationFailureSemantics` | `components/rtg/migration/tests/test_rtg_migration_contract.py#PutMigrationContractVerification` |
+| `SetMigrationStatusContractVerification` | `SetMigrationStatus` | `statusTransitionTable`, `setMigrationStatusFailureSemantics` | `components/rtg/migration/tests/test_rtg_migration_contract.py#SetMigrationStatusContractVerification` |
+| `AddMigrationEvidenceContractVerification` | `AddMigrationEvidence` | `evidenceEffect`, `addMigrationEvidenceFailureSemantics` | `components/rtg/migration/tests/test_rtg_migration_contract.py#AddMigrationEvidenceContractVerification` |
+| `DeleteMigrationContractVerification` | `DeleteMigration` | `deleteEffect`, `deleteMigrationFailureSemantics` | `components/rtg/migration/tests/test_rtg_migration_contract.py#DeleteMigrationContractVerification` |
+| `BuildMigrationCutoverPlanContractVerification` | `BuildMigrationCutoverPlan` | `cutoverPlanEffect`, `buildMigrationCutoverPlanFailureSemantics` | `components/rtg/migration/tests/test_rtg_migration_contract.py#BuildMigrationCutoverPlanContractVerification` |
+| `ExportMigrationSnapshotContractVerification` | `ExportMigrationSnapshot` | `exportMigrationSnapshotFailureSemantics` | `components/rtg/migration/tests/test_rtg_migration_contract.py#ExportMigrationSnapshotContractVerification` |
+| `GetMigrationContractVerification` | `GetMigration` | `getMigrationFailureSemantics` | `components/rtg/migration/tests/test_rtg_migration_contract.py#GetMigrationContractVerification` |
+| `ListMigrationsContractVerification` | `ListMigrations` | `listMigrationsFailureSemantics` | `components/rtg/migration/tests/test_rtg_migration_contract.py#ListMigrationsContractVerification` |
+| `CreateEmptyRtgMigrationContractVerification` | `CreateEmptyRtgMigration` | `createEmptyRtgMigrationFailureSemantics` | `components/rtg/migration/tests/test_rtg_migration_contract.py#CreateEmptyRtgMigrationContractVerification` |
+| `ImportRtgMigrationSnapshotContractVerification` | `ImportRtgMigrationSnapshot` | `importRtgMigrationSnapshotFailureSemantics` | `components/rtg/migration/tests/test_rtg_migration_contract.py#ImportRtgMigrationSnapshotContractVerification` |
+| `RtgMigrationBoundaryVerification` | `RtgMigration` | `idUnique`, `cutoverSetsDisjoint`, `notNormalCrud`, `candidatesMaterialized`, `referencesAreData`, `noStoreMutation`, `statusTransitionControlled`, `statusTrackingNotProof`, `completedHistoryExternal`, `rollbackForwardChange` | `components/rtg/migration/tests/test_rtg_migration_contract.py#RtgMigrationBoundaryVerification` |
 
 Equivalent private algorithms, helpers, storage layouts, and implementation-language inheritance remain implementation choices.

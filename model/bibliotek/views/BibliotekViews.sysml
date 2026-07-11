@@ -2,26 +2,27 @@ package BibliotekViews {
     private import Views::*;
     private import Bibliotek::*;
 
-    viewpoint def BibliotekComponentStructureViewpoint {
-        require constraint {
-            doc /* Show reusable component definitions and their structural decomposition without application or realization elements. */
-        }
-    }
-
-    viewpoint def BibliotekBehaviorContractViewpoint {
-        require constraint {
-            doc /* Show public action definitions and usages needed to reason about Bibliotek black-box behavior. */
-        }
-    }
-
     view def BibliotekComponentStructureView {
-        viewpoint structure : BibliotekComponentStructureViewpoint;
+        doc /* Reusable definitions, usages, composition, equality bindings, and allocations. */
         filter @SysML::PartDefinition;
+        filter @SysML::PartUsage;
+        filter @SysML::BindingConnectorAsUsage;
+        filter @SysML::AllocationUsage;
     }
 
     view def BibliotekBehaviorContractView {
-        viewpoint behavior : BibliotekBehaviorContractViewpoint;
+        doc /* Public operations, performances, state/capability dependencies, and sequencing. */
         filter @SysML::ActionDefinition;
+        filter @SysML::ActionUsage;
+        filter @SysML::Dependency;
+        filter @SysML::SuccessionAsUsage;
+    }
+
+    view def BibliotekRequirementVerificationView {
+        doc /* Requirements, asserted satisfiers, verification definitions, and their objectives. */
+        filter @SysML::RequirementUsage;
+        filter @SysML::SatisfyRequirementUsage;
+        filter @SysML::VerificationCaseDefinition;
     }
 
     view bibliotekComponentStructure : BibliotekComponentStructureView {
@@ -30,6 +31,11 @@ package BibliotekViews {
     }
 
     view bibliotekBehaviorContracts : BibliotekBehaviorContractView {
+        expose Bibliotek::**;
+        render asElementTable;
+    }
+
+    view bibliotekRequirementVerification : BibliotekRequirementVerificationView {
         expose Bibliotek::**;
         render asElementTable;
     }

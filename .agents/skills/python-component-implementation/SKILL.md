@@ -17,16 +17,17 @@ obligations.
 ## Workflow
 
 1. Locate the component by stable ID in the repository's canonical model package.
-2. Resolve the accepted library package version and read its imported public values, actions,
-   action inputs, retained collaborator roles, state, invariants, failures, and
-   verification cases.
+2. Resolve the accepted library package version and read its public values, actions, retained
+   collaborator roles, state, required constraints, asserted satisfiers, failures, and verification
+   cases. Treat top-level documentation as explanation, not as an unmodeled obligation.
 3. Locate the matching concrete realization and confirm its code root and symbol from
    `@ImplementationBinding`; do not expect language bindings on the reusable logical component.
 4. Implement or revise the consumer-facing Python protocol.
 5. Encapsulate canonical state and invariant enforcement inside the component root.
 6. Supply action-scoped collaborators and wire retained referential roles only through modeled
    public boundaries; do not reach through another component's internals.
-7. Add or update black-box tests derived from the model verification cases.
+7. Add or update black-box tests derived from subject-compatible model verification cases and their
+   evidence groups.
 8. Run the narrowest component tests, `just model-check`, and relevant repository checks.
 
 ## Realization Rules

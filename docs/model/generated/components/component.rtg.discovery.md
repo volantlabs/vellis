@@ -34,23 +34,33 @@ Generated from textual SysML v2 by `just model-render`; do not edit by hand.
 
 ## Action and state effects
 
-| Action | State / collaborator | Modeled effect |
+| Action | State / collaborator | Access | Modeled effect |
+|---|---|---|---|
+| `putView` | `curatedViews` | `write` | create or fully replace one valid view atomically. |
+| `listViews` | `curatedViews` | `read` | return full views in view-ID order without mutation. |
+| `selectAnchorTypes` | `curatedViews` | `read` | return the stable union and descriptions of selected cells without mutation. |
+
+## Native action behavior
+
+| Public action | Nested semantic actions | Observable successions |
 |---|---|---|
-| `putView` | `curatedViews` | create or fully replace one valid view atomically. |
-| `listViews` | `curatedViews` | return full views in view-ID order without mutation. |
-| `selectAnchorTypes` | `curatedViews` | return the stable union and descriptions of selected cells without mutation. |
+| — | — | No action decomposition required at this boundary. |
 
 ## Invariants and behavioral obligations
 
-| Stable ID | Modeled obligation |
-|---|---|
-| `contract.rtg.discovery.view_validity` | viewId and label keys are non-empty; row and column label values are strings; each cell coordinate is unique and refers to declared labels; all metadata and descriptions are JSON-safe and anchor type keys preserve caller order. |
-| `contract.rtg.discovery.replacement` | A valid put stores exactly the supplied view under viewId, replacing any prior version atomically and leaving other views unchanged. |
-| `contract.rtg.discovery.selection` | Selection requires an existing view and one or more unique existing coordinates. Results preserve coordinate order, de-duplicate anchor keys by first occurrence, and include descriptions keyed without coordinate ambiguity. |
-| `contract.rtg.discovery.deterministic_reads` | Listing is ordered by viewId; selection is ordered by request coordinates and cell anchor-key order. Reads never mutate curatedViews. |
-| `invariant.rtg.discovery.views_not_schema` | Views organize opaque type keys but do not define or validate schema. |
-| `invariant.rtg.discovery.no_graph_dependency` | Selection does not require graph objects or population counts. |
-| `invariant.rtg.discovery.knowledge_engineer_curated` | Curated views are explicit knowledge-engineering records, not inferred search results. |
+| Stable ID | Subject | Satisfier | Required constraint |
+|---|---|---|---|
+| `contract.rtg.discovery.view_validity` | `PutDiscoveryView` | `unsatisfied-draft` | viewId and label keys are non-empty; row and column label values are strings; each cell coordinate is unique and refers to declared labels; all metadata and descriptions are JSON-safe and anchor type keys preserve caller order. |
+| `contract.rtg.discovery.replacement` | `PutDiscoveryView` | `unsatisfied-draft` | A valid put stores exactly the supplied view under viewId, replacing any prior version atomically and leaving other views unchanged. |
+| `contract.rtg.discovery.selection` | `SelectDiscoveryAnchorTypes` | `unsatisfied-draft` | Selection requires an existing view and one or more unique existing coordinates. Results preserve coordinate order, de-duplicate anchor keys by first occurrence, and include descriptions keyed without coordinate ambiguity. |
+| `contract.rtg.discovery.deterministic_reads` | `RtgDiscovery` | `unsatisfied-draft` | Listing is ordered by viewId; selection is ordered by request coordinates and cell anchor-key order. Reads never mutate curatedViews. |
+| `invariant.rtg.discovery.views_not_schema` | `RtgDiscovery` | `unsatisfied-draft` | Views organize opaque type keys but do not define or validate schema. |
+| `invariant.rtg.discovery.no_graph_dependency` | `RtgDiscovery` | `unsatisfied-draft` | Selection does not require graph objects or population counts. |
+| `invariant.rtg.discovery.knowledge_engineer_curated` | `RtgDiscovery` | `unsatisfied-draft` | Curated views are explicit knowledge-engineering records, not inferred search results. |
+| `contract.rtg.discovery.put_discovery_view.failures` | `PutDiscoveryView` | `unsatisfied-draft` | Invalid identity, labels, or duplicate or unknown cell coordinates leave the prior registry unchanged. |
+| `contract.rtg.discovery.list_discovery_views.failures` | `ListDiscoveryViews` | `unsatisfied-draft` | Listing has no state effect. |
+| `contract.rtg.discovery.select_discovery_anchor_types.failures` | `SelectDiscoveryAnchorTypes` | `unsatisfied-draft` | Unknown views, duplicate or unknown coordinates, and empty selections have no state effect. |
+| `contract.rtg.discovery.create_empty_rtg_discovery.failures` | `CreateEmptyRtgDiscovery` | `unsatisfied-draft` | Construction has no external side effect. |
 
 ## Public values and items
 
@@ -67,14 +77,18 @@ Generated from textual SysML v2 by `just model-render`; do not edit by hand.
 
 ## Public enumerations
 
-| Enumeration | Model and external values |
+| Enumeration | Logical literals |
 |---|---|
 | — | No component-owned public enumerations. |
 
 ## Verification
 
-| Verification | Objectives | Evidence |
-|---|---|---|
-| `RtgDiscoveryBoundaryVerification` | `viewValidity`, `replacementEffect`, `selectionEffect`, `deterministicReads`, `viewsNotSchema`, `noGraphDependency`, `knowledgeEngineerCurated` | `pending` |
+| Verification | Subject | Objectives | Evidence |
+|---|---|---|---|
+| `PutDiscoveryViewContractVerification` | `PutDiscoveryView` | `viewValidity`, `replacementEffect`, `putDiscoveryViewFailureSemantics` | `pending#PutDiscoveryViewContractVerification` |
+| `SelectDiscoveryAnchorTypesContractVerification` | `SelectDiscoveryAnchorTypes` | `selectionEffect`, `selectDiscoveryAnchorTypesFailureSemantics` | `pending#SelectDiscoveryAnchorTypesContractVerification` |
+| `ListDiscoveryViewsContractVerification` | `ListDiscoveryViews` | `listDiscoveryViewsFailureSemantics` | `pending#ListDiscoveryViewsContractVerification` |
+| `CreateEmptyRtgDiscoveryContractVerification` | `CreateEmptyRtgDiscovery` | `createEmptyRtgDiscoveryFailureSemantics` | `pending#CreateEmptyRtgDiscoveryContractVerification` |
+| `RtgDiscoveryBoundaryVerification` | `RtgDiscovery` | `deterministicReads`, `viewsNotSchema`, `noGraphDependency`, `knowledgeEngineerCurated` | `pending#RtgDiscoveryBoundaryVerification` |
 
 Equivalent private algorithms, helpers, storage layouts, and implementation-language inheritance remain implementation choices.

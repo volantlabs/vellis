@@ -4,9 +4,14 @@ Textual SysML v2 under `model/` is the authored design for Bibliotek and Vellis.
 under `docs/model/generated/` explain that model for humans; they are projections, not a second
 contract source.
 
-The model remains in `shadow` status until a pinned formal validator and human acceptance complete
-the gates in `model/model-status.json`. The former Markdown component specifications are frozen as
-a migration baseline during that interval. New design work belongs in SysML.
+`docs/model/generated/verification-evidence.json` resolves every modeled evidence group to the
+exact test nodes currently available to evaluate it. Repository checks reject accepted component
+evidence groups that resolve only to a path with no concrete tests.
+
+The official Java pilot is pinned and qualified for headless syntax, linking, and semantic
+validation. The model remains in `shadow` status until human acceptance completes the remaining
+gates in `model/model-status.json`. The former Markdown component specifications are frozen as a
+migration baseline during that interval. New design work belongs in SysML.
 
 ## Model products
 
@@ -14,12 +19,14 @@ a migration baseline during that interval. New design work belongs in SysML.
   realization, and evidence traceability vocabulary. Logical semantics stay in native SysML.
 - `model/bibliotek/shared-values/` contains the deliberately narrow language-neutral value layer.
 - `model/bibliotek/components/` contains ten reusable black-box component models.
-- `model/bibliotek/views/` contains native viewpoints and views for reusable structure and behavior.
+- `model/bibliotek/views/` contains native reusable views for structure, behavior, requirements,
+  satisfaction, and verification.
 - `model/vellis/` contains the Vellis application composition, façade, use cases, and current
   Python/MCP realizations.
-- `model/vellis/views/` contains native viewpoints and views for application composition and use cases.
-- `model/implementation-drift.yaml` records the small set of known implementation disagreements
-  without promoting current Python behavior into intended design.
+- `model/vellis/views/` contains native views for application composition, use cases, requirements,
+  satisfaction, verification, and realization.
+- `model/realizations/PythonImplementationDrift.sysml` relates known implementation disagreements
+  from logical model elements to Python realizations without changing intended design.
 
 Bibliotek imports the foundation and never imports Vellis. Vellis imports Bibliotek. Derived KPAR
 packaging preserves this direction so the library and application can later move to separate
@@ -104,8 +111,8 @@ default mode.
 
 - Use parts for active components and applications, attributes for values, and items for things
   whose identity or lifecycle matters.
-- Give stable public identities with native SysML short names, including qualified component IDs and
-  exact external enum spellings where needed.
+- Give stable public identities with native SysML short names. Use the logical literal name when an
+  enum value is itself a public encoding; otherwise define the encoding in a realization codec.
 - Give every invocable action explicit multiplicity. `perform action` is the native
   provided-operation relationship and needs no duplicate role annotation.
 - Use typed action inputs for invocation-scoped collaborators and multiplicited `ref part` features
@@ -116,9 +123,16 @@ default mode.
 - Keep construction actions separate from actions performed by an existing component.
 - Use ordinary owned features for component-owned state, `derived` features for projections, and
   `ref` features for independently existing durable resources or collaborators.
-- Use dependencies and documentation to expose contract-significant action-to-state and
-  action-to-collaborator relationships; use requirements for exact effects and no-effect guarantees.
-- Use requirements for testable obligations and constraints only for complete predicates. Use an
+- Use typed dependencies for action-to-state access and allowed dependency topology. Model a call as
+  a nested action performed by its provider. Explicitly redefine the typed action parameters and
+  bind or flow every contract-significant input and output.
+- Put every testable obligation in a requirement `require constraint`. A required constraint may be
+  a complete Boolean predicate or normative text when exact formalization would reduce clarity.
+  Top-level documentation is not a truth condition.
+- Assert which part or action usage satisfies each accepted requirement. Verify it separately with a
+  verification case whose subject is compatible with the requirement subject and whose evidence ID
+  names a concrete evidence group.
+- Use constraints only for complete predicates. Use an
   enum-valued status plus transition obligations for request-driven record lifecycle; use an
   exhibited state when activated behavior or event-triggered transitions are actually modeled.
 - Use a calculation only when it defines a real reusable computation with an evaluable result.
@@ -127,10 +141,11 @@ default mode.
   connection or transfer semantics are part of the current contract.
 - A modeled interface has typed port ends and explicit contract-significant flows. Empty ports are
   not generic software API notation.
-- Define viewpoints for recurring stakeholder concerns and views that expose and filter model
-  elements; generated prose and diagrams remain projections rather than parallel specifications.
-- Bibliotek and Vellis public field names and enum literals encode as `lower_snake_case` by default.
-  Native short names record exact exceptions such as abbreviated query operators.
+- Use view definitions for reusable projections. Define a viewpoint only when explicit stakeholders
+  and concerns constrain the view; generated prose and diagrams remain projections.
+- SysML names identify logical model features and literals; they do not implicitly define a wire
+  encoding. When an external spelling is contract-significant, model it as an explicit logical
+  literal or in a realization codec rather than deriving it from identifier style.
 
 The JSON storage, query, and controller models are the representative patterns: respectively
 durable state, declarative matching, and externally meaningful orchestration.
@@ -138,10 +153,11 @@ durable state, declarative matching, and externally meaningful orchestration.
 ## Generated views and checks
 
 `just model-render` produces one page per Bibliotek component, Bibliotek and Vellis indexes,
-action/state/invariant tables, composition and use-case projections, and the static Vellis application
-manifest. `just model-check` rejects stale outputs, empty or semantically hollow public actions,
+action/state/requirement/satisfaction/verification tables, composition and use-case projections,
+and the static Vellis application manifest. `just model-check` rejects stale outputs, empty or semantically hollow public actions,
 missing or signature-incompatible protocol operations, accepted Markdown fields/failures/invariants
-that disappeared during shadow migration, requirements without verification objectives, unresolved
+that disappeared during shadow migration, requirements without required constraints, satisfiers, or
+subject-compatible verification objectives, untyped state access, unresolved
 implementation bindings, invalid referential-role bindings, the wrong Vellis role/tool surface, and
 unrecorded drift. These shadow comparisons are repository migration gates, not part of the reusable
 component-authoring skills.
@@ -157,16 +173,18 @@ just model-package
 just model-handoff TARGET=component.storage.json_file
 ```
 
-The repository profile checker is not a substitute for a formal parser. Run
-`uv run python tools/model_tool.py check --require-external` for the formal gate after the official
-Java pilot (or a conformant alternative behind the same adapter) is pinned and qualified. Until
-then, KPAR outputs remain explicitly marked shadow candidates and Markdown retirement remains
-blocked.
+The repository profile checker is not a substitute for formal validation. `just model-setup`
+downloads checksum-pinned copies of the official 2025-06 Java pilot, its SysML 2.0/KerML 1.0
+libraries, and a Java 21 runtime into the ignored `model/.cache/` directory. `just model-check`
+then runs both the repository profile and the official validator; `just model-check-formal` runs
+the latter directly. The published BNF is useful for syntax tooling, but it cannot replace the
+pilot's linking, type, multiplicity, specialization, and other semantic diagnostics. KPAR outputs
+remain shadow candidates and Markdown retirement remains blocked until human acceptance.
 
 ## Semantic discoveries
 
 Changing representation does not authorize changing accepted boundaries. Record a genuine Python
-disagreement in `model/implementation-drift.yaml`. Treat boundary, ownership, lifecycle,
+disagreement in `model/realizations/PythonImplementationDrift.sysml`. Treat boundary, ownership, lifecycle,
 dependency, and invariant changes as explicit proposals for human approval. Implementation-only
 helpers and incidental behavior stay outside the model unless they acquire independent,
 language-neutral contract meaning.

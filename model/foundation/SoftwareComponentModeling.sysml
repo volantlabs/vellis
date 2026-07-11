@@ -20,26 +20,44 @@ library package SoftwareComponentModeling {
         enum unimplemented;
     }
 
+    enum def StateAccessKind {
+        enum read;
+        enum create;
+        enum write;
+        enum delete;
+        enum noStateEffect;
+    }
+
     metadata def SpecificationStatus {
+        :> annotatedElement : SysML::PartDefinition;
         attribute lifecycleStatus : SpecLifecycle;
         attribute owner : String;
         doc /* Human governance status only; model identity is carried by the element's SysML short name. */
     }
 
     metadata def FailureContract {
+        :> annotatedElement : SysML::ActionDefinition;
+        :> annotatedElement : SysML::ActionUsage;
         attribute errorIds[0..*] : String;
-        attribute obligation : String;
+        doc /* Identifies concrete public failure outcomes. Normative failure effects belong to requirements. */
+    }
+
+    metadata def StateAccess {
+        :>> annotatedElement : SysML::Dependency;
+        attribute kind : StateAccessKind;
     }
 
     metadata def ImplementationBinding {
-        attribute language : ImplementationLanguage;
+        :> annotatedElement : SysML::PartDefinition;
+        :> annotatedElement : SysML::AllocationUsage;
+        attribute implementationLanguage : ImplementationLanguage;
         attribute codeRoot : String;
         attribute symbol : String;
         attribute realization : String;
     }
 
     metadata def EvidenceBinding {
-        attribute verificationId : String;
+        :>> annotatedElement : SysML::VerificationCaseDefinition;
         attribute evidenceId : String;
         attribute implementationScope : String;
     }

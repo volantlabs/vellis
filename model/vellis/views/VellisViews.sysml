@@ -3,26 +3,27 @@ package VellisViews {
     private import Vellis::*;
     private import VellisUseCases::*;
 
-    viewpoint def VellisCompositionViewpoint {
-        require constraint {
-            doc /* Show the Vellis application roles and the identity bindings that compose its Bibliotek components. */
-        }
-    }
-
-    viewpoint def VellisUseCaseViewpoint {
-        require constraint {
-            doc /* Show actor-visible Vellis outcomes and their application subject. */
-        }
-    }
-
     view def VellisCompositionView {
-        viewpoint composition : VellisCompositionViewpoint;
+        doc /* Vellis roles, equality bindings, and logical-to-realization allocations. */
+        filter @SysML::PartDefinition;
         filter @SysML::PartUsage;
+        filter @SysML::BindingConnectorAsUsage;
+        filter @SysML::AllocationUsage;
     }
 
     view def VellisUseCaseView {
-        viewpoint outcomes : VellisUseCaseViewpoint;
+        doc /* Actor-visible outcomes, internal actions, and externally meaningful succession. */
+        filter @SysML::UseCaseDefinition;
         filter @SysML::UseCaseUsage;
+        filter @SysML::ActionUsage;
+        filter @SysML::SuccessionAsUsage;
+    }
+
+    view def VellisRequirementVerificationView {
+        doc /* Application requirements, satisfiers, verification cases, and objectives. */
+        filter @SysML::RequirementUsage;
+        filter @SysML::SatisfyRequirementUsage;
+        filter @SysML::VerificationCaseDefinition;
     }
 
     view vellisComposition : VellisCompositionView {
@@ -32,6 +33,11 @@ package VellisViews {
 
     view vellisUseCases : VellisUseCaseView {
         expose VellisUseCases::**;
+        render asElementTable;
+    }
+
+    view vellisRequirementVerification : VellisRequirementVerificationView {
+        expose Vellis::**;
         render asElementTable;
     }
 }

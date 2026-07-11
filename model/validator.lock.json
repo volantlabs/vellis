@@ -1,0 +1,37 @@
+{
+  "provider": "Systems-Modeling/SysML-v2-Pilot-Implementation",
+  "release": "2025-06",
+  "implementation_version": "0.50.0",
+  "language_baseline": {
+    "sysml": "2.0",
+    "kerml": "1.0"
+  },
+  "kernel": {
+    "url": "https://github.com/Systems-Modeling/SysML-v2-Pilot-Implementation/releases/download/2025-06/jupyter-sysml-kernel-0.50.0.zip",
+    "sha256": "f6c9fa760ff198c21ceae08fc377f4b7366cf12671c3cbef90ebd3e526103060",
+    "jar": "sysml/jupyter-sysml-kernel-0.50.0-all.jar",
+    "library": "sysml/sysml.library"
+  },
+  "java": {
+    "version": "21.0.11+10",
+    "distribution": "Eclipse Temurin JRE",
+    "platforms": {
+      "darwin-arm64": {
+        "url": "https://github.com/adoptium/temurin21-binaries/releases/download/jdk-21.0.11%2B10/OpenJDK21U-jre_aarch64_mac_hotspot_21.0.11_10.tar.gz",
+        "sha256": "4b7a8cd23102c251c8b8be42a9a5f1263fb337cf1037f6f64b25f3070efe4b76"
+      },
+      "darwin-x86_64": {
+        "url": "https://github.com/adoptium/temurin21-binaries/releases/download/jdk-21.0.11%2B10/OpenJDK21U-jre_x64_mac_hotspot_21.0.11_10.tar.gz",
+        "sha256": "b341fb8ed5b70d49066b98176bc98e30f55082192403deb60e0cd5948b6e7923"
+      },
+      "linux-arm64": {
+        "url": "https://github.com/adoptium/temurin21-binaries/releases/download/jdk-21.0.11%2B10/OpenJDK21U-jre_aarch64_linux_hotspot_21.0.11_10.tar.gz",
+        "sha256": "fa23d9d9945053e67bcc7638410eabf1e17a7672c7c95a24f70cd08b8407d36e"
+      },
+      "linux-x86_64": {
+        "url": "https://github.com/adoptium/temurin21-binaries/releases/download/jdk-21.0.11%2B10/OpenJDK21U-jre_x64_linux_hotspot_21.0.11_10.tar.gz",
+        "sha256": "e5038aae3ca9ff670bc696496b0728dbd23d280026bad30291cb919221ecfdcb"
+      }
+    }
+  }
+}

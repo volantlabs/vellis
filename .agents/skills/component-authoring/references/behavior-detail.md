@@ -29,7 +29,14 @@ occurrence ordering; it is not a call graph.
 
 A calculation defines a reusable computation and must return a result. A constraint is a complete
 Boolean predicate. When a rule cannot be expressed completely and correctly with the supported
-expression subset, use a requirement with normative text rather than a hollow formal construct.
+expression subset, put normative text inside a requirement `require constraint` rather than using
+top-level documentation or a hollow formal construct.
+
+Use native action decomposition for contract-significant orchestration. A nested action represents
+the invoked occurrence; a provider part performs it; its directed parameters redefine the typed
+action parameters and bind or flow contract values;
+successions constrain externally meaningful order. A dependency may record allowed topology or
+state access, but does not itself mean that an invocation occurs.
 
 ## Leave open
 

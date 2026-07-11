@@ -54,59 +54,85 @@ Generated from textual SysML v2 by `just model-render`; do not edit by hand.
 
 ## Action and state effects
 
-| Action | State / collaborator | Modeled effect |
+| Action | State / collaborator | Access | Modeled effect |
+|---|---|---|---|
+| `putAnchor` | `anchors` | `write` | atomically create/replace anchor and maintain indexes. |
+| `putDataObject` | `dataObjects` | `write` | atomically create/replace data, associations, and indexes. |
+| `putLink` | `links` | `write` | atomically create/replace link and indexes. |
+| `associateData` | `anchorDataAssociations` | `write` | idempotently add symmetric direct association. |
+| `dissociateData` | `anchorDataAssociations` | `write` | remove association and complete cascade atomically. |
+| `deleteAnchor` | `anchors` | `delete` | remove anchor and complete cascade atomically. |
+| `deleteDataObject` | `dataObjects` | `delete` | remove data and complete cascade atomically. |
+| `deleteLink` | `links` | `delete` | remove exactly one link and index entries. |
+| `exportSnapshot` | `anchors` | `read` | read all canonical records, associations, and their stable identities without mutation. |
+| `getObject` | `anchors` | `read` | read the one global object namespace across anchors, data objects, and links. |
+| `listByType` | `derivedIndexes` | `read` | read the derived type index and canonical records without mutation. |
+| `listAnchorData` | `anchorDataAssociations` | `read` | read direct anchor-to-data associations without mutation. |
+| `listDataAnchors` | `anchorDataAssociations` | `read` | read inverse direct associations without mutation. |
+| `listIncidentLinks` | `derivedIndexes` | `read` | read incident-link indexes and canonical links without mutation. |
+| `countByType` | `derivedIndexes` | `read` | derive deterministic counts without mutation. |
+| `previewDeleteAnchor` | `anchors` | `read` | compute the exact cascade from current canonical state with no state effect. |
+| `previewDeleteDataObject` | `dataObjects` | `read` | compute the exact cascade from current canonical state with no state effect. |
+| `previewDissociateData` | `anchorDataAssociations` | `read` | compute the exact dissociation cascade from current canonical state with no state effect. |
+
+## Native action behavior
+
+| Public action | Nested semantic actions | Observable successions |
 |---|---|---|
-| `putAnchor` | `anchors` | atomically create/replace anchor and maintain indexes. |
-| `putDataObject` | `dataObjects` | atomically create/replace data, associations, and indexes. |
-| `putLink` | `links` | atomically create/replace link and indexes. |
-| `associateData` | `anchorDataAssociations` | idempotently add symmetric direct association. |
-| `dissociateData` | `anchorDataAssociations` | remove association and complete cascade atomically. |
-| `deleteAnchor` | `anchors` | remove anchor and complete cascade atomically. |
-| `deleteDataObject` | `dataObjects` | remove data and complete cascade atomically. |
-| `deleteLink` | `links` | remove exactly one link and index entries. |
-| `exportSnapshot` | — | read complete canonical state. |
-| `getObject` | — | direct unfiltered read. |
-| `listByType` | — | read derived type index in stable order. |
-| `listAnchorData` | — | read direct anchor-data index. |
-| `listDataAnchors` | — | read inverse direct association index. |
-| `listIncidentLinks` | — | read derived incident-link index. |
-| `countByType` | — | derive counts from canonical records. |
-| `previewDeleteAnchor` | — | compute exact anchor cascade without mutation. |
-| `previewDeleteDataObject` | — | compute exact data cascade without mutation. |
-| `previewDissociateData` | — | compute exact dissociation cascade without mutation. |
+| — | — | No action decomposition required at this boundary. |
 
 ## Invariants and behavioral obligations
 
-| Stable ID | Modeled obligation |
-|---|---|
-| `contract.rtg.graph.put_effect` | Puts generate a UUID when omitted, preserve a supplied valid UUID, normalize missing system.live to true, fully replace the named record fields, preserve unrelated records, and atomically maintain associations and indexes. |
-| `contract.rtg.graph.association_effect` | Association is a direct identity-free many-to-many relation. Repeated association is idempotent; removing the last anchor grounds deletion of the data object and its incident links. |
-| `contract.rtg.graph.delete_effect` | Deletes return the complete cascade with always-present result lists and leave no dangling links or associations; rejected deletes have no effect. |
-| `contract.rtg.graph.preview_effect` | Each preview returns exactly the cascade the paired mutation would produce from the same state and changes no canonical or derived state. |
-| `contract.rtg.graph.snapshot_effect` | Export preserves UUIDs, types, endpoints, properties, system metadata, and direct associations without filtering. Import validates the whole candidate and rebuilds derived indexes. |
-| `invariant.rtg.graph.global_uuid_uniqueness` | UUIDs are globally unique across graph object kinds. |
-| `invariant.rtg.graph.well_formed_uuids` | Every stored identity is a well-formed UUID. |
-| `invariant.rtg.graph.uuid_generation` | Generated identities are UUIDs and valid caller identities are preserved. |
-| `invariant.rtg.graph.well_formed_types` | Every object has a non-empty type key. |
-| `invariant.rtg.graph.single_global_type_namespace` | A type key belongs to only one object kind. |
-| `invariant.rtg.graph.many_to_many_data_association` | Anchors and data objects support direct many-to-many association. |
-| `invariant.rtg.graph.no_unassociated_data_objects` | Every stored data object has at least one anchor. |
-| `invariant.rtg.graph.association_indexes_reference_existing_objects` | Associations reference existing anchors and data objects. |
-| `invariant.rtg.graph.no_association_objects` | Direct associations have no object identity, type, metadata, or link representation. |
-| `invariant.rtg.graph.valid_link_endpoints` | Link endpoints exist and are anchors or data objects. |
-| `invariant.rtg.graph.no_dangling_references_after_delete` | Deletes leave no dangling association or link references. |
-| `invariant.rtg.graph.no_link_to_link_edges` | Links cannot be link endpoints. |
-| `invariant.rtg.graph.type_indexes_match_canonical_maps` | Derived type indexes equal canonical object membership. |
-| `invariant.rtg.graph.association_indexes_are_symmetric` | Both direct association directions agree. |
-| `invariant.rtg.graph.incident_link_indexes_match_canonical_links` | Incident-link indexes derive exactly from canonical links. |
-| `invariant.rtg.graph.json_serializable_property_stores` | Properties and system metadata are JSON-safe. |
-| `invariant.rtg.graph.system_live_boolean` | Missing system.live normalizes to true and supplied live is Boolean. |
-| `invariant.rtg.graph.schema_neutrality` | Graph storage does not enforce application schema or ontology meaning. |
-| `invariant.rtg.graph.anchor_display_name_non_authoritative` | Display name is optional, non-unique, and not identity. |
-| `invariant.rtg.graph.unfiltered_reads` | Base reads never hide objects by live status, visibility, role, or publication. |
-| `invariant.rtg.graph.type_counts_match_canonical_maps` | Counts derive from canonical records and explicit kind/live filters. |
-| `invariant.rtg.graph.mutation_atomicity` | Each mutation preserves every graph invariant or has no effect. |
-| `invariant.rtg.graph.preview_matches_delete` | Preview cascades match their corresponding mutations. |
+| Stable ID | Subject | Satisfier | Required constraint |
+|---|---|---|---|
+| `contract.rtg.graph.put_effect` | `RtgGraph` | `graph` | Puts generate a UUID when omitted, preserve a supplied valid UUID, normalize missing system.live to true, fully replace the named record fields, preserve unrelated records, and atomically maintain associations and indexes. |
+| `contract.rtg.graph.association_effect` | `RtgGraph` | `graph` | Association is a direct identity-free many-to-many relation. Repeated association is idempotent; removing the last anchor grounds deletion of the data object and its incident links. |
+| `contract.rtg.graph.delete_effect` | `RtgGraph` | `graph` | Deletes return the complete cascade with always-present result lists and leave no dangling links or associations; rejected deletes have no effect. |
+| `contract.rtg.graph.preview_effect` | `RtgGraph` | `graph` | Each preview returns exactly the cascade the paired mutation would produce from the same state and changes no canonical or derived state. |
+| `contract.rtg.graph.snapshot_effect` | `RtgGraph` | `graph` | Export preserves UUIDs, types, endpoints, properties, system metadata, and direct associations without filtering. Import validates the whole candidate and rebuilds derived indexes. |
+| `invariant.rtg.graph.global_uuid_uniqueness` | `RtgGraph` | `graph` | UUIDs are globally unique across graph object kinds. |
+| `invariant.rtg.graph.well_formed_uuids` | `RtgGraph` | `graph` | Every stored identity is a well-formed UUID. |
+| `invariant.rtg.graph.uuid_generation` | `RtgGraph` | `graph` | Generated identities are UUIDs and valid caller identities are preserved. |
+| `invariant.rtg.graph.well_formed_types` | `RtgGraph` | `graph` | Every object has a non-empty type key. |
+| `invariant.rtg.graph.single_global_type_namespace` | `RtgGraph` | `graph` | A type key belongs to only one object kind. |
+| `invariant.rtg.graph.many_to_many_data_association` | `RtgGraph` | `graph` | Anchors and data objects support direct many-to-many association. |
+| `invariant.rtg.graph.no_unassociated_data_objects` | `RtgGraph` | `graph` | Every stored data object has at least one anchor. |
+| `invariant.rtg.graph.association_indexes_reference_existing_objects` | `RtgGraph` | `graph` | Associations reference existing anchors and data objects. |
+| `invariant.rtg.graph.no_association_objects` | `RtgGraph` | `graph` | Direct associations have no object identity, type, metadata, or link representation. |
+| `invariant.rtg.graph.valid_link_endpoints` | `RtgGraph` | `graph` | Link endpoints exist and are anchors or data objects. |
+| `invariant.rtg.graph.no_dangling_references_after_delete` | `RtgGraph` | `graph` | Deletes leave no dangling association or link references. |
+| `invariant.rtg.graph.no_link_to_link_edges` | `RtgGraph` | `graph` | Links cannot be link endpoints. |
+| `invariant.rtg.graph.type_indexes_match_canonical_maps` | `RtgGraph` | `graph` | Derived type indexes equal canonical object membership. |
+| `invariant.rtg.graph.association_indexes_are_symmetric` | `RtgGraph` | `graph` | Both direct association directions agree. |
+| `invariant.rtg.graph.incident_link_indexes_match_canonical_links` | `RtgGraph` | `graph` | Incident-link indexes derive exactly from canonical links. |
+| `invariant.rtg.graph.json_serializable_property_stores` | `RtgGraph` | `graph` | Properties and system metadata are JSON-safe. |
+| `invariant.rtg.graph.system_live_boolean` | `RtgGraph` | `graph` | Missing system.live normalizes to true and supplied live is Boolean. |
+| `invariant.rtg.graph.schema_neutrality` | `RtgGraph` | `graph` | Graph storage does not enforce application schema or ontology meaning. |
+| `invariant.rtg.graph.anchor_display_name_non_authoritative` | `RtgGraph` | `graph` | Display name is optional, non-unique, and not identity. |
+| `invariant.rtg.graph.unfiltered_reads` | `RtgGraph` | `graph` | Base reads never hide objects by live status, visibility, role, or publication. |
+| `invariant.rtg.graph.type_counts_match_canonical_maps` | `RtgGraph` | `graph` | Counts derive from canonical records and explicit kind/live filters. |
+| `invariant.rtg.graph.mutation_atomicity` | `RtgGraph` | `graph` | Each mutation preserves every graph invariant or has no effect. |
+| `invariant.rtg.graph.preview_matches_delete` | `RtgGraph` | `graph` | Preview cascades match their corresponding mutations. |
+| `contract.rtg.graph.export_graph_snapshot.failures` | `ExportGraphSnapshot` | `graph.exportSnapshot` | Export has no declared domain failure. |
+| `contract.rtg.graph.put_anchor.failures` | `PutAnchor` | `graph.putAnchor` | Rejected writes have no effect. |
+| `contract.rtg.graph.put_data_object.failures` | `PutDataObject` | `graph.putDataObject` | Rejected writes change neither records nor indexes. |
+| `contract.rtg.graph.put_link.failures` | `PutLink` | `graph.putLink` | Rejected writes change neither links nor incident indexes. |
+| `contract.rtg.graph.associate_data.failures` | `AssociateData` | `graph.associateData` | Failure has no effect. |
+| `contract.rtg.graph.dissociate_data.failures` | `DissociateData` | `graph.dissociateData` | Failure has no effect. |
+| `contract.rtg.graph.delete_anchor.failures` | `DeleteAnchor` | `graph.deleteAnchor` | Failure has no effect and success leaves no dangling reference. |
+| `contract.rtg.graph.delete_data_object.failures` | `DeleteDataObject` | `graph.deleteDataObject` | Failure has no effect. |
+| `contract.rtg.graph.delete_link.failures` | `DeleteLink` | `graph.deleteLink` | Failure has no effect. |
+| `contract.rtg.graph.preview_delete_anchor.failures` | `PreviewDeleteAnchor` | `graph.previewDeleteAnchor` | Success and failure are state-neutral. |
+| `contract.rtg.graph.preview_delete_data_object.failures` | `PreviewDeleteDataObject` | `graph.previewDeleteDataObject` | Success and failure are state-neutral. |
+| `contract.rtg.graph.preview_dissociate_data.failures` | `PreviewDissociateData` | `graph.previewDissociateData` | Success and failure are state-neutral. |
+| `contract.rtg.graph.get_graph_object.failures` | `GetGraphObject` | `graph.getObject` | Read failure has no effect. |
+| `contract.rtg.graph.list_graph_objects_by_type.failures` | `ListGraphObjectsByType` | `graph.listByType` | Read failure has no effect. |
+| `contract.rtg.graph.list_anchor_data.failures` | `ListAnchorData` | `graph.listAnchorData` | Read failure has no effect. |
+| `contract.rtg.graph.list_data_anchors.failures` | `ListDataAnchors` | `graph.listDataAnchors` | Read failure has no effect. |
+| `contract.rtg.graph.list_incident_links.failures` | `ListIncidentLinks` | `graph.listIncidentLinks` | Invalid direction is rejected before reading and failure has no effect. |
+| `contract.rtg.graph.count_graph_objects_by_type.failures` | `CountGraphObjectsByType` | `graph.countByType` | Read failure has no effect. |
+| `contract.rtg.graph.create_empty_rtg_graph.failures` | `CreateEmptyRtgGraph` | `createEmptyRtgGraphSubject` | Construction has no declared domain failure. |
+| `contract.rtg.graph.import_rtg_graph_snapshot.failures` | `ImportRtgGraphSnapshot` | `importRtgGraphSnapshotSubject` | Failure returns no partially reconstructed graph. |
 
 ## Public values and items
 
@@ -143,15 +169,35 @@ Generated from textual SysML v2 by `just model-render`; do not edit by hand.
 
 ## Public enumerations
 
-| Enumeration | Model and external values |
+| Enumeration | Logical literals |
 |---|---|
-| `RtgObjectKind` | `anchor`, `dataObject` → `data_object`, `link` |
+| `RtgObjectKind` | `anchor`, `data_object`, `link` |
 | `RtgLinkDirection` | `source`, `target`, `both` |
 
 ## Verification
 
-| Verification | Objectives | Evidence |
-|---|---|---|
-| `RtgGraphBoundaryVerification` | `putEffect`, `associationEffect`, `deleteEffect`, `previewEffect`, `snapshotEffect`, `globalUuidUniqueness`, `wellFormedUuids`, `uuidGeneration`, `wellFormedTypes`, `singleGlobalTypeNamespace`, `manyToManyDataAssociation`, `noUnassociatedDataObjects`, `associationIndexesReferenceExistingObjects`, `noAssociationObjects`, `validLinkEndpoints`, `noDanglingReferencesAfterDelete`, `noLinkToLinkEdges`, `typeIndexesMatchCanonicalMaps`, `associationIndexesAreSymmetric`, `incidentLinkIndexesMatchCanonicalLinks`, `jsonSerializablePropertyStores`, `systemLiveBoolean`, `schemaNeutrality`, `anchorDisplayNameNonAuthoritative`, `unfilteredReads`, `typeCountsMatchCanonicalMaps`, `mutationAtomicity`, `previewMatchesDelete` | `components/rtg/graph/tests/test_rtg_graph_contract.py` |
+| Verification | Subject | Objectives | Evidence |
+|---|---|---|---|
+| `ExportGraphSnapshotContractVerification` | `ExportGraphSnapshot` | `exportGraphSnapshotFailureSemantics` | `components/rtg/graph/tests/test_rtg_graph_contract.py#ExportGraphSnapshotContractVerification` |
+| `PutAnchorContractVerification` | `PutAnchor` | `putAnchorFailureSemantics` | `components/rtg/graph/tests/test_rtg_graph_contract.py#PutAnchorContractVerification` |
+| `PutDataObjectContractVerification` | `PutDataObject` | `putDataObjectFailureSemantics` | `components/rtg/graph/tests/test_rtg_graph_contract.py#PutDataObjectContractVerification` |
+| `PutLinkContractVerification` | `PutLink` | `putLinkFailureSemantics` | `components/rtg/graph/tests/test_rtg_graph_contract.py#PutLinkContractVerification` |
+| `AssociateDataContractVerification` | `AssociateData` | `associateDataFailureSemantics` | `components/rtg/graph/tests/test_rtg_graph_contract.py#AssociateDataContractVerification` |
+| `DissociateDataContractVerification` | `DissociateData` | `dissociateDataFailureSemantics` | `components/rtg/graph/tests/test_rtg_graph_contract.py#DissociateDataContractVerification` |
+| `DeleteAnchorContractVerification` | `DeleteAnchor` | `deleteAnchorFailureSemantics` | `components/rtg/graph/tests/test_rtg_graph_contract.py#DeleteAnchorContractVerification` |
+| `DeleteDataObjectContractVerification` | `DeleteDataObject` | `deleteDataObjectFailureSemantics` | `components/rtg/graph/tests/test_rtg_graph_contract.py#DeleteDataObjectContractVerification` |
+| `DeleteLinkContractVerification` | `DeleteLink` | `deleteLinkFailureSemantics` | `components/rtg/graph/tests/test_rtg_graph_contract.py#DeleteLinkContractVerification` |
+| `PreviewDeleteAnchorContractVerification` | `PreviewDeleteAnchor` | `previewDeleteAnchorFailureSemantics` | `components/rtg/graph/tests/test_rtg_graph_contract.py#PreviewDeleteAnchorContractVerification` |
+| `PreviewDeleteDataObjectContractVerification` | `PreviewDeleteDataObject` | `previewDeleteDataObjectFailureSemantics` | `components/rtg/graph/tests/test_rtg_graph_contract.py#PreviewDeleteDataObjectContractVerification` |
+| `PreviewDissociateDataContractVerification` | `PreviewDissociateData` | `previewDissociateDataFailureSemantics` | `components/rtg/graph/tests/test_rtg_graph_contract.py#PreviewDissociateDataContractVerification` |
+| `GetGraphObjectContractVerification` | `GetGraphObject` | `getGraphObjectFailureSemantics` | `components/rtg/graph/tests/test_rtg_graph_contract.py#GetGraphObjectContractVerification` |
+| `ListGraphObjectsByTypeContractVerification` | `ListGraphObjectsByType` | `listGraphObjectsByTypeFailureSemantics` | `components/rtg/graph/tests/test_rtg_graph_contract.py#ListGraphObjectsByTypeContractVerification` |
+| `ListAnchorDataContractVerification` | `ListAnchorData` | `listAnchorDataFailureSemantics` | `components/rtg/graph/tests/test_rtg_graph_contract.py#ListAnchorDataContractVerification` |
+| `ListDataAnchorsContractVerification` | `ListDataAnchors` | `listDataAnchorsFailureSemantics` | `components/rtg/graph/tests/test_rtg_graph_contract.py#ListDataAnchorsContractVerification` |
+| `ListIncidentLinksContractVerification` | `ListIncidentLinks` | `listIncidentLinksFailureSemantics` | `components/rtg/graph/tests/test_rtg_graph_contract.py#ListIncidentLinksContractVerification` |
+| `CountGraphObjectsByTypeContractVerification` | `CountGraphObjectsByType` | `countGraphObjectsByTypeFailureSemantics` | `components/rtg/graph/tests/test_rtg_graph_contract.py#CountGraphObjectsByTypeContractVerification` |
+| `CreateEmptyRtgGraphContractVerification` | `CreateEmptyRtgGraph` | `createEmptyRtgGraphFailureSemantics` | `components/rtg/graph/tests/test_rtg_graph_contract.py#CreateEmptyRtgGraphContractVerification` |
+| `ImportRtgGraphSnapshotContractVerification` | `ImportRtgGraphSnapshot` | `importRtgGraphSnapshotFailureSemantics` | `components/rtg/graph/tests/test_rtg_graph_contract.py#ImportRtgGraphSnapshotContractVerification` |
+| `RtgGraphBoundaryVerification` | `RtgGraph` | `putEffect`, `associationEffect`, `deleteEffect`, `previewEffect`, `snapshotEffect`, `globalUuidUniqueness`, `wellFormedUuids`, `uuidGeneration`, `wellFormedTypes`, `singleGlobalTypeNamespace`, `manyToManyDataAssociation`, `noUnassociatedDataObjects`, `associationIndexesReferenceExistingObjects`, `noAssociationObjects`, `validLinkEndpoints`, `noDanglingReferencesAfterDelete`, `noLinkToLinkEdges`, `typeIndexesMatchCanonicalMaps`, `associationIndexesAreSymmetric`, `incidentLinkIndexesMatchCanonicalLinks`, `jsonSerializablePropertyStores`, `systemLiveBoolean`, `schemaNeutrality`, `anchorDisplayNameNonAuthoritative`, `unfilteredReads`, `typeCountsMatchCanonicalMaps`, `mutationAtomicity`, `previewMatchesDelete` | `components/rtg/graph/tests/test_rtg_graph_contract.py#RtgGraphBoundaryVerification` |
 
 Equivalent private algorithms, helpers, storage layouts, and implementation-language inheritance remain implementation choices.

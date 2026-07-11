@@ -177,9 +177,11 @@ realizations. Human-readable pages under [`docs/model/generated/`](docs/model/ge
 generated projections and must not be edited as alternate specifications.
 
 The model currently remains in shadow status: the former Markdown specifications are frozen as a
-migration baseline until the pinned formal-validator and human model-acceptance gates pass. New
-contract work belongs in SysML, while known implementation disagreements are recorded compactly in
-[`model/implementation-drift.yaml`](model/implementation-drift.yaml). See
+migration baseline until the remaining human model-acceptance gates pass. The pinned official Java
+validator now enforces SysML syntax, linking, and semantic validation. New
+contract work belongs in SysML, while known implementation disagreements are related to their
+logical elements and Python realizations in
+[`model/realizations/PythonImplementationDrift.sysml`](model/realizations/PythonImplementationDrift.sysml). See
 [`docs/sysml-modeling.md`](docs/sysml-modeling.md) for the modeling profile and gate status.
 
 A component model defines:
@@ -264,8 +266,9 @@ Useful recipes:
 - `just typecheck`: run BasedPyright checks
 - `just format`: format Python code with Ruff
 - `just build`: build source and wheel distributions for release validation
-- `just model-setup`: fetch and verify pinned SysML/KerML assets and inspect the validator gate
-- `just model-check`: check model structure, architecture, realization drift, and generated files
+- `just model-setup`: fetch and verify the official Java validator, formal libraries, and Java runtime
+- `just model-check`: run formal SysML validation plus architecture, realization, and generated-file checks
+- `just model-check-formal`: run the pinned official SysML validator directly
 - `just model-render`: regenerate model views and the static application manifest
 - `just model-package`: build independently packageable shadow KPAR candidates
 - `just model-handoff TARGET=<stable-id>`: inspect a model slice for an implementation handoff

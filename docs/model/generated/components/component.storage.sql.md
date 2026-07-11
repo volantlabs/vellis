@@ -12,7 +12,7 @@ Generated from textual SysML v2 by `just model-render`; do not edit by hand.
 |---|---|---|---|---|
 | `execute` | `ExecuteSql` | in `statement: String`; in `parameters: SqlParameters`; out `result: SqlExecutionResult` | `SqlStatementInvalid`, `SqlParameterInvalid`, `SqlExecutionFailed`, `SqlStoragePermissionDenied` | Execute one data-definition or data-manipulation statement, return affected-row metadata, and never return result rows. |
 | `query` | `QuerySql` | in `statement: String`; in `parameters: SqlParameters`; out `result: SqlQueryResult` | `SqlStatementInvalid`, `SqlParameterInvalid`, `SqlExecutionFailed`, `SqlStoragePermissionDenied` | Execute one row-returning statement and return rows in database result order as column-name keyed JSON-compatible scalar objects. |
-| `transaction` | `ExecuteSqlTransaction` | in `operations: SqlOperation[0..*]`; out `result: SqlTransactionResult` | `SqlStatementInvalid`, `SqlParameterInvalid`, `SqlTransactionFailed`, `SqlStoragePermissionDenied` | Execute operations in request order in one SQLite transaction and return corresponding results in that order. |
+| `transaction` | `ExecuteSqlTransaction` | in `operations: SqlOperation[0..*]`; out `result: SqlTransactionResult` | `SqlStatementInvalid`, `SqlParameterInvalid`, `SqlTransactionFailed`, `SqlStoragePermissionDenied` | Execute operations whose parameters satisfy SqlParametersWellFormed in request order in one SQLite transaction and return corresponding results in that order. |
 
 ## Construction actions
 
@@ -34,31 +34,41 @@ Generated from textual SysML v2 by `just model-render`; do not edit by hand.
 
 ## Action and state effects
 
-| Action | State / collaborator | Modeled effect |
+| Action | State / collaborator | Access | Modeled effect |
+|---|---|---|---|
+| `execute` | `database` | `write` | apply one caller statement under serialized handle access. |
+| `query` | `database` | `read` | return database-ordered JSON-compatible rows without mutation. |
+| `transaction` | `database` | `write` | apply request-ordered operations as one atomic SQLite transaction. |
+
+## Native action behavior
+
+| Public action | Nested semantic actions | Observable successions |
 |---|---|---|
-| `execute` | `database` | apply one caller statement under serialized handle access. |
-| `query` | `database` | return database-ordered JSON-compatible rows without mutation. |
-| `transaction` | `database` | apply request-ordered operations as one atomic SQLite transaction. |
+| — | — | No action decomposition required at this boundary. |
 
 ## Invariants and behavioral obligations
 
-| Stable ID | Modeled obligation |
-|---|---|
-| `contract.storage.sql.execute_effect` | Success applies exactly one statement and reports affected rows and an optional inserted-row identity; callers use query for rows. |
-| `contract.storage.sql.query_effect` | Success returns deterministic column-name keyed rows in database result order; scalar/null values are JSON-compatible and serialized JSON text remains uninterpreted. |
-| `contract.storage.sql.transaction_effect` | Operations execute and produce results in caller order and either all commit or all roll back. |
-| `contract.storage.sql.serialized_handle_access` | One opened handle serializes use of its SQLite connection so worker-thread callers do not observe connection thread affinity. |
-| `invariant.storage.sql.no_implicit_database_change` | A handle never changes databases implicitly. |
-| `invariant.storage.sql.transaction_atomicity` | A transaction commits all operations or none. |
-| `invariant.storage.sql.generic_storage` | Storage owns no RTG tables, ledger policy, replay, migrations, authorization, ORM mapping, or domain interpretation. |
-| `invariant.storage.sql.json_compatible_rows` | Query result rows contain only JSON-compatible scalar values or null. |
+| Stable ID | Subject | Satisfier | Required constraint |
+|---|---|---|---|
+| `contract.storage.sql.execute_effect` | `ExecuteSql` | `storage.execute` | Success applies exactly one statement and reports affected rows and an optional inserted-row identity; callers use query for rows. |
+| `contract.storage.sql.query_effect` | `QuerySql` | `storage.query` | Success returns deterministic column-name keyed rows in database result order; scalar/null values are JSON-compatible and serialized JSON text remains uninterpreted. |
+| `contract.storage.sql.transaction_effect` | `ExecuteSqlTransaction` | `storage.transaction` | Operations execute and produce results in caller order and either all commit or all roll back. |
+| `contract.storage.sql.serialized_handle_access` | `SqlStorage` | `storage` | One opened handle serializes use of its SQLite connection so worker-thread callers do not observe connection thread affinity. |
+| `invariant.storage.sql.no_implicit_database_change` | `SqlStorage` | `storage` | A handle never changes databases implicitly. |
+| `invariant.storage.sql.transaction_atomicity` | `SqlStorage` | `storage` | A transaction commits all operations or none. |
+| `invariant.storage.sql.generic_storage` | `SqlStorage` | `storage` | Storage owns no RTG tables, ledger policy, replay, migrations, authorization, ORM mapping, or domain interpretation. |
+| `invariant.storage.sql.json_compatible_rows` | `SqlStorage` | `storage` | Query result rows contain only JSON-compatible scalar values or null. |
+| `contract.storage.sql.execute_sql.failures` | `ExecuteSql` | `storage.execute` | A rejected or failed statement is rolled back and the opened handle remains usable. |
+| `contract.storage.sql.query_sql.failures` | `QuerySql` | `storage.query` | Failure changes no database state and exposes no application-specific row mapping. |
+| `contract.storage.sql.execute_sql_transaction.failures` | `ExecuteSqlTransaction` | `storage.transaction` | Every operation commits or every operation rolls back. |
+| `contract.storage.sql.open_sql_storage.failures` | `OpenSqlStorage` | `openSqlStorageSubject` | Failure returns no usable handle and never redirects to another database. |
 
 ## Public values and items
 
 | Public definition | Kind | Fields | Meaning |
 |---|---|---|---|
 | `SqlScalar` | `attribute` | — | One SQL parameter value: null, Boolean, number, or string. Query results use only these JSON-compatible scalar kinds. |
-| `SqlParameters` | `attribute` | `positional[0..*]: SqlScalar`, `named: JsonObject` | Exactly one positional or named parameter representation is used for an invocation. Empty positional parameters are the default. |
+| `SqlParameters` | `attribute` | `kind: SqlParameterKind` = `SqlParameterKind::positional`, `positional[0..*]: SqlScalar`, `named[0..1]: JsonObject` | Exactly one positional or named parameter representation is used for an invocation. Empty positional parameters are the default. |
 | `SqlOperation` | `attribute` | `statement: String`, `parameters: SqlParameters`, `returnsRows: Boolean` = `false` | One execute or query operation in a transaction; returnsRows selects its result kind. |
 | `SqlRow` | `attribute` | `values: JsonObject` | Defined by its typed fields and action requirements. |
 | `SqlOperationResult` | `attribute` | — | One execution or query result in transaction request order. |
@@ -76,14 +86,18 @@ Generated from textual SysML v2 by `just model-render`; do not edit by hand.
 
 ## Public enumerations
 
-| Enumeration | Model and external values |
+| Enumeration | Logical literals |
 |---|---|
-| — | No component-owned public enumerations. |
+| `SqlParameterKind` | `positional`, `named` |
 
 ## Verification
 
-| Verification | Objectives | Evidence |
-|---|---|---|
-| `SqlStorageBoundaryVerification` | `executeEffect`, `queryEffect`, `transactionEffect`, `serializedHandleAccess`, `noImplicitDatabaseChange`, `transactionAtomicity`, `genericStorage`, `jsonCompatibleRows` | `components/storage/sql/tests/test_storage_sql_contract.py` |
+| Verification | Subject | Objectives | Evidence |
+|---|---|---|---|
+| `ExecuteSqlContractVerification` | `ExecuteSql` | `executeEffect`, `executeSqlFailureSemantics` | `components/storage/sql/tests/test_storage_sql_contract.py#ExecuteSqlContractVerification` |
+| `QuerySqlContractVerification` | `QuerySql` | `queryEffect`, `querySqlFailureSemantics` | `components/storage/sql/tests/test_storage_sql_contract.py#QuerySqlContractVerification` |
+| `ExecuteSqlTransactionContractVerification` | `ExecuteSqlTransaction` | `transactionEffect`, `executeSqlTransactionFailureSemantics` | `components/storage/sql/tests/test_storage_sql_contract.py#ExecuteSqlTransactionContractVerification` |
+| `OpenSqlStorageContractVerification` | `OpenSqlStorage` | `openSqlStorageFailureSemantics` | `components/storage/sql/tests/test_storage_sql_contract.py#OpenSqlStorageContractVerification` |
+| `SqlStorageBoundaryVerification` | `SqlStorage` | `serializedHandleAccess`, `noImplicitDatabaseChange`, `transactionAtomicity`, `genericStorage`, `jsonCompatibleRows` | `components/storage/sql/tests/test_storage_sql_contract.py#SqlStorageBoundaryVerification` |
 
 Equivalent private algorithms, helpers, storage layouts, and implementation-language inheritance remain implementation choices.

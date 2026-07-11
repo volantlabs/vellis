@@ -21,9 +21,9 @@ invariants.
 
 1. Identify the canonical model or implementation change.
 2. Run `just model-render` for model-derived views and manifests.
-3. Review generated component pages for public construction and instance actions, exact
-   signatures/defaults, failures, state ownership, state effects, requirements, invariants,
-   dependencies, and verification objectives. A fresh but incomplete projection fails sync.
+3. Review generated component pages for actions, signatures/defaults, typed failures, state access,
+   required constraints, asserted satisfiers, native action calls, invariants, and subject-compatible
+   verification objectives. A fresh but semantically incomplete projection fails sync.
 4. When an accepted source or prior model exists, confirm the projection preserves its public
    meaning unless an explicit contract change was approved.
 5. When package ownership or imports change, update library/application indexes and confirm the

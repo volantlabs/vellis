@@ -29,22 +29,39 @@ package Vellis {
         bind facade.controller = controller;
     }
 
+
     requirement <'invariant.vellis.bibliotek_public_contracts_only'> bibliotekOnlyThroughContracts {
         subject application : VellisApplication;
-        doc /* Vellis consumes Bibliotek roles only through modeled public contracts. */
+        require constraint {
+            doc /* Vellis consumes Bibliotek roles only through modeled public contracts. */
+        }
     }
+
     requirement <'invariant.vellis.discovery_draft_unbound'> discoveryDraftUnbound {
         subject application : VellisApplication;
-        doc /* The draft curated discovery component is not part of the current application. */
+        require constraint {
+            doc /* The draft curated discovery component is not part of the current application. */
+        }
     }
+
     requirement <'invariant.vellis.transport_outside_controller'> transportOutsideController {
         subject application : VellisApplication;
-        doc /* MCP transport and app shaping remain outside the RTG controller. */
+        require constraint {
+            doc /* MCP transport and app shaping remain outside the RTG controller. */
+        }
     }
+
+    part contractContext {
+        part application : VellisApplication;
+        satisfy bibliotekOnlyThroughContracts by application;
+        satisfy discoveryDraftUnbound by application;
+        satisfy transportOutsideController by application;
+    }
+
 
     verification def VellisCompositionVerification {
         subject application : VellisApplication;
         objective { verify bibliotekOnlyThroughContracts; verify discoveryDraftUnbound; verify transportOutsideController; }
-        @EvidenceBinding { verificationId = "verification.vellis.composition"; evidenceId = "apps/rtg_knowledge_graph/tests/test_rtg_knowledge_graph_app.py"; implementationScope = "VellisLocalPython"; }
+        @EvidenceBinding { evidenceId = "apps/rtg_knowledge_graph/tests/test_rtg_knowledge_graph_app.py#VellisCompositionVerification"; implementationScope = "VellisLocalPython"; }
     }
 }

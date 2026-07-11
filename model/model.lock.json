@@ -43,18 +43,28 @@
     }
   },
   "validator": {
-    "adapter": "tools/model_tool.py",
+    "adapter": "tools/sysml_validator.py",
     "profile_validation": "required",
     "external_validation": "required-before-cutover",
-    "external_provider": null,
-    "external_version": null,
-    "external_checksum": null,
+    "external_provider": "Systems-Modeling/SysML-v2-Pilot-Implementation",
+    "external_version": "2025-06 / 0.50.0",
+    "external_checksum": "f6c9fa760ff198c21ceae08fc377f4b7366cf12671c3cbef90ebd3e526103060",
+    "command": [
+      "{python}",
+      "tools/sysml_validator.py",
+      "validate",
+      "--scope",
+      "all",
+      "--self-test"
+    ],
     "official_java_evaluation": {
       "candidate": "Systems-Modeling/SysML-v2-Pilot-Implementation",
-      "status": "pending-java-runtime-and-2.0-compatible-headless-distribution",
-      "rejected_input": "The locally inspected incremental release contains SysML 2.1/KerML 1.1 development libraries and is not the pinned baseline.",
-      "rejected_input_commit": "288d129",
-      "local_java_runtime": "unavailable"
+      "status": "qualified-headless",
+      "selected_release": "2025-06",
+      "selected_commit": "04096d6",
+      "selected_plugin_version": "0.50.0",
+      "runtime": "repository-cached Eclipse Temurin JRE 21.0.11+10",
+      "diagnostics": "syntax, linking, and semantic validation with source line and column"
     }
   }
 }

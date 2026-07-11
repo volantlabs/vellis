@@ -2,7 +2,7 @@ package VellisUseCases {
     private import Vellis::*;
     private import VellisOperations::*;
 
-    part def VellisUser { doc /* A human or software agent acting through the Vellis application facade. */ }
+    abstract part def VellisUser { doc /* A human or software agent acting through the Vellis application facade. */ }
     part def HumanOperator :> VellisUser { doc /* A human Vellis user. */ }
     part def AiAgent :> VellisUser { doc /* An AI Vellis user. */ }
 
@@ -64,7 +64,7 @@ package VellisUseCases {
             perform snapshotAndRestoreSystem.restore;
             perform auditAndReplayActivity.history;
             perform auditAndReplayActivity.verifyReplay;
-            perform inspectStateAndGuidance.state;
+            perform inspectStateAndGuidance.'state';
             perform inspectStateAndGuidance.guide;
             perform abandonStagedWork.abandon;
         }
@@ -119,7 +119,7 @@ package VellisUseCases {
     use case inspectStateAndGuidance : InspectStateAndGuidance {
         subject application = vellis;
         actor users = humanActor;
-        action state : RtgGetSystemState;
+        action 'state' : RtgGetSystemState;
         then action guide : RtgGetUsageGuide;
     }
 

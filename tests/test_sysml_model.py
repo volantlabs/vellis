@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from tools import model_tool
+from tools import model_tool, sysml_validator
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -36,9 +36,41 @@ def test_model_remains_shadow_until_formal_and_human_gates_pass() -> None:
     assert status["authored_design"] == "model/**/*.sysml"
     assert status["frozen_migration_baseline"] == "docs/components/*.md"
     assert status["gates"]["markdown_retirement"] == "blocked"
-    assert status["gates"]["external_sysml_validator"] == "pending"
+    assert status["gates"]["external_sysml_validator"] == "implemented-qualified-headless"
     assert status["gates"]["representative_pilots"] == "implemented-pending-human-review"
     assert status["gates"]["accepted_contract_preservation"] == "implemented-pending-human-review"
+
+
+def test_formal_validator_is_pinned_and_covers_every_authored_model() -> None:
+    lock = json.loads((ROOT / "model" / "validator.lock.json").read_text(encoding="utf-8"))
+
+    assert lock["provider"] == "Systems-Modeling/SysML-v2-Pilot-Implementation"
+    assert lock["release"] == "2025-06"
+    assert lock["language_baseline"] == {"sysml": "2.0", "kerml": "1.0"}
+    assert len(lock["kernel"]["sha256"]) == 64
+    assert "--self-test" in json.loads(
+        (ROOT / "model" / "model.lock.json").read_text(encoding="utf-8")
+    )["validator"]["command"]
+    assert len(sysml_validator._model_files("all")) == 23
+    assert all(path.exists() for path in sysml_validator._model_files("all"))
+
+
+def test_formal_validator_diagnostic_parser_captures_cell_location() -> None:
+    diagnostic = (
+        "ERROR:Couldn't resolve reference to Type 'Missing'"
+        "(7.sysml line : 12 column : 9)"
+    )
+
+    match = sysml_validator.DIAGNOSTIC.search(diagnostic)
+
+    assert match is not None
+    assert match.groupdict() == {
+        "level": "ERROR",
+        "message": "Couldn't resolve reference to Type 'Missing'",
+        "cell": "7",
+        "line": "12",
+        "column": "9",
+    }
 
 
 def test_profile_checker_rejects_unbalanced_and_nonbaseline_text(
@@ -71,7 +103,7 @@ def test_native_style_rejects_realization_leaks_and_semantic_profile_metadata(
         }
         perform action useRead[0..*] : UseRead;
         dependency misuse from useRead to requiredRead {
-            @StateAccess { kind = StateAccessKind::read; effect = "delegate"; }
+            @StateAccess { kind = StateAccessKind::read; }
         }
     }
     """,
@@ -134,18 +166,178 @@ def test_native_style_rejects_hollow_calculations(tmp_path: Path) -> None:
     assert any("has no evaluable result" in finding.message for finding in findings)
 
 
+def test_connected_semantics_rejects_orphaned_calculation(tmp_path: Path) -> None:
+    model = tmp_path / "Orphan.sysml"
+    model.write_text(
+        "calc def Orphan { in value : Integer; return result : Integer = value; }",
+        encoding="utf-8",
+    )
+
+    findings = model_tool._check_connected_formal_semantics([model])
+
+    assert any("is not connected to a contract" in finding.message for finding in findings)
+
+
+def test_evidence_groups_resolve_to_concrete_test_nodes(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    evidence = tmp_path / "test_evidence.py"
+    evidence.write_text(
+        "def test_contract_behavior() -> None:\n    pass\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(model_tool, "ROOT", tmp_path)
+
+    assert model_tool._evidence_test_nodes(
+        "test_evidence.py::test_contract_behavior#ContractVerification"
+    ) == ["test_evidence.py::test_contract_behavior"]
+    assert model_tool._evidence_test_nodes("test_evidence.py#ContractVerification") == [
+        "test_evidence.py::test_contract_behavior"
+    ]
+    assert (
+        model_tool._evidence_test_nodes("test_evidence.py::missing_test#ContractVerification") == []
+    )
+
+
+def test_requirement_checker_rejects_documentation_only_and_incompatible_verification(
+    tmp_path: Path,
+) -> None:
+    model = tmp_path / "Requirements.sysml"
+    model.write_text(
+        """part def Component;
+        action def Operation;
+        requirement obligation { subject operation : Operation; doc /* shall do work */ }
+        verification def WrongCase {
+            subject component : Component;
+            objective { verify obligation; }
+            @EvidenceBinding { evidenceId = "evidence#WrongCase"; implementationScope = "test"; }
+        }
+        """,
+        encoding="utf-8",
+    )
+
+    findings = model_tool._check_requirement_and_verification_semantics([model])
+
+    assert any("no required constraint" in finding.message for finding in findings)
+    assert any("no satisfier" in finding.message for finding in findings)
+    assert any("is incompatible" in finding.message for finding in findings)
+
+
+def test_state_access_checker_rejects_untyped_owned_state_dependency(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    component_root = tmp_path / "bibliotek" / "components"
+    component_root.mkdir(parents=True)
+    model = component_root / "component.example.sysml"
+    model.write_text(
+        """part def <'component.example'> Example {
+            item records : Record;
+            perform action read[0..*] : Read;
+            dependency readRecords from read to records { doc /* read */ }
+        }
+        item def Record { attribute value : String; }
+        action def Read { out value : String; }
+        """,
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(model_tool, "COMPONENT_MODEL_ROOT", component_root)
+
+    findings = model_tool._check_state_access_semantics()
+
+    assert any("lacks typed StateAccess" in finding.message for finding in findings)
+    assert any("action read lacks typed state access" in finding.message for finding in findings)
+
+
+def test_state_access_checker_rejects_missing_action_declaration(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    component_root = tmp_path / "bibliotek" / "components"
+    component_root.mkdir(parents=True)
+    model = component_root / "component.example.sysml"
+    model.write_text(
+        """part def <'component.example'> Example {
+            item records : Record;
+            perform action read[0..*] : Read;
+        }
+        item def Record { attribute value : String; }
+        action def Read { out value : String; }
+        """,
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(model_tool, "COMPONENT_MODEL_ROOT", component_root)
+
+    findings = model_tool._check_state_access_semantics()
+
+    assert any("action read lacks typed state access" in finding.message for finding in findings)
+
+
+def test_foundation_native_semantics() -> None:
+    fixture = (ROOT / "model" / "foundation" / "SoftwareComponentPattern.sysml").read_text(
+        encoding="utf-8"
+    )
+
+    assert "assume constraint" in fixture
+    assert "require constraint matchingResponse : MatchingResponse" in fixture
+    assert "satisfy processRequestRequirement by provider.processRequest" in fixture
+    assert "verification def ProcessRequestVerification" in fixture
+    assert "calc def RequestIsValid" in fixture
+    assert "assign successfulRequestCount" in fixture
+    assert "in request redefines ProcessRequest::request" in fixture
+
+
+def test_native_behavior_checker_rejects_unbound_facade_values(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    model_root = tmp_path / "model"
+    component_root = model_root / "bibliotek" / "components"
+    component_root.mkdir(parents=True)
+    (model_root / "vellis" / "realizations").mkdir(parents=True)
+    operations = model_root / "vellis" / "VellisOperations.sysml"
+    operations.write_text(
+        """action def Outer { in request : String; out result : String; }
+        action def Inner { in request : String; out result : String; }
+        part def VellisApplicationFacade {
+            ref part controller : RtgController { perform rtgCall.invokeController; }
+            perform action rtgCall[0..*] : Outer {
+                action invokeController : Inner {
+                    out result redefines Inner::result = rtgCall::result;
+                }
+            }
+        }
+        """,
+        encoding="utf-8",
+    )
+    (component_root / "component.rtg.controller.sysml").write_text(
+        "part def RtgController;", encoding="utf-8"
+    )
+    (model_root / "vellis" / "realizations" / "VellisMcpPython.sysml").write_text(
+        "part def VellisMcpAdapter;", encoding="utf-8"
+    )
+    (model_root / "vellis" / "realizations" / "VellisLocalPython.sysml").write_text(
+        "part :>> facade : PythonVellisFacade;", encoding="utf-8"
+    )
+    monkeypatch.setattr(model_tool, "MODEL_ROOT", model_root)
+    monkeypatch.setattr(model_tool, "COMPONENT_MODEL_ROOT", component_root)
+
+    findings = model_tool._check_native_behavior_realizations()
+
+    assert any("leaves input request unbound" in finding.message for finding in findings)
+
+
 def test_native_view_packages_cover_library_and_application_concerns() -> None:
-    bibliotek_views = (
-        ROOT / "model" / "bibliotek" / "views" / "BibliotekViews.sysml"
-    ).read_text(encoding="utf-8")
+    bibliotek_views = (ROOT / "model" / "bibliotek" / "views" / "BibliotekViews.sysml").read_text(
+        encoding="utf-8"
+    )
     vellis_views = (ROOT / "model" / "vellis" / "views" / "VellisViews.sysml").read_text(
         encoding="utf-8"
     )
 
-    assert "viewpoint def BibliotekComponentStructureViewpoint" in bibliotek_views
+    assert "viewpoint def" not in bibliotek_views
     assert "view bibliotekComponentStructure" in bibliotek_views
-    assert "viewpoint def VellisCompositionViewpoint" in vellis_views
+    assert "filter @SysML::SatisfyRequirementUsage" in bibliotek_views
+    assert "viewpoint def" not in vellis_views
     assert "view vellisUseCases" in vellis_views
+    assert "filter @SysML::BindingConnectorAsUsage" in vellis_views
 
 
 def test_generated_artifact_checker_detects_staleness(
@@ -184,6 +376,7 @@ def test_generated_component_views_cover_actions_state_and_invariants() -> None:
         assert "## Construction actions" in content
         assert "## Owned state" in content
         assert "## Action and state effects" in content
+        assert "## Native action behavior" in content
         assert "## Invariants and behavioral obligations" in content
         assert "## Public enumerations" in content
         assert "## Verification" in content
@@ -193,6 +386,11 @@ def test_generated_component_views_cover_actions_state_and_invariants() -> None:
     )
     assert "`OpenJsonFileStorage`" in json_page
     assert '`relativeDirectoryPath: JsonRelativePath` = `"."`' in json_page
+    assert "| `write` | `storageRoot` | `write` |" in json_page
+    assert (
+        "| `contract.storage.json_file.write_effect` | `WriteJsonDocument` | `storage.write` |"
+        in json_page
+    )
 
     graph_page = next(
         content for path, content in pages.items() if path.name == "component.rtg.graph.md"
@@ -201,3 +399,10 @@ def test_generated_component_views_cover_actions_state_and_invariants() -> None:
     assert "`uuid[0..1]: Uuid`" in graph_page
     assert "`type: String`" in graph_page
     assert "`system: RtgSystem`" in graph_page
+
+    vellis_page = (ROOT / "docs" / "model" / "generated" / "vellis-operations.md").read_text(
+        encoding="utf-8"
+    )
+    assert "## Requirements and satisfaction" in vellis_page
+    assert "## Verification closure" in vellis_page
+    assert "`rtgGetSystemState` → `GetSystemState` → `getSystemState`" in vellis_page

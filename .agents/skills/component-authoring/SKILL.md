@@ -49,8 +49,8 @@ implementation fidelity the default completeness criterion.
 1. Locate or create the owning model package and confirm its library, application, view, or
    realization layer.
 2. Establish the smallest coherent boundary around one responsibility and its invariants.
-3. Give public elements stable SysML short names where qualified identity or an exact external
-   spelling matters.
+3. Give public elements stable SysML short names for durable model identity. Model an external
+   encoding as the logical name itself or as an explicit realization codec.
 4. Define boundary-crossing values and identity-bearing items. Separate request and stored forms
    when identity is optional only on creation.
 5. Define every public and construction action with exact typed inputs, outputs, defaults,
@@ -60,19 +60,23 @@ implementation fidelity the default completeness criterion.
 7. Model abstract canonical, derived, and externally referenced state with native feature kinds.
 8. Relate every action to the state or collaborator it reads, creates, writes, or deletes; state
    explicit no-effect behavior for reads, previews, validation, and rejected mutations.
-9. Add concise preconditions, effects, failure effects, ordering, and invariant obligations.
-10. Model lifecycle only when it changes permitted operations or observable results. Use an
+9. Put every normative obligation in a requirement `require constraint`; use textual constraints
+   when a complete Boolean expression would obscure or weaken the intended rule.
+10. Assert which component or action usage satisfies each accepted requirement. Keep satisfaction
+   separate from evidence that verifies the assertion.
+11. Model lifecycle only when it changes permitted operations or observable results. Use an
     enum-valued status and transition obligations for request-driven record lifecycles; use an
     exhibited state only when activation/event semantics are intentionally modeled.
-11. Add verification cases that cover every accepted obligation, directly or through a
-   named coherent verification group.
-12. For applications, bind retained collaborator roles to actual part occurrences and model
+12. Add verification cases whose subjects are compatible with the requirements they verify. Use
+   separate action, component, and composition cases when their subjects differ.
+13. For applications, bind retained collaborator roles to actual part occurrences and model
     actor-visible use cases and application-owned invariants.
-13. Define or update viewpoints and views for recurring structure, behavior, composition, and
-    verification concerns.
-14. Run the repository's model checks and regenerate projections, then review the complete boundary
-    rather than only filenames or operation names.
-15. Ask whether a conforming implementation in a different suitable language could be built from
+14. Use a `view def` for a reusable projection. Introduce a viewpoint only when stakeholders and
+    concerns are explicitly modeled.
+15. Run a conformant SysML parser/linker/semantic validator as well as repository profile checks,
+    then regenerate projections and review the complete boundary. Grammar matching and regular
+    expressions alone do not establish language conformance.
+16. Ask whether a conforming implementation in a different suitable language could be built from
     the model and pass black-box conformance at this boundary. Repair the model if correct callers,
     state effects, results, failures, or composition behavior would still require guessing.
 
@@ -119,11 +123,15 @@ invariants, or observable behavior that the design intentionally promises.
   realization, or global grab bag as the accidental owner of reusable types.
 - Use binding only for actual equality or identity, including binding a retained referential role to
   the application part occurrence it denotes. Never bind action occurrences as a call relationship.
-- Use action inputs for invocation-scoped collaborators and dependencies to make contract-significant
-  action-to-state or action-to-collaborator relationships visible.
+- Use action inputs for invocation-scoped collaborators and typed dependencies for state access or
+  allowed dependency topology. Model an invocation as a nested action performed by the provider,
+  with bindings or flows for contract-significant inputs and outputs.
 - Let native constructs carry their native meaning: performed actions are provided capabilities,
   interfaces connect ports, exhibited states are activated behavior, and allocations map logical
   elements to realizations. Add metadata only for semantics the language construct does not express.
+- Use `default =` for an overridable default value and `=` only for an actual binding. Navigate
+  nested features with dot notation and reserve `::` for qualification/redefinition references.
+  Quote a required public name when it is a reserved word; do not silently rename the contract.
 
 ## Outputs
 

@@ -13,16 +13,16 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-import yaml
-
 ROOT = Path(__file__).resolve().parents[1]
 MODEL_ROOT = ROOT / "model"
 COMPONENT_MODEL_ROOT = MODEL_ROOT / "bibliotek" / "components"
 GENERATED_DOC_ROOT = ROOT / "docs" / "model" / "generated"
 GENERATED_COMPONENT_DOC_ROOT = GENERATED_DOC_ROOT / "components"
 GENERATED_MANIFEST = ROOT / "apps" / "rtg_knowledge_graph" / "resources" / "model_app_manifest.json"
-IMPLEMENTATION_DRIFT_PATH = MODEL_ROOT / "implementation-drift.yaml"
+GENERATED_EVIDENCE_INDEX = GENERATED_DOC_ROOT / "verification-evidence.json"
+IMPLEMENTATION_DRIFT_PATH = MODEL_ROOT / "realizations" / "PythonImplementationDrift.sysml"
 OPTIONAL_IDENTIFICATION = r"(?:<'[^']+'>\s+)?"
+SYSML_IDENTIFIER = r"(?:[A-Za-z_]\w*|'[^']+')"
 
 EXPECTED_VELLIS_ROLES: dict[str, str] = {
     "documentStorage": "component.storage.json_file",
@@ -87,7 +87,22 @@ def _sysml_files(scope: str) -> list[Path]:
         "vellis": [MODEL_ROOT / "foundation", MODEL_ROOT / "bibliotek", MODEL_ROOT / "vellis"],
         "all": [MODEL_ROOT],
     }[scope]
-    return sorted(path for root in roots for path in root.rglob("*.sysml"))
+    return sorted(
+        path
+        for root in roots
+        for path in root.rglob("*.sysml")
+        if ".cache" not in path.relative_to(MODEL_ROOT).parts
+    )
+
+
+def _identifier_value(identifier: str) -> str:
+    if identifier.startswith("'") and identifier.endswith("'"):
+        return identifier[1:-1]
+    return identifier
+
+
+def _identifier_pattern(identifier: str) -> str:
+    return rf"(?:{re.escape(identifier)}|'{re.escape(identifier)}')"
 
 
 def _without_comments(text: str) -> str:
@@ -148,13 +163,40 @@ def _extract_braced_block(text: str, start: int) -> str:
     if brace < 0 or (semicolon >= 0 and semicolon < brace):
         return text[start : semicolon + 1 if semicolon >= 0 else len(text)]
     depth = 0
-    for index in range(brace, len(text)):
-        if text[index] == "{":
+    in_comment = False
+    in_string = False
+    escaped = False
+    index = brace
+    while index < len(text):
+        if in_comment:
+            if text.startswith("*/", index):
+                in_comment = False
+                index += 2
+                continue
+            index += 1
+            continue
+        if in_string:
+            if escaped:
+                escaped = False
+            elif text[index] == "\\":
+                escaped = True
+            elif text[index] == '"':
+                in_string = False
+            index += 1
+            continue
+        if text.startswith("/*", index):
+            in_comment = True
+            index += 2
+            continue
+        if text[index] == '"':
+            in_string = True
+        elif text[index] == "{":
             depth += 1
         elif text[index] == "}":
             depth -= 1
             if depth == 0:
                 return text[start : index + 1]
+        index += 1
     return text[start:]
 
 
@@ -298,17 +340,13 @@ def _protocol_method_parameters(component_id: str) -> dict[str, tuple[str, ...]]
 
 def _protocol_signature_drift_is_acknowledged(component_id: str, method: str) -> bool:
     try:
-        value = yaml.safe_load(IMPLEMENTATION_DRIFT_PATH.read_text(encoding="utf-8"))
-    except (OSError, yaml.YAMLError):
+        text = IMPLEMENTATION_DRIFT_PATH.read_text(encoding="utf-8")
+    except OSError:
         return False
     component_module = component_id.removeprefix("component.")
-    for entry in value.get("findings", []) if isinstance(value, dict) else []:
-        if not isinstance(entry, dict):
-            continue
-        symbol = str(entry.get("implementation_symbol", ""))
-        if (
-            symbol.startswith(f"components.{component_module}.protocol.")
-            and symbol.endswith(f".{method}")
+    for symbol in re.findall(r'implementationSymbol\s*=\s*"([^"]+)"', text):
+        if symbol.startswith(f"components.{component_module}.protocol.") and symbol.endswith(
+            f".{method}"
         ):
             return True
     return False
@@ -323,9 +361,7 @@ def _check_protocol_action_signatures() -> list[Finding]:
             continue
         action_blocks = {
             match.group(1): _extract_braced_block(text, match.start())
-            for match in re.finditer(
-                rf"\baction def\s+{OPTIONAL_IDENTIFICATION}(\w+)\s*\{{", text
-            )
+            for match in re.finditer(rf"\baction def\s+{OPTIONAL_IDENTIFICATION}(\w+)\s*\{{", text)
         }
         actions = set(action_blocks)
         for method, protocol_parameters in _protocol_method_parameters(component_id).items():
@@ -333,9 +369,10 @@ def _check_protocol_action_signatures() -> list[Finding]:
             if not action:
                 continue
             model_parameters = tuple(
-                name
+                _identifier_value(name)
                 for name in re.findall(
-                    r"\bin\s+(?:ref\s+)?(?:part\s+|item\s+)?(\w+)(?:\[[^]]+\])?\s*:",
+                    rf"\bin\s+(?:ref\s+)?(?:attribute\s+|part\s+|item\s+)?"
+                    rf"({SYSML_IDENTIFIER})(?:\[[^]]+\])?\s*:",
                     action_blocks[action],
                 )
             )
@@ -375,7 +412,7 @@ def _check_native_modeling_style(files: list[Path]) -> list[Finding]:
         text = path.read_text(encoding="utf-8")
         if re.search(
             r"\b(?:ContractKind|RequiredCapability|ContractSatisfaction|CapabilityUse|"
-            r"StateAuthority|StateAccess|DependencyPolicy|StableId|ExternalName)\b|"
+            r"StateAuthority|DependencyPolicy|StableId|ExternalName)\b|"
             r"@(?:ContractRole|SpecIdentity)\b",
             text,
         ):
@@ -390,12 +427,20 @@ def _check_native_modeling_style(files: list[Path]) -> list[Finding]:
             findings.append(
                 Finding(path, "logical component definitions must not contain realization bindings")
             )
+        if re.search(r"\benum\s+<'[^']+'>", text):
+            findings.append(
+                Finding(
+                    path,
+                    "enum short names must not serve as implicit external serialization mappings",
+                )
+            )
         for match in re.finditer(r"\b(calc|constraint) def\s+(?:<'[^']+'>\s+)?(\w+)\s*\{", text):
             block = _extract_braced_block(text, match.start())
             expression_body = _without_comments(block)
             expression_body = expression_body[expression_body.find("{") + 1 :]
             expression_body = expression_body.rsplit("}", 1)[0]
             expression_body = re.sub(r"\b(?:in|out)\s+[^;{}]+;", "", expression_body)
+            expression_body = re.sub(r"\breturn\s+[^;={}]+;", "", expression_body)
             expression_body = re.sub(r"\bdoc\b\s*;?", "", expression_body)
             expression_body = re.sub(r"@\w+\s*\{.*?\}", "", expression_body, flags=re.DOTALL)
             has_result = bool(expression_body.strip())
@@ -412,6 +457,146 @@ def _check_native_modeling_style(files: list[Path]) -> list[Finding]:
             findings.append(
                 Finding(foundation, "application/transport vocabulary leaked into the foundation")
             )
+    all_text = "\n".join(path.read_text(encoding="utf-8") for path in files)
+    for kind, name in (
+        ("attribute", "JsonValue"),
+        ("attribute", "JsonScalar"),
+        ("attribute", "SqlOperationResult"),
+        ("item", "RtgObject"),
+        ("attribute", "RtgSchemaPayload"),
+        ("attribute", "RtgConstraintPayload"),
+        ("attribute", "VellisQueryResponse"),
+        ("attribute", "VellisSnapshotExport"),
+        ("part", "VellisUser"),
+    ):
+        if re.search(rf"\b{kind} def\s+{name}\b", all_text) and not re.search(
+            rf"\babstract\s+{kind} def\s+{name}\b", all_text
+        ):
+            findings.append(Finding(MODEL_ROOT, f"specialization base {name} must be abstract"))
+    return findings
+
+
+def _check_connected_formal_semantics(files: list[Path]) -> list[Finding]:
+    """Reject evaluable definitions that are never connected to a contract or another rule."""
+    findings: list[Finding] = []
+    all_text = "\n".join(path.read_text(encoding="utf-8") for path in files)
+    for path in files:
+        text = path.read_text(encoding="utf-8")
+        for match in re.finditer(r"\b(calc|constraint) def\s+(?:<'[^']+'>\s+)?(\w+)\s*\{", text):
+            kind, name = match.groups()
+            if len(re.findall(rf"\b{re.escape(name)}\b", all_text)) < 2:
+                findings.append(
+                    Finding(path, f"{kind} definition {name} is not connected to a contract")
+                )
+    return findings
+
+
+def _check_discriminated_public_alternatives(files: list[Path]) -> list[Finding]:
+    findings: list[Finding] = []
+    all_text = "\n".join(path.read_text(encoding="utf-8") for path in files)
+    for base in ("VellisQueryResponse", "VellisSnapshotExport"):
+        match = re.search(rf"\babstract attribute def\s+{base}\s*\{{", all_text)
+        if not match:
+            continue
+        base_block = _extract_braced_block(all_text, match.start())
+        if not re.search(r"\battribute\s+kind\s*:\s*\w+", base_block):
+            findings.append(
+                Finding(MODEL_ROOT, f"public alternative base {base} lacks a discriminator")
+            )
+        subtypes = list(
+            re.finditer(rf"\battribute def\s+(\w+)\s*:>\s*{base}(?:\s*,[^{{]+)?\s*\{{", all_text)
+        )
+        if len(subtypes) < 2:
+            findings.append(
+                Finding(MODEL_ROOT, f"public alternative base {base} lacks concrete alternatives")
+            )
+        for subtype in subtypes:
+            subtype_block = _extract_braced_block(all_text, subtype.start())
+            if not re.search(r":>>\s+kind\s*=\s*\w+::\w+\s*;", subtype_block):
+                findings.append(
+                    Finding(
+                        MODEL_ROOT,
+                        f"public alternative {subtype.group(1)} does not fix its discriminator",
+                    )
+                )
+    return findings
+
+
+def _check_requirement_and_verification_semantics(files: list[Path]) -> list[Finding]:
+    """Require native obligations, satisfaction, and subject-compatible verification."""
+    findings: list[Finding] = []
+    for path in files:
+        text = path.read_text(encoding="utf-8")
+        requirements: dict[str, str] = {}
+        for match in re.finditer(
+            rf"(?m)^\s*requirement\s+(?!def\b){OPTIONAL_IDENTIFICATION}(\w+)\s*\{{",
+            text,
+        ):
+            block = _extract_braced_block(text, match.start())
+            subject = re.search(r"\bsubject\s+\w+\s*:\s*([\w:]+)", block)
+            if not subject:
+                findings.append(Finding(path, f"requirement {match.group(1)} has no subject"))
+                continue
+            requirements[match.group(1)] = subject.group(1)
+            if not re.search(r"\brequire\s+constraint\b", block):
+                findings.append(
+                    Finding(path, f"requirement {match.group(1)} has no required constraint")
+                )
+
+        draft = bool(
+            re.search(
+                r"@SpecificationStatus\s*\{[^}]*lifecycleStatus\s*=\s*SpecLifecycle::draft;",
+                text,
+                re.DOTALL,
+            )
+        )
+        if not draft:
+            for name in requirements:
+                if not re.search(rf"\bsatisfy\s+(?:requirement\s+)?{re.escape(name)}\s+by\b", text):
+                    findings.append(Finding(path, f"accepted requirement {name} has no satisfier"))
+
+        verified: set[str] = set()
+        for match in re.finditer(r"(?m)^\s*verification def\s+(\w+)\s*\{", text):
+            block = _extract_braced_block(text, match.start())
+            subject = re.search(r"\bsubject\s+\w+\s*:\s*([\w:]+)", block)
+            subject_type = subject.group(1) if subject else None
+            if not subject_type:
+                findings.append(
+                    Finding(path, f"verification {match.group(1)} has no typed subject")
+                )
+            for requirement_name in re.findall(r"\bverify\s+(\w+)\s*;", block):
+                verified.add(requirement_name)
+                requirement_type = requirements.get(requirement_name)
+                if requirement_type and subject_type and requirement_type != subject_type:
+                    findings.append(
+                        Finding(
+                            path,
+                            f"verification {match.group(1)} subject {subject_type} is incompatible "
+                            f"with {requirement_name} subject {requirement_type}",
+                        )
+                    )
+            if "verify " in block and "@EvidenceBinding" not in block:
+                findings.append(
+                    Finding(path, f"verification {match.group(1)} lacks evidence binding")
+                )
+        for name in requirements:
+            if name not in verified:
+                findings.append(Finding(path, f"requirement {name} has no verification objective"))
+
+        failure_subjects = {
+            subject_type
+            for name, subject_type in requirements.items()
+            if name.endswith("FailureSemantics")
+        }
+        for match in re.finditer(rf"\baction def\s+{OPTIONAL_IDENTIFICATION}(\w+)\s*\{{", text):
+            block = _extract_braced_block(text, match.start())
+            if "@FailureContract" in block and match.group(1) not in failure_subjects:
+                findings.append(
+                    Finding(
+                        path,
+                        f"action {match.group(1)} lacks an action-scoped failure requirement",
+                    )
+                )
     return findings
 
 
@@ -432,9 +617,7 @@ def _check_component_contract_completeness() -> list[Finding]:
             _definition_block(text, "part def", component_name) if component_name else ""
         )
 
-        for match in re.finditer(
-            rf"\baction def\s+{OPTIONAL_IDENTIFICATION}(\w+)\s*\{{", text
-        ):
+        for match in re.finditer(rf"\baction def\s+{OPTIONAL_IDENTIFICATION}(\w+)\s*\{{", text):
             action_name = match.group(1)
             block = _extract_braced_block(text, match.start())
             if not _documentation(block):
@@ -456,12 +639,11 @@ def _check_component_contract_completeness() -> list[Finding]:
                 feature, action_name = match.groups()
                 feature_block = _extract_braced_block(component_block, match.start())
                 direct_access = bool(_documentation(feature_block))
-                dependency_access = bool(
-                    re.search(
-                        rf"dependency\s+\w+\s+from\s+{re.escape(feature)}\s+to\s+"
-                        r"[\w.]+\s*\{[^}]*\bdoc\s*/\*",
+                dependency_access = any(
+                    _documentation(_extract_braced_block(component_block, dependency.start()))
+                    for dependency in re.finditer(
+                        rf"\bdependency\s+\w+\s+from\s+{re.escape(feature)}\s+to\s+",
                         component_block,
-                        re.DOTALL,
                     )
                 )
                 if not direct_access and not dependency_access:
@@ -485,6 +667,268 @@ def _check_component_contract_completeness() -> list[Finding]:
         verified = set(re.findall(r"\bverify\s+(\w+)\s*;", text))
         for name in sorted(requirement_names - verified):
             findings.append(Finding(path, f"requirement {name} lacks verification objective"))
+    return findings
+
+
+def _check_state_access_semantics() -> list[Finding]:
+    findings: list[Finding] = []
+    allowed = {"read", "create", "write", "delete", "noStateEffect"}
+    for path in sorted(COMPONENT_MODEL_ROOT.glob("component.*.sysml")):
+        text = path.read_text(encoding="utf-8")
+        component_name = _component_definition_name(text)
+        if not component_name:
+            continue
+        block = _definition_block(text, "part def", component_name)
+        complete_contract = "\n".join(_part_definition_chain(text, component_name)) or block
+        state_features = set(
+            re.findall(
+                r"\b(?:ref\s+)?(?:derived\s+)?(?:attribute|item)\s+(\w+)(?:\[[^]]+\])?\s*:",
+                block,
+            )
+        )
+        provided_actions = set(
+            re.findall(r"\bperform action\s+(\w+)\[[^]]+\]\s*:", complete_contract)
+        )
+        actions_with_state_semantics: set[str] = set()
+        for match in re.finditer(
+            r"\bdependency\s+(\w+)\s+from\s+(\w+)\s+to\s+([\w.]+)\s*\{",
+            block,
+        ):
+            dependency_name, source, target = match.groups()
+            dependency_block = _extract_braced_block(block, match.start())
+            access = re.search(
+                r"@StateAccess\s*\{[^}]*kind\s*=\s*StateAccessKind::(\w+);",
+                dependency_block,
+                re.DOTALL,
+            )
+            if target.rsplit(".", 1)[-1] in state_features and not access:
+                findings.append(
+                    Finding(path, f"state dependency {dependency_name} lacks typed StateAccess")
+                )
+            if access and access.group(1) not in allowed:
+                findings.append(
+                    Finding(path, f"state dependency {dependency_name} has invalid access kind")
+                )
+            if target.rsplit(".", 1)[-1] in state_features and access:
+                actions_with_state_semantics.add(source)
+        if state_features:
+            for action in sorted(provided_actions - actions_with_state_semantics):
+                findings.append(
+                    Finding(
+                        path,
+                        f"stateful component action {action} lacks typed state access "
+                        "or explicit no-state-effect",
+                    )
+                )
+    return findings
+
+
+def _check_native_behavior_realizations() -> list[Finding]:
+    findings: list[Finding] = []
+    operations_path = MODEL_ROOT / "vellis" / "VellisOperations.sysml"
+    operations_text = operations_path.read_text(encoding="utf-8")
+    facade = _definition_block(operations_text, "part def", "VellisApplicationFacade")
+    if re.search(r"\bdependency\s+\w+Flow\s+from\s+rtg", facade):
+        findings.append(Finding(operations_path, "facade still uses dependency as invocation"))
+    facade_calls = re.findall(r"\baction\s+invoke\w*\s*:\s*\w+", facade)
+    facade_performers = re.findall(r"\bperform\s+rtg\w+\.invoke\w*\s*;", facade)
+    if len(facade_calls) != 27 or len(facade_performers) != 27:
+        findings.append(
+            Finding(
+                operations_path,
+                f"expected 27 native facade calls and performers; found "
+                f"{len(facade_calls)} and {len(facade_performers)}",
+            )
+        )
+
+    action_definitions: dict[str, str] = {}
+    for source in (
+        operations_text,
+        (COMPONENT_MODEL_ROOT / "component.rtg.controller.sysml").read_text(encoding="utf-8"),
+    ):
+        for match in re.finditer(rf"\baction def\s+{OPTIONAL_IDENTIFICATION}(\w+)\s*\{{", source):
+            action_definitions[match.group(1)] = _extract_braced_block(source, match.start())
+
+    def features(action_type: str, direction: str) -> set[str]:
+        return set(
+            _identifier_value(name)
+            for name in re.findall(
+                rf"\b{direction}\s+(?:ref\s+)?(?:attribute\s+|part\s+|item\s+)?"
+                rf"({SYSML_IDENTIFIER})(?:\[[^]]+\])?\s*:",
+                action_definitions.get(action_type, ""),
+            )
+        )
+
+    for outer in re.finditer(r"\bperform action\s+(rtg\w+)\[[^]]+\]\s*:\s*(\w+)\s*\{", facade):
+        outer_name, outer_type = outer.groups()
+        outer_block = _extract_braced_block(facade, outer.start())
+        calls = list(re.finditer(r"\baction\s+(invoke\w*)\s*:\s*(\w+)\s*\{", outer_block))
+        if not calls:
+            continue
+        for field in sorted(features(outer_type, "in") | features(outer_type, "out")):
+            if not re.search(
+                rf"\b{re.escape(outer_name)}\.{_identifier_pattern(field)}", outer_block
+            ):
+                findings.append(
+                    Finding(operations_path, f"facade action {outer_name} does not connect {field}")
+                )
+        for call in calls:
+            call_name, call_type = call.groups()
+            call_block = _extract_braced_block(outer_block, call.start())
+            for field in sorted(features(call_type, "in")):
+                field_pattern = _identifier_pattern(field)
+                if not re.search(
+                    rf"\bin\s+(?:ref\s+)?(?:attribute\s+|part\s+|item\s+)?{field_pattern}"
+                    rf"\s+redefines\s+{re.escape(call_type)}::{field_pattern}\s*=",
+                    call_block,
+                ):
+                    findings.append(
+                        Finding(
+                            operations_path,
+                            f"facade call {outer_name}.{call_name} leaves input {field} unbound",
+                        )
+                    )
+            for field in sorted(features(call_type, "out")):
+                field_pattern = _identifier_pattern(field)
+                directly_bound = re.search(
+                    rf"\bout\s+(?:ref\s+)?(?:attribute\s+|part\s+|item\s+)?{field_pattern}"
+                    rf"\s+redefines\s+{re.escape(call_type)}::{field_pattern}\s*=",
+                    call_block,
+                )
+                consumed = bool(
+                    re.search(rf"\b{call_name}\.{field_pattern}", outer_block)
+                )
+                if not directly_bound and not consumed:
+                    findings.append(
+                        Finding(
+                            operations_path,
+                            f"facade call {outer_name}.{call_name} leaves output "
+                            f"{field} disconnected",
+                        )
+                    )
+
+    controller_path = COMPONENT_MODEL_ROOT / "component.rtg.controller.sysml"
+    controller_text = controller_path.read_text(encoding="utf-8")
+    controller = _definition_block(controller_text, "part def", "RtgController")
+    for call in re.finditer(r"(?<!perform )\baction\s+(\w+)\s*:\s*(\w+)\s*\{", controller):
+        call_name, call_type = call.groups()
+        if call_type not in action_definitions:
+            continue
+        call_block = _extract_braced_block(controller, call.start())
+        for field in sorted(features(call_type, "in")):
+            field_pattern = _identifier_pattern(field)
+            if not re.search(
+                rf"\bin\s+(?:ref\s+)?(?:attribute\s+|part\s+|item\s+)?{field_pattern}"
+                rf"\s+redefines\s+{re.escape(call_type)}::{field_pattern}\s*=",
+                call_block,
+            ):
+                findings.append(
+                    Finding(
+                        controller_path,
+                        f"controller call {call_name} leaves input {field} unbound",
+                    )
+                )
+        for field in sorted(features(call_type, "out")):
+            field_pattern = _identifier_pattern(field)
+            directly_bound = re.search(
+                rf"\bout\s+(?:ref\s+)?(?:attribute\s+|part\s+|item\s+)?{field_pattern}"
+                rf"\s+redefines\s+{re.escape(call_type)}::{field_pattern}\s*=",
+                call_block,
+            )
+            consumed = bool(re.search(rf"\b{call_name}\.{field_pattern}", controller))
+            if not directly_bound and not consumed:
+                findings.append(
+                    Finding(
+                        controller_path,
+                        f"controller call {call_name} leaves output {field} disconnected",
+                    )
+                )
+
+    mcp_path = MODEL_ROOT / "vellis" / "realizations" / "VellisMcpPython.sysml"
+    mcp_text = mcp_path.read_text(encoding="utf-8")
+    adapter = _definition_block(mcp_text, "part def", "VellisMcpAdapter")
+    delegations = re.findall(r"\baction invokeFacade\s*:\s*\w+", adapter)
+    performers = re.findall(r"\bperform\s+\w+\.invokeFacade\s*;", adapter)
+    allocations = re.findall(
+        r"\ballocate\s+application\.facade\.\w+\s+to\s+adapter\.\w+\s*;", mcp_text
+    )
+    if "bind adapter.facade = application.facade;" not in mcp_text:
+        findings.append(Finding(mcp_path, "MCP adapter is not bound to the application facade"))
+    if (len(delegations), len(performers), len(allocations)) != (27, 27, 27):
+        findings.append(
+            Finding(
+                mcp_path,
+                "MCP realization must contain 27 facade delegations, performers, and allocations",
+            )
+        )
+    for call in re.finditer(r"\baction\s+invokeFacade\s*:\s*(\w+)\s*\{", adapter):
+        call_type = call.group(1)
+        call_block = _extract_braced_block(adapter, call.start())
+        for direction in ("in", "out"):
+            for field in sorted(features(call_type, direction)):
+                field_pattern = _identifier_pattern(field)
+                if not re.search(
+                    rf"\b{direction}\s+(?:ref\s+)?(?:attribute\s+|part\s+|item\s+)?{field_pattern}"
+                    rf"\s+redefines\s+{re.escape(call_type)}::{field_pattern}\s*=",
+                    call_block,
+                ):
+                    findings.append(
+                        Finding(
+                            mcp_path,
+                            f"MCP facade call {call_type} leaves {direction} "
+                            f"parameter {field} unbound",
+                        )
+                    )
+    local_path = MODEL_ROOT / "vellis" / "realizations" / "VellisLocalPython.sysml"
+    local_text = local_path.read_text(encoding="utf-8")
+    local_allocations = re.findall(
+        r"allocate\s+logicalVellis\.facade\.\w+\s+to\s+pythonVellis\.facade\.\w+\s*;",
+        local_text,
+    )
+    if "part :>> facade : PythonVellisFacade;" not in local_text or len(local_allocations) != 27:
+        findings.append(
+            Finding(local_path, "Python facade realization must allocate all 27 logical actions")
+        )
+    return findings
+
+
+def _check_view_semantics() -> list[Finding]:
+    findings: list[Finding] = []
+    expected = {
+        MODEL_ROOT / "bibliotek" / "views" / "BibliotekViews.sysml": {
+            "SysML::PartDefinition",
+            "SysML::PartUsage",
+            "SysML::BindingConnectorAsUsage",
+            "SysML::ActionDefinition",
+            "SysML::ActionUsage",
+            "SysML::Dependency",
+            "SysML::SuccessionAsUsage",
+            "SysML::RequirementUsage",
+            "SysML::SatisfyRequirementUsage",
+            "SysML::VerificationCaseDefinition",
+        },
+        MODEL_ROOT / "vellis" / "views" / "VellisViews.sysml": {
+            "SysML::PartDefinition",
+            "SysML::PartUsage",
+            "SysML::BindingConnectorAsUsage",
+            "SysML::AllocationUsage",
+            "SysML::UseCaseDefinition",
+            "SysML::UseCaseUsage",
+            "SysML::ActionUsage",
+            "SysML::SuccessionAsUsage",
+            "SysML::RequirementUsage",
+            "SysML::SatisfyRequirementUsage",
+            "SysML::VerificationCaseDefinition",
+        },
+    }
+    for path, required_filters in expected.items():
+        text = path.read_text(encoding="utf-8")
+        if "viewpoint def" in text:
+            findings.append(Finding(path, "projection-only concerns must use view definitions"))
+        filters = set(re.findall(r"\bfilter\s+@([\w:]+)\s*;", text))
+        missing = sorted(required_filters - filters)
+        if missing:
+            findings.append(Finding(path, f"view projections omit filters: {missing}"))
     return findings
 
 
@@ -521,8 +965,11 @@ def _modeled_public_fields(
         return set()
     block = _extract_braced_block(text, match.start())
     fields = {
-        _normalized_name(name)
-        for name in re.findall(r"\b(?:attribute|item|part)\s+(\w+)(?:\[[^]]+\])?\s*:", block)
+        _normalized_name(_identifier_value(name))
+        for name in re.findall(
+            rf"\b(?:attribute|item|part)\s+({SYSML_IDENTIFIER})(?:\[[^]]+\])?\s*:",
+            block,
+        )
     }
     parent = match.group(1)
     if parent:
@@ -555,9 +1002,7 @@ def _check_shadow_contract_parity() -> list[Finding]:
         action_names = set(action_blocks)
 
         markdown_invariants = set(re.findall(r"(?m)^###\s+`(invariant\.[^`]+)`\s*$", markdown_text))
-        model_invariants = set(
-            re.findall(r"\brequirement\s+<'(invariant\.[^']+)'>", model_text)
-        )
+        model_invariants = set(re.findall(r"\brequirement\s+<'(invariant\.[^']+)'>", model_text))
         for invariant in sorted(markdown_invariants - model_invariants):
             findings.append(Finding(model_path, f"accepted invariant omitted: {invariant}"))
 
@@ -575,20 +1020,18 @@ def _check_shadow_contract_parity() -> list[Finding]:
                             r"(?m)^-\s+`([^`]+)`", inputs_match.group(1)
                         )
                         markdown_inputs = tuple(
-                            _normalized_name(name.split(" |", 1)[0])
-                            for name in raw_markdown_inputs
+                            _normalized_name(name.split(" |", 1)[0]) for name in raw_markdown_inputs
                         )
                         model_inputs = tuple(
-                            _normalized_name(name)
+                            _normalized_name(_identifier_value(name))
                             for name in re.findall(
-                                r"\bin\s+(?:ref\s+)?(?:part\s+|item\s+)?(\w+)"
-                                r"(?:\[[^]]+\])?\s*:",
+                                rf"\bin\s+(?:ref\s+)?(?:attribute\s+|part\s+|item\s+)?"
+                                rf"({SYSML_IDENTIFIER})(?:\[[^]]+\])?\s*:",
                                 action_block,
                             )
                         )
                         markdown_lists_only_a_type = (
-                            len(raw_markdown_inputs) == 1
-                            and raw_markdown_inputs[0][:1].isupper()
+                            len(raw_markdown_inputs) == 1 and raw_markdown_inputs[0][:1].isupper()
                         )
                         if not markdown_lists_only_a_type and markdown_inputs != model_inputs:
                             findings.append(
@@ -645,9 +1088,7 @@ def _check_shadow_contract_parity() -> list[Finding]:
                         )
                 if "." in heading:
                     method_name = heading.rsplit(".", 1)[-1]
-                    action_name = _model_action_for_method(
-                        component_id, method_name, action_names
-                    )
+                    action_name = _model_action_for_method(component_id, method_name, action_names)
                     if action_name:
                         failure = re.search(
                             r"@FailureContract\s*\{(.*?)\}",
@@ -673,40 +1114,55 @@ def _check_shadow_contract_parity() -> list[Finding]:
 
 def _check_implementation_drift_file() -> list[Finding]:
     try:
-        value = yaml.safe_load(IMPLEMENTATION_DRIFT_PATH.read_text(encoding="utf-8"))
-    except (OSError, yaml.YAMLError) as error:
+        text = IMPLEMENTATION_DRIFT_PATH.read_text(encoding="utf-8")
+    except OSError as error:
         return [
             Finding(IMPLEMENTATION_DRIFT_PATH, f"invalid implementation drift artifact: {error}")
         ]
-    if not isinstance(value, dict) or not isinstance(value.get("findings"), list):
-        return [Finding(IMPLEMENTATION_DRIFT_PATH, "findings must be a list")]
     findings: list[Finding] = []
     seen: set[str] = set()
-    required = {
-        "id",
-        "model_element",
-        "implementation_symbol",
-        "observed",
-        "expected",
-        "verification",
-    }
     model_text = "\n".join(path.read_text(encoding="utf-8") for path in _sysml_files("all"))
-    for entry in value["findings"]:
-        if not isinstance(entry, dict) or not required <= set(entry):
-            findings.append(Finding(IMPLEMENTATION_DRIFT_PATH, "drift entry lacks required fields"))
-            continue
-        drift_id = str(entry["id"])
+    entries = list(
+        re.finditer(
+            r"\bdependency\s+<'(drift\.[^']+)'>\s+\w+\s+"
+            r"from\s+([\w:]+)\s+to\s+([\w:]+)\s*\{",
+            text,
+        )
+    )
+    if not entries:
+        return [Finding(IMPLEMENTATION_DRIFT_PATH, "drift package contains no dependencies")]
+    for entry in entries:
+        drift_id, source, _ = entry.groups()
+        block = _extract_braced_block(text, entry.start())
         if drift_id in seen:
             findings.append(Finding(IMPLEMENTATION_DRIFT_PATH, f"duplicate drift ID {drift_id}"))
         seen.add(drift_id)
-        if str(entry["model_element"]) not in model_text:
+        source_name = source.rsplit("::", 1)[-1]
+        if source_name not in model_text:
             findings.append(
                 Finding(
                     IMPLEMENTATION_DRIFT_PATH,
-                    f"drift {drift_id} references unknown model element {entry['model_element']}",
+                    f"drift {drift_id} references unknown model element {source}",
                 )
             )
-        symbol = str(entry["implementation_symbol"])
+        metadata = re.search(r"@ImplementationDrift\s*\{", block)
+        if not metadata:
+            findings.append(Finding(IMPLEMENTATION_DRIFT_PATH, f"drift {drift_id} lacks metadata"))
+            continue
+        metadata_block = _extract_braced_block(block, metadata.start())
+        values = {
+            key: value
+            for key, value in re.findall(
+                r"'?\b(implementationSymbol|observed|expected|verification)\b'?\s*=\s*\"([^\"]+)\";",
+                metadata_block,
+            )
+        }
+        if set(values) != {"implementationSymbol", "observed", "expected", "verification"}:
+            findings.append(
+                Finding(IMPLEMENTATION_DRIFT_PATH, f"drift {drift_id} metadata is incomplete")
+            )
+            continue
+        symbol = values["implementationSymbol"]
         if not _python_symbol_exists(ROOT, symbol):
             findings.append(
                 Finding(
@@ -723,21 +1179,75 @@ def _check_verification_closure() -> list[Finding]:
         text = path.read_text(encoding="utf-8")
         component_id = _component_id(text) or path.stem
         status = _component_model_statuses().get(component_id)
-        verification = re.search(r"\bverification def\s+\w+\s*\{", text)
-        if not verification:
+        verifications = list(re.finditer(r"\bverification def\s+(\w+)\s*\{", text))
+        if not verifications:
             findings.append(Finding(path, "component lacks a boundary verification definition"))
             continue
-        block = _extract_braced_block(text, verification.start())
-        if not re.search(r"\bobjective\s*\{.*?\bverify\s+\w+", block, re.DOTALL):
-            findings.append(Finding(path, "boundary verification has no modeled objective"))
-        evidence = re.search(r'evidenceId\s*=\s*"([^"]+)"', block)
-        if not evidence:
-            findings.append(Finding(path, "boundary verification lacks evidence binding"))
-        elif status != "draft" and not (ROOT / evidence.group(1)).exists():
-            findings.append(
-                Finding(path, f"boundary evidence does not resolve: {evidence.group(1)}")
-            )
+        if not any(match.group(1).endswith("BoundaryVerification") for match in verifications):
+            findings.append(Finding(path, "component lacks a named boundary verification"))
+        for verification in verifications:
+            name = verification.group(1)
+            block = _extract_braced_block(text, verification.start())
+            if not re.search(r"\bobjective\s*\{.*?\bverify\s+\w+", block, re.DOTALL):
+                findings.append(Finding(path, f"verification {name} has no modeled objective"))
+            evidence = re.search(r'evidenceId\s*=\s*"([^"]+)"', block)
+            if not evidence:
+                findings.append(Finding(path, f"verification {name} lacks evidence binding"))
+                continue
+            evidence_id = evidence.group(1)
+            if not evidence_id.endswith(f"#{name}"):
+                findings.append(
+                    Finding(path, f"verification {name} evidence lacks its exact evidence group")
+                )
+            evidence_path = evidence_id.split("#", 1)[0].split("::", 1)[0]
+            if status != "draft" and not (ROOT / evidence_path).exists():
+                findings.append(Finding(path, f"evidence does not resolve: {evidence_id}"))
+            elif status != "draft" and not _evidence_test_nodes(evidence_id):
+                findings.append(
+                    Finding(path, f"evidence has no concrete test nodes: {evidence_id}")
+                )
     return findings
+
+
+def _test_functions(path: Path) -> list[str]:
+    try:
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+    except OSError, SyntaxError:
+        return []
+    return sorted(
+        node.name
+        for node in tree.body
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+        and node.name.startswith("test_")
+    )
+
+
+def _evidence_test_nodes(evidence_id: str) -> list[str]:
+    source = evidence_id.split("#", 1)[0]
+    if source == "pending":
+        return []
+    if "::" in source:
+        path_text, symbol = source.split("::", 1)
+        return [f"{path_text}::{symbol}"] if symbol in _test_functions(ROOT / path_text) else []
+    return [f"{source}::{name}" for name in _test_functions(ROOT / source)]
+
+
+def _verification_evidence_data() -> dict[str, object]:
+    groups: dict[str, object] = {}
+    for path in _sysml_files("all"):
+        text = path.read_text(encoding="utf-8")
+        for evidence_id in re.findall(r'evidenceId\s*=\s*"([^"]+)"', text):
+            groups[evidence_id] = {
+                "model_source": str(path.relative_to(ROOT)),
+                "test_nodes": _evidence_test_nodes(evidence_id),
+                "status": "pending" if evidence_id.startswith("pending#") else "resolved",
+            }
+    return {
+        "description": (
+            "Generated concrete test-node index for modeled verification evidence groups."
+        ),
+        "groups": dict(sorted(groups.items())),
+    }
 
 
 def _check_vellis_use_cases() -> list[Finding]:
@@ -837,11 +1347,16 @@ def _model_tool_parameters() -> dict[str, tuple[tuple[str, bool, Any], ...]]:
             continue
         action_parameters = []
         for parameter, multiplicity, default in re.findall(
-            r"\bin\s+(\w+)\s*:\s*\w+(\[[^]]+\])?(?:\s*=\s*([^;{}]+))?",
+            rf"\bin\s+({SYSML_IDENTIFIER})\s*:\s*\w+(\[[^]]+\])?"
+            r"(?:\s+(?:default\s*)?=\s*([^;{}]+))?",
             block,
         ):
             action_parameters.append(
-                (parameter, multiplicity == "[0..1]", _model_default(default or None))
+                (
+                    _identifier_value(parameter),
+                    multiplicity == "[0..1]",
+                    _model_default(default or None),
+                )
             )
         parameters[identity.removeprefix("operation.vellis.")] = tuple(action_parameters)
     return parameters
@@ -873,9 +1388,7 @@ def _model_operation_ids() -> tuple[str, ...]:
 def _model_operation_blocks() -> dict[str, str]:
     text = (MODEL_ROOT / "vellis" / "VellisOperations.sysml").read_text(encoding="utf-8")
     blocks: dict[str, str] = {}
-    for match in re.finditer(
-        r"\baction def\s+(?:<'([^']+)'>\s+)?\w+\s*\{", text
-    ):
+    for match in re.finditer(r"\baction def\s+(?:<'([^']+)'>\s+)?\w+\s*\{", text):
         block = _extract_braced_block(text, match.start())
         identity = match.group(1)
         if identity and identity.startswith("operation.vellis."):
@@ -913,19 +1426,18 @@ def _check_vellis_contract_completeness() -> list[Finding]:
     ):
         if contract_id not in operations_text:
             findings.append(Finding(operations_path, f"Vellis facade omits {contract_id}"))
-    facade_block = _definition_block(
-        operations_text, "part def", "VellisApplicationFacade"
-    )
-    for performance in re.finditer(
-        r"perform action\s+(\w+)\[[^]]+\]\s*:\s*(\w+)", facade_block
-    ):
+    facade_block = _definition_block(operations_text, "part def", "VellisApplicationFacade")
+    for performance in re.finditer(r"perform action\s+(\w+)\[[^]]+\]\s*:\s*(\w+)", facade_block):
         feature = performance.group(1)
         performance_has_effect = False
         body_start = facade_block.find("{", performance.end())
         statement_end = facade_block.find(";", performance.end())
         if body_start != -1 and (statement_end == -1 or body_start < statement_end):
             performance_body = _extract_braced_block(facade_block, body_start)
-            performance_has_effect = bool(_documentation(performance_body))
+            performance_has_effect = bool(
+                _documentation(performance_body)
+                or re.search(r"\baction\s+\w+\s*(?::\s*\w+)?\s*\{", performance_body)
+            )
         dependency_has_effect = bool(
             re.search(
                 rf"dependency\s+\w+\s+from\s+{re.escape(feature)}\s+to\s+[\w.]+\s*\{{"
@@ -971,9 +1483,9 @@ def _check_vellis_contract_completeness() -> list[Finding]:
     required_controller_terms = (
         "enum strict; enum skip;",
         "enum record; enum skip;",
-        "<'restore_pre_cutover_snapshot'>",
-        "<'cutover_applied'>",
-        "<'ledger_failures_flushed'>",
+        "enum restore_pre_cutover_snapshot;",
+        "enum cutover_applied;",
+        "enum ledger_failures_flushed;",
         "contract.rtg.controller.operation_results",
         "contract.rtg.controller.replay_selection",
     )
@@ -1034,16 +1546,12 @@ def _check_contract_satisfaction() -> list[Finding]:
         )
     }
     bindings: dict[tuple[str, str], list[str]] = {}
-    for consumer, feature, provider in re.findall(
-        r"\bbind\s+(\w+)\.(\w+)\s*=\s*(\w+)\s*;", text
-    ):
+    for consumer, feature, provider in re.findall(r"\bbind\s+(\w+)\.(\w+)\s*=\s*(\w+)\s*;", text):
         bindings.setdefault((consumer, feature), []).append(provider)
 
     for consumer_role, consumer_type in role_types.items():
         definition = _definition_block(model_text, "part def", consumer_type)
-        for match in re.finditer(
-            r"\bref part\s+(\w+)\s*(\[[^]]+\])\s*:\s*(\w+)\s*;", definition
-        ):
+        for match in re.finditer(r"\bref part\s+(\w+)\s*(\[[^]]+\])\s*:\s*(\w+)\s*;", definition):
             feature, multiplicity, required_type = match.groups()
             providers = bindings.get((consumer_role, feature), [])
             if multiplicity == "[1]" and len(providers) != 1:
@@ -1073,9 +1581,7 @@ def _check_contract_satisfaction() -> list[Finding]:
 
     declared_bindings = {
         (consumer, feature)
-        for consumer, feature, _ in re.findall(
-            r"\bbind\s+(\w+)\.(\w+)\s*=\s*(\w+)\s*;", text
-        )
+        for consumer, feature, _ in re.findall(r"\bbind\s+(\w+)\.(\w+)\s*=\s*(\w+)\s*;", text)
     }
     for consumer, feature in declared_bindings:
         consumer_type = role_types.get(consumer)
@@ -1205,6 +1711,9 @@ def check(scope: str = "all", *, require_external: bool = False) -> list[Finding
     findings.extend(_check_implementation_bindings(files))
     findings.extend(_check_empty_public_definitions(files))
     findings.extend(_check_native_modeling_style(files))
+    findings.extend(_check_connected_formal_semantics(files))
+    findings.extend(_check_discriminated_public_alternatives(files))
+    findings.extend(_check_requirement_and_verification_semantics(files))
 
     stable_ids: dict[str, Path] = {}
     for path in files:
@@ -1281,6 +1790,7 @@ def check(scope: str = "all", *, require_external: bool = False) -> list[Finding
         findings.extend(_check_protocol_action_coverage())
         findings.extend(_check_protocol_action_signatures())
         findings.extend(_check_component_contract_completeness())
+        findings.extend(_check_state_access_semantics())
         findings.extend(_check_shadow_contract_parity())
         findings.extend(_check_verification_closure())
 
@@ -1350,9 +1860,11 @@ def check(scope: str = "all", *, require_external: bool = False) -> list[Finding
         findings.extend(_check_vellis_contract_completeness())
         findings.extend(_check_contract_satisfaction())
         findings.extend(_check_vellis_use_cases())
+        findings.extend(_check_native_behavior_realizations())
 
     if scope == "all":
         findings.extend(_check_implementation_drift_file())
+        findings.extend(_check_view_semantics())
 
     if require_external:
         validator = _read_json(lock_path).get("validator", {})
@@ -1362,8 +1874,11 @@ def check(scope: str = "all", *, require_external: bool = False) -> list[Finding
                 Finding(lock_path, "external formal validator is not pinned/configured")
             )
         else:
+            expanded_command = [
+                sys.executable if str(part) == "{python}" else str(part) for part in command
+            ]
             result = subprocess.run(
-                [str(part) for part in command],
+                expanded_command,
                 cwd=ROOT,
                 check=False,
                 capture_output=True,
@@ -1385,13 +1900,15 @@ def _documentation(block: str) -> str:
 
 def _feature_signature(block: str) -> str:
     features = re.findall(
-        r"\b(in|out)\s+(?:ref\s+)?(?:part\s+|item\s+)?(\w+)(\[[^]]+\])?\s*:\s*([\w:]+)(\[[^]]+\])?(?:\s*=\s*([^;{}]+))?",
+        rf"\b(in|out)\s+(?:ref\s+)?(?:attribute\s+|part\s+|item\s+)?"
+        rf"({SYSML_IDENTIFIER})(\[[^]]+\])?\s*:\s*([\w:]+)(\[[^]]+\])?"
+        r"(?:\s+(?:default\s*)?=\s*([^;{}]+))?",
         block,
     )
     if not features:
         return "—"
     return "; ".join(
-        f"{direction} `{name}: {type_name}{before or after or ''}`"
+        f"{direction} `{_identifier_value(name)}: {type_name}{before or after or ''}`"
         + (f" = `{default.strip()}`" if default else "")
         for direction, name, before, type_name, after, default in features
     )
@@ -1433,9 +1950,16 @@ def _public_field_signatures(
     fields = _public_field_signatures(text, parent, seen) if parent else []
     block = _extract_braced_block(text, match.start())
     fields.extend(
-        re.findall(
-            r"\b(?:ref\s+)?(?:attribute|item)\s+(\w+)(\[[^]]+\])?\s*:\s*([\w:]+)"
-            r"(?:\s*=\s*([^;{}]+))?",
+        (
+            _identifier_value(field_name),
+            multiplicity,
+            type_name,
+            default,
+        )
+        for field_name, multiplicity, type_name, default in re.findall(
+            rf"\b(?:ref\s+)?(?:attribute|item)\s+({SYSML_IDENTIFIER})"
+            r"(\[[^]]+\])?\s*:\s*([\w:]+)"
+            r"(?:\s+(?:default\s*)?=\s*([^;{}]+))?",
             block,
         )
     )
@@ -1454,9 +1978,7 @@ def _component_page(path: Path) -> str:
 
     action_definitions = {
         match.group(1): _extract_braced_block(text, match.start())
-        for match in re.finditer(
-            rf"\baction def\s+{OPTIONAL_IDENTIFICATION}(\w+)\s*\{{", text
-        )
+        for match in re.finditer(rf"\baction def\s+{OPTIONAL_IDENTIFICATION}(\w+)\s*\{{", text)
     }
     provided = re.findall(
         r"perform action\s+(\w+)\[[^]]+\]\s*:\s*(\w+)", complete_component_contract
@@ -1545,17 +2067,22 @@ def _component_page(path: Path) -> str:
     if len(state_rows) == 2:
         state_rows.append("| — | — | — | This component owns no abstract state. |")
 
-    effect_rows = ["| Action | State / collaborator | Modeled effect |", "|---|---|---|"]
+    effect_rows = [
+        "| Action | State / collaborator | Access | Modeled effect |",
+        "|---|---|---|---|",
+    ]
     for match in re.finditer(
-        r"dependency\s+\w+\s+from\s+(\w+)\s+to\s+([\w.]+)\s*\{(.*?)\}",
+        r"dependency\s+\w+\s+from\s+(\w+)\s+to\s+([\w.]+)\s*\{",
         complete_component_contract,
-        flags=re.DOTALL,
     ):
-        body = match.group(3)
+        body = _extract_braced_block(complete_component_contract, match.start())
         effect = _documentation(body)
+        access = re.search(r"kind\s*=\s*StateAccessKind::(\w+)", body)
         if effect:
             effect_rows.append(
-                f"| `{match.group(1)}` | `{match.group(2)}` | {effect} |"
+                f"| `{match.group(1)}` | `{match.group(2)}` | `{access.group(1)}` | {effect} |"
+                if access
+                else f"| `{match.group(1)}` | `{match.group(2)}` | `dependency` | {effect} |"
             )
     for feature, _ in provided:
         feature_match = re.search(
@@ -1567,20 +2094,51 @@ def _component_page(path: Path) -> str:
         body = _extract_braced_block(complete_component_contract, feature_match.start())
         effect = _documentation(body)
         if effect and not any(f"| `{feature}` |" in row for row in effect_rows):
-            effect_rows.append(
-                f"| `{feature}` | — | {effect} |"
-            )
+            effect_rows.append(f"| `{feature}` | — | `declared` | {effect} |")
     if len(effect_rows) == 2:
-        effect_rows.append("| — | — | Effects are stated by the requirements below. |")
+        effect_rows.append("| — | — | — | Effects are stated by the requirements below. |")
 
-    requirement_rows = ["| Stable ID | Modeled obligation |", "|---|---|"]
-    for match in re.finditer(r"\brequirement\s+<'([^']+)'>\s+\w+\s*\{", text):
+    behavior_rows = [
+        "| Public action | Nested semantic actions | Observable successions |",
+        "|---|---|---|",
+    ]
+    for feature, _ in provided:
+        feature_match = re.search(
+            rf"perform action\s+{re.escape(feature)}\[[^]]+\]\s*:\s*\w+\s*\{{",
+            complete_component_contract,
+        )
+        if not feature_match:
+            continue
+        block = _extract_braced_block(complete_component_contract, feature_match.start())
+        nested = re.findall(r"\baction\s+(?!def\b)(\w+)(?:\s*:\s*(\w+))?\s*(?:\{|;)", block)
+        successions = [" ".join(value.split()) for value in re.findall(r"\bfirst\s+.*?;", block)]
+        if nested or successions:
+            nested_text = ", ".join(
+                f"`{name}: {type_name or 'local'}`" for name, type_name in nested
+            )
+            behavior_rows.append(
+                f"| `{feature}` | "
+                f"{nested_text or '—'} | "
+                f"{'; '.join(f'`{value}`' for value in successions) or '—'} |"
+            )
+    if len(behavior_rows) == 2:
+        behavior_rows.append("| — | — | No action decomposition required at this boundary. |")
+
+    satisfiers = dict(re.findall(r"\bsatisfy\s+(\w+)\s+by\s+([\w.]+)\s*;", text))
+    requirement_rows = [
+        "| Stable ID | Subject | Satisfier | Required constraint |",
+        "|---|---|---|---|",
+    ]
+    for match in re.finditer(r"\brequirement\s+<'([^']+)'>\s+(\w+)\s*\{", text):
         block = _extract_braced_block(text, match.start())
+        subject = re.search(r"\bsubject\s+\w+\s*:\s*([\w:]+)", block)
         requirement_rows.append(
-            f"| `{match.group(1)}` | {_documentation(block) or 'Modeled requirement.'} |"
+            f"| `{match.group(1)}` | `{subject.group(1) if subject else 'unknown'}` | "
+            f"`{satisfiers.get(match.group(2), 'unsatisfied-draft')}` | "
+            f"{_documentation(block) or 'Formal modeled predicate.'} |"
         )
     if len(requirement_rows) == 2:
-        requirement_rows.append("| — | No component-scoped requirements. |")
+        requirement_rows.append("| — | — | — | No component-scoped requirements. |")
 
     value_rows = [
         "| Public definition | Kind | Fields | Meaning |",
@@ -1601,52 +2159,43 @@ def _component_page(path: Path) -> str:
             "Defined by its typed fields and action requirements."
         )
         value_rows.append(
-            f"| `{match.group(2)}` | `{match.group(1)}` | {rendered_fields} | "
-            f"{meaning} |"
+            f"| `{match.group(2)}` | `{match.group(1)}` | {rendered_fields} | {meaning} |"
         )
     if len(value_rows) == 2:
         value_rows.append("| — | — | — | No component-owned public values. |")
 
-    enum_rows = ["| Enumeration | Model and external values |", "|---|---|"]
+    enum_rows = ["| Enumeration | Logical literals |", "|---|---|"]
     for match in re.finditer(r"\benum def\s+(\w+)\s*\{", text):
         block = _extract_braced_block(text, match.start())
         rendered_values: list[str] = []
-        for value_match in re.finditer(
-            r"\benum\s+(?:<'([^']+)'>\s+)?(\w+)\s*(;|\{)", block
-        ):
-            external_name, model_name, _ = value_match.groups()
-            external_name = external_name or model_name
-            rendered_value = (
-                f"`{model_name}`"
-                if model_name == external_name
-                else f"`{model_name}` → `{external_name}`"
-            )
-            rendered_values.append(rendered_value)
-        enum_rows.append(
-            f"| `{match.group(1)}` | {', '.join(rendered_values) or '—'} |"
-        )
+        for value_match in re.finditer(r"\benum\s+(?:'([^']+)'|(\w+))\s*(;|\{)", block):
+            quoted_name, model_name, _ = value_match.groups()
+            rendered_values.append(f"`{quoted_name or model_name}`")
+        enum_rows.append(f"| `{match.group(1)}` | {', '.join(rendered_values) or '—'} |")
     if len(enum_rows) == 2:
         enum_rows.append("| — | No component-owned public enumerations. |")
 
     verification_rows = [
-        "| Verification | Objectives | Evidence |",
-        "|---|---|---|",
+        "| Verification | Subject | Objectives | Evidence |",
+        "|---|---|---|---|",
     ]
     for match in re.finditer(r"\bverification def\s+(\w+)\s*\{", text):
         block = _extract_braced_block(text, match.start())
         objectives = re.findall(r"\bverify\s+(\w+)\s*;", block)
         evidence = re.search(r'evidenceId\s*=\s*"([^"]+)"', block)
+        subject = re.search(r"\bsubject\s+\w+\s*:\s*([\w:]+)", block)
         verification_rows.append(
-            f"| `{match.group(1)}` | {', '.join(f'`{name}`' for name in objectives) or '—'} | "
+            f"| `{match.group(1)}` | `{subject.group(1) if subject else 'unknown'}` | "
+            f"{', '.join(f'`{name}`' for name in objectives) or '—'} | "
             f"`{evidence.group(1)}` |"
             if evidence
             else (
-                f"| `{match.group(1)}` | "
+                f"| `{match.group(1)}` | `{subject.group(1) if subject else 'unknown'}` | "
                 f"{', '.join(f'`{name}`' for name in objectives) or '—'} | — |"
             )
         )
     if len(verification_rows) == 2:
-        verification_rows.append("| — | — | No boundary verification modeled. |")
+        verification_rows.append("| — | — | — | No boundary verification modeled. |")
 
     return "\n".join(
         [
@@ -1677,6 +2226,10 @@ def _component_page(path: Path) -> str:
             "## Action and state effects",
             "",
             *effect_rows,
+            "",
+            "## Native action behavior",
+            "",
+            *behavior_rows,
             "",
             "## Invariants and behavioral obligations",
             "",
@@ -1731,16 +2284,45 @@ def _render_component_summary() -> str:
 def _render_operation_summary() -> str:
     operation_text = (MODEL_ROOT / "vellis" / "VellisOperations.sysml").read_text(encoding="utf-8")
     operation_blocks: dict[str, str] = {}
-    for match in re.finditer(
-        r"\baction def\s+(?:<'([^']+)'>\s+)?\w+\s*\{", operation_text
-    ):
+    for match in re.finditer(r"\baction def\s+(?:<'([^']+)'>\s+)?\w+\s*\{", operation_text):
         block = _extract_braced_block(operation_text, match.start())
         identity = match.group(1)
         if identity and identity.startswith("operation.vellis."):
             operation_blocks[identity.removeprefix("operation.vellis.")] = block
+    facade_block = _definition_block(operation_text, "part def", "VellisApplicationFacade")
+    facade_features = {
+        action_type: feature
+        for feature, action_type in re.findall(
+            r"perform action\s+(\w+)\[[^]]+\]\s*:\s*(\w+)", facade_block
+        )
+    }
+    controller_calls: dict[str, list[str]] = {}
+    for action_type, feature in facade_features.items():
+        match = re.search(
+            rf"perform action\s+{re.escape(feature)}\[[^]]+\]\s*:\s*{action_type}\s*\{{",
+            facade_block,
+        )
+        if match:
+            block = _extract_braced_block(facade_block, match.start())
+            controller_calls[feature] = re.findall(r"\baction\s+invoke\w*\s*:\s*(\w+)", block)
+    realization_text = (MODEL_ROOT / "vellis" / "realizations" / "VellisMcpPython.sysml").read_text(
+        encoding="utf-8"
+    )
+    allocations = dict(
+        re.findall(
+            r"allocate\s+application\.facade\.(\w+)\s+to\s+adapter\.(\w+)\s*;",
+            realization_text,
+        )
+    )
+    action_types = {
+        identity.removeprefix("operation.vellis."): action_type
+        for identity, action_type in re.findall(
+            r"action def\s+<'(operation\.vellis\.[^']+)'>\s+(\w+)", operation_text
+        )
+    }
     rows = [
-        "| # | Vellis façade / MCP tool | Signature | Principal failures | Outcome |",
-        "|---:|---|---|---|---|",
+        "| # | Tool | Façade / controller realization | Signature | Principal failures | Outcome |",
+        "|---:|---|---|---|---|---|",
     ]
     for index, tool in enumerate(_model_tool_names(), 1):
         block = operation_blocks.get(tool, "")
@@ -1750,8 +2332,16 @@ def _render_operation_summary() -> str:
             if failure
             else "—"
         )
+        facade_feature = facade_features.get(action_types.get(tool, ""), "unmapped")
+        calls = controller_calls.get(facade_feature, [])
+        realization = (
+            f"`{facade_feature}` → "
+            f"{', '.join(f'`{call}`' for call in calls) or '`application-local`'} → "
+            f"`{allocations.get(facade_feature, 'unmapped')}`"
+        )
         rows.append(
-            f"| {index} | `{tool}` | {_feature_signature(block)} | {failures or 'None'} | "
+            f"| {index} | `{tool}` | {realization} | {_feature_signature(block)} | "
+            f"{failures or 'None'} | "
             f"{_documentation(block) or 'See the typed façade action.'} |"
         )
     role_rows = ["| Application role | Bibliotek component |", "|---|---|"]
@@ -1762,9 +2352,54 @@ def _render_operation_summary() -> str:
         path.read_text(encoding="utf-8")
         for path in sorted((MODEL_ROOT / "vellis" / "use-cases").glob("*.sysml"))
     )
-    use_cases = sorted(set(re.findall(r"\buse case def\s+(\w+)", use_case_text)))
-    use_case_rows = ["| Actor-visible use case |", "|---|"]
-    use_case_rows.extend(f"| `{name}` |" for name in use_cases)
+    use_case_rows = [
+        "| Actor-visible use case | Objective | Realized application actions |",
+        "|---|---|---|",
+    ]
+    for definition in re.finditer(r"\buse case def\s+(\w+)\s*\{", use_case_text):
+        name = definition.group(1)
+        definition_block = _extract_braced_block(use_case_text, definition.start())
+        usage = re.search(rf"\buse case\s+\w+\s*:\s*{name}\s*\{{", use_case_text)
+        usage_block = _extract_braced_block(use_case_text, usage.start()) if usage else ""
+        actions = re.findall(r"\baction\s+(\w+)\s*:\s*(\w+)", usage_block)
+        use_case_rows.append(
+            f"| `{name}` | {_documentation(definition_block) or 'Modeled actor outcome.'} | "
+            f"{', '.join(f'`{feature}: {action}`' for feature, action in actions) or '—'} |"
+        )
+
+    contract_texts = [
+        (MODEL_ROOT / "vellis" / "Vellis.sysml").read_text(encoding="utf-8"),
+        operation_text,
+        realization_text,
+    ]
+    contract_rows = [
+        "| Stable ID | Subject | Satisfier | Required constraint |",
+        "|---|---|---|---|",
+    ]
+    verification_rows = [
+        "| Verification | Subject | Objectives | Evidence |",
+        "|---|---|---|---|",
+    ]
+    for contract_text in contract_texts:
+        satisfiers = dict(re.findall(r"\bsatisfy\s+(\w+)\s+by\s+([\w.]+)\s*;", contract_text))
+        for requirement in re.finditer(r"\brequirement\s+<'([^']+)'>\s+(\w+)\s*\{", contract_text):
+            block = _extract_braced_block(contract_text, requirement.start())
+            subject = re.search(r"\bsubject\s+\w+\s*:\s*([\w:]+)", block)
+            contract_rows.append(
+                f"| `{requirement.group(1)}` | `{subject.group(1) if subject else 'unknown'}` | "
+                f"`{satisfiers.get(requirement.group(2), 'unsatisfied')}` | "
+                f"{_documentation(block) or 'Formal modeled predicate.'} |"
+            )
+        for verification in re.finditer(r"\bverification def\s+(\w+)\s*\{", contract_text):
+            block = _extract_braced_block(contract_text, verification.start())
+            subject = re.search(r"\bsubject\s+\w+\s*:\s*([\w:]+)", block)
+            evidence = re.search(r'evidenceId\s*=\s*"([^"]+)"', block)
+            objectives = re.findall(r"\bverify\s+(\w+)\s*;", block)
+            verification_rows.append(
+                f"| `{verification.group(1)}` | `{subject.group(1) if subject else 'unknown'}` | "
+                f"{', '.join(f'`{objective}`' for objective in objectives) or '—'} | "
+                f"`{evidence.group(1) if evidence else 'unbound'}` |"
+            )
     return "\n".join(
         [
             "# Vellis operations",
@@ -1778,6 +2413,14 @@ def _render_operation_summary() -> str:
             "## Actor-visible use cases",
             "",
             *use_case_rows,
+            "",
+            "## Requirements and satisfaction",
+            "",
+            *contract_rows,
+            "",
+            "## Verification closure",
+            "",
+            *verification_rows,
             "",
             "## Façade and transport mappings",
             "",
@@ -1847,6 +2490,10 @@ def render() -> None:
     GENERATED_MANIFEST.write_text(
         json.dumps(_manifest_data(), indent=2, sort_keys=True) + "\n", encoding="utf-8"
     )
+    GENERATED_EVIDENCE_INDEX.write_text(
+        json.dumps(_verification_evidence_data(), indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
 
 
 def check_generated() -> list[Finding]:
@@ -1855,6 +2502,10 @@ def check_generated() -> list[Finding]:
         GENERATED_DOC_ROOT / "bibliotek-components.md": _render_component_summary(),
         GENERATED_DOC_ROOT / "vellis-operations.md": _render_operation_summary(),
         GENERATED_MANIFEST: json.dumps(_manifest_data(), indent=2, sort_keys=True) + "\n",
+        GENERATED_EVIDENCE_INDEX: json.dumps(
+            _verification_evidence_data(), indent=2, sort_keys=True
+        )
+        + "\n",
     }
     findings = [
         Finding(path, "generated artifact is missing or stale; run just model-render")
@@ -2011,7 +2662,17 @@ def setup_status() -> int:
     validator = lock.get("validator", {})
     command = validator.get("command") if isinstance(validator, dict) else None
     if command:
-        print(f"External validator: {' '.join(str(part) for part in command)}")
+        result = subprocess.run(
+            [sys.executable, "tools/sysml_validator.py", "setup"],
+            cwd=ROOT,
+            check=False,
+        )
+        if result.returncode:
+            return result.returncode
+        print(
+            "External validator: "
+            + " ".join(sys.executable if str(part) == "{python}" else str(part) for part in command)
+        )
     else:
         print("External validator: pending; profile checks remain available")
     print("Run `just model-check` for repository profile checks.")

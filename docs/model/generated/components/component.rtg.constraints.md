@@ -39,31 +39,45 @@ Generated from textual SysML v2 by `just model-render`; do not edit by hand.
 
 ## Action and state effects
 
-| Action | State / collaborator | Modeled effect |
+| Action | State / collaborator | Access | Modeled effect |
+|---|---|---|---|
+| `exportSnapshot` | `constraintRecords` | `read` | read all canonical records. |
+| `putConstraint` | `constraintRecords` | `write` | atomically create/replace one record and rebuild affected indexes. |
+| `getConstraint` | `constraintRecords` | `read` | read one canonical record. |
+| `listConstraints` | `derivedIndexes` | `read` | read kind/live indexes. |
+| `listConstraintsByTarget` | `derivedIndexes` | `read` | read target/kind/live indexes. |
+| `deleteConstraint` | `constraintRecords` | `delete` | remove one record and affected indexes. |
+
+## Native action behavior
+
+| Public action | Nested semantic actions | Observable successions |
 |---|---|---|
-| `exportSnapshot` | `constraintRecords` | read all canonical records. |
-| `putConstraint` | `constraintRecords` | atomically create/replace one record and rebuild affected indexes. |
-| `getConstraint` | `constraintRecords` | read one canonical record. |
-| `listConstraints` | `derivedIndexes` | read kind/live indexes. |
-| `listConstraintsByTarget` | `derivedIndexes` | read target/kind/live indexes. |
-| `deleteConstraint` | `constraintRecords` | remove one record and affected indexes. |
+| — | — | No action decomposition required at this boundary. |
 
 ## Invariants and behavioral obligations
 
-| Stable ID | Modeled obligation |
-|---|---|
-| `contract.rtg.constraints.write_effect` | Missing UUID generates identity; supplied identity is preserved. Kind selects a compatible typed payload, descriptions remain human-readable, missing live becomes true, and writes do not execute rules. |
-| `contract.rtg.constraints.read_effect` | Reads are deterministic, honor explicit filters, derive only from canonical records/indexes, and never inspect or mutate graph/schema state. |
-| `contract.rtg.constraints.delete_effect` | Delete removes exactly one definition and index entries with no cross-component cascade. |
-| `contract.rtg.constraints.snapshot_effect` | Snapshot round-trip preserves full records and normalized live state; import validates the whole candidate before visibility. |
-| `invariant.rtg.constraints.uuid_unique` | Constraint UUIDs are unique. |
-| `invariant.rtg.constraints.display_name_not_identity` | Display name is non-unique navigation text, not identity. |
-| `invariant.rtg.constraints.live_status_boolean` | Missing live normalizes to true and supplied live is Boolean. |
-| `invariant.rtg.constraints.no_validation_execution` | The store never executes constraints or validates graph objects. |
-| `invariant.rtg.constraints.cardinality_rules_live_here` | Query-binding cardinality rule definitions are owned here rather than in schema definitions. |
-| `invariant.rtg.constraints.no_severity_policy_v1` | V1 definitions contain no violation severity or blocking policy. |
-| `invariant.rtg.constraints.pattern_compatibility` | Query-pattern and cardinality payloads use the canonical RtgQuerySpec and name valid bindings structurally; evaluation belongs to validation/query. |
-| `invariant.rtg.constraints.indexes_match_records` | Derived kind, target, and live indexes exactly match canonical records. |
+| Stable ID | Subject | Satisfier | Required constraint |
+|---|---|---|---|
+| `contract.rtg.constraints.write_effect` | `PutConstraint` | `registry.putConstraint` | Missing UUID generates identity; supplied identity is preserved. Kind selects a compatible typed payload, descriptions remain human-readable, missing live becomes true, and writes do not execute rules. |
+| `contract.rtg.constraints.read_effect` | `RtgConstraints` | `registry` | Reads are deterministic, honor explicit filters, derive only from canonical records/indexes, and never inspect or mutate graph/schema state. |
+| `contract.rtg.constraints.delete_effect` | `DeleteConstraint` | `registry.deleteConstraint` | Delete removes exactly one definition and index entries with no cross-component cascade. |
+| `contract.rtg.constraints.snapshot_effect` | `RtgConstraints` | `registry` | Snapshot round-trip preserves full records and normalized live state; import validates the whole candidate before visibility. |
+| `invariant.rtg.constraints.uuid_unique` | `RtgConstraints` | `registry` | Constraint UUIDs are unique. |
+| `invariant.rtg.constraints.display_name_not_identity` | `RtgConstraints` | `registry` | Display name is non-unique navigation text, not identity. |
+| `invariant.rtg.constraints.live_status_boolean` | `RtgConstraints` | `registry` | Missing live normalizes to true and supplied live is Boolean. |
+| `invariant.rtg.constraints.no_validation_execution` | `RtgConstraints` | `registry` | The store never executes constraints or validates graph objects. |
+| `invariant.rtg.constraints.cardinality_rules_live_here` | `RtgConstraints` | `registry` | Query-binding cardinality rule definitions are owned here rather than in schema definitions. |
+| `invariant.rtg.constraints.no_severity_policy_v1` | `RtgConstraints` | `registry` | V1 definitions contain no violation severity or blocking policy. |
+| `invariant.rtg.constraints.pattern_compatibility` | `RtgConstraints` | `registry` | Query-pattern and cardinality payloads use the canonical RtgQuerySpec and name valid bindings structurally; evaluation belongs to validation/query. |
+| `invariant.rtg.constraints.indexes_match_records` | `RtgConstraints` | `registry` | Derived kind, target, and live indexes exactly match canonical records. |
+| `contract.rtg.constraints.export_constraint_snapshot.failures` | `ExportConstraintSnapshot` | `registry.exportSnapshot` | Export is state-neutral and has no declared domain failure. |
+| `contract.rtg.constraints.put_constraint.failures` | `PutConstraint` | `registry.putConstraint` | Rejected writes leave canonical records and indexes unchanged. |
+| `contract.rtg.constraints.get_constraint.failures` | `GetConstraint` | `registry.getConstraint` | Read failure has no effect. |
+| `contract.rtg.constraints.list_constraints.failures` | `ListConstraints` | `registry.listConstraints` | Read failure has no effect. |
+| `contract.rtg.constraints.list_constraints_by_target.failures` | `ListConstraintsByTarget` | `registry.listConstraintsByTarget` | Read failure has no effect and never inspects schema or graph state. |
+| `contract.rtg.constraints.delete_constraint.failures` | `DeleteConstraint` | `registry.deleteConstraint` | Rejected delete has no effect. |
+| `contract.rtg.constraints.create_empty_rtg_constraints.failures` | `CreateEmptyRtgConstraints` | `createEmptyRtgConstraintsSubject` | Construction has no declared domain failure. |
+| `contract.rtg.constraints.import_rtg_constraint_snapshot.failures` | `ImportRtgConstraintSnapshot` | `importRtgConstraintSnapshotSubject` | Failure returns no partially imported registry. |
 
 ## Public values and items
 
@@ -88,15 +102,23 @@ Generated from textual SysML v2 by `just model-render`; do not edit by hand.
 
 ## Public enumerations
 
-| Enumeration | Model and external values |
+| Enumeration | Logical literals |
 |---|---|
-| `RtgConstraintKind` | `queryPattern` → `query_pattern`, `cardinality` |
-| `RtgConstraintExpectation` | `mustMatchAtLeastOne` → `must_match_at_least_one`, `mustMatchNone` → `must_match_none` |
+| `RtgConstraintKind` | `query_pattern`, `cardinality` |
+| `RtgConstraintExpectation` | `must_match_at_least_one`, `must_match_none` |
 
 ## Verification
 
-| Verification | Objectives | Evidence |
-|---|---|---|
-| `RtgConstraintsBoundaryVerification` | `constraintWriteEffect`, `constraintReadEffect`, `constraintDeleteEffect`, `snapshotEffect`, `uuidUnique`, `displayNameNotIdentity`, `liveStatusBoolean`, `noValidationExecution`, `cardinalityRulesLiveHere`, `noSeverityPolicyV1`, `patternCompatibility`, `indexesMatchRecords` | `components/rtg/constraints/tests/test_rtg_constraints_contract.py` |
+| Verification | Subject | Objectives | Evidence |
+|---|---|---|---|
+| `PutConstraintContractVerification` | `PutConstraint` | `constraintWriteEffect`, `putConstraintFailureSemantics` | `components/rtg/constraints/tests/test_rtg_constraints_contract.py#PutConstraintContractVerification` |
+| `DeleteConstraintContractVerification` | `DeleteConstraint` | `constraintDeleteEffect`, `deleteConstraintFailureSemantics` | `components/rtg/constraints/tests/test_rtg_constraints_contract.py#DeleteConstraintContractVerification` |
+| `ExportConstraintSnapshotContractVerification` | `ExportConstraintSnapshot` | `exportConstraintSnapshotFailureSemantics` | `components/rtg/constraints/tests/test_rtg_constraints_contract.py#ExportConstraintSnapshotContractVerification` |
+| `GetConstraintContractVerification` | `GetConstraint` | `getConstraintFailureSemantics` | `components/rtg/constraints/tests/test_rtg_constraints_contract.py#GetConstraintContractVerification` |
+| `ListConstraintsContractVerification` | `ListConstraints` | `listConstraintsFailureSemantics` | `components/rtg/constraints/tests/test_rtg_constraints_contract.py#ListConstraintsContractVerification` |
+| `ListConstraintsByTargetContractVerification` | `ListConstraintsByTarget` | `listConstraintsByTargetFailureSemantics` | `components/rtg/constraints/tests/test_rtg_constraints_contract.py#ListConstraintsByTargetContractVerification` |
+| `CreateEmptyRtgConstraintsContractVerification` | `CreateEmptyRtgConstraints` | `createEmptyRtgConstraintsFailureSemantics` | `components/rtg/constraints/tests/test_rtg_constraints_contract.py#CreateEmptyRtgConstraintsContractVerification` |
+| `ImportRtgConstraintSnapshotContractVerification` | `ImportRtgConstraintSnapshot` | `importRtgConstraintSnapshotFailureSemantics` | `components/rtg/constraints/tests/test_rtg_constraints_contract.py#ImportRtgConstraintSnapshotContractVerification` |
+| `RtgConstraintsBoundaryVerification` | `RtgConstraints` | `constraintReadEffect`, `snapshotEffect`, `uuidUnique`, `displayNameNotIdentity`, `liveStatusBoolean`, `noValidationExecution`, `cardinalityRulesLiveHere`, `noSeverityPolicyV1`, `patternCompatibility`, `indexesMatchRecords` | `components/rtg/constraints/tests/test_rtg_constraints_contract.py#RtgConstraintsBoundaryVerification` |
 
 Equivalent private algorithms, helpers, storage layouts, and implementation-language inheritance remain implementation choices.

@@ -13,6 +13,9 @@ Model an application separately from reusable component libraries.
 - Use use cases for actor-visible outcomes rather than method inventories.
 - Put whole-system invariants with the component or application that has authority to enforce them.
 - Use action decomposition and successions only for externally meaningful application orchestration.
+- Model façade-to-component and adapter-to-façade delegation as nested performed actions. Preserve
+  request/result mappings with typed bindings or flows and use allocation for logical-to-realization
+  traceability.
 - Use allocations to map logical elements to implementation, deployment, or runtime realizations.
 - Put implementation bindings on concrete realization definitions/usages, not reusable logical
   component definitions.
@@ -20,8 +23,8 @@ Model an application separately from reusable component libraries.
   semantics are part of the logical application contract.
 - When connected interaction is modeled, define typed ports, interfaces, transferred items, and
   flows. Do not use an empty port or interface as generic software API notation.
-- Define viewpoints and views for composition, behavior, use cases, verification, and realization
-  concerns that readers need to inspect repeatedly.
+- Define reusable views for composition, behavior, use cases, verification, and realization.
+  Define viewpoints only when named stakeholder concerns constrain those views.
 
 Alternative in-process, message-oriented, distributed, or other realizations may map the same
 logical roles and actions without changing the component contracts solely because invocation

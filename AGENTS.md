@@ -13,7 +13,7 @@ The repository should evolve in this order:
 
 Prefer reusable, self-contained behavior over one-off application code. Treat applications, SDKs, runtimes, and generated systems as consumers of the component library, not as reasons to weaken component boundaries.
 
-Use textual SysML v2 under `model/` as the authored source for new component and application design. The model is still marked `shadow` while the formal-validator and human-acceptance gates in `model/model-status.json` remain open; the old Markdown specs are a frozen migration baseline, not the place to author new contracts. Generated explanatory pages live under `docs/model/generated/`. Do not claim final normative cutover or remove the frozen baseline before those gates pass.
+Use textual SysML v2 under `model/` as the authored source for new component and application design. The pinned official Java validator is mandatory through `just model-check`; repository regex/profile checks are not formal language validation. The model is still marked `shadow` while the human-acceptance gates in `model/model-status.json` remain open; the old Markdown specs are a frozen migration baseline, not the place to author new contracts. Generated explanatory pages live under `docs/model/generated/`. Do not claim final normative cutover or remove the frozen baseline before those gates pass.
 
 Keep three separately packageable model layers: the software-component modeling foundation,
 Bibliotek reusable components, and the Vellis application. In SysML terms, the foundation and
@@ -32,7 +32,7 @@ Vellis façade values, MCP metadata, Python realization types, or speculative ru
 Bibliotek shared values.
 
 The modeling foundation is reusable process vocabulary, not Bibliotek domain vocabulary. Keep only
-minimal lifecycle, realization, evidence, and other non-semantic governance conventions there. Bibliotek-wide
+minimal lifecycle, typed state-access, realization, evidence, and other generic governance conventions there. Bibliotek-wide
 software/domain semantics belong in Bibliotek. Vellis-specific composition, use cases, façade
 contracts, transport mappings, and response policy belong in Vellis packages.
 
@@ -40,16 +40,21 @@ Prefer native SysML semantics over duplicate annotations. A `perform action` is 
 operation. An invocation-scoped collaborator is a typed action input. A collaborator retained by a
 component occurrence is a multiplicited `ref part` role; the application may bind that role to the
 actual part usage because both denote the same occurrence. Never bind action usages to mean one
-action calls another. Use ordinary, `derived`, and `ref` features to distinguish owned, derived, and
+action calls another. Model calls as nested actions performed by provider roles, with bindings or
+flows for contract-significant values. Use ordinary, `derived`, and `ref` features to distinguish owned, derived, and
 independently existing state. Keep implementation bindings on concrete realization elements, not
 reusable logical component definitions. Use exhibited states only for actual activated/event-driven
 state behavior, and use typed ports/interfaces only when a connected interaction and its transfers
 are being modeled.
 
-Use native short names for stable qualified identities and exact external enum spellings. Define a
+Use native short names for stable qualified model identities, not as implicit serialization maps.
+Use the logical literal name for a public encoding or define an explicit realization codec. Define a
 calculation only when it has an evaluable result and a constraint only when it is a complete
-predicate. Do not create hollow calculations, constraints, states, ports, or interfaces to hold
-prose. Define viewpoints and views for recurring model concerns; generated Markdown is a projection.
+predicate. Put every normative obligation inside a requirement `require constraint`; top-level
+documentation is explanatory. Assert satisfiers separately and verify requirements only in cases
+with compatible subjects. Do not create hollow calculations, constraints, states, ports, or
+interfaces to hold prose. Use view definitions for reusable projections and viewpoints only for
+explicit stakeholder concerns; generated Markdown is a projection.
 
 A future message runtime should be modeled as separately packageable Bibliotek runtime contracts
 only after delivery, addressing, routing, correlation, ordering, retry, and idempotency semantics
@@ -77,7 +82,7 @@ extracting, splitting, merging, or validating components. Author the component c
 
 During migration, a semantic mismatch with the frozen Markdown baseline or current implementation
 is a review finding, not permission to rewrite an accepted boundary. Record genuine implementation
-disagreement in `model/implementation-drift.yaml` and obtain human approval before changing
+disagreement in `model/realizations/PythonImplementationDrift.sysml` and obtain human approval before changing
 accepted contracts, state ownership, dependencies, invariants, or lifecycle status.
 
 Use stable component IDs:
@@ -89,7 +94,7 @@ component.<domain>.<name>
 Component models are human-owned black-box contracts. They define purpose, public values/items,
 performed actions, action-scoped inputs, retained collaborator roles, abstract owned state,
 action effects, principal failures, invariants,
-and verification objectives. Stop at the level needed for composition, substitution, design-level
+required constraints, asserted satisfiers, and subject-compatible verification objectives. Stop at the level needed for composition, substitution, design-level
 reasoning, and black-box verification.
 
 The model is the living engineering definition, not a summary of the Python implementation. Judge
@@ -222,7 +227,9 @@ Default recipes:
 - `just format`: format Python code with Ruff.
 - `just skills-check`: validate repo-local skill metadata.
 - `just skills-sync`: expose `.agents/skills` source-of-truth skills in Claude Code's `.claude/skills` project-skill layout.
-- `just model-check`: validate the SysML profile, architecture, implementation bindings, and generated artifacts.
+- `just model-setup`: fetch and checksum-verify the pinned official validator, formal libraries, and Java runtime.
+- `just model-check`: run official SysML validation plus profile, architecture, implementation-binding, and generated-artifact checks.
+- `just model-check-formal`: run the pinned official SysML validator directly.
 - `just model-render`: regenerate model-derived documentation views and the static Vellis application manifest.
 - `just model-package`: build independently packageable shadow KPAR candidates.
 - `just model-handoff TARGET=<stable-id>`: inspect the model slice and verification objectives for an implementation handoff.

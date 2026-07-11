@@ -6,8 +6,14 @@ package SoftwareComponentPattern {
         attribute value : String;
     }
 
-    attribute def ResponseValue {
+    abstract attribute def OperationOutcome;
+
+    attribute def ResponseValue :> OperationOutcome {
         attribute value : String;
+    }
+
+    attribute def RejectedOutcome :> OperationOutcome {
+        attribute reason : String;
     }
 
     item def WorkMessage {
@@ -15,7 +21,9 @@ package SoftwareComponentPattern {
         attribute payload : RequestValue;
     }
 
-    item def DurableQueue { doc /* An independently durable external resource used only by the fixture. */ }
+    item def DurableQueue {
+        doc /* An independently durable external resource used only by the fixture. */
+    }
 
     constraint def MatchingResponse {
         in request : RequestValue;
@@ -23,41 +31,58 @@ package SoftwareComponentPattern {
         request.value == response.value
     }
 
+    calc def RequestIsValid {
+        in request : RequestValue;
+        return valid : Boolean = request.value != "";
+    }
+
     action def ProcessRequest {
         in request : RequestValue;
         out response : ResponseValue;
-        doc /* Produce a response with the same value as a valid request. */
+        doc /* Produce a response for one valid request. */
         @FailureContract {
             errorIds = ("foundation.error.request_invalid");
-            obligation = "Invalid requests fail without a partial response.";
         }
     }
 
     action def DispatchMessage {
-        in message : WorkMessage;
+        in 'message' : WorkMessage;
         out accepted : Boolean;
         doc /* Submit one message to the configured durable queue and report acceptance. */
     }
 
     part def Provider {
+        attribute successfulRequestCount : Integer := 0;
         derived attribute cachedResponse : ResponseValue {
             doc /* Ephemeral response cache derived from the most recent successful processing. */
         }
         ref item queue : DurableQueue {
             doc /* Independently durable queue referenced, but not lifecycle-owned, by the provider. */
         }
-        perform action processRequest[0..*] : ProcessRequest;
-        perform action dispatch[0..*] : DispatchMessage;
-        dependency processCache from processRequest to cachedResponse {
-            doc /* cache the most recent successful response. */
+
+        perform action processRequest[0..*] : ProcessRequest {
+            assign successfulRequestCount := successfulRequestCount + 1;
         }
-        dependency dispatchQueue from dispatch to queue {
-            doc /* submit one message to the external queue. */
+        perform action dispatch[0..*] : DispatchMessage;
+
+        dependency processDerivesCache from processRequest to cachedResponse {
+            @StateAccess { kind = StateAccessKind::write; }
+            doc /* A successful response determines the derived most-recent response view. */
+        }
+        dependency processWritesCount from processRequest to successfulRequestCount {
+            @StateAccess { kind = StateAccessKind::write; }
+        }
+        dependency dispatchReadsQueue from dispatch to queue {
+            @StateAccess { kind = StateAccessKind::read; }
+        }
+        dependency dispatchPreservesCount from dispatch to successfulRequestCount {
+            @StateAccess { kind = StateAccessKind::noStateEffect; }
+            doc /* Dispatch does not change request-processing state. */
         }
     }
 
     action def OpenProvider {
-        in ref queue : DurableQueue;
+        in ref item queue : DurableQueue;
         out part provider : Provider;
         doc /* Construct a provider that refers to the supplied independently existing queue. */
         bind provider.queue = queue;
@@ -67,14 +92,31 @@ package SoftwareComponentPattern {
         ref part provider[1] : Provider;
     }
 
-    part def ExampleApplication {
-        part consumer : Consumer;
-        part provider : Provider;
-
-        bind consumer.provider = provider;
+    action def ServeRequest {
+        in request : RequestValue;
+        out response : ResponseValue;
     }
 
-    part def ExternalActor { doc /* A system-external participant in the fixture use case. */ }
+    part def ExampleApplication {
+        part consumer : Consumer;
+        part provider : Provider {
+            perform serve.invokeProvider;
+        }
+
+        bind consumer.provider = provider;
+
+        action serve : ServeRequest {
+            action invokeProvider : ProcessRequest {
+                in request redefines ProcessRequest::request = serve.request;
+                out response redefines ProcessRequest::response = serve.response;
+            }
+        }
+
+    }
+
+    part def ExternalActor {
+        doc /* A system-external participant in the fixture use case. */
+    }
 
     use case def ProcessRequestUseCase {
         subject application : ExampleApplication;
@@ -87,29 +129,69 @@ package SoftwareComponentPattern {
     use case processRequestUseCase : ProcessRequestUseCase {
         subject application;
         actor requester;
-        action process : ProcessRequest;
+        action process : ServeRequest;
     }
 
+
     requirement <'contract.foundation.process_request'> processRequestRequirement {
-        subject application : ExampleApplication;
-        doc /* The application shall use a compatible provider for each requested process. */
+        subject operation : ProcessRequest;
+        assume constraint {
+            RequestIsValid(operation.request)
+        }
+        require constraint matchingResponse : MatchingResponse {
+            in request = operation.request;
+            in response = operation.response;
+        }
+    }
+
+
+    requirement <'contract.foundation.process_request_failure'> processRequestFailureSemantics {
+        subject operation : ProcessRequest;
+        require constraint {
+            doc /* An invalid request reports foundation.error.request_invalid and produces no partial response. */
+        }
+    }
+
+    requirement <'invariant.foundation.provider_count'> providerCountRequirement {
+        subject provider : Provider;
+        require constraint {
+            doc /* The successful request count changes only after successful processing and never decreases. */
+        }
+    }
+
+    part contractContext {
+        part provider : Provider;
+        satisfy processRequestRequirement by provider.processRequest;
+        satisfy processRequestFailureSemantics by provider.processRequest;
+        satisfy providerCountRequirement by provider;
     }
 
     verification def ProcessRequestVerification {
-        subject application : ExampleApplication;
+        subject operation : ProcessRequest;
         objective {
             verify processRequestRequirement;
+            verify processRequestFailureSemantics;
         }
         @EvidenceBinding {
-            verificationId = "verification.foundation.process_request";
-            evidenceId = "tests/test_sysml_model.py";
+            evidenceId = "tests/test_sysml_model.py::test_foundation_native_semantics#ProcessRequestVerification";
+            implementationScope = "model-profile";
+        }
+    }
+
+    verification def ProviderVerification {
+        subject provider : Provider;
+        objective {
+            verify providerCountRequirement;
+        }
+        @EvidenceBinding {
+            evidenceId = "tests/test_sysml_model.py::test_foundation_native_semantics#ProviderVerification";
             implementationScope = "model-profile";
         }
     }
 
     part def PythonProvider :> Provider {
         @ImplementationBinding {
-            language = ImplementationLanguage::python;
+            implementationLanguage = ImplementationLanguage::python;
             codeRoot = "tools";
             symbol = "model_tool.main";
             realization = "modeling-fixture-only";
