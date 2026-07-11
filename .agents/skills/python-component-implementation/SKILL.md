@@ -28,7 +28,10 @@ obligations.
    public boundaries; do not reach through another component's internals.
 7. Consume structured implementation-neutral conformance objectives when available; add or update
    black-box tests derived from their subject-compatible verification cases and evidence groups.
-8. Run the narrowest component tests, `just model-check`, and relevant repository checks.
+8. When implementation work forces an observable choice the model does not settle, stop treating
+   it as a private coding decision: propose the language-neutral contract clarification or record
+   realization drift. Incidental helper, library, and representation choices remain private.
+9. Run the narrowest component tests, `just model-check`, and relevant repository checks.
 
 ## Realization Rules
 

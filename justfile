@@ -52,7 +52,7 @@ model-check-formal:
     @uv run python tools/sysml_validator.py validate-products --self-test
 
 model-render:
-    @uv run python tools/sysml_validator.py export-index --output docs/model/generated/formal-model-index.json
+    @uv run python tools/sysml_validator.py export-index --output generated/model/formal-model-index.json
     @uv run python tools/model_tool.py render
 
 model-package:

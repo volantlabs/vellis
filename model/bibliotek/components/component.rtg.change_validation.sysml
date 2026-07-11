@@ -121,7 +121,7 @@ library package BibliotekRtgChangeValidation {
     requirement <'contract.rtg.change_validation.track_isolation'> trackIsolation {
         subject operation : ValidateRtgChangeBatch;
         require constraint {
-            doc /* Select tracks before track-specific reference validation and projection. Each track reads and projects only its required sections and dependencies; malformed unselected sections cannot affect the report. */
+            doc /* Select tracks before track-specific reference validation and projection. schema_object reads and projects graph and schema; constraint_network reads and projects graph, schema, and constraints and invokes query; migration_cutover may read and project all four stores. Malformed unselected sections and unavailable unselected dependencies cannot affect the report. */
         }
     }
 
@@ -142,7 +142,14 @@ library package BibliotekRtgChangeValidation {
     requirement <'contract.rtg.change_validation.report'> reportSemantics {
         subject validator : RtgChangeValidator;
         require constraint {
-            doc /* Findings have stable track/code/reference identity, deterministic order, and deduplication. accepted is false when any produced finding is blocking. A positive limit returns blocking before warning/informational findings and evidence reports total, returned, and truncation without changing acceptance. */
+            doc /* Finding identity is the tuple (track, code, affected-reference sequence). Findings are de-duplicated by that identity before acceptance, evidence counts, limiting, and canonical ordering. Canonical order is severity (blocking, warning, informational), then track, code, and affected-reference sequence. accepted is false when any unique produced finding is blocking. A positive limit returns that canonical prefix and evidence reports total unique, returned, and truncation without changing acceptance. */
+        }
+    }
+
+    requirement <'contract.rtg.change_validation.intentional_boundary'> intentionalBoundary {
+        subject validator : RtgChangeValidator;
+        require constraint {
+            doc /* Validation is stateless and report-only. It stores no graph, schema, constraint, or migration records; performs no mutation, publication, cutover, persistence, authorization, UI, or distributed coordination; and returns validation evidence rather than a general query result. */
         }
     }
 
@@ -243,6 +250,7 @@ library package BibliotekRtgChangeValidation {
         satisfy validationRuleCatalog by validator;
         satisfy validationRules by validator;
         satisfy reportSemantics by validator;
+        satisfy intentionalBoundary by validator;
         satisfy noMutation by validator;
         satisfy deterministicReports by validator;
         satisfy findingsComprehensive by validator;
@@ -284,7 +292,7 @@ library package BibliotekRtgChangeValidation {
 
     verification def RtgChangeValidationBoundaryVerification {
         subject validator : RtgChangeValidator;
-        objective { verify referenceSemantics; verify validationRuleCatalog; verify validationRules; verify reportSemantics; verify noMutation; verify deterministicReports; verify findingsComprehensive; verify sourceOfTruthExternal; verify blockingFindingsControlAcceptance; verify findingsAgentActionable; verify tracksExtractable; verify batchSectionsExplicit; verify constraintSchemaCompatibility; verify patternEvaluationDelegated; verify cascadeEffectsFromPreview; }
+        objective { verify referenceSemantics; verify validationRuleCatalog; verify validationRules; verify reportSemantics; verify intentionalBoundary; verify noMutation; verify deterministicReports; verify findingsComprehensive; verify sourceOfTruthExternal; verify blockingFindingsControlAcceptance; verify findingsAgentActionable; verify tracksExtractable; verify batchSectionsExplicit; verify constraintSchemaCompatibility; verify patternEvaluationDelegated; verify cascadeEffectsFromPreview; }
         @EvidenceBinding { evidenceId = "components/rtg/change_validation/tests/test_rtg_change_validation_contract.py#RtgChangeValidationBoundaryVerification"; implementationScope = "DeterministicRtgChangeValidator"; }
     }
 }

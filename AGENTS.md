@@ -13,7 +13,7 @@ The repository should evolve in this order:
 
 Prefer reusable, self-contained behavior over one-off application code. Treat applications, SDKs, runtimes, and generated systems as consumers of the component library, not as reasons to weaken component boundaries.
 
-Use textual SysML v2 under `model/` as the authored source for new component and application design. The pinned official Java validator is mandatory through `just model-check`; repository regex/profile checks are not formal language validation. Validate Foundation, Bibliotek, and Vellis from independently packaged KPAR contents, and keep the official parser-backed inventory and structured conformance objectives current through `just model-render`. The model is still marked `shadow` while the human-acceptance gates in `model/model-status.json` remain open; the old Markdown specs are a frozen migration baseline, not the place to author new contracts. Generated explanatory pages live under `docs/model/generated/`. Do not claim final normative cutover or remove the frozen baseline before those gates pass.
+Use textual SysML v2 under `model/` as the authored source for new component and application design. The pinned official Java validator is mandatory through `just model-check`; repository regex/profile checks are not formal language validation. Validate Foundation, Bibliotek, and Vellis from independently packaged KPAR contents, and keep the official parser-backed inventory and structured conformance objectives current through `just model-render`. The model is still marked `shadow` while the human-acceptance gates in `model/migration/cutover-status.json` remain open; the old Markdown specs under `docs/migration/component-spec-baseline/` are frozen migration evidence, not the place to author new contracts. Generated explanatory pages live under `docs/reference/`, while generated machine projections live under `generated/model/`. Do not claim final normative cutover or remove the frozen baseline before those gates pass.
 
 Keep three separately packageable model layers: the software-component modeling foundation,
 Bibliotek reusable components, and the Vellis application. In SysML terms, the foundation and
@@ -81,9 +81,17 @@ extracting, splitting, merging, or validating components. Author the component c
 `just model-render` for human-readable projections. Do not hand-edit generated pages.
 
 During migration, a semantic mismatch with the frozen Markdown baseline or current implementation
-is a review finding, not permission to rewrite an accepted boundary. Record genuine implementation
-disagreement in `model/realizations/PythonImplementationDrift.sysml` and obtain human approval before changing
-accepted contracts, state ownership, dependencies, invariants, or lifecycle status.
+is a review finding, not permission to rewrite an accepted boundary. Surface genuine implementation
+disagreement for human review before changing accepted contracts, state ownership, dependencies,
+invariants, lifecycle status, or public behavior; after a decision, align the model, realization,
+and conformance evidence together.
+
+Before deleting the frozen baseline, disposition its durable content rather than relying only on
+surface-name parity: contractual facts belong in SysML; useful rationale, operations, evolution
+notes, and unresolved questions belong in clearly non-normative documentation; superseded prose
+must be traceable to the current model decision; and implementation-time contract discoveries must
+be modeled deliberately or remain an explicit unresolved engineering decision outside the accepted
+contract.
 
 Use stable component IDs:
 
@@ -277,7 +285,8 @@ This repo may later include folder-level guidance for areas such as:
 
 - `model/bibliotek/` for reusable component models
 - `model/vellis/` for application composition and realizations
-- `docs/model/generated/` for generated human views
+- `docs/reference/` for generated human views
+- `generated/model/` for generated parser, conformance, and evidence data
 - `components/` or `src/` for reusable component implementations
 - `apps/` for reference applications
 - `sdk/` for component authoring and composition APIs

@@ -154,7 +154,7 @@ library package BibliotekStorageJsonFile {
     requirement <'contract.storage.json_file.list_effect'> listEffect {
         subject operation : ListJsonDocuments;
         require constraint {
-            doc /* Success recursively returns metadata for regular .json documents below the requested directory, never parsed values or files outside the root, and leaves storage state unchanged. */
+            doc /* Success recursively returns metadata for regular .json documents below the requested directory in ascending normalized relative-path order, never parsed values or files outside the root, and leaves storage state unchanged. */
         }
     }
 
@@ -221,6 +221,13 @@ library package BibliotekStorageJsonFile {
         }
     }
 
+    requirement <'contract.storage.json_file.intentional_boundary'> intentionalBoundary {
+        subject storage : JsonFileStorage;
+        require constraint {
+            doc /* The component is local filesystem JSON-document storage only. It exposes no directories, non-JSON formats, partial updates, query/index/search, schema policy, separate metadata index, remote storage, encryption, authorization, backup, replication, cross-process writer coordination, or filesystem watching. */
+        }
+    }
+
     requirement <'contract.storage.json_file.write_json_document.failures'> writeJsonDocumentFailureSemantics {
         subject operation : WriteJsonDocument;
         require constraint {
@@ -271,6 +278,7 @@ library package BibliotekStorageJsonFile {
         satisfy pathSemantics by storage;
         satisfy directorySemantics by storage;
         satisfy metadataSemantics by storage;
+        satisfy intentionalBoundary by storage;
 
         satisfy writeJsonDocumentFailureSemantics by storage.write;
         satisfy readJsonDocumentFailureSemantics by storage.read;
@@ -351,6 +359,7 @@ library package BibliotekStorageJsonFile {
 verify pathSemantics;
             verify directorySemantics;
             verify metadataSemantics;
+            verify intentionalBoundary;
         }
         @EvidenceBinding {
                         evidenceId = "components/storage/json_file/tests/test_storage_json_file_contract.py#JsonFileStorageBoundaryVerification";

@@ -76,14 +76,14 @@ def test_composed_app_runs_and_writes_manifest(tmp_path: Path) -> None:
             "launch_mode": "repository_checkout",
             "state_mode": "fresh_single_session",
             "eval_prompt_path": str(
-                Path("docs/evals/rtg-individual-life-graph-beta-prompt.md").resolve()
+                Path("docs/guides/vellis/evals/rtg-individual-life-graph-beta-prompt.md").resolve()
             ),
             "recommended_eval_prompt": "individual_life_graph",
             "eval_prompts": {
                 "individual_life_graph": {
                     "title": "RTG Individual Life Graph Beta Prompt",
                     "path": str(
-                        Path("docs/evals/rtg-individual-life-graph-beta-prompt.md").resolve()
+                        Path("docs/guides/vellis/evals/rtg-individual-life-graph-beta-prompt.md").resolve()
                     ),
                     "description": (
                         "Initial single-user personal and professional life-graph beta scenario."
@@ -93,7 +93,11 @@ def test_composed_app_runs_and_writes_manifest(tmp_path: Path) -> None:
                 },
                 "component_repo_affordance": {
                     "title": "RTG Agent Affordance Eval Prompt",
-                    "path": str(Path("docs/evals/rtg-agent-affordance-eval-prompt.md").resolve()),
+                    "path": str(
+                        Path(
+                            "docs/guides/vellis/evals/rtg-agent-affordance-eval-prompt.md"
+                        ).resolve()
+                    ),
                     "description": "Software-component repository modeling scenario.",
                     "available": True,
                     "recommended": False,
@@ -102,7 +106,11 @@ def test_composed_app_runs_and_writes_manifest(tmp_path: Path) -> None:
             "guides": {
                 "known_good_walkthrough": {
                     "title": "RTG Beta Known-Good Walkthrough",
-                    "path": str(Path("docs/evals/rtg-beta-known-good-walkthrough.md").resolve()),
+                    "path": str(
+                        Path(
+                            "docs/guides/vellis/evals/rtg-beta-known-good-walkthrough.md"
+                        ).resolve()
+                    ),
                     "description": "Expected shape of a successful first life-graph beta run.",
                     "available": True,
                 },
@@ -313,7 +321,7 @@ def test_cli_reports_mcp_dry_run_metadata(tmp_path: Path) -> None:
     assert status["mcp"]["launch_mode"] == "repository_checkout"
     assert status["mcp"]["state_mode"] == "fresh_single_session"
     assert status["mcp"]["eval_prompt_path"].endswith(
-        "docs/evals/rtg-individual-life-graph-beta-prompt.md"
+        "docs/guides/vellis/evals/rtg-individual-life-graph-beta-prompt.md"
     )
     assert status["mcp"]["recommended_eval_prompt"] == "individual_life_graph"
     assert set(status["mcp"]["eval_prompts"]) == {
@@ -325,7 +333,7 @@ def test_cli_reports_mcp_dry_run_metadata(tmp_path: Path) -> None:
     assert status["mcp"]["eval_prompts"]["component_repo_affordance"]["recommended"] is False
     assert status["mcp"]["guides"]["known_good_walkthrough"]["available"] is True
     assert status["mcp"]["guides"]["known_good_walkthrough"]["path"].endswith(
-        "docs/evals/rtg-beta-known-good-walkthrough.md"
+        "docs/guides/vellis/evals/rtg-beta-known-good-walkthrough.md"
     )
     assert set(status["mcp"]["guides"]) == {"known_good_walkthrough"}
     assert status["mcp"]["first_call"] == {

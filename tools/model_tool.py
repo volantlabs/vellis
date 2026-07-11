@@ -13,16 +13,48 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-ROOT = Path(__file__).resolve().parents[1]
-MODEL_ROOT = ROOT / "model"
-COMPONENT_MODEL_ROOT = MODEL_ROOT / "bibliotek" / "components"
-GENERATED_DOC_ROOT = ROOT / "docs" / "model" / "generated"
-GENERATED_COMPONENT_DOC_ROOT = GENERATED_DOC_ROOT / "components"
-GENERATED_MANIFEST = ROOT / "apps" / "rtg_knowledge_graph" / "resources" / "model_app_manifest.json"
-GENERATED_EVIDENCE_INDEX = GENERATED_DOC_ROOT / "verification-evidence.json"
-GENERATED_CONFORMANCE_OBJECTIVES = GENERATED_DOC_ROOT / "conformance-objectives.json"
-GENERATED_FORMAL_INDEX = GENERATED_DOC_ROOT / "formal-model-index.json"
-IMPLEMENTATION_DRIFT_PATH = MODEL_ROOT / "realizations" / "PythonImplementationDrift.sysml"
+try:
+    from .model_layout import (
+        ALLOWED_CONSTRUCTS_PATH,
+        BIBLIOTEK_COMPONENT_REFERENCE_ROOT,
+        BIBLIOTEK_MODEL_ROOT,
+        BIBLIOTEK_REFERENCE_ROOT,
+        COMPONENT_MODEL_ROOT,
+        CUTOVER_STATUS_PATH,
+        FORMAL_CACHE_ROOT,
+        GENERATED_CONFORMANCE_OBJECTIVES,
+        GENERATED_EVIDENCE_INDEX,
+        GENERATED_FORMAL_INDEX,
+        GENERATED_MANIFEST,
+        LANGUAGE_LOCK_PATH,
+        MIGRATION_BASELINE_ROOT,
+        MODEL_PACKAGE_ROOT,
+        MODEL_ROOT,
+        ROOT,
+        VELLIS_REFERENCE_ROOT,
+    )
+except ImportError:  # pragma: no cover - direct script execution
+    from model_layout import (  # type: ignore[no-redef]
+        ALLOWED_CONSTRUCTS_PATH,
+        BIBLIOTEK_COMPONENT_REFERENCE_ROOT,
+        BIBLIOTEK_MODEL_ROOT,
+        BIBLIOTEK_REFERENCE_ROOT,
+        COMPONENT_MODEL_ROOT,
+        CUTOVER_STATUS_PATH,
+        FORMAL_CACHE_ROOT,
+        GENERATED_CONFORMANCE_OBJECTIVES,
+        GENERATED_EVIDENCE_INDEX,
+        GENERATED_FORMAL_INDEX,
+        GENERATED_MANIFEST,
+        LANGUAGE_LOCK_PATH,
+        MIGRATION_BASELINE_ROOT,
+        MODEL_PACKAGE_ROOT,
+        MODEL_ROOT,
+        ROOT,
+        VELLIS_REFERENCE_ROOT,
+    )
+
+GENERATED_COMPONENT_DOC_ROOT = BIBLIOTEK_COMPONENT_REFERENCE_ROOT
 OPTIONAL_IDENTIFICATION = r"(?:<'[^']+'>\s+)?"
 SYSML_IDENTIFIER = r"(?:[A-Za-z_]\w*|'[^']+')"
 
@@ -340,20 +372,6 @@ def _protocol_method_parameters(component_id: str) -> dict[str, tuple[str, ...]]
     return parameters
 
 
-def _protocol_signature_drift_is_acknowledged(component_id: str, method: str) -> bool:
-    try:
-        text = IMPLEMENTATION_DRIFT_PATH.read_text(encoding="utf-8")
-    except OSError:
-        return False
-    component_module = component_id.removeprefix("component.")
-    for symbol in re.findall(r'implementationSymbol\s*=\s*"([^"]+)"', text):
-        if symbol.startswith(f"components.{component_module}.protocol.") and symbol.endswith(
-            f".{method}"
-        ):
-            return True
-    return False
-
-
 def _check_protocol_action_signatures() -> list[Finding]:
     findings: list[Finding] = []
     for path in sorted(COMPONENT_MODEL_ROOT.glob("component.*.sysml")):
@@ -374,16 +392,14 @@ def _check_protocol_action_signatures() -> list[Finding]:
                 _identifier_value(name)
                 for name in re.findall(
                     rf"\bin\s+(?:ref\s+)?(?:attribute\s+|part\s+|item\s+)?"
-                    rf"({SYSML_IDENTIFIER})(?:\[[^]]+\])?\s*:",
+                    rf"({SYSML_IDENTIFIER})(?:\[[^]]+\])?"
+                    rf"(?:\s+(?:ordered|nonunique))*\s*:",
                     action_blocks[action],
                 )
             )
             normalized_protocol = tuple(_normalized_name(name) for name in protocol_parameters)
             normalized_model = tuple(_normalized_name(name) for name in model_parameters)
-            signature_drift_acknowledged = _protocol_signature_drift_is_acknowledged(
-                component_id, method
-            )
-            if normalized_protocol != normalized_model and not signature_drift_acknowledged:
+            if normalized_protocol != normalized_model:
                 findings.append(
                     Finding(
                         path,
@@ -969,7 +985,8 @@ def _modeled_public_fields(
     fields = {
         _normalized_name(_identifier_value(name))
         for name in re.findall(
-            rf"\b(?:attribute|item|part)\s+({SYSML_IDENTIFIER})(?:\[[^]]+\])?\s*:",
+            rf"\b(?:attribute|item|part)\s+({SYSML_IDENTIFIER})(?:\[[^]]+\])?"
+            rf"(?:\s+ordered)?\s*:",
             block,
         )
     }
@@ -991,7 +1008,7 @@ def _check_shadow_contract_parity() -> list[Finding]:
         component_id = _component_id(model_text)
         if not component_id:
             continue
-        markdown_path = ROOT / "docs" / "components" / f"{component_id}.md"
+        markdown_path = MIGRATION_BASELINE_ROOT / f"{component_id}.md"
         if not markdown_path.exists():
             continue
         markdown_text = markdown_path.read_text(encoding="utf-8")
@@ -1028,7 +1045,8 @@ def _check_shadow_contract_parity() -> list[Finding]:
                             _normalized_name(_identifier_value(name))
                             for name in re.findall(
                                 rf"\bin\s+(?:ref\s+)?(?:attribute\s+|part\s+|item\s+)?"
-                                rf"({SYSML_IDENTIFIER})(?:\[[^]]+\])?\s*:",
+                                rf"({SYSML_IDENTIFIER})(?:\[[^]]+\])?"
+                                rf"(?:\s+(?:ordered|nonunique))*\s*:",
                                 action_block,
                             )
                         )
@@ -1111,67 +1129,6 @@ def _check_shadow_contract_parity() -> list[Finding]:
                                     f"{sorted(missing_action_errors)}",
                                 )
                             )
-    return findings
-
-
-def _check_implementation_drift_file() -> list[Finding]:
-    try:
-        text = IMPLEMENTATION_DRIFT_PATH.read_text(encoding="utf-8")
-    except OSError as error:
-        return [
-            Finding(IMPLEMENTATION_DRIFT_PATH, f"invalid implementation drift artifact: {error}")
-        ]
-    findings: list[Finding] = []
-    seen: set[str] = set()
-    model_text = "\n".join(path.read_text(encoding="utf-8") for path in _sysml_files("all"))
-    entries = list(
-        re.finditer(
-            r"\bdependency\s+<'(drift\.[^']+)'>\s+\w+\s+"
-            r"from\s+([\w:]+)\s+to\s+([\w:]+)\s*\{",
-            text,
-        )
-    )
-    if not entries:
-        return [Finding(IMPLEMENTATION_DRIFT_PATH, "drift package contains no dependencies")]
-    for entry in entries:
-        drift_id, source, _ = entry.groups()
-        block = _extract_braced_block(text, entry.start())
-        if drift_id in seen:
-            findings.append(Finding(IMPLEMENTATION_DRIFT_PATH, f"duplicate drift ID {drift_id}"))
-        seen.add(drift_id)
-        source_name = source.rsplit("::", 1)[-1]
-        if source_name not in model_text:
-            findings.append(
-                Finding(
-                    IMPLEMENTATION_DRIFT_PATH,
-                    f"drift {drift_id} references unknown model element {source}",
-                )
-            )
-        metadata = re.search(r"@ImplementationDrift\s*\{", block)
-        if not metadata:
-            findings.append(Finding(IMPLEMENTATION_DRIFT_PATH, f"drift {drift_id} lacks metadata"))
-            continue
-        metadata_block = _extract_braced_block(block, metadata.start())
-        values = {
-            key: value
-            for key, value in re.findall(
-                r"'?\b(implementationSymbol|observed|expected|verification)\b'?\s*=\s*\"([^\"]+)\";",
-                metadata_block,
-            )
-        }
-        if set(values) != {"implementationSymbol", "observed", "expected", "verification"}:
-            findings.append(
-                Finding(IMPLEMENTATION_DRIFT_PATH, f"drift {drift_id} metadata is incomplete")
-            )
-            continue
-        symbol = values["implementationSymbol"]
-        if not _python_symbol_exists(ROOT, symbol):
-            findings.append(
-                Finding(
-                    IMPLEMENTATION_DRIFT_PATH,
-                    f"drift {drift_id} references unknown symbol {symbol}",
-                )
-            )
     return findings
 
 
@@ -1728,7 +1685,7 @@ def _check_contract_satisfaction() -> list[Finding]:
 
 
 def _check_allowed_profile(files: list[Path]) -> list[Finding]:
-    profile_path = MODEL_ROOT / "allowed-constructs.json"
+    profile_path = ALLOWED_CONSTRUCTS_PATH
     try:
         profile = _read_json(profile_path)
     except (OSError, ValueError, json.JSONDecodeError) as error:
@@ -1880,7 +1837,7 @@ def check(scope: str = "all", *, require_external: bool = False) -> list[Finding
                 )
             stable_ids[stable_id] = path
 
-    lock_path = MODEL_ROOT / "model.lock.json"
+    lock_path = LANGUAGE_LOCK_PATH
     try:
         lock = _read_json(lock_path)
         language = lock.get("language", {})
@@ -1999,7 +1956,6 @@ def check(scope: str = "all", *, require_external: bool = False) -> list[Finding
         findings.extend(_check_native_behavior_realizations())
 
     if scope == "all":
-        findings.extend(_check_implementation_drift_file())
         findings.extend(_check_view_semantics())
 
     if require_external:
@@ -2037,16 +1993,18 @@ def _documentation(block: str) -> str:
 def _feature_signature(block: str) -> str:
     features = re.findall(
         rf"\b(in|out)\s+(?:ref\s+)?(?:attribute\s+|part\s+|item\s+)?"
-        rf"({SYSML_IDENTIFIER})(\[[^]]+\])?\s*:\s*([\w:]+)(\[[^]]+\])?"
+        rf"({SYSML_IDENTIFIER})(\[[^]]+\])?((?:\s+(?:ordered|nonunique))*)"
+        rf"\s*:\s*([\w:]+)(\[[^]]+\])?"
         r"(?:\s+(?:default\s*)?=\s*([^;{}]+))?",
         block,
     )
     if not features:
         return "—"
     return "; ".join(
-        f"{direction} `{_identifier_value(name)}: {type_name}{before or after or ''}`"
+        f"{direction} `{_identifier_value(name)}: {type_name}{before or after or ''}"
+        f"{modifiers}`"
         + (f" = `{default.strip()}`" if default else "")
-        for direction, name, before, type_name, after, default in features
+        for direction, name, before, modifiers, type_name, after, default in features
     )
 
 
@@ -2088,13 +2046,13 @@ def _public_field_signatures(
     fields.extend(
         (
             _identifier_value(field_name),
-            multiplicity,
+            multiplicity + (" ordered" if ordering else ""),
             type_name,
             default,
         )
-        for field_name, multiplicity, type_name, default in re.findall(
+        for field_name, multiplicity, ordering, type_name, default in re.findall(
             rf"\b(?:ref\s+)?(?:attribute|item)\s+({SYSML_IDENTIFIER})"
-            r"(\[[^]]+\])?\s*:\s*([\w:]+)"
+            r"(\[[^]]+\])?(?:\s+(ordered))?\s*:\s*([\w:]+)"
             r"(?:\s+(?:default\s*)?=\s*([^;{}]+))?",
             block,
         )
@@ -2405,13 +2363,70 @@ def _render_component_summary() -> str:
         rows.append(
             f"| `{component_id}` | `{status}` | [component view](components/{component_id}.md) |"
         )
+
+    component_models = {
+        path: path.read_text(encoding="utf-8")
+        for path in sorted(COMPONENT_MODEL_ROOT.glob("component.*.sysml"))
+    }
+    definition_owners: dict[str, str] = {}
+    for text in component_models.values():
+        for component_id, definition in re.findall(
+            r"\bpart def\s+<'(component\.[^']+)'>\s+(\w+)", text
+        ):
+            definition_owners[definition] = component_id
+
+    dependency_rows = [
+        "| Consumer | Retained role | Required component type | Provider |",
+        "|---|---|---|---|",
+    ]
+    for text in component_models.values():
+        component_id = _component_id(text)
+        component_name = _component_definition_name(text)
+        if not component_id or not component_name:
+            continue
+        component_block = _definition_block(text, "part def", component_name)
+        for role, required_type in re.findall(
+            r"\bref part\s+(\w+)\s*\[[^]]+\]\s*:\s*(\w+)\s*;", component_block
+        ):
+            provider = definition_owners.get(required_type, "external capability")
+            dependency_rows.append(
+                f"| `{component_id}` | `{role}` | `{required_type}` | `{provider}` |"
+            )
+    if len(dependency_rows) == 2:
+        dependency_rows.append("| — | — | — | No retained component dependencies. |")
+
+    umbrella = (BIBLIOTEK_MODEL_ROOT / "Bibliotek.sysml").read_text(encoding="utf-8")
+    shared_packages = [
+        package
+        for package in re.findall(r"\bpublic import\s+(\w+)::\*\s*;", umbrella)
+        if package in {"BibliotekSoftwareValues", "BibliotekRtgDiagnostics"}
+    ]
+    shared_rows = ["| Shared package | Ownership |", "|---|---|"]
+    shared_rows.extend(
+        f"| `{package}` | Bibliotek-wide public values with no single component owner. |"
+        for package in shared_packages
+    )
     return "\n".join(
         [
-            "# Bibliotek component model",
+            "# Bibliotek model reference",
             "",
             "Generated by `just model-render`; do not edit by hand.",
             "",
+            "Bibliotek is a reusable SysML library package. It imports the generic modeling "
+            "foundation privately and publicly exposes its supported component and shared-value "
+            "packages. It has no dependency on Vellis or its realizations.",
+            "",
+            "## Components",
+            "",
             *rows,
+            "",
+            "## Shared public packages",
+            "",
+            *shared_rows,
+            "",
+            "## Retained component dependency topology",
+            "",
+            *dependency_rows,
             "",
         ]
     )
@@ -2538,7 +2553,7 @@ def _render_operation_summary() -> str:
             )
     return "\n".join(
         [
-            "# Vellis operations",
+            "# Vellis application model reference",
             "",
             "Generated by `just model-render`; do not edit by hand.",
             "",
@@ -2608,7 +2623,8 @@ def _manifest_data() -> dict[str, Any]:
 
 
 def render() -> None:
-    GENERATED_DOC_ROOT.mkdir(parents=True, exist_ok=True)
+    BIBLIOTEK_REFERENCE_ROOT.mkdir(parents=True, exist_ok=True)
+    VELLIS_REFERENCE_ROOT.mkdir(parents=True, exist_ok=True)
     GENERATED_COMPONENT_DOC_ROOT.mkdir(parents=True, exist_ok=True)
     GENERATED_MANIFEST.parent.mkdir(parents=True, exist_ok=True)
     component_pages = _component_pages()
@@ -2617,10 +2633,10 @@ def render() -> None:
             stale.unlink()
     for path, content in component_pages.items():
         path.write_text(content, encoding="utf-8")
-    (GENERATED_DOC_ROOT / "bibliotek-components.md").write_text(
+    (BIBLIOTEK_REFERENCE_ROOT / "index.md").write_text(
         _render_component_summary(), encoding="utf-8"
     )
-    (GENERATED_DOC_ROOT / "vellis-operations.md").write_text(
+    (VELLIS_REFERENCE_ROOT / "index.md").write_text(
         _render_operation_summary(), encoding="utf-8"
     )
     GENERATED_MANIFEST.write_text(
@@ -2639,8 +2655,8 @@ def render() -> None:
 def check_generated() -> list[Finding]:
     expected = {
         **_component_pages(),
-        GENERATED_DOC_ROOT / "bibliotek-components.md": _render_component_summary(),
-        GENERATED_DOC_ROOT / "vellis-operations.md": _render_operation_summary(),
+        BIBLIOTEK_REFERENCE_ROOT / "index.md": _render_component_summary(),
+        VELLIS_REFERENCE_ROOT / "index.md": _render_operation_summary(),
         GENERATED_MANIFEST: json.dumps(_manifest_data(), indent=2, sort_keys=True) + "\n",
         GENERATED_EVIDENCE_INDEX: json.dumps(
             _verification_evidence_data(), indent=2, sort_keys=True
@@ -2667,7 +2683,7 @@ def check_generated() -> list[Finding]:
 
 
 def package_models() -> None:
-    destination = MODEL_ROOT / "dist"
+    destination = MODEL_PACKAGE_ROOT
     destination.mkdir(parents=True, exist_ok=True)
     packages = {
         "software-component-modeling-foundation-0.1.0.kpar": [MODEL_ROOT / "foundation"],
@@ -2752,7 +2768,7 @@ def handoff(target: str) -> int:
     if not matches:
         print(f"No model element found for {target}", file=sys.stderr)
         return 1
-    status = _read_json(MODEL_ROOT / "model-status.json")
+    status = _read_json(CUTOVER_STATUS_PATH)
     print(f"Target: {target}")
     print(f"Model phase: {status.get('phase')}")
     print("Inputs:")
@@ -2785,7 +2801,7 @@ def handoff(target: str) -> int:
 
 
 def setup_status() -> int:
-    lock = _read_json(MODEL_ROOT / "model.lock.json")
+    lock = _read_json(LANGUAGE_LOCK_PATH)
     language = lock.get("language", {})
     assert isinstance(language, dict)
     print(f"Language baseline: SysML {language.get('sysml')} / KerML {language.get('kerml')}")
@@ -2802,7 +2818,7 @@ def setup_status() -> int:
             for artifact_id, artifact in grammar.items()
             if isinstance(artifact, dict)
         )
-    cache = MODEL_ROOT / ".cache" / "formal"
+    cache = FORMAL_CACHE_ROOT
     cache.mkdir(parents=True, exist_ok=True)
     for artifact_id, artifact in artifacts:
         url = str(artifact["url"])
@@ -2879,13 +2895,26 @@ def main() -> int:
         return 0
     if args.command == "package":
         package_models()
-        print("Packaged shadow KPAR candidates under model/dist/.")
+        print(f"Packaged shadow KPAR candidates under {MODEL_PACKAGE_ROOT.relative_to(ROOT)}/.")
         return 0
     if args.command == "setup":
         return setup_status()
     if args.command == "handoff":
         return handoff(args.target)
-    result = subprocess.run(["git", "diff", "--", "model", "docs/model"], cwd=ROOT, check=False)
+    result = subprocess.run(
+        [
+            "git",
+            "diff",
+            "--",
+            "model",
+            "docs/reference",
+            "docs/migration",
+            "generated/model",
+            str(GENERATED_MANIFEST.relative_to(ROOT)),
+        ],
+        cwd=ROOT,
+        check=False,
+    )
     return result.returncode
 
 

@@ -33,7 +33,7 @@ library package BibliotekRtgConstraints {
         attribute description : String;
         attribute payload : RtgConstraintPayload;
         attribute system : JsonObject;
-        doc /* UUID may be absent on write only. Stored definitions have concrete UUID and Boolean system.live, defaulting missing live to true. */
+        doc /* UUID may be absent on write only. Stored definitions have concrete UUID and Boolean system.live, defaulting missing live to true. targetTypeKeys has native unique, unordered set semantics; duplicate inputs are invalid and realization encodings may use a canonical order. */
     }
     attribute def RtgConstraintSnapshot { item constraints[0..*] : RtgConstraintDefinition; }
     attribute def RtgConstraintDefinitionList { item constraints[0..*] : RtgConstraintDefinition; }
@@ -50,10 +50,10 @@ library package BibliotekRtgConstraints {
     attribute def RtgConstraintTargetInvalid { attribute 'message' : String; }
 
     action def ExportConstraintSnapshot { out 'snapshot' : RtgConstraintSnapshot; doc /* Export every full constraint record without evaluating it or inspecting other components. */ @FailureContract { errorIds = (); } }
-    action def PutConstraint { in 'constraint' : RtgConstraintDefinition; out stored : RtgConstraintDefinition; doc /* Generate or preserve identity, validate kind-specific structure and bounds, and atomically create or fully replace one record. A kind/payload mismatch is RtgConstraintDefinitionInvalid. */ @FailureContract { errorIds = ("RtgConstraintUuidInvalid", "RtgConstraintUuidConflict", "RtgConstraintKindInvalid", "RtgConstraintDefinitionInvalid", "RtgConstraintSystemValueInvalid"); } }
+    action def PutConstraint { in 'constraint' : RtgConstraintDefinition; out stored : RtgConstraintDefinition; doc /* Generate or preserve identity, validate kind-specific structure and bounds, and atomically create or fully replace one record. A kind/payload type mismatch is RtgConstraintDefinitionInvalid; malformed contents of the selected payload are RtgConstraintPayloadInvalid. */ @FailureContract { errorIds = ("RtgConstraintUuidInvalid", "RtgConstraintUuidConflict", "RtgConstraintKindInvalid", "RtgConstraintDefinitionInvalid", "RtgConstraintPayloadInvalid", "RtgConstraintSystemValueInvalid"); } }
     action def GetConstraint { in constraintUuid : Uuid; out 'constraint' : RtgConstraintDefinition; doc /* Return one full constraint definition by UUID without executing it. */ @FailureContract { errorIds = ("RtgConstraintNotFound"); } }
     action def ListConstraints { in kind[0..1] : RtgConstraintKind; in live[0..1] : Boolean; out result : RtgConstraintDefinitionList; doc /* List definitions with optional kind/live filters in deterministic order. */ @FailureContract { errorIds = ("RtgConstraintKindInvalid"); } }
-    action def ListConstraintsByTarget { in targetTypeKey : String; in live[0..1] : Boolean; out result : RtgConstraintDefinitionList; doc /* List definitions whose target metadata contains one type key, optionally filtered by live status. */ @FailureContract { errorIds = ("RtgConstraintTargetInvalid"); } }
+    action def ListConstraintsByTarget { in targetTypeKey : String; in kind[0..1] : RtgConstraintKind; in live[0..1] : Boolean; out result : RtgConstraintDefinitionList; doc /* List definitions whose target metadata contains one type key, optionally filtered by constraint kind and live status. */ @FailureContract { errorIds = ("RtgConstraintTargetInvalid", "RtgConstraintKindInvalid"); } }
     action def DeleteConstraint { in constraintUuid : Uuid; out result : RtgConstraintDeleteResult; doc /* Delete exactly one definition without cascading into graph, schema, migration, or validation state. */ @FailureContract { errorIds = ("RtgConstraintNotFound"); } }
 
     part def <'component.rtg.constraints'> RtgConstraints {
@@ -71,20 +71,20 @@ library package BibliotekRtgConstraints {
         dependency deleteState from deleteConstraint to constraintRecords { @StateAccess { kind = StateAccessKind::delete; } doc /* remove one record and affected indexes. */ }
     }
     action def CreateEmptyRtgConstraints { out part constraints : RtgConstraints; doc /* Return an empty registry with empty derived indexes. */ @FailureContract { errorIds = (); } }
-    action def ImportRtgConstraintSnapshot { in 'snapshot' : RtgConstraintSnapshot; out part constraints : RtgConstraints; doc /* Validate all identities, records, payloads, bounds, and system values before rebuilding indexes and exposing the registry. */ @FailureContract { errorIds = ("RtgConstraintSnapshotInvalid", "RtgConstraintUuidInvalid", "RtgConstraintUuidConflict", "RtgConstraintDefinitionInvalid", "RtgConstraintSystemValueInvalid"); } }
+    action def ImportRtgConstraintSnapshot { in 'snapshot' : RtgConstraintSnapshot; out part constraints : RtgConstraints; doc /* Validate all identities, records, payloads, bounds, and system values before rebuilding indexes and exposing the registry. */ @FailureContract { errorIds = ("RtgConstraintSnapshotInvalid", "RtgConstraintUuidInvalid", "RtgConstraintUuidConflict", "RtgConstraintKindInvalid", "RtgConstraintDefinitionInvalid", "RtgConstraintPayloadInvalid", "RtgConstraintSystemValueInvalid"); } }
 
 
     requirement <'contract.rtg.constraints.write_effect'> constraintWriteEffect {
         subject operation : PutConstraint;
         require constraint {
-            doc /* Missing UUID generates identity; supplied identity is preserved. Kind selects a compatible typed payload, descriptions remain human-readable, missing live becomes true, and writes do not execute rules. */
+            doc /* Missing UUID generates identity; supplied identity is preserved. Kind selects a compatible typed payload, target keys are unique and unordered, descriptions remain human-readable, missing live becomes true, and writes do not execute rules. Duplicate target keys are rejected rather than silently repaired. */
         }
     }
 
     requirement <'contract.rtg.constraints.read_effect'> constraintReadEffect {
         subject constraints : RtgConstraints;
         require constraint {
-            doc /* Reads are deterministic, honor explicit filters, derive only from canonical records/indexes, and never inspect or mutate graph/schema state. */
+            doc /* Reads honor explicit filters, use ascending textual constraint UUID order, derive only from canonical records/indexes, and never inspect or mutate graph/schema state. */
         }
     }
 
@@ -99,6 +99,13 @@ library package BibliotekRtgConstraints {
         subject constraints : RtgConstraints;
         require constraint {
             doc /* Snapshot round-trip preserves full records and normalized live state; import validates the whole candidate before visibility. */
+        }
+    }
+
+    requirement <'contract.rtg.constraints.intentional_boundary'> intentionalBoundary {
+        subject constraints : RtgConstraints;
+        require constraint {
+            doc /* This registry owns declarative definitions only. It does not execute constraints, inspect or mutate graph/schema/migration state, choose migration membership, own durable persistence or workflow, provide general graph query/inference, or attach v1 severity/blocking policy. UUID alone identifies a definition; names and target keys may be shared by multiple definitions. */
         }
     }
 
@@ -219,6 +226,7 @@ library package BibliotekRtgConstraints {
         satisfy constraintWriteEffect by registry.putConstraint;
         satisfy constraintReadEffect by registry;
         satisfy snapshotEffect by registry;
+        satisfy intentionalBoundary by registry;
         satisfy uuidUnique by registry;
         satisfy displayNameNotIdentity by registry;
         satisfy liveStatusBoolean by registry;
@@ -306,7 +314,7 @@ library package BibliotekRtgConstraints {
 
     verification def RtgConstraintsBoundaryVerification {
         subject constraints : RtgConstraints;
-        objective { verify constraintReadEffect; verify snapshotEffect; verify uuidUnique; verify displayNameNotIdentity; verify liveStatusBoolean; verify noValidationExecution; verify cardinalityRulesLiveHere; verify noSeverityPolicyV1; verify patternCompatibility; verify indexesMatchRecords; }
+        objective { verify constraintReadEffect; verify snapshotEffect; verify intentionalBoundary; verify uuidUnique; verify displayNameNotIdentity; verify liveStatusBoolean; verify noValidationExecution; verify cardinalityRulesLiveHere; verify noSeverityPolicyV1; verify patternCompatibility; verify indexesMatchRecords; }
         @EvidenceBinding { evidenceId = "components/rtg/constraints/tests/test_rtg_constraints_contract.py#RtgConstraintsBoundaryVerification"; implementationScope = "InMemoryRtgConstraints"; }
     }
 }

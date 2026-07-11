@@ -7,6 +7,7 @@ from components.rtg.constraints.protocol import (
     JsonObject,
     RtgConstraintCardinalityPayload,
     RtgConstraintDefinition,
+    RtgConstraintDefinitionInvalid,
     RtgConstraintDefinitionList,
     RtgConstraintDeleteResult,
     RtgConstraintKindInvalid,
@@ -15,7 +16,9 @@ from components.rtg.constraints.protocol import (
     RtgConstraintPayloadInvalid,
     RtgConstraintQueryPatternPayload,
     RtgConstraintSnapshot,
+    RtgConstraintSnapshotInvalid,
     RtgConstraintSystemValueInvalid,
+    RtgConstraintTargetInvalid,
     RtgConstraintUuidConflict,
     RtgConstraintUuidInvalid,
     UuidInput,
@@ -39,8 +42,23 @@ class InMemoryRtgConstraints:
 
     @classmethod
     def import_snapshot(cls, snapshot: RtgConstraintSnapshot) -> InMemoryRtgConstraints:
+        if not isinstance(snapshot, RtgConstraintSnapshot) or not isinstance(
+            snapshot.constraints, tuple
+        ):
+            raise RtgConstraintSnapshotInvalid("snapshot must contain a constraint tuple")
         constraints = cls.empty()
+        seen_uuids: set[UUID] = set()
         for constraint in snapshot.constraints:
+            if not isinstance(constraint, RtgConstraintDefinition):
+                raise RtgConstraintSnapshotInvalid(
+                    "snapshot constraints must be constraint definitions"
+                )
+            if constraint.uuid is None:
+                raise RtgConstraintUuidInvalid("snapshot constraint UUID is not concrete")
+            constraint_uuid = _parse_uuid(constraint.uuid)
+            if constraint_uuid in seen_uuids:
+                raise RtgConstraintUuidConflict(str(constraint_uuid))
+            seen_uuids.add(constraint_uuid)
             constraints.put_constraint(constraint)
         return constraints
 
@@ -80,17 +98,17 @@ class InMemoryRtgConstraints:
 
     def list_constraints_by_target(
         self,
-        type_key: str,
+        target_type_key: str,
         kind: str | None = None,
         live: bool | None = None,
     ) -> RtgConstraintDefinitionList:
-        if not isinstance(type_key, str) or not type_key:
-            raise RtgConstraintPayloadInvalid("target type key must be a non-empty string")
+        if not isinstance(target_type_key, str) or not target_type_key:
+            raise RtgConstraintTargetInvalid("target type key must be a non-empty string")
         return RtgConstraintDefinitionList(
             constraints=tuple(
                 _copy_constraint(item)
                 for item in self.list_constraints(kind=kind, live=live).constraints
-                if type_key in item.target_type_keys
+                if target_type_key in item.target_type_keys
             )
         )
 
@@ -110,12 +128,15 @@ class InMemoryRtgConstraints:
         )
         if uuid_value in self._constraints and self._constraints[uuid_value].kind != kind:
             raise RtgConstraintUuidConflict(str(uuid_value))
+        target_type_keys = tuple(
+            _validate_type_key(item) for item in constraint.target_type_keys
+        )
+        if len(set(target_type_keys)) != len(target_type_keys):
+            raise RtgConstraintDefinitionInvalid("target type keys must be unique")
         return RtgConstraintDefinition(
             uuid=uuid_value,
             kind=kind,
-            target_type_keys=tuple(
-                _validate_type_key(item) for item in constraint.target_type_keys
-            ),
+            target_type_keys=tuple(sorted(target_type_keys)),
             display_name=_validate_text(constraint.display_name, "display_name"),
             description=_validate_text(constraint.description, "description"),
             payload=payload,
@@ -176,18 +197,18 @@ def _validate_payload(kind: str, payload: RtgConstraintPayload) -> RtgConstraint
         ):
             raise RtgConstraintPayloadInvalid("minimum must not exceed maximum")
         return copy.deepcopy(payload)
-    raise RtgConstraintPayloadInvalid(f"payload does not match constraint kind {kind!r}")
+    raise RtgConstraintDefinitionInvalid(f"payload does not match constraint kind {kind!r}")
 
 
 def _validate_type_key(value: str) -> str:
     if not isinstance(value, str) or value == "" or value != value.strip():
-        raise RtgConstraintPayloadInvalid("target type keys must be non-empty strings")
+        raise RtgConstraintDefinitionInvalid("target type keys must be non-empty strings")
     return value
 
 
 def _validate_text(value: str, field_name: str) -> str:
     if not isinstance(value, str):
-        raise RtgConstraintPayloadInvalid(f"{field_name} must be a string")
+        raise RtgConstraintDefinitionInvalid(f"{field_name} must be a string")
     return value
 
 

@@ -41,11 +41,13 @@ from components.rtg.controller.protocol import (
     RtgAnchorTypeDiscoveryResult,
     RtgControllerAppliedChanges,
     RtgControllerApplyFailed,
+    RtgControllerCandidateCounts,
     RtgControllerConfigurationInvalid,
     RtgControllerCutoverOptions,
     RtgControllerDiscoveryFailed,
     RtgControllerLedgerFailureRecord,
     RtgControllerLiveGraphValidationResult,
+    RtgControllerMigrationCounts,
     RtgControllerMigrationHistory,
     RtgControllerOperationResult,
     RtgControllerPreconditionFailed,
@@ -53,6 +55,7 @@ from components.rtg.controller.protocol import (
     RtgControllerReplayOptions,
     RtgControllerReplayVerificationResult,
     RtgControllerRestoreOptions,
+    RtgControllerSchemaCounts,
     RtgControllerSchemaPack,
     RtgControllerSchemaPackOptions,
     RtgControllerSnapshotFailed,
@@ -73,6 +76,7 @@ from components.rtg.graph.protocol import (
     RtgGraphSnapshot,
     RtgLink,
     RtgObject,
+    RtgTypeCountList,
 )
 from components.rtg.migration.protocol import (
     RtgMigration,
@@ -573,6 +577,9 @@ class InProcessRtgController:
                 status: sum(1 for item in migrations if item.status == status)
                 for status in ("draft", "ready", "failed", "applied", "abandoned")
             }
+            persisted_snapshot_paths = tuple(
+                str(item["relative_path"]) for item in self.list_persisted_snapshots().snapshots
+            )
             live_graph_total = sum(item.count for item in live_graph_counts)
             ledger_record_count = self._ledger_record_count()
             staged_work = bool(
@@ -605,24 +612,32 @@ class InProcessRtgController:
                 )
             return RtgControllerSystemState(
                 state_classification=classification,
-                live_schema_summary={
-                    "definition_count": len(live_schema),
-                    "anchor_types": [
-                        item.type_key for item in live_schema if item.kind == "anchor"
-                    ],
-                    "data_object_types": [
-                        item.type_key for item in live_schema if item.kind == "data_object"
-                    ],
-                    "link_types": [item.type_key for item in live_schema if item.kind == "link"],
-                },
-                live_object_counts=_type_counts_by_kind(live_graph_counts),
-                non_live_candidate_counts={
-                    "schema": len(non_live_schema),
-                    "constraints": len(non_live_constraints),
-                    "graph": sum(item.count for item in non_live_graph_counts),
-                },
-                migration_counts_by_status=cast(JsonObject, migration_counts),
-                persisted_snapshots=self.list_persisted_snapshots().snapshots,
+                live_schema_counts=RtgControllerSchemaCounts(
+                    anchor=sum(1 for item in live_schema if item.kind == "anchor"),
+                    data_object=sum(1 for item in live_schema if item.kind == "data_object"),
+                    link=sum(1 for item in live_schema if item.kind == "link"),
+                    total=len(live_schema),
+                ),
+                live_object_counts=RtgTypeCountList(counts=tuple(live_graph_counts)),
+                non_live_candidate_counts=RtgControllerCandidateCounts(
+                    schema=len(non_live_schema),
+                    constraints=len(non_live_constraints),
+                    graph=sum(item.count for item in non_live_graph_counts),
+                    total=(
+                        len(non_live_schema)
+                        + len(non_live_constraints)
+                        + sum(item.count for item in non_live_graph_counts)
+                    ),
+                ),
+                migration_counts_by_status=RtgControllerMigrationCounts(
+                    draft=migration_counts["draft"],
+                    ready=migration_counts["ready"],
+                    failed=migration_counts["failed"],
+                    applied=migration_counts["applied"],
+                    abandoned=migration_counts["abandoned"],
+                    total=sum(migration_counts.values()),
+                ),
+                persisted_snapshot_paths=persisted_snapshot_paths,
                 ledger_record_count=ledger_record_count,
                 migration_counts_scope="current_migration_store",
                 migration_history_hint=(
@@ -633,7 +648,6 @@ class InProcessRtgController:
                 ),
                 last_ledger_position=self._last_ledger_position,
                 last_transaction_id=self._last_transaction_id,
-                last_transaction_timestamp=self._last_transaction_timestamp,
                 recommended_workflows=_recommended_workflows(classification),
                 recommended_next_steps=tuple(recommended_next_steps),
             )
@@ -791,13 +805,58 @@ class InProcessRtgController:
                 if request_failure is not None:
                     ledger_failures.append(request_failure)
             try:
-                self._graph = type(self._graph).import_snapshot(snapshot.graph)
-                self._schema = type(self._schema).import_snapshot(snapshot.schema)
-                self._constraints = type(self._constraints).import_snapshot(snapshot.constraints)
-                self._migration = type(self._migration).import_snapshot(snapshot.migration)
-                self._last_ledger_position = snapshot.last_ledger_position
-                self._last_transaction_id = snapshot.last_transaction_id
-                self._last_transaction_timestamp = snapshot.last_transaction_timestamp
+                candidate_graph = type(self._graph).import_snapshot(snapshot.graph)
+                candidate_schema = type(self._schema).import_snapshot(snapshot.schema)
+                candidate_constraints = type(self._constraints).import_snapshot(
+                    snapshot.constraints
+                )
+                candidate_migration = type(self._migration).import_snapshot(snapshot.migration)
+                validation_report = self._change_validator.validate_graph_state(
+                    candidate_graph,
+                    candidate_schema,
+                    candidate_constraints,
+                    candidate_migration,
+                    self._query_engine,
+                    validation_options=RtgValidationOptions(),
+                )
+                if not validation_report.accepted:
+                    codes = ", ".join(
+                        sorted({finding.code for finding in validation_report.findings})
+                    )
+                    raise RtgControllerSnapshotFailed(
+                        f"snapshot state violates controller invariants: {codes}",
+                        diagnostic=rtg_diagnostic(
+                            code="controller.snapshot.semantic_validation_failed",
+                            category="snapshot_recovery",
+                            path="snapshot",
+                            problem=(
+                                "The coordinated snapshot is structurally valid but "
+                                "semantically inconsistent."
+                            ),
+                            remedy=(
+                                "Repair or select a snapshot whose graph, schema, constraints, "
+                                "and migration state validate together."
+                            ),
+                            mutation_state="live_state_preserved",
+                        ),
+                    )
+                (
+                    self._graph,
+                    self._schema,
+                    self._constraints,
+                    self._migration,
+                    self._last_ledger_position,
+                    self._last_transaction_id,
+                    self._last_transaction_timestamp,
+                ) = (
+                    candidate_graph,
+                    candidate_schema,
+                    candidate_constraints,
+                    candidate_migration,
+                    snapshot.last_ledger_position,
+                    snapshot.last_transaction_id,
+                    snapshot.last_transaction_timestamp,
+                )
             except Exception as error:
                 if should_record:
                     self._record_ledger(
@@ -2159,13 +2218,6 @@ def _system_live(system: JsonObject) -> bool:
     return system.get("live", True) is True
 
 
-def _type_counts_by_kind(counts: object) -> JsonObject:
-    grouped: dict[str, dict[str, int]] = {}
-    for item in cast(Any, counts):
-        grouped.setdefault(str(item.kind), {})[str(item.type)] = int(item.count)
-    return cast(JsonObject, grouped)
-
-
 def _recommended_next_steps(classification: str) -> tuple[str, ...]:
     if classification == "needs_replay":
         return (
@@ -2843,8 +2895,11 @@ def _schema_definition_from_json(value: object) -> RtgSchemaDefinition:
 def _schema_field_from_json(value: object) -> RtgSchemaField:
     data = _object(value)
     items = data.get("items")
+    required = data.get("required")
+    if not isinstance(required, bool):
+        raise RtgControllerReplayFailed("schema field required must be boolean")
     return RtgSchemaField(
-        required=bool(data["required"]),
+        required=required,
         value_kinds=tuple(str(item) for item in _list(data.get("value_kinds", []))),
         properties={
             str(key): _schema_field_from_json(item)

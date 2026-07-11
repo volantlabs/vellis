@@ -27,25 +27,34 @@ invariants.
    verification objectives. A fresh but semantically incomplete projection fails sync.
 4. When an accepted source or prior model exists, confirm the projection preserves its public
    meaning unless an explicit contract change was approved.
-5. When package ownership or imports change, update library/application indexes and confirm the
+5. Before deleting predecessor documentation, classify its remaining content: contractual facts
+   move to the model; rationale, tutorials, operations, evolution notes, and unresolved questions
+   move to a clearly non-normative home; obsolete statements cite the current model decision that
+   supersedes them. Confirm implementation discoveries are either modeled intentionally or recorded
+   as realization drift.
+6. When package ownership or imports change, update library/application indexes and confirm the
    generated dependency direction still matches the canonical model.
-6. Update only hand-authored documents whose readers need new context or workflow guidance.
-7. Update AGENTS when repository-wide authoring or realization rules change.
-8. Update reusable skills only for generally applicable workflow improvements; keep product names,
+7. Update only hand-authored documents whose readers need new context or workflow guidance.
+8. Update AGENTS when repository-wide authoring or realization rules change.
+9. Update reusable skills only for generally applicable workflow improvements; keep product names,
    project findings, and repository-specific package maps in repository guidance.
-9. Update skill UI metadata when a skill's purpose changes.
-10. Confirm packaged products validate independently and downstream products consume packaged
+10. Update skill UI metadata when a skill's purpose changes.
+11. Confirm packaged products validate independently and downstream products consume packaged
     dependencies, then run `just skills-check`, `just model-check`, and the narrowest relevant
     repository checks.
 
 ## Documentation Roles
 
-- `model/**/*.sysml`: normative component and application design when designated canonical by the repository.
-- `docs/model/generated/`: generated, non-normative human views; never edit by hand.
-- `README.md`: project orientation, current architecture, links, setup, and common workflows.
-- `AGENTS.md`: repository-wide contributor and agent rules.
-- `docs/model/`: hand-authored modeling guidance and operational runbooks.
-- `.agents/skills/`: reusable authoring, realization, and maintenance workflows.
+- Canonical textual model roots: normative component and application design when designated by the
+  repository.
+- Generated human-reference roots: non-normative projections; never edit them by hand.
+- Generated machine-projection roots: parser indexes, conformance objectives, evidence indexes, or
+  other derived data; regenerate rather than hand-edit.
+- Project orientation and contributor guidance: architecture, links, setup, and workflow rules.
+- Hand-authored documentation roots: rationale, tutorials, operations, evolution, and unresolved
+  questions that do not restate the contract.
+- Reusable skill roots: general authoring, realization, and maintenance workflows rather than
+  product-specific findings or directory maps.
 
 ## Rules
 

@@ -174,6 +174,13 @@ library package BibliotekStorageSql {
         }
     }
 
+    requirement <'contract.storage.sql.intentional_boundary'> intentionalBoundary {
+        subject storage : SqlStorage;
+        require constraint {
+            doc /* The component is generic SQLite execution infrastructure. It defines no application tables, domain events, RTG ledger policy, ORM or query-builder surface, schema migration, authorization, backup, replication, remote database, alternate SQL backend, or distributed transaction behavior. */
+        }
+    }
+
     requirement <'contract.storage.sql.execute_sql.failures'> executeSqlFailureSemantics {
         subject operation : ExecuteSql;
         require constraint {
@@ -212,6 +219,7 @@ library package BibliotekStorageSql {
         satisfy transactionAtomicity by storage;
         satisfy genericStorage by storage;
         satisfy jsonCompatibleRows by storage;
+        satisfy intentionalBoundary by storage;
 
         satisfy executeSqlFailureSemantics by storage.execute;
         satisfy querySqlFailureSemantics by storage.query;
@@ -270,7 +278,7 @@ library package BibliotekStorageSql {
         subject storage : SqlStorage;
         objective {
 verify serializedHandleAccess; verify noImplicitDatabaseChange;
-            verify transactionAtomicity; verify genericStorage; verify jsonCompatibleRows;
+            verify transactionAtomicity; verify genericStorage; verify jsonCompatibleRows; verify intentionalBoundary;
         }
         @EvidenceBinding {
                         evidenceId = "components/storage/sql/tests/test_storage_sql_contract.py#SqlStorageBoundaryVerification";

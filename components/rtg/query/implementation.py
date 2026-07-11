@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import itertools
-import re
 from uuid import UUID
+
+import re2
 
 from components.rtg.diagnostics import rtg_diagnostic
 from components.rtg.graph.protocol import (
@@ -333,9 +334,9 @@ def _predicate_matches(properties: JsonObject, predicate: RtgQueryPropertyPredic
     if not found:
         return False
     if predicate.operator == "equals":
-        return actual == predicate.value
+        return _json_equal(actual, predicate.value)
     if predicate.operator == "not_equals":
-        return actual != predicate.value
+        return not _json_equal(actual, predicate.value)
     if predicate.operator in {"lt", "lte", "gt", "gte"}:
         expected = predicate.value
         if isinstance(actual, bool) or isinstance(expected, bool):
@@ -346,9 +347,11 @@ def _predicate_matches(properties: JsonObject, predicate: RtgQueryPropertyPredic
             return _compare_numbers(actual, expected, predicate.operator)
         return False
     if predicate.operator == "contains":
-        return isinstance(actual, list) and predicate.value in actual
+        return isinstance(actual, list) and any(
+            _json_equal(item, predicate.value) for item in actual
+        )
     if predicate.operator == "in":
-        return actual in predicate.values
+        return any(_json_equal(actual, item) for item in predicate.values)
     if predicate.operator == "substring":
         if not isinstance(actual, str) or not isinstance(predicate.value, str):
             return False
@@ -380,21 +383,59 @@ def _compare_numbers(left: int | float, right: int | float, operator: str) -> bo
     return left >= right
 
 
+def _json_equal(left: JsonValue, right: JsonValue) -> bool:
+    """Compare JSON values without Python's Boolean/number equivalence."""
+    if left is None or right is None:
+        return left is None and right is None
+    if isinstance(left, bool) or isinstance(right, bool):
+        return isinstance(left, bool) and isinstance(right, bool) and left == right
+    if isinstance(left, int | float) or isinstance(right, int | float):
+        return (
+            isinstance(left, int | float)
+            and not isinstance(left, bool)
+            and isinstance(right, int | float)
+            and not isinstance(right, bool)
+            and left == right
+        )
+    if isinstance(left, str) or isinstance(right, str):
+        return isinstance(left, str) and isinstance(right, str) and left == right
+    if isinstance(left, list) or isinstance(right, list):
+        return (
+            isinstance(left, list)
+            and isinstance(right, list)
+            and len(left) == len(right)
+            and all(_json_equal(a, b) for a, b in zip(left, right, strict=True))
+        )
+    if isinstance(left, dict) or isinstance(right, dict):
+        return (
+            isinstance(left, dict)
+            and isinstance(right, dict)
+            and left.keys() == right.keys()
+            and all(_json_equal(left[key], right[key]) for key in left)
+        )
+    return False
+
+
 def _regex_matches(actual: JsonValue, predicate: RtgQueryPropertyPredicate) -> bool:
     if not isinstance(actual, str) or not isinstance(predicate.value, str):
         return False
-    invalid_tokens = ("(?=", "(?!", "(?<=", "(?<!", "\\1", "\\2", "\\k")
-    if any(token in predicate.value for token in invalid_tokens):
-        raise RtgQuerySpecInvalid("regex uses unsupported non-linear feature")
-    flags = 0
+    option_letters: list[str] = []
     for flag in predicate.regex_flags:
         if flag == "case_insensitive":
-            flags |= re.IGNORECASE
+            option_letters.append("i")
         elif flag == "multiline":
-            flags |= re.MULTILINE
+            option_letters.append("m")
         else:
             raise RtgQuerySpecInvalid(f"unsupported regex flag: {flag}")
-    return re.search(predicate.value, actual, flags) is not None
+    pattern = (
+        f"(?{''.join(option_letters)}){predicate.value}"
+        if option_letters
+        else predicate.value
+    )
+    try:
+        return re2.search(pattern, actual) is not None
+    except re2.error as error:
+        raise RtgQuerySpecInvalid(f"unsupported regex pattern: {error}") from error
 
 
 def _resolve_path(properties: JsonObject, path: tuple[str, ...]) -> tuple[bool, JsonValue]:

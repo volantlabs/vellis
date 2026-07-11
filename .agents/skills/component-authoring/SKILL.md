@@ -80,6 +80,11 @@ implementation fidelity the default completeness criterion.
 16. Ask whether a conforming implementation in a different suitable language could be built from
     the model and pass black-box conformance at this boundary. Repair the model if correct callers,
     state effects, results, failures, or composition behavior would still require guessing.
+17. Before retiring a predecessor specification, disposition every durable fact: put contractual
+    structure and behavior in the model, retain rationale/tutorial/operations/open questions in a
+    clearly non-normative document, record implementation disagreement as realization drift, and
+    identify any superseded statement by the model decision that replaced it. File deletion alone
+    is never evidence that migration is complete.
 
 ## Fidelity Rule
 
@@ -146,3 +151,6 @@ For authoring or revision, produce:
 
 For review, report material boundary, contract, state, invariant, composition, and verification gaps.
 Keep implementation inspection focused on evidence needed to assess the public design.
+
+When predecessor material is being retired, also report the non-normative destination of useful
+context and the explicit disposition of unresolved model/implementation differences.

@@ -18,7 +18,7 @@ the controller ledger. MCP remains an application interface; RTG component inter
 workflow stay in the component stack.
 
 The default beta scenario is the individual life graph in
-`docs/evals/rtg-individual-life-graph-beta-prompt.md`. The component-repository affordance prompt
+`docs/guides/vellis/evals/rtg-individual-life-graph-beta-prompt.md`. The component-repository affordance prompt
 is the advanced engineering-system example.
 
 ## Structure
@@ -85,7 +85,7 @@ Then call `rtg_get_system_state` with `{}` so the agent can tell whether the app
 bootstrapped, has staged work, or needs ledger replay.
 
 Then give the agent the recommended life-graph beta prompt. A known-good walkthrough lives in
-`docs/evals/rtg-beta-known-good-walkthrough.md`. Agents without repository access can fetch generic
+`docs/guides/vellis/evals/rtg-beta-known-good-walkthrough.md`. Agents without repository access can fetch generic
 bootstrap, schema-staging, live-write, lookup, query, recovery, and audit examples directly through
 `rtg_get_usage_guide`; those examples teach payload shape and tool sequence rather than supplying a
 scenario-specific schema.
@@ -228,7 +228,7 @@ V1 beta eval state semantics:
 - Live RTG graph, schema, constraint, and migration state is in memory for the running MCP process.
 - The storage root persists the app manifest, persisted snapshots, queued ledger failures, and the SQL ledger.
 - Restart restore/replay is not automatic. Keep the server running for one eval or explicitly use snapshot, restore, and replay tools.
-- The agent affordance eval prompt lives in `docs/evals/`. Generic operational examples are also
+- The agent affordance eval prompt lives in `docs/guides/vellis/evals/`. Generic operational examples are also
   exposed through `rtg_get_usage_guide` for MCP-only agents.
 
 Turnkey MCP tool groups:
@@ -323,7 +323,7 @@ Agent operation notes:
 
 Manual eval materials:
 
-- `docs/evals/rtg-beta-known-good-walkthrough.md`
-- `docs/evals/rtg-agent-affordance-eval-runbook.md`
-- `docs/evals/rtg-agent-affordance-eval-prompt.md`
-- `docs/evals/rtg-individual-life-graph-beta-prompt.md`
+- `docs/guides/vellis/evals/rtg-beta-known-good-walkthrough.md`
+- `docs/guides/vellis/evals/rtg-agent-affordance-eval-runbook.md`
+- `docs/guides/vellis/evals/rtg-agent-affordance-eval-prompt.md`
+- `docs/guides/vellis/evals/rtg-individual-life-graph-beta-prompt.md`

@@ -249,6 +249,20 @@ library package BibliotekRtgGraph {
         }
     }
 
+    requirement <'contract.rtg.graph.canonical_ordering'> canonicalOrdering {
+        subject graph : RtgGraph;
+        require constraint {
+            doc /* Object lists, snapshot record collections, and each delete-result collection use ascending textual UUID order. Snapshot association entries use ascending anchor UUID and their data UUIDs use ascending textual order. Type counts use ascending type key then object kind. */
+        }
+    }
+
+    requirement <'contract.rtg.graph.intentional_boundary'> intentionalBoundary {
+        subject graph : RtgGraph;
+        require constraint {
+            doc /* Graph owns schema-neutral records, direct associations, and indexes only. It performs no schema/delta validation, authorization, migration-candidate policy, hidden live filtering, query/inference/reasoning, persistence, replay/audit, backup/replication, or distributed coordination; arbitrary system metadata is preserved without assigned meaning beyond system.live. */
+        }
+    }
+
     requirement <'invariant.rtg.graph.global_uuid_uniqueness'> globalUuidUniqueness {
         subject graph : RtgGraph;
         require constraint {
@@ -557,6 +571,8 @@ library package BibliotekRtgGraph {
         satisfy deleteEffect by graph;
         satisfy previewEffect by graph;
         satisfy snapshotEffect by graph;
+        satisfy canonicalOrdering by graph;
+        satisfy intentionalBoundary by graph;
         satisfy globalUuidUniqueness by graph;
         satisfy wellFormedUuids by graph;
         satisfy uuidGeneration by graph;
@@ -729,7 +745,7 @@ library package BibliotekRtgGraph {
     verification def RtgGraphBoundaryVerification {
         subject graph : RtgGraph;
         objective {
-            verify putEffect; verify associationEffect; verify deleteEffect; verify previewEffect; verify snapshotEffect;
+            verify putEffect; verify associationEffect; verify deleteEffect; verify previewEffect; verify snapshotEffect; verify canonicalOrdering; verify intentionalBoundary;
             verify globalUuidUniqueness; verify wellFormedUuids; verify uuidGeneration; verify wellFormedTypes;
             verify singleGlobalTypeNamespace; verify manyToManyDataAssociation; verify noUnassociatedDataObjects;
             verify associationIndexesReferenceExistingObjects; verify noAssociationObjects; verify validLinkEndpoints;

@@ -6,6 +6,7 @@ from components.rtg.change_validation import (
     DeterministicRtgChangeValidator,
     RtgChangeBatch,
     RtgChangeReference,
+    RtgConstraintChangeSet,
     RtgGraphAnchorWrite,
     RtgGraphChangeSet,
     RtgGraphDataObjectWrite,
@@ -16,7 +17,11 @@ from components.rtg.change_validation import (
     RtgSchemaDefinitionWrite,
     RtgValidationOptions,
 )
-from components.rtg.constraints import InMemoryRtgConstraints
+from components.rtg.constraints import (
+    InMemoryRtgConstraints,
+    RtgConstraintDefinition,
+    RtgConstraintQueryPatternPayload,
+)
 from components.rtg.graph import InMemoryRtgGraph, RtgAnchor, RtgDataObject
 from components.rtg.migration import (
     InMemoryRtgMigration,
@@ -98,6 +103,89 @@ def test_validation_reports_schema_object_findings_without_mutation() -> None:
     assert stored.properties == {"extra": "nope"}
 
 
+def test_schema_value_kind_refinements_and_nested_strictness() -> None:
+    schema = InMemoryRtgSchema.empty()
+    schema.put_definition(
+        RtgSchemaDefinition(
+            uuid=uuid4(),
+            kind="anchor",
+            type_key="Person",
+            description="Person.",
+            payload=RtgAnchorSchemaPayload(required_data_types=("Profile",)),
+        )
+    )
+    schema.put_definition(
+        RtgSchemaDefinition(
+            uuid=uuid4(),
+            kind="data_object",
+            type_key="Profile",
+            description="Profile with refined scalar and nested fields.",
+            payload=RtgDataObjectSchemaPayload(
+                properties={
+                    "amount": RtgSchemaField(required=True, value_kinds=("number",)),
+                    "identifier": RtgSchemaField(required=True, value_kinds=("uuid",)),
+                    "label": RtgSchemaField(required=True, value_kinds=("string",)),
+                    "nested": RtgSchemaField(
+                        required=True,
+                        value_kinds=("object",),
+                        properties={
+                            "child": RtgSchemaField(required=True, value_kinds=("string",))
+                        },
+                    ),
+                }
+            ),
+        )
+    )
+    graph = InMemoryRtgGraph.empty()
+    anchor = graph.put_anchor(RtgAnchor(uuid=uuid4(), type="Person"))
+    identifier = str(uuid4())
+    data = graph.put_data_object(
+        RtgDataObject(
+            uuid=uuid4(),
+            type="Profile",
+            properties={
+                "amount": 1,
+                "identifier": identifier,
+                "label": identifier,
+                "nested": {"child": "valid"},
+            },
+        ),
+        (concrete_uuid(anchor.uuid),),
+    )
+    validator = DeterministicRtgChangeValidator()
+    report = validator.validate_graph_state(
+        graph,
+        schema,
+        InMemoryRtgConstraints.empty(),
+        InMemoryRtgMigration.empty(),
+        SimpleRtgQueryEngine(),
+    )
+    assert report.accepted is True
+
+    graph.put_data_object(
+        RtgDataObject(
+            uuid=data.uuid,
+            type="Profile",
+            properties={
+                "amount": 1,
+                "identifier": identifier,
+                "label": identifier,
+                "nested": {"child": "valid", "undeclared": True},
+            },
+        ),
+        (concrete_uuid(anchor.uuid),),
+    )
+    report = validator.validate_graph_state(
+        graph,
+        schema,
+        InMemoryRtgConstraints.empty(),
+        InMemoryRtgMigration.empty(),
+        SimpleRtgQueryEngine(),
+    )
+    assert report.accepted is False
+    assert "schema_object.property_kind_mismatch" in {finding.code for finding in report.findings}
+
+
 def test_validation_rejects_malformed_proposed_data_batch() -> None:
     batch = RtgChangeBatch(
         graph_changes=RtgGraphChangeSet(
@@ -123,6 +211,80 @@ def test_validation_rejects_malformed_proposed_data_batch() -> None:
 
     assert report.accepted is False
     assert "schema_object.undeclared_property" in {finding.code for finding in report.findings}
+
+
+def test_unselected_malformed_sections_do_not_affect_selected_track() -> None:
+    report = DeterministicRtgChangeValidator().validate_batch(
+        InMemoryRtgGraph.empty(),
+        build_schema(),
+        object(),
+        None,
+        object(),
+        RtgChangeBatch(
+            constraint_changes=RtgConstraintChangeSet(
+                delete_constraints=(RtgChangeReference(),)
+            )
+        ),
+        RtgValidationOptions(tracks=("schema_object",)),
+    )
+
+    assert report.accepted is True
+    assert report.findings == ()
+
+
+def test_duplicate_findings_collapse_before_evidence_and_acceptance() -> None:
+    graph = InMemoryRtgGraph.empty()
+    anchor = graph.put_anchor(RtgAnchor(uuid=uuid4(), type="Person"))
+    for _ in range(2):
+        graph.put_data_object(
+            RtgDataObject(uuid=uuid4(), type="Profile", properties={}),
+            (concrete_uuid(anchor.uuid),),
+        )
+
+    report = DeterministicRtgChangeValidator().validate_graph_state(
+        graph,
+        build_schema(),
+        InMemoryRtgConstraints.empty(),
+        None,
+        SimpleRtgQueryEngine(),
+        validation_options=RtgValidationOptions(tracks=("schema_object",)),
+    )
+
+    assert report.accepted is False
+    assert [finding.code for finding in report.findings] == [
+        "schema_object.missing_required_property"
+    ]
+    assert report.evidence["total_finding_count"] == 1
+
+
+def test_unevaluable_constraint_payload_is_a_catalog_finding() -> None:
+    constraints = InMemoryRtgConstraints.empty()
+    constraints.put_constraint(
+        RtgConstraintDefinition(
+            uuid=uuid4(),
+            kind="query_pattern",
+            target_type_keys=("Person",),
+            display_name="Malformed query",
+            description="The public payload is structurally valid but cannot be evaluated.",
+            payload=RtgConstraintQueryPatternPayload(
+                query_spec={"not": "an RtgQuerySpec"},
+                expectation="must_match_none",
+            ),
+        )
+    )
+
+    report = DeterministicRtgChangeValidator().validate_graph_state(
+        InMemoryRtgGraph.empty(),
+        build_schema(),
+        constraints,
+        None,
+        SimpleRtgQueryEngine(),
+        validation_options=RtgValidationOptions(tracks=("constraint_network",)),
+    )
+
+    assert [finding.code for finding in report.findings] == [
+        "constraint_network.constraint_payload_unevaluable"
+    ]
 
 
 def test_validation_reports_unresolved_link_endpoints_with_paths() -> None:
@@ -241,6 +403,9 @@ def test_migration_projection_reports_replacement_type_mismatch_as_warning() -> 
 def test_finding_limit_does_not_hide_blocking_acceptance() -> None:
     schema = build_schema()
     live_person = schema.list_definitions_by_type_key("Person", kind="anchor").definitions[0]
+    live_profile = schema.list_definitions_by_type_key(
+        "Profile", kind="data_object"
+    ).definitions[0]
     project_candidate = RtgSchemaDefinition(
         uuid=uuid4(),
         kind="anchor",
@@ -257,9 +422,10 @@ def test_finding_limit_does_not_hide_blocking_acceptance() -> None:
             description="Produce both blocking and warning cutover findings.",
             status="ready",
             schema_make_live=(
-                concrete_uuid(live_person.uuid),
                 concrete_uuid(project_candidate.uuid),
+                concrete_uuid(live_profile.uuid),
             ),
+            schema_make_non_live=(concrete_uuid(live_person.uuid),),
             schema_replacements=(
                 RtgMigrationReplacement(
                     concrete_uuid(live_person.uuid),

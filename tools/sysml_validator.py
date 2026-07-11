@@ -22,14 +22,30 @@ from typing import Any
 from jupyter_client.blocking.client import BlockingKernelClient
 from jupyter_client.connect import write_connection_file
 
-ROOT = Path(__file__).resolve().parents[1]
-MODEL_ROOT = ROOT / "model"
-LOCK_PATH = MODEL_ROOT / "validator.lock.json"
-CACHE_ROOT = MODEL_ROOT / ".cache" / "validator"
+try:
+    from .model_layout import (
+        MODEL_PACKAGE_ROOT,
+        MODEL_ROOT,
+        ROOT,
+        SOFTWARE_COMPONENT_PATTERN_PATH,
+        VALIDATOR_CACHE_ROOT,
+        VALIDATOR_LOCK_PATH,
+    )
+except ImportError:  # pragma: no cover - direct script execution
+    from model_layout import (  # type: ignore[no-redef]
+        MODEL_PACKAGE_ROOT,
+        MODEL_ROOT,
+        ROOT,
+        SOFTWARE_COMPONENT_PATTERN_PATH,
+        VALIDATOR_CACHE_ROOT,
+        VALIDATOR_LOCK_PATH,
+    )
+
+LOCK_PATH = VALIDATOR_LOCK_PATH
+CACHE_ROOT = VALIDATOR_CACHE_ROOT
 
 MODEL_ORDER = (
     "foundation/SoftwareComponentModeling.sysml",
-    "foundation/SoftwareComponentPattern.sysml",
     "bibliotek/shared-values/SoftwareValues.sysml",
     "bibliotek/shared-values/RtgDiagnostics.sysml",
     "bibliotek/components/component.storage.json_file.sysml",
@@ -50,7 +66,6 @@ MODEL_ORDER = (
     "vellis/realizations/VellisLocalPython.sysml",
     "vellis/realizations/VellisMcpPython.sysml",
     "vellis/views/VellisViews.sysml",
-    "realizations/PythonImplementationDrift.sysml",
 )
 
 PACKAGE_ARCHIVES = {
@@ -236,7 +251,7 @@ def _packaged_model_files(scope: str, destination: Path) -> tuple[list[Path], li
     extracted_by_name: dict[str, Path] = {}
     labels_by_name: dict[str, str] = {}
     for product in products:
-        archive_path = MODEL_ROOT / "dist" / PACKAGE_ARCHIVES[product]
+        archive_path = MODEL_PACKAGE_ROOT / PACKAGE_ARCHIVES[product]
         if not archive_path.exists():
             raise RuntimeError(f"missing packaged model artifact: {archive_path}")
         product_root = destination / product
@@ -403,7 +418,15 @@ def validate_products(self_test: bool = False) -> int:
     for scope in ("foundation", "bibliotek", "vellis"):
         if validate(scope, self_test=self_test, packaged=True):
             return 1
-    return 0
+    return validate_fixture(self_test=self_test)
+
+
+def validate_fixture(self_test: bool = False) -> int:
+    with tempfile.TemporaryDirectory(prefix="vellis-foundation-fixture-") as temporary:
+        files, labels = _packaged_model_files("foundation", Path(temporary))
+        files.append(SOFTWARE_COMPONENT_PATTERN_PATH)
+        labels.append(SOFTWARE_COMPONENT_PATTERN_PATH.relative_to(ROOT).as_posix())
+        return _validate_files(files, labels, self_test, "foundation modeling fixture")
 
 
 def _source_digest(files: list[Path]) -> str:
@@ -525,6 +548,8 @@ def main() -> int:
     )
     products_parser = subparsers.add_parser("validate-products")
     products_parser.add_argument("--self-test", action="store_true")
+    fixture_parser = subparsers.add_parser("validate-fixture")
+    fixture_parser.add_argument("--self-test", action="store_true")
     export_parser = subparsers.add_parser("export-index")
     export_parser.add_argument("--output", type=Path, required=True)
     arguments = parser.parse_args()
@@ -536,6 +561,8 @@ def main() -> int:
         return 0
     if arguments.command == "validate-products":
         return validate_products(arguments.self_test)
+    if arguments.command == "validate-fixture":
+        return validate_fixture(arguments.self_test)
     if arguments.command == "export-index":
         export_index(arguments.output)
         return 0

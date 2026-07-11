@@ -41,6 +41,19 @@ def test_component_authoring_has_a_black_box_stop_rule() -> None:
     assert "private helpers" in text
     assert "Conformance Hierarchy" in text
     assert "different suitable language" in text
+    assert "Before retiring a predecessor specification" in text
+
+
+def test_documentation_retirement_preserves_non_contract_knowledge() -> None:
+    text = Path(".agents/skills/documentation-sync/SKILL.md").read_text(encoding="utf-8")
+
+    for term in (
+        "contractual facts",
+        "rationale",
+        "unresolved questions",
+        "realization drift",
+    ):
+        assert term in text
 
 
 def test_component_authoring_distinguishes_library_application_and_distribution() -> None:

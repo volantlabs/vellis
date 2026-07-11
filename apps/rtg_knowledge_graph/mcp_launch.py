@@ -15,19 +15,19 @@ RECOMMENDED_EVAL_PROMPT_ID = "individual_life_graph"
 EVAL_PROMPTS = {
     "individual_life_graph": {
         "title": "RTG Individual Life Graph Beta Prompt",
-        "path": "docs/evals/rtg-individual-life-graph-beta-prompt.md",
+        "path": "docs/guides/vellis/evals/rtg-individual-life-graph-beta-prompt.md",
         "description": ("Initial single-user personal and professional life-graph beta scenario."),
     },
     "component_repo_affordance": {
         "title": "RTG Agent Affordance Eval Prompt",
-        "path": "docs/evals/rtg-agent-affordance-eval-prompt.md",
+        "path": "docs/guides/vellis/evals/rtg-agent-affordance-eval-prompt.md",
         "description": "Software-component repository modeling scenario.",
     },
 }
 GUIDES = {
     "known_good_walkthrough": {
         "title": "RTG Beta Known-Good Walkthrough",
-        "path": "docs/evals/rtg-beta-known-good-walkthrough.md",
+        "path": "docs/guides/vellis/evals/rtg-beta-known-good-walkthrough.md",
         "description": "Expected shape of a successful first life-graph beta run.",
     }
 }
@@ -263,7 +263,6 @@ def _find_repository_root(start: Path) -> Path | None:
         if (
             (candidate / "pyproject.toml").is_file()
             and (candidate / "apps" / "rtg_knowledge_graph").is_dir()
-            and (candidate / "docs" / "evals").is_dir()
         ):
             return candidate
     return None

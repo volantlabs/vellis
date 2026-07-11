@@ -1,0 +1,30 @@
+{
+  "phase": "shadow",
+  "native_model_checkpoint": "c979e78",
+  "authored_design": "model/{foundation,bibliotek,vellis}/**/*.sysml",
+  "generated_documentation": "docs/reference/**/*.md",
+  "generated_machine_projections": "generated/model/*.json",
+  "frozen_migration_baseline": "docs/migration/component-spec-baseline/*.md",
+  "gates": {
+    "right_sized_modeling_profile": "implemented",
+    "native_requirement_satisfaction_semantics": "implemented",
+    "subject_compatible_verification": "implemented",
+    "native_action_invocation_patterns": "implemented-pending-human-review",
+    "typed_state_access": "implemented",
+    "accepted_contract_preservation": "implemented-pending-human-review",
+    "black_box_rebuild_readiness": "implemented-pending-human-review",
+    "representative_pilots": "implemented-pending-human-review",
+    "external_sysml_validator": "implemented-qualified-headless",
+    "packaged_product_validation": "implemented",
+    "parser_backed_model_index": "implemented",
+    "model_derived_conformance_objectives": "implemented",
+    "legacy_contract_knowledge_disposition": "implemented-pending-human-review",
+    "legacy_non_contract_knowledge_preservation": "implemented-pending-human-review",
+    "implementation_decision_reconciliation": "implemented",
+    "bibliotek_human_acceptance": "pending",
+    "vellis_human_acceptance": "pending",
+    "generated_views": "implemented",
+    "markdown_retirement": "blocked"
+  },
+  "rule": "Author new design in SysML. Keep formal cutover and Markdown retirement blocked until pinned formal validation and human acceptance pass."
+}

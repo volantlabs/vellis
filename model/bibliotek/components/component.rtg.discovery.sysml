@@ -87,6 +87,13 @@ library package BibliotekRtgDiscovery {
         }
     }
 
+    requirement <'contract.rtg.discovery.intentional_boundary'> intentionalBoundary {
+        subject discovery : RtgDiscovery;
+        require constraint {
+            doc /* Discovery owns curated navigation records only. It stores no schema definitions, graph objects, or population counts; executes no query or validation; assembles no controller schema pack; and provides no ranking/search/embedding, authorization, or UI behavior. */
+        }
+    }
+
     requirement <'invariant.rtg.discovery.views_not_schema'> viewsNotSchema {
         subject discovery : RtgDiscovery;
         require constraint {
@@ -175,7 +182,7 @@ library package BibliotekRtgDiscovery {
 
     verification def RtgDiscoveryBoundaryVerification {
         subject discovery : RtgDiscovery;
-        objective { verify deterministicReads; verify viewsNotSchema; verify noGraphDependency; verify knowledgeEngineerCurated; }
+        objective { verify deterministicReads; verify intentionalBoundary; verify viewsNotSchema; verify noGraphDependency; verify knowledgeEngineerCurated; }
         @EvidenceBinding { evidenceId = "pending#RtgDiscoveryBoundaryVerification"; implementationScope = "unimplemented-draft"; }
     }
 }

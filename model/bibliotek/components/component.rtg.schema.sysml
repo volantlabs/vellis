@@ -8,32 +8,49 @@ library package BibliotekRtgSchema {
         enum data_object;
         enum link;
     }
-    enum def RtgSchemaDirection { enum source; enum target; enum either; }
+    enum def RtgSchemaParticipationQueryDirection { enum source; enum target; enum either; }
+    enum def RtgSchemaParticipationDirection { enum source; enum target; enum both; }
     enum def RtgSchemaValueKind {
         enum string; enum integer; enum number; enum boolean;
         enum 'null';
         enum object; enum list; enum uuid;
     }
 
+    calc def SchemaValueKindCompatible {
+        in actual : RtgSchemaValueKind;
+        in allowed : RtgSchemaValueKind;
+        doc /* Schema kinds are refinement predicates rather than mutually exclusive JSON tags: integer satisfies number, and uuid satisfies string. */
+        return compatible : Boolean = actual == allowed or
+            (actual == RtgSchemaValueKind::integer and allowed == RtgSchemaValueKind::number) or
+            (actual == RtgSchemaValueKind::uuid and allowed == RtgSchemaValueKind::string);
+    }
+
+    attribute def RtgSchemaProperty {
+        attribute name : String;
+        attribute field : RtgSchemaField;
+        doc /* One entry in a logical unique-key property map. Realization codecs may encode the entry collection as a JSON object. */
+    }
     attribute def RtgSchemaField {
         attribute required : Boolean;
         attribute valueKinds[1..*] : RtgSchemaValueKind;
-        attribute properties : JsonObject;
-        attribute items[0..1] : JsonObject;
-        doc /* Field schema. Properties describes nested fields only for object values; items describes the item field only for list values. */
+        attribute properties[0..*] : RtgSchemaProperty;
+        attribute items[0..1] : RtgSchemaField;
+        doc /* Recursive field schema. Allowed value kinds and property names are unique unordered sets. Properties is non-empty only when object is allowed; items is present only when list is allowed. */
     }
     abstract attribute def RtgSchemaPayload { doc /* One native anchor, data-object, or link schema payload selected by definition kind. */ }
     attribute def RtgAnchorSchemaPayload :> RtgSchemaPayload {
         attribute requiredDataTypes[0..*] : String;
         attribute optionalDataTypes[0..*] : String;
+        doc /* Required and optional type-key sets are individually unique and mutually disjoint. */
     }
     attribute def RtgDataObjectSchemaPayload :> RtgSchemaPayload {
-        attribute properties : JsonObject;
-        doc /* Strict mapping from property name to RtgSchemaField; undeclared properties are invalid for validation consumers. */
+        attribute properties[0..*] : RtgSchemaProperty;
+        doc /* Strict unique-key property map; undeclared properties are invalid for validation consumers. Realization codecs may encode it as a JSON object. */
     }
     attribute def RtgLinkSchemaPayload :> RtgSchemaPayload {
         attribute allowedSourceTypes[1..*] : String;
         attribute allowedTargetTypes[1..*] : String;
+        doc /* Each endpoint set is unique and unordered. One type may occur in both sets. */
     }
     item def RtgSchemaDefinition {
         attribute uuid[0..1] : Uuid;
@@ -42,24 +59,24 @@ library package BibliotekRtgSchema {
         attribute description : String;
         attribute payload : RtgSchemaPayload;
         attribute system : JsonObject;
-        doc /* UUID may be absent on write only. Stored definitions have concrete UUID and Boolean system.live, defaulting missing live to true. */
+        doc /* UUID may be absent on write only. Description is non-empty human-readable semantic text. Stored definitions have concrete UUID and Boolean system.live, defaulting missing live to true. */
     }
-    attribute def RtgSchemaSnapshot { item definitions[0..*] : RtgSchemaDefinition; }
-    attribute def RtgSchemaDefinitionList { item definitions[0..*] : RtgSchemaDefinition; }
-    attribute def RtgSchemaAssociatedDataTypeList { attribute requiredDataTypes[0..*] : String; attribute optionalDataTypes[0..*] : String; }
-    attribute def RtgSchemaLinkParticipation { attribute definitionUuid : Uuid; attribute typeKey : String; attribute direction : RtgSchemaDirection; attribute allowedSourceTypes[0..*] : String; attribute allowedTargetTypes[0..*] : String; attribute live : Boolean; }
-    attribute def RtgSchemaLinkParticipationList { attribute links[0..*] : RtgSchemaLinkParticipation; }
+    attribute def RtgSchemaSnapshot { item definitions[0..*] ordered : RtgSchemaDefinition; }
+    attribute def RtgSchemaDefinitionList { item definitions[0..*] ordered : RtgSchemaDefinition; }
+    attribute def RtgSchemaAssociatedDataTypeList { attribute requiredDataTypes[0..*] ordered : String; attribute optionalDataTypes[0..*] ordered : String; }
+    attribute def RtgSchemaLinkParticipation { attribute definitionUuid : Uuid; attribute typeKey : String; attribute direction : RtgSchemaParticipationDirection; attribute allowedSourceTypes[0..*] ordered : String; attribute allowedTargetTypes[0..*] ordered : String; attribute live : Boolean; }
+    attribute def RtgSchemaLinkParticipationList { attribute links[0..*] ordered : RtgSchemaLinkParticipation; }
     attribute def RtgSchemaAnchorTypeSummary { attribute definitionUuid : Uuid; attribute typeKey : String; attribute description : String; attribute live : Boolean; }
-    attribute def RtgSchemaAnchorTypeSummaryList { attribute anchorTypes[0..*] : RtgSchemaAnchorTypeSummary; }
-    attribute def RtgSchemaPack { item anchorSchemas[0..*] : RtgSchemaDefinition; item associatedDataObjectSchemas[0..*] : RtgSchemaDefinition; item linkSchemas[0..*] : RtgSchemaDefinition; }
+    attribute def RtgSchemaAnchorTypeSummaryList { attribute anchorTypes[0..*] ordered : RtgSchemaAnchorTypeSummary; }
+    attribute def RtgSchemaPack { item anchorSchemas[0..*] ordered : RtgSchemaDefinition; item associatedDataObjectSchemas[0..*] ordered : RtgSchemaDefinition; item linkSchemas[0..*] ordered : RtgSchemaDefinition; }
     attribute def RtgSchemaDeleteResult { item deletedDefinition : RtgSchemaDefinition; }
 
     attribute def RtgSchemaDefinitionNotFound { attribute 'message' : String; }
     attribute def RtgSchemaSnapshotInvalid { attribute 'message' : String; }
     attribute def RtgSchemaUuidInvalid { attribute 'message' : String; }
     attribute def RtgSchemaUuidConflict { attribute 'message' : String; }
-    attribute def RtgSchemaReferenceInvalid { attribute 'message' : String; }
     attribute def RtgSchemaDefinitionInvalid { attribute 'message' : String; }
+    attribute def RtgSchemaPayloadInvalid { attribute 'message' : String; }
     attribute def RtgSchemaDefinitionKindInvalid { attribute 'message' : String; }
     attribute def RtgSchemaTypeKeyInvalid { attribute 'message' : String; }
     attribute def RtgSchemaDirectionInvalid { attribute 'message' : String; }
@@ -67,14 +84,14 @@ library package BibliotekRtgSchema {
     attribute def RtgSchemaLiveTypeConflict { attribute 'message' : String; }
 
     action def ExportSchemaSnapshot { out 'snapshot' : RtgSchemaSnapshot; doc /* Export every full definition with normalized live metadata without mutation or filtering. */ @FailureContract { errorIds = (); } }
-    action def PutSchemaDefinition { in definition : RtgSchemaDefinition; out stored : RtgSchemaDefinition; doc /* Generate or preserve identity, validate kind-specific payload, and atomically create or fully replace one definition. */ @FailureContract { errorIds = ("RtgSchemaUuidInvalid", "RtgSchemaUuidConflict", "RtgSchemaDefinitionInvalid", "RtgSchemaSystemValueInvalid", "RtgSchemaLiveTypeConflict"); } }
+    action def PutSchemaDefinition { in definition : RtgSchemaDefinition; out stored : RtgSchemaDefinition; doc /* Generate or preserve identity, validate definition structure and the selected payload, and atomically create or fully replace one definition. */ @FailureContract { errorIds = ("RtgSchemaUuidInvalid", "RtgSchemaDefinitionKindInvalid", "RtgSchemaTypeKeyInvalid", "RtgSchemaDefinitionInvalid", "RtgSchemaPayloadInvalid", "RtgSchemaSystemValueInvalid", "RtgSchemaLiveTypeConflict"); } }
     action def GetSchemaDefinition { in definitionUuid : Uuid; out definition : RtgSchemaDefinition; doc /* Return one definition by UUID. */ @FailureContract { errorIds = ("RtgSchemaDefinitionNotFound"); } }
     action def ListSchemaDefinitions { in kind[0..1] : RtgSchemaDefinitionKind; in live[0..1] : Boolean; out result : RtgSchemaDefinitionList; doc /* List definitions with optional kind and live filters in deterministic order. */ @FailureContract { errorIds = ("RtgSchemaDefinitionKindInvalid"); } }
     action def ListDefinitionsByTypeKey { in schemaTypeKey : String; in kind[0..1] : RtgSchemaDefinitionKind; in live[0..1] : Boolean; out result : RtgSchemaDefinitionList; doc /* List every definition for one type key with optional kind/live filters, including multiple non-live candidates. */ @FailureContract { errorIds = ("RtgSchemaTypeKeyInvalid", "RtgSchemaDefinitionKindInvalid"); } }
     action def ListAnchorDataTypeKeys { in anchorTypeKey : String; in live[0..1] : Boolean default = true; out result : RtgSchemaAssociatedDataTypeList; doc /* Return required and optional associated data type keys declared by one anchor schema. */ @FailureContract { errorIds = ("RtgSchemaTypeKeyInvalid", "RtgSchemaDefinitionNotFound"); } }
-    action def ListLinkParticipation { in typeKey : String; in direction : RtgSchemaDirection default = RtgSchemaDirection::either; in live[0..1] : Boolean default = true; out result : RtgSchemaLinkParticipationList; doc /* Return link schemas that admit the type as source, target, or either endpoint. */ @FailureContract { errorIds = ("RtgSchemaTypeKeyInvalid", "RtgSchemaDirectionInvalid"); } }
+    action def ListLinkParticipation { in typeKey : String; in direction : RtgSchemaParticipationQueryDirection default = RtgSchemaParticipationQueryDirection::either; in live[0..1] : Boolean default = true; out result : RtgSchemaLinkParticipationList; doc /* Return link schemas that admit the type as source, target, or either endpoint. Each result reports source, target, or both relative to the queried type. */ @FailureContract { errorIds = ("RtgSchemaTypeKeyInvalid", "RtgSchemaDirectionInvalid"); } }
     action def ListAnchorTypeSummaries { in live[0..1] : Boolean default = true; out result : RtgSchemaAnchorTypeSummaryList; doc /* Return anchor type identities and descriptions only, never graph counts. */ @FailureContract { errorIds = (); } }
-    action def GetSchemaPack { in anchorTypeKeys[1..*] : String; in live[0..1] : Boolean default = true; out result : RtgSchemaPack; doc /* Expand requested anchor schemas with defined associated-data schemas and participating link schemas; omit missing referenced schemas but fail missing requested anchors. */ @FailureContract { errorIds = ("RtgSchemaTypeKeyInvalid", "RtgSchemaDefinitionNotFound"); } }
+    action def GetSchemaPack { in anchorTypeKeys[1..*] ordered : String; in live[0..1] : Boolean default = true; out result : RtgSchemaPack; doc /* Expand unique requested anchor schemas in request order with defined associated-data schemas and participating link schemas; omit missing referenced schemas but fail missing requested anchors. */ @FailureContract { errorIds = ("RtgSchemaTypeKeyInvalid", "RtgSchemaDefinitionNotFound"); } }
     action def DeleteSchemaDefinition { in definitionUuid : Uuid; out result : RtgSchemaDeleteResult; doc /* Delete exactly one definition and no graph, constraint, or migration record. */ @FailureContract { errorIds = ("RtgSchemaDefinitionNotFound"); } }
 
     part def <'component.rtg.schema'> RtgSchema {
@@ -98,27 +115,41 @@ library package BibliotekRtgSchema {
         dependency deleteState from deleteDefinition to definitions { @StateAccess { kind = StateAccessKind::delete; } doc /* remove one definition and affected indexes. */ }
     }
     action def CreateEmptyRtgSchema { out part schema : RtgSchema; doc /* Return an empty registry with empty derived indexes. */ @FailureContract { errorIds = (); } }
-    action def ImportRtgSchemaSnapshot { in 'snapshot' : RtgSchemaSnapshot; out part schema : RtgSchema; doc /* Validate every record, UUID, reference, payload, system value, and live uniqueness before rebuilding indexes and exposing the registry. */ @FailureContract { errorIds = ("RtgSchemaSnapshotInvalid", "RtgSchemaUuidInvalid", "RtgSchemaUuidConflict", "RtgSchemaReferenceInvalid", "RtgSchemaDefinitionInvalid", "RtgSchemaSystemValueInvalid", "RtgSchemaLiveTypeConflict"); } }
+    action def ImportRtgSchemaSnapshot { in 'snapshot' : RtgSchemaSnapshot; out part schema : RtgSchema; doc /* Validate every record, UUID, kind, type key, payload, system value, and global live uniqueness before rebuilding indexes and exposing the registry. */ @FailureContract { errorIds = ("RtgSchemaSnapshotInvalid", "RtgSchemaUuidInvalid", "RtgSchemaUuidConflict", "RtgSchemaDefinitionKindInvalid", "RtgSchemaTypeKeyInvalid", "RtgSchemaDefinitionInvalid", "RtgSchemaPayloadInvalid", "RtgSchemaSystemValueInvalid", "RtgSchemaLiveTypeConflict"); } }
 
 
     requirement <'contract.rtg.schema.write_effect'> definitionWriteEffect {
         subject operation : PutSchemaDefinition;
         require constraint {
-            doc /* Missing UUID generates a new UUID; supplied identity is preserved. Missing system.live becomes true. Kind selects the exact payload family and at most one live definition owns a kind/type-key pair. */
+            doc /* Missing UUID generates a new UUID; supplied identity is preserved and fully replaces that record. Description is non-empty semantic text. Missing system.live becomes true. Kind selects the exact payload family and at most one live definition of any kind owns a type key. */
         }
     }
 
     requirement <'contract.rtg.schema.field_semantics'> fieldSemantics {
         subject schema : RtgSchema;
         require constraint {
-            doc /* A field has a non-empty ordered value-kind set. Nested properties are permitted only with object, items only with list, null is permitted only when explicitly listed, required fields must be present, and strict data-object payloads reject undeclared properties. */
+            doc /* A field has a non-empty unique unordered value-kind set. Compatibility follows SchemaValueKindCompatible: Boolean never satisfies a numeric kind; integer satisfies integer and number; a fractional number satisfies number; every string satisfies string and a canonical UUID string also satisfies uuid. Nested properties are permitted only with object, items only with list, null is permitted only when explicitly listed, required fields must be present, and strict data-object payloads reject undeclared properties recursively. */
+        }
+    }
+
+    requirement <'contract.rtg.schema.canonical_ordering'> canonicalOrdering {
+        subject schema : RtgSchema;
+        require constraint {
+            doc /* Definition lists and snapshots use ascending textual UUID order. Associated-data results encode each type-key set in ascending text order. Link-participation results use ascending link type key with textual definition UUID as tie-breaker and encode endpoint sets in ascending text order. Anchor summaries use definition order. Schema packs preserve unique requested anchor-key order, then use definition order for associated-data and link schemas. */
+        }
+    }
+
+    requirement <'contract.rtg.schema.intentional_boundary'> intentionalBoundary {
+        subject schema : RtgSchema;
+        require constraint {
+            doc /* Schema owns native definition records and navigation only. It does not validate graph objects or changes, enforce graph-pattern constraints, own discovery views/counts, migration membership/cutover, inheritance/composition, general schema query/inference, persistence, authorization, workflow, or distributed coordination. */
         }
     }
 
     requirement <'contract.rtg.schema.payload_semantics'> payloadSemantics {
         subject schema : RtgSchema;
         require constraint {
-            doc /* Anchor payloads distinguish required from optional associated data types; data-object payloads map property names to recursive field definitions; link payloads contain non-empty allowed source and target type-key sets. Kind and payload family must agree. */
+            doc /* Anchor payloads distinguish disjoint required and optional associated-data type-key sets; data-object payloads map unique property names to recursive field definitions; link payloads contain non-empty unique source and target type-key sets whose overlap is allowed. Kind and payload family must agree. */
         }
     }
 
@@ -153,7 +184,7 @@ library package BibliotekRtgSchema {
     requirement <'invariant.rtg.schema.live_type_unique'> liveTypeUnique {
         subject schema : RtgSchema;
         require constraint {
-            doc /* At most one live definition owns a kind/type-key pair. */
+            doc /* At most one live definition across all definition kinds owns a type key. */
         }
     }
 
@@ -303,6 +334,8 @@ library package BibliotekRtgSchema {
         satisfy fieldSemantics by schema;
         satisfy payloadSemantics by schema;
         satisfy schemaReadEffect by schema;
+        satisfy canonicalOrdering by schema;
+        satisfy intentionalBoundary by schema;
         satisfy schemaSnapshotEffect by schema;
         satisfy uuidUnique by schema;
         satisfy liveTypeUnique by schema;
@@ -421,7 +454,7 @@ library package BibliotekRtgSchema {
 
     verification def RtgSchemaBoundaryVerification {
         subject schema : RtgSchema;
-        objective { verify fieldSemantics; verify payloadSemantics; verify schemaReadEffect; verify schemaSnapshotEffect; verify uuidUnique; verify liveTypeUnique; verify liveStatusBoolean; verify noChangeSetOwnership; verify noObjectValidation; verify nativePayloads; verify noInheritanceCompositionV1; verify typeKeyChangesAreMigrationConcerns; verify navigationIndexesMatchPayloads; verify deterministicListOrdering; }
+        objective { verify fieldSemantics; verify payloadSemantics; verify schemaReadEffect; verify canonicalOrdering; verify intentionalBoundary; verify schemaSnapshotEffect; verify uuidUnique; verify liveTypeUnique; verify liveStatusBoolean; verify noChangeSetOwnership; verify noObjectValidation; verify nativePayloads; verify noInheritanceCompositionV1; verify typeKeyChangesAreMigrationConcerns; verify navigationIndexesMatchPayloads; verify deterministicListOrdering; }
         @EvidenceBinding { evidenceId = "components/rtg/schema/tests/test_rtg_schema_contract.py#RtgSchemaBoundaryVerification"; implementationScope = "InMemoryRtgSchema"; }
     }
 }

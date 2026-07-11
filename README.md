@@ -64,15 +64,15 @@ staged work, or replay the ledger.
 
 Then, give the agent the default life-graph beta prompt:
 ```text
-docs/evals/rtg-individual-life-graph-beta-prompt.md
+docs/guides/vellis/evals/rtg-individual-life-graph-beta-prompt.md
 ```
 
 That scenario bootstraps an initial personal/professional schema, writes live graph facts, exercises
 bad-write recovery, validates a failed schema evolution, persists a snapshot, and verifies ledger
 replay. The detailed runbook is in
-[`docs/evals/rtg-agent-affordance-eval-runbook.md`](docs/evals/rtg-agent-affordance-eval-runbook.md).
+[`docs/guides/vellis/evals/rtg-agent-affordance-eval-runbook.md`](docs/guides/vellis/evals/rtg-agent-affordance-eval-runbook.md).
 The known-good walkthrough is
-[`docs/evals/rtg-beta-known-good-walkthrough.md`](docs/evals/rtg-beta-known-good-walkthrough.md).
+[`docs/guides/vellis/evals/rtg-beta-known-good-walkthrough.md`](docs/guides/vellis/evals/rtg-beta-known-good-walkthrough.md).
 Agents without repository access can fetch generic bootstrap, schema-staging, live-write, lookup,
 query, recovery, and audit examples through `rtg_get_usage_guide`; those examples teach payload
 shape and tool sequence rather than solving the beta scenario.
@@ -117,7 +117,7 @@ Good components are:
 
 These values keep systems easier to understand, maintain, test, and extend as the component library grows.
 
-The longer-term engineering-system thesis is captured in [`docs/agentic-mbse-engineering-system.md`](docs/agentic-mbse-engineering-system.md): use agents to help humans design and manage a durable MBSE-style model that connects product intent, component architecture, implementation, validation evidence, and task flow.
+The longer-term engineering-system thesis is captured in [`docs/vision/agentic-mbse-engineering-system.md`](docs/vision/agentic-mbse-engineering-system.md): use agents to help humans design and manage a durable MBSE-style model that connects product intent, component architecture, implementation, validation evidence, and task flow.
 
 ## Current Focus
 
@@ -130,16 +130,19 @@ Vellis evolves in this order:
 
 Current generated component views include:
 
-- [`component.storage.json_file`](docs/model/generated/components/component.storage.json_file.md): local filesystem-backed JSON document storage.
-- [`component.storage.sql`](docs/model/generated/components/component.storage.sql.md): SQLite-backed generic SQL execution surface for durable relational storage consumers.
-- [`component.rtg.graph`](docs/model/generated/components/component.rtg.graph.md): schema-neutral in-memory reified type graph for anchors, data objects, links, and direct UUID indexes.
-- [`component.rtg.schema`](docs/model/generated/components/component.rtg.schema.md): RTG-native schema-definition store for live and non-live anchor, data object, and link definitions.
-- [`component.rtg.constraints`](docs/model/generated/components/component.rtg.constraints.md): constraint-definition store for RTG graph-pattern and lifecycle rules.
-- [`component.rtg.migration`](docs/model/generated/components/component.rtg.migration.md): migration records that track schema, constraint, and graph lifecycle cutover sets.
-- [`component.rtg.change_validation`](docs/model/generated/components/component.rtg.change_validation.md): batch validator with isolated validation tracks.
-- [`component.rtg.query`](docs/model/generated/components/component.rtg.query.md): declarative graph query evaluator.
-- [`component.rtg.discovery`](docs/model/generated/components/component.rtg.discovery.md): draft curated discovery-view component.
-- [`component.rtg.controller`](docs/model/generated/components/component.rtg.controller.md): cross-component orchestration and invariant owner.
+- [Bibliotek model reference](docs/reference/bibliotek/index.md): library packages, components,
+  shared values, and retained dependency topology.
+
+- [`component.storage.json_file`](docs/reference/bibliotek/components/component.storage.json_file.md): local filesystem-backed JSON document storage.
+- [`component.storage.sql`](docs/reference/bibliotek/components/component.storage.sql.md): SQLite-backed generic SQL execution surface for durable relational storage consumers.
+- [`component.rtg.graph`](docs/reference/bibliotek/components/component.rtg.graph.md): schema-neutral in-memory reified type graph for anchors, data objects, links, and direct UUID indexes.
+- [`component.rtg.schema`](docs/reference/bibliotek/components/component.rtg.schema.md): RTG-native schema-definition store for live and non-live anchor, data object, and link definitions.
+- [`component.rtg.constraints`](docs/reference/bibliotek/components/component.rtg.constraints.md): constraint-definition store for RTG graph-pattern and lifecycle rules.
+- [`component.rtg.migration`](docs/reference/bibliotek/components/component.rtg.migration.md): migration records that track schema, constraint, and graph lifecycle cutover sets.
+- [`component.rtg.change_validation`](docs/reference/bibliotek/components/component.rtg.change_validation.md): batch validator with isolated validation tracks.
+- [`component.rtg.query`](docs/reference/bibliotek/components/component.rtg.query.md): declarative graph query evaluator.
+- [`component.rtg.discovery`](docs/reference/bibliotek/components/component.rtg.discovery.md): draft curated discovery-view component.
+- [`component.rtg.controller`](docs/reference/bibliotek/components/component.rtg.controller.md): cross-component orchestration and invariant owner.
 
 Current Python implementations include:
 
@@ -158,31 +161,34 @@ The first application is:
 - [`apps/rtg_knowledge_graph`](apps/rtg_knowledge_graph/): the Vellis RTG Knowledge Graph app. It
   wires JSON File Storage, SQL Storage, and the in-process RTG controller, then exposes the
   controller through local MCP transports for human/agent knowledge-system workflows.
+- [Vellis application model reference](docs/reference/vellis/index.md): composition, actor-visible
+  use cases, façade requirements, verification, and MCP realization mappings.
 
 The RTG Knowledge Graph MCP server uses standalone FastMCP v3 from the `fastmcp` package.
 
 Manual evaluation prompts include:
 
-- [`docs/evals/rtg-beta-known-good-walkthrough.md`](docs/evals/rtg-beta-known-good-walkthrough.md): a compact known-good walkthrough for the default life-graph beta path.
-- [`docs/evals/rtg-agent-affordance-eval-prompt.md`](docs/evals/rtg-agent-affordance-eval-prompt.md): a copy-pastable agent eval for using RTG as an evolving memory, knowledge graph, and database.
-- [`docs/evals/rtg-agent-affordance-eval-runbook.md`](docs/evals/rtg-agent-affordance-eval-runbook.md): launch and prompt-sequencing guidance for running the RTG MCP eval.
-- [`docs/evals/rtg-individual-life-graph-beta-prompt.md`](docs/evals/rtg-individual-life-graph-beta-prompt.md): the initial individual multi-domain life-graph beta prompt for personal and professional planning.
+- [`docs/guides/vellis/evals/rtg-beta-known-good-walkthrough.md`](docs/guides/vellis/evals/rtg-beta-known-good-walkthrough.md): a compact known-good walkthrough for the default life-graph beta path.
+- [`docs/guides/vellis/evals/rtg-agent-affordance-eval-prompt.md`](docs/guides/vellis/evals/rtg-agent-affordance-eval-prompt.md): a copy-pastable agent eval for using RTG as an evolving memory, knowledge graph, and database.
+- [`docs/guides/vellis/evals/rtg-agent-affordance-eval-runbook.md`](docs/guides/vellis/evals/rtg-agent-affordance-eval-runbook.md): launch and prompt-sequencing guidance for running the RTG MCP eval.
+- [`docs/guides/vellis/evals/rtg-individual-life-graph-beta-prompt.md`](docs/guides/vellis/evals/rtg-individual-life-graph-beta-prompt.md): the initial individual multi-domain life-graph beta prompt for personal and professional planning.
 
 ## Component Models
 
 Textual SysML v2 under [`model/`](model/) is the authored black-box design for Bibliotek and
 Vellis. It captures typed public actions and values, abstract owned state, action effects,
 principal failures, collaborator roles, invariants, application composition, use cases, and
-realizations. Human-readable pages under [`docs/model/generated/`](docs/model/generated/) are
+realizations. Human-readable pages under [`docs/reference/`](docs/reference/) are
 generated projections and must not be edited as alternate specifications.
 
 The model currently remains in shadow status: the former Markdown specifications are frozen as a
 migration baseline until the remaining human model-acceptance gates pass. The pinned official Java
-validator now enforces SysML syntax, linking, and semantic validation. New
-contract work belongs in SysML, while known implementation disagreements are related to their
-logical elements and Python realizations in
-[`model/realizations/PythonImplementationDrift.sysml`](model/realizations/PythonImplementationDrift.sysml). See
-[`docs/sysml-modeling.md`](docs/sysml-modeling.md) for the modeling profile and gate status.
+validator now enforces SysML syntax, linking, and semantic validation. New contract work belongs
+in SysML. The reviewed implementation disagreements have been resolved in the model and Python
+realization; future disagreements must return through model review instead of silently changing
+either side. See the non-normative
+[open model-design questions](docs/design/open-design-questions.md) for remaining cutover decisions. See
+[`docs/engineering/sysml-modeling.md`](docs/engineering/sysml-modeling.md) for the modeling profile and gate status.
 
 A component model defines:
 

@@ -1,11 +1,23 @@
 from __future__ import annotations
 
+from typing import cast
 from uuid import UUID, uuid4
+
+import pytest
 
 from components.rtg.constraints import (
     InMemoryRtgConstraints,
     RtgConstraintCardinalityPayload,
     RtgConstraintDefinition,
+    RtgConstraintDefinitionInvalid,
+    RtgConstraintKindInvalid,
+    RtgConstraintPayloadInvalid,
+    RtgConstraintQueryPatternPayload,
+    RtgConstraintSnapshot,
+    RtgConstraintSnapshotInvalid,
+    RtgConstraintTargetInvalid,
+    RtgConstraintUuidConflict,
+    RtgConstraintUuidInvalid,
 )
 from components.rtg.constraints.reference import create_reference_component
 from components.rtg.query import RtgQueryAnchorBucket, RtgQuerySpec
@@ -41,3 +53,161 @@ def test_constraints_store_payloads_without_executing_them() -> None:
     )
     assert constraints.list_constraints_by_target("Component").constraints == (stored,)
     assert not hasattr(constraints, "validate")
+
+
+def test_constraints_by_target_supports_kind_and_live_filters() -> None:
+    constraints = create_reference_component()
+    query_spec = RtgQuerySpec(anchor_buckets=(RtgQueryAnchorBucket("component", ("Component",)),))
+    cardinality = constraints.put_constraint(
+        RtgConstraintDefinition(
+            uuid=uuid4(),
+            kind="cardinality",
+            target_type_keys=("Component",),
+            display_name="At least one component",
+            description="The model should contain a component.",
+            payload=RtgConstraintCardinalityPayload(
+                query_spec=query_spec,
+                counted_binding="component",
+                minimum=1,
+            ),
+        )
+    )
+    constraints.put_constraint(
+        RtgConstraintDefinition(
+            uuid=uuid4(),
+            kind="query_pattern",
+            target_type_keys=("Component",),
+            display_name="No forbidden component",
+            description="The model should not contain a forbidden component.",
+            payload=RtgConstraintQueryPatternPayload(
+                query_spec=query_spec,
+                expectation="must_match_none",
+            ),
+        )
+    )
+
+    assert constraints.list_constraints_by_target(
+        "Component", kind="cardinality", live=True
+    ).constraints == (cardinality,)
+    try:
+        constraints.list_constraints_by_target("Component", kind="unsupported")
+    except RtgConstraintKindInvalid:
+        pass
+    else:
+        raise AssertionError("invalid kind was accepted")
+
+
+def test_constraint_validation_failures_are_boundary_specific() -> None:
+    constraints = create_reference_component()
+    query_spec = RtgQuerySpec(anchor_buckets=(RtgQueryAnchorBucket("component", ("Component",)),))
+
+    malformed_payload = RtgConstraintDefinition(
+        uuid=uuid4(),
+        kind="cardinality",
+        target_type_keys=("Component",),
+        display_name="Malformed cardinality",
+        description="The bound name must be present.",
+        payload=RtgConstraintCardinalityPayload(
+            query_spec=query_spec,
+            counted_binding="",
+            minimum=1,
+        ),
+    )
+    try:
+        constraints.put_constraint(malformed_payload)
+    except RtgConstraintPayloadInvalid:
+        pass
+    else:
+        raise AssertionError("malformed payload was accepted")
+
+    mismatched_payload = RtgConstraintDefinition(
+        uuid=uuid4(),
+        kind="query_pattern",
+        target_type_keys=("Component",),
+        display_name="Mismatched payload",
+        description="The payload type must match kind.",
+        payload=RtgConstraintCardinalityPayload(
+            query_spec=query_spec,
+            counted_binding="component",
+            minimum=1,
+        ),
+    )
+    try:
+        constraints.put_constraint(mismatched_payload)
+    except RtgConstraintDefinitionInvalid:
+        pass
+    else:
+        raise AssertionError("kind/payload mismatch was accepted")
+
+    try:
+        constraints.list_constraints_by_target("")
+    except RtgConstraintTargetInvalid:
+        pass
+    else:
+        raise AssertionError("invalid target lookup key was accepted")
+
+
+def test_constraint_targets_realize_an_unordered_unique_set() -> None:
+    constraints = create_reference_component()
+    query_spec = RtgQuerySpec(anchor_buckets=(RtgQueryAnchorBucket("component", ("Component",)),))
+    stored = constraints.put_constraint(
+        RtgConstraintDefinition(
+            uuid=uuid4(),
+            kind="cardinality",
+            target_type_keys=("Zulu", "Alpha"),
+            display_name="Canonical targets",
+            description="Target ordering has no domain meaning.",
+            payload=RtgConstraintCardinalityPayload(
+                query_spec=query_spec,
+                counted_binding="component",
+                minimum=1,
+            ),
+        )
+    )
+    assert stored.target_type_keys == ("Alpha", "Zulu")
+
+    with pytest.raises(RtgConstraintDefinitionInvalid):
+        constraints.put_constraint(
+            RtgConstraintDefinition(
+                uuid=uuid4(),
+                kind="cardinality",
+                target_type_keys=("Component", "Component"),
+                display_name="Duplicate targets",
+                description="Duplicate target membership is invalid.",
+                payload=RtgConstraintCardinalityPayload(
+                    query_spec=query_spec,
+                    counted_binding="component",
+                    minimum=1,
+                ),
+            )
+        )
+
+
+def test_constraint_snapshot_rejects_malformed_and_duplicate_identities() -> None:
+    query_spec = RtgQuerySpec(anchor_buckets=(RtgQueryAnchorBucket("component", ("Component",)),))
+    shared_uuid = uuid4()
+
+    def record(name: str, record_uuid: UUID | None = shared_uuid) -> RtgConstraintDefinition:
+        return RtgConstraintDefinition(
+            uuid=record_uuid,
+            kind="cardinality",
+            target_type_keys=("Component",),
+            display_name=name,
+            description="Snapshot identity must be unique and concrete.",
+            payload=RtgConstraintCardinalityPayload(
+                query_spec=query_spec,
+                counted_binding="component",
+                minimum=1,
+            ),
+        )
+
+    with pytest.raises(RtgConstraintUuidConflict):
+        InMemoryRtgConstraints.import_snapshot(
+            RtgConstraintSnapshot(constraints=(record("first"), record("second")))
+        )
+    with pytest.raises(RtgConstraintUuidInvalid):
+        InMemoryRtgConstraints.import_snapshot(
+            RtgConstraintSnapshot(constraints=(record("missing identity", None),))
+        )
+    with pytest.raises(RtgConstraintSnapshotInvalid):
+        InMemoryRtgConstraints.import_snapshot(cast(RtgConstraintSnapshot, object()))

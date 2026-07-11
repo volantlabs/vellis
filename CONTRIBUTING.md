@@ -27,6 +27,12 @@ Fork the repository, create a topic branch, make your change, run `just check`, 
 
 ## Component Changes
 
-Component specs under `docs/components/` are the durable contracts. Implementations should consume public contracts and avoid depending on private internals of adjacent components.
+Textual SysML under `model/bibliotek/` and `model/vellis/` is the authored design for new
+component and application work. Generated reference pages under `docs/reference/` are review aids,
+not alternate contracts. The former Markdown specs under
+`docs/migration/component-spec-baseline/` are frozen migration evidence and must not be edited as
+the current design.
 
-Accepted specs are human-owned. If a change requires altering an accepted public contract, record the mismatch and get maintainer approval before changing the contract.
+Accepted model contracts are human-owned. If a change requires altering an accepted public
+contract, surface the change and get maintainer approval before changing the model and its
+realizations together.

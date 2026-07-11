@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 from uuid import UUID, uuid4
 
 import pytest
@@ -10,8 +11,16 @@ from components.rtg.schema import (
     RtgDataObjectSchemaPayload,
     RtgLinkSchemaPayload,
     RtgSchemaDefinition,
+    RtgSchemaDefinitionInvalid,
+    RtgSchemaDefinitionKindInvalid,
+    RtgSchemaDirectionInvalid,
     RtgSchemaField,
-    RtgSchemaLiveConflict,
+    RtgSchemaLiveTypeConflict,
+    RtgSchemaPayloadInvalid,
+    RtgSchemaSnapshot,
+    RtgSchemaSnapshotInvalid,
+    RtgSchemaTypeKeyInvalid,
+    RtgSchemaUuidConflict,
 )
 from components.rtg.schema.reference import create_reference_component
 
@@ -88,7 +97,7 @@ def test_live_type_key_uniqueness_allows_non_live_candidates() -> None:
         )
     )
 
-    with pytest.raises(RtgSchemaLiveConflict):
+    with pytest.raises(RtgSchemaLiveTypeConflict):
         schema.put_definition(
             RtgSchemaDefinition(
                 uuid=uuid4(),
@@ -98,3 +107,229 @@ def test_live_type_key_uniqueness_allows_non_live_candidates() -> None:
                 payload=RtgDataObjectSchemaPayload(),
             )
         )
+
+
+def test_link_participation_distinguishes_query_and_result_directions() -> None:
+    schema = create_reference_component()
+    schema.put_definition(
+        RtgSchemaDefinition(
+            uuid=uuid4(),
+            kind="link",
+            type_key="related",
+            description="A link that admits Person at either endpoint.",
+            payload=RtgLinkSchemaPayload(
+                allowed_source_types=("Person",),
+                allowed_target_types=("Person", "Project"),
+            ),
+        )
+    )
+
+    assert schema.list_link_participation("Project").links[0].direction == "target"
+    assert schema.list_link_participation("Person", "source").links[0].direction == "both"
+    assert schema.list_link_participation("Person", "target").links[0].direction == "both"
+    assert schema.list_link_participation("Person", "either").links[0].direction == "both"
+    with pytest.raises(RtgSchemaDirectionInvalid):
+        schema.list_link_participation("Person", "both")
+
+
+def test_recursive_fields_require_coherent_unique_kind_sets() -> None:
+    schema = create_reference_component()
+    stored = schema.put_definition(
+        RtgSchemaDefinition(
+            uuid=uuid4(),
+            kind="data_object",
+            type_key="Profile",
+            description="A profile with recursive contact data.",
+            payload=RtgDataObjectSchemaPayload(
+                properties={
+                    "contact": RtgSchemaField(
+                        required=True,
+                        value_kinds=("uuid", "string", "number", "integer", "object"),
+                        properties={
+                            "label": RtgSchemaField(
+                                required=True,
+                                value_kinds=("string",),
+                            )
+                        },
+                    )
+                }
+            ),
+        )
+    )
+    assert isinstance(stored.payload, RtgDataObjectSchemaPayload)
+    assert stored.payload.properties["contact"].value_kinds == (
+        "string",
+        "integer",
+        "number",
+        "object",
+        "uuid",
+    )
+
+    incoherent_fields = (
+        RtgSchemaField(
+            required=True,
+            value_kinds=("string",),
+            properties={"nested": RtgSchemaField(True, ("string",))},
+        ),
+        RtgSchemaField(
+            required=True,
+            value_kinds=("string",),
+            items=RtgSchemaField(True, ("string",)),
+        ),
+        RtgSchemaField(required=True, value_kinds=("string", "string")),
+    )
+    for index, field in enumerate(incoherent_fields):
+        with pytest.raises(RtgSchemaPayloadInvalid):
+            schema.put_definition(
+                RtgSchemaDefinition(
+                    uuid=uuid4(),
+                    kind="data_object",
+                    type_key=f"Invalid{index}",
+                    description="An intentionally invalid recursive field.",
+                    payload=RtgDataObjectSchemaPayload(properties={"field": field}),
+                )
+            )
+
+
+def test_schema_payload_sets_are_unique_disjoint_and_canonical() -> None:
+    schema = create_reference_component()
+    stored_anchor = schema.put_definition(
+        RtgSchemaDefinition(
+            uuid=uuid4(),
+            kind="anchor",
+            type_key="Person",
+            description="A person with associated data.",
+            payload=RtgAnchorSchemaPayload(
+                required_data_types=("Zulu", "Alpha"),
+                optional_data_types=("Middle",),
+            ),
+        )
+    )
+    assert isinstance(stored_anchor.payload, RtgAnchorSchemaPayload)
+    assert stored_anchor.payload.required_data_types == ("Alpha", "Zulu")
+
+    with pytest.raises(RtgSchemaPayloadInvalid):
+        schema.put_definition(
+            RtgSchemaDefinition(
+                uuid=uuid4(),
+                kind="anchor",
+                type_key="Duplicate",
+                description="Duplicate membership is invalid.",
+                payload=RtgAnchorSchemaPayload(required_data_types=("Profile", "Profile")),
+            )
+        )
+    with pytest.raises(RtgSchemaPayloadInvalid):
+        schema.put_definition(
+            RtgSchemaDefinition(
+                uuid=uuid4(),
+                kind="anchor",
+                type_key="Overlap",
+                description="Required and optional membership must be disjoint.",
+                payload=RtgAnchorSchemaPayload(
+                    required_data_types=("Profile",),
+                    optional_data_types=("Profile",),
+                ),
+            )
+        )
+
+
+def test_schema_failure_vocabulary_is_boundary_specific() -> None:
+    schema = create_reference_component()
+    base = RtgSchemaDefinition(
+        uuid=uuid4(),
+        kind="anchor",
+        type_key="Person",
+        description="A person.",
+        payload=RtgAnchorSchemaPayload(),
+    )
+    with pytest.raises(RtgSchemaDefinitionKindInvalid):
+        schema.put_definition(
+            RtgSchemaDefinition(
+                uuid=base.uuid,
+                kind="unsupported",
+                type_key=base.type_key,
+                description=base.description,
+                payload=base.payload,
+            )
+        )
+    with pytest.raises(RtgSchemaTypeKeyInvalid):
+        schema.put_definition(
+            RtgSchemaDefinition(
+                uuid=base.uuid,
+                kind=base.kind,
+                type_key=" bad ",
+                description=base.description,
+                payload=base.payload,
+            )
+        )
+    with pytest.raises(RtgSchemaDefinitionInvalid):
+        schema.put_definition(
+            RtgSchemaDefinition(
+                uuid=base.uuid,
+                kind="link",
+                type_key=base.type_key,
+                description=base.description,
+                payload=base.payload,
+            )
+        )
+    with pytest.raises(RtgSchemaDefinitionInvalid):
+        schema.put_definition(
+            RtgSchemaDefinition(
+                uuid=base.uuid,
+                kind=base.kind,
+                type_key=base.type_key,
+                description="",
+                payload=base.payload,
+            )
+        )
+
+
+def test_schema_snapshot_rejects_duplicate_and_coercive_input() -> None:
+    schema = create_reference_component()
+    schema.put_definition(
+        RtgSchemaDefinition(
+            uuid=uuid4(),
+            kind="data_object",
+            type_key="Profile",
+            description="A profile.",
+            payload=RtgDataObjectSchemaPayload(
+                properties={"name": RtgSchemaField(required=False, value_kinds=("string",))}
+            ),
+        )
+    )
+    record = schema.export_snapshot().definitions[0]
+    with pytest.raises(RtgSchemaUuidConflict):
+        InMemoryRtgSchema.import_snapshot(RtgSchemaSnapshot(definitions=(record, record)))
+
+    malformed = copy.deepcopy(record)
+    payload = malformed["payload"]
+    assert isinstance(payload, dict)
+    properties = payload["properties"]
+    assert isinstance(properties, dict)
+    name_field = properties["name"]
+    assert isinstance(name_field, dict)
+    name_field["required"] = "false"
+    with pytest.raises(RtgSchemaPayloadInvalid):
+        InMemoryRtgSchema.import_snapshot(RtgSchemaSnapshot(definitions=(malformed,)))
+    with pytest.raises(RtgSchemaSnapshotInvalid):
+        InMemoryRtgSchema.import_snapshot(RtgSchemaSnapshot(definitions=({"kind": "anchor"},)))
+
+
+def test_schema_pack_selection_is_unique_and_ordered() -> None:
+    schema = create_reference_component()
+    for type_key in ("Alpha", "Zulu"):
+        schema.put_definition(
+            RtgSchemaDefinition(
+                uuid=uuid4(),
+                kind="anchor",
+                type_key=type_key,
+                description=f"{type_key} anchor.",
+                payload=RtgAnchorSchemaPayload(),
+            )
+        )
+    assert [item.type_key for item in schema.get_schema_pack(("Zulu", "Alpha")).anchor_schemas] == [
+        "Zulu",
+        "Alpha",
+    ]
+    with pytest.raises(RtgSchemaTypeKeyInvalid):
+        schema.get_schema_pack(("Alpha", "Alpha"))

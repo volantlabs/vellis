@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from typing import cast
 from uuid import uuid4
 
 import pytest
@@ -7,10 +8,14 @@ import pytest
 from components.rtg.migration import (
     InMemoryRtgMigration,
     RtgMigrationCutoverPlan,
-    RtgMigrationDeleteRejected,
+    RtgMigrationDeleteNotAllowed,
     RtgMigrationEvidence,
+    RtgMigrationIdConflict,
     RtgMigrationRecord,
     RtgMigrationRecordInvalid,
+    RtgMigrationReplacement,
+    RtgMigrationSnapshot,
+    RtgMigrationSnapshotInvalid,
     RtgMigrationStatusTransitionInvalid,
 )
 from components.rtg.migration.reference import create_reference_component
@@ -49,7 +54,7 @@ def test_migration_status_and_delete_rules() -> None:
     migration = create_reference_component()
     migration.put_migration(RtgMigrationRecord(migration_id="m1", description="Test migration"))
 
-    with pytest.raises(RtgMigrationDeleteRejected):
+    with pytest.raises(RtgMigrationDeleteNotAllowed):
         migration.delete_migration("m1")
     with pytest.raises(RtgMigrationStatusTransitionInvalid):
         migration.set_status("m1", "applied")
@@ -61,6 +66,110 @@ def test_migration_status_and_delete_rules() -> None:
     migration.set_status("m1", "ready")
     migration.set_status("m1", "applied")
     assert migration.delete_migration("m1").deleted_migration.status == "applied"
+
+
+def test_migration_replacement_obeys_lifecycle_and_has_no_effect_on_rejection() -> None:
+    migration = create_reference_component()
+    migration.put_migration(
+        RtgMigrationRecord(migration_id="m1", description="Lifecycle", status="draft")
+    )
+
+    with pytest.raises(RtgMigrationStatusTransitionInvalid):
+        migration.put_migration(
+            RtgMigrationRecord(migration_id="m1", description="Skip", status="applied")
+        )
+
+    assert migration.get_migration("m1").description == "Lifecycle"
+    assert migration.get_migration("m1").status == "draft"
+    assert migration.put_migration(
+        RtgMigrationRecord(migration_id="m1", description="Ready", status="ready")
+    ).status == "ready"
+
+
+def test_migration_status_metadata_is_replaced_even_when_empty_or_same_status() -> None:
+    migration = create_reference_component()
+    migration.put_migration(
+        RtgMigrationRecord(
+            migration_id="m1",
+            description="Metadata",
+            metadata={"owner": "team", "status_metadata": {"review": "old"}},
+        )
+    )
+
+    updated = migration.set_status("m1", "draft")
+
+    assert updated.metadata == {"owner": "team", "status_metadata": {}}
+
+
+def test_migration_membership_is_unique_consistent_and_canonical() -> None:
+    migration = create_reference_component()
+    old_b, old_a, new_b, new_a = (uuid4() for _ in range(4))
+    stored = migration.put_migration(
+        RtgMigrationRecord(
+            migration_id="m1",
+            description="Replace resources",
+            schema_make_live=(new_b, new_a),
+            schema_make_non_live=(old_b, old_a),
+            schema_replacements=(
+                RtgMigrationReplacement(old_b, new_b),
+                RtgMigrationReplacement(old_a, new_a),
+            ),
+        )
+    )
+
+    assert stored.schema_make_live == tuple(sorted((new_a, new_b), key=str))
+    assert stored.schema_make_non_live == tuple(sorted((old_a, old_b), key=str))
+    assert stored.schema_replacements == tuple(
+        sorted(stored.schema_replacements, key=lambda value: str(value.old_resource_id))
+    )
+
+    for invalid in (
+        RtgMigrationRecord(
+            migration_id="duplicate",
+            description="Duplicate",
+            graph_make_live=(new_a, new_a),
+        ),
+        RtgMigrationRecord(
+            migration_id="self",
+            description="Self replacement",
+            graph_make_live=(new_a,),
+            graph_make_non_live=(old_a,),
+            graph_replacements=(RtgMigrationReplacement(old_a, old_a),),
+        ),
+        RtgMigrationRecord(
+            migration_id="unlisted",
+            description="Unlisted replacement",
+            graph_replacements=(RtgMigrationReplacement(old_a, new_a),),
+        ),
+    ):
+        with pytest.raises(RtgMigrationRecordInvalid):
+            migration.put_migration(invalid)
+
+
+def test_migration_snapshot_import_rejects_duplicate_and_malformed_records_atomically() -> None:
+    record = RtgMigrationRecord(migration_id="m1", description="One")
+    with pytest.raises(RtgMigrationIdConflict):
+        InMemoryRtgMigration.import_snapshot(RtgMigrationSnapshot((record, record)))
+
+    malformed = RtgMigrationSnapshot(
+        cast(tuple[RtgMigrationRecord, ...], (record, object()))
+    )
+    with pytest.raises(RtgMigrationSnapshotInvalid):
+        InMemoryRtgMigration.import_snapshot(malformed)
+
+
+def test_migration_snapshot_accepts_independent_terminal_records() -> None:
+    restored = InMemoryRtgMigration.import_snapshot(
+        RtgMigrationSnapshot(
+            (
+                RtgMigrationRecord(
+                    migration_id="terminal", description="Already applied", status="applied"
+                ),
+            )
+        )
+    )
+
+    assert restored.get_migration("terminal").status == "applied"
 
 
 def test_migration_cutover_sets_must_be_disjoint() -> None:

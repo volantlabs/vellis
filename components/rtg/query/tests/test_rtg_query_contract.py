@@ -248,6 +248,81 @@ def test_query_invalid_operator_has_structured_diagnostic() -> None:
         raise AssertionError("query should reject unsupported predicate operator")
 
 
+def test_query_json_equality_is_kind_sensitive_and_recursive() -> None:
+    graph = InMemoryRtgGraph.empty()
+    anchor = graph.put_anchor(RtgAnchor(uuid=uuid4(), type="Thing"))
+    graph.put_data_object(
+        RtgDataObject(
+            uuid=uuid4(),
+            type="Facts",
+            properties={
+                "boolean": True,
+                "number": 1,
+                "array": [True, {"number": 1}],
+                "object": {"a": True, "b": 1},
+            },
+        ),
+        (concrete_uuid(anchor.uuid),),
+    )
+
+    def matches(predicate: RtgQueryPropertyPredicate) -> bool:
+        query = RtgQuerySpec(
+            anchor_buckets=(RtgQueryAnchorBucket("thing", ("Thing",)),),
+            data_requirements=(
+                RtgQueryDataRequirement("facts", "thing", "Facts", predicates=(predicate,)),
+            ),
+        )
+        return bool(SimpleRtgQueryEngine().execute(graph, query).bindings)
+
+    assert not matches(RtgQueryPropertyPredicate(("boolean",), "equals", value=1))
+    assert matches(RtgQueryPropertyPredicate(("number",), "equals", value=1.0))
+    assert not matches(RtgQueryPropertyPredicate(("array",), "contains", value=1))
+    assert matches(
+        RtgQueryPropertyPredicate(
+            ("array",), "equals", value=[True, {"number": 1.0}]
+        )
+    )
+    assert not matches(
+        RtgQueryPropertyPredicate(("object",), "equals", value={"a": 1, "b": 1})
+    )
+
+
+def test_query_regex_uses_re2_dialect_and_declared_flags() -> None:
+    graph = InMemoryRtgGraph.empty()
+    anchor = graph.put_anchor(RtgAnchor(uuid=uuid4(), type="Thing"))
+    graph.put_data_object(
+        RtgDataObject(uuid=uuid4(), type="Facts", properties={"text": "First\nAda"}),
+        (concrete_uuid(anchor.uuid),),
+    )
+
+    def execute(pattern: str, flags: tuple[str, ...] = ()) -> bool:
+        query = RtgQuerySpec(
+            anchor_buckets=(RtgQueryAnchorBucket("thing", ("Thing",)),),
+            data_requirements=(
+                RtgQueryDataRequirement(
+                    "facts",
+                    "thing",
+                    "Facts",
+                    predicates=(
+                        RtgQueryPropertyPredicate(
+                            ("text",), "regex", value=pattern, regex_flags=flags
+                        ),
+                    ),
+                ),
+            ),
+        )
+        return bool(SimpleRtgQueryEngine().execute(graph, query).bindings)
+
+    assert execute("^ada$", ("case_insensitive", "multiline"))
+    for unsupported in (r"(Ada)\1", r"(?P<name>Ada)(?P=name)", r"(?=Ada)"):
+        try:
+            execute(unsupported)
+        except RtgQuerySpecInvalid as error:
+            assert "unsupported regex pattern" in str(error)
+        else:
+            raise AssertionError(f"query should reject unsupported RE2 pattern {unsupported!r}")
+
+
 def _returned_title(properties: JsonObject) -> object:
     facts = cast(JsonObject, properties["facts"])
     return facts["title"]

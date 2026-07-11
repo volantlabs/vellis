@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import dataclasses
+import json
 from typing import Any, cast
 from uuid import UUID
 
@@ -24,6 +25,7 @@ from components.rtg.change_validation.protocol import (
 from components.rtg.constraints.protocol import (
     RtgConstraintCardinalityPayload,
     RtgConstraintDefinition,
+    RtgConstraintError,
     RtgConstraintQueryPatternPayload,
     RtgConstraints,
 )
@@ -33,16 +35,23 @@ from components.rtg.graph.protocol import (
     RtgAnchor,
     RtgDataObject,
     RtgGraph,
+    RtgGraphError,
     RtgLink,
     RtgObject,
 )
 from components.rtg.migration.protocol import (
     RtgMigration,
     RtgMigrationCutoverPlan,
+    RtgMigrationError,
     RtgMigrationReplacement,
     RtgMigrationStatusTransitionInvalid,
 )
-from components.rtg.query.protocol import RtgQueryEngine, RtgQueryOptions, RtgQuerySpec
+from components.rtg.query.protocol import (
+    RtgQueryEngine,
+    RtgQueryError,
+    RtgQueryOptions,
+    RtgQuerySpec,
+)
 from components.rtg.schema.protocol import (
     RtgAnchorSchemaPayload,
     RtgDataObjectSchemaPayload,
@@ -50,6 +59,7 @@ from components.rtg.schema.protocol import (
     RtgSchema,
     RtgSchemaDefinition,
     RtgSchemaDefinitionNotFound,
+    RtgSchemaError,
     RtgSchemaField,
 )
 
@@ -70,9 +80,9 @@ class DeterministicRtgChangeValidator(RtgChangeValidator):
         change_batch: RtgChangeBatch,
         validation_options: RtgValidationOptions | None = None,
     ) -> RtgValidationReport:
-        _validate_references(change_batch)
         options = validation_options or RtgValidationOptions()
         tracks = _selected_tracks(options)
+        _validate_references(change_batch, tracks)
         findings: list[RtgValidationFinding] = []
         pre_projection_findings: list[RtgValidationFinding] = []
         if "schema_object" in tracks:
@@ -82,23 +92,12 @@ class DeterministicRtgChangeValidator(RtgChangeValidator):
             return _report(pre_projection_findings, options)
         try:
             projected_graph, projected_schema, projected_constraints, projected_migration = (
-                _project_batch(graph, schema, constraints, migration, change_batch)
+                _project_batch(graph, schema, constraints, migration, change_batch, tracks)
             )
-        except Exception as error:
-            projected_findings: list[RtgValidationFinding] = []
-            if "schema_object" in tracks:
-                projected_findings.extend(_validate_graph_writes(schema, change_batch))
-            projected_findings.append(
-                _finding(
-                    "schema_object",
-                    "schema_object.projection_failed",
-                    str(error),
-                )
-            )
-            return _report(
-                projected_findings,
-                options,
-            )
+        except (RtgGraphError, RtgSchemaError, RtgConstraintError, RtgMigrationError) as error:
+            raise RtgValidationInputInvalid(
+                f"selected change section cannot be projected: {error}"
+            ) from error
         post_state_findings: list[RtgValidationFinding] = []
         if "schema_object" in tracks:
             post_state_findings.extend(_validate_current_graph(projected_graph, projected_schema))
@@ -218,13 +217,19 @@ def _project_batch(
     constraints: object,
     migration: object | None,
     change_batch: RtgChangeBatch,
+    tracks: set[str] | None = None,
 ) -> tuple[RtgGraph, RtgSchema, RtgConstraints, RtgMigration | None]:
+    selected = tracks or set(_TRACKS)
+    uses_constraints = bool(selected & {"constraint_network", "migration_cutover"})
+    uses_migration = "migration_cutover" in selected
     _require_graph(graph)
     _require_schema(schema)
-    _require_constraints(constraints)
+    if uses_constraints:
+        _require_constraints(constraints)
+    if uses_migration and migration is not None:
+        _require_migration(migration)
     graph_type = cast(Any, type(graph))
     schema_type = cast(Any, type(schema))
-    constraints_type = cast(Any, type(constraints))
     graph_view = cast(
         RtgGraph,
         graph_type.import_snapshot(cast(RtgGraph, graph).export_snapshot()),
@@ -233,10 +238,13 @@ def _project_batch(
         RtgSchema,
         schema_type.import_snapshot(cast(RtgSchema, schema).export_snapshot()),
     )
-    constraints_view = cast(
-        RtgConstraints,
-        constraints_type.import_snapshot(cast(RtgConstraints, constraints).export_snapshot()),
-    )
+    constraints_view = cast(RtgConstraints, constraints)
+    if uses_constraints:
+        constraints_type = cast(Any, type(constraints))
+        constraints_view = cast(
+            RtgConstraints,
+            constraints_type.import_snapshot(cast(RtgConstraints, constraints).export_snapshot()),
+        )
     migration_view = (
         cast(
             RtgMigration,
@@ -244,7 +252,7 @@ def _project_batch(
                 cast(RtgMigration, migration).export_snapshot()
             ),
         )
-        if migration is not None
+        if uses_migration and migration is not None
         else None
     )
 
@@ -304,15 +312,16 @@ def _project_batch(
             dataclasses.replace(definition, system={**definition.system, "live": change.live})
         )
 
-    for write in change_batch.constraint_changes.constraint_writes:
-        constraints_view.put_constraint(write.constraint)
-    for ref in change_batch.constraint_changes.delete_constraints:
-        constraints_view.delete_constraint(_uuid_or_raise(ref))
-    for change in change_batch.constraint_changes.set_live:
-        constraint = constraints_view.get_constraint(_uuid_or_raise(change.target_ref))
-        constraints_view.put_constraint(
-            dataclasses.replace(constraint, system={**constraint.system, "live": change.live})
-        )
+    if uses_constraints:
+        for write in change_batch.constraint_changes.constraint_writes:
+            constraints_view.put_constraint(write.constraint)
+        for ref in change_batch.constraint_changes.delete_constraints:
+            constraints_view.delete_constraint(_uuid_or_raise(ref))
+        for change in change_batch.constraint_changes.set_live:
+            constraint = constraints_view.get_constraint(_uuid_or_raise(change.target_ref))
+            constraints_view.put_constraint(
+                dataclasses.replace(constraint, system={**constraint.system, "live": change.live})
+            )
 
     if migration_view is not None:
         for write in change_batch.migration_changes.migration_writes:
@@ -582,9 +591,7 @@ def _graph_reference_missing(
                 "rtg_resolve_anchor_by_fact, or use local_ref only for objects created in the "
                 "same request."
             ),
-            minimal_example={
-                "ref": {"resource_id": "11111111-1111-1111-1111-111111111111"}
-            },
+            minimal_example={"ref": {"resource_id": "11111111-1111-1111-1111-111111111111"}},
             guide_topics=("workflow_patterns", "lookup_examples", "live_write"),
         ),
     )
@@ -683,8 +690,7 @@ def _validate_anchor(
                         category="validation_failure",
                         path="graph_changes.data_object_writes",
                         problem=(
-                            f"Anchor {anchor_uuid} is missing required data type "
-                            f"{required_type}."
+                            f"Anchor {anchor_uuid} is missing required data type {required_type}."
                         ),
                         remedy=(
                             "Add a data object of the required type and link it to the anchor with "
@@ -868,7 +874,13 @@ def _validate_constraints(
             continue
         payload = constraint.payload
         if isinstance(payload, RtgConstraintQueryPatternPayload):
-            result = query.execute(graph, _as_query_spec(payload.query_spec), RtgQueryOptions())
+            try:
+                result = query.execute(
+                    graph, _as_query_spec(payload.query_spec), RtgQueryOptions()
+                )
+            except (RtgValidationInputInvalid, RtgQueryError):
+                findings.append(_constraint_payload_unevaluable(constraint))
+                continue
             if payload.expectation == "must_match_at_least_one" and not result.bindings:
                 findings.append(
                     _finding(
@@ -886,7 +898,15 @@ def _validate_constraints(
                     )
                 )
         elif isinstance(payload, RtgConstraintCardinalityPayload):
-            result = query.execute(graph, _as_query_spec(payload.query_spec), RtgQueryOptions())
+            try:
+                query_spec = _as_query_spec(payload.query_spec)
+                if payload.counted_binding not in _query_binding_names(query_spec):
+                    findings.append(_constraint_payload_unevaluable(constraint))
+                    continue
+                result = query.execute(graph, query_spec, RtgQueryOptions())
+            except (RtgValidationInputInvalid, RtgQueryError):
+                findings.append(_constraint_payload_unevaluable(constraint))
+                continue
             count = sum(
                 1 for row in result.bindings if _binding_present(row, payload.counted_binding)
             )
@@ -901,6 +921,24 @@ def _validate_constraints(
                     )
                 )
     return findings
+
+
+def _constraint_payload_unevaluable(
+    constraint: RtgConstraintDefinition,
+) -> RtgValidationFinding:
+    return _finding(
+        "constraint_network",
+        "constraint_network.constraint_payload_unevaluable",
+        str(constraint.uuid),
+    )
+
+
+def _query_binding_names(query_spec: RtgQuerySpec) -> set[str]:
+    return {
+        *(bucket.name for bucket in query_spec.anchor_buckets),
+        *(requirement.name for requirement in query_spec.link_requirements),
+        *(requirement.name for requirement in query_spec.data_requirements),
+    }
 
 
 def _validate_migration_batch(
@@ -1192,44 +1230,43 @@ def _validate_migration_ids(
 
 
 def _value_matches_field(value: object, field: RtgSchemaField) -> bool:
-    value_kind = _json_kind(value)
-    if value_kind not in field.value_kinds:
+    if not any(_value_satisfies_schema_kind(value, kind) for kind in field.value_kinds):
         return False
-    if value_kind == "object":
-        if not isinstance(value, dict):
+    if isinstance(value, dict) and "object" in field.value_kinds:
+        if set(value).difference(field.properties):
             return False
         for key, nested in field.properties.items():
             if nested.required and key not in value:
                 return False
             if key in value and not _value_matches_field(value[key], nested):
                 return False
-    if value_kind == "list" and field.items is not None:
-        if not isinstance(value, list):
-            return False
+    if isinstance(value, list) and "list" in field.value_kinds and field.items is not None:
         return all(_value_matches_field(item, field.items) for item in value)
     return True
 
 
-def _json_kind(value: object) -> str:
-    if value is None:
-        return "null"
-    if isinstance(value, bool):
-        return "boolean"
-    if isinstance(value, int) and not isinstance(value, bool):
-        return "integer"
-    if isinstance(value, float):
-        return "number"
-    if isinstance(value, str):
+def _value_satisfies_schema_kind(value: object, kind: str) -> bool:
+    if kind == "null":
+        return value is None
+    if kind == "boolean":
+        return isinstance(value, bool)
+    if kind == "integer":
+        return isinstance(value, int) and not isinstance(value, bool)
+    if kind == "number":
+        return isinstance(value, int | float) and not isinstance(value, bool)
+    if kind == "string":
+        return isinstance(value, str)
+    if kind == "uuid" and isinstance(value, str):
         try:
             UUID(value)
-            return "uuid"
+            return True
         except ValueError:
-            return "string"
-    if isinstance(value, dict):
-        return "object"
-    if isinstance(value, list):
-        return "list"
-    return "unknown"
+            return False
+    if kind == "object":
+        return isinstance(value, dict)
+    if kind == "list":
+        return isinstance(value, list)
+    return False
 
 
 def _selected_tracks(options: RtgValidationOptions) -> set[str]:
@@ -1243,36 +1280,43 @@ def _selected_tracks(options: RtgValidationOptions) -> set[str]:
     return tracks
 
 
-def _validate_references(change_batch: RtgChangeBatch) -> None:
+def _validate_references(change_batch: RtgChangeBatch, tracks: set[str]) -> None:
     refs: list[RtgChangeReference] = []
-    refs.extend(write.ref for write in change_batch.graph_changes.anchor_writes)
-    refs.extend(write.ref for write in change_batch.graph_changes.data_object_writes)
-    refs.extend(write.ref for write in change_batch.graph_changes.link_writes)
-    refs.extend(
-        ref for write in change_batch.graph_changes.data_object_writes for ref in write.anchor_refs
-    )
-    refs.extend(write.source_ref for write in change_batch.graph_changes.link_writes)
-    refs.extend(write.target_ref for write in change_batch.graph_changes.link_writes)
-    refs.extend(change.anchor_ref for change in change_batch.graph_changes.associate_data)
-    refs.extend(change.data_ref for change in change_batch.graph_changes.associate_data)
-    refs.extend(change.anchor_ref for change in change_batch.graph_changes.dissociate_data)
-    refs.extend(change.data_ref for change in change_batch.graph_changes.dissociate_data)
-    refs.extend(change_batch.graph_changes.delete_anchors)
-    refs.extend(change_batch.graph_changes.delete_data_objects)
-    refs.extend(change_batch.graph_changes.delete_links)
-    refs.extend(change.object_ref for change in change_batch.graph_changes.set_live)
-    refs.extend(write.ref for write in change_batch.schema_changes.definition_writes)
-    refs.extend(change_batch.schema_changes.delete_definitions)
-    refs.extend(change.target_ref for change in change_batch.schema_changes.set_live)
-    refs.extend(write.ref for write in change_batch.constraint_changes.constraint_writes)
-    refs.extend(change_batch.constraint_changes.delete_constraints)
-    refs.extend(change.target_ref for change in change_batch.constraint_changes.set_live)
-    refs.extend(write.ref for write in change_batch.migration_changes.migration_writes)
-    refs.extend(change_batch.migration_changes.delete_migrations)
-    refs.extend(change.migration_ref for change in change_batch.migration_changes.status_changes)
-    refs.extend(
-        change.migration_ref for change in change_batch.migration_changes.evidence_additions
-    )
+    if tracks:
+        refs.extend(write.ref for write in change_batch.graph_changes.anchor_writes)
+        refs.extend(write.ref for write in change_batch.graph_changes.data_object_writes)
+        refs.extend(write.ref for write in change_batch.graph_changes.link_writes)
+        refs.extend(
+            ref
+            for write in change_batch.graph_changes.data_object_writes
+            for ref in write.anchor_refs
+        )
+        refs.extend(write.source_ref for write in change_batch.graph_changes.link_writes)
+        refs.extend(write.target_ref for write in change_batch.graph_changes.link_writes)
+        refs.extend(change.anchor_ref for change in change_batch.graph_changes.associate_data)
+        refs.extend(change.data_ref for change in change_batch.graph_changes.associate_data)
+        refs.extend(change.anchor_ref for change in change_batch.graph_changes.dissociate_data)
+        refs.extend(change.data_ref for change in change_batch.graph_changes.dissociate_data)
+        refs.extend(change_batch.graph_changes.delete_anchors)
+        refs.extend(change_batch.graph_changes.delete_data_objects)
+        refs.extend(change_batch.graph_changes.delete_links)
+        refs.extend(change.object_ref for change in change_batch.graph_changes.set_live)
+        refs.extend(write.ref for write in change_batch.schema_changes.definition_writes)
+        refs.extend(change_batch.schema_changes.delete_definitions)
+        refs.extend(change.target_ref for change in change_batch.schema_changes.set_live)
+    if tracks & {"constraint_network", "migration_cutover"}:
+        refs.extend(write.ref for write in change_batch.constraint_changes.constraint_writes)
+        refs.extend(change_batch.constraint_changes.delete_constraints)
+        refs.extend(change.target_ref for change in change_batch.constraint_changes.set_live)
+    if "migration_cutover" in tracks:
+        refs.extend(write.ref for write in change_batch.migration_changes.migration_writes)
+        refs.extend(change_batch.migration_changes.delete_migrations)
+        refs.extend(
+            change.migration_ref for change in change_batch.migration_changes.status_changes
+        )
+        refs.extend(
+            change.migration_ref for change in change_batch.migration_changes.evidence_additions
+        )
     for ref in refs:
         if (ref.resource_id is None) == (ref.local_ref is None):
             raise RtgValidationInputInvalid("each change reference needs exactly one identity")
@@ -1282,8 +1326,14 @@ def _report(
     findings: list[RtgValidationFinding],
     options: RtgValidationOptions,
 ) -> RtgValidationReport:
+    unique: dict[tuple[str, str, tuple[str, ...]], RtgValidationFinding] = {}
+    for finding in findings:
+        identity = (finding.track, finding.code, finding.affected_references)
+        current = unique.get(identity)
+        if current is None or _finding_representation(finding) < _finding_representation(current):
+            unique[identity] = finding
     ordered = sorted(
-        findings,
+        unique.values(),
         key=lambda item: (
             _SEVERITY_ORDER.get(item.severity, 3),
             item.track,
@@ -1303,6 +1353,14 @@ def _report(
             "total_finding_count": total_finding_count,
             "truncated": len(ordered) != total_finding_count,
         },
+    )
+
+
+def _finding_representation(finding: RtgValidationFinding) -> tuple[str, str, str]:
+    return (
+        finding.message,
+        finding.suggestion or "",
+        json.dumps(finding.diagnostic, sort_keys=True, separators=(",", ":"), default=str),
     )
 
 

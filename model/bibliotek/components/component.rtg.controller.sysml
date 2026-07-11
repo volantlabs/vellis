@@ -114,15 +114,35 @@ library package BibliotekRtgController {
     attribute def RtgAnchorTypeDiscoveryResult { attribute anchorTypes[0..*] : RtgAnchorTypeDiscoveryEntry; }
     attribute def RtgControllerSchemaPack { attribute schemaPack : RtgSchemaPack; attribute liveCounts : JsonObject; }
     attribute def RtgPersistedSnapshotMetadata { attribute relativePath : JsonRelativePath; attribute sizeBytes : Integer; attribute modifiedAt : Timestamp; }
+    attribute def RtgControllerSchemaCounts {
+        attribute anchor : Integer;
+        attribute dataObject : Integer;
+        attribute link : Integer;
+        attribute total : Integer;
+    }
+    attribute def RtgControllerCandidateCounts {
+        attribute schema : Integer;
+        attribute constraints : Integer;
+        attribute graph : Integer;
+        attribute total : Integer;
+    }
+    attribute def RtgControllerMigrationCounts {
+        attribute draft : Integer;
+        attribute ready : Integer;
+        attribute failed : Integer;
+        attribute applied : Integer;
+        attribute abandoned : Integer;
+        attribute total : Integer;
+    }
     attribute def RtgControllerSystemState {
         attribute stateClassification : RtgControllerStateClassification;
-        attribute liveSchemaCounts : JsonObject;
-        attribute liveObjectCounts : JsonObject;
-        attribute nonLiveCandidateCounts : JsonObject;
-        attribute migrationCountsByStatus : JsonObject;
+        attribute liveSchemaCounts : RtgControllerSchemaCounts;
+        attribute liveObjectCounts : RtgTypeCountList;
+        attribute nonLiveCandidateCounts : RtgControllerCandidateCounts;
+        attribute migrationCountsByStatus : RtgControllerMigrationCounts;
         attribute migrationCountsScope : RtgControllerMigrationCountScope = RtgControllerMigrationCountScope::current_migration_store;
         attribute migrationHistoryHint[0..1] : String;
-        attribute persistedSnapshotPaths[0..*] : JsonRelativePath;
+        attribute persistedSnapshotPaths[0..*] ordered : JsonRelativePath;
         attribute ledgerRecordCount : Integer;
         attribute lastLedgerPosition[0..1] : Integer;
         attribute lastTransactionId[0..1] : Uuid;
@@ -656,7 +676,7 @@ library package BibliotekRtgController {
     requirement <'contract.rtg.controller.system_state_semantics'> systemStateSemantics {
         subject operation : GetSystemState;
         require constraint {
-            doc /* State classification is exactly empty, schema_only, populated, has_staged_work, or needs_replay. liveSchemaCounts has anchor, data_object, and link counts; liveObjectCounts groups counts by object kind and type key; nonLiveCandidateCounts has schema, constraints, and graph totals; migrationCountsByStatus has draft, ready, failed, applied, and abandoned totals. The result also reports storage-scoped snapshot paths, ledger pointers/count, stable workflow identifiers, and advisory next steps without mutation. */
+            doc /* State classification is exactly empty, schema_only, populated, has_staged_work, or needs_replay. liveSchemaCounts has anchor, data-object, link, and total definition counts; liveObjectCounts is the graph-owned ordered type-count list; nonLiveCandidateCounts has schema, constraints, graph, and total counts; migrationCountsByStatus has draft, ready, failed, applied, abandoned, and total counts. The result also reports storage-scoped snapshot paths, ledger pointers/count, stable workflow identifiers, and advisory next steps without mutation. Type names and snapshot metadata remain available through their dedicated discovery and snapshot-list actions. */
         }
     }
 
@@ -677,7 +697,7 @@ library package BibliotekRtgController {
     requirement <'contract.rtg.controller.restore_flow'> restoreFlow {
         subject operation : RestoreFromSnapshot;
         require constraint {
-            doc /* Validate all supplied component snapshots before replacement, expose no partially restored state, and honor the requested ledger recording mode. */
+            doc /* Construct and semantically validate all four candidate component states before replacing any current component or the represented snapshot cursor. Success replaces the coordinated state as one serialized visible change. Failure preserves current component state; skip mode also preserves ledger state, while record mode may append request/error audit records and advance only the audit ledger pointer. */
         }
     }
 
@@ -741,6 +761,13 @@ library package BibliotekRtgController {
         subject controller : RtgController;
         require constraint {
             doc /* Controller owns no MCP, REST, CLI, SDK, or UI transport. */
+        }
+    }
+
+    requirement <'contract.rtg.controller.intentional_boundary'> intentionalBoundary {
+        subject controller : RtgController;
+        require constraint {
+            doc /* The controller owns cross-component sequencing, recovery, and audit outcomes, not lower-store records or algorithms. It owns no authentication/authorization, UI or transport, snapshot filesystem mechanics, replication/deployment topology, distributed lock, SQL engine behavior, or distributed transaction guarantee. Curated discovery-view state remains outside v1. */
         }
     }
 
@@ -1160,6 +1187,7 @@ library package BibliotekRtgController {
         satisfy ledgerOutcomeFlow by controller;
         satisfy publicContractsOnly by controller;
         satisfy noTransportOwnership by controller;
+        satisfy intentionalBoundary by controller;
         satisfy validatesBeforeRequiredMutation by controller;
         satisfy strictValidationDefault by controller;
         satisfy liveGraphLaneExcludesKnowledgeEngineering by controller;
@@ -1472,6 +1500,7 @@ verify operationResultSemantics;
             verify ledgerOutcomeFlow;
             verify publicContractsOnly;
             verify noTransportOwnership;
+            verify intentionalBoundary;
             verify validatesBeforeRequiredMutation;
             verify strictValidationDefault;
             verify liveGraphLaneExcludesKnowledgeEngineering;

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import copy
+import json
 from uuid import UUID, uuid4
 
 from components.rtg.schema.protocol import (
@@ -13,21 +14,23 @@ from components.rtg.schema.protocol import (
     RtgSchemaAnchorTypeSummaryList,
     RtgSchemaAssociatedDataTypeList,
     RtgSchemaDefinition,
+    RtgSchemaDefinitionInvalid,
+    RtgSchemaDefinitionKindInvalid,
     RtgSchemaDefinitionList,
     RtgSchemaDefinitionNotFound,
     RtgSchemaDeleteResult,
+    RtgSchemaDirectionInvalid,
     RtgSchemaField,
-    RtgSchemaKindInvalid,
     RtgSchemaLinkParticipation,
     RtgSchemaLinkParticipationList,
-    RtgSchemaLiveConflict,
+    RtgSchemaLiveTypeConflict,
     RtgSchemaPack,
     RtgSchemaPayload,
     RtgSchemaPayloadInvalid,
     RtgSchemaSnapshot,
     RtgSchemaSnapshotInvalid,
     RtgSchemaSystemValueInvalid,
-    RtgSchemaTypeInvalid,
+    RtgSchemaTypeKeyInvalid,
     RtgSchemaUuidConflict,
     RtgSchemaUuidInvalid,
     UuidInput,
@@ -37,8 +40,14 @@ _ANCHOR = "anchor"
 _DATA_OBJECT = "data_object"
 _LINK = "link"
 _KINDS = {_ANCHOR, _DATA_OBJECT, _LINK}
-_VALUE_KINDS = {"string", "integer", "number", "boolean", "null", "object", "list", "uuid"}
-_DIRECTIONS = {"source", "target", "both"}
+_VALUE_KIND_ORDER = {
+    kind: index
+    for index, kind in enumerate(
+        ("string", "integer", "number", "boolean", "null", "object", "list", "uuid")
+    )
+}
+_VALUE_KINDS = set(_VALUE_KIND_ORDER)
+_DIRECTIONS = {"source", "target", "either"}
 
 
 class InMemoryRtgSchema:
@@ -53,12 +62,19 @@ class InMemoryRtgSchema:
 
     @classmethod
     def import_snapshot(cls, snapshot: RtgSchemaSnapshot) -> InMemoryRtgSchema:
+        if not isinstance(snapshot, RtgSchemaSnapshot) or not isinstance(
+            snapshot.definitions, tuple
+        ):
+            raise RtgSchemaSnapshotInvalid("snapshot must contain a definition tuple")
         schema = cls.empty()
-        try:
-            for record in snapshot.definitions:
-                schema.put_definition(_definition_from_json(record))
-        except (AttributeError, TypeError, ValueError) as error:
-            raise RtgSchemaSnapshotInvalid(str(error)) from error
+        seen_uuids: set[UUID] = set()
+        for record in snapshot.definitions:
+            definition = _definition_from_json(record)
+            definition_uuid = _definition_uuid(definition)
+            if definition_uuid in seen_uuids:
+                raise RtgSchemaUuidConflict(str(definition_uuid))
+            seen_uuids.add(definition_uuid)
+            schema.put_definition(definition)
         return schema
 
     def export_snapshot(self) -> RtgSchemaSnapshot:
@@ -69,9 +85,6 @@ class InMemoryRtgSchema:
     def put_definition(self, definition: RtgSchemaDefinition) -> RtgSchemaDefinition:
         normalized = self._normalize_definition(definition)
         definition_uuid = _definition_uuid(normalized)
-        previous = self._definitions.get(definition_uuid)
-        if previous is None and definition_uuid in self._definitions:
-            raise RtgSchemaUuidConflict(str(definition_uuid))
         self._validate_live_type_conflict(normalized)
         self._definitions[definition_uuid] = normalized
         return _copy_definition(normalized)
@@ -123,19 +136,19 @@ class InMemoryRtgSchema:
         if not isinstance(definition.payload, RtgAnchorSchemaPayload):
             raise RtgSchemaPayloadInvalid("anchor definition payload mismatch")
         return RtgSchemaAssociatedDataTypeList(
-            required_data_types=definition.payload.required_data_types,
-            optional_data_types=definition.payload.optional_data_types,
+            required_data_types=tuple(sorted(definition.payload.required_data_types)),
+            optional_data_types=tuple(sorted(definition.payload.optional_data_types)),
         )
 
     def list_link_participation(
         self,
         type_key: str,
-        direction: str = "both",
+        direction: str = "either",
         live: bool | None = True,
     ) -> RtgSchemaLinkParticipationList:
         queried = _validate_type_key(type_key)
         if direction not in _DIRECTIONS:
-            raise RtgSchemaPayloadInvalid(f"invalid direction: {direction}")
+            raise RtgSchemaDirectionInvalid(f"invalid direction: {direction}")
         links = []
         for definition in self.list_definitions(kind=_LINK, live=live).definitions:
             if not isinstance(definition.payload, RtgLinkSchemaPayload):
@@ -146,7 +159,7 @@ class InMemoryRtgSchema:
                 continue
             if direction == "target" and not target:
                 continue
-            if direction == "both" and not (source or target):
+            if direction == "either" and not (source or target):
                 continue
             relative = "both" if source and target else "source" if source else "target"
             links.append(
@@ -160,7 +173,7 @@ class InMemoryRtgSchema:
                 )
             )
         return RtgSchemaLinkParticipationList(
-            links=tuple(sorted(links, key=lambda item: item.type_key))
+            links=tuple(sorted(links, key=lambda item: (item.type_key, str(item.definition_uuid))))
         )
 
     def list_anchor_type_summaries(
@@ -184,9 +197,16 @@ class InMemoryRtgSchema:
         anchor_type_keys: tuple[str, ...],
         live: bool | None = True,
     ) -> RtgSchemaPack:
+        if not isinstance(anchor_type_keys, tuple) or not anchor_type_keys:
+            raise RtgSchemaTypeKeyInvalid("anchor type keys must be a non-empty tuple")
+        validated_anchor_type_keys = tuple(
+            _validate_type_key(type_key) for type_key in anchor_type_keys
+        )
+        if len(set(validated_anchor_type_keys)) != len(validated_anchor_type_keys):
+            raise RtgSchemaTypeKeyInvalid("anchor type keys must be unique")
         anchors = tuple(
             self._live_or_first_definition(anchor_type_key, _ANCHOR, live)
-            for anchor_type_key in anchor_type_keys
+            for anchor_type_key in validated_anchor_type_keys
         )
         data_type_keys: set[str] = set()
         for anchor in anchors:
@@ -252,7 +272,7 @@ class InMemoryRtgSchema:
                 and existing.system["live"] is True
                 and existing.type_key == definition.type_key
             ):
-                raise RtgSchemaLiveConflict(definition.type_key)
+                raise RtgSchemaLiveTypeConflict(definition.type_key)
 
     def _live_or_first_definition(
         self, type_key: str, kind: str, live: bool | None
@@ -287,65 +307,141 @@ def _definition_uuid(definition: RtgSchemaDefinition) -> UUID:
 
 def _validate_kind(value: str) -> str:
     if value not in _KINDS:
-        raise RtgSchemaKindInvalid(str(value))
+        raise RtgSchemaDefinitionKindInvalid(str(value))
     return value
 
 
 def _validate_type_key(value: str) -> str:
     if not isinstance(value, str) or value == "" or value != value.strip():
-        raise RtgSchemaTypeInvalid(str(value))
+        raise RtgSchemaTypeKeyInvalid(str(value))
     return value
 
 
 def _validate_description(value: str) -> str:
-    if not isinstance(value, str):
-        raise RtgSchemaPayloadInvalid("description must be a string")
+    if not isinstance(value, str) or not value.strip():
+        raise RtgSchemaDefinitionInvalid("description must be non-empty semantic text")
     return value
 
 
 def _validate_payload(kind: str, payload: RtgSchemaPayload) -> RtgSchemaPayload:
     if kind == _ANCHOR and isinstance(payload, RtgAnchorSchemaPayload):
-        for type_key in (*payload.required_data_types, *payload.optional_data_types):
-            _validate_type_key(type_key)
-        return copy.deepcopy(payload)
+        required = _normalize_type_key_set(payload.required_data_types, "required_data_types")
+        optional = _normalize_type_key_set(payload.optional_data_types, "optional_data_types")
+        overlap = set(required).intersection(optional)
+        if overlap:
+            raise RtgSchemaPayloadInvalid(
+                f"required and optional data types must be disjoint: {sorted(overlap)}"
+            )
+        return RtgAnchorSchemaPayload(
+            required_data_types=required,
+            optional_data_types=optional,
+        )
     if kind == _DATA_OBJECT and isinstance(payload, RtgDataObjectSchemaPayload):
+        if not isinstance(payload.properties, dict):
+            raise RtgSchemaPayloadInvalid("data object properties must be a property map")
+        properties: dict[str, RtgSchemaField] = {}
         for name, field in payload.properties.items():
             if not isinstance(name, str) or not name:
                 raise RtgSchemaPayloadInvalid("property names must be non-empty strings")
-            _validate_field(field)
-        return copy.deepcopy(payload)
+            properties[name] = _normalize_field(field)
+        return RtgDataObjectSchemaPayload(
+            properties={name: properties[name] for name in sorted(properties)}
+        )
     if kind == _LINK and isinstance(payload, RtgLinkSchemaPayload):
-        if not payload.allowed_source_types or not payload.allowed_target_types:
-            raise RtgSchemaPayloadInvalid("link schemas require source and target types")
-        for type_key in (*payload.allowed_source_types, *payload.allowed_target_types):
-            _validate_type_key(type_key)
-        return copy.deepcopy(payload)
-    raise RtgSchemaPayloadInvalid(f"payload does not match schema kind {kind!r}")
+        return RtgLinkSchemaPayload(
+            allowed_source_types=_normalize_type_key_set(
+                payload.allowed_source_types, "allowed_source_types", nonempty=True
+            ),
+            allowed_target_types=_normalize_type_key_set(
+                payload.allowed_target_types, "allowed_target_types", nonempty=True
+            ),
+        )
+    raise RtgSchemaDefinitionInvalid(f"payload does not match schema kind {kind!r}")
 
 
-def _validate_field(field: RtgSchemaField) -> None:
+def _normalize_type_key_set(
+    values: tuple[str, ...], field_name: str, *, nonempty: bool = False
+) -> tuple[str, ...]:
+    if not isinstance(values, tuple) or (nonempty and not values):
+        qualifier = "non-empty " if nonempty else ""
+        raise RtgSchemaPayloadInvalid(f"{field_name} must be a {qualifier}type-key tuple")
+    normalized = tuple(_validate_type_key(value) for value in values)
+    if len(set(normalized)) != len(normalized):
+        raise RtgSchemaPayloadInvalid(f"{field_name} must contain unique type keys")
+    return tuple(sorted(normalized))
+
+
+def _normalize_field(field: RtgSchemaField) -> RtgSchemaField:
+    if not isinstance(field, RtgSchemaField):
+        raise RtgSchemaPayloadInvalid("properties and items must contain schema fields")
     if not isinstance(field.required, bool):
         raise RtgSchemaPayloadInvalid("field.required must be boolean")
-    if not field.value_kinds:
-        raise RtgSchemaPayloadInvalid("field.value_kinds must not be empty")
+    if not isinstance(field.value_kinds, tuple) or not field.value_kinds:
+        raise RtgSchemaPayloadInvalid("field.value_kinds must be a non-empty tuple")
     for value_kind in field.value_kinds:
         if value_kind not in _VALUE_KINDS:
             raise RtgSchemaPayloadInvalid(f"invalid value kind: {value_kind}")
-    for nested in field.properties.values():
-        _validate_field(nested)
-    if field.items is not None:
-        _validate_field(field.items)
+    if len(set(field.value_kinds)) != len(field.value_kinds):
+        raise RtgSchemaPayloadInvalid("field.value_kinds must be unique")
+    if not isinstance(field.properties, dict):
+        raise RtgSchemaPayloadInvalid("field.properties must be a property map")
+    if field.properties and "object" not in field.value_kinds:
+        raise RtgSchemaPayloadInvalid("field.properties requires object in value_kinds")
+    if field.items is not None and "list" not in field.value_kinds:
+        raise RtgSchemaPayloadInvalid("field.items requires list in value_kinds")
+    properties: dict[str, RtgSchemaField] = {}
+    for name, nested in field.properties.items():
+        if not isinstance(name, str) or not name:
+            raise RtgSchemaPayloadInvalid("nested property names must be non-empty strings")
+        properties[name] = _normalize_field(nested)
+    items = _normalize_field(field.items) if field.items is not None else None
+    return RtgSchemaField(
+        required=field.required,
+        value_kinds=tuple(sorted(field.value_kinds, key=_VALUE_KIND_ORDER.__getitem__)),
+        properties={name: properties[name] for name in sorted(properties)},
+        items=items,
+    )
 
 
 def _normalize_system(value: JsonObject) -> JsonObject:
     if not isinstance(value, dict):
         raise RtgSchemaSystemValueInvalid("system must be a JSON object")
-    system = copy.deepcopy(value)
+    system = _validate_json_object(value)
     live = system.get("live", True)
     if not isinstance(live, bool):
         raise RtgSchemaSystemValueInvalid("system.live must be boolean")
     system["live"] = live
     return system
+
+
+def _validate_json_object(value: JsonObject) -> JsonObject:
+    if not isinstance(value, dict):
+        raise RtgSchemaSystemValueInvalid("system must be a JSON object")
+    copied = copy.deepcopy(value)
+    _validate_json_value(copied)
+    return copied
+
+
+def _validate_json_value(value: JsonValue) -> None:
+    if isinstance(value, dict):
+        if not all(isinstance(key, str) for key in value):
+            raise RtgSchemaSystemValueInvalid("JSON object keys must be strings")
+        for item in value.values():
+            _validate_json_value(item)
+        return
+    if isinstance(value, list):
+        for item in value:
+            _validate_json_value(item)
+        return
+    if value is None or isinstance(value, str | int | float | bool):
+        try:
+            json.dumps(value, allow_nan=False)
+        except (TypeError, ValueError) as error:
+            raise RtgSchemaSystemValueInvalid(str(error)) from error
+        return
+    raise RtgSchemaSystemValueInvalid(
+        f"system value is not JSON serializable: {type(value).__name__}"
+    )
 
 
 def _field_to_json(field: RtgSchemaField) -> JsonObject:
@@ -361,20 +457,26 @@ def _field_to_json(field: RtgSchemaField) -> JsonObject:
 
 def _field_from_json(value: JsonValue) -> RtgSchemaField:
     if not isinstance(value, dict):
-        raise RtgSchemaSnapshotInvalid("field must be object")
+        raise RtgSchemaPayloadInvalid("field must be an object")
+    unknown = set(value).difference({"required", "value_kinds", "properties", "items"})
+    if unknown:
+        raise RtgSchemaPayloadInvalid(f"unknown field keys: {sorted(unknown)}")
+    required = value.get("required")
+    if not isinstance(required, bool):
+        raise RtgSchemaPayloadInvalid("field.required must be boolean")
     value_kinds = _string_tuple(value.get("value_kinds", []), "value_kinds")
     properties = value.get("properties", {})
+    if not isinstance(properties, dict):
+        raise RtgSchemaPayloadInvalid("field.properties must be an object")
     return RtgSchemaField(
-        required=bool(value.get("required", False)),
+        required=required,
         value_kinds=value_kinds,
-        properties={
-            str(key): _field_from_json(item)
-            for key, item in properties.items()
-            if isinstance(key, str)
-        }
-        if isinstance(properties, dict)
-        else {},
-        items=_field_from_json(value["items"]) if "items" in value else None,
+        properties={key: _field_from_json(item) for key, item in properties.items()},
+        items=(
+            _field_from_json(value["items"])
+            if "items" in value and value["items"] is not None
+            else None
+        ),
     )
 
 
@@ -396,8 +498,9 @@ def _payload_to_json(payload: RtgSchemaPayload) -> JsonObject:
 
 def _payload_from_json(kind: str, value: JsonValue) -> RtgSchemaPayload:
     if not isinstance(value, dict):
-        raise RtgSchemaSnapshotInvalid("payload must be object")
+        raise RtgSchemaPayloadInvalid("payload must be an object")
     if kind == _ANCHOR:
+        _reject_payload_keys(value, {"required_data_types", "optional_data_types"})
         return RtgAnchorSchemaPayload(
             required_data_types=_string_tuple(
                 value.get("required_data_types", []), "required_data_types"
@@ -407,12 +510,14 @@ def _payload_from_json(kind: str, value: JsonValue) -> RtgSchemaPayload:
             ),
         )
     if kind == _DATA_OBJECT:
+        _reject_payload_keys(value, {"properties"})
         properties = value.get("properties", {})
         if not isinstance(properties, dict):
-            raise RtgSchemaSnapshotInvalid("data object properties must be object")
+            raise RtgSchemaPayloadInvalid("data object properties must be an object")
         return RtgDataObjectSchemaPayload(
             properties={str(key): _field_from_json(item) for key, item in properties.items()}
         )
+    _reject_payload_keys(value, {"allowed_source_types", "allowed_target_types"})
     return RtgLinkSchemaPayload(
         allowed_source_types=_string_tuple(
             value.get("allowed_source_types", []), "allowed_source_types"
@@ -423,11 +528,17 @@ def _payload_from_json(kind: str, value: JsonValue) -> RtgSchemaPayload:
     )
 
 
+def _reject_payload_keys(value: JsonObject, allowed: set[str]) -> None:
+    unknown = set(value).difference(allowed)
+    if unknown:
+        raise RtgSchemaPayloadInvalid(f"unknown payload keys: {sorted(unknown)}")
+
+
 def _string_tuple(value: object, field_name: str) -> tuple[str, ...]:
     if not isinstance(value, list):
-        raise RtgSchemaSnapshotInvalid(f"{field_name} must be a list")
+        raise RtgSchemaPayloadInvalid(f"{field_name} must be a list")
     if not all(isinstance(item, str) for item in value):
-        raise RtgSchemaSnapshotInvalid(f"{field_name} must contain strings")
+        raise RtgSchemaPayloadInvalid(f"{field_name} must contain strings")
     return tuple(item for item in value if isinstance(item, str))
 
 
@@ -442,16 +553,37 @@ def _definition_to_json(definition: RtgSchemaDefinition) -> JsonObject:
     }
 
 
-def _definition_from_json(value: JsonObject) -> RtgSchemaDefinition:
-    kind = str(value["kind"])
+def _definition_from_json(value: object) -> RtgSchemaDefinition:
+    if not isinstance(value, dict):
+        raise RtgSchemaSnapshotInvalid("snapshot definitions must be objects")
+    required_keys = {"uuid", "kind", "type_key", "description", "payload"}
+    missing = required_keys.difference(value)
+    unknown = set(value).difference(required_keys | {"system"})
+    if missing or unknown:
+        raise RtgSchemaSnapshotInvalid(
+            f"definition keys invalid; missing={sorted(missing)}, unknown={sorted(unknown)}"
+        )
+    uuid_text = value["uuid"]
+    kind = value["kind"]
+    type_key = value["type_key"]
+    description = value["description"]
+    if not isinstance(uuid_text, str):
+        raise RtgSchemaSnapshotInvalid("definition.uuid must be a string")
+    if not isinstance(kind, str):
+        raise RtgSchemaSnapshotInvalid("definition.kind must be a string")
+    if not isinstance(type_key, str):
+        raise RtgSchemaSnapshotInvalid("definition.type_key must be a string")
+    if not isinstance(description, str):
+        raise RtgSchemaSnapshotInvalid("definition.description must be a string")
+    _validate_kind(kind)
     system = value.get("system", {})
     if not isinstance(system, dict):
-        raise RtgSchemaSnapshotInvalid("system must be object")
+        raise RtgSchemaSystemValueInvalid("system must be an object")
     return RtgSchemaDefinition(
-        uuid=_parse_uuid(str(value["uuid"])),
+        uuid=_parse_uuid(uuid_text),
         kind=kind,
-        type_key=str(value["type_key"]),
-        description=str(value.get("description", "")),
+        type_key=type_key,
+        description=description,
         payload=_payload_from_json(kind, value["payload"]),
         system=system,
     )

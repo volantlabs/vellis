@@ -75,21 +75,32 @@ library package BibliotekRtgQuery {
     }
     attribute def RtgQueryOptions {
         attribute liveFilter : RtgQueryLiveFilter = RtgQueryLiveFilter::'all';
-        attribute liveStatusOverlay[0..1] : JsonObject;
+        attribute liveStatusOverlay[0..*] : RtgQueryLiveStatusOverride;
         attribute orderBy[0..*] : RtgQueryOrderBy;
+    }
+    attribute def RtgQueryLiveStatusOverride {
+        attribute objectUuid : Uuid;
+        attribute live : Boolean;
+        doc /* One entry in a unique object-UUID-to-effective-live-status map used only for selection. */
+    }
+    attribute def RtgQueryNamedObjectBinding {
+        attribute name : String;
+        attribute objectUuid : Uuid;
+        doc /* One unique query name to matched graph-object identity binding. */
     }
     attribute def RtgQueryBindingRow {
         attribute rowIndex : Integer;
-        attribute anchors : JsonObject;
-        attribute links : JsonObject;
-        attribute dataObjects : JsonObject;
+        attribute anchors[1..*] : RtgQueryNamedObjectBinding;
+        attribute links[0..*] : RtgQueryNamedObjectBinding;
+        attribute dataObjects[0..*] : RtgQueryNamedObjectBinding;
     }
     attribute def RtgQueryReturnRow {
         attribute rowIndex : Integer;
-        attribute anchors : JsonObject;
-        attribute links : JsonObject;
-        attribute dataObjects : JsonObject;
+        attribute anchors[0..*] : RtgQueryNamedObjectBinding;
+        attribute links[0..*] : RtgQueryNamedObjectBinding;
+        attribute dataObjects[0..*] : RtgQueryNamedObjectBinding;
         attribute properties : JsonObject;
+        doc /* Binding entry collections have unique names and realization codecs encode them as JSON objects from name to UUID. */
     }
     attribute def RtgQueryDiagnostic {
         attribute severity : RtgQueryDiagnosticSeverity;
@@ -185,7 +196,7 @@ library package BibliotekRtgQuery {
     requirement <'contract.rtg.query.predicates'> predicateSemantics {
         subject operation : ExecuteRtgQuery;
         require constraint {
-            doc /* exists treats missing paths as false. Equality/not-equality invoke RtgQueryJsonEqual; contains/in membership invoke RtgQueryJsonContains. Relational operators match only two numbers or two strings. Substring defaults case-insensitive. Regex searches strings with only case_insensitive and multiline flags in a deterministic RE2-style subset and rejects backreferences, lookaround, and other unsupported constructs. Unresolved paths are non-matches, not errors. */
+            doc /* exists treats missing paths as false. Equality/not-equality invoke RtgQueryJsonEqual; contains/in membership invoke RtgQueryJsonContains. Relational operators match only two numbers or two strings. Substring defaults case-insensitive. Regex performs an unanchored search using the RE2 2025-11-05 syntax in UTF-8 mode; only case_insensitive and multiline may be supplied as flags. Invalid RE2 syntax and unsupported constructs such as backreferences and lookaround are rejected. Unresolved paths are non-matches, not errors. */
         }
     }
 
@@ -214,6 +225,13 @@ library package BibliotekRtgQuery {
         subject operation : ExecuteRtgQuery;
         require constraint {
             doc /* Valid queries may return warning/info diagnostics without changing results. Malformed structure, unsupported operators, flags, or ordering references raise declared errors. Stable diagnostic codes distinguish unbound return requirements and unresolved returned property paths and carry generic repair guidance only. */
+        }
+    }
+
+    requirement <'contract.rtg.query.intentional_boundary'> intentionalBoundary {
+        subject query : RtgQueryEngine;
+        require constraint {
+            doc /* Query is a read-only declarative evaluator. It owns no graph, schema, constraint, authorization, visibility, publication, persistence, transport, or UI state; validates no proposed change; infers no facts; and exposes only the modeled RTG query language rather than a general graph-database language. */
         }
     }
 
@@ -306,6 +324,7 @@ library package BibliotekRtgQuery {
         satisfy deterministicResult by query.execute;
         satisfy returnShaping by query.execute;
         satisfy diagnosticSemantics by query.execute;
+        satisfy intentionalBoundary by query;
         satisfy queryNoMutation by query;
         satisfy diagnosticsAreNonMutating by query;
         satisfy deterministicResults by query;
@@ -356,6 +375,7 @@ verify queryNoMutation;
             verify overlayFiltersOnly;
             verify defaultIncludesNonLive;
             verify discoveryIndependent;
+            verify intentionalBoundary;
         }
         @EvidenceBinding {
                         evidenceId = "components/rtg/query/tests/test_rtg_query_contract.py#RtgQueryBoundaryVerification";

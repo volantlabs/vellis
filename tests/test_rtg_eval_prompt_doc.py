@@ -4,7 +4,7 @@ from pathlib import Path
 
 
 def test_rtg_agent_affordance_eval_prompt_exists_and_covers_affordances() -> None:
-    prompt = Path("docs/evals/rtg-agent-affordance-eval-prompt.md")
+    prompt = Path("docs/guides/vellis/evals/rtg-agent-affordance-eval-prompt.md")
     text = prompt.read_text(encoding="utf-8")
 
     for term in (
@@ -26,7 +26,7 @@ def test_rtg_agent_affordance_eval_prompt_exists_and_covers_affordances() -> Non
 
 
 def test_rtg_agent_affordance_eval_runbook_covers_mcp_launch_and_sequence() -> None:
-    runbook = Path("docs/evals/rtg-agent-affordance-eval-runbook.md")
+    runbook = Path("docs/guides/vellis/evals/rtg-agent-affordance-eval-runbook.md")
     text = runbook.read_text(encoding="utf-8")
 
     for term in (
@@ -55,7 +55,7 @@ def test_rtg_agent_affordance_eval_runbook_covers_mcp_launch_and_sequence() -> N
 
 
 def test_individual_life_graph_beta_prompt_covers_initial_user_profile() -> None:
-    prompt = Path("docs/evals/rtg-individual-life-graph-beta-prompt.md")
+    prompt = Path("docs/guides/vellis/evals/rtg-individual-life-graph-beta-prompt.md")
     text = prompt.read_text(encoding="utf-8")
 
     for term in (

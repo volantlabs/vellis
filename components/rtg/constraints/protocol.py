@@ -77,8 +77,16 @@ class RtgConstraintKindInvalid(RtgConstraintError):
     """A constraint kind is invalid."""
 
 
+class RtgConstraintDefinitionInvalid(RtgConstraintError):
+    """A constraint definition is structurally invalid."""
+
+
 class RtgConstraintPayloadInvalid(RtgConstraintError):
     """A constraint payload is invalid."""
+
+
+class RtgConstraintTargetInvalid(RtgConstraintError):
+    """A constraint target lookup key is invalid."""
 
 
 class RtgConstraintSystemValueInvalid(RtgConstraintError):
@@ -118,7 +126,7 @@ class RtgConstraints(Protocol):
 
     def list_constraints_by_target(
         self,
-        type_key: str,
+        target_type_key: str,
         kind: str | None = None,
         live: bool | None = None,
     ) -> RtgConstraintDefinitionList:

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import dataclasses
 import json
 from concurrent.futures import ThreadPoolExecutor, TimeoutError
 from pathlib import Path
@@ -38,8 +39,12 @@ from components.rtg.controller import (
     RtgControllerSnapshotFailed,
     RtgControllerValidationFailed,
 )
-from components.rtg.graph import InMemoryRtgGraph
-from components.rtg.migration import InMemoryRtgMigration, RtgMigrationRecord
+from components.rtg.graph import InMemoryRtgGraph, RtgAnchor
+from components.rtg.migration import (
+    InMemoryRtgMigration,
+    RtgMigrationRecord,
+    RtgMigrationSnapshot,
+)
 from components.rtg.query import RtgQueryAnchorBucket, RtgQuerySpec, SimpleRtgQueryEngine
 from components.rtg.schema import (
     InMemoryRtgSchema,
@@ -99,7 +104,13 @@ class FailingDataPutGraph:
 
 
 class PostCutoverRejectingValidator(DeterministicRtgChangeValidator):
+    def __init__(self) -> None:
+        self.rejected = False
+
     def validate_graph_state(self, *args: object, **kwargs: object) -> RtgValidationReport:
+        if self.rejected:
+            return super().validate_graph_state(*args, **kwargs)  # type: ignore[arg-type]
+        self.rejected = True
         return RtgValidationReport(
             accepted=False,
             findings=(
@@ -303,6 +314,59 @@ def test_controller_reads_wait_while_restore_replaces_component_handles(
         assert restore_future.result(timeout=2).status == "restore_applied"
         assert read_future.result(timeout=2).accepted is True
         assert validate_graph_started.is_set()
+
+
+def test_restore_validates_combined_candidate_before_any_visible_replacement(
+    tmp_path: Path,
+) -> None:
+    controller = build_controller(tmp_path)
+    before = controller.export_system_snapshot()
+    invalid_graph = InMemoryRtgGraph.empty()
+    invalid_graph.put_anchor(RtgAnchor(uuid=uuid4(), type="Person"))
+    invalid_snapshot = dataclasses.replace(before, graph=invalid_graph.export_snapshot())
+
+    with pytest.raises(RtgControllerSnapshotFailed) as error:
+        controller.restore_from_snapshot(
+            invalid_snapshot, RtgControllerRestoreOptions(ledger_mode="skip")
+        )
+
+    assert "violates controller invariants" in str(error.value)
+    assert controller.export_system_snapshot() == before
+
+
+def test_failed_recorded_restore_preserves_components_but_may_advance_audit_pointer(
+    tmp_path: Path,
+) -> None:
+    controller = build_controller(tmp_path)
+    before = controller.export_system_snapshot()
+    duplicate = RtgMigrationRecord(migration_id="duplicate", description="Duplicate")
+    invalid_snapshot = dataclasses.replace(
+        before, migration=RtgMigrationSnapshot((duplicate, duplicate))
+    )
+
+    with pytest.raises(RtgControllerSnapshotFailed):
+        controller.restore_from_snapshot(invalid_snapshot)
+
+    after = controller.export_system_snapshot()
+    assert after.graph == before.graph
+    assert after.schema == before.schema
+    assert after.constraints == before.constraints
+    assert after.migration == before.migration
+    assert after.last_ledger_position is not None
+    assert after.last_ledger_position != before.last_ledger_position
+
+
+def test_system_state_uses_typed_compact_counts_and_snapshot_paths(tmp_path: Path) -> None:
+    controller = build_controller(tmp_path)
+    state = controller.get_system_state()
+
+    assert state.live_schema_counts.total == 2
+    assert state.live_schema_counts.anchor == 1
+    assert state.live_object_counts.counts == ()
+    assert state.non_live_candidate_counts.total == 0
+    assert state.migration_counts_by_status.total == 0
+    assert state.persisted_snapshot_paths == ()
+    assert not hasattr(state, "last_transaction_timestamp")
 
 
 def test_controller_writes_wait_while_replay_owns_system_state(tmp_path: Path) -> None:

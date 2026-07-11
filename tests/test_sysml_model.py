@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 import json
+import zipfile
 from pathlib import Path
 
 import pytest
 
-from tools import model_tool, sysml_validator
+from tools import model_layout, model_tool, sysml_validator
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -30,32 +31,44 @@ def test_vellis_has_nine_bibliotek_roles_and_exact_mcp_surface() -> None:
 
 
 def test_model_remains_shadow_until_formal_and_human_gates_pass() -> None:
-    status = json.loads((ROOT / "model" / "model-status.json").read_text(encoding="utf-8"))
+    status = json.loads(model_layout.CUTOVER_STATUS_PATH.read_text(encoding="utf-8"))
 
     assert status["phase"] == "shadow"
-    assert status["authored_design"] == "model/**/*.sysml"
-    assert status["frozen_migration_baseline"] == "docs/components/*.md"
+    assert status["authored_design"] == "model/{foundation,bibliotek,vellis}/**/*.sysml"
+    assert status["generated_documentation"] == "docs/reference/**/*.md"
+    assert status["generated_machine_projections"] == "generated/model/*.json"
+    assert status["frozen_migration_baseline"] == "docs/migration/component-spec-baseline/*.md"
     assert status["gates"]["markdown_retirement"] == "blocked"
     assert status["gates"]["external_sysml_validator"] == "implemented-qualified-headless"
     assert status["gates"]["packaged_product_validation"] == "implemented"
     assert status["gates"]["parser_backed_model_index"] == "implemented"
     assert status["gates"]["model_derived_conformance_objectives"] == "implemented"
+    assert (
+        status["gates"]["legacy_contract_knowledge_disposition"]
+        == "implemented-pending-human-review"
+    )
+    assert (
+        status["gates"]["legacy_non_contract_knowledge_preservation"]
+        == "implemented-pending-human-review"
+    )
+    assert status["gates"]["implementation_decision_reconciliation"] == "implemented"
     assert status["gates"]["representative_pilots"] == "implemented-pending-human-review"
     assert status["gates"]["accepted_contract_preservation"] == "implemented-pending-human-review"
 
 
 def test_formal_validator_is_pinned_and_covers_every_authored_model() -> None:
-    lock = json.loads((ROOT / "model" / "validator.lock.json").read_text(encoding="utf-8"))
+    lock = json.loads(model_layout.VALIDATOR_LOCK_PATH.read_text(encoding="utf-8"))
 
     assert lock["provider"] == "Systems-Modeling/SysML-v2-Pilot-Implementation"
     assert lock["release"] == "2025-06"
     assert lock["language_baseline"] == {"sysml": "2.0", "kerml": "1.0"}
     assert len(lock["kernel"]["sha256"]) == 64
     assert "--self-test" in json.loads(
-        (ROOT / "model" / "model.lock.json").read_text(encoding="utf-8")
+        model_layout.LANGUAGE_LOCK_PATH.read_text(encoding="utf-8")
     )["validator"]["command"]
-    assert len(sysml_validator._model_files("all")) == 23
+    assert len(sysml_validator._model_files("all")) == 21
     assert all(path.exists() for path in sysml_validator._model_files("all"))
+    assert model_layout.SOFTWARE_COMPONENT_PATTERN_PATH not in sysml_validator._model_files("all")
 
 
 def test_formal_validator_diagnostic_parser_captures_cell_location() -> None:
@@ -116,13 +129,10 @@ def test_generated_conformance_objectives_resolve_model_requirements_and_evidenc
 
 
 def test_official_parser_index_covers_authored_packages_and_public_definitions() -> None:
-    index = json.loads(
-        (ROOT / "docs" / "model" / "generated" / "formal-model-index.json").read_text(
-            encoding="utf-8"
-        )
-    )
+    index = json.loads(model_layout.GENERATED_FORMAL_INDEX.read_text(encoding="utf-8"))
 
-    assert len(index["authored_packages"]) == 23
+    assert len(index["authored_packages"]) == 21
+    assert "SoftwareComponentPattern" not in index["authored_packages"]
     assert set(index["packages"]) == set(index["authored_packages"])
     assert model_tool._check_formal_model_index() == []
     graph_parts = {
@@ -141,6 +151,7 @@ def test_profile_checker_rejects_unbalanced_and_nonbaseline_text(
     profile = tmp_path / "allowed-constructs.json"
     profile.write_text(json.dumps({"forbidden_patterns": ["#component\\b"]}), encoding="utf-8")
     monkeypatch.setattr(model_tool, "MODEL_ROOT", tmp_path)
+    monkeypatch.setattr(model_tool, "ALLOWED_CONSTRUCTS_PATH", profile)
 
     delimiter_findings = model_tool._balanced_delimiters(invalid, invalid.read_text())
     profile_findings = model_tool._check_allowed_profile([invalid])
@@ -332,9 +343,7 @@ def test_state_access_checker_rejects_missing_action_declaration(
 
 
 def test_foundation_native_semantics() -> None:
-    fixture = (ROOT / "model" / "foundation" / "SoftwareComponentPattern.sysml").read_text(
-        encoding="utf-8"
-    )
+    fixture = model_layout.SOFTWARE_COMPONENT_PATTERN_PATH.read_text(encoding="utf-8")
 
     assert "assume constraint" in fixture
     assert "require constraint matchingResponse : MatchingResponse" in fixture
@@ -403,11 +412,16 @@ def test_native_view_packages_cover_library_and_application_concerns() -> None:
 def test_generated_artifact_checker_detects_staleness(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    stale = tmp_path / "bibliotek-components.md"
+    stale = tmp_path / "bibliotek-index.md"
     stale.write_text("stale", encoding="utf-8")
-    monkeypatch.setattr(model_tool, "GENERATED_DOC_ROOT", tmp_path)
+    monkeypatch.setattr(model_tool, "BIBLIOTEK_REFERENCE_ROOT", tmp_path / "bibliotek")
+    monkeypatch.setattr(model_tool, "VELLIS_REFERENCE_ROOT", tmp_path / "vellis")
     monkeypatch.setattr(model_tool, "GENERATED_COMPONENT_DOC_ROOT", tmp_path / "components")
     monkeypatch.setattr(model_tool, "GENERATED_MANIFEST", tmp_path / "manifest.json")
+    monkeypatch.setattr(model_tool, "GENERATED_EVIDENCE_INDEX", tmp_path / "evidence.json")
+    monkeypatch.setattr(
+        model_tool, "GENERATED_CONFORMANCE_OBJECTIVES", tmp_path / "conformance.json"
+    )
     monkeypatch.setattr(model_tool, "_check_formal_model_index", lambda: [])
 
     findings = model_tool.check_generated()
@@ -421,11 +435,10 @@ def test_all_python_protocol_operations_map_to_model_actions() -> None:
     assert model_tool._check_protocol_action_signatures() == []
 
 
-def test_public_definitions_are_not_empty_and_drift_is_explicit() -> None:
+def test_public_definitions_and_shadow_contracts_are_complete() -> None:
     assert model_tool._check_empty_public_definitions(model_tool._sysml_files("all")) == []
     assert model_tool._check_component_contract_completeness() == []
     assert model_tool._check_shadow_contract_parity() == []
-    assert model_tool._check_implementation_drift_file() == []
 
 
 def test_generated_component_views_cover_actions_state_and_invariants() -> None:
@@ -453,6 +466,21 @@ def test_generated_component_views_cover_actions_state_and_invariants() -> None:
         in json_page
     )
 
+    schema_page = next(
+        content for path, content in pages.items() if path.name == "component.rtg.schema.md"
+    )
+    assert "`valueKinds[1..*]: RtgSchemaValueKind`" in schema_page
+    assert "`anchorTypeKeys: String[1..*] ordered`" in schema_page
+    assert "`properties[0..*]: RtgSchemaProperty`" in schema_page
+    assert "`direction: RtgSchemaParticipationQueryDirection`" in schema_page
+    assert "`direction: RtgSchemaParticipationDirection`" in schema_page
+
+    query_page = next(
+        content for path, content in pages.items() if path.name == "component.rtg.query.md"
+    )
+    assert "`anchors[1..*]: RtgQueryNamedObjectBinding`" in query_page
+    assert "`liveStatusOverlay[0..*]: RtgQueryLiveStatusOverride`" in query_page
+
     graph_page = next(
         content for path, content in pages.items() if path.name == "component.rtg.graph.md"
     )
@@ -461,9 +489,52 @@ def test_generated_component_views_cover_actions_state_and_invariants() -> None:
     assert "`type: String`" in graph_page
     assert "`system: RtgSystem`" in graph_page
 
-    vellis_page = (ROOT / "docs" / "model" / "generated" / "vellis-operations.md").read_text(
+    vellis_page = (ROOT / "docs" / "reference" / "vellis" / "index.md").read_text(
         encoding="utf-8"
     )
     assert "## Requirements and satisfaction" in vellis_page
     assert "## Verification closure" in vellis_page
     assert "`rtgGetSystemState` → `GetSystemState` → `getSystemState`" in vellis_page
+
+
+def test_generated_bibliotek_index_covers_library_topology() -> None:
+    index = (ROOT / "docs" / "reference" / "bibliotek" / "index.md").read_text(
+        encoding="utf-8"
+    )
+
+    assert "## Shared public packages" in index
+    assert "`BibliotekSoftwareValues`" in index
+    assert "## Retained component dependency topology" in index
+    assert "`component.rtg.controller`" in index
+    assert "`component.rtg.graph`" in index
+
+
+def test_model_packages_exclude_fixture_configuration_and_migration(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    package_root = tmp_path / "packages"
+    monkeypatch.setattr(model_tool, "MODEL_PACKAGE_ROOT", package_root)
+
+    model_tool.package_models()
+
+    expected_sources = {
+        "software-component-modeling-foundation-0.1.0.kpar": {"SoftwareComponentModeling.sysml"},
+        "bibliotek-0.1.0.kpar": {
+            path.name for path in model_layout.BIBLIOTEK_MODEL_ROOT.rglob("*.sysml")
+        },
+        "vellis-0.1.0.kpar": {
+            path.name for path in model_layout.VELLIS_MODEL_ROOT.rglob("*.sysml")
+        },
+    }
+    for archive_name, expected in expected_sources.items():
+        with zipfile.ZipFile(package_root / archive_name) as archive:
+            actual = {Path(name).name for name in archive.namelist() if name.endswith(".sysml")}
+        assert actual == expected
+        assert "SoftwareComponentPattern.sysml" not in actual
+
+
+def test_frozen_markdown_baseline_is_complete_and_isolated() -> None:
+    baseline = model_layout.MIGRATION_BASELINE_ROOT
+
+    assert len(list(baseline.glob("component.*.md"))) == 10
+    assert not list((ROOT / "docs").glob("components/component.*.md"))
