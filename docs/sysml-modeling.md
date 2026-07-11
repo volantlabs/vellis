@@ -8,6 +8,12 @@ contract source.
 exact test nodes currently available to evaluate it. Repository checks reject accepted component
 evidence groups that resolve only to a path with no concrete tests.
 
+`docs/model/generated/formal-model-index.json` is produced by the official Java parser and records
+the packages, element kinds, and named contract elements it resolves. Repository checks compare
+every authored public definition and requirement with this inventory. The complementary
+`conformance-objectives.json` projects verification subjects, stable requirement IDs, and concrete
+evidence nodes into a language-neutral implementation handoff.
+
 The official Java pilot is pinned and qualified for headless syntax, linking, and semantic
 validation. The model remains in `shadow` status until human acceptance completes the remaining
 gates in `model/model-status.json`. The former Markdown component specifications are frozen as a
@@ -154,7 +160,8 @@ durable state, declarative matching, and externally meaningful orchestration.
 
 `just model-render` produces one page per Bibliotek component, Bibliotek and Vellis indexes,
 action/state/requirement/satisfaction/verification tables, composition and use-case projections,
-and the static Vellis application manifest. `just model-check` rejects stale outputs, empty or semantically hollow public actions,
+the formal parser inventory, structured conformance objectives, and the static Vellis application
+manifest. `just model-check` rejects stale outputs, empty or semantically hollow public actions,
 missing or signature-incompatible protocol operations, accepted Markdown fields/failures/invariants
 that disappeared during shadow migration, requirements without required constraints, satisfiers, or
 subject-compatible verification objectives, untyped state access, unresolved
@@ -176,10 +183,12 @@ just model-handoff TARGET=component.storage.json_file
 The repository profile checker is not a substitute for formal validation. `just model-setup`
 downloads checksum-pinned copies of the official 2025-06 Java pilot, its SysML 2.0/KerML 1.0
 libraries, and a Java 21 runtime into the ignored `model/.cache/` directory. `just model-check`
-then runs both the repository profile and the official validator; `just model-check-formal` runs
-the latter directly. The published BNF is useful for syntax tooling, but it cannot replace the
-pilot's linking, type, multiplicity, specialization, and other semantic diagnostics. KPAR outputs
-remain shadow candidates and Markdown retirement remains blocked until human acceptance.
+then packages the model products and validates Foundation, Bibliotek, and Vellis from their KPAR
+contents in fresh Java kernels. This prevents source loading from hiding undeclared dependencies
+and confirms that downstream products consume the packaged layers. `just model-check-formal` runs
+those formal product checks directly. The published BNF is useful for syntax tooling, but it cannot
+replace the pilot's linking, type, multiplicity, specialization, and other semantic diagnostics.
+KPAR outputs remain shadow candidates and Markdown retirement remains blocked until human acceptance.
 
 ## Semantic discoveries
 

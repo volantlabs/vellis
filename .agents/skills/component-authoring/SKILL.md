@@ -74,7 +74,8 @@ implementation fidelity the default completeness criterion.
 14. Use a `view def` for a reusable projection. Introduce a viewpoint only when stakeholders and
     concerns are explicitly modeled.
 15. Run a conformant SysML parser/linker/semantic validator as well as repository profile checks,
-    then regenerate projections and review the complete boundary. Grammar matching and regular
+    validate downstream products against their packaged dependencies, then regenerate
+    parser-backed projections and review the complete boundary. Grammar matching and regular
     expressions alone do not establish language conformance.
 16. Ask whether a conforming implementation in a different suitable language could be built from
     the model and pass black-box conformance at this boundary. Repair the model if correct callers,
@@ -140,7 +141,8 @@ For authoring or revision, produce:
 1. Updated SysML source.
 2. Updated generated human view.
 3. A concise list of contract decisions or conformance questions, if any.
-4. Verification results.
+4. Structured implementation-neutral conformance objectives derived from verification cases.
+5. Verification results.
 
 For review, report material boundary, contract, state, invariant, composition, and verification gaps.
 Keep implementation inspection focused on evidence needed to assess the public design.

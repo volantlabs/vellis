@@ -267,9 +267,9 @@ Useful recipes:
 - `just format`: format Python code with Ruff
 - `just build`: build source and wheel distributions for release validation
 - `just model-setup`: fetch and verify the official Java validator, formal libraries, and Java runtime
-- `just model-check`: run formal SysML validation plus architecture, realization, and generated-file checks
+- `just model-check`: validate packaged model products plus architecture, realization, and generated files
 - `just model-check-formal`: run the pinned official SysML validator directly
-- `just model-render`: regenerate model views and the static application manifest
+- `just model-render`: regenerate the parser inventory, conformance objectives, views, and manifest
 - `just model-package`: build independently packageable shadow KPAR candidates
 - `just model-handoff TARGET=<stable-id>`: inspect a model slice for an implementation handoff
 - `just skills-check`: validate repo-local skill metadata

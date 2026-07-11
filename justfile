@@ -43,13 +43,16 @@ model-check-vellis:
 
 # Run repository profile, architecture, realization, and generated-artifact checks.
 model-check:
+    @uv run python tools/model_tool.py package
     @uv run python tools/model_tool.py check --scope all --require-external
     @uv run python tools/model_tool.py check-generated
 
 model-check-formal:
-    @uv run python tools/sysml_validator.py validate --scope all --self-test
+    @uv run python tools/model_tool.py package
+    @uv run python tools/sysml_validator.py validate-products --self-test
 
 model-render:
+    @uv run python tools/sysml_validator.py export-index --output docs/model/generated/formal-model-index.json
     @uv run python tools/model_tool.py render
 
 model-package:

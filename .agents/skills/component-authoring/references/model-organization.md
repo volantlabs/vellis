@@ -66,4 +66,6 @@ the component contract solely because the invocation mechanism changed.
   and incompatible value changes as library contract changes.
 - Keep deprecated public definitions available while supported consumers remain.
 - Validate application models against the packaged library artifact they claim to consume.
+- Validate each independently distributed model product in a fresh validator context so earlier
+  source loading cannot hide undeclared package dependencies or missing public exports.
 - Use qualified names at ownership boundaries and avoid relying on accidental transitive imports.

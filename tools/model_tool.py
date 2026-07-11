@@ -20,6 +20,8 @@ GENERATED_DOC_ROOT = ROOT / "docs" / "model" / "generated"
 GENERATED_COMPONENT_DOC_ROOT = GENERATED_DOC_ROOT / "components"
 GENERATED_MANIFEST = ROOT / "apps" / "rtg_knowledge_graph" / "resources" / "model_app_manifest.json"
 GENERATED_EVIDENCE_INDEX = GENERATED_DOC_ROOT / "verification-evidence.json"
+GENERATED_CONFORMANCE_OBJECTIVES = GENERATED_DOC_ROOT / "conformance-objectives.json"
+GENERATED_FORMAL_INDEX = GENERATED_DOC_ROOT / "formal-model-index.json"
 IMPLEMENTATION_DRIFT_PATH = MODEL_ROOT / "realizations" / "PythonImplementationDrift.sysml"
 OPTIONAL_IDENTIFICATION = r"(?:<'[^']+'>\s+)?"
 SYSML_IDENTIFIER = r"(?:[A-Za-z_]\w*|'[^']+')"
@@ -1248,6 +1250,140 @@ def _verification_evidence_data() -> dict[str, object]:
         ),
         "groups": dict(sorted(groups.items())),
     }
+
+
+def _conformance_objectives_data() -> dict[str, object]:
+    requirements_by_source: dict[Path, dict[str, str]] = {}
+    global_requirements: dict[str, set[str]] = {}
+    for path in _sysml_files("all"):
+        text = path.read_text(encoding="utf-8")
+        requirements = {
+            name: stable_id
+            for stable_id, name in re.findall(
+                r"\brequirement\s+<'([^']+)'>\s+(\w+)\s*\{", text
+            )
+        }
+        requirements_by_source[path] = requirements
+        for name, stable_id in requirements.items():
+            global_requirements.setdefault(name, set()).add(stable_id)
+
+    objectives: list[dict[str, object]] = []
+    for path in _sysml_files("all"):
+        text = path.read_text(encoding="utf-8")
+        local_requirements = requirements_by_source[path]
+        for match in re.finditer(r"\bverification def\s+(\w+)\s*\{", text):
+            block = _extract_braced_block(text, match.start())
+            subject = re.search(r"\bsubject\s+(\w+)\s*:\s*([\w:]+)", block)
+            evidence = re.search(r'evidenceId\s*=\s*"([^"]+)"', block)
+            requirement_ids: list[str] = []
+            for requirement_name in re.findall(r"\bverify\s+(\w+)\s*;", block):
+                stable_id = local_requirements.get(requirement_name)
+                if stable_id is None:
+                    candidates = global_requirements.get(requirement_name, set())
+                    stable_id = next(iter(candidates)) if len(candidates) == 1 else requirement_name
+                requirement_ids.append(stable_id)
+            evidence_id = evidence.group(1) if evidence else ""
+            objectives.append(
+                {
+                    "verification": match.group(1),
+                    "model_source": path.relative_to(ROOT).as_posix(),
+                    "subject": {
+                        "role": subject.group(1) if subject else "unknown",
+                        "type": subject.group(2) if subject else "unknown",
+                    },
+                    "requirements": requirement_ids,
+                    "evidence_id": evidence_id,
+                    "evidence_nodes": _evidence_test_nodes(evidence_id) if evidence_id else [],
+                    "status": "pending" if evidence_id.startswith("pending#") else "resolved",
+                }
+            )
+    return {
+        "schema_version": 1,
+        "description": (
+            "Generated implementation-neutral verification objectives derived from SysML "
+            "subjects, requirements, and evidence bindings."
+        ),
+        "objectives": sorted(
+            objectives,
+            key=lambda item: (str(item["model_source"]), str(item["verification"])),
+        ),
+    }
+
+
+def _model_source_digest() -> str:
+    digest = hashlib.sha256()
+    for path in _sysml_files("all"):
+        relative = path.relative_to(MODEL_ROOT).as_posix()
+        digest.update(relative.encode())
+        digest.update(b"\0")
+        digest.update(path.read_bytes())
+        digest.update(b"\0")
+    return digest.hexdigest()
+
+
+def _check_formal_model_index() -> list[Finding]:
+    try:
+        index = _read_json(GENERATED_FORMAL_INDEX)
+    except (OSError, ValueError, json.JSONDecodeError) as error:
+        return [Finding(GENERATED_FORMAL_INDEX, f"invalid formal model index: {error}")]
+    findings: list[Finding] = []
+    if index.get("source_digest") != _model_source_digest():
+        findings.append(
+            Finding(GENERATED_FORMAL_INDEX, "formal parser index is stale; run just model-render")
+        )
+    packages = index.get("packages")
+    authored = index.get("authored_packages")
+    if not isinstance(packages, dict) or not isinstance(authored, dict):
+        return [Finding(GENERATED_FORMAL_INDEX, "formal parser index lacks package inventories")]
+    expected_sources = {path.relative_to(ROOT).as_posix() for path in _sysml_files("all")}
+    if set(authored.values()) != expected_sources or set(packages) != set(authored):
+        findings.append(
+            Finding(GENERATED_FORMAL_INDEX, "formal parser package inventory is incomplete")
+        )
+
+    expected_kinds = {
+        "action": "ActionDefinition",
+        "attribute": "AttributeDefinition",
+        "calc": "CalculationDefinition",
+        "constraint": "ConstraintDefinition",
+        "item": "ItemDefinition",
+        "part": "PartDefinition",
+        "use case": "UseCaseDefinition",
+        "verification": "VerificationCaseDefinition",
+        "view": "ViewDefinition",
+    }
+    source_to_package = {str(source): str(package) for package, source in authored.items()}
+    for path in _sysml_files("all"):
+        relative = path.relative_to(ROOT).as_posix()
+        package = source_to_package.get(relative)
+        package_index = packages.get(package, {}) if package else {}
+        named = package_index.get("named_elements", []) if isinstance(package_index, dict) else []
+        parsed = {
+            (str(element.get("kind")), str(element.get("name")))
+            for element in named
+            if isinstance(element, dict)
+        }
+        text = path.read_text(encoding="utf-8")
+        for keyword, formal_kind in expected_kinds.items():
+            for name in re.findall(
+                rf"\b{keyword}\s+def\s+{OPTIONAL_IDENTIFICATION}(\w+)", text
+            ):
+                if (formal_kind, name) not in parsed:
+                    findings.append(
+                        Finding(
+                            GENERATED_FORMAL_INDEX,
+                            f"official parser index omits {formal_kind} {package}::{name}",
+                        )
+                    )
+        for name in re.findall(r"\brequirement\s+<'[^']+'>\s+(\w+)\s*\{", text):
+            if ("RequirementUsage", name) not in parsed:
+                findings.append(
+                    Finding(
+                        GENERATED_FORMAL_INDEX,
+                        f"official parser index omits RequirementUsage {package}::{name}",
+                    )
+                )
+    return findings
 
 
 def _check_vellis_use_cases() -> list[Finding]:
@@ -2494,6 +2630,10 @@ def render() -> None:
         json.dumps(_verification_evidence_data(), indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
     )
+    GENERATED_CONFORMANCE_OBJECTIVES.write_text(
+        json.dumps(_conformance_objectives_data(), indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
 
 
 def check_generated() -> list[Finding]:
@@ -2504,6 +2644,10 @@ def check_generated() -> list[Finding]:
         GENERATED_MANIFEST: json.dumps(_manifest_data(), indent=2, sort_keys=True) + "\n",
         GENERATED_EVIDENCE_INDEX: json.dumps(
             _verification_evidence_data(), indent=2, sort_keys=True
+        )
+        + "\n",
+        GENERATED_CONFORMANCE_OBJECTIVES: json.dumps(
+            _conformance_objectives_data(), indent=2, sort_keys=True
         )
         + "\n",
     }
@@ -2518,6 +2662,7 @@ def check_generated() -> list[Finding]:
     for path in GENERATED_COMPONENT_DOC_ROOT.glob("*.md"):
         if path not in expected_component_paths:
             findings.append(Finding(path, "stale generated component page; run just model-render"))
+    findings.extend(_check_formal_model_index())
     return findings
 
 
@@ -2584,7 +2729,7 @@ def package_models() -> None:
             "created": "2026-07-10T00:00:00Z",
             "metamodel": "https://www.omg.org/spec/SysML/20250201",
             "checksum": checksums,
-            "status": "shadow-candidate-external-validation-pending",
+            "status": "shadow-candidate-formally-validated",
         }
         archive_root = project["name"].replace("-", " ").title()
         with zipfile.ZipFile(destination / name, "w", zipfile.ZIP_DEFLATED) as archive:
@@ -2615,7 +2760,24 @@ def handoff(target: str) -> int:
     for path in matches:
         print(f"- {path.relative_to(ROOT)}")
     print("Implementation input: accepted SysML/KPAR, generated view, and verification objectives.")
-    print("Verification: derive black-box evidence from the target model's verification cases.")
+    model_sources = {path.relative_to(ROOT).as_posix() for path in matches}
+    conformance = _conformance_objectives_data()
+    raw_objectives = conformance.get("objectives", [])
+    if not isinstance(raw_objectives, list):
+        raw_objectives = []
+    objectives = [
+        objective
+        for objective in raw_objectives
+        if isinstance(objective, dict)
+        and (
+            objective.get("model_source") in model_sources
+            or target in objective.get("requirements", [])
+        )
+    ]
+    print(
+        f"Verification: {len(objectives)} structured objective(s) in "
+        f"{GENERATED_CONFORMANCE_OBJECTIVES.relative_to(ROOT)}."
+    )
     print(
         "Freedom: private helpers, algorithms, storage layouts, and language inheritance are open."
     )

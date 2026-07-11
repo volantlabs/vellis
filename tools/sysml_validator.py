@@ -13,6 +13,9 @@ import tempfile
 import time
 import urllib.request
 import zipfile
+from collections import Counter
+from collections.abc import Iterator
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
 
@@ -50,10 +53,27 @@ MODEL_ORDER = (
     "realizations/PythonImplementationDrift.sysml",
 )
 
+PACKAGE_ARCHIVES = {
+    "foundation": "software-component-modeling-foundation-0.1.0.kpar",
+    "bibliotek": "bibliotek-0.1.0.kpar",
+    "vellis": "vellis-0.1.0.kpar",
+}
+
 DIAGNOSTIC = re.compile(
     r"(?P<level>ERROR|WARNING):(?P<message>.*?)"
     r"\((?P<cell>\d+)\.sysml line : (?P<line>\d+) column : (?P<column>\d+)\)"
 )
+LISTING_LINE = re.compile(
+    r"^(?P<kind>[A-Za-z_]\w*)(?:\s+(?P<name>.*?))?\s+"
+    r"\([0-9a-fA-F-]{36}\)$"
+)
+INDEXED_ELEMENT_KINDS = {
+    "AllocationUsage",
+    "RequirementUsage",
+    "SatisfyRequirementUsage",
+    "UseCaseUsage",
+    "ViewUsage",
+}
 
 
 def _lock() -> dict[str, Any]:
@@ -146,7 +166,57 @@ def setup() -> tuple[Path, Path, Path]:
     return java, jar, library
 
 
+def _authored_model_files() -> set[str]:
+    return {
+        path.relative_to(MODEL_ROOT).as_posix()
+        for path in MODEL_ROOT.rglob("*.sysml")
+        if not {".cache", "dist"}.intersection(path.relative_to(MODEL_ROOT).parts)
+    }
+
+
+def _check_inventory_and_order() -> None:
+    authored = _authored_model_files()
+    ordered = set(MODEL_ORDER)
+    missing = sorted(authored - ordered)
+    stale = sorted(ordered - authored)
+    if missing or stale:
+        raise RuntimeError(
+            f"validator model inventory differs: unlisted={missing}, missing={stale}"
+        )
+
+    package_files: dict[str, str] = {}
+    imports_by_file: dict[str, set[str]] = {}
+    for relative in MODEL_ORDER:
+        text = (MODEL_ROOT / relative).read_text(encoding="utf-8")
+        package_match = re.search(r"\b(?:library\s+)?package\s+([A-Za-z_]\w*)\s*\{", text)
+        if not package_match:
+            raise RuntimeError(f"{relative} does not declare a package")
+        package = package_match.group(1)
+        if package in package_files:
+            raise RuntimeError(
+                f"package {package} is declared by both {package_files[package]} and {relative}"
+            )
+        package_files[package] = relative
+        imports_by_file[relative] = set(
+            re.findall(
+                r"\b(?:private|public)?\s*import\s+([A-Za-z_]\w*)::",
+                text,
+            )
+        )
+
+    position = {relative: index for index, relative in enumerate(MODEL_ORDER)}
+    for relative, imports in imports_by_file.items():
+        for imported_package in imports:
+            dependency = package_files.get(imported_package)
+            if dependency is not None and position[dependency] >= position[relative]:
+                raise RuntimeError(
+                    f"validator load order places {relative} before imported package "
+                    f"{imported_package} in {dependency}"
+                )
+
+
 def _model_files(scope: str) -> list[Path]:
+    _check_inventory_and_order()
     allowed = {
         "foundation": ("foundation/",),
         "bibliotek": ("foundation/", "bibliotek/"),
@@ -156,9 +226,52 @@ def _model_files(scope: str) -> list[Path]:
     return [MODEL_ROOT / relative for relative in MODEL_ORDER if relative.startswith(allowed)]
 
 
-def validate(scope: str, self_test: bool = False) -> int:
+def _packaged_model_files(scope: str, destination: Path) -> tuple[list[Path], list[str]]:
+    _check_inventory_and_order()
+    products = {
+        "foundation": ("foundation",),
+        "bibliotek": ("foundation", "bibliotek"),
+        "vellis": ("foundation", "bibliotek", "vellis"),
+    }[scope]
+    extracted_by_name: dict[str, Path] = {}
+    labels_by_name: dict[str, str] = {}
+    for product in products:
+        archive_path = MODEL_ROOT / "dist" / PACKAGE_ARCHIVES[product]
+        if not archive_path.exists():
+            raise RuntimeError(f"missing packaged model artifact: {archive_path}")
+        product_root = destination / product
+        with zipfile.ZipFile(archive_path) as archive:
+            archive.extractall(product_root)
+        for path in product_root.rglob("*.sysml"):
+            if path.name in extracted_by_name:
+                raise RuntimeError(f"duplicate packaged model filename: {path.name}")
+            extracted_by_name[path.name] = path
+            labels_by_name[path.name] = f"{archive_path.name}!/{path.name}"
+
+    allowed = {
+        "foundation": ("foundation/",),
+        "bibliotek": ("foundation/", "bibliotek/"),
+        "vellis": ("foundation/", "bibliotek/", "vellis/"),
+    }[scope]
+    relatives = [relative for relative in MODEL_ORDER if relative.startswith(allowed)]
+    files: list[Path] = []
+    labels: list[str] = []
+    for relative in relatives:
+        name = Path(relative).name
+        path = extracted_by_name.get(name)
+        if path is None:
+            raise RuntimeError(f"packaged {scope} product omits {relative}")
+        files.append(path)
+        labels.append(labels_by_name[name])
+    unexpected = sorted(set(extracted_by_name) - {path.name for path in files})
+    if unexpected:
+        raise RuntimeError(f"packaged {scope} product has unexpected SysML files: {unexpected}")
+    return files, labels
+
+
+@contextmanager
+def _kernel_session() -> Iterator[BlockingKernelClient]:
     java, jar, library = setup()
-    files = _model_files(scope)
     with tempfile.TemporaryDirectory(prefix="vellis-sysml-") as temporary:
         connection_file = Path(temporary) / "kernel.json"
         write_connection_file(str(connection_file))
@@ -181,38 +294,18 @@ def validate(scope: str, self_test: bool = False) -> int:
                 text=True,
             )
         client = BlockingKernelClient(connection_file=str(connection_file))
-        client.load_connection_file()
-        client.start_channels()
-        diagnostics: list[str] = []
-        negative_diagnostics: list[str] = []
         try:
+            client.load_connection_file()
+            client.start_channels()
             time.sleep(3)
+            if process.poll() is not None:
+                raise RuntimeError(
+                    "official Java kernel exited during startup:\n"
+                    + log_path.read_text(encoding="utf-8")
+                )
             client.kernel_info()
             client.get_shell_msg(timeout=90)
-
-            def execute_source(source: str) -> list[str]:
-                captured: list[str] = []
-                message_id = client.execute(source)
-                while True:
-                    message = client.get_iopub_msg(timeout=120)
-                    if message["parent_header"].get("msg_id") != message_id:
-                        continue
-                    message_type = message["msg_type"]
-                    content = message["content"]
-                    if message_type == "stream" and content.get("name") == "stderr":
-                        captured.extend(str(content.get("text", "")).splitlines())
-                    elif message_type == "error":
-                        captured.extend(str(line) for line in content.get("traceback", []))
-                    elif message_type == "status" and content.get("execution_state") == "idle":
-                        break
-                return captured
-
-            if self_test:
-                negative_diagnostics = execute_source(
-                    "package ValidatorNegative { part def Broken :> MissingType; }"
-                )
-            for path in files:
-                diagnostics.extend(execute_source(path.read_text(encoding="utf-8")))
+            yield client
         finally:
             client.stop_channels()
             process.terminate()
@@ -220,6 +313,46 @@ def validate(scope: str, self_test: bool = False) -> int:
                 process.wait(timeout=5)
             except subprocess.TimeoutExpired:
                 process.kill()
+
+
+def _execute_source(
+    client: BlockingKernelClient, source: str
+) -> tuple[list[str], list[dict[str, Any]]]:
+    diagnostics: list[str] = []
+    outputs: list[dict[str, Any]] = []
+    message_id = client.execute(source)
+    while True:
+        message = client.get_iopub_msg(timeout=120)
+        if message["parent_header"].get("msg_id") != message_id:
+            continue
+        message_type = message["msg_type"]
+        content = message["content"]
+        if message_type == "stream" and content.get("name") == "stderr":
+            diagnostics.extend(str(content.get("text", "")).splitlines())
+        elif message_type == "error":
+            diagnostics.extend(str(line) for line in content.get("traceback", []))
+        elif message_type in {"display_data", "execute_result"}:
+            data = content.get("data", {})
+            if isinstance(data, dict):
+                outputs.append(data)
+        elif message_type == "status" and content.get("execution_state") == "idle":
+            break
+    return diagnostics, outputs
+
+
+def _validate_files(
+    files: list[Path], labels: list[str], self_test: bool, product_label: str
+) -> int:
+    diagnostics: list[str] = []
+    negative_diagnostics: list[str] = []
+    with _kernel_session() as client:
+        if self_test:
+            negative_diagnostics, _ = _execute_source(
+                client, "package ValidatorNegative { part def Broken :> MissingType; }"
+            )
+        for path in files:
+            captured, _ = _execute_source(client, path.read_text(encoding="utf-8"))
+            diagnostics.extend(captured)
 
     failed = False
     cell_offset = 1 if self_test else 0
@@ -234,11 +367,10 @@ def validate(scope: str, self_test: bool = False) -> int:
         match = DIAGNOSTIC.search(diagnostic)
         if match:
             cell = int(match.group("cell")) - cell_offset
-            path = files[cell - 1] if 0 < cell <= len(files) else MODEL_ROOT
-            relative = path.relative_to(ROOT)
+            label = labels[cell - 1] if 0 < cell <= len(labels) else "model"
             level = match.group("level")
             print(
-                f"{level} {relative}:{match.group('line')}:{match.group('column')}:"
+                f"{level} {label}:{match.group('line')}:{match.group('column')}:"
                 f"{match.group('message').strip()}"
             )
             failed = failed or level == "ERROR"
@@ -246,13 +378,131 @@ def validate(scope: str, self_test: bool = False) -> int:
             print(f"ERROR {diagnostic.strip()}")
             failed = True
     if failed:
-        print("Formal SysML validation failed.")
+        print(f"Formal SysML validation failed for {product_label}.")
         return 1
     print(
-        f"Formal SysML validation passed for {len(files)} files "
+        f"Formal SysML validation passed for {product_label} ({len(files)} files) "
         f"with official Java pilot { _lock()['implementation_version'] }."
     )
     return 0
+
+
+def validate(scope: str, self_test: bool = False, packaged: bool = False) -> int:
+    if packaged:
+        if scope == "all":
+            raise RuntimeError("packaged validation requires a concrete product scope")
+        with tempfile.TemporaryDirectory(prefix=f"vellis-{scope}-kpar-") as temporary:
+            files, labels = _packaged_model_files(scope, Path(temporary))
+            return _validate_files(files, labels, self_test, f"packaged {scope}")
+    files = _model_files(scope)
+    labels = [path.relative_to(ROOT).as_posix() for path in files]
+    return _validate_files(files, labels, self_test, f"source {scope}")
+
+
+def validate_products(self_test: bool = False) -> int:
+    for scope in ("foundation", "bibliotek", "vellis"):
+        if validate(scope, self_test=self_test, packaged=True):
+            return 1
+    return 0
+
+
+def _source_digest(files: list[Path]) -> str:
+    digest = hashlib.sha256()
+    for path in sorted(files, key=lambda item: item.relative_to(MODEL_ROOT).as_posix()):
+        relative = path.relative_to(MODEL_ROOT).as_posix()
+        digest.update(relative.encode())
+        digest.update(b"\0")
+        digest.update(path.read_bytes())
+        digest.update(b"\0")
+    return digest.hexdigest()
+
+
+def export_index(output: Path) -> None:
+    files = _model_files("all")
+    package_sources: dict[str, str] = {}
+    for path in files:
+        text = path.read_text(encoding="utf-8")
+        match = re.search(r"\b(?:library\s+)?package\s+([A-Za-z_]\w*)\s*\{", text)
+        if not match:
+            raise RuntimeError(f"{path} does not declare a package")
+        package_sources[match.group(1)] = path.relative_to(ROOT).as_posix()
+
+    package_indexes: dict[str, dict[str, Any]] = {}
+    with _kernel_session() as client:
+        for path in files:
+            diagnostics, _ = _execute_source(client, path.read_text(encoding="utf-8"))
+            if any(DIAGNOSTIC.search(line) for line in diagnostics):
+                raise RuntimeError(
+                    f"cannot export invalid model {path.relative_to(ROOT)}:\n"
+                    + "\n".join(diagnostics)
+                )
+        for package, source in sorted(package_sources.items()):
+            diagnostics, outputs = _execute_source(client, f"%list {package}::**")
+            if diagnostics:
+                raise RuntimeError(f"listing of {package} failed:\n" + "\n".join(diagnostics))
+            listing = next(
+                (
+                    value
+                    for result in outputs
+                    if isinstance((value := result.get("text/plain")), str)
+                ),
+                None,
+            )
+            if listing is None:
+                raise RuntimeError(f"official Java pilot did not list package {package}")
+            named_elements: list[dict[str, str]] = []
+            for line in listing.splitlines():
+                match = LISTING_LINE.match(line.strip())
+                if not match:
+                    if line.strip():
+                        raise RuntimeError(
+                            f"unrecognized official listing line for {package}: {line}"
+                        )
+                    continue
+                listed_name = match.group("name") or ""
+                identification = re.match(r"<([^>]+)>\s+(.*)", listed_name)
+                element = {
+                    "kind": match.group("kind"),
+                    "name": identification.group(2) if identification else listed_name,
+                }
+                if identification:
+                    element["short_name"] = identification.group(1)
+                named_elements.append(element)
+            counts = Counter(element["kind"] for element in named_elements)
+            contract_elements = [
+                element
+                for element in named_elements
+                if element["name"]
+                and (
+                    element["kind"].endswith("Definition")
+                    or element["kind"] in INDEXED_ELEMENT_KINDS
+                )
+            ]
+            package_indexes[package] = {
+                "source": source,
+                "element_counts": dict(sorted(counts.items())),
+                "named_elements": sorted(
+                    contract_elements, key=lambda item: (item["kind"], item["name"])
+                ),
+            }
+
+    value = {
+        "schema_version": 1,
+        "source_digest": _source_digest(files),
+        "validator": {
+            "provider": _lock()["provider"],
+            "release": _lock()["release"],
+            "implementation_version": _lock()["implementation_version"],
+        },
+        "authored_packages": dict(sorted(package_sources.items())),
+        "packages": package_indexes,
+    }
+    output.parent.mkdir(parents=True, exist_ok=True)
+    output.write_text(json.dumps(value, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    print(
+        "Exported official parser-backed model index to "
+        f"{output.resolve().relative_to(ROOT)}."
+    )
 
 
 def main() -> int:
@@ -268,6 +518,15 @@ def main() -> int:
         action="store_true",
         help="require the official validator to reject an unresolved-type probe before validation",
     )
+    validate_parser.add_argument(
+        "--packaged",
+        action="store_true",
+        help="validate sources extracted from the packaged product artifact",
+    )
+    products_parser = subparsers.add_parser("validate-products")
+    products_parser.add_argument("--self-test", action="store_true")
+    export_parser = subparsers.add_parser("export-index")
+    export_parser.add_argument("--output", type=Path, required=True)
     arguments = parser.parse_args()
     if arguments.command == "setup":
         java, jar, library = setup()
@@ -275,7 +534,12 @@ def main() -> int:
         print(f"Pinned validator: {jar}")
         print(f"Pinned library: {library}")
         return 0
-    return validate(arguments.scope, arguments.self_test)
+    if arguments.command == "validate-products":
+        return validate_products(arguments.self_test)
+    if arguments.command == "export-index":
+        export_index(arguments.output)
+        return 0
+    return validate(arguments.scope, arguments.self_test, arguments.packaged)
 
 
 if __name__ == "__main__":

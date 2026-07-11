@@ -37,6 +37,9 @@ def test_model_remains_shadow_until_formal_and_human_gates_pass() -> None:
     assert status["frozen_migration_baseline"] == "docs/components/*.md"
     assert status["gates"]["markdown_retirement"] == "blocked"
     assert status["gates"]["external_sysml_validator"] == "implemented-qualified-headless"
+    assert status["gates"]["packaged_product_validation"] == "implemented"
+    assert status["gates"]["parser_backed_model_index"] == "implemented"
+    assert status["gates"]["model_derived_conformance_objectives"] == "implemented"
     assert status["gates"]["representative_pilots"] == "implemented-pending-human-review"
     assert status["gates"]["accepted_contract_preservation"] == "implemented-pending-human-review"
 
@@ -71,6 +74,63 @@ def test_formal_validator_diagnostic_parser_captures_cell_location() -> None:
         "line": "12",
         "column": "9",
     }
+
+
+def test_formal_validator_inventory_and_import_order_are_fail_closed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    (tmp_path / "A.sysml").write_text(
+        "package A { private import B::*; }", encoding="utf-8"
+    )
+    (tmp_path / "B.sysml").write_text("package B {}", encoding="utf-8")
+    monkeypatch.setattr(sysml_validator, "MODEL_ROOT", tmp_path)
+    monkeypatch.setattr(sysml_validator, "MODEL_ORDER", ("A.sysml", "B.sysml"))
+
+    with pytest.raises(RuntimeError, match="before imported package"):
+        sysml_validator._check_inventory_and_order()
+
+    monkeypatch.setattr(sysml_validator, "MODEL_ORDER", ("B.sysml", "A.sysml"))
+    sysml_validator._check_inventory_and_order()
+    (tmp_path / "Unlisted.sysml").write_text("package Unlisted {}", encoding="utf-8")
+
+    with pytest.raises(RuntimeError, match="unlisted"):
+        sysml_validator._check_inventory_and_order()
+
+
+def test_generated_conformance_objectives_resolve_model_requirements_and_evidence() -> None:
+    data = model_tool._conformance_objectives_data()
+    objectives = data["objectives"]
+
+    assert isinstance(objectives, list)
+    assert len(objectives) == sum(
+        path.read_text(encoding="utf-8").count("verification def ")
+        for path in model_tool._sysml_files("all")
+    )
+    assert all(objective["requirements"] for objective in objectives)
+    assert all(objective["evidence_id"] for objective in objectives)
+    assert all(
+        requirement.startswith(("contract.", "invariant."))
+        for objective in objectives
+        for requirement in objective["requirements"]
+    )
+
+
+def test_official_parser_index_covers_authored_packages_and_public_definitions() -> None:
+    index = json.loads(
+        (ROOT / "docs" / "model" / "generated" / "formal-model-index.json").read_text(
+            encoding="utf-8"
+        )
+    )
+
+    assert len(index["authored_packages"]) == 23
+    assert set(index["packages"]) == set(index["authored_packages"])
+    assert model_tool._check_formal_model_index() == []
+    graph_parts = {
+        element["name"]
+        for element in index["packages"]["BibliotekRtgGraph"]["named_elements"]
+        if element["kind"] == "PartDefinition"
+    }
+    assert "RtgGraph" in graph_parts
 
 
 def test_profile_checker_rejects_unbalanced_and_nonbaseline_text(
@@ -348,6 +408,7 @@ def test_generated_artifact_checker_detects_staleness(
     monkeypatch.setattr(model_tool, "GENERATED_DOC_ROOT", tmp_path)
     monkeypatch.setattr(model_tool, "GENERATED_COMPONENT_DOC_ROOT", tmp_path / "components")
     monkeypatch.setattr(model_tool, "GENERATED_MANIFEST", tmp_path / "manifest.json")
+    monkeypatch.setattr(model_tool, "_check_formal_model_index", lambda: [])
 
     findings = model_tool.check_generated()
 

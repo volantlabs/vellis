@@ -52,9 +52,7 @@
     "command": [
       "{python}",
       "tools/sysml_validator.py",
-      "validate",
-      "--scope",
-      "all",
+      "validate-products",
       "--self-test"
     ],
     "official_java_evaluation": {
