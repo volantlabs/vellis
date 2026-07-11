@@ -1,6 +1,6 @@
 interface:
   display_name: "Component Authoring"
-  short_description: "Design agent-ready components"
-  default_prompt: "Use $component-authoring to design, draft, or review a black-box component spec with contracts, state, invariants, verification, and agent change rules."
+  short_description: "Model components in SysML v2"
+  default_prompt: "Use $component-authoring to design or review a black-box software component or application composition as canonical textual SysML v2."
 policy:
   allow_implicit_invocation: true

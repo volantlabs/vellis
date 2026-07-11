@@ -1,0 +1,965 @@
+{
+  "app_name": "rtg_knowledge_graph",
+  "component_dependencies": [
+    {
+      "id": "component.storage.json_file",
+      "role": "document_storage"
+    },
+    {
+      "id": "component.storage.sql",
+      "role": "controller_ledger_storage"
+    },
+    {
+      "id": "component.rtg.controller",
+      "role": "rtg_system_controller"
+    },
+    {
+      "id": "component.rtg.graph",
+      "role": "graph_store"
+    },
+    {
+      "id": "component.rtg.schema",
+      "role": "schema_registry"
+    },
+    {
+      "id": "component.rtg.constraints",
+      "role": "constraint_registry"
+    },
+    {
+      "id": "component.rtg.migration",
+      "role": "migration_store"
+    },
+    {
+      "id": "component.rtg.change_validation",
+      "role": "change_validator"
+    },
+    {
+      "id": "component.rtg.query",
+      "role": "query_engine"
+    }
+  ],
+  "schema_version": 1,
+  "tools": [
+    {
+      "description": "Return state classification, counts, ledger pointers, and recommended next steps.",
+      "failure_envelope": {
+        "error": {
+          "message": "<message>",
+          "type": "<failure type>"
+        },
+        "ok": false,
+        "optional": [
+          "error.diagnostic",
+          "transaction_id",
+          "validation_report"
+        ]
+      },
+      "name": "rtg_get_system_state",
+      "operation_id": "operation.vellis.rtg_get_system_state",
+      "parameters": [],
+      "success_envelope": {
+        "ok": true,
+        "result": "<encoded action result>"
+      },
+      "transports": [
+        "stdio",
+        "http"
+      ]
+    },
+    {
+      "description": "Return MCP-accessible workflow guidance and complete generic request examples for exactly one declared topic; it does not invent domain schema.",
+      "failure_envelope": {
+        "error": {
+          "message": "<message>",
+          "type": "<failure type>"
+        },
+        "ok": false,
+        "optional": [
+          "error.diagnostic",
+          "transaction_id",
+          "validation_report"
+        ]
+      },
+      "name": "rtg_get_usage_guide",
+      "operation_id": "operation.vellis.rtg_get_usage_guide",
+      "parameters": [
+        {
+          "name": "topic",
+          "required": true
+        }
+      ],
+      "success_envelope": {
+        "ok": true,
+        "result": "<encoded action result>"
+      },
+      "transports": [
+        "stdio",
+        "http"
+      ]
+    },
+    {
+      "description": "Generate a UUID for each schema candidate, force each candidate non-live, resolve each retirement to exactly one live definition, create a ready migration whose membership covers those candidates, submit canonical staged knowledge changes, and return generated IDs, submitted changes, and the controller outcome.",
+      "failure_envelope": {
+        "error": {
+          "message": "<message>",
+          "type": "<failure type>"
+        },
+        "ok": false,
+        "optional": [
+          "error.diagnostic",
+          "transaction_id",
+          "validation_report"
+        ]
+      },
+      "name": "rtg_stage_schema_migration",
+      "operation_id": "operation.vellis.rtg_stage_schema_migration",
+      "parameters": [
+        {
+          "name": "migration_id",
+          "required": true
+        },
+        {
+          "name": "description",
+          "required": true
+        },
+        {
+          "name": "schema_definitions",
+          "required": true
+        },
+        {
+          "name": "retire_live_schema",
+          "required": false
+        },
+        {
+          "default": "strict",
+          "name": "validation_mode",
+          "required": false
+        }
+      ],
+      "success_envelope": {
+        "ok": true,
+        "result": "<encoded action result>"
+      },
+      "transports": [
+        "stdio",
+        "http"
+      ]
+    },
+    {
+      "description": "Compile each anchor and nested fact into canonical writes, generate deterministic request-local fact references where omitted, pass through canonical link writes, and return compiled changes plus validation without mutation or ledger writes.",
+      "failure_envelope": {
+        "error": {
+          "message": "<message>",
+          "type": "<failure type>"
+        },
+        "ok": false,
+        "optional": [
+          "error.diagnostic",
+          "transaction_id",
+          "validation_report"
+        ]
+      },
+      "name": "rtg_validate_live_anchor_records",
+      "operation_id": "operation.vellis.rtg_validate_live_anchor_records",
+      "parameters": [
+        {
+          "name": "anchor_records",
+          "required": true
+        },
+        {
+          "name": "link_writes",
+          "required": false
+        },
+        {
+          "name": "validation_options",
+          "required": false
+        }
+      ],
+      "success_envelope": {
+        "ok": true,
+        "result": "<encoded action result>"
+      },
+      "transports": [
+        "stdio",
+        "http"
+      ]
+    },
+    {
+      "description": "Compile anchor-with-facts input identically to the validation action, apply the canonical graph changes through the controller, and return compiled changes, generated fact references, and operation outcome.",
+      "failure_envelope": {
+        "error": {
+          "message": "<message>",
+          "type": "<failure type>"
+        },
+        "ok": false,
+        "optional": [
+          "error.diagnostic",
+          "transaction_id",
+          "validation_report"
+        ]
+      },
+      "name": "rtg_apply_live_anchor_records",
+      "operation_id": "operation.vellis.rtg_apply_live_anchor_records",
+      "parameters": [
+        {
+          "name": "anchor_records",
+          "required": true
+        },
+        {
+          "name": "link_writes",
+          "required": false
+        },
+        {
+          "default": "strict",
+          "name": "validation_mode",
+          "required": false
+        }
+      ],
+      "success_envelope": {
+        "ok": true,
+        "result": "<encoded action result>"
+      },
+      "transports": [
+        "stdio",
+        "http"
+      ]
+    },
+    {
+      "description": "Validate normal live graph CRUD without mutation or ledger writes.",
+      "failure_envelope": {
+        "error": {
+          "message": "<message>",
+          "type": "<failure type>"
+        },
+        "ok": false,
+        "optional": [
+          "error.diagnostic",
+          "transaction_id",
+          "validation_report"
+        ]
+      },
+      "name": "rtg_validate_live_graph_changes",
+      "operation_id": "operation.vellis.rtg_validate_live_graph_changes",
+      "parameters": [
+        {
+          "name": "graph_changes",
+          "required": true
+        },
+        {
+          "name": "validation_options",
+          "required": false
+        }
+      ],
+      "success_envelope": {
+        "ok": true,
+        "result": "<encoded action result>"
+      },
+      "transports": [
+        "stdio",
+        "http"
+      ]
+    },
+    {
+      "description": "Apply normal live graph CRUD through strict controller policy by default.",
+      "failure_envelope": {
+        "error": {
+          "message": "<message>",
+          "type": "<failure type>"
+        },
+        "ok": false,
+        "optional": [
+          "error.diagnostic",
+          "transaction_id",
+          "validation_report"
+        ]
+      },
+      "name": "rtg_apply_live_graph_changes",
+      "operation_id": "operation.vellis.rtg_apply_live_graph_changes",
+      "parameters": [
+        {
+          "name": "graph_changes",
+          "required": true
+        },
+        {
+          "default": "strict",
+          "name": "validation_mode",
+          "required": false
+        }
+      ],
+      "success_envelope": {
+        "ok": true,
+        "result": "<encoded action result>"
+      },
+      "transports": [
+        "stdio",
+        "http"
+      ]
+    },
+    {
+      "description": "Stage advanced normalized migration-scoped knowledge changes.",
+      "failure_envelope": {
+        "error": {
+          "message": "<message>",
+          "type": "<failure type>"
+        },
+        "ok": false,
+        "optional": [
+          "error.diagnostic",
+          "transaction_id",
+          "validation_report"
+        ]
+      },
+      "name": "rtg_stage_knowledge_changes",
+      "operation_id": "operation.vellis.rtg_stage_knowledge_changes",
+      "parameters": [
+        {
+          "name": "knowledge_changes",
+          "required": true
+        },
+        {
+          "default": "strict",
+          "name": "validation_mode",
+          "required": false
+        }
+      ],
+      "success_envelope": {
+        "ok": true,
+        "result": "<encoded action result>"
+      },
+      "transports": [
+        "stdio",
+        "http"
+      ]
+    },
+    {
+      "description": "Apply the selected migration cutover with validation and failure restoration.",
+      "failure_envelope": {
+        "error": {
+          "message": "<message>",
+          "type": "<failure type>"
+        },
+        "ok": false,
+        "optional": [
+          "error.diagnostic",
+          "transaction_id",
+          "validation_report"
+        ]
+      },
+      "name": "rtg_apply_migration_cutover",
+      "operation_id": "operation.vellis.rtg_apply_migration_cutover",
+      "parameters": [
+        {
+          "name": "migration_id",
+          "required": true
+        },
+        {
+          "name": "cutover_options",
+          "required": false
+        }
+      ],
+      "success_envelope": {
+        "ok": true,
+        "result": "<encoded action result>"
+      },
+      "transports": [
+        "stdio",
+        "http"
+      ]
+    },
+    {
+      "description": "Abandon safe non-live staged work without deleting live records.",
+      "failure_envelope": {
+        "error": {
+          "message": "<message>",
+          "type": "<failure type>"
+        },
+        "ok": false,
+        "optional": [
+          "error.diagnostic",
+          "transaction_id",
+          "validation_report"
+        ]
+      },
+      "name": "rtg_abandon_migration",
+      "operation_id": "operation.vellis.rtg_abandon_migration",
+      "parameters": [
+        {
+          "name": "migration_id",
+          "required": true
+        },
+        {
+          "name": "reason",
+          "required": false
+        }
+      ],
+      "success_envelope": {
+        "ok": true,
+        "result": "<encoded action result>"
+      },
+      "transports": [
+        "stdio",
+        "http"
+      ]
+    },
+    {
+      "description": "Execute the canonical read-only query. full returns RtgQueryResult unchanged; properties_only returns row_index plus requested properties, row count, and diagnostics, adding empty-return-property guidance when appropriate.",
+      "failure_envelope": {
+        "error": {
+          "message": "<message>",
+          "type": "<failure type>"
+        },
+        "ok": false,
+        "optional": [
+          "error.diagnostic",
+          "transaction_id",
+          "validation_report"
+        ]
+      },
+      "name": "rtg_execute_query",
+      "operation_id": "operation.vellis.rtg_execute_query",
+      "parameters": [
+        {
+          "name": "query_spec",
+          "required": true
+        },
+        {
+          "name": "query_options",
+          "required": false
+        },
+        {
+          "name": "response_options",
+          "required": false
+        }
+      ],
+      "success_envelope": {
+        "ok": true,
+        "result": "<encoded action result>"
+      },
+      "transports": [
+        "stdio",
+        "http"
+      ]
+    },
+    {
+      "description": "Build one live-only anchor-plus-associated-data equality query, return resolved status, deterministic matches with resource IDs and selected properties, the submitted query/options, query diagnostics, and guidance that distinguishes zero, one, and multiple matches.",
+      "failure_envelope": {
+        "error": {
+          "message": "<message>",
+          "type": "<failure type>"
+        },
+        "ok": false,
+        "optional": [
+          "error.diagnostic",
+          "transaction_id",
+          "validation_report"
+        ]
+      },
+      "name": "rtg_resolve_anchor_by_fact",
+      "operation_id": "operation.vellis.rtg_resolve_anchor_by_fact",
+      "parameters": [
+        {
+          "name": "anchor_type",
+          "required": true
+        },
+        {
+          "name": "data_type",
+          "required": true
+        },
+        {
+          "name": "property_path",
+          "required": true
+        },
+        {
+          "name": "value",
+          "required": true
+        },
+        {
+          "default": false,
+          "name": "case_sensitive",
+          "required": false
+        }
+      ],
+      "success_envelope": {
+        "ok": true,
+        "result": "<encoded action result>"
+      },
+      "transports": [
+        "stdio",
+        "http"
+      ]
+    },
+    {
+      "description": "Return one graph object by UUID without lifecycle filtering or mutation.",
+      "failure_envelope": {
+        "error": {
+          "message": "<message>",
+          "type": "<failure type>"
+        },
+        "ok": false,
+        "optional": [
+          "error.diagnostic",
+          "transaction_id",
+          "validation_report"
+        ]
+      },
+      "name": "rtg_get_object",
+      "operation_id": "operation.vellis.rtg_get_object",
+      "parameters": [
+        {
+          "name": "object_uuid",
+          "required": true
+        }
+      ],
+      "success_envelope": {
+        "ok": true,
+        "result": "<encoded action result>"
+      },
+      "transports": [
+        "stdio",
+        "http"
+      ]
+    },
+    {
+      "description": "Return every current migration, or one status, in deterministic migration-ID order.",
+      "failure_envelope": {
+        "error": {
+          "message": "<message>",
+          "type": "<failure type>"
+        },
+        "ok": false,
+        "optional": [
+          "error.diagnostic",
+          "transaction_id",
+          "validation_report"
+        ]
+      },
+      "name": "rtg_list_migrations",
+      "operation_id": "operation.vellis.rtg_list_migrations",
+      "parameters": [
+        {
+          "name": "status",
+          "required": false
+        }
+      ],
+      "success_envelope": {
+        "ok": true,
+        "result": "<encoded action result>"
+      },
+      "transports": [
+        "stdio",
+        "http"
+      ]
+    },
+    {
+      "description": "Return one current migration record by stable migration ID.",
+      "failure_envelope": {
+        "error": {
+          "message": "<message>",
+          "type": "<failure type>"
+        },
+        "ok": false,
+        "optional": [
+          "error.diagnostic",
+          "transaction_id",
+          "validation_report"
+        ]
+      },
+      "name": "rtg_get_migration",
+      "operation_id": "operation.vellis.rtg_get_migration",
+      "parameters": [
+        {
+          "name": "migration_id",
+          "required": true
+        }
+      ],
+      "success_envelope": {
+        "ok": true,
+        "result": "<encoded action result>"
+      },
+      "transports": [
+        "stdio",
+        "http"
+      ]
+    },
+    {
+      "description": "Validate current or migration-projected state without mutation.",
+      "failure_envelope": {
+        "error": {
+          "message": "<message>",
+          "type": "<failure type>"
+        },
+        "ok": false,
+        "optional": [
+          "error.diagnostic",
+          "transaction_id",
+          "validation_report"
+        ]
+      },
+      "name": "rtg_validate_graph",
+      "operation_id": "operation.vellis.rtg_validate_graph",
+      "parameters": [
+        {
+          "name": "migration_ids",
+          "required": false
+        },
+        {
+          "name": "validation_options",
+          "required": false
+        }
+      ],
+      "success_envelope": {
+        "ok": true,
+        "result": "<encoded action result>"
+      },
+      "transports": [
+        "stdio",
+        "http"
+      ]
+    },
+    {
+      "description": "Return schema type keys, descriptions, and live counts; exclude non-live types by default and honor a positive optional limit.",
+      "failure_envelope": {
+        "error": {
+          "message": "<message>",
+          "type": "<failure type>"
+        },
+        "ok": false,
+        "optional": [
+          "error.diagnostic",
+          "transaction_id",
+          "validation_report"
+        ]
+      },
+      "name": "rtg_discover_anchor_types",
+      "operation_id": "operation.vellis.rtg_discover_anchor_types",
+      "parameters": [
+        {
+          "name": "discovery_options",
+          "required": false
+        }
+      ],
+      "success_envelope": {
+        "ok": true,
+        "result": "<encoded action result>"
+      },
+      "transports": [
+        "stdio",
+        "http"
+      ]
+    },
+    {
+      "description": "Return selected anchor schemas, associated-data schemas, participating link schemas, and requested live counts.",
+      "failure_envelope": {
+        "error": {
+          "message": "<message>",
+          "type": "<failure type>"
+        },
+        "ok": false,
+        "optional": [
+          "error.diagnostic",
+          "transaction_id",
+          "validation_report"
+        ]
+      },
+      "name": "rtg_get_schema_pack",
+      "operation_id": "operation.vellis.rtg_get_schema_pack",
+      "parameters": [
+        {
+          "name": "anchor_type_keys",
+          "required": true
+        },
+        {
+          "name": "schema_pack_options",
+          "required": false
+        }
+      ],
+      "success_envelope": {
+        "ok": true,
+        "result": "<encoded action result>"
+      },
+      "transports": [
+        "stdio",
+        "http"
+      ]
+    },
+    {
+      "description": "Return the full coordinated snapshot when summary is false; otherwise return snapshot_exported plus compact component counts and ledger pointers.",
+      "failure_envelope": {
+        "error": {
+          "message": "<message>",
+          "type": "<failure type>"
+        },
+        "ok": false,
+        "optional": [
+          "error.diagnostic",
+          "transaction_id",
+          "validation_report"
+        ]
+      },
+      "name": "rtg_export_system_snapshot",
+      "operation_id": "operation.vellis.rtg_export_system_snapshot",
+      "parameters": [
+        {
+          "default": false,
+          "name": "summary",
+          "required": false
+        }
+      ],
+      "success_envelope": {
+        "ok": true,
+        "result": "<encoded action result>"
+      },
+      "transports": [
+        "stdio",
+        "http"
+      ]
+    },
+    {
+      "description": "Persist a coordinated snapshot, add relative path and compact summary to the controller result, and omit the full snapshot only when requested.",
+      "failure_envelope": {
+        "error": {
+          "message": "<message>",
+          "type": "<failure type>"
+        },
+        "ok": false,
+        "optional": [
+          "error.diagnostic",
+          "transaction_id",
+          "validation_report"
+        ]
+      },
+      "name": "rtg_persist_system_snapshot",
+      "operation_id": "operation.vellis.rtg_persist_system_snapshot",
+      "parameters": [
+        {
+          "name": "relative_path",
+          "required": true
+        },
+        {
+          "default": true,
+          "name": "return_snapshot",
+          "required": false
+        }
+      ],
+      "success_envelope": {
+        "ok": true,
+        "result": "<encoded action result>"
+      },
+      "transports": [
+        "stdio",
+        "http"
+      ]
+    },
+    {
+      "description": "List only persisted snapshot-like documents visible through the configured JSON storage root.",
+      "failure_envelope": {
+        "error": {
+          "message": "<message>",
+          "type": "<failure type>"
+        },
+        "ok": false,
+        "optional": [
+          "error.diagnostic",
+          "transaction_id",
+          "validation_report"
+        ]
+      },
+      "name": "rtg_list_persisted_snapshots",
+      "operation_id": "operation.vellis.rtg_list_persisted_snapshots",
+      "parameters": [],
+      "success_envelope": {
+        "ok": true,
+        "result": "<encoded action result>"
+      },
+      "transports": [
+        "stdio",
+        "http"
+      ]
+    },
+    {
+      "description": "Load and validate one persisted snapshot, always return path and compact summary, and omit the full snapshot only when requested; do not apply it.",
+      "failure_envelope": {
+        "error": {
+          "message": "<message>",
+          "type": "<failure type>"
+        },
+        "ok": false,
+        "optional": [
+          "error.diagnostic",
+          "transaction_id",
+          "validation_report"
+        ]
+      },
+      "name": "rtg_load_persisted_snapshot",
+      "operation_id": "operation.vellis.rtg_load_persisted_snapshot",
+      "parameters": [
+        {
+          "name": "relative_path",
+          "required": true
+        },
+        {
+          "default": true,
+          "name": "return_snapshot",
+          "required": false
+        }
+      ],
+      "success_envelope": {
+        "ok": true,
+        "result": "<encoded action result>"
+      },
+      "transports": [
+        "stdio",
+        "http"
+      ]
+    },
+    {
+      "description": "Reconstruct state from an empty or explicit snapshot seed using the selected ascending ledger window.",
+      "failure_envelope": {
+        "error": {
+          "message": "<message>",
+          "type": "<failure type>"
+        },
+        "ok": false,
+        "optional": [
+          "error.diagnostic",
+          "transaction_id",
+          "validation_report"
+        ]
+      },
+      "name": "rtg_replay_ledger",
+      "operation_id": "operation.vellis.rtg_replay_ledger",
+      "parameters": [
+        {
+          "name": "replay_options",
+          "required": false
+        }
+      ],
+      "success_envelope": {
+        "ok": true,
+        "result": "<encoded action result>"
+      },
+      "transports": [
+        "stdio",
+        "http"
+      ]
+    },
+    {
+      "description": "Replay into isolated state and return summaries, count differences, replay window, and validation without replacing current state.",
+      "failure_envelope": {
+        "error": {
+          "message": "<message>",
+          "type": "<failure type>"
+        },
+        "ok": false,
+        "optional": [
+          "error.diagnostic",
+          "transaction_id",
+          "validation_report"
+        ]
+      },
+      "name": "rtg_verify_replay_from_ledger",
+      "operation_id": "operation.vellis.rtg_verify_replay_from_ledger",
+      "parameters": [
+        {
+          "name": "replay_options",
+          "required": false
+        }
+      ],
+      "success_envelope": {
+        "ok": true,
+        "result": "<encoded action result>"
+      },
+      "transports": [
+        "stdio",
+        "http"
+      ]
+    },
+    {
+      "description": "Return ledger-backed staged, cutover-applied, cutover-failed, and abandoned events in ledger order.",
+      "failure_envelope": {
+        "error": {
+          "message": "<message>",
+          "type": "<failure type>"
+        },
+        "ok": false,
+        "optional": [
+          "error.diagnostic",
+          "transaction_id",
+          "validation_report"
+        ]
+      },
+      "name": "rtg_list_migration_history",
+      "operation_id": "operation.vellis.rtg_list_migration_history",
+      "parameters": [],
+      "success_envelope": {
+        "ok": true,
+        "result": "<encoded action result>"
+      },
+      "transports": [
+        "stdio",
+        "http"
+      ]
+    },
+    {
+      "description": "Retry queued audit records in original order and report remaining degraded-audit state.",
+      "failure_envelope": {
+        "error": {
+          "message": "<message>",
+          "type": "<failure type>"
+        },
+        "ok": false,
+        "optional": [
+          "error.diagnostic",
+          "transaction_id",
+          "validation_report"
+        ]
+      },
+      "name": "rtg_flush_ledger_failures",
+      "operation_id": "operation.vellis.rtg_flush_ledger_failures",
+      "parameters": [],
+      "success_envelope": {
+        "ok": true,
+        "result": "<encoded action result>"
+      },
+      "transports": [
+        "stdio",
+        "http"
+      ]
+    },
+    {
+      "description": "Validate and atomically restore coordinated state; record the operation by default and reserve skip for internal recovery.",
+      "failure_envelope": {
+        "error": {
+          "message": "<message>",
+          "type": "<failure type>"
+        },
+        "ok": false,
+        "optional": [
+          "error.diagnostic",
+          "transaction_id",
+          "validation_report"
+        ]
+      },
+      "name": "rtg_restore_from_snapshot",
+      "operation_id": "operation.vellis.rtg_restore_from_snapshot",
+      "parameters": [
+        {
+          "name": "snapshot",
+          "required": true
+        },
+        {
+          "name": "restore_options",
+          "required": false
+        }
+      ],
+      "success_envelope": {
+        "ok": true,
+        "result": "<encoded action result>"
+      },
+      "transports": [
+        "stdio",
+        "http"
+      ]
+    }
+  ]
+}

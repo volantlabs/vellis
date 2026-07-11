@@ -3,6 +3,7 @@ id: component.storage.sql
 type: Component
 status: accepted
 owner: humans
+model: model/bibliotek/components/component.storage.sql.sysml
 code:
   roots:
     - components/storage/sql

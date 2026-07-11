@@ -3,6 +3,7 @@ id: component.rtg.discovery
 type: Component
 status: draft
 owner: humans
+model: model/bibliotek/components/component.rtg.discovery.sysml
 code:
   roots:
     - components/rtg/discovery

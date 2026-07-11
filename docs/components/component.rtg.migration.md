@@ -3,6 +3,7 @@ id: component.rtg.migration
 type: Component
 status: accepted
 owner: humans
+model: model/bibliotek/components/component.rtg.migration.sysml
 code:
   roots:
     - components/rtg/migration

@@ -1,6 +1,6 @@
 interface:
   display_name: "Documentation Sync"
-  short_description: "Keep repository docs aligned"
-  default_prompt: "Use $documentation-sync to update Vellis documentation after specs, code, tooling, skills, or workflow rules change."
+  short_description: "Sync model-derived documentation"
+  default_prompt: "Use $documentation-sync to regenerate SysML-derived views and align repository documentation after model, code, tooling, or workflow changes."
 policy:
   allow_implicit_invocation: true

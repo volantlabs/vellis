@@ -3,6 +3,7 @@ id: component.rtg.schema
 type: Component
 status: accepted
 owner: humans
+model: model/bibliotek/components/component.rtg.schema.sysml
 code:
   roots:
     - components/rtg/schema

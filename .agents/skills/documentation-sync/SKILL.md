@@ -1,54 +1,55 @@
 ---
 name: documentation-sync
-description: Keep Vellis documentation synchronized with component specs, Python implementations, repo tooling, skills, and workflow rules. Use after changes to README.md, AGENTS.md, docs/components specs, .agents/skills, pyproject.toml, justfile, component directories, tests, or public behavior that should be reflected in docs.
+description: Keep human documentation synchronized with canonical SysML v2 models, generated component and application views, implementation realizations, repository tooling, skills, and workflow rules. Use after model, code, generated-view, README, AGENTS, skill, command, or public behavior changes.
 ---
 
 # Documentation Sync
 
-Use this skill when repository changes may make durable documentation stale. Keep documentation current without duplicating every detail across every file.
+Keep each documentation projection useful without creating a second source of component truth.
+
+## Source Direction
+
+```text
+textual SysML/KPAR -> generated component, application, and manifest views
+```
+
+Hand-authored Markdown may explain rationale, tutorials, operations, evolution, or unresolved
+questions. It must not independently restate normative action signatures, state, dependencies, or
+invariants.
 
 ## Workflow
 
-1. Identify the source of truth for the change.
-2. List documentation surfaces that may reference that behavior, rule, tool, or component.
-3. Update only the docs whose reader needs the changed information.
-4. Preserve the role of each document.
-5. Run the narrowest relevant checks.
-6. Report what was updated and what was intentionally left unchanged.
+1. Identify the canonical model or implementation change.
+2. Run `just model-render` for model-derived views and manifests.
+3. Review generated component pages for public construction and instance actions, exact
+   signatures/defaults, failures, state authority, state effects, requirements, invariants,
+   dependencies, and verification objectives. A fresh but incomplete projection fails sync.
+4. When an accepted source or prior model exists, confirm the projection preserves its public
+   meaning unless an explicit contract change was approved.
+5. When package ownership or imports change, update library/application indexes and confirm the
+   generated dependency direction still matches the canonical model.
+6. Update only hand-authored documents whose readers need new context or workflow guidance.
+7. Update AGENTS when repository-wide authoring or realization rules change.
+8. Update reusable skills only for generally applicable workflow improvements; keep product names,
+   migration findings, and repository-specific package maps in repository guidance.
+9. Update skill UI metadata when a skill's purpose changes.
+10. Run `just skills-check`, `just model-check`, and the narrowest relevant repository checks.
 
 ## Documentation Roles
 
-- `README.md`: human-facing project overview, setup, common workflows, and current status.
-- `AGENTS.md`: repository-wide operating rules for agents and contributors.
-- `docs/components/*.md`: component-local contracts, owned state, dependencies, invariants, verification, lifecycle, and open questions.
-- `.agents/skills/*/SKILL.md`: reusable agent workflows for repeated repo tasks.
-- `.agents/skills/*/agents/openai.yaml`: UI metadata for skills; keep it aligned with the skill purpose.
-- `pyproject.toml`, `.python-version`, `uv.lock`, and `justfile`: executable project and tooling configuration, not prose documentation.
+- `model/**/*.sysml`: normative component and application design when designated canonical by the repository.
+- `docs/model/generated/`: generated, non-normative human views; never edit by hand.
+- `README.md`: project orientation, current architecture, links, setup, and common workflows.
+- `AGENTS.md`: repository-wide contributor and agent rules.
+- `docs/model/`: hand-authored modeling guidance and operational runbooks.
+- `.agents/skills/`: reusable authoring, realization, and maintenance workflows.
 
-## Sync Rules
+## Rules
 
-- When public component behavior changes, update the component spec in the same change.
-- When repo-wide workflow changes, update `AGENTS.md` and only summarize in `README.md` if humans need it.
-- When setup commands, Python version, dependencies, or task recipes change, update `README.md`, `AGENTS.md`, and executable config together when applicable.
-- When adding or changing a repeated agent workflow, update or add a skill and mention it in `AGENTS.md` if agents must use it.
-- When public affordance names or workflows change, check durable eval prompts, examples, and reference-app docs that teach agents or humans how to use those affordances.
-- When implementation exposes unclear design, record the uncertainty under the affected component spec's `Open questions` instead of hiding it in README prose.
-- Do not create ADRs by default; use component specs or `AGENTS.md` unless a durable cross-component rule cannot fit there.
-
-## Avoid Over-Syncing
-
-- Do not copy full component specs into `README.md`.
-- Do not make `README.md` authoritative for agent rules.
-- Do not document private helper structure unless it affects a public contract, owned state, invariant, dependency, verification, or runtime assumption.
-- Do not update unrelated docs just because they are nearby.
-- Do not add historical narratives when the current rule is enough.
-
-## Checks
-
-Prefer these checks when relevant:
-
-- `just check` for repository lint, type checking, skill validation, and tests.
-- `just skills-check` after changing repo-local skills.
-- Link and path readback for changed Markdown files.
-- Skill frontmatter readback for changed skills.
-- `uv sync --dev` when Python dependency metadata changes.
+- Change the model, not generated Markdown, when a public component contract changes.
+- Keep generated-artifact freshness in ordinary `model-check`.
+- Freshness is insufficient: generated pages must expose every modeled public contract, including
+  package-level constructors, failure mappings, defaults, and verification closure.
+- Record unclear model/implementation behavior as compact drift rather than explanatory duplication.
+- Do not create historical archives or ADRs when Git history and the current model are sufficient.
+- Do not copy full model contracts into README or workflow documents.

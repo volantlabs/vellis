@@ -1,0 +1,18 @@
+{
+  "phase": "shadow",
+  "authored_design": "model/**/*.sysml",
+  "generated_documentation": "docs/model/generated/**/*.md",
+  "frozen_migration_baseline": "docs/components/*.md",
+  "gates": {
+    "right_sized_modeling_profile": "implemented",
+    "accepted_contract_preservation": "implemented-pending-human-review",
+    "black_box_rebuild_readiness": "implemented-pending-human-review",
+    "representative_pilots": "implemented-pending-human-review",
+    "external_sysml_validator": "pending",
+    "bibliotek_human_acceptance": "pending",
+    "vellis_human_acceptance": "pending",
+    "generated_views": "implemented",
+    "markdown_retirement": "blocked"
+  },
+  "rule": "Author new design in SysML. Keep formal cutover and Markdown retirement blocked until pinned formal validation and human acceptance pass."
+}

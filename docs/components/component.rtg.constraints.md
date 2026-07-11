@@ -3,6 +3,7 @@ id: component.rtg.constraints
 type: Component
 status: accepted
 owner: humans
+model: model/bibliotek/components/component.rtg.constraints.sysml
 code:
   roots:
     - components/rtg/constraints

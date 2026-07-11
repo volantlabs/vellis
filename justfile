@@ -28,6 +28,36 @@ typecheck:
 build:
     @uv build
 
+# Fetch and verify pinned SysML/KerML assets, then inspect the validator gate.
+model-setup:
+    @uv run python tools/model_tool.py setup
+
+model-check-foundation:
+    @uv run python tools/model_tool.py check --scope foundation
+
+model-check-bibliotek:
+    @uv run python tools/model_tool.py check --scope bibliotek
+
+model-check-vellis:
+    @uv run python tools/model_tool.py check --scope vellis
+
+# Run repository profile, architecture, realization, and generated-artifact checks.
+model-check:
+    @uv run python tools/model_tool.py check --scope all
+    @uv run python tools/model_tool.py check-generated
+
+model-render:
+    @uv run python tools/model_tool.py render
+
+model-package:
+    @uv run python tools/model_tool.py package
+
+model-diff:
+    @uv run python tools/model_tool.py diff
+
+model-handoff *args:
+    @target="{{args}}"; target="${target#TARGET=}"; test -n "$target" || { echo "Set TARGET=<stable-id>" >&2; exit 2; }; uv run python tools/model_tool.py handoff "$target"
+
 # Run the RTG Knowledge Graph app with default .data storage.
 rtg:
     @uv run python -m apps.rtg_knowledge_graph --json
@@ -61,4 +91,4 @@ run-rtg-knowledge-graph-mcp *args:
 run-rtg-knowledge-graph-mcp-info *args:
     @uv run python -m apps.rtg_knowledge_graph serve-mcp --dry-run --json {{args}}
 
-check: lint typecheck skills-check test
+check: lint typecheck skills-check model-check test

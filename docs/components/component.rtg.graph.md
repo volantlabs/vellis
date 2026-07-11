@@ -3,6 +3,7 @@ id: component.rtg.graph
 type: Component
 status: accepted
 owner: humans
+model: model/bibliotek/components/component.rtg.graph.sysml
 code:
   roots:
     - components/rtg/graph

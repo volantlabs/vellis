@@ -3,6 +3,7 @@ id: component.rtg.controller
 type: Component
 status: accepted
 owner: humans
+model: model/bibliotek/components/component.rtg.controller.sysml
 code:
   roots:
     - components/rtg/controller

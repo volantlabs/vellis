@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
+from importlib.resources import files
 from pathlib import Path
+from typing import cast
 
 from apps.rtg_knowledge_graph.config import RtgKnowledgeGraphConfig
 from apps.rtg_knowledge_graph.mcp_launch import MCP_SERVER_NAME, mcp_launch_metadata
@@ -70,62 +73,23 @@ class RtgKnowledgeGraphRunner:
                 sql_database_path=self._sql_database_path,
             )
         )
-        return {
-            "app_name": APP_NAME,
-            "schema_version": 1,
-            "component_dependencies": [
-                {
-                    "id": "component.storage.json_file",
-                    "role": "document_storage",
-                },
-                {
-                    "id": "component.storage.sql",
-                    "role": "controller_ledger_storage",
-                },
-                {
-                    "id": "component.rtg.controller",
-                    "role": "rtg_system_controller",
-                },
-                {
-                    "id": "component.rtg.graph",
-                    "role": "graph_store",
-                },
-                {
-                    "id": "component.rtg.schema",
-                    "role": "schema_registry",
-                },
-                {
-                    "id": "component.rtg.constraints",
-                    "role": "constraint_registry",
-                },
-                {
-                    "id": "component.rtg.migration",
-                    "role": "migration_store",
-                },
-                {
-                    "id": "component.rtg.change_validation",
-                    "role": "change_validator",
-                },
-                {
-                    "id": "component.rtg.query",
-                    "role": "query_engine",
-                },
-            ],
-            "interfaces": [
-                {
-                    "kind": "mcp",
-                    "server_name": MCP_SERVER_NAME,
-                    "transport": "stdio",
-                    "launch_mode": mcp["launch_mode"],
-                    "state_mode": mcp["state_mode"],
-                    "eval_prompt_path": mcp["eval_prompt_path"],
-                    "recommended_eval_prompt": mcp["recommended_eval_prompt"],
-                    "eval_prompts": mcp["eval_prompts"],
-                    "guides": mcp["guides"],
-                    "first_call": mcp["first_call"],
-                    "transports": mcp["transports"],
-                    "launch": mcp["launch"],
-                    "client_config": mcp["client_config"],
-                }
-            ],
-        }
+        resource = files("apps.rtg_knowledge_graph.resources").joinpath("model_app_manifest.json")
+        manifest = cast(dict[str, JsonValue], json.loads(resource.read_text(encoding="utf-8")))
+        manifest["interfaces"] = [
+            {
+                "kind": "mcp",
+                "server_name": MCP_SERVER_NAME,
+                "transport": "stdio",
+                "launch_mode": mcp["launch_mode"],
+                "state_mode": mcp["state_mode"],
+                "eval_prompt_path": mcp["eval_prompt_path"],
+                "recommended_eval_prompt": mcp["recommended_eval_prompt"],
+                "eval_prompts": mcp["eval_prompts"],
+                "guides": mcp["guides"],
+                "first_call": mcp["first_call"],
+                "transports": mcp["transports"],
+                "launch": mcp["launch"],
+                "client_config": mcp["client_config"],
+            }
+        ]
+        return manifest

@@ -1,8 +1,11 @@
 # Vellis
 
-Vellis is both a reusable AI-native component library and the first application built from those
-components: a local RTG (Reified Typed Graph) knowledge system for humans working with AI agents, 
-or for agents working on their own.
+This repository contains two deliberately separate products while early adopters benefit from a
+single clone:
+
+- **Bibliotek** is the reusable AI-native software component library.
+- **Vellis** is the first application composed from Bibliotek: a local RTG (Reified Typed Graph)
+  knowledge system for humans working with AI agents, or for agents working on their own.
 
 The repository is clone-and-run for beta and open-source evaluation. It gives first-time users two
 entry points:
@@ -14,10 +17,9 @@ entry points:
 - **Build with the components**: use the storage, RTG graph, schema, migration, validation, query,
   and controller components as reusable building blocks for follow-on applications.
 
-Vellis currently lives in this repository as the first application manufactured from the component
-library. In a future repository layout, the application may move into its own repo and depend on the
-library package; until then, this repo is the first stop for both using Vellis and understanding how
-new component-based systems can be built.
+The library and application are independently modeled and packageable even though their Python
+sources currently share this repository. Bibliotek never depends on Vellis. In a future repository
+layout, each can move to its own repo without changing the component contracts.
 
 ## Start Here: Use Vellis With An AI Agent
 
@@ -123,21 +125,21 @@ Vellis evolves in this order:
 
 1. Build a coherent component library.
 2. Ship Vellis as the first turnkey application assembled from those components.
-3. Add tooling and SDK surfaces for building software from component specs.
+3. Add tooling and SDK surfaces for building software from component models.
 4. Add runtime support, including distributed-runtime patterns, when component contracts justify it.
 
-Current component specs include:
+Current generated component views include:
 
-- [`component.storage.json_file`](docs/components/component.storage.json_file.md): local filesystem-backed JSON document storage.
-- [`component.storage.sql`](docs/components/component.storage.sql.md): SQLite-backed generic SQL execution surface for durable relational storage consumers.
-- [`component.rtg.graph`](docs/components/component.rtg.graph.md): schema-neutral in-memory reified type graph for anchors, data objects, links, and direct UUID indexes.
-- [`component.rtg.schema`](docs/components/component.rtg.schema.md): RTG-native schema-definition store for live and non-live anchor, data object, and link definitions.
-- [`component.rtg.constraints`](docs/components/component.rtg.constraints.md): constraint-definition store for RTG graph-pattern and lifecycle rules.
-- [`component.rtg.migration`](docs/components/component.rtg.migration.md): migration records that track schema, constraint, and graph lifecycle cutover sets.
-- [`component.rtg.change_validation`](docs/components/component.rtg.change_validation.md): batch validator for proposed RTG changes using isolated schema/object, constraint/network, and migration/cutover tracks.
-- [`component.rtg.query`](docs/components/component.rtg.query.md): declarative query evaluator for anchor buckets, typed links, associated data requirements, and return shaping.
-- [`component.rtg.discovery`](docs/components/component.rtg.discovery.md): deferred curated discovery-view component for narrowing large RTG schema spaces.
-- [`component.rtg.controller`](docs/components/component.rtg.controller.md): main in-code orchestration surface and black-box API for the RTG knowledge graph system.
+- [`component.storage.json_file`](docs/model/generated/components/component.storage.json_file.md): local filesystem-backed JSON document storage.
+- [`component.storage.sql`](docs/model/generated/components/component.storage.sql.md): SQLite-backed generic SQL execution surface for durable relational storage consumers.
+- [`component.rtg.graph`](docs/model/generated/components/component.rtg.graph.md): schema-neutral in-memory reified type graph for anchors, data objects, links, and direct UUID indexes.
+- [`component.rtg.schema`](docs/model/generated/components/component.rtg.schema.md): RTG-native schema-definition store for live and non-live anchor, data object, and link definitions.
+- [`component.rtg.constraints`](docs/model/generated/components/component.rtg.constraints.md): constraint-definition store for RTG graph-pattern and lifecycle rules.
+- [`component.rtg.migration`](docs/model/generated/components/component.rtg.migration.md): migration records that track schema, constraint, and graph lifecycle cutover sets.
+- [`component.rtg.change_validation`](docs/model/generated/components/component.rtg.change_validation.md): batch validator with isolated validation tracks.
+- [`component.rtg.query`](docs/model/generated/components/component.rtg.query.md): declarative graph query evaluator.
+- [`component.rtg.discovery`](docs/model/generated/components/component.rtg.discovery.md): draft curated discovery-view component.
+- [`component.rtg.controller`](docs/model/generated/components/component.rtg.controller.md): cross-component orchestration and invariant owner.
 
 Current Python implementations include:
 
@@ -166,21 +168,30 @@ Manual evaluation prompts include:
 - [`docs/evals/rtg-agent-affordance-eval-runbook.md`](docs/evals/rtg-agent-affordance-eval-runbook.md): launch and prompt-sequencing guidance for running the RTG MCP eval.
 - [`docs/evals/rtg-individual-life-graph-beta-prompt.md`](docs/evals/rtg-individual-life-graph-beta-prompt.md): the initial individual multi-domain life-graph beta prompt for personal and professional planning.
 
-## Component Specs
+## Component Models
 
-Component specs live in [`docs/components/`](docs/components/). They are black-box contracts owned by humans and implemented by agents.
+Textual SysML v2 under [`model/`](model/) is the authored black-box design for Bibliotek and
+Vellis. It captures typed public actions and values, abstract owned state, action effects,
+principal failures, required capabilities, invariants, application composition, use cases, and
+realizations. Human-readable pages under [`docs/model/generated/`](docs/model/generated/) are
+generated projections and must not be edited as alternate specifications.
 
-A component spec defines:
+The model currently remains in shadow status: the former Markdown specifications are frozen as a
+migration baseline until the pinned formal-validator and human model-acceptance gates pass. New
+contract work belongs in SysML, while known implementation disagreements are recorded compactly in
+[`model/implementation-drift.yaml`](model/implementation-drift.yaml). See
+[`docs/sysml-modeling.md`](docs/sysml-modeling.md) for the modeling profile and gate status.
+
+A component model defines:
 
 - purpose
-- responsibilities and non-responsibilities
-- provided and required contracts
-- owned state
-- invariants
-- verification expectations
-- agent change rules
+- public values/items and provided/required actions
+- abstract owned state and action read/write effects
+- principal failures and no-effect guarantees
+- invariants and contract-significant behavior
+- verification objectives
 
-Specs use lifecycle statuses:
+Models use lifecycle statuses:
 
 - `draft`: proposed boundary for discussion or early implementation
 - `accepted`: human-approved and normative for implementation
@@ -191,7 +202,7 @@ Only a human owner may move a component to `accepted`, `deprecated`, or `retired
 
 ## Python Components
 
-Component specs are language-neutral contracts; Python is the first implementation target, not the only possible one. Other language implementations may be produced from the same specs without changing their meaning.
+Component models are language-neutral contracts; Python is the first implementation target, not the only possible one. Other language implementations may be produced from the same model without changing its meaning.
 
 Each component should have its own directory. By default, map component IDs to implementation directories by removing the `component.` prefix and replacing dots with path separators:
 
@@ -253,6 +264,11 @@ Useful recipes:
 - `just typecheck`: run BasedPyright checks
 - `just format`: format Python code with Ruff
 - `just build`: build source and wheel distributions for release validation
+- `just model-setup`: fetch and verify pinned SysML/KerML assets and inspect the validator gate
+- `just model-check`: check model structure, architecture, realization drift, and generated files
+- `just model-render`: regenerate model views and the static application manifest
+- `just model-package`: build independently packageable shadow KPAR candidates
+- `just model-handoff TARGET=<stable-id>`: inspect a model slice for an implementation handoff
 - `just skills-check`: validate repo-local skill metadata
 - `just skills-sync`: expose source-of-truth repo skills in Claude Code's project-skill layout
 - `just rtg`: launch the RTG Knowledge Graph app with default local `.data/` storage
@@ -265,7 +281,7 @@ Useful recipes:
 - `just run-rtg-knowledge-graph-mcp`: launch the RTG Knowledge Graph MCP server
 - `just run-rtg-knowledge-graph-mcp-info`: print RTG MCP dry-run metadata and client config
 - `vellis-rtg-knowledge-graph`: installed console script for the RTG Knowledge Graph app
-- `just check`: run lint, type checking, skill validation, and tests
+- `just check`: run lint, type checking, skill validation, model checks, and tests
 
 Launch the first application with the default local `.data/` storage:
 
@@ -334,4 +350,4 @@ Repo-local agent skills live in [`.agents/skills/`](.agents/skills/). This is th
 
 ## Status
 
-This repository is beta-stage. The component spec system, Python project infrastructure, initial component implementations, and local RTG Knowledge Graph eval path are in place.
+This repository is beta-stage. The SysML component-model system, Python project infrastructure, initial component implementations, and local RTG Knowledge Graph eval path are in place.

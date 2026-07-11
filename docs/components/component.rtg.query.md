@@ -3,6 +3,7 @@ id: component.rtg.query
 type: Component
 status: accepted
 owner: humans
+model: model/bibliotek/components/component.rtg.query.sysml
 code:
   roots:
     - components/rtg/query

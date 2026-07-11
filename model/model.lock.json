@@ -1,0 +1,60 @@
+{
+  "language": {
+    "sysml": "2.0",
+    "kerml": "1.0",
+    "sysml_specification": "https://www.omg.org/spec/SysML/2.0",
+    "kerml_specification": "https://www.omg.org/spec/KerML/1.0"
+  },
+  "libraries": {
+    "policy": "formal-2.0-only",
+    "source": "OMG formal machine-readable artifacts",
+    "floating_versions_allowed": false,
+    "artifacts": [
+      {
+        "id": "sysml-systems-library-2.0.0",
+        "url": "https://www.omg.org/spec/SysML/20250201/Systems-Library.kpar",
+        "sha256": "df7d8b2c6e08232ca7ce123a63148949c383fcbeaeba8d89c27ceece43793a1f"
+      },
+      {
+        "id": "kerml-semantic-library-1.0.0",
+        "url": "https://www.omg.org/spec/KerML/20250201/Semantic-Library.kpar",
+        "sha256": "6d9e311646a557cb08b64313cab6a7931109751b2ac7fbfcefad5c2216a6167b"
+      },
+      {
+        "id": "kerml-data-type-library-1.0.0",
+        "url": "https://www.omg.org/spec/KerML/20250201/Data-Type-Library.kpar",
+        "sha256": "957e4ff5c60f7fc5eedaf0b6d4f776856061c0aa7a424e260eeccb8d6ed7bfbd"
+      },
+      {
+        "id": "kerml-function-library-1.0.0",
+        "url": "https://www.omg.org/spec/KerML/20250201/Function-Library.kpar",
+        "sha256": "a8319da3ab1d8ffc0f390ea1aef29d85a00451655c41a9267ce396845c2b1c8d"
+      }
+    ]
+  },
+  "grammar": {
+    "sysml_language_pdf": {
+      "url": "https://www.omg.org/spec/SysML/2.0/Language/PDF",
+      "sha256": "46e6c0476a6f1f34f367d57e039d56659bff75e41d2e4b3d37ca4cadea84a83a"
+    },
+    "kerml_language_pdf": {
+      "url": "https://www.omg.org/spec/KerML/1.0/PDF",
+      "sha256": "3bcc96f989bfa9d05cd28e026df3351b795fe8d494187b87bff3db7d96373697"
+    }
+  },
+  "validator": {
+    "adapter": "tools/model_tool.py",
+    "profile_validation": "required",
+    "external_validation": "required-before-cutover",
+    "external_provider": null,
+    "external_version": null,
+    "external_checksum": null,
+    "official_java_evaluation": {
+      "candidate": "Systems-Modeling/SysML-v2-Pilot-Implementation",
+      "status": "pending-java-runtime-and-2.0-compatible-headless-distribution",
+      "rejected_input": "The locally inspected incremental release contains SysML 2.1/KerML 1.1 development libraries and is not the pinned baseline.",
+      "rejected_input_commit": "288d129",
+      "local_java_runtime": "unavailable"
+    }
+  }
+}

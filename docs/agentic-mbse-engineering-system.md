@@ -4,7 +4,11 @@
 
 This note captures a working thesis for an agentic engineering system built around a durable model, not around disconnected documents, tickets, plans, and implementation artifacts.
 
-The current component specs are a bootstrap representation. The long-term goal is to move the source of truth into an RTG-backed model that agents and humans can use to design, plan, implement, validate, and ship software systems with stronger cohesion and traceability.
+The former Markdown component specs are the frozen bootstrap representation. The selected target
+is committed textual SysML v2: a native-first model that agents and humans use to design,
+implement, validate, and ship Bibliotek components and Vellis applications with stronger cohesion
+and traceability. During migration the model remains in shadow status until formal validation and
+human acceptance; new design is authored in SysML and prose is generated from it.
 
 ## Thesis
 
@@ -89,7 +93,7 @@ Humans should not need to author raw SysML, graph records, or Markdown specs by 
 
 ## Canonical Model Scope
 
-The first useful model should be narrower than a full systems-engineering universe. It should begin with the concepts already proven useful in the component specs:
+The first useful model should be narrower than a full systems-engineering universe. It should begin with the concepts already proven useful in the component models:
 
 - `Component`
 - `ProvidedContract`
@@ -141,7 +145,9 @@ Useful relationships include:
 
 SysML v2 is the likely reference standard for the MBSE side of the model because it covers requirements, structure, behavior, analysis, and verification. KerML is useful as the conceptual foundation behind SysML v2.
 
-The internal model should probably be a Vellis profile aligned with SysML v2 rather than raw SysML v2 as the only canonical representation. Vellis has domain-specific concepts that matter:
+The canonical form should use native SysML constructs plus ordinary typed governance metadata,
+not a custom language or implicit specialization. The software-component modeling foundation adds
+metadata for the repository concepts that SysML does not itself govern:
 
 - component boundary
 - invariant ownership
@@ -163,7 +169,9 @@ Other standards may be useful as projections or imports:
 
 The practical stance is:
 
-Use SysML v2 as the reference and interoperability target. Use a Vellis RTG profile as the canonical working model.
+Use textual SysML v2.0 committed to Git as the semantic source of truth after the migration gates
+pass. Use RTG as a potential query, projection, or collaboration realization—not as a second
+canonical representation. Keep the foundation, Bibliotek, and Vellis independently packageable.
 
 ## Artifact Policy
 
@@ -189,10 +197,11 @@ Disconnected artifacts should either be imported into the model, linked as evide
 
 A full implementation would likely need these layers:
 
-1. Canonical model layer: RTG stores typed engineering graph objects.
-2. Schema and constraint layer: validates object-level and network-level model integrity.
+1. Canonical model layer: textual SysML v2 stores typed engineering model elements in Git.
+2. Language and profile layer: a pinned formal validator plus repository architecture checks
+   validate language and component-model integrity.
 3. Controller layer: applies validated changes, snapshots, migrations, and cutovers.
-4. Projection layer: generates Markdown specs, diagrams, reports, implementation handoffs, task views, and release summaries.
+4. Projection layer: generates explanatory Markdown pages, diagrams, reports, implementation handoffs, task views, and release summaries.
 5. Evidence ingestion layer: imports test runs, traces, screenshots, code analysis, commits, pull requests, and review decisions.
 6. Planning/task layer: turns model deltas and unresolved requirements into work items and execution streams.
 7. Human interface layer: conversational, visual, and dashboard interfaces over the same model.
@@ -215,14 +224,14 @@ A mature workflow should look like this:
 
 The first useful slice should prove the loop without over-modeling:
 
-1. Define the Vellis component-authoring metamodel in RTG schema and constraints.
-2. Import existing component specs into RTG model objects.
-3. Query model structure and traceability.
-4. Regenerate an equivalent Markdown spec for one component.
-5. Validate acceptance readiness from model data.
-6. Link implementation roots and tests to modeled components and invariants.
-
-Once that works, make one or two component specs model-canonical and treat Markdown as generated projection.
+1. Freeze and formally validate the native-first software modeling fixture.
+2. Human-review JSON storage, query, and controller as representative state, declarative behavior,
+   and orchestration patterns.
+3. Migrate and independently package all ten Bibliotek component contracts at that level.
+4. Model the Vellis composition, actor-visible use cases, 27 façade actions, and Python/MCP
+   realizations.
+5. Generate useful component/application pages and implementation handoffs from the model.
+6. Retire the frozen Markdown baseline only after formal validation and human approval.
 
 ## Success Criteria
 
@@ -255,10 +264,12 @@ Do not build a giant ontology for its own sake. Start with the model elements ne
 
 ## Open Questions
 
-- What is the smallest useful Vellis metamodel that can replace one Markdown component spec as source of truth?
-- Which concepts should be modeled as first-class RTG anchors versus data objects or properties?
-- How closely should the canonical model follow SysML v2 versus a Vellis-specific profile?
-- What projection format should be generated first: Markdown specs, dependency maps, task views, or implementation handoffs?
+- Which headless conformant validator best satisfies pinned imports, source diagnostics, CI
+  portability, and redistribution requirements?
+- What model clarifications emerge from implementation and black-box verification of the three
+  representative patterns?
+- Which additional documentation projections would make model review easier after cutover?
+- When does a second application justify extracting a reusable configurable MCP/REST adapter?
 - What evidence should be required before a model element can be accepted?
 - How should model changes, implementation changes, and task-stream changes be migrated and cut over together?
 - What user interface best supports human review of model changes without requiring humans to inspect raw graph data?

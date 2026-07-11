@@ -3,6 +3,7 @@ id: component.storage.json_file
 type: Component
 status: accepted
 owner: humans
+model: model/bibliotek/components/component.storage.json_file.sysml
 code:
   roots:
     - components/storage/json_file
