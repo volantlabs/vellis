@@ -351,9 +351,9 @@ def test_cli_reports_mcp_dry_run_metadata(tmp_path: Path) -> None:
     assert status["mcp"]["transport"] == "stdio"
     assert status["mcp"]["launch_mode"] == "repository_checkout"
     assert status["mcp"]["state_mode"] == "durable_local_auto_replay"
-    assert status["mcp"]["eval_prompt_path"].endswith(
+    assert Path(status["mcp"]["eval_prompt_path"]) == Path(
         "docs/guides/vellis/evals/rtg-individual-life-graph-beta-prompt.md"
-    )
+    ).resolve()
     assert status["mcp"]["recommended_eval_prompt"] == "individual_life_graph"
     assert set(status["mcp"]["eval_prompts"]) == {
         "individual_life_graph",
@@ -363,9 +363,9 @@ def test_cli_reports_mcp_dry_run_metadata(tmp_path: Path) -> None:
     assert status["mcp"]["eval_prompts"]["individual_life_graph"]["available"] is True
     assert status["mcp"]["eval_prompts"]["component_repo_affordance"]["recommended"] is False
     assert status["mcp"]["guides"]["known_good_walkthrough"]["available"] is True
-    assert status["mcp"]["guides"]["known_good_walkthrough"]["path"].endswith(
+    assert Path(status["mcp"]["guides"]["known_good_walkthrough"]["path"]) == Path(
         "docs/guides/vellis/evals/rtg-beta-known-good-walkthrough.md"
-    )
+    ).resolve()
     assert set(status["mcp"]["guides"]) == {"known_good_walkthrough"}
     assert status["mcp"]["first_call"] == {
         "tool": "rtg_validate_graph",
