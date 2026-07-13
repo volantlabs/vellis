@@ -1,6 +1,7 @@
 library package BibliotekRtgDiscovery {
     private import SoftwareComponentModeling::*;
     private import BibliotekSoftwareValues::*;
+    private import BibliotekRtgDiagnostics::*;
     private import ScalarValues::*;
 
     doc /* Draft registry of knowledge-engineer-curated, two-dimensional type-discovery views. */
@@ -18,9 +19,9 @@ library package BibliotekRtgDiscovery {
     }
     attribute def RtgDiscoverySelection { attribute viewId : String; attribute coordinates[1..*] : RtgDiscoveryCoordinates; attribute anchorTypeKeys[0..*] : String; attribute cellDescriptions : JsonObject; }
     attribute def RtgDiscoveryViewList { item views[0..*] : RtgDiscoveryView; }
-    attribute def RtgDiscoveryViewInvalid { attribute 'message' : String; attribute diagnostic : JsonObject; }
-    attribute def RtgDiscoveryViewNotFound { attribute 'message' : String; attribute diagnostic : JsonObject; }
-    attribute def RtgDiscoverySelectionInvalid { attribute 'message' : String; attribute diagnostic : JsonObject; }
+    attribute def RtgDiscoveryViewInvalid { attribute 'message' : String; attribute diagnostic[0..1] : RtgDiagnostic; }
+    attribute def RtgDiscoveryViewNotFound { attribute 'message' : String; attribute diagnostic[0..1] : RtgDiagnostic; }
+    attribute def RtgDiscoverySelectionInvalid { attribute 'message' : String; attribute diagnostic[0..1] : RtgDiagnostic; }
 
     action def PutDiscoveryView {
         in 'view' : RtgDiscoveryView;

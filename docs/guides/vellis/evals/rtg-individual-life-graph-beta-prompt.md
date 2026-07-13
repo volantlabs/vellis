@@ -1,5 +1,8 @@
 # RTG Individual Life Graph Beta Prompt
 
+Evaluation only: launch Vellis with `--empty --manual-recovery` before using this prompt. Ordinary
+users receive the modeled Everyday Life ontology automatically and should not use this prompt.
+
 Use this prompt manually with an agent after the `rtg_knowledge_graph` MCP server is
 connected. The prompt exercises the initial individual open-source RTG use case: one person
 using an AI assistant to organize personal and professional domains in a durable graph.

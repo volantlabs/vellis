@@ -9,12 +9,14 @@ package VellisOperations {
     private import BibliotekRtgQuery::*;
     private import BibliotekRtgChangeValidation::*;
     private import BibliotekRtgController::*;
+    private import BibliotekRtgDiagnostics::*;
 
     enum def VellisUsageGuideTopic {
         enum mcpBootstrapChecklist; enum operatorCard; enum workflowPatterns;
         enum requestPatterns; enum schemaStagingMinimal; enum toolCallShapes;
         enum liveWrite; enum lookupExamples; enum queryExamples;
         enum recoveryAndReplay; enum migrationHistory; enum migrationAbandonment;
+        enum everydayLifeSchema; enum schemaDesign;
     }
     enum def VellisQueryResponseFormat {
         enum full;
@@ -28,11 +30,22 @@ package VellisOperations {
     enum def VellisSnapshotSummaryStatus {
         enum snapshot_exported;
     }
+    enum def VellisStarterSchemaState { enum installed; enum custom; enum empty; }
 
     attribute def JsonObjectList { attribute values[0..*] : JsonObject; doc /* Encodes directly as a JSON array, not an object containing values. */ }
     attribute def StringList { attribute values[0..*] : String; doc /* Encodes directly as a JSON array, not an object containing values. */ }
     attribute def RtgGraphLinkWriteList { attribute values[0..*] : RtgGraphLinkWrite; doc /* Encodes directly as a JSON array of canonical link-write objects. */ }
     attribute def VellisUsageGuide { attribute topic : VellisUsageGuideTopic; attribute content : JsonObject; }
+    attribute def VellisStarterSchemaSummary {
+        attribute ontologyId : String;
+        attribute ontologyVersion : String;
+        attribute status : VellisStarterSchemaState;
+        attribute anchorTypeKeys[0..*] : String;
+        attribute linkTypeKeys[0..*] : String;
+    }
+    attribute def VellisSystemState :> RtgControllerSystemState {
+        attribute starterSchema : VellisStarterSchemaSummary;
+    }
     attribute def VellisSchemaDefinitionRequest { attribute kind : RtgSchemaDefinitionKind; attribute typeKey : String; attribute description : String; attribute payload : RtgSchemaPayload; doc /* Description and typeKey are non-empty; payload family must match kind. */ }
     attribute def VellisSchemaDefinitionRequestList { attribute definitions[1..*] : VellisSchemaDefinitionRequest; doc /* Encodes directly as the schema_definitions JSON array. */ }
     attribute def VellisSchemaRetirement { attribute kind : RtgSchemaDefinitionKind; attribute typeKey : String; }
@@ -67,10 +80,10 @@ package VellisOperations {
     attribute def VellisSnapshotSummaryExport :> VellisSnapshotExport { :>> kind = VellisSnapshotExportKind::summary; attribute status : VellisSnapshotSummaryStatus; attribute summary : JsonObject; }
     attribute def VellisPersistedSnapshotResult { attribute status : RtgControllerOperationStatus; attribute transactionId : Uuid; attribute ledgerPosition[0..1] : Integer; attribute appliedChanges : RtgControllerAppliedChanges; attribute validationReport[0..1] : RtgValidationReport; attribute 'snapshot'[0..1] : RtgSystemSnapshot; attribute details : JsonObject; attribute relativePath : JsonRelativePath; attribute summary : JsonObject; doc /* Mirrors the controller result, adds relativePath and summary, and omits snapshot when return_snapshot is false. */ }
     attribute def VellisLoadedSnapshotResult { attribute relativePath : JsonRelativePath; attribute 'snapshot'[0..1] : RtgSystemSnapshot; attribute summary : JsonObject; doc /* snapshot is omitted when return_snapshot is false. */ }
-    attribute def VellisRequestInvalid { attribute 'message' : String; attribute diagnostic : JsonObject; }
+    attribute def VellisRequestInvalid { attribute 'message' : String; attribute diagnostic[0..1] : RtgDiagnostic; }
 
     action def <'operation.vellis.rtg_get_system_state'> RtgGetSystemState {
-        out result : RtgControllerSystemState[1];
+        out result : VellisSystemState[1];
         doc /* Return state classification, counts, ledger pointers, and recommended next steps. */
         @FailureContract { errorIds = ("VellisRequestInvalid", "RtgControllerDiscoveryFailed"); }
     }
@@ -180,7 +193,7 @@ package VellisOperations {
     requirement <'contract.vellis.facade.usage_guides'> usageGuideSemantics {
         subject operation : RtgGetUsageGuide;
         require constraint {
-            doc /* The twelve guide topics cover: MCP bootstrap sequence; concise operator rules; state-driven workflows; ordinary-request-to-workflow mapping; minimal schema staging; exact top-level tool shapes; live writes; identity lookup before links; query construction; snapshot/restore/replay recovery; durable migration history; and safe abandonment. Examples use complete generic envelopes and never invent application-domain schema. */
+            doc /* The fourteen guide topics cover: the installed Everyday Life schema; safe RTG schema design and evolution; MCP bootstrap sequence; concise operator rules; state-driven workflows; ordinary-request-to-workflow mapping; minimal schema staging; exact top-level tool shapes; live writes; identity lookup before links; query construction; snapshot/restore/replay recovery; durable migration history; and safe abandonment. Generic examples do not silently replace or specialize an application's modeled schema. */
         }
     }
 

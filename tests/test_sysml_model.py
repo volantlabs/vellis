@@ -27,33 +27,66 @@ def test_vellis_has_nine_bibliotek_roles_and_exact_mcp_surface() -> None:
     assert set(model_tool._model_tool_names()) == set(model_tool._python_tool_names())
     assert model_tool._model_tool_parameters() == model_tool._python_tool_parameters()
     assert model_tool._python_tool_description_names() == set(model_tool._python_tool_names())
+    model_descriptions = model_tool._model_tool_descriptions()
+    manifest = json.loads(model_layout.GENERATED_MANIFEST.read_text(encoding="utf-8"))
+    assert model_descriptions == {
+        tool["name"]: tool["description"] for tool in manifest["tools"]
+    }
     assert len(set(model_tool._model_operation_ids())) == 27
 
 
-def test_model_remains_shadow_until_formal_and_human_gates_pass() -> None:
+def test_model_phase_and_retirement_gates_are_consistent() -> None:
     status = json.loads(model_layout.CUTOVER_STATUS_PATH.read_text(encoding="utf-8"))
 
-    assert status["phase"] == "shadow"
+    assert status["phase"] == "normative"
+    assert status["cutover_completed"] == "2026-07-11"
     assert status["authored_design"] == "model/{foundation,bibliotek,vellis}/**/*.sysml"
-    assert status["generated_documentation"] == "docs/reference/**/*.md"
+    assert status["generated_documentation"] == "generated/reference/**/*.md"
     assert status["generated_machine_projections"] == "generated/model/*.json"
-    assert status["frozen_migration_baseline"] == "docs/migration/component-spec-baseline/*.md"
-    assert status["gates"]["markdown_retirement"] == "blocked"
     assert status["gates"]["external_sysml_validator"] == "implemented-qualified-headless"
     assert status["gates"]["packaged_product_validation"] == "implemented"
     assert status["gates"]["parser_backed_model_index"] == "implemented"
     assert status["gates"]["model_derived_conformance_objectives"] == "implemented"
-    assert (
-        status["gates"]["legacy_contract_knowledge_disposition"]
-        == "implemented-pending-human-review"
-    )
-    assert (
-        status["gates"]["legacy_non_contract_knowledge_preservation"]
-        == "implemented-pending-human-review"
-    )
     assert status["gates"]["implementation_decision_reconciliation"] == "implemented"
-    assert status["gates"]["representative_pilots"] == "implemented-pending-human-review"
-    assert status["gates"]["accepted_contract_preservation"] == "implemented-pending-human-review"
+    assert model_tool._check_cutover_state() == []
+
+    assert "frozen_migration_baseline" not in status
+    assert status["gates"]["bibliotek_human_acceptance"] == "accepted"
+    assert status["gates"]["vellis_human_acceptance"] == "accepted"
+    assert status["gates"]["markdown_retirement"] == "completed"
+
+
+def test_cutover_state_rejects_non_normative_or_incomplete_authority(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    status_path = tmp_path / "cutover-status.json"
+    monkeypatch.setattr(model_tool, "CUTOVER_STATUS_PATH", status_path)
+
+    status_path.write_text(
+        json.dumps(
+            {
+                "phase": "shadow",
+                "gates": {"markdown_retirement": "blocked"},
+            }
+        ),
+        encoding="utf-8",
+    )
+    assert any(
+        "must remain normative" in finding.message
+        for finding in model_tool._check_cutover_state()
+    )
+
+    status_path.write_text(
+        json.dumps(
+            {
+                "phase": "normative",
+                "gates": {"markdown_retirement": "blocked"},
+            }
+        ),
+        encoding="utf-8",
+    )
+    findings = model_tool._check_cutover_state()
+    assert any("incomplete acceptance" in finding.message for finding in findings)
 
 
 def test_formal_validator_is_pinned_and_covers_every_authored_model() -> None:
@@ -66,7 +99,10 @@ def test_formal_validator_is_pinned_and_covers_every_authored_model() -> None:
     assert "--self-test" in json.loads(
         model_layout.LANGUAGE_LOCK_PATH.read_text(encoding="utf-8")
     )["validator"]["command"]
-    assert len(sysml_validator._model_files("all")) == 21
+    assert json.loads(model_layout.LANGUAGE_LOCK_PATH.read_text(encoding="utf-8"))["validator"][
+        "external_validation"
+    ] == "required"
+    assert len(sysml_validator._model_files("all")) == 22
     assert all(path.exists() for path in sysml_validator._model_files("all"))
     assert model_layout.SOFTWARE_COMPONENT_PATTERN_PATH not in sysml_validator._model_files("all")
 
@@ -131,7 +167,7 @@ def test_generated_conformance_objectives_resolve_model_requirements_and_evidenc
 def test_official_parser_index_covers_authored_packages_and_public_definitions() -> None:
     index = json.loads(model_layout.GENERATED_FORMAL_INDEX.read_text(encoding="utf-8"))
 
-    assert len(index["authored_packages"]) == 21
+    assert len(index["authored_packages"]) == 22
     assert "SoftwareComponentPattern" not in index["authored_packages"]
     assert set(index["packages"]) == set(index["authored_packages"])
     assert model_tool._check_formal_model_index() == []
@@ -235,6 +271,18 @@ def test_native_style_rejects_hollow_calculations(tmp_path: Path) -> None:
     findings = model_tool._check_native_modeling_style([model])
 
     assert any("has no evaluable result" in finding.message for finding in findings)
+
+
+def test_profile_rejects_concrete_doc_only_public_values(tmp_path: Path) -> None:
+    model = tmp_path / "Opaque.sysml"
+    model.write_text(
+        "attribute def OpaqueChoice { doc /* prose is not a value algebra */ }",
+        encoding="utf-8",
+    )
+
+    findings = model_tool._check_empty_public_definitions([model])
+
+    assert any("only documentation" in finding.message for finding in findings)
 
 
 def test_connected_semantics_rejects_orphaned_calculation(tmp_path: Path) -> None:
@@ -407,6 +455,8 @@ def test_native_view_packages_cover_library_and_application_concerns() -> None:
     assert "viewpoint def" not in vellis_views
     assert "view vellisUseCases" in vellis_views
     assert "filter @SysML::BindingConnectorAsUsage" in vellis_views
+    assert "expose VellisLocalPythonRealization::**;" in vellis_views
+    assert "expose VellisMcpPythonRealization::**;" in vellis_views
 
 
 def test_generated_artifact_checker_detects_staleness(
@@ -435,10 +485,9 @@ def test_all_python_protocol_operations_map_to_model_actions() -> None:
     assert model_tool._check_protocol_action_signatures() == []
 
 
-def test_public_definitions_and_shadow_contracts_are_complete() -> None:
+def test_public_definitions_and_component_contracts_are_complete() -> None:
     assert model_tool._check_empty_public_definitions(model_tool._sysml_files("all")) == []
     assert model_tool._check_component_contract_completeness() == []
-    assert model_tool._check_shadow_contract_parity() == []
 
 
 def test_generated_component_views_cover_actions_state_and_invariants() -> None:
@@ -489,24 +538,55 @@ def test_generated_component_views_cover_actions_state_and_invariants() -> None:
     assert "`type: String`" in graph_page
     assert "`system: RtgSystem`" in graph_page
 
-    vellis_page = (ROOT / "docs" / "reference" / "vellis" / "index.md").read_text(
+    vellis_page = (ROOT / "generated" / "reference" / "vellis" / "index.md").read_text(
         encoding="utf-8"
     )
     assert "## Requirements and satisfaction" in vellis_page
     assert "## Verification closure" in vellis_page
+    assert "## Python realization" in vellis_page
+    assert "`documentStorage` | `JsonFileStorage` | `LocalJsonFileStorage`" in vellis_page
+    assert "`state: RtgGetSystemState`, `guide: RtgGetUsageGuide`" in vellis_page
     assert "`rtgGetSystemState` → `GetSystemState` → `getSystemState`" in vellis_page
 
 
 def test_generated_bibliotek_index_covers_library_topology() -> None:
-    index = (ROOT / "docs" / "reference" / "bibliotek" / "index.md").read_text(
+    index = (ROOT / "generated" / "reference" / "bibliotek" / "index.md").read_text(
         encoding="utf-8"
     )
 
     assert "## Shared public packages" in index
     assert "`BibliotekSoftwareValues`" in index
+    assert "## Shared public values" in index
+    assert "`JsonValue`" in index
+    assert "`RtgDiagnostic`" in index
+    assert "`safeToRetry: Boolean`" in index
     assert "## Retained component dependency topology" in index
     assert "`component.rtg.controller`" in index
     assert "`component.rtg.graph`" in index
+
+
+def test_model_handoff_names_complete_products_and_application_sources(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    assert model_tool.handoff("component.rtg.query") == 0
+    component_output = capsys.readouterr().out
+    assert "bibliotek-0.1.0.kpar" in component_output
+    assert "generated/reference/bibliotek/components/component.rtg.query.md" in component_output
+
+    assert model_tool.handoff("application.vellis") == 0
+    application_output = capsys.readouterr().out
+    assert "vellis-0.1.0.kpar" in application_output
+    for source in (
+        "model/vellis/EverydayLifeOntology.sysml",
+        "model/vellis/Vellis.sysml",
+        "model/vellis/VellisOperations.sysml",
+        "model/vellis/use-cases/VellisUseCases.sysml",
+        "model/vellis/realizations/VellisLocalPython.sysml",
+        "model/vellis/realizations/VellisMcpPython.sysml",
+    ):
+        assert source in application_output
+    assert "apps/rtg_knowledge_graph/resources/everyday_life_schema.json" in application_output
+    assert "Verification: 32 structured objective(s)" in application_output
 
 
 def test_model_packages_exclude_fixture_configuration_and_migration(
@@ -529,12 +609,19 @@ def test_model_packages_exclude_fixture_configuration_and_migration(
     for archive_name, expected in expected_sources.items():
         with zipfile.ZipFile(package_root / archive_name) as archive:
             actual = {Path(name).name for name in archive.namelist() if name.endswith(".sysml")}
+            project_path = next(
+                name for name in archive.namelist() if name.endswith(".project.json")
+            )
+            metadata_path = next(name for name in archive.namelist() if name.endswith(".meta.json"))
+            project = json.loads(archive.read(project_path))
+            metadata = json.loads(archive.read(metadata_path))
         assert actual == expected
         assert "SoftwareComponentPattern.sysml" not in actual
+        assert project["version"] == "0.1.0"
+        assert metadata["status"] == "formally-validated"
 
 
-def test_frozen_markdown_baseline_is_complete_and_isolated() -> None:
-    baseline = model_layout.MIGRATION_BASELINE_ROOT
-
-    assert len(list(baseline.glob("component.*.md"))) == 10
+def test_retired_markdown_baseline_is_absent() -> None:
+    baseline = ROOT / "docs" / "migration" / "component-spec-baseline"
+    assert not list(baseline.glob("component.*.md"))
     assert not list((ROOT / "docs").glob("components/component.*.md"))

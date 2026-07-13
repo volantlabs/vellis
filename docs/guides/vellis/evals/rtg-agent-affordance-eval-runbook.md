@@ -13,8 +13,8 @@ The prompt files are copied into the agent by the human after the MCP connection
 - `git`, plus a clone of this repository.
 - [`uv`](https://docs.astral.sh/uv/) (Python 3.14 is required but `uv` provisions it
   automatically).
-- [`just`](https://just.systems/) for the convenience recipes below; optional, since the
-  generated client config invokes `uv` directly.
+- [`just`](https://just.systems/) only for optional convenience recipes; native Windows users can
+  use the cross-platform `uv run` commands without Bash, WSL, or `just`.
 - An MCP client to evaluate with (Claude Desktop, Claude Code, or any stdio-capable or HTTP-capable client).
 
 See the repository `README.md` Development Setup section for install commands.
@@ -24,14 +24,15 @@ See the repository `README.md` Development Setup section for install commands.
 Use a fresh explicit storage root for each beta eval:
 
 ```sh
-just rtg-eval-info /tmp/vellis-beta-001
+uv run vellis-rtg-knowledge-graph mcp-config --storage-root .data/vellis-beta-001 --empty --manual-recovery
 ```
 
-Note: this metadata command runs the app composition once, so it creates the storage root,
-`controller.sqlite`, and `system/app_manifest.json` before the MCP server ever starts. That is
-expected; the root still counts as fresh for eval purposes.
+This prints only a copy-pastable `mcpServers` block and does not initialize the application. Merge
+the block into the evaluating client's configuration and restart/reload that client. The client
+then launches and owns the stdio server; do not start `just rtg` or `just rtg-mcp` separately.
 
-The command prints JSON with:
+For troubleshooting or eval bookkeeping, `just rtg-eval-info .data/vellis-beta-001` prints the
+larger diagnostic payload. That command initializes the composition and reports:
 
 - `mcp.client_config`: copy-pastable MCP server config.
 - `mcp.transports.localhost_http.client_config`: URL-based config for agents attaching to a
@@ -42,16 +43,20 @@ The command prints JSON with:
 - `mcp.eval_prompts`: available prompt paths, including the individual life-graph beta prompt and
   the component-repo affordance prompt.
 - `mcp.first_call`: the first MCP call to make after connecting the client.
-- `mcp.state_mode`: `fresh_single_session`.
+- `mcp.state_mode`: `manual_recovery` for this evaluation launch.
 - `mcp.tools`: controller-facing RTG MCP tools.
 
-Then configure the evaluating agent's MCP client from `mcp.client_config` and start the server.
-This is best when the MCP client should launch the server itself. Client wiring:
+Client wiring:
 
 - Claude Desktop (macOS): merge the `mcpServers` block into
   `~/Library/Application Support/Claude/claude_desktop_config.json` and restart the app.
+- Claude Desktop (Windows): merge it into `%APPDATA%\Claude\claude_desktop_config.json` and
+  restart the app.
 - Claude Code: `claude mcp add rtg_knowledge_graph -- <command and args from the generated
   config>`, or place the `mcpServers` block in a project `.mcp.json`.
+- Codex: run the output from
+  `uv run vellis-rtg-knowledge-graph mcp-config --client codex --storage-root .data/vellis-beta-001 --empty --manual-recovery`,
+  then restart or reload Codex. Do not paste the generic JSON block into Codex's TOML config.
 
 The "MCP Interface" section of `apps/rtg_knowledge_graph/README.md` covers wiring in more
 detail.
@@ -60,7 +65,7 @@ For agents that should attach to an already-running local Vellis app, launch the
 localhost HTTP MCP server instead:
 
 ```sh
-just rtg-mcp-http /tmp/vellis-beta-001 127.0.0.1 8765 /mcp
+uv run vellis serve-mcp --transport http --host 127.0.0.1 --port 8765 --path /mcp --storage-root .data/vellis-beta-001 --empty --manual-recovery
 ```
 
 Then configure the other same-machine agent with
@@ -90,7 +95,7 @@ V1 state semantics:
   server process.
 - The storage root persists the app manifest, persisted snapshots, queued ledger failures, and
   the SQL ledger.
-- Restart restore/replay is not automatic. For beta evals, keep the MCP process running for the
+- Restart restore/replay is disabled by `--manual-recovery`. For beta evals, keep the MCP process running for the
   whole eval or explicitly use snapshot, restore, replay, and replay-verification tools.
 - Persisted snapshots can be listed and loaded through MCP with
   `rtg_list_persisted_snapshots` and `rtg_load_persisted_snapshot`; agents do not need direct

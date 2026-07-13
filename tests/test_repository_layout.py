@@ -11,6 +11,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 STALE_PATHS = (
     "docs" + "/components/",
+    "docs" + "/reference/",
     "docs" + "/model/generated/",
     "docs" + "/evals/",
     "docs" + "/sysml-modeling.md",
@@ -95,10 +96,10 @@ def test_authored_products_generated_outputs_and_fixture_are_separated() -> None
         "formal-model-index.json",
         "verification-evidence.json",
     }
-    assert all(
-        "Generated" in path.read_text(encoding="utf-8").splitlines()[2]
-        for path in model_layout.REFERENCE_DOC_ROOT.rglob("*.md")
-    )
+    for path in model_layout.REFERENCE_DOC_ROOT.rglob("*.md"):
+        notice = path.read_text(encoding="utf-8").splitlines()[2]
+        assert "Generated" in notice
+        assert "non-normative reading projection" in notice
 
 
 def test_model_cache_and_packages_are_ignored() -> None:
@@ -107,3 +108,20 @@ def test_model_cache_and_packages_are_ignored() -> None:
             ["git", "check-ignore", "-q", str(path)], cwd=ROOT, check=False
         )
         assert result.returncode == 0, path
+
+
+def test_local_vellis_data_readme_is_tracked_and_runtime_state_is_ignored() -> None:
+    readme = ROOT / ".data" / "README.md"
+    assert readme.is_file()
+    trackable = subprocess.run(
+        ["git", "check-ignore", "-q", ".data/README.md"],
+        cwd=ROOT,
+        check=False,
+    )
+    assert trackable.returncode == 1
+    ignored = subprocess.run(
+        ["git", "check-ignore", "-q", ".data/rtg_knowledge_graph/controller.sqlite"],
+        cwd=ROOT,
+        check=False,
+    )
+    assert ignored.returncode == 0

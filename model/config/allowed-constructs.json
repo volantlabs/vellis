@@ -9,5 +9,5 @@
     "\\bcomponent\\s+def\\b",
     "@semantic\\b"
   ],
-  "formal_language_gate": "A pinned conformant parser remains mandatory before cutover."
+  "formal_language_gate": "The pinned conformant parser is mandatory for every model check."
 }

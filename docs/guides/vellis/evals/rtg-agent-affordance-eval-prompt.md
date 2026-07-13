@@ -1,5 +1,7 @@
 # RTG Agent Affordance Eval Prompt
 
+Evaluation only: launch Vellis with `--empty --manual-recovery` before using this prompt.
+
 Use this prompt manually with an agent after the `rtg_knowledge_graph` MCP server is
 already connected. The prompt is external eval material, not an MCP tool or resource.
 

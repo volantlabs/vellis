@@ -11,15 +11,15 @@ The app wires the in-process RTG stack:
 - `component.rtg.controller` as the black-box RTG orchestration API.
 - RTG graph, schema, constraints, migration, validation, and query implementations behind the controller.
 
-It exposes the controller through thin local MCP adapters. For beta and open-source
-evaluation, that MCP surface is the turnkey application interface: agents can create and evolve
-schema, write and query graph data, recover from validation failures, persist snapshots, and replay
-the controller ledger. MCP remains an application interface; RTG component internals and controller
-workflow stay in the component stack.
+It exposes the modeled Vellis application façade through local MCP adapters. The façade delegates
+canonical operations to the controller and owns application request shaping and response policy.
+For beta and open-source evaluation, that MCP surface is the turnkey application interface: agents
+can create and evolve schema, write and query graph data, recover from validation failures, persist
+snapshots, and replay the controller ledger. RTG component internals and controller workflow remain
+in the component stack.
 
-The default beta scenario is the individual life graph in
-`docs/guides/vellis/evals/rtg-individual-life-graph-beta-prompt.md`. The component-repository affordance prompt
-is the advanced engineering-system example.
+Ordinary installations include the modeled Everyday Life ontology and recover durable state
+automatically. Evaluation prompts deliberately opt into blank/manual-recovery mode.
 
 ## Structure
 
@@ -30,12 +30,14 @@ apps/rtg_knowledge_graph/
   main.py         # CLI entry point
   mcp_codec.py    # JSON/dataclass adapter for MCP inputs and outputs
   mcp_server.py   # FastMCP server registration and launch
-  mcp_toolset.py  # directly testable controller tool handlers
-  runner.py       # temporary launch smoke behavior
+  mcp_toolset.py  # directly testable Vellis façade handlers
+  runner.py       # application status and manifest launch behavior
   tests/          # full-app tests
 ```
 
-Keep new component wiring in `composition.py`. Keep launch smoke behavior in `runner.py`. When an RTG Knowledge Graph facade component exists, wire that facade in `composition.py` and move domain/application rules into the component stack instead of this reference app shell.
+Keep component wiring in `composition.py` and launch/status behavior in `runner.py`. Application
+request shaping belongs to the modeled Vellis façade and its `mcp_toolset.py` realization; reusable
+RTG invariants and orchestration remain in Bibliotek components and the controller.
 
 ## Configuration
 
@@ -62,59 +64,34 @@ If neither is provided, the app uses:
 just rtg
 ```
 
-The current launch writes `system/app_manifest.json` through JSON File Storage and returns a status summary. This is a smoke path for composition, not the long-term RTG Knowledge Graph application facade.
+The normal non-MCP launch writes `system/app_manifest.json` through JSON File Storage and returns a
+status summary. It is a composition and configuration smoke path; MCP is the primary agent-facing
+application interface.
 
 When installed in the local uv environment, the same app is available through the console script:
 
 ```sh
-uv run vellis-rtg-knowledge-graph --json
+uv run vellis setup
+uv run vellis doctor
 ```
 
 ## MCP Interface
 
-For a first beta run, use a fresh explicit storage root:
+The ordinary first run is:
 
 ```sh
-just rtg-eval-info /tmp/vellis-beta-001
+uv run vellis setup
 ```
 
-Copy the generated `mcp.client_config` into your MCP client, start the server, then make the
-metadata's `mcp.first_call`. For the default config, that first call is `rtg_validate_graph` with
-`{}`. A fresh server should return `ok: true`, `result.accepted: true`, and no findings.
-Then call `rtg_get_system_state` with `{}` so the agent can tell whether the app is empty, already
-bootstrapped, has staged work, or needs ledger replay.
+Setup recovers the ledger, installs the starter schema only for a genuinely empty graph, validates
+the result, and registers the stdio MCP server user-wide with Codex, Claude Code, Claude Desktop,
+or a generic JSON client. The generated launch uses absolute paths and the client owns the server
+process. The same `uv run vellis setup` path works on native Windows without Bash or `just`. Use
+`uv run vellis doctor` for a non-destructive check.
 
-Then give the agent the recommended life-graph beta prompt. A known-good walkthrough lives in
-`docs/guides/vellis/evals/rtg-beta-known-good-walkthrough.md`. Agents without repository access can fetch generic
-bootstrap, schema-staging, live-write, lookup, query, recovery, and audit examples directly through
-`rtg_get_usage_guide`; those examples teach payload shape and tool sequence rather than supplying a
-scenario-specific schema.
-
-Print default MCP metadata without starting the long-running server:
-
-```sh
-just rtg-mcp-info
-```
-
-For a beta eval with another fresh explicit storage root:
-
-```sh
-just rtg-eval-info /tmp/vellis-beta-002
-```
-
-The metadata includes `mcp.launch_mode`, `mcp.client_config`, `mcp.transports`, a cwd-independent
-stdio client configuration, `mcp.first_call`, `mcp.eval_prompts`, and
-`mcp.recommended_eval_prompt`.
-In a repository checkout, `mcp.launch_mode` is `repository_checkout` and the generated client
-configuration uses `uv --directory <repo-root>` with the absolute repo, storage-root, and
-SQLite paths already filled in. Always start from this generated block rather than
-hand-writing paths. The metadata command runs the app composition once, so it creates the
-storage root, `controller.sqlite`, and `system/app_manifest.json` as a side effect.
-When the app is launched from an installed package without the repository docs available,
-`mcp.launch_mode` is `installed_package`; the server launch remains available, while eval
-prompt paths are reported as unavailable.
-After configuring an MCP client, use the first-call tool as the connection smoke check before
-giving the agent an eval prompt.
+`mcp-config`, `just rtg-mcp`, `just rtg-mcp-info`, and the evaluation prompts remain developer and
+protocol-debugging surfaces. Evaluations run with `--empty --manual-recovery` so they can still test
+schema construction and explicit replay from a blank RTG.
 
 ### Localhost HTTP MCP
 
@@ -125,13 +102,13 @@ it by URL.
 Print URL-based MCP client config:
 
 ```sh
-just rtg-mcp-http-info /tmp/vellis-beta-001 127.0.0.1 8765 /mcp
+just rtg-mcp-http-info .data/vellis-beta-001 127.0.0.1 8765 /mcp
 ```
 
 Launch the unauthenticated localhost HTTP server:
 
 ```sh
-just rtg-mcp-http /tmp/vellis-beta-001 127.0.0.1 8765 /mcp
+just rtg-mcp-http .data/vellis-beta-001 127.0.0.1 8765 /mcp
 ```
 
 Then configure the other local agent with:
@@ -176,13 +153,16 @@ The MCP surface includes low-level controller tools plus agent-facing response s
   operating sequences, or `topic: "request_patterns"` to map ordinary user requests to workflow
   IDs. `rtg_get_system_state` returns `recommended_workflows` for the current state.
 
-Sample generated `mcp.client_config` (your paths will differ):
+### Manual client configuration (advanced fallback)
+
+`vellis setup` performs client registration in the ordinary path. The following generated shape is
+for client integration development or unsupported clients; your paths will differ:
 
 ```json
 {
   "mcpServers": {
     "rtg_knowledge_graph": {
-      "command": "uv",
+      "command": "/absolute/path/to/uv",
       "args": [
         "--directory",
         "/absolute/path/to/your/vellis/checkout",
@@ -194,9 +174,9 @@ Sample generated `mcp.client_config` (your paths will differ):
         "--transport",
         "stdio",
         "--storage-root",
-        "/tmp/vellis-beta-001",
+        "/absolute/path/to/your/vellis/checkout/.data/vellis-beta-001",
         "--sql-database-path",
-        "/tmp/vellis-beta-001/controller.sqlite"
+        "/absolute/path/to/your/vellis/checkout/.data/vellis-beta-001/controller.sqlite"
       ],
       "cwd": "/absolute/path/to/your/vellis/checkout"
     }
@@ -204,13 +184,17 @@ Sample generated `mcp.client_config` (your paths will differ):
 }
 ```
 
-Wiring the stdio server into common MCP clients:
+Manual fallback locations and commands are:
 
 - Claude Desktop (macOS): merge the generated `mcpServers` block into
   `~/Library/Application Support/Claude/claude_desktop_config.json`, then restart Claude
   Desktop.
+- Claude Desktop (Windows): merge it into
+  `%APPDATA%\Claude\claude_desktop_config.json`, then restart Claude Desktop.
 - Claude Code: run `claude mcp add rtg_knowledge_graph -- <command and args from the
   generated config>`, or place the generated `mcpServers` block in a project `.mcp.json`.
+- Codex: use `mcp-config --client codex`, run the exact `codex mcp add` command it prints, then
+  restart or reload Codex. Codex stores MCP entries in `~/.codex/config.toml`.
 - Other clients: any MCP client that accepts JSON stdio server configuration can consume
   the generated block directly. Clients that support remote MCP servers can instead use
   `mcp.transports.localhost_http.client_config`.
@@ -223,11 +207,35 @@ For manual stdio debugging, launch the server directly:
 just rtg-mcp
 ```
 
+This command intentionally appears to wait: an stdio MCP server stays attached to its client and
+uses standard input/output for JSON-RPC. It is not the normal setup step and should not be running
+at the same time as a client-owned stdio instance.
+
+### Setup troubleshooting
+
+- **Windows asks for Bash, WSL, `just`, or a manual Python install:** stop using the convenience
+  recipe and run `uv run vellis setup` from PowerShell. `uv` manages Python 3.14 and installs the
+  locked dependencies.
+- **Setup or the client reports a path/configuration problem:** run `uv run vellis doctor` (or add
+  `--json` for an agent-readable report). Setup records the absolute `uv`, repository, data, and
+  SQLite paths rather than relying on the GUI application's working directory or `PATH`.
+- **The config command prints pages of tool metadata:** that is the diagnostic `*-info` command.
+  Use `mcp-config` for the small client block.
+- **The raw server command seems frozen:** stdio is waiting for JSON-RPC on standard input. Stop it
+  and let the configured MCP client own the process.
+- **The client shows no RTG tools:** verify that the generated top-level `mcpServers` object was
+  merged at the level required by that client, then fully restart or reload the client. Inspect its
+  MCP process logs if the first `rtg_validate_graph({})` call is unavailable.
+- **Dependency installation fails:** run `uv sync` in the checkout to surface the package error
+  directly. The lock includes Windows x64, ARM64, and 32-bit wheels for the native RE2 dependency;
+  include the OS, architecture, and complete `uv sync` output in a bug report.
+
 V1 beta eval state semantics:
 
-- Live RTG graph, schema, constraint, and migration state is in memory for the running MCP process.
-- The storage root persists the app manifest, persisted snapshots, queued ledger failures, and the SQL ledger.
-- Restart restore/replay is not automatic. Keep the server running for one eval or explicitly use snapshot, restore, and replay tools.
+- Live RTG graph, schema, constraint, and migration state is reconstructed from the durable SQL
+  ledger before an ordinary MCP server accepts connections.
+- Recovery fails closed if ledger replay or resulting graph validation fails.
+- `--manual-recovery` preserves the previous explicit replay behavior for evaluations.
 - The agent affordance eval prompt lives in `docs/guides/vellis/evals/`. Generic operational examples are also
   exposed through `rtg_get_usage_guide` for MCP-only agents.
 
@@ -246,35 +254,9 @@ Turnkey MCP tool groups:
   `rtg_replay_ledger`, `rtg_verify_replay_from_ledger`, `rtg_list_migration_history`,
   `rtg_flush_ledger_failures`
 
-Full exposed MCP tool list:
-
-- `rtg_apply_live_graph_changes`
-- `rtg_validate_live_graph_changes`
-- `rtg_apply_live_anchor_records`
-- `rtg_validate_live_anchor_records`
-- `rtg_get_system_state`
-- `rtg_get_usage_guide`
-- `rtg_stage_schema_migration`
-- `rtg_stage_knowledge_changes`
-- `rtg_apply_migration_cutover`
-- `rtg_abandon_migration`
-- `rtg_execute_query`
-- `rtg_resolve_anchor_by_fact`
-- `rtg_get_object`
-- `rtg_list_migrations`
-- `rtg_get_migration`
-- `rtg_validate_graph`
-- `rtg_discover_anchor_types`
-- `rtg_get_schema_pack`
-- `rtg_export_system_snapshot`
-- `rtg_persist_system_snapshot`
-- `rtg_list_persisted_snapshots`
-- `rtg_load_persisted_snapshot`
-- `rtg_replay_ledger`
-- `rtg_verify_replay_from_ledger`
-- `rtg_list_migration_history`
-- `rtg_flush_ledger_failures`
-- `rtg_restore_from_snapshot`
+The canonical 27-tool inventory, typed façade mappings, parameters, defaults, outcomes, and
+failures are generated from the model in the
+[Vellis application reference](../../generated/reference/vellis/index.md).
 
 MCP tool responses use:
 

@@ -4,32 +4,36 @@ library package BibliotekStorageSql {
     private import ScalarValues::*;
     private import SequenceFunctions::*;
 
-    attribute def SqlScalar {
-        doc /* One SQL parameter value: null, Boolean, number, or string. Query results use only these JSON-compatible scalar kinds. */
-    }
     enum def SqlParameterKind {
         enum positional;
         enum named;
     }
+    attribute def SqlNamedScalar {
+        attribute name : String;
+        attribute value : JsonScalar;
+        doc /* One uniquely named SQL parameter or result-column value. */
+    }
     attribute def SqlParameters {
         attribute kind : SqlParameterKind = SqlParameterKind::positional;
-        attribute positional[0..*] : SqlScalar;
-        attribute named[0..1] : JsonObject;
-        doc /* Exactly one positional or named parameter representation is used for an invocation. Empty positional parameters are the default. */
+        attribute positional[0..*] : JsonScalar;
+        attribute named[0..*] : SqlNamedScalar;
+        doc /* Exactly one positional or named parameter representation is used for an invocation. Named entries have unique names. Empty positional parameters are the default. */
     }
     constraint def SqlParametersWellFormed {
         in parameters : SqlParameters;
-        (parameters.kind == SqlParameterKind::positional and parameters.named == null) or
-        (parameters.kind == SqlParameterKind::named and parameters.named != null and
-            parameters.positional->isEmpty())
+        (parameters.kind == SqlParameterKind::positional and parameters.named->isEmpty()) or
+        (parameters.kind == SqlParameterKind::named and parameters.positional->isEmpty())
     }
     attribute def SqlOperation {
         attribute statement : String;
-        attribute parameters : SqlParameters;
+        attribute parameters[0..1] : SqlParameters;
         attribute returnsRows : Boolean = false;
-        doc /* One execute or query operation in a transaction; returnsRows selects its result kind. */
+        doc /* One execute or query operation in a transaction; omitted parameters mean an empty positional parameter set and returnsRows selects the result kind. */
     }
-    attribute def SqlRow { attribute values : JsonObject; }
+    attribute def SqlRow {
+        attribute columns[0..*] : SqlNamedScalar;
+        doc /* One column-name keyed row. Column names are unique and every value is a JSON-compatible SQL scalar or null. */
+    }
     abstract attribute def SqlOperationResult { doc /* One execution or query result in transaction request order. */ }
     attribute def SqlExecutionResult :> SqlOperationResult {
         attribute affectedRowCount : Integer;
@@ -53,7 +57,7 @@ library package BibliotekStorageSql {
 
     action def ExecuteSql {
         in statement : String;
-        in parameters : SqlParameters;
+        in parameters[0..1] : SqlParameters;
         out result : SqlExecutionResult;
         doc /* Execute one data-definition or data-manipulation statement, return affected-row metadata, and never return result rows. */
         @FailureContract {
@@ -63,7 +67,7 @@ library package BibliotekStorageSql {
     }
     action def QuerySql {
         in statement : String;
-        in parameters : SqlParameters;
+        in parameters[0..1] : SqlParameters;
         out result : SqlQueryResult;
         doc /* Execute one row-returning statement and return rows in database result order as column-name keyed JSON-compatible scalar objects. */
         @FailureContract {
@@ -114,21 +118,15 @@ library package BibliotekStorageSql {
 
     requirement <'contract.storage.sql.execute_effect'> executeEffect {
         subject operation : ExecuteSql;
-        assume constraint validParameters : SqlParametersWellFormed {
-            in parameters = operation.parameters;
-        }
         require constraint {
-            doc /* Success applies exactly one statement and reports affected rows and an optional inserted-row identity; callers use query for rows. */
+            doc /* Omitted parameters mean an empty positional parameter set. Supplied parameters satisfy SqlParametersWellFormed. Success applies exactly one statement and reports affected rows and an optional inserted-row identity; callers use query for rows. */
         }
     }
 
     requirement <'contract.storage.sql.query_effect'> queryEffect {
         subject operation : QuerySql;
-        assume constraint validParameters : SqlParametersWellFormed {
-            in parameters = operation.parameters;
-        }
         require constraint {
-            doc /* Success returns deterministic column-name keyed rows in database result order; scalar/null values are JSON-compatible and serialized JSON text remains uninterpreted. */
+            doc /* Omitted parameters mean an empty positional parameter set. Supplied parameters satisfy SqlParametersWellFormed. Success returns deterministic column-name keyed rows in database result order; scalar/null values are JSON-compatible and serialized JSON text remains uninterpreted. */
         }
     }
 

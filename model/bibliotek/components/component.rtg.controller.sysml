@@ -10,6 +10,7 @@ library package BibliotekRtgController {
     private import BibliotekRtgMigration::*;
     private import BibliotekRtgQuery::*;
     private import BibliotekRtgChangeValidation::*;
+    private import BibliotekRtgDiagnostics::*;
 
     enum def RtgControllerValidationMode { enum strict; enum skip; }
     enum def RtgControllerFailureRestore {
@@ -50,10 +51,9 @@ library package BibliotekRtgController {
         enum cutover_failed;
         enum abandoned;
     }
-    attribute def RtgControllerValidationTrackChoice {
-        doc /* Externally encoded as either the literal "all" or a non-empty unique ordered list of RtgValidationTrack literals. */
+    attribute def RtgControllerValidationOptions :> RtgValidationOptions {
+        doc /* Controller validation uses the same canonical track-selection and finding-limit semantics as change validation. */
     }
-    attribute def RtgControllerValidationOptions { attribute tracks[0..1] : RtgControllerValidationTrackChoice; attribute findingLimit[0..1] : Integer; doc /* Omitted tracks means "all" and an absent finding limit means unlimited; a present limit is positive and limits returned findings without changing acceptance. */ }
     attribute def RtgControllerCutoverOptions { attribute validationMode : RtgControllerValidationMode = RtgControllerValidationMode::strict; attribute pruneRetired : Boolean = true; attribute failureRestore : RtgControllerFailureRestore = RtgControllerFailureRestore::restore_pre_cutover_snapshot; }
     attribute def RtgControllerDiscoveryOptions { attribute includeNonLive : Boolean = false; attribute limit[0..1] : Integer; }
     attribute def RtgControllerSchemaPackOptions { attribute live[0..1] : Boolean = true; attribute includeLiveCounts : Boolean = true; }
@@ -152,21 +152,21 @@ library package BibliotekRtgController {
     attribute def RtgPersistedSnapshotList { attribute snapshots[0..*] : RtgPersistedSnapshotMetadata; }
     attribute def RtgPersistedSnapshotDocument { attribute relativePath : JsonRelativePath; attribute 'snapshot' : RtgSystemSnapshot; }
 
-    attribute def RtgControllerConfigurationInvalid { attribute 'message' : String; attribute diagnostic : JsonObject; }
-    attribute def RtgControllerValidationFailed { attribute 'message' : String; attribute transactionId[0..1] : Uuid; attribute validationReport[0..1] : RtgValidationReport; attribute diagnostic : JsonObject; }
-    attribute def RtgControllerPreconditionFailed { attribute 'message' : String; attribute diagnostic : JsonObject; }
-    attribute def RtgControllerApplyFailed { attribute 'message' : String; attribute diagnostic : JsonObject; }
-    attribute def RtgControllerObjectNotFound { attribute 'message' : String; attribute diagnostic : JsonObject; }
-    attribute def RtgControllerDiscoveryFailed { attribute 'message' : String; attribute diagnostic : JsonObject; }
-    attribute def RtgControllerSnapshotFailed { attribute 'message' : String; attribute diagnostic : JsonObject; }
-    attribute def RtgControllerReplayFailed { attribute 'message' : String; attribute diagnostic : JsonObject; }
+    attribute def RtgControllerConfigurationInvalid { attribute 'message' : String; attribute diagnostic[0..1] : RtgDiagnostic; }
+    attribute def RtgControllerValidationFailed { attribute 'message' : String; attribute transactionId[0..1] : Uuid; attribute validationReport[0..1] : RtgValidationReport; attribute diagnostic[0..1] : RtgDiagnostic; }
+    attribute def RtgControllerPreconditionFailed { attribute 'message' : String; attribute diagnostic[0..1] : RtgDiagnostic; }
+    attribute def RtgControllerApplyFailed { attribute 'message' : String; attribute diagnostic[0..1] : RtgDiagnostic; }
+    attribute def RtgControllerObjectNotFound { attribute 'message' : String; attribute diagnostic[0..1] : RtgDiagnostic; }
+    attribute def RtgControllerDiscoveryFailed { attribute 'message' : String; attribute diagnostic[0..1] : RtgDiagnostic; }
+    attribute def RtgControllerSnapshotFailed { attribute 'message' : String; attribute diagnostic[0..1] : RtgDiagnostic; }
+    attribute def RtgControllerReplayFailed { attribute 'message' : String; attribute diagnostic[0..1] : RtgDiagnostic; }
 
     action def ApplyLiveGraphChanges { in graphChanges : RtgGraphChangeSet; in validationMode : RtgControllerValidationMode default = RtgControllerValidationMode::strict; out result : RtgControllerOperationResult; doc /* Validate and apply normal live graph CRUD in the serialized mutation lane. */ @FailureContract { errorIds = ("RtgControllerValidationFailed", "RtgControllerApplyFailed"); } }
     action def ValidateLiveGraphChanges { in graphChanges : RtgGraphChangeSet; in validationOptions[0..1] : RtgControllerValidationOptions; out result : RtgControllerLiveGraphValidationResult; doc /* Normalize exactly as apply would and return generated identities, resolved changes, and validation without component or ledger mutation. */ @FailureContract { errorIds = ("RtgControllerPreconditionFailed", "RtgValidationInputInvalid"); } }
     action def StageKnowledgeChanges { in knowledgeChanges : RtgChangeBatch; in validationMode : RtgControllerValidationMode default = RtgControllerValidationMode::strict; out result : RtgControllerOperationResult; doc /* Validate and stage migration-scoped non-live graph, schema, constraint, and migration records. */ @FailureContract { errorIds = ("RtgControllerValidationFailed", "RtgControllerPreconditionFailed", "RtgControllerApplyFailed"); } }
     action def ApplyMigrationCutover { in migrationId : String; in cutoverOptions[0..1] : RtgControllerCutoverOptions; out result : RtgControllerOperationResult; doc /* Apply exactly one migration membership in reference-safe order, validate the result, and either commit or restore. */ @FailureContract { errorIds = ("RtgControllerPreconditionFailed", "RtgControllerValidationFailed", "RtgControllerApplyFailed"); } }
     action def ExecuteControllerQuery { in querySpec : RtgQuerySpec; in queryOptions[0..1] : RtgQueryOptions; out result : RtgQueryResult; doc /* Execute against one coherent graph view while controller mutations are excluded; do not append a mutation ledger record. */ @FailureContract { errorIds = ("RtgQuerySpecInvalid", "RtgQueryUnsupported"); } }
-    action def ControllerGetObject { in objectUuid : String; out ref object : RtgObject; doc /* Normalize UUID text and return the public graph record without lifecycle filtering. */ @FailureContract { errorIds = ("RtgControllerObjectNotFound"); } }
+    action def ControllerGetObject { in objectUuid : String; out ref object : RtgObject; doc /* Normalize UUID text and return the public graph record without lifecycle filtering; invalid and absent UUIDs are reported through the controller-owned not-found contract. */ @FailureContract { errorIds = ("RtgControllerObjectNotFound"); } }
     action def ControllerListMigrations { in status[0..1] : RtgMigrationStatus; out result : RtgMigrationRecordList; doc /* Return all migration records or one status in deterministic migration-ID order. */ @FailureContract { errorIds = ("RtgMigrationStatusInvalid"); } }
     action def ControllerGetMigration { in migrationId : String; out result : RtgMigrationRecord; doc /* Return one migration tracking record by stable migration ID. */ @FailureContract { errorIds = ("RtgMigrationNotFound"); } }
     action def ValidateGraph { in migrationIds[0..*] : String; in validationOptions[0..1] : RtgControllerValidationOptions; out report : RtgValidationReport; doc /* Validate current state or named migration projections without mutation. */ @FailureContract { errorIds = ("RtgControllerValidationFailed"); } }
@@ -1047,7 +1047,7 @@ library package BibliotekRtgController {
     requirement <'contract.rtg.controller.controller_get_object.failures'> controllerGetObjectFailureSemantics {
         subject operation : ControllerGetObject;
         require constraint {
-            doc /* Read failure has no state or ledger effect. */
+            doc /* Invalid UUID text or an absent graph object produces RtgControllerObjectNotFound with corrective diagnostics and has no state or ledger effect. */
         }
     }
 

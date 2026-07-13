@@ -1,8 +1,8 @@
 # Open model-design questions
 
-These are non-normative design questions retained from the component-spec migration. They do not
-modify current SysML contracts. Resolve a question by changing the appropriate model deliberately
-and deleting or rewriting the question; do not answer it only in implementation code.
+These are non-normative questions about possible future design evolution. They do not modify
+current SysML contracts. Resolve a question by changing the appropriate model deliberately and
+deleting or rewriting the question; do not answer it only in implementation code.
 
 ## Validation boundaries
 

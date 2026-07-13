@@ -55,11 +55,11 @@ library package BibliotekRtgChangeValidation {
         attribute selection : RtgValidationTrackSelection = RtgValidationTrackSelection::'all';
         attribute tracks[0..*] : RtgValidationTrack;
         attribute findingLimit[0..1] : Integer;
-        doc /* all executes every track; selected requires at least one unique track. findingLimit, when present, is positive and limits returned findings only. */
+        doc /* Canonical normalized options. all requires an empty tracks collection and executes every track; selected requires a non-empty unique tracks collection and executes exactly those tracks. findingLimit, when present, is positive and limits returned findings only. */
     }
-    attribute def RtgValidationFinding { attribute track : RtgValidationTrack; attribute severity : RtgValidationSeverity; attribute code : String; attribute 'message' : String; attribute suggestion[0..1] : String; attribute affectedReferences[0..*] : String; attribute diagnostic : JsonObject; }
+    attribute def RtgValidationFinding { attribute track : RtgValidationTrack; attribute severity : RtgValidationSeverity; attribute code : String; attribute 'message' : String; attribute suggestion[0..1] : String; attribute affectedReferences[0..*] : String; attribute diagnostic[0..1] : RtgDiagnostic; }
     attribute def RtgValidationReport { attribute accepted : Boolean; attribute findings[0..*] : RtgValidationFinding; attribute evidence : JsonObject; }
-    attribute def RtgValidationInputInvalid { attribute 'message' : String; attribute diagnostic : JsonObject; }
+    attribute def RtgValidationInputInvalid { attribute 'message' : String; }
 
     action def ValidateRtgChangeBatch {
         in graph : RtgGraphReadView;
@@ -143,6 +143,13 @@ library package BibliotekRtgChangeValidation {
         subject validator : RtgChangeValidator;
         require constraint {
             doc /* Finding identity is the tuple (track, code, affected-reference sequence). Findings are de-duplicated by that identity before acceptance, evidence counts, limiting, and canonical ordering. Canonical order is severity (blocking, warning, informational), then track, code, and affected-reference sequence. accepted is false when any unique produced finding is blocking. A positive limit returns that canonical prefix and evidence reports total unique, returned, and truncation without changing acceptance. */
+        }
+    }
+
+    requirement <'contract.rtg.change_validation.options'> validationOptionSemantics {
+        subject validator : RtgChangeValidator;
+        require constraint {
+            doc /* Absent options normalize to selection=all with no explicit tracks and no finding limit. selection=all is valid only with an empty tracks collection. selection=selected is valid only with one or more unique track literals. A present findingLimit is positive. Invalid combinations raise RtgValidationInputInvalid without reading or mutating supplied component state. */
         }
     }
 
@@ -250,6 +257,7 @@ library package BibliotekRtgChangeValidation {
         satisfy validationRuleCatalog by validator;
         satisfy validationRules by validator;
         satisfy reportSemantics by validator;
+        satisfy validationOptionSemantics by validator;
         satisfy intentionalBoundary by validator;
         satisfy noMutation by validator;
         satisfy deterministicReports by validator;
@@ -292,7 +300,7 @@ library package BibliotekRtgChangeValidation {
 
     verification def RtgChangeValidationBoundaryVerification {
         subject validator : RtgChangeValidator;
-        objective { verify referenceSemantics; verify validationRuleCatalog; verify validationRules; verify reportSemantics; verify intentionalBoundary; verify noMutation; verify deterministicReports; verify findingsComprehensive; verify sourceOfTruthExternal; verify blockingFindingsControlAcceptance; verify findingsAgentActionable; verify tracksExtractable; verify batchSectionsExplicit; verify constraintSchemaCompatibility; verify patternEvaluationDelegated; verify cascadeEffectsFromPreview; }
+        objective { verify referenceSemantics; verify validationRuleCatalog; verify validationRules; verify reportSemantics; verify validationOptionSemantics; verify intentionalBoundary; verify noMutation; verify deterministicReports; verify findingsComprehensive; verify sourceOfTruthExternal; verify blockingFindingsControlAcceptance; verify findingsAgentActionable; verify tracksExtractable; verify batchSectionsExplicit; verify constraintSchemaCompatibility; verify patternEvaluationDelegated; verify cascadeEffectsFromPreview; }
         @EvidenceBinding { evidenceId = "components/rtg/change_validation/tests/test_rtg_change_validation_contract.py#RtgChangeValidationBoundaryVerification"; implementationScope = "DeterministicRtgChangeValidator"; }
     }
 }

@@ -19,23 +19,23 @@ CUTOVER_STATUS_PATH = MODEL_MIGRATION_ROOT / "cutover-status.json"
 MODEL_FIXTURE_ROOT = ROOT / "tests" / "model" / "fixtures"
 SOFTWARE_COMPONENT_PATTERN_PATH = MODEL_FIXTURE_ROOT / "SoftwareComponentPattern.sysml"
 
-DOCS_ROOT = ROOT / "docs"
-REFERENCE_DOC_ROOT = DOCS_ROOT / "reference"
+GENERATED_ROOT = ROOT / "generated"
+REFERENCE_DOC_ROOT = GENERATED_ROOT / "reference"
 BIBLIOTEK_REFERENCE_ROOT = REFERENCE_DOC_ROOT / "bibliotek"
 BIBLIOTEK_COMPONENT_REFERENCE_ROOT = BIBLIOTEK_REFERENCE_ROOT / "components"
 VELLIS_REFERENCE_ROOT = REFERENCE_DOC_ROOT / "vellis"
-MIGRATION_BASELINE_ROOT = DOCS_ROOT / "migration" / "component-spec-baseline"
-
-GENERATED_MODEL_ROOT = ROOT / "generated" / "model"
+GENERATED_MODEL_ROOT = GENERATED_ROOT / "model"
 GENERATED_FORMAL_INDEX = GENERATED_MODEL_ROOT / "formal-model-index.json"
 GENERATED_CONFORMANCE_OBJECTIVES = GENERATED_MODEL_ROOT / "conformance-objectives.json"
 GENERATED_EVIDENCE_INDEX = GENERATED_MODEL_ROOT / "verification-evidence.json"
 GENERATED_MANIFEST = (
     ROOT / "apps" / "rtg_knowledge_graph" / "resources" / "model_app_manifest.json"
 )
+GENERATED_STARTER_SCHEMA = (
+    ROOT / "apps" / "rtg_knowledge_graph" / "resources" / "everyday_life_schema.json"
+)
 
 SYSML_CACHE_ROOT = ROOT / ".cache" / "sysml"
 FORMAL_CACHE_ROOT = SYSML_CACHE_ROOT / "formal"
 VALIDATOR_CACHE_ROOT = SYSML_CACHE_ROOT / "validator"
 MODEL_PACKAGE_ROOT = ROOT / "build" / "model" / "packages"
-

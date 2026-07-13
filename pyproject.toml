@@ -31,6 +31,7 @@ dependencies = [
 ]
 
 [project.scripts]
+vellis = "apps.rtg_knowledge_graph.main:main"
 vellis-rtg-knowledge-graph = "apps.rtg_knowledge_graph.main:main"
 
 [project.urls]

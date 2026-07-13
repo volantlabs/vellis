@@ -15,6 +15,8 @@ SQL_DATABASE_PATH_ENV_VAR = "RTG_KNOWLEDGE_GRAPH_SQL_DATABASE_PATH"
 class RtgKnowledgeGraphConfig:
     storage_root: Path
     sql_database_path: Path
+    install_starter_schema: bool = True
+    automatic_recovery: bool = True
 
     @classmethod
     def from_env(

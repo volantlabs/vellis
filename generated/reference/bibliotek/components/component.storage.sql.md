@@ -1,6 +1,6 @@
 # component.storage.sql
 
-Generated from textual SysML v2 by `just model-render`; do not edit by hand.
+Generated from textual SysML v2 by `just model-render` as a non-normative reading projection; do not edit by hand.
 
 - Model definition: `SqlStorage`
 - Lifecycle: `accepted`
@@ -10,8 +10,8 @@ Generated from textual SysML v2 by `just model-render`; do not edit by hand.
 
 | Feature | Contract | Signature | Principal failures | Meaning |
 |---|---|---|---|---|
-| `execute` | `ExecuteSql` | in `statement: String`; in `parameters: SqlParameters`; out `result: SqlExecutionResult` | `SqlStatementInvalid`, `SqlParameterInvalid`, `SqlExecutionFailed`, `SqlStoragePermissionDenied` | Execute one data-definition or data-manipulation statement, return affected-row metadata, and never return result rows. |
-| `query` | `QuerySql` | in `statement: String`; in `parameters: SqlParameters`; out `result: SqlQueryResult` | `SqlStatementInvalid`, `SqlParameterInvalid`, `SqlExecutionFailed`, `SqlStoragePermissionDenied` | Execute one row-returning statement and return rows in database result order as column-name keyed JSON-compatible scalar objects. |
+| `execute` | `ExecuteSql` | in `statement: String`; in `parameters: SqlParameters[0..1]`; out `result: SqlExecutionResult` | `SqlStatementInvalid`, `SqlParameterInvalid`, `SqlExecutionFailed`, `SqlStoragePermissionDenied` | Execute one data-definition or data-manipulation statement, return affected-row metadata, and never return result rows. |
+| `query` | `QuerySql` | in `statement: String`; in `parameters: SqlParameters[0..1]`; out `result: SqlQueryResult` | `SqlStatementInvalid`, `SqlParameterInvalid`, `SqlExecutionFailed`, `SqlStoragePermissionDenied` | Execute one row-returning statement and return rows in database result order as column-name keyed JSON-compatible scalar objects. |
 | `transaction` | `ExecuteSqlTransaction` | in `operations: SqlOperation[0..*]`; out `result: SqlTransactionResult` | `SqlStatementInvalid`, `SqlParameterInvalid`, `SqlTransactionFailed`, `SqlStoragePermissionDenied` | Execute operations whose parameters satisfy SqlParametersWellFormed in request order in one SQLite transaction and return corresponding results in that order. |
 
 ## Construction actions
@@ -50,8 +50,8 @@ Generated from textual SysML v2 by `just model-render`; do not edit by hand.
 
 | Stable ID | Subject | Satisfier | Required constraint |
 |---|---|---|---|
-| `contract.storage.sql.execute_effect` | `ExecuteSql` | `storage.execute` | Success applies exactly one statement and reports affected rows and an optional inserted-row identity; callers use query for rows. |
-| `contract.storage.sql.query_effect` | `QuerySql` | `storage.query` | Success returns deterministic column-name keyed rows in database result order; scalar/null values are JSON-compatible and serialized JSON text remains uninterpreted. |
+| `contract.storage.sql.execute_effect` | `ExecuteSql` | `storage.execute` | Omitted parameters mean an empty positional parameter set. Supplied parameters satisfy SqlParametersWellFormed. Success applies exactly one statement and reports affected rows and an optional inserted-row identity; callers use query for rows. |
+| `contract.storage.sql.query_effect` | `QuerySql` | `storage.query` | Omitted parameters mean an empty positional parameter set. Supplied parameters satisfy SqlParametersWellFormed. Success returns deterministic column-name keyed rows in database result order; scalar/null values are JSON-compatible and serialized JSON text remains uninterpreted. |
 | `contract.storage.sql.transaction_effect` | `ExecuteSqlTransaction` | `storage.transaction` | Operations execute and produce results in caller order and either all commit or all roll back. |
 | `contract.storage.sql.serialized_handle_access` | `SqlStorage` | `storage` | One opened handle serializes use of its SQLite connection so worker-thread callers do not observe connection thread affinity. |
 | `invariant.storage.sql.no_implicit_database_change` | `SqlStorage` | `storage` | A handle never changes databases implicitly. |
@@ -68,10 +68,10 @@ Generated from textual SysML v2 by `just model-render`; do not edit by hand.
 
 | Public definition | Kind | Fields | Meaning |
 |---|---|---|---|
-| `SqlScalar` | `attribute` | — | One SQL parameter value: null, Boolean, number, or string. Query results use only these JSON-compatible scalar kinds. |
-| `SqlParameters` | `attribute` | `kind: SqlParameterKind` = `SqlParameterKind::positional`, `positional[0..*]: SqlScalar`, `named[0..1]: JsonObject` | Exactly one positional or named parameter representation is used for an invocation. Empty positional parameters are the default. |
-| `SqlOperation` | `attribute` | `statement: String`, `parameters: SqlParameters`, `returnsRows: Boolean` = `false` | One execute or query operation in a transaction; returnsRows selects its result kind. |
-| `SqlRow` | `attribute` | `values: JsonObject` | Defined by its typed fields and action requirements. |
+| `SqlNamedScalar` | `attribute` | `name: String`, `value: JsonScalar` | One uniquely named SQL parameter or result-column value. |
+| `SqlParameters` | `attribute` | `kind: SqlParameterKind` = `SqlParameterKind::positional`, `positional[0..*]: JsonScalar`, `named[0..*]: SqlNamedScalar` | Exactly one positional or named parameter representation is used for an invocation. Named entries have unique names. Empty positional parameters are the default. |
+| `SqlOperation` | `attribute` | `statement: String`, `parameters[0..1]: SqlParameters`, `returnsRows: Boolean` = `false` | One execute or query operation in a transaction; omitted parameters mean an empty positional parameter set and returnsRows selects the result kind. |
+| `SqlRow` | `attribute` | `columns[0..*]: SqlNamedScalar` | One column-name keyed row. Column names are unique and every value is a JSON-compatible SQL scalar or null. |
 | `SqlOperationResult` | `attribute` | — | One execution or query result in transaction request order. |
 | `SqlExecutionResult` | `attribute` | `affectedRowCount: Integer`, `lastInsertedRowId[0..1]: Integer` | Defined by its typed fields and action requirements. |
 | `SqlQueryResult` | `attribute` | `rows[0..*]: SqlRow` | Defined by its typed fields and action requirements. |

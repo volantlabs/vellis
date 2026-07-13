@@ -2,6 +2,8 @@ package VellisViews {
     private import Views::*;
     private import Vellis::*;
     private import VellisUseCases::*;
+    private import VellisLocalPythonRealization::*;
+    private import VellisMcpPythonRealization::*;
 
     view def VellisCompositionView {
         doc /* Vellis roles, equality bindings, and logical-to-realization allocations. */
@@ -28,6 +30,8 @@ package VellisViews {
 
     view vellisComposition : VellisCompositionView {
         expose Vellis::**;
+        expose VellisLocalPythonRealization::**;
+        expose VellisMcpPythonRealization::**;
         render asTreeDiagram;
     }
 

@@ -1,6 +1,6 @@
 # component.rtg.controller
 
-Generated from textual SysML v2 by `just model-render`; do not edit by hand.
+Generated from textual SysML v2 by `just model-render` as a non-normative reading projection; do not edit by hand.
 
 - Model definition: `RtgController`
 - Lifecycle: `accepted`
@@ -15,7 +15,7 @@ Generated from textual SysML v2 by `just model-render`; do not edit by hand.
 | `stageKnowledgeChanges` | `StageKnowledgeChanges` | in `knowledgeChanges: RtgChangeBatch`; in `validationMode: RtgControllerValidationMode` = `RtgControllerValidationMode::strict`; out `result: RtgControllerOperationResult` | `RtgControllerValidationFailed`, `RtgControllerPreconditionFailed`, `RtgControllerApplyFailed` | Validate and stage migration-scoped non-live graph, schema, constraint, and migration records. |
 | `applyMigrationCutover` | `ApplyMigrationCutover` | in `migrationId: String`; in `cutoverOptions: RtgControllerCutoverOptions[0..1]`; out `result: RtgControllerOperationResult` | `RtgControllerPreconditionFailed`, `RtgControllerValidationFailed`, `RtgControllerApplyFailed` | Apply exactly one migration membership in reference-safe order, validate the result, and either commit or restore. |
 | `executeQuery` | `ExecuteControllerQuery` | in `querySpec: RtgQuerySpec`; in `queryOptions: RtgQueryOptions[0..1]`; out `result: RtgQueryResult` | `RtgQuerySpecInvalid`, `RtgQueryUnsupported` | Execute against one coherent graph view while controller mutations are excluded; do not append a mutation ledger record. |
-| `getObject` | `ControllerGetObject` | in `objectUuid: String`; out `object: RtgObject` | `RtgControllerObjectNotFound` | Normalize UUID text and return the public graph record without lifecycle filtering. |
+| `getObject` | `ControllerGetObject` | in `objectUuid: String`; out `object: RtgObject` | `RtgControllerObjectNotFound` | Normalize UUID text and return the public graph record without lifecycle filtering; invalid and absent UUIDs are reported through the controller-owned not-found contract. |
 | `listMigrations` | `ControllerListMigrations` | in `status: RtgMigrationStatus[0..1]`; out `result: RtgMigrationRecordList` | `RtgMigrationStatusInvalid` | Return all migration records or one status in deterministic migration-ID order. |
 | `getMigration` | `ControllerGetMigration` | in `migrationId: String`; out `result: RtgMigrationRecord` | `RtgMigrationNotFound` | Return one migration tracking record by stable migration ID. |
 | `validateGraph` | `ValidateGraph` | in `migrationIds: String[0..*]`; in `validationOptions: RtgControllerValidationOptions[0..1]`; out `report: RtgValidationReport` | `RtgControllerValidationFailed` | Validate current state or named migration projections without mutation. |
@@ -241,7 +241,7 @@ Generated from textual SysML v2 by `just model-render`; do not edit by hand.
 | `contract.rtg.controller.stage_knowledge_changes.failures` | `StageKnowledgeChanges` | `controller.stageKnowledgeChanges` | Rejected staging has no effect; failed apply restores touched state and records the visible outcome. |
 | `contract.rtg.controller.apply_migration_cutover.failures` | `ApplyMigrationCutover` | `controller.applyMigrationCutover` | A failed cutover restores the pre-cutover visible state and records a legible failed outcome. |
 | `contract.rtg.controller.execute_controller_query.failures` | `ExecuteControllerQuery` | `controller.executeQuery` | Query failures have no component or ledger effect. |
-| `contract.rtg.controller.controller_get_object.failures` | `ControllerGetObject` | `controller.getObject` | Read failure has no state or ledger effect. |
+| `contract.rtg.controller.controller_get_object.failures` | `ControllerGetObject` | `controller.getObject` | Invalid UUID text or an absent graph object produces RtgControllerObjectNotFound with corrective diagnostics and has no state or ledger effect. |
 | `contract.rtg.controller.controller_list_migrations.failures` | `ControllerListMigrations` | `controller.listMigrations` | Listing has no state or ledger effect. |
 | `contract.rtg.controller.controller_get_migration.failures` | `ControllerGetMigration` | `controller.getMigration` | Read failure has no state or ledger effect. |
 | `contract.rtg.controller.validate_graph.failures` | `ValidateGraph` | `controller.validateGraph` | Validation has no component or ledger effect. |
@@ -264,8 +264,7 @@ Generated from textual SysML v2 by `just model-render`; do not edit by hand.
 
 | Public definition | Kind | Fields | Meaning |
 |---|---|---|---|
-| `RtgControllerValidationTrackChoice` | `attribute` | — | Externally encoded as either the literal "all" or a non-empty unique ordered list of RtgValidationTrack literals. |
-| `RtgControllerValidationOptions` | `attribute` | `tracks[0..1]: RtgControllerValidationTrackChoice`, `findingLimit[0..1]: Integer` | Omitted tracks means "all" and an absent finding limit means unlimited; a present limit is positive and limits returned findings without changing acceptance. |
+| `RtgControllerValidationOptions` | `attribute` | `selection: RtgValidationTrackSelection` = `RtgValidationTrackSelection::'all'`, `tracks[0..*]: RtgValidationTrack`, `findingLimit[0..1]: Integer` | Controller validation uses the same canonical track-selection and finding-limit semantics as change validation. |
 | `RtgControllerCutoverOptions` | `attribute` | `validationMode: RtgControllerValidationMode` = `RtgControllerValidationMode::strict`, `pruneRetired: Boolean` = `true`, `failureRestore: RtgControllerFailureRestore` = `RtgControllerFailureRestore::restore_pre_cutover_snapshot` | Defined by its typed fields and action requirements. |
 | `RtgControllerDiscoveryOptions` | `attribute` | `includeNonLive: Boolean` = `false`, `limit[0..1]: Integer` | Defined by its typed fields and action requirements. |
 | `RtgControllerSchemaPackOptions` | `attribute` | `live[0..1]: Boolean` = `true`, `includeLiveCounts: Boolean` = `true` | Defined by its typed fields and action requirements. |
@@ -290,14 +289,14 @@ Generated from textual SysML v2 by `just model-render`; do not edit by hand.
 | `RtgControllerSystemState` | `attribute` | `stateClassification: RtgControllerStateClassification`, `liveSchemaCounts: RtgControllerSchemaCounts`, `liveObjectCounts: RtgTypeCountList`, `nonLiveCandidateCounts: RtgControllerCandidateCounts`, `migrationCountsByStatus: RtgControllerMigrationCounts`, `migrationCountsScope: RtgControllerMigrationCountScope` = `RtgControllerMigrationCountScope::current_migration_store`, `migrationHistoryHint[0..1]: String`, `persistedSnapshotPaths[0..*] ordered: JsonRelativePath`, `ledgerRecordCount: Integer`, `lastLedgerPosition[0..1]: Integer`, `lastTransactionId[0..1]: Uuid`, `recommendedWorkflows[0..*]: RtgControllerWorkflow`, `recommendedNextSteps[0..*]: String` | Defined by its typed fields and action requirements. |
 | `RtgPersistedSnapshotList` | `attribute` | `snapshots[0..*]: RtgPersistedSnapshotMetadata` | Defined by its typed fields and action requirements. |
 | `RtgPersistedSnapshotDocument` | `attribute` | `relativePath: JsonRelativePath`, `snapshot: RtgSystemSnapshot` | Defined by its typed fields and action requirements. |
-| `RtgControllerConfigurationInvalid` | `attribute` | `message: String`, `diagnostic: JsonObject` | Defined by its typed fields and action requirements. |
-| `RtgControllerValidationFailed` | `attribute` | `message: String`, `transactionId[0..1]: Uuid`, `validationReport[0..1]: RtgValidationReport`, `diagnostic: JsonObject` | Defined by its typed fields and action requirements. |
-| `RtgControllerPreconditionFailed` | `attribute` | `message: String`, `diagnostic: JsonObject` | Defined by its typed fields and action requirements. |
-| `RtgControllerApplyFailed` | `attribute` | `message: String`, `diagnostic: JsonObject` | Defined by its typed fields and action requirements. |
-| `RtgControllerObjectNotFound` | `attribute` | `message: String`, `diagnostic: JsonObject` | Defined by its typed fields and action requirements. |
-| `RtgControllerDiscoveryFailed` | `attribute` | `message: String`, `diagnostic: JsonObject` | Defined by its typed fields and action requirements. |
-| `RtgControllerSnapshotFailed` | `attribute` | `message: String`, `diagnostic: JsonObject` | Defined by its typed fields and action requirements. |
-| `RtgControllerReplayFailed` | `attribute` | `message: String`, `diagnostic: JsonObject` | Defined by its typed fields and action requirements. |
+| `RtgControllerConfigurationInvalid` | `attribute` | `message: String`, `diagnostic[0..1]: RtgDiagnostic` | Defined by its typed fields and action requirements. |
+| `RtgControllerValidationFailed` | `attribute` | `message: String`, `transactionId[0..1]: Uuid`, `validationReport[0..1]: RtgValidationReport`, `diagnostic[0..1]: RtgDiagnostic` | Defined by its typed fields and action requirements. |
+| `RtgControllerPreconditionFailed` | `attribute` | `message: String`, `diagnostic[0..1]: RtgDiagnostic` | Defined by its typed fields and action requirements. |
+| `RtgControllerApplyFailed` | `attribute` | `message: String`, `diagnostic[0..1]: RtgDiagnostic` | Defined by its typed fields and action requirements. |
+| `RtgControllerObjectNotFound` | `attribute` | `message: String`, `diagnostic[0..1]: RtgDiagnostic` | Defined by its typed fields and action requirements. |
+| `RtgControllerDiscoveryFailed` | `attribute` | `message: String`, `diagnostic[0..1]: RtgDiagnostic` | Defined by its typed fields and action requirements. |
+| `RtgControllerSnapshotFailed` | `attribute` | `message: String`, `diagnostic[0..1]: RtgDiagnostic` | Defined by its typed fields and action requirements. |
+| `RtgControllerReplayFailed` | `attribute` | `message: String`, `diagnostic[0..1]: RtgDiagnostic` | Defined by its typed fields and action requirements. |
 
 ## Public enumerations
 

@@ -49,6 +49,7 @@ from components.rtg.controller.protocol import (
     RtgControllerLiveGraphValidationResult,
     RtgControllerMigrationCounts,
     RtgControllerMigrationHistory,
+    RtgControllerObjectNotFound,
     RtgControllerOperationResult,
     RtgControllerPreconditionFailed,
     RtgControllerReplayFailed,
@@ -73,7 +74,9 @@ from components.rtg.graph.protocol import (
     RtgAnchor,
     RtgDataObject,
     RtgGraph,
+    RtgGraphObjectNotFound,
     RtgGraphSnapshot,
+    RtgGraphUuidInvalid,
     RtgLink,
     RtgObject,
     RtgTypeCountList,
@@ -496,7 +499,21 @@ class InProcessRtgController:
 
     def get_object(self, object_uuid: UUID | str) -> RtgObject:
         with self._lock:
-            return self._graph.get_object(object_uuid)
+            try:
+                return self._graph.get_object(object_uuid)
+            except (RtgGraphObjectNotFound, RtgGraphUuidInvalid) as error:
+                raise RtgControllerObjectNotFound(
+                    str(error),
+                    diagnostic=rtg_diagnostic(
+                        code="controller.object.not_found",
+                        category="request_input",
+                        path="rtg_get_object.object_uuid",
+                        problem="The requested graph object UUID is invalid or does not exist.",
+                        remedy="Use a resource_id returned by a graph write or query result.",
+                        guide_topics=("lookup_examples",),
+                        mutation_state="not_mutated",
+                    ),
+                ) from error
 
     def list_migrations(self, status: str | None = None) -> RtgMigrationRecordList:
         with self._lock:

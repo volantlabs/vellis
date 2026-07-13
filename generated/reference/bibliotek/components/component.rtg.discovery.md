@@ -1,6 +1,6 @@
 # component.rtg.discovery
 
-Generated from textual SysML v2 by `just model-render`; do not edit by hand.
+Generated from textual SysML v2 by `just model-render` as a non-normative reading projection; do not edit by hand.
 
 - Model definition: `RtgDiscovery`
 - Lifecycle: `draft`
@@ -72,9 +72,9 @@ Generated from textual SysML v2 by `just model-render`; do not edit by hand.
 | `RtgDiscoveryView` | `item` | `viewId: String`, `description: String`, `rowLabels: JsonObject`, `columnLabels: JsonObject`, `cells[0..*]: RtgDiscoveryCell`, `metadata: JsonObject` | viewId is stable identity; label objects map coordinate keys to human-readable labels. Each coordinate is unique and every cell uses declared row and column keys. |
 | `RtgDiscoverySelection` | `attribute` | `viewId: String`, `coordinates[1..*]: RtgDiscoveryCoordinates`, `anchorTypeKeys[0..*]: String`, `cellDescriptions: JsonObject` | Defined by its typed fields and action requirements. |
 | `RtgDiscoveryViewList` | `attribute` | `views[0..*]: RtgDiscoveryView` | Defined by its typed fields and action requirements. |
-| `RtgDiscoveryViewInvalid` | `attribute` | `message: String`, `diagnostic: JsonObject` | Defined by its typed fields and action requirements. |
-| `RtgDiscoveryViewNotFound` | `attribute` | `message: String`, `diagnostic: JsonObject` | Defined by its typed fields and action requirements. |
-| `RtgDiscoverySelectionInvalid` | `attribute` | `message: String`, `diagnostic: JsonObject` | Defined by its typed fields and action requirements. |
+| `RtgDiscoveryViewInvalid` | `attribute` | `message: String`, `diagnostic[0..1]: RtgDiagnostic` | Defined by its typed fields and action requirements. |
+| `RtgDiscoveryViewNotFound` | `attribute` | `message: String`, `diagnostic[0..1]: RtgDiagnostic` | Defined by its typed fields and action requirements. |
+| `RtgDiscoverySelectionInvalid` | `attribute` | `message: String`, `diagnostic[0..1]: RtgDiagnostic` | Defined by its typed fields and action requirements. |
 
 ## Public enumerations
 

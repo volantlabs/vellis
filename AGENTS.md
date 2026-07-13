@@ -13,7 +13,7 @@ The repository should evolve in this order:
 
 Prefer reusable, self-contained behavior over one-off application code. Treat applications, SDKs, runtimes, and generated systems as consumers of the component library, not as reasons to weaken component boundaries.
 
-Use textual SysML v2 under `model/` as the authored source for new component and application design. The pinned official Java validator is mandatory through `just model-check`; repository regex/profile checks are not formal language validation. Validate Foundation, Bibliotek, and Vellis from independently packaged KPAR contents, and keep the official parser-backed inventory and structured conformance objectives current through `just model-render`. The model is still marked `shadow` while the human-acceptance gates in `model/migration/cutover-status.json` remain open; the old Markdown specs under `docs/migration/component-spec-baseline/` are frozen migration evidence, not the place to author new contracts. Generated explanatory pages live under `docs/reference/`, while generated machine projections live under `generated/model/`. Do not claim final normative cutover or remove the frozen baseline before those gates pass.
+Use textual SysML v2 under `model/` as the normative source for component and application design. The pinned official Java validator is mandatory through `just model-check`; repository regex/profile checks are not formal language validation. Validate Foundation, Bibliotek, and Vellis from independently packaged KPAR contents, and keep the official parser-backed inventory and structured conformance objectives current through `just model-render`. Generated explanatory pages live under `generated/reference/`, while generated machine projections live under `generated/model/`. Do not introduce a parallel hand-authored component specification.
 
 Keep three separately packageable model layers: the software-component modeling foundation,
 Bibliotek reusable components, and the Vellis application. In SysML terms, the foundation and
@@ -73,6 +73,25 @@ When starting work, run:
 
 If this directory is not a git repository, say so and continue only for tasks that are safe without repository history. Do not assume branch or worktree state exists.
 
+## Installing Vellis For A User
+
+When a user asks an agent to install or connect Vellis, run `uv run vellis setup`. Let setup detect
+the client, show the launch and data paths, and pause for its one confirmation; use `--yes` only
+after the human has explicitly authorized the displayed change. Ask the user to restart or reload
+the client, then inspect `rtg_get_system_state` and the `everyday_life_schema` usage guide. Begin
+with ordinary questions about what the human wants remembered. Do not direct a normal user to MCP
+JSON, schema construction, snapshots, or evaluation prompts. Use `uv run vellis doctor` for
+non-destructive troubleshooting.
+
+For one of the private-beta testers with an existing Vellis registration, do not run bare setup or
+assume the new default data path. First inspect the existing `rtg_knowledge_graph` MCP launch and
+extract its exact `--storage-root` and `--sql-database-path`. Show those paths to the human, obtain
+confirmation, and run `vellis setup` with the same arguments so automatic replay adopts the graph
+in place. Run `vellis doctor` with those same arguments, restart the client, and verify system state
+and graph validation before moving or deleting anything. Prefer in-place reuse; if relocation is
+requested, preserve the original until the copied ledger, JSON storage, schema, and object counts
+have been verified. Never substitute `--data-dir` for a legacy flat `--storage-root`.
+
 ## Model-First Component Workflow
 
 Use `.agents/skills/component-authoring/SKILL.md` when designing, creating, reviewing, revising,
@@ -80,18 +99,16 @@ extracting, splitting, merging, or validating components. Author the component c
 `model/bibliotek/components/` and application composition in `model/vellis/`; run
 `just model-render` for human-readable projections. Do not hand-edit generated pages.
 
-During migration, a semantic mismatch with the frozen Markdown baseline or current implementation
-is a review finding, not permission to rewrite an accepted boundary. Surface genuine implementation
-disagreement for human review before changing accepted contracts, state ownership, dependencies,
-invariants, lifecycle status, or public behavior; after a decision, align the model, realization,
-and conformance evidence together.
+A semantic mismatch between the model and an implementation is a review finding, not permission to
+rewrite an accepted boundary. Surface genuine disagreement for human review before changing
+accepted contracts, state ownership, dependencies, invariants, lifecycle status, or public
+behavior; after a decision, align the model, realization, and conformance evidence together.
 
-Before deleting the frozen baseline, disposition its durable content rather than relying only on
-surface-name parity: contractual facts belong in SysML; useful rationale, operations, evolution
-notes, and unresolved questions belong in clearly non-normative documentation; superseded prose
-must be traceable to the current model decision; and implementation-time contract discoveries must
-be modeled deliberately or remain an explicit unresolved engineering decision outside the accepted
-contract.
+Use `.agents/skills/rtg-schema-design/SKILL.md` when designing or evolving an RTG schema. Inspect
+live schema and representative data first, distinguish anchors from associated facts and links,
+keep incomplete truthful records possible, and obtain human approval before consequential schema
+evolution. Use `.agents/skills/rtg-knowledge-graph-mcp/SKILL.md` for operational controller and MCP
+work.
 
 Use stable component IDs:
 
@@ -164,9 +181,9 @@ Use these lifecycle statuses:
 
 Only a human owner may mark a component model `accepted`, `deprecated`, or `retired`. If ownership is unclear, keep it in `draft` and record the question in model documentation or a nearby non-normative note.
 
-Accepted models are normative over implementation convenience after cutover. During shadow mode,
-preserve accepted boundaries and record disagreements explicitly before changing contracts,
-dependencies, owned state, invariants, lifecycle status, or verification requirements.
+Accepted models are normative over implementation convenience. Preserve accepted boundaries and
+record disagreements explicitly before changing contracts, dependencies, owned state, invariants,
+lifecycle status, or verification requirements.
 
 Before a human owner marks a spec `accepted`, verify that:
 
@@ -176,10 +193,6 @@ Before a human owner marks a spec `accepted`, verify that:
 - Invariants are externally meaningful and testable.
 - Verification requirements are specific enough to prove boundary behavior.
 - Open questions do not leave current public behavior ambiguous.
-
-During the current shadow migration, the same checklist applies before approving model cutover,
-and every accepted predecessor obligation must either be represented, explicitly excluded as
-non-normative, or approved as a contract change.
 
 ## Agent Implementation Rules
 
@@ -239,7 +252,8 @@ Default recipes:
 - `just model-check`: run official SysML validation plus profile, architecture, implementation-binding, and generated-artifact checks.
 - `just model-check-formal`: run the pinned official SysML validator directly.
 - `just model-render`: regenerate model-derived documentation views and the static Vellis application manifest.
-- `just model-package`: build independently packageable shadow KPAR candidates.
+- `just model-diff`: review authored model, generated projection, and runtime-manifest changes together.
+- `just model-package`: build independently packageable KPAR products.
 - `just model-handoff TARGET=<stable-id>`: inspect the model slice and verification objectives for an implementation handoff.
 - `just check`: run lint, type checking, skill validation, model checks, and tests.
 
@@ -279,21 +293,11 @@ Claude Code project-skill exposure lives in `.claude/skills/` as relative symlin
 
 Use `.agents/skills/rtg-knowledge-graph-mcp/SKILL.md` when operating or evaluating the RTG Knowledge Graph MCP server through tools such as `rtg_validate_graph`, `rtg_apply_live_graph_changes`, `rtg_stage_knowledge_changes`, `rtg_apply_migration_cutover`, `rtg_execute_query`, snapshots, restore, or ledger replay.
 
-## Future Repo Areas
+## Folder-Level Guidance
 
-This repo may later include folder-level guidance for areas such as:
-
-- `model/bibliotek/` for reusable component models
-- `model/vellis/` for application composition and realizations
-- `docs/reference/` for generated human views
-- `generated/model/` for generated parser, conformance, and evidence data
-- `components/` or `src/` for reusable component implementations
-- `apps/` for reference applications
-- `sdk/` for component authoring and composition APIs
-- `runtime/` for local and distributed runtime support
-- `tools/` for validation, generation, and spec-to-artifact workflows
-
-Add nested `AGENTS.md` or `AGENTS.override.md` files when a folder develops specialized rules. Keep the root file focused on repository-wide norms.
+Add a nested `AGENTS.md` or `AGENTS.override.md` only when a directory develops specialized rules
+that do not belong in the repository-wide guidance. Keep this root file focused on shared norms and
+avoid speculative instructions for directories or systems that do not yet exist.
 
 ## Documentation Sync
 

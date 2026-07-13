@@ -60,6 +60,7 @@ MODEL_ORDER = (
     "bibliotek/components/component.rtg.controller.sysml",
     "bibliotek/Bibliotek.sysml",
     "bibliotek/views/BibliotekViews.sysml",
+    "vellis/EverydayLifeOntology.sysml",
     "vellis/VellisOperations.sysml",
     "vellis/Vellis.sysml",
     "vellis/use-cases/VellisUseCases.sysml",

@@ -11,7 +11,7 @@ Use the RTG MCP server as a controller-facing graph memory, not as a loose JSON 
 
 1. Validate the connection with `rtg_validate_graph({})`.
 2. Read `rtg_get_system_state({})` to classify the app as empty, schema-only, populated, staged, or needing replay.
-3. If examples are needed, call `rtg_get_usage_guide` with `workflow_patterns`, `request_patterns`, `mcp_bootstrap_checklist`, `operator_card`, `schema_staging_minimal`, `tool_call_shapes`, `live_write`, `lookup_examples`, `query_examples`, `recovery_and_replay`, `migration_history`, or `migration_abandonment`.
+3. If examples are needed, call `rtg_get_usage_guide` with `everyday_life_schema`, `schema_design`, `workflow_patterns`, `request_patterns`, `mcp_bootstrap_checklist`, `operator_card`, `schema_staging_minimal`, `tool_call_shapes`, `live_write`, `lookup_examples`, `query_examples`, `recovery_and_replay`, `migration_history`, or `migration_abandonment`.
 4. Discover available anchor types with `rtg_discover_anchor_types`, then read details with `rtg_get_schema_pack`.
 5. Stage initial schema or schema evolution with `rtg_stage_schema_migration` unless you need the advanced normalized-batch surface.
 6. Make staged schema live with `rtg_apply_migration_cutover`.
@@ -22,7 +22,9 @@ Use the RTG MCP server as a controller-facing graph memory, not as a loose JSON 
 ## First Calls
 
 If the RTG MCP tools are not already connected, use the repo-generated MCP metadata before writing
-custom scripts. `mcp.client_config` launches the stdio server from absolute paths. For a Vellis app
+custom scripts. Prefer the focused `mcp-config` CLI output, which is the complete client block and
+launches the stdio server from absolute paths. The larger diagnostic metadata exposes the same
+block as `mcp.client_config`. For a Vellis app
 that is already running locally, use `mcp.transports.localhost_http.client_config` and connect to
 `http://127.0.0.1:8765/mcp` by default. The localhost HTTP transport is unauthenticated and should
 remain bound to `127.0.0.1`.
@@ -34,7 +36,7 @@ remain bound to `127.0.0.1`.
 5. Call `rtg_get_usage_guide` with `topic: "mcp_bootstrap_checklist"` when you need the full repo-blind workflow through MCP.
 6. Call `rtg_discover_anchor_types` or `rtg_get_schema_pack` before inventing type keys or property names.
 
-If the graph has no live schema, create schema with `rtg_stage_schema_migration`, then make it live with `rtg_apply_migration_cutover`.
+If the graph has no live schema, create schema with `rtg_stage_schema_migration`, then make it live with `rtg_apply_migration_cutover`. When repository skills are available, use `$rtg-schema-design` before authoring or evolving a consequential schema.
 
 ## Mutation Lanes
 

@@ -4,6 +4,7 @@ from dataclasses import dataclass
 
 from apps.rtg_knowledge_graph.config import RtgKnowledgeGraphConfig
 from apps.rtg_knowledge_graph.runner import RtgKnowledgeGraphRunner
+from apps.rtg_knowledge_graph.starter_schema import StarterSchemaStatus, prepare_controller
 from components.rtg.change_validation import DeterministicRtgChangeValidator
 from components.rtg.constraints import InMemoryRtgConstraints
 from components.rtg.controller import InProcessRtgController
@@ -20,6 +21,13 @@ class RtgKnowledgeGraphComposition:
     config: RtgKnowledgeGraphConfig
     controller: InProcessRtgController
     runner: RtgKnowledgeGraphRunner
+
+    def prepare(self) -> StarterSchemaStatus:
+        return prepare_controller(
+            self.controller,
+            install_starter_schema=self.config.install_starter_schema,
+            automatic_recovery=self.config.automatic_recovery,
+        )
 
 
 def build_app(config: RtgKnowledgeGraphConfig) -> RtgKnowledgeGraphComposition:

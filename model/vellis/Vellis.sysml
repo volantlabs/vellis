@@ -3,6 +3,7 @@ package Vellis {
     private import BibliotekSoftwareValues::*;
     private import Bibliotek::*;
     private import VellisOperations::*;
+    private import VellisEverydayLifeOntology::*;
 
     part def <'application.vellis'> VellisApplication {
         @SpecificationStatus { lifecycleStatus = SpecLifecycle::accepted; owner = "humans"; }
@@ -17,6 +18,7 @@ package Vellis {
         part changeValidator : RtgChangeValidator;
         part controller : RtgController;
         part facade : VellisApplicationFacade;
+        part starterOntologyInstaller : EverydayLifeOntologyInstaller;
 
         bind controller.graph = graphStore;
         bind controller.schema = schemaRegistry;

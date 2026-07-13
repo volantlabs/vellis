@@ -72,21 +72,25 @@ rtg:
 rtg-mcp-info:
     @uv run python -m apps.rtg_knowledge_graph serve-mcp --transport stdio --dry-run --json
 
+# Print only copy-pastable stdio MCP client configuration.
+rtg-mcp-config storage_root=".data/vellis-beta-001":
+    @uv run vellis-rtg-knowledge-graph mcp-config --transport stdio --storage-root {{storage_root}}
+
 # Launch the default RTG Knowledge Graph stdio MCP server.
 rtg-mcp:
     @uv run python -m apps.rtg_knowledge_graph serve-mcp --transport stdio
 
 # Print localhost HTTP MCP client config for a fresh beta storage root.
-rtg-mcp-http-info storage_root="/tmp/vellis-beta-001" host="127.0.0.1" port="8765" path="/mcp":
+rtg-mcp-http-info storage_root=".data/vellis-beta-001" host="127.0.0.1" port="8765" path="/mcp":
     @uv run python -m apps.rtg_knowledge_graph serve-mcp --transport http --host {{host}} --port {{port}} --path {{path}} --dry-run --json --storage-root {{storage_root}}
 
 # Launch an unauthenticated localhost HTTP MCP server.
-rtg-mcp-http storage_root="/tmp/vellis-beta-001" host="127.0.0.1" port="8765" path="/mcp":
+rtg-mcp-http storage_root=".data/vellis-beta-001" host="127.0.0.1" port="8765" path="/mcp":
     @uv run python -m apps.rtg_knowledge_graph serve-mcp --transport http --host {{host}} --port {{port}} --path {{path}} --storage-root {{storage_root}} --sql-database-path {{storage_root}}/controller.sqlite
 
 # Print beta eval MCP metadata with an explicit storage root.
-rtg-eval-info storage_root="/tmp/vellis-beta-001":
-    @uv run python -m apps.rtg_knowledge_graph serve-mcp --transport stdio --dry-run --json --storage-root {{storage_root}}
+rtg-eval-info storage_root=".data/vellis-beta-001":
+    @uv run python -m apps.rtg_knowledge_graph serve-mcp --transport stdio --dry-run --json --storage-root {{storage_root}} --empty --manual-recovery
 
 run-rtg-knowledge-graph *args:
     @uv run python -m apps.rtg_knowledge_graph {{args}}

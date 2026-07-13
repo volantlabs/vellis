@@ -12,6 +12,7 @@ import zipfile
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
+from uuid import NAMESPACE_URL, uuid5
 
 try:
     from .model_layout import (
@@ -26,8 +27,8 @@ try:
         GENERATED_EVIDENCE_INDEX,
         GENERATED_FORMAL_INDEX,
         GENERATED_MANIFEST,
+        GENERATED_STARTER_SCHEMA,
         LANGUAGE_LOCK_PATH,
-        MIGRATION_BASELINE_ROOT,
         MODEL_PACKAGE_ROOT,
         MODEL_ROOT,
         ROOT,
@@ -46,8 +47,8 @@ except ImportError:  # pragma: no cover - direct script execution
         GENERATED_EVIDENCE_INDEX,
         GENERATED_FORMAL_INDEX,
         GENERATED_MANIFEST,
+        GENERATED_STARTER_SCHEMA,
         LANGUAGE_LOCK_PATH,
-        MIGRATION_BASELINE_ROOT,
         MODEL_PACKAGE_ROOT,
         MODEL_ROOT,
         ROOT,
@@ -372,6 +373,41 @@ def _protocol_method_parameters(component_id: str) -> dict[str, tuple[str, ...]]
     return parameters
 
 
+def _protocol_defaulted_parameters(component_id: str) -> dict[str, set[str]]:
+    code_root = ROOT / "components" / Path(*component_id.removeprefix("component.").split("."))
+    protocol_path = code_root / "protocol.py"
+    if not protocol_path.exists():
+        return {}
+    tree = ast.parse(protocol_path.read_text(encoding="utf-8"))
+    result: dict[str, set[str]] = {}
+    for node in tree.body:
+        if not isinstance(node, ast.ClassDef) or not any(
+            (isinstance(base, ast.Name) and base.id == "Protocol")
+            or (isinstance(base, ast.Attribute) and base.attr == "Protocol")
+            for base in node.bases
+        ):
+            continue
+        for member in node.body:
+            if not isinstance(member, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                continue
+            positional = [*member.args.posonlyargs, *member.args.args]
+            default_start = len(positional) - len(member.args.defaults)
+            defaulted = {
+                argument.arg
+                for index, argument in enumerate(positional)
+                if index >= default_start and argument.arg not in {"self", "cls"}
+            }
+            defaulted.update(
+                argument.arg
+                for argument, default in zip(
+                    member.args.kwonlyargs, member.args.kw_defaults, strict=True
+                )
+                if default is not None
+            )
+            result[member.name] = defaulted
+    return result
+
+
 def _check_protocol_action_signatures() -> list[Finding]:
     findings: list[Finding] = []
     for path in sorted(COMPONENT_MODEL_ROOT.glob("component.*.sysml")):
@@ -384,6 +420,7 @@ def _check_protocol_action_signatures() -> list[Finding]:
             for match in re.finditer(rf"\baction def\s+{OPTIONAL_IDENTIFICATION}(\w+)\s*\{{", text)
         }
         actions = set(action_blocks)
+        defaulted_parameters = _protocol_defaulted_parameters(component_id)
         for method, protocol_parameters in _protocol_method_parameters(component_id).items():
             action = _model_action_for_method(component_id, method, actions)
             if not action:
@@ -407,6 +444,110 @@ def _check_protocol_action_signatures() -> list[Finding]:
                         f"protocol={protocol_parameters}, model={model_parameters}",
                     )
                 )
+            model_declarations: dict[str, tuple[str, str]] = {}
+            for declaration in re.findall(r"\bin\s+[^;{}]+;", action_blocks[action]):
+                declaration_match = re.search(
+                    rf"\bin\s+(?:ref\s+)?(?:attribute\s+|part\s+|item\s+)?"
+                    rf"({SYSML_IDENTIFIER})(\[[^]]+\])?",
+                    declaration,
+                )
+                if declaration_match is None:
+                    continue
+                name, multiplicity = declaration_match.groups()
+                model_declarations[_normalized_name(_identifier_value(name))] = (
+                    multiplicity or "",
+                    declaration,
+                )
+            for parameter in defaulted_parameters.get(method, set()):
+                model_contract = model_declarations.get(_normalized_name(parameter))
+                if model_contract is None:
+                    continue
+                multiplicity, declaration = model_contract
+                if not multiplicity.startswith("[0..") and not re.search(
+                    r"\s(?:default\s*)?=\s*", declaration
+                ):
+                    findings.append(
+                        Finding(
+                            path,
+                            f"{method}/{action} omits modeled optionality or a default for "
+                            f"Python-defaulted input {parameter}",
+                        )
+                    )
+        code_root = ROOT / "components" / Path(*component_id.removeprefix("component.").split("."))
+        tree = ast.parse((code_root / "protocol.py").read_text(encoding="utf-8"))
+        protocol_returns: dict[str, str | None] = {}
+        for node in tree.body:
+            if not isinstance(node, ast.ClassDef) or not any(
+                (isinstance(base, ast.Name) and base.id == "Protocol")
+                or (isinstance(base, ast.Attribute) and base.attr == "Protocol")
+                for base in node.bases
+            ):
+                continue
+            for member in node.body:
+                if isinstance(
+                    member, (ast.FunctionDef, ast.AsyncFunctionDef)
+                ) and not member.name.startswith("_"):
+                    protocol_returns[member.name] = (
+                        ast.unparse(member.returns) if member.returns is not None else None
+                    )
+        for method, return_type in protocol_returns.items():
+            action = _model_action_for_method(component_id, method, actions)
+            if not action:
+                continue
+            model_outputs = re.findall(
+                rf"\bout\s+(?:ref\s+)?(?:attribute\s+|part\s+|item\s+)?"
+                rf"{SYSML_IDENTIFIER}(?:\[[^]]+\])?\s*:\s*([\w:]+)",
+                action_blocks[action],
+            )
+            expected_outputs = () if return_type in {None, "None"} else (return_type,)
+            if tuple(model_outputs) != expected_outputs:
+                findings.append(
+                    Finding(
+                        path,
+                        f"{method}/{action} return contract differs: "
+                        f"protocol={return_type}, model={tuple(model_outputs)}",
+                    )
+                )
+    return findings
+
+
+def _check_protocol_value_fields() -> list[Finding]:
+    """Require every Python boundary record field to exist in its logical model value."""
+    findings: list[Finding] = []
+    all_model_text = "\n".join(path.read_text(encoding="utf-8") for path in _sysml_files("all"))
+    modeled_values = set(
+        re.findall(
+            rf"\b(?:attribute|item) def\s+{OPTIONAL_IDENTIFICATION}(\w+)",
+            all_model_text,
+        )
+    )
+    boundary_paths = list((ROOT / "components").glob("**/protocol.py"))
+    boundary_paths.append(ROOT / "components" / "rtg" / "diagnostics.py")
+    for protocol_path in sorted(boundary_paths):
+        tree = ast.parse(protocol_path.read_text(encoding="utf-8"))
+        for node in tree.body:
+            if not isinstance(node, ast.ClassDef) or node.name.startswith("_"):
+                continue
+            fields = {
+                _normalized_name(member.target.id)
+                for member in node.body
+                if isinstance(member, ast.AnnAssign) and isinstance(member.target, ast.Name)
+            }
+            if not fields:
+                continue
+            if node.name not in modeled_values:
+                findings.append(
+                    Finding(
+                        protocol_path,
+                        f"public boundary value lacks model definition: {node.name}",
+                    )
+                )
+                continue
+            missing = sorted(fields - _modeled_public_fields(all_model_text, node.name))
+            if missing:
+                findings.append(
+                    Finding(protocol_path, f"{node.name} has unmodeled public fields: {missing}")
+                )
     return findings
 
 
@@ -417,8 +558,28 @@ def _check_empty_public_definitions(files: list[Path]) -> list[Finding]:
         rf"{OPTIONAL_IDENTIFICATION}(\w+)\s*;"
     )
     for path in files:
-        for match in pattern.finditer(path.read_text(encoding="utf-8")):
+        text = path.read_text(encoding="utf-8")
+        for match in pattern.finditer(text):
             findings.append(Finding(path, f"unexplained empty public definition {match.group(1)}"))
+        braced = re.compile(
+            rf"(?m)^\s*(?!abstract\b)(attribute|item|part|action|calc|constraint) def\s+"
+            rf"{OPTIONAL_IDENTIFICATION}(\w+)\b(?!\s*:>)\s*\{{"
+        )
+        for match in braced.finditer(text):
+            block = _extract_braced_block(text, match.start())
+            if match.group(1) == "part" and "@ImplementationBinding" in block:
+                continue
+            body = _without_comments(block)
+            body = body[body.find("{") + 1 : body.rfind("}")]
+            body = re.sub(r"@\w+\s*\{.*?\}", "", body, flags=re.DOTALL)
+            body = re.sub(r"\bdoc\b", "", body).strip()
+            if not body:
+                findings.append(
+                    Finding(
+                        path,
+                        f"concrete public definition has only documentation: {match.group(2)}",
+                    )
+                )
     return findings
 
 
@@ -444,6 +605,10 @@ def _check_native_modeling_style(files: list[Path]) -> list[Finding]:
         if path.parent == COMPONENT_MODEL_ROOT and "@ImplementationBinding" in text:
             findings.append(
                 Finding(path, "logical component definitions must not contain realization bindings")
+            )
+        if re.search(r"\battribute\s+diagnostic(?:\[[^]]+\])?\s*:\s*JsonObject\b", text):
+            findings.append(
+                Finding(path, "public diagnostics must use the shared typed diagnostic value")
             )
         if re.search(r"\benum\s+<'[^']+'>", text):
             findings.append(
@@ -947,24 +1112,20 @@ def _check_view_semantics() -> list[Finding]:
         missing = sorted(required_filters - filters)
         if missing:
             findings.append(Finding(path, f"view projections omit filters: {missing}"))
+    vellis_path = MODEL_ROOT / "vellis" / "views" / "VellisViews.sysml"
+    vellis_text = vellis_path.read_text(encoding="utf-8")
+    for package in ("VellisLocalPythonRealization", "VellisMcpPythonRealization"):
+        if f"private import {package}::*;" not in vellis_text:
+            findings.append(Finding(vellis_path, f"Vellis views do not import {package}"))
+        if f"expose {package}::**;" not in vellis_text:
+            findings.append(
+                Finding(vellis_path, f"Vellis composition view does not expose {package}")
+            )
     return findings
 
 
 def _normalized_name(value: str) -> str:
     return "".join(_words(value))
-
-
-def _markdown_sections(text: str) -> list[tuple[str, str]]:
-    matches = list(re.finditer(r"(?m)^###\s+`([^`]+)`\s*$", text))
-    return [
-        (
-            match.group(1),
-            text[
-                match.end() : matches[index + 1].start() if index + 1 < len(matches) else len(text)
-            ],
-        )
-        for index, match in enumerate(matches)
-    ]
 
 
 def _modeled_public_fields(
@@ -994,142 +1155,6 @@ def _modeled_public_fields(
     if parent:
         fields.update(_modeled_public_fields(text, parent, seen))
     return fields
-
-
-def _check_shadow_contract_parity() -> list[Finding]:
-    """Keep accepted Markdown meaning visible while this repository remains in shadow mode."""
-    findings: list[Finding] = []
-    all_model_text = "\n".join(path.read_text(encoding="utf-8") for path in _sysml_files("all"))
-    all_definitions = set(
-        re.findall(r"\b(?:attribute|item|part|action) def\s+(\w+)", all_model_text)
-    )
-    for model_path in sorted(COMPONENT_MODEL_ROOT.glob("component.*.sysml")):
-        model_text = model_path.read_text(encoding="utf-8")
-        component_id = _component_id(model_text)
-        if not component_id:
-            continue
-        markdown_path = MIGRATION_BASELINE_ROOT / f"{component_id}.md"
-        if not markdown_path.exists():
-            continue
-        markdown_text = markdown_path.read_text(encoding="utf-8")
-        action_blocks = {
-            match.group(1): _extract_braced_block(model_text, match.start())
-            for match in re.finditer(
-                rf"\baction def\s+{OPTIONAL_IDENTIFICATION}(\w+)\s*\{{", model_text
-            )
-        }
-        action_names = set(action_blocks)
-
-        markdown_invariants = set(re.findall(r"(?m)^###\s+`(invariant\.[^`]+)`\s*$", markdown_text))
-        model_invariants = set(re.findall(r"\brequirement\s+<'(invariant\.[^']+)'>", model_text))
-        for invariant in sorted(markdown_invariants - model_invariants):
-            findings.append(Finding(model_path, f"accepted invariant omitted: {invariant}"))
-
-        for heading, section in _markdown_sections(markdown_text):
-            if "." in heading:
-                method_name = heading.rsplit(".", 1)[-1]
-                action_name = _model_action_for_method(component_id, method_name, action_names)
-                if action_name:
-                    action_block = action_blocks[action_name]
-                    inputs_match = re.search(
-                        r"(?ms)^Inputs:\s*(.*?)(?=^[A-Z][A-Za-z ]+:\s*$|\Z)", section
-                    )
-                    if inputs_match:
-                        raw_markdown_inputs = re.findall(
-                            r"(?m)^-\s+`([^`]+)`", inputs_match.group(1)
-                        )
-                        markdown_inputs = tuple(
-                            _normalized_name(name.split(" |", 1)[0]) for name in raw_markdown_inputs
-                        )
-                        model_inputs = tuple(
-                            _normalized_name(_identifier_value(name))
-                            for name in re.findall(
-                                rf"\bin\s+(?:ref\s+)?(?:attribute\s+|part\s+|item\s+)?"
-                                rf"({SYSML_IDENTIFIER})(?:\[[^]]+\])?"
-                                rf"(?:\s+(?:ordered|nonunique))*\s*:",
-                                action_block,
-                            )
-                        )
-                        markdown_lists_only_a_type = (
-                            len(raw_markdown_inputs) == 1 and raw_markdown_inputs[0][:1].isupper()
-                        )
-                        if not markdown_lists_only_a_type and markdown_inputs != model_inputs:
-                            findings.append(
-                                Finding(
-                                    model_path,
-                                    f"{heading} input contract differs: "
-                                    f"markdown={markdown_inputs}, model={model_inputs}",
-                                )
-                            )
-
-            fields_match = re.search(
-                r"(?ms)^Fields:\s*(.*?)"
-                r"(?=^[A-Z][A-Za-z ]+:\s*$|^Semantics:\s*$|^Validation:\s*$|\Z)",
-                section,
-            )
-            if fields_match:
-                definition_name = heading.rsplit(".", 1)[-1]
-                definition_block = ""
-                for kind in ("attribute def", "item def"):
-                    definition_block = _definition_block(model_text, kind, definition_name)
-                    if definition_block:
-                        break
-                if not definition_block:
-                    findings.append(
-                        Finding(model_path, f"accepted public value omitted: {definition_name}")
-                    )
-                else:
-                    expected = {
-                        _normalized_name(name)
-                        for name in re.findall(r"(?m)^-\s+`([A-Za-z_]\w*)`", fields_match.group(1))
-                    }
-                    modeled = _modeled_public_fields(model_text, definition_name)
-                    missing = sorted(expected - modeled)
-                    if missing:
-                        findings.append(
-                            Finding(
-                                model_path,
-                                f"{definition_name} omits accepted fields: {missing}",
-                            )
-                        )
-
-            errors_match = re.search(
-                r"(?ms)^Errors:\s*(.*?)(?=^[A-Z][A-Za-z ]+:\s*$|^Semantics:\s*$|\Z)",
-                section,
-            )
-            if errors_match:
-                expected_errors = set(
-                    re.findall(r"(?m)^-\s+`([A-Za-z]\w+)`", errors_match.group(1))
-                )
-                for error_name in expected_errors:
-                    if error_name not in all_definitions:
-                        findings.append(
-                            Finding(model_path, f"accepted failure omitted: {error_name}")
-                        )
-                if "." in heading:
-                    method_name = heading.rsplit(".", 1)[-1]
-                    action_name = _model_action_for_method(component_id, method_name, action_names)
-                    if action_name:
-                        failure = re.search(
-                            r"@FailureContract\s*\{(.*?)\}",
-                            action_blocks[action_name],
-                            re.DOTALL,
-                        )
-                        modeled_errors = (
-                            set(re.findall(r'"([A-Za-z]\w+)"', failure.group(1)))
-                            if failure
-                            else set()
-                        )
-                        missing_action_errors = expected_errors - modeled_errors
-                        if missing_action_errors:
-                            findings.append(
-                                Finding(
-                                    model_path,
-                                    f"{heading} omits accepted action failures: "
-                                    f"{sorted(missing_action_errors)}",
-                                )
-                            )
-    return findings
 
 
 def _check_verification_closure() -> list[Finding]:
@@ -1351,6 +1376,9 @@ def _check_vellis_use_cases() -> list[Finding]:
         type_name for _, type_name in re.findall(r"\buse case\s+(?!def\b)(\w+)\s*:\s*(\w+)", text)
     }
     findings: list[Finding] = []
+    for actor_type in ("HumanOperator", "AiAgent"):
+        if not re.search(rf"\bpart def\s+{actor_type}\s*:>\s*VellisUser\b", text):
+            findings.append(Finding(path, f"missing VellisUser specialization {actor_type}"))
     if definitions != usages:
         findings.append(
             Finding(
@@ -1363,18 +1391,72 @@ def _check_vellis_use_cases() -> list[Finding]:
         block = _extract_braced_block(text, match.start())
         if not re.search(r"actor\s+users\[1\.\.\*]\s*:\s*VellisUser", block):
             findings.append(Finding(path, "use case must bind one or more VellisUser actors"))
+    operations_text = (MODEL_ROOT / "vellis" / "VellisOperations.sysml").read_text(
+        encoding="utf-8"
+    )
+    operation_types = set(
+        re.findall(rf"\baction def\s+{OPTIONAL_IDENTIFICATION}(\w+)", operations_text)
+    )
+    performers = {
+        (_identifier_value(use_case), _identifier_value(action))
+        for use_case, action in re.findall(
+            rf"\bperform\s+({SYSML_IDENTIFIER})\.({SYSML_IDENTIFIER})\s*;", text
+        )
+    }
+    actor_occurrences = dict(
+        re.findall(r"\bpart\s+(\w+)\s*:\s*(HumanOperator|AiAgent)\s*;", text)
+    )
+    for match in re.finditer(
+        rf"\buse case\s+(?!def\b)({SYSML_IDENTIFIER})\s*:\s*(\w+)\s*\{{", text
+    ):
+        usage_name = _identifier_value(match.group(1))
+        block = _extract_braced_block(text, match.start())
+        actor_binding = re.search(r"\bactor\s+users\s*=\s*(\w+)\s*;", block)
+        if (
+            "subject application = vellis;" not in block
+            or actor_binding is None
+            or actor_binding.group(1) not in actor_occurrences
+        ):
+            findings.append(Finding(path, f"use case {usage_name} lacks subject or actor binding"))
+        nested_actions = re.findall(
+            rf"\b(?:then\s+)?action\s+({SYSML_IDENTIFIER})\s*:\s*(\w+)\s*;", block
+        )
+        if not nested_actions:
+            findings.append(Finding(path, f"use case {usage_name} has no observable actions"))
+        for action_name, action_type in nested_actions:
+            action_name = _identifier_value(action_name)
+            if action_type not in operation_types:
+                findings.append(
+                    Finding(path, f"use case {usage_name} uses unknown action type {action_type}")
+                )
+            if (usage_name, action_name) not in performers:
+                findings.append(
+                    Finding(path, f"facade does not perform {usage_name}.{action_name}")
+                )
     return findings
 
 
 def _python_tool_names() -> tuple[str, ...]:
-    source_path = ROOT / "apps" / "rtg_knowledge_graph" / "mcp_toolset.py"
+    source_path = ROOT / "apps" / "rtg_knowledge_graph" / "mcp_server.py"
     tree = ast.parse(source_path.read_text(encoding="utf-8"))
-    for node in tree.body:
-        if isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name):
-            if node.target.id == "TOOL_NAMES" and node.value is not None:
-                value = ast.literal_eval(node.value)
-                return tuple(str(item) for item in value)
-    raise ValueError("TOOL_NAMES was not found in mcp_toolset.py")
+    registrations: list[tuple[int, str]] = []
+    for node in ast.walk(tree):
+        if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            continue
+        for decorator in node.decorator_list:
+            if not isinstance(decorator, ast.Call):
+                continue
+            if not isinstance(decorator.func, ast.Attribute) or decorator.func.attr != "tool":
+                continue
+            name_keyword = next(
+                (keyword for keyword in decorator.keywords if keyword.arg == "name"), None
+            )
+            if name_keyword is None or not isinstance(name_keyword.value, ast.Constant):
+                continue
+            registrations.append((node.lineno, str(name_keyword.value.value)))
+    if not registrations:
+        raise ValueError("FastMCP tool registrations were not found in mcp_server.py")
+    return tuple(name for _, name in sorted(registrations))
 
 
 def _python_tool_parameters() -> dict[str, tuple[tuple[str, bool, Any], ...]]:
@@ -1456,14 +1538,31 @@ def _model_tool_parameters() -> dict[str, tuple[tuple[str, bool, Any], ...]]:
 
 
 def _python_tool_description_names() -> set[str]:
-    source_path = ROOT / "apps" / "rtg_knowledge_graph" / "mcp_toolset.py"
+    source_path = ROOT / "apps" / "rtg_knowledge_graph" / "mcp_server.py"
     tree = ast.parse(source_path.read_text(encoding="utf-8"))
-    for node in tree.body:
-        if isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name):
-            if node.target.id == "TOOL_DESCRIPTIONS" and node.value is not None:
-                value = ast.literal_eval(node.value)
-                return {str(key) for key in value}
-    raise ValueError("TOOL_DESCRIPTIONS was not found in mcp_toolset.py")
+    names: set[str] = set()
+    for node in ast.walk(tree):
+        if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            continue
+        for decorator in node.decorator_list:
+            if not isinstance(decorator, ast.Call):
+                continue
+            description = next(
+                (keyword.value for keyword in decorator.keywords if keyword.arg == "description"),
+                None,
+            )
+            if not isinstance(description, ast.Subscript):
+                continue
+            if (
+                not isinstance(description.value, ast.Name)
+                or description.value.id != "TOOL_DESCRIPTIONS"
+            ):
+                continue
+            if isinstance(description.slice, ast.Constant):
+                names.add(str(description.slice.value))
+    if not names:
+        raise ValueError("TOOL_DESCRIPTIONS references were not found in mcp_server.py")
+    return names
 
 
 def _model_tool_names() -> tuple[str, ...]:
@@ -1471,6 +1570,20 @@ def _model_tool_names() -> tuple[str, ...]:
         encoding="utf-8"
     )
     return tuple(re.findall(r'toolName\s*=\s*"([^"]+)"', text))
+
+
+def _model_tool_descriptions() -> dict[str, str]:
+    text = (MODEL_ROOT / "vellis" / "realizations" / "VellisMcpPython.sysml").read_text(
+        encoding="utf-8"
+    )
+    descriptions: dict[str, str] = {}
+    for match in re.finditer(r"\bperform action\s+\w+\[[^]]+\]\s*:\s*\w+\s*\{", text):
+        block = _extract_braced_block(text, match.start())
+        tool_match = re.search(r'toolName\s*=\s*"([^"]+)"', block)
+        if tool_match is None:
+            continue
+        descriptions[tool_match.group(1)] = _documentation(block)
+    return descriptions
 
 
 def _model_operation_ids() -> tuple[str, ...]:
@@ -1794,6 +1907,71 @@ def _check_forbidden_component_imports() -> list[Finding]:
     return findings
 
 
+def _check_cutover_state() -> list[Finding]:
+    """Keep the completed model-authority cutover fail closed."""
+    try:
+        status = _read_json(CUTOVER_STATUS_PATH)
+    except (OSError, ValueError, json.JSONDecodeError) as error:
+        return [Finding(CUTOVER_STATUS_PATH, f"invalid cutover status: {error}")]
+
+    phase = status.get("phase")
+    gates = status.get("gates")
+    if not isinstance(gates, dict):
+        return [Finding(CUTOVER_STATUS_PATH, "cutover status has no gates object")]
+    findings: list[Finding] = []
+    if phase == "normative":
+        retired_baseline = ROOT / "docs" / "migration" / "component-spec-baseline"
+        if any(retired_baseline.glob("component.*.md")):
+            findings.append(
+                Finding(
+                    retired_baseline,
+                    "normative phase cannot retain predecessor specifications",
+                )
+            )
+        if "frozen_migration_baseline" in status:
+            findings.append(
+                Finding(CUTOVER_STATUS_PATH, "normative phase cannot name a frozen baseline")
+            )
+        required_gates = {
+            "native_action_invocation_patterns",
+            "accepted_contract_preservation",
+            "black_box_rebuild_readiness",
+            "representative_pilots",
+            "legacy_contract_knowledge_disposition",
+            "legacy_non_contract_knowledge_preservation",
+            "bibliotek_human_acceptance",
+            "vellis_human_acceptance",
+        }
+        incomplete = sorted(
+            gate for gate in required_gates if gates.get(gate) not in {"accepted", "implemented"}
+        )
+        if incomplete:
+            findings.append(
+                Finding(
+                    CUTOVER_STATUS_PATH,
+                    f"normative phase has incomplete acceptance gates: {incomplete}",
+                )
+            )
+        if gates.get("markdown_retirement") != "completed":
+            findings.append(
+                Finding(CUTOVER_STATUS_PATH, "normative phase requires completed retirement")
+            )
+        transitional_guidance = {
+            ROOT / "AGENTS.md": "still marked `shadow`",
+            ROOT / "CONTRIBUTING.md": "component-spec-baseline/",
+        }
+        for path, phrase in transitional_guidance.items():
+            if path.exists() and phrase in path.read_text(encoding="utf-8"):
+                findings.append(
+                    Finding(path, "normative phase retains shadow-migration guidance")
+                )
+    else:
+        findings.append(
+            Finding(CUTOVER_STATUS_PATH, f"model authority must remain normative, found {phase!r}")
+        )
+    return findings
+
+
 def check(scope: str = "all", *, require_external: bool = False) -> list[Finding]:
     findings: list[Finding] = []
     files = _sysml_files(scope)
@@ -1807,6 +1985,8 @@ def check(scope: str = "all", *, require_external: bool = False) -> list[Finding
     findings.extend(_check_connected_formal_semantics(files))
     findings.extend(_check_discriminated_public_alternatives(files))
     findings.extend(_check_requirement_and_verification_semantics(files))
+    if scope == "all":
+        findings.extend(_check_cutover_state())
 
     stable_ids: dict[str, Path] = {}
     for path in files:
@@ -1882,9 +2062,9 @@ def check(scope: str = "all", *, require_external: bool = False) -> list[Finding
         findings.extend(_check_forbidden_component_imports())
         findings.extend(_check_protocol_action_coverage())
         findings.extend(_check_protocol_action_signatures())
+        findings.extend(_check_protocol_value_fields())
         findings.extend(_check_component_contract_completeness())
         findings.extend(_check_state_access_semantics())
-        findings.extend(_check_shadow_contract_parity())
         findings.extend(_check_verification_closure())
 
     if scope in {"vellis", "all"}:
@@ -1917,31 +2097,43 @@ def check(scope: str = "all", *, require_external: bool = False) -> list[Finding
                     "MCP descriptions do not match the exact tool surface",
                 )
             )
+        toolset_path = ROOT / "apps" / "rtg_knowledge_graph" / "mcp_toolset.py"
+        toolset_text = toolset_path.read_text(encoding="utf-8")
+        if (
+            'joinpath("model_app_manifest.json")' not in toolset_text
+            or "TOOL_NAMES, TOOL_DESCRIPTIONS = _load_model_tool_metadata()" not in toolset_text
+            or re.search(r"TOOL_DESCRIPTIONS\s*:\s*dict[^=]*=\s*\{", toolset_text)
+        ):
+            findings.append(
+                Finding(
+                    toolset_path,
+                    "MCP runtime tool names and descriptions must come from the generated "
+                    "model application manifest",
+                )
+            )
         realization_text = (
             MODEL_ROOT / "vellis" / "realizations" / "VellisMcpPython.sysml"
         ).read_text(encoding="utf-8")
         binding_blocks = re.findall(r"@McpToolBinding\s*\{(.*?)\}", realization_text, re.DOTALL)
-        description_symbols = set(
-            re.findall(r'descriptionSymbol\s*=\s*"TOOL_DESCRIPTIONS\.([^"]+)"', realization_text)
-        )
-        if len(binding_blocks) != 27 or description_symbols != set(python_tools):
+        model_descriptions = _model_tool_descriptions()
+        if (
+            len(binding_blocks) != 27
+            or set(model_descriptions) != set(python_tools)
+            or any(not description.strip() for description in model_descriptions.values())
+        ):
             findings.append(
                 Finding(
                     MODEL_ROOT / "vellis" / "realizations" / "VellisMcpPython.sysml",
-                    "each MCP realization must bind its exact description and mapping policy",
+                    "each MCP realization must document its exact non-empty tool description",
                 )
             )
-        for block in binding_blocks:
-            if not re.search(r'resultMapping\s*=\s*"[^"]+"', block) or not re.search(
-                r'errorMapping\s*=\s*"[^"]+"', block
-            ):
-                findings.append(
-                    Finding(
-                        MODEL_ROOT / "vellis" / "realizations" / "VellisMcpPython.sysml",
-                        "MCP binding lacks result or error mapping",
-                    )
+        if re.search(r"\b(?:descriptionSymbol|resultMapping|errorMapping)\b", realization_text):
+            findings.append(
+                Finding(
+                    MODEL_ROOT / "vellis" / "realizations" / "VellisMcpPython.sysml",
+                    "MCP realization duplicates native documentation or typed encoding semantics",
                 )
-                break
+            )
         operation_ids = _model_operation_ids()
         if len(operation_ids) != 27 or len(set(operation_ids)) != 27:
             findings.append(
@@ -2062,6 +2254,9 @@ def _public_field_signatures(
 
 def _component_page(path: Path) -> str:
     text = path.read_text(encoding="utf-8")
+    all_model_text = "\n".join(
+        source.read_text(encoding="utf-8") for source in _sysml_files("all")
+    )
     component_id = _component_id(text) or path.stem
     component_name = _component_definition_name(text) or path.stem
     component_block = _definition_block(text, "part def", component_name)
@@ -2240,7 +2435,7 @@ def _component_page(path: Path) -> str:
     ]
     for match in re.finditer(r"\b(attribute|item) def\s+(\w+)(?:\s*:>\s*\w+)?\s*\{", text):
         definition_block = _extract_braced_block(text, match.start())
-        fields = _public_field_signatures(text, match.group(2))
+        fields = _public_field_signatures(all_model_text, match.group(2))
         rendered_fields = (
             ", ".join(
                 f"`{name}{multiplicity}: {type_name}`"
@@ -2295,7 +2490,8 @@ def _component_page(path: Path) -> str:
         [
             f"# {component_id}",
             "",
-            "Generated from textual SysML v2 by `just model-render`; do not edit by hand.",
+            "Generated from textual SysML v2 by `just model-render` as a non-normative reading "
+            "projection; do not edit by hand.",
             "",
             f"- Model definition: `{component_name}`",
             f"- Lifecycle: `{status}`",
@@ -2406,11 +2602,49 @@ def _render_component_summary() -> str:
         f"| `{package}` | Bibliotek-wide public values with no single component owner. |"
         for package in shared_packages
     )
+    shared_sources = {
+        "BibliotekSoftwareValues": BIBLIOTEK_MODEL_ROOT / "shared-values" / "SoftwareValues.sysml",
+        "BibliotekRtgDiagnostics": BIBLIOTEK_MODEL_ROOT / "shared-values" / "RtgDiagnostics.sysml",
+    }
+    shared_text = "\n".join(
+        shared_sources[package].read_text(encoding="utf-8") for package in shared_packages
+    )
+    shared_value_rows = [
+        "| Package | Public definition | Kind | Fields / literals | Meaning |",
+        "|---|---|---|---|---|",
+    ]
+    for package in shared_packages:
+        text = shared_sources[package].read_text(encoding="utf-8")
+        for match in re.finditer(r"\b(abstract\s+)?(attribute|item) def\s+(\w+)", text):
+            abstract, kind, name = match.groups()
+            block = _extract_braced_block(text, match.start())
+            fields = _public_field_signatures(shared_text, name)
+            rendered_fields = ", ".join(
+                f"`{field}{multiplicity}: {type_name}`"
+                + (f" = `{default.strip()}`" if default else "")
+                for field, multiplicity, type_name, default in fields
+            )
+            shared_value_rows.append(
+                f"| `{package}` | `{name}` | `{'abstract ' if abstract else ''}{kind}` | "
+                f"{rendered_fields or '—'} | "
+                f"{_documentation(block) or 'Defined by its typed alternatives or fields.'} |"
+            )
+        for match in re.finditer(r"\benum def\s+(\w+)\s*\{", text):
+            block = _extract_braced_block(text, match.start())
+            literals = ", ".join(
+                f"`{_identifier_value(literal)}`"
+                for literal in re.findall(rf"\benum\s+({SYSML_IDENTIFIER})\s*;", block)
+            )
+            shared_value_rows.append(
+                f"| `{package}` | `{match.group(1)}` | `enum` | {literals or '—'} | "
+                f"{_documentation(block) or 'Closed public literal vocabulary.'} |"
+            )
     return "\n".join(
         [
             "# Bibliotek model reference",
             "",
-            "Generated by `just model-render`; do not edit by hand.",
+            "Generated from textual SysML v2 by `just model-render` as a non-normative reading "
+            "projection; do not edit by hand.",
             "",
             "Bibliotek is a reusable SysML library package. It imports the generic modeling "
             "foundation privately and publicly exposes its supported component and shared-value "
@@ -2424,6 +2658,10 @@ def _render_component_summary() -> str:
             "",
             *shared_rows,
             "",
+            "## Shared public values",
+            "",
+            *shared_value_rows,
+            "",
             "## Retained component dependency topology",
             "",
             *dependency_rows,
@@ -2434,6 +2672,46 @@ def _render_component_summary() -> str:
 
 def _render_operation_summary() -> str:
     operation_text = (MODEL_ROOT / "vellis" / "VellisOperations.sysml").read_text(encoding="utf-8")
+    starter = _starter_schema_data()
+    starter_definitions = [
+        item["definition"]
+        for item in starter["knowledge_changes"]["schema_changes"]["definition_writes"]
+    ]
+    starter_rows = [
+        "| Anchor | Required facts | Fields |",
+        "|---|---|---|",
+    ]
+    facts_by_key = {
+        definition["type_key"]: definition
+        for definition in starter_definitions
+        if definition["kind"] == "data_object"
+    }
+    for definition in starter_definitions:
+        if definition["kind"] != "anchor":
+            continue
+        facts_key = definition["payload"]["required_data_types"][0]
+        properties = facts_by_key[facts_key]["payload"]["properties"]
+        fields = ", ".join(
+            f"`{name}`{' (required)' if rule['required'] else ''}"
+            for name, rule in properties.items()
+        )
+        starter_rows.append(f"| `{definition['type_key']}` | `{facts_key}` | {fields} |")
+    starter_link_rows = [
+        "| Link | Allowed sources | Allowed targets |",
+        "|---|---|---|",
+    ]
+    for definition in starter_definitions:
+        if definition["kind"] != "link":
+            continue
+        sources = ", ".join(
+            f"`{value}`" for value in definition["payload"]["allowed_source_types"]
+        )
+        targets = ", ".join(
+            f"`{value}`" for value in definition["payload"]["allowed_target_types"]
+        )
+        starter_link_rows.append(
+            f"| `{definition['type_key']}` | {sources} | {targets} |"
+        )
     operation_blocks: dict[str, str] = {}
     for match in re.finditer(r"\baction def\s+(?:<'([^']+)'>\s+)?\w+\s*\{", operation_text):
         block = _extract_braced_block(operation_text, match.start())
@@ -2499,6 +2777,28 @@ def _render_operation_summary() -> str:
     role_rows.extend(
         f"| `{role}` | `{component_id}` |" for role, component_id in _vellis_roles().items()
     )
+    local_realization_text = (
+        MODEL_ROOT / "vellis" / "realizations" / "VellisLocalPython.sysml"
+    ).read_text(encoding="utf-8")
+    realization_definitions: dict[str, tuple[str, str]] = {}
+    for definition in re.finditer(
+        r"\bpart def\s+(\w+)\s*:>\s*(\w+)\s*\{", local_realization_text
+    ):
+        block = _extract_braced_block(local_realization_text, definition.start())
+        symbol = re.search(r'\bsymbol\s*=\s*"([^"]+)"', block)
+        if symbol:
+            realization_definitions[definition.group(1)] = (definition.group(2), symbol.group(1))
+    python_role_rows = [
+        "| Application role | Logical type | Python realization | Implementation symbol |",
+        "|---|---|---|---|",
+    ]
+    for role, realization in re.findall(
+        r"\bpart\s+:>>\s+(\w+)\s*:\s*(\w+)\s*;", local_realization_text
+    ):
+        logical_type, symbol = realization_definitions.get(realization, ("unmapped", "unmapped"))
+        python_role_rows.append(
+            f"| `{role}` | `{logical_type}` | `{realization}` | `{symbol}` |"
+        )
     use_case_text = "\n".join(
         path.read_text(encoding="utf-8")
         for path in sorted((MODEL_ROOT / "vellis" / "use-cases").glob("*.sysml"))
@@ -2512,7 +2812,12 @@ def _render_operation_summary() -> str:
         definition_block = _extract_braced_block(use_case_text, definition.start())
         usage = re.search(rf"\buse case\s+\w+\s*:\s*{name}\s*\{{", use_case_text)
         usage_block = _extract_braced_block(use_case_text, usage.start()) if usage else ""
-        actions = re.findall(r"\baction\s+(\w+)\s*:\s*(\w+)", usage_block)
+        actions = [
+            (_identifier_value(feature), action)
+            for feature, action in re.findall(
+                rf"\baction\s+({SYSML_IDENTIFIER})\s*:\s*(\w+)", usage_block
+            )
+        ]
         use_case_rows.append(
             f"| `{name}` | {_documentation(definition_block) or 'Modeled actor outcome.'} | "
             f"{', '.join(f'`{feature}: {action}`' for feature, action in actions) or '—'} |"
@@ -2555,15 +2860,29 @@ def _render_operation_summary() -> str:
         [
             "# Vellis application model reference",
             "",
-            "Generated by `just model-render`; do not edit by hand.",
+            "Generated from textual SysML v2 by `just model-render` as a non-normative reading "
+            "projection; do not edit by hand.",
             "",
             "## Application composition",
             "",
             *role_rows,
             "",
+            "## Everyday Life starter ontology",
+            "",
+            f"Ontology `{starter['ontology_id']}` version `{starter['version']}` is generated as "
+            "schema-only bootstrap material. It contains no people, tasks, or other graph facts.",
+            "",
+            *starter_rows,
+            "",
+            *starter_link_rows,
+            "",
             "## Actor-visible use cases",
             "",
             *use_case_rows,
+            "",
+            "## Python realization",
+            "",
+            *python_role_rows,
             "",
             "## Requirements and satisfaction",
             "",
@@ -2587,8 +2906,8 @@ def _render_operation_summary() -> str:
 
 
 def _manifest_data() -> dict[str, Any]:
-    operation_blocks = _model_operation_blocks()
     operation_parameters = _model_tool_parameters()
+    tool_descriptions = _model_tool_descriptions()
     return {
         "app_name": "rtg_knowledge_graph",
         "schema_version": 1,
@@ -2600,7 +2919,7 @@ def _manifest_data() -> dict[str, Any]:
             {
                 "name": tool,
                 "operation_id": f"operation.vellis.{tool}",
-                "description": _documentation(operation_blocks[tool]),
+                "description": tool_descriptions[tool],
                 "parameters": [
                     {
                         "name": name,
@@ -2620,6 +2939,137 @@ def _manifest_data() -> dict[str, Any]:
             for tool in _model_tool_names()
         ],
     }
+
+
+def _starter_schema_data() -> dict[str, Any]:
+    path = MODEL_ROOT / "vellis" / "EverydayLifeOntology.sysml"
+    text = path.read_text(encoding="utf-8")
+    identity = _definition_block(text, "attribute def", "EverydayLifeOntologyIdentity")
+    ontology_id = _required_string_default(identity, "ontologyId")
+    version = _required_string_default(identity, "version")
+    migration_id = _required_string_default(identity, "bootstrapMigrationId")
+
+    definitions: list[dict[str, Any]] = []
+    schema_ids: list[str] = []
+    for match in re.finditer(r"\bpart def\s+(?:<'[^']+'>\s+)?(\w+)\s*\{", text):
+        block = _extract_braced_block(text, match.start())
+        if "@StarterAnchorDefinition" not in block:
+            continue
+        metadata = _definition_block(block, "@StarterAnchorDefinition", "")
+        if not metadata:
+            metadata = _extract_braced_block(block, block.index("@StarterAnchorDefinition"))
+        type_key = _required_assignment(metadata, "typeKey")
+        facts_type = _required_assignment(metadata, "factsTypeKey")
+        description = _required_assignment(metadata, "description")
+        facts_block = _definition_block(text, "attribute def", facts_type)
+        fields: dict[str, dict[str, Any]] = {}
+        for field in re.finditer(
+            rf"\battribute\s+({SYSML_IDENTIFIER})(\[0\.\.1\])?\s*:\s*(String|Boolean)\s*;",
+            facts_block,
+        ):
+            fields[_snake_case(_identifier_value(field.group(1)))] = {
+                "required": field.group(2) is None,
+                "value_kinds": ["boolean" if field.group(3) == "Boolean" else "string"],
+            }
+        anchor_uuid = str(uuid5(NAMESPACE_URL, f"{ontology_id}:schema:{type_key}"))
+        facts_uuid = str(uuid5(NAMESPACE_URL, f"{ontology_id}:schema:{facts_type}"))
+        schema_ids.extend((anchor_uuid, facts_uuid))
+        definitions.extend(
+            (
+                {
+                    "uuid": anchor_uuid,
+                    "kind": "anchor",
+                    "type_key": type_key,
+                    "description": description,
+                    "payload": {"required_data_types": [facts_type]},
+                    "system": {"live": False},
+                },
+                {
+                    "uuid": facts_uuid,
+                    "kind": "data_object",
+                    "type_key": facts_type,
+                    "description": f"Typed facts for {type_key} anchors.",
+                    "payload": {"properties": fields},
+                    "system": {"live": False},
+                },
+            )
+        )
+
+    for match in re.finditer(r"\bitem def\s+(\w+)\s*\{", text):
+        block = _extract_braced_block(text, match.start())
+        if "@StarterLinkDefinition" not in block:
+            continue
+        metadata = _extract_braced_block(block, block.index("@StarterLinkDefinition"))
+        type_key = _required_assignment(metadata, "typeKey")
+        link_uuid = str(uuid5(NAMESPACE_URL, f"{ontology_id}:schema:{type_key}"))
+        schema_ids.append(link_uuid)
+        definitions.append(
+            {
+                "uuid": link_uuid,
+                "kind": "link",
+                "type_key": type_key,
+                "description": _required_assignment(metadata, "description"),
+                "payload": {
+                    "allowed_source_types": _string_tuple_assignment(metadata, "sourceTypes"),
+                    "allowed_target_types": _string_tuple_assignment(metadata, "targetTypes"),
+                },
+                "system": {"live": False},
+            }
+        )
+
+    migration_uuid = str(uuid5(NAMESPACE_URL, f"{ontology_id}:migration-record:{migration_id}"))
+    definition_writes = [
+        {"ref": {"resource_id": item["uuid"]}, "definition": item} for item in definitions
+    ]
+    return {
+        "ontology_id": ontology_id,
+        "version": version,
+        "bootstrap_migration_id": migration_uuid,
+        "bootstrap_migration_key": migration_id,
+        "schema_definition_count": len(definitions),
+        "graph_objects": [],
+        "knowledge_changes": {
+            "schema_changes": {"definition_writes": definition_writes},
+            "migration_changes": {
+                "migration_writes": [
+                    {
+                        "ref": {"resource_id": migration_uuid},
+                        "migration": {
+                            "migration_id": migration_uuid,
+                            "description": "Install the modeled Vellis Everyday Life ontology.",
+                            "status": "ready",
+                            "schema_make_live": schema_ids,
+                        },
+                    }
+                ]
+            },
+        },
+    }
+
+
+def _required_string_default(block: str, name: str) -> str:
+    match = re.search(rf"\battribute\s+{name}\s*:\s*String\s*=\s*\"([^\"]+)\"", block)
+    if match is None:
+        raise ValueError(f"Everyday Life ontology is missing {name}")
+    return match.group(1)
+
+
+def _required_assignment(block: str, name: str) -> str:
+    match = re.search(rf"\b{name}\s*=\s*\"([^\"]+)\"", block)
+    if match is None:
+        raise ValueError(f"starter ontology metadata is missing {name}")
+    return match.group(1)
+
+
+def _string_tuple_assignment(block: str, name: str) -> list[str]:
+    match = re.search(rf"\b{name}\s*=\s*\(([^)]*)\)", block)
+    if match is None:
+        raise ValueError(f"starter ontology metadata is missing {name}")
+    return re.findall(r'"([^"]+)"', match.group(1))
+
+
+def _snake_case(value: str) -> str:
+    return re.sub(r"(?<!^)(?=[A-Z])", "_", value).lower()
 
 
 def render() -> None:
@@ -2642,6 +3092,9 @@ def render() -> None:
     GENERATED_MANIFEST.write_text(
         json.dumps(_manifest_data(), indent=2, sort_keys=True) + "\n", encoding="utf-8"
     )
+    GENERATED_STARTER_SCHEMA.write_text(
+        json.dumps(_starter_schema_data(), indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
     GENERATED_EVIDENCE_INDEX.write_text(
         json.dumps(_verification_evidence_data(), indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
@@ -2658,6 +3111,10 @@ def check_generated() -> list[Finding]:
         BIBLIOTEK_REFERENCE_ROOT / "index.md": _render_component_summary(),
         VELLIS_REFERENCE_ROOT / "index.md": _render_operation_summary(),
         GENERATED_MANIFEST: json.dumps(_manifest_data(), indent=2, sort_keys=True) + "\n",
+        GENERATED_STARTER_SCHEMA: json.dumps(
+            _starter_schema_data(), indent=2, sort_keys=True
+        )
+        + "\n",
         GENERATED_EVIDENCE_INDEX: json.dumps(
             _verification_evidence_data(), indent=2, sort_keys=True
         )
@@ -2716,21 +3173,21 @@ def package_models() -> None:
             usage = [
                 {
                     "resource": "software-component-modeling-foundation-0.1.0.kpar",
-                    "versionConstraint": "0.1.0-shadow",
+                    "versionConstraint": "0.1.0",
                 }
             ]
         else:
             usage = [
                 {
                     "resource": "software-component-modeling-foundation-0.1.0.kpar",
-                    "versionConstraint": "0.1.0-shadow",
+                    "versionConstraint": "0.1.0",
                 },
-                {"resource": "bibliotek-0.1.0.kpar", "versionConstraint": "0.1.0-shadow"},
+                {"resource": "bibliotek-0.1.0.kpar", "versionConstraint": "0.1.0"},
             ]
         project = {
             "name": name.removesuffix("-0.1.0.kpar"),
             "description": "Vellis textual SysML source package",
-            "version": "0.1.0-shadow",
+            "version": "0.1.0",
             "usage": usage,
         }
         checksums = {
@@ -2745,7 +3202,7 @@ def package_models() -> None:
             "created": "2026-07-10T00:00:00Z",
             "metamodel": "https://www.omg.org/spec/SysML/20250201",
             "checksum": checksums,
-            "status": "shadow-candidate-formally-validated",
+            "status": "formally-validated",
         }
         archive_root = project["name"].replace("-", " ").title()
         with zipfile.ZipFile(destination / name, "w", zipfile.ZIP_DEFLATED) as archive:
@@ -2768,11 +3225,34 @@ def handoff(target: str) -> int:
     if not matches:
         print(f"No model element found for {target}", file=sys.stderr)
         return 1
+    is_component = target.startswith("component.")
+    is_vellis = target == "application.vellis" or any(
+        path.is_relative_to(MODEL_ROOT / "vellis") for path in matches
+    )
+    if target == "application.vellis":
+        matches = sorted((MODEL_ROOT / "vellis").rglob("*.sysml"))
     status = _read_json(CUTOVER_STATUS_PATH)
     print(f"Target: {target}")
     print(f"Model phase: {status.get('phase')}")
-    print("Inputs:")
-    print("- model/foundation/SoftwareComponentModeling.sysml")
+    if is_component:
+        print("Model product: build/model/packages/bibliotek-0.1.0.kpar")
+        print(f"Generated view: generated/reference/bibliotek/components/{target}.md")
+    elif is_vellis:
+        print("Model product: build/model/packages/vellis-0.1.0.kpar")
+        print("Generated view: generated/reference/vellis/index.md")
+        print(
+            "Generated starter schema: "
+            "apps/rtg_knowledge_graph/resources/everyday_life_schema.json"
+        )
+    else:
+        print(
+            "Model product: "
+            "build/model/packages/software-component-modeling-foundation-0.1.0.kpar"
+        )
+    print("Model sources:")
+    foundation = MODEL_ROOT / "foundation" / "SoftwareComponentModeling.sysml"
+    if foundation not in matches:
+        print("- model/foundation/SoftwareComponentModeling.sysml")
     for path in matches:
         print(f"- {path.relative_to(ROOT)}")
     print("Implementation input: accepted SysML/KPAR, generated view, and verification objectives.")
@@ -2895,7 +3375,7 @@ def main() -> int:
         return 0
     if args.command == "package":
         package_models()
-        print(f"Packaged shadow KPAR candidates under {MODEL_PACKAGE_ROOT.relative_to(ROOT)}/.")
+        print(f"Packaged KPAR products under {MODEL_PACKAGE_ROOT.relative_to(ROOT)}/.")
         return 0
     if args.command == "setup":
         return setup_status()
@@ -2907,9 +3387,7 @@ def main() -> int:
             "diff",
             "--",
             "model",
-            "docs/reference",
-            "docs/migration",
-            "generated/model",
+            "generated",
             str(GENERATED_MANIFEST.relative_to(ROOT)),
         ],
         cwd=ROOT,

@@ -41,7 +41,7 @@
   "schema_version": 1,
   "tools": [
     {
-      "description": "Return state classification, counts, ledger pointers, and recommended next steps.",
+      "description": "Read controller state for MCP-only agents. Returns state_classification (empty|schema_only|populated|has_staged_work|needs_replay), typed starter_schema status and available type keys, live schema summary, live/non-live counts, current migration-store status counts, persisted snapshot paths, ledger count, last ledger/transaction pointers, migration history hints, and recommended_workflows plus recommended_next_steps. Use everyday_life_schema, workflow_patterns, or request_patterns when entering cold.",
       "failure_envelope": {
         "error": {
           "message": "<message>",
@@ -67,7 +67,7 @@
       ]
     },
     {
-      "description": "Return MCP-accessible workflow guidance and complete generic request examples for exactly one declared topic; it does not invent domain schema.",
+      "description": "Return MCP-accessible usage guidance and complete examples. topic values: everyday_life_schema, schema_design, mcp_bootstrap_checklist, operator_card, workflow_patterns, request_patterns, schema_staging_minimal, tool_call_shapes, live_write, lookup_examples, query_examples, recovery_and_replay, migration_history, migration_abandonment. Everyday Life guidance describes the installed Vellis ontology; generic examples teach RTG operation shapes without silently replacing application schema.",
       "failure_envelope": {
         "error": {
           "message": "<message>",
@@ -98,7 +98,7 @@
       ]
     },
     {
-      "description": "Generate a UUID for each schema candidate, force each candidate non-live, resolve each retirement to exactly one live definition, create a ready migration whose membership covers those candidates, submit canonical staged knowledge changes, and return generated IDs, submitted changes, and the controller outcome.",
+      "description": "Ergonomic schema staging for agents. Inputs: migration_id, description, schema_definitions[{kind:anchor|data_object|link,type_key,description,payload}], optional retire_live_schema[{kind,type_key}], validation_mode. Generates candidate UUIDs, sets system.live=false, fills schema_make_live/schema_make_non_live, submits the canonical rtg_stage_knowledge_changes payload, and returns that payload. Use after schema_bootstrap or schema_evolution workflow planning; next call is usually rtg_apply_migration_cutover.",
       "failure_envelope": {
         "error": {
           "message": "<message>",
@@ -146,7 +146,7 @@
       ]
     },
     {
-      "description": "Compile each anchor and nested fact into canonical writes, generate deterministic request-local fact references where omitted, pass through canonical link writes, and return compiled changes plus validation without mutation or ledger writes.",
+      "description": "Validate ergonomic live anchor records without mutating or ledgering. Inputs: anchor_records[{ref,type,display_name?,system?,facts:[{ref?,type,properties,system?}]}], optional link_writes, optional validation_options{tracks,finding_limit}. Compiles to canonical graph_changes and returns submitted_graph_changes plus validation result.",
       "failure_envelope": {
         "error": {
           "message": "<message>",
@@ -185,7 +185,7 @@
       ]
     },
     {
-      "description": "Compile anchor-with-facts input identically to the validation action, apply the canonical graph changes through the controller, and return compiled changes, generated fact references, and operation outcome.",
+      "description": "Apply ergonomic live anchor records after schema exists. Inputs: anchor_records[{ref,type,display_name?,system?,facts:[{ref?,type,properties,system?}]}], optional link_writes, validation_mode(strict|skip). Compiles to canonical graph_changes and returns submitted_graph_changes plus the underlying operation result.",
       "failure_envelope": {
         "error": {
           "message": "<message>",
@@ -225,7 +225,7 @@
       ]
     },
     {
-      "description": "Validate normal live graph CRUD without mutation or ledger writes.",
+      "description": "Validate normal live graph CRUD without mutating or ledgering it. Inputs: graph_changes with the same shape as rtg_apply_live_graph_changes and optional validation_options{tracks,finding_limit}. Do not pass validation_options.mode; mutation tools use validation_mode. Resolves local_ref values exactly like a real write, returns generated_ids, resolved_graph_changes, and validation_report, and leaves graph state and the controller ledger unchanged. Use before risky imports, safe_update, or validation_error_recovery probes.",
       "failure_envelope": {
         "error": {
           "message": "<message>",
@@ -260,7 +260,7 @@
       ]
     },
     {
-      "description": "Apply normal live graph CRUD through strict controller policy by default.",
+      "description": "Apply normal live graph CRUD only. Use this after the live schema exists. graph_changes keys: anchor_writes[{ref:{local_ref|resource_id}, type, display_name?, system?}], data_object_writes[{ref, type, properties, anchor_refs:[ref], system?}], link_writes[{ref, type, source_ref, target_ref, system?}], associate_data[{anchor_ref,data_ref}], dissociate_data, delete_anchors, delete_data_objects, delete_links, set_live[{object_ref,live}]. Link writes require existing or same-request endpoint anchors and a live link schema allowing their types. local_ref is request-local only; use resource_id values returned by earlier calls for existing objects. Strict invalid writes return validation_report findings. Rejects schema, constraint, migration, and non-live candidate work.",
       "failure_envelope": {
         "error": {
           "message": "<message>",
@@ -296,7 +296,7 @@
       ]
     },
     {
-      "description": "Stage advanced normalized migration-scoped knowledge changes.",
+      "description": "Advanced normalized-batch staging for migration-scoped knowledge-engineering changes. For ordinary schema bootstrap/evolution, prefer rtg_stage_schema_migration because it generates candidate UUIDs and migration membership. knowledge_changes is a change batch with schema_changes, constraint_changes, migration_changes, and optional non-live graph_changes. Schema writes use schema_changes.definition_writes[{ref, definition:{uuid?, kind: anchor|data_object|link, type_key, description, payload, system:{live:false}}}], where anchor payload uses required_data_types/optional_data_types, data_object payload uses properties:{field:{required,value_kinds,properties?,items?}}, and link payload uses allowed_source_types/allowed_target_types. Constraint writes use constraint_changes.constraint_writes[{ref,constraint:{uuid?, kind: query_pattern|cardinality, target_type_keys, display_name, description, payload, system:{live:false}}}], where query_pattern payload uses query_spec+expectation and cardinality payload uses query_spec+counted_binding+minimum/maximum. Migration writes use migration_changes.migration_writes[{ref, migration:{migration_id, description, status:ready, schema_make_live?, schema_make_non_live?, graph_make_live?, constraint_make_live?}}]. New candidates must be referenced by a migration record in the same request. For non-live graph_changes, graph_make_live must include every candidate anchor, data object, and link UUID. Strict staging validates the projected migration cutover; use validation_mode:skip only for controlled recovery or intentionally invalid cutover tests.",
       "failure_envelope": {
         "error": {
           "message": "<message>",
@@ -332,7 +332,7 @@
       ]
     },
     {
-      "description": "Apply the selected migration cutover with validation and failure restoration.",
+      "description": "Apply an explicit migration cutover. The migration record decides which staged schema, constraint, or graph candidates become live and which records retire. Use after rtg_stage_knowledge_changes returns ok:true. cutover_options keys: validation_mode (strict|skip, default strict), prune_retired (default true), failure_restore (only restore_pre_cutover_snapshot in v1). Strict cutover returns validation_report findings, restores or preserves the previous live state on blocking failures, and marks the migration failed so replay can reproduce that status.",
       "failure_envelope": {
         "error": {
           "message": "<message>",
@@ -367,7 +367,7 @@
       ]
     },
     {
-      "description": "Abandon safe non-live staged work without deleting live records.",
+      "description": "Abandon draft/ready/failed staged work and prune safe non-live make-live candidates. Never deletes live records or make-non-live targets. Use when exploratory schema, constraint, or non-live graph candidates should not proceed.",
       "failure_envelope": {
         "error": {
           "message": "<message>",
@@ -402,7 +402,7 @@
       ]
     },
     {
-      "description": "Execute the canonical read-only query. full returns RtgQueryResult unchanged; properties_only returns row_index plus requested properties, row count, and diagnostics, adding empty-return-property guidance when appropriate.",
+      "description": "Execute a read-only RTG query. query_spec keys: anchor_buckets[{name, anchor_type_keys}], link_requirements[{name, source_bucket, target_bucket, link_type_keys}], data_requirements[{name, anchor_bucket, data_type_key, required?, predicates:[{path:[property,...], operator, value?, values?, case_sensitive?, regex_flags?}]}], return_spec:{anchor_buckets?, link_requirements?, data_requirements?, properties:[[data_requirement_name,[property,...]]]}. Operators: exists, equals, not_equals, lt, lte, gt, gte, contains, in, substring, regex. query_options keys: live_filter(all|live|non_live), live_status_overlay, order_by[{data_requirement,path,direction:ascending|descending}]. order_by may only reference paths listed in return_spec.properties. Optional response_options supports format:full or properties_only.",
       "failure_envelope": {
         "error": {
           "message": "<message>",
@@ -441,7 +441,7 @@
       ]
     },
     {
-      "description": "Build one live-only anchor-plus-associated-data equality query, return resolved status, deterministic matches with resource IDs and selected properties, the submitted query/options, query diagnostics, and guidance that distinguishes zero, one, and multiple matches.",
+      "description": "Resolve live anchor UUIDs through the canonical query contract. Inputs: anchor_type, data_type, property_path, value, optional case_sensitive. Compiles to rtg_execute_query and returns match_count, matches[{resource_id, properties}], submitted_query, and guidance for zero or multiple matches.",
       "failure_envelope": {
         "error": {
           "message": "<message>",
@@ -489,7 +489,7 @@
       ]
     },
     {
-      "description": "Return one graph object by UUID without lifecycle filtering or mutation.",
+      "description": "Read one RTG graph object by UUID.",
       "failure_envelope": {
         "error": {
           "message": "<message>",
@@ -520,7 +520,7 @@
       ]
     },
     {
-      "description": "Return every current migration, or one status, in deterministic migration-ID order.",
+      "description": "List RTG migration records, optionally filtered by status.",
       "failure_envelope": {
         "error": {
           "message": "<message>",
@@ -551,7 +551,7 @@
       ]
     },
     {
-      "description": "Return one current migration record by stable migration ID.",
+      "description": "Read one RTG migration record by ID.",
       "failure_envelope": {
         "error": {
           "message": "<message>",
@@ -582,7 +582,7 @@
       ]
     },
     {
-      "description": "Validate current or migration-projected state without mutation.",
+      "description": "Validate current or migration-projected RTG state without mutation. Use rtg_validate_graph({}) as the first MCP smoke check. Pass migration_ids to validate a staged cutover projection. validation_options keys: tracks (all or list), finding_limit (positive integer).",
       "failure_envelope": {
         "error": {
           "message": "<message>",
@@ -617,7 +617,7 @@
       ]
     },
     {
-      "description": "Return schema type keys, descriptions, and live counts; exclude non-live types by default and honor a positive optional limit.",
+      "description": "Return live anchor type keys and descriptions for discovery. discovery_options keys: include_non_live, limit (positive integer). Use before guessing anchor_type_keys.",
       "failure_envelope": {
         "error": {
           "message": "<message>",
@@ -648,7 +648,7 @@
       ]
     },
     {
-      "description": "Return selected anchor schemas, associated-data schemas, participating link schemas, and requested live counts.",
+      "description": "Return schema details and optional live counts for anchor types. Provide anchor_type_keys. schema_pack_options keys: live (true, false, or null), include_live_counts. Use this before writing data_object_writes or query data_requirements so required data types and property names are known.",
       "failure_envelope": {
         "error": {
           "message": "<message>",
@@ -683,7 +683,7 @@
       ]
     },
     {
-      "description": "Return the full coordinated snapshot when summary is false; otherwise return snapshot_exported plus compact component counts and ledger pointers.",
+      "description": "Export a coordinated JSON-safe RTG system snapshot for graph, schema, constraints, migration state, and ledger position. Pass summary:true for compact counts and ledger pointers instead of the full graph payload.",
       "failure_envelope": {
         "error": {
           "message": "<message>",
@@ -715,7 +715,7 @@
       ]
     },
     {
-      "description": "Persist a coordinated snapshot, add relative path and compact summary to the controller result, and omit the full snapshot only when requested.",
+      "description": "Persist a coordinated system snapshot through JSON File Storage at relative_path. Pass return_snapshot:false to omit the full snapshot payload and return compact summary metadata.",
       "failure_envelope": {
         "error": {
           "message": "<message>",
@@ -751,7 +751,7 @@
       ]
     },
     {
-      "description": "List only persisted snapshot-like documents visible through the configured JSON storage root.",
+      "description": "List persisted system snapshots visible through JSON File Storage. Does not expose arbitrary filesystem access.",
       "failure_envelope": {
         "error": {
           "message": "<message>",
@@ -777,7 +777,7 @@
       ]
     },
     {
-      "description": "Load and validate one persisted snapshot, always return path and compact summary, and omit the full snapshot only when requested; do not apply it.",
+      "description": "Load one persisted system snapshot by relative JSON File Storage path. Use the returned snapshot with rtg_restore_from_snapshot or rtg_replay_ledger start_snapshot. Pass return_snapshot:false to return only relative_path and compact summary.",
       "failure_envelope": {
         "error": {
           "message": "<message>",
@@ -813,7 +813,7 @@
       ]
     },
     {
-      "description": "Reconstruct state from an empty or explicit snapshot seed using the selected ascending ledger window.",
+      "description": "Replay mutating controller ledger requests into an empty or snapshot-seeded controller. replay_options keys: start_snapshot, start_snapshot_path, after_ledger_position, through_ledger_position. Ordinary startup replays automatically; this explicit surface supports controlled recovery, audits, and manual-recovery evaluation.",
       "failure_envelope": {
         "error": {
           "message": "<message>",
@@ -844,7 +844,7 @@
       ]
     },
     {
-      "description": "Replay into isolated state and return summaries, count differences, replay window, and validation without replacing current state.",
+      "description": "Replay mutating controller ledger requests into isolated scratch state and restore the current state before returning. Accepts the same replay_options as rtg_replay_ledger, including start_snapshot_path. Returns pre/post summaries, count diffs, replay counts, and validation result without appending ledger entries.",
       "failure_envelope": {
         "error": {
           "message": "<message>",
@@ -875,7 +875,7 @@
       ]
     },
     {
-      "description": "Return ledger-backed staged, cutover-applied, cutover-failed, and abandoned events in ledger order.",
+      "description": "Return ledger-backed migration audit events, including staged, cutover_applied, cutover_failed, and abandoned events. Applied migrations may be absent from the live migration store but remain visible here.",
       "failure_envelope": {
         "error": {
           "message": "<message>",
@@ -901,7 +901,7 @@
       ]
     },
     {
-      "description": "Retry queued audit records in original order and report remaining degraded-audit state.",
+      "description": "Flush queued controller ledger failures to SQL storage.",
       "failure_envelope": {
         "error": {
           "message": "<message>",
@@ -927,7 +927,7 @@
       ]
     },
     {
-      "description": "Validate and atomically restore coordinated state; record the operation by default and reserve skip for internal recovery.",
+      "description": "Restore RTG state from a supplied system snapshot. restore_options keys: ledger_mode(record|skip). Use with rtg_export_system_snapshot or a persisted snapshot payload.",
       "failure_envelope": {
         "error": {
           "message": "<message>",

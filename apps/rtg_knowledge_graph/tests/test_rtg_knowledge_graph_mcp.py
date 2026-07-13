@@ -461,7 +461,7 @@ def test_mcp_toolset_live_graph_query_get_object_and_validation_error(
     assert query["ok"] is True
     assert read["result"]["type"] == "Person"
     assert missing["ok"] is False
-    assert missing["error"]["type"] == "RtgGraphObjectNotFound"
+    assert missing["error"]["type"] == "RtgControllerObjectNotFound"
 
 
 def test_mcp_toolset_validates_live_graph_changes_without_mutation_or_ledger(
@@ -887,7 +887,8 @@ def test_mcp_usage_guides_are_packaged_and_do_not_return_fake_snapshot_payloads(
     assert requests["ok"] is True
     assert checklist["result"]["steps"][0]["tool"] == "rtg_validate_graph"
     assert checklist["result"]["steps"][1]["tool"] == "rtg_get_system_state"
-    assert checklist["result"]["steps"][2]["arguments"] == {"topic": "schema_staging_minimal"}
+    assert checklist["result"]["steps"][2]["arguments"] == {"topic": "everyday_life_schema"}
+    assert checklist["result"]["steps"][3]["arguments"] == {"topic": "schema_staging_minimal"}
     assert any(
         step.get("arguments") == {"topic": "tool_call_shapes"}
         for step in checklist["result"]["steps"]
@@ -995,6 +996,36 @@ def test_mcp_generic_usage_guides_do_not_leak_beta_domain_terms(tmp_path: Path) 
         "TaskFacts",
     ):
         assert term not in payload
+
+
+def test_mcp_exposes_modeled_everyday_life_and_schema_design_guidance(tmp_path: Path) -> None:
+    toolset = build_empty_toolset(tmp_path)
+    everyday = toolset.rtg_get_usage_guide("everyday_life_schema")
+    schema_design = toolset.rtg_get_usage_guide("schema_design")
+
+    assert everyday["ok"] is True
+    assert everyday["result"]["ontology_id"] == "ontology.vellis.everyday_life"
+    assert {item["type_key"] for item in everyday["result"]["anchors"]} == {
+        "Person",
+        "Group",
+        "Area",
+        "Goal",
+        "Project",
+        "Task",
+        "Event",
+        "Routine",
+        "Decision",
+        "Note",
+        "Resource",
+        "Place",
+    }
+    assert len(everyday["result"]["links"]) == 9
+    assert schema_design["ok"] is True
+    assert any("human approval" in step for step in schema_design["result"]["workflow"])
+    assert any(
+        "generic JSON blobs" in principle
+        for principle in schema_design["result"]["principles"]
+    )
 
 
 def test_mcp_toolset_stage_schema_migration_can_replace_live_schema(

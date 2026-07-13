@@ -32,6 +32,7 @@ from components.rtg.controller import (
     RtgControllerApplyFailed,
     RtgControllerCutoverOptions,
     RtgControllerDiscoveryFailed,
+    RtgControllerObjectNotFound,
     RtgControllerPreconditionFailed,
     RtgControllerReplayFailed,
     RtgControllerReplayOptions,
@@ -282,6 +283,19 @@ def build_controller_with_graph_and_validator(
         LocalJsonFileStorage.open(tmp_path / "json"),
         SqliteStorage.open(tmp_path / "ledger.sqlite"),
     )
+
+
+def test_get_object_maps_invalid_and_missing_graph_ids_to_controller_failure(
+    tmp_path: Path,
+) -> None:
+    controller = build_controller(tmp_path)
+
+    for object_uuid in ("not-a-uuid", "11111111-1111-1111-1111-111111111111"):
+        with pytest.raises(RtgControllerObjectNotFound) as raised:
+            controller.get_object(object_uuid)
+
+        assert raised.value.diagnostic["code"] == "controller.object.not_found"
+        assert raised.value.diagnostic["mutation_state"] == "not_mutated"
 
 
 def test_controller_reads_wait_while_restore_replaces_component_handles(

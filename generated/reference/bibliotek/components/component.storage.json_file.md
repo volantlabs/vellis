@@ -1,6 +1,6 @@
 # component.storage.json_file
 
-Generated from textual SysML v2 by `just model-render`; do not edit by hand.
+Generated from textual SysML v2 by `just model-render` as a non-normative reading projection; do not edit by hand.
 
 - Model definition: `JsonFileStorage`
 - Lifecycle: `accepted`

@@ -11,6 +11,7 @@ package VellisLocalPythonRealization {
     private import BibliotekRtgChangeValidation::*;
     private import BibliotekRtgController::*;
     private import VellisOperations::*;
+    private import VellisEverydayLifeOntology::*;
     private import Vellis::*;
 
     part def LocalJsonFileStorage :> JsonFileStorage {
@@ -35,9 +36,11 @@ package VellisLocalPythonRealization {
         @ImplementationBinding { implementationLanguage = ImplementationLanguage::python; codeRoot = "components/rtg/query"; symbol = "components.rtg.query.SimpleRtgQueryEngine"; realization = "VellisLocalPython"; }
     }
     part def DeterministicRtgChangeValidator :> RtgChangeValidator {
+        doc /* Python encodes canonical validation selection as tracks="all" or a non-empty tuple of track literals; decoding preserves the modeled selection and track collection exactly. */
         @ImplementationBinding { implementationLanguage = ImplementationLanguage::python; codeRoot = "components/rtg/change_validation"; symbol = "components.rtg.change_validation.DeterministicRtgChangeValidator"; realization = "VellisLocalPython"; }
     }
     part def InProcessRtgController :> RtgController {
+        doc /* Python controller validation options use the same tracks="all" or non-empty tuple encoding and map losslessly to RtgControllerValidationOptions. */
         @ImplementationBinding { implementationLanguage = ImplementationLanguage::python; codeRoot = "components/rtg/controller"; symbol = "components.rtg.controller.InProcessRtgController"; realization = "VellisLocalPython"; }
     }
     part def PythonVellisFacade :> VellisApplicationFacade {
@@ -45,6 +48,10 @@ package VellisLocalPythonRealization {
     }
     part def RtgKnowledgeGraphRunner {
         @ImplementationBinding { implementationLanguage = ImplementationLanguage::python; codeRoot = "apps/rtg_knowledge_graph"; symbol = "apps.rtg_knowledge_graph.runner.RtgKnowledgeGraphRunner"; realization = "VellisLocalPython"; }
+    }
+    part def PythonEverydayLifeOntologyInstaller :> EverydayLifeOntologyInstaller {
+        @ImplementationBinding { implementationLanguage = ImplementationLanguage::python; codeRoot = "apps/rtg_knowledge_graph"; symbol = "apps.rtg_knowledge_graph.starter_schema.prepare_controller"; realization = "generated schema bundle staged and cut over through the controller"; }
+        perform action :>> install : InstallEverydayLifeOntology;
     }
 
     part def VellisLocalPython :> VellisApplication {
@@ -60,6 +67,7 @@ package VellisLocalPythonRealization {
         part :>> controller : InProcessRtgController;
         part :>> facade : PythonVellisFacade;
         part runner : RtgKnowledgeGraphRunner;
+        part :>> starterOntologyInstaller : PythonEverydayLifeOntologyInstaller;
     }
 
     part logicalVellis : VellisApplication;
@@ -103,5 +111,6 @@ package VellisLocalPythonRealization {
             allocate logicalVellis.facade.rtgFlushLedgerFailures to pythonVellis.facade.rtgFlushLedgerFailures;
             allocate logicalVellis.facade.rtgRestoreFromSnapshot to pythonVellis.facade.rtgRestoreFromSnapshot;
         }
+        allocate logicalVellis.starterOntologyInstaller to pythonVellis.starterOntologyInstaller;
     }
 }

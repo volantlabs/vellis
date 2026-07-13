@@ -566,6 +566,8 @@ def _server_params(
             str(storage_root),
             "--sql-database-path",
             str(sql_database_path),
+            "--empty",
+            "--manual-recovery",
         ],
         cwd=cwd,
     )

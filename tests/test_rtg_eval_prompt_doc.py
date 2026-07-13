@@ -32,9 +32,11 @@ def test_rtg_agent_affordance_eval_runbook_covers_mcp_launch_and_sequence() -> N
     for term in (
         "uv --directory",
         "just rtg-eval-info",
+        "mcp-config --storage-root .data/vellis-beta-001",
         "mcp.first_call",
         "fresh explicit storage root",
-        "fresh_single_session",
+        "manual_recovery",
+        "--empty --manual-recovery",
         "not exposed as an MCP tool or resource",
         "Prompt 1: Bootstrap Model",
         "Prompt 2: Ingest And Query Live Graph",

@@ -45,7 +45,7 @@
   "validator": {
     "adapter": "tools/sysml_validator.py",
     "profile_validation": "required",
-    "external_validation": "required-before-cutover",
+    "external_validation": "required",
     "external_provider": "Systems-Modeling/SysML-v2-Pilot-Implementation",
     "external_version": "2025-06 / 0.50.0",
     "external_checksum": "f6c9fa760ff198c21ceae08fc377f4b7366cf12671c3cbef90ebd3e526103060",

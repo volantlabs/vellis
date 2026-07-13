@@ -25,14 +25,19 @@ def build_mcp_server(toolset: RtgMcpToolset) -> FastMCP:
     server = FastMCP(
         MCP_SERVER_NAME,
         instructions=(
-            "Use RTG tools through the controller lanes: live graph work, "
+            "Vellis normally starts with its Everyday Life schema already installed. Start "
+            "with rtg_get_system_state({}); use "
+            "rtg_get_usage_guide(topic='everyday_life_schema') to map ordinary requests to "
+            "the installed anchors and links. Use RTG tools through the controller lanes: "
+            "live graph work, "
             "knowledge-engineering staging, and migration cutover. Start with "
             "rtg_validate_graph({}) as a smoke check, use rtg_get_schema_pack or "
             "rtg_discover_anchor_types before inventing type keys, and prefer "
             "rtg_execute_query for graph questions instead of scanning objects manually. "
             "Use rtg_get_usage_guide(topic='mcp_bootstrap_checklist') for the MCP-only "
             "happy path, workflow_patterns for state-driven sequences, and request_patterns "
-            "to map ordinary user requests to RTG workflows. For an empty app, stage ordinary "
+            "to map ordinary user requests to RTG workflows. Only for an intentionally empty "
+            "app, stage ordinary "
             "schema with "
             "rtg_stage_schema_migration, then cut over with rtg_apply_migration_cutover; "
             "rtg_stage_knowledge_changes is the advanced normalized-batch surface. Use "
@@ -375,6 +380,7 @@ def mcp_dry_run_status(
     path: str = DEFAULT_LOCALHOST_PATH,
 ) -> dict[str, Any]:
     composition = build_app(config)
+    starter_schema = composition.prepare()
     status = composition.runner.run()
     launch_metadata = mcp_launch_metadata(
         config,
@@ -389,6 +395,7 @@ def mcp_dry_run_status(
             "server_name": MCP_SERVER_NAME,
             "transport": transport,
             **launch_metadata,
+            "starter_schema": starter_schema.to_json_value(),
             "tools": mcp_tool_metadata(),
         },
     }
@@ -403,8 +410,9 @@ def run_mcp_server(
     path: str = DEFAULT_LOCALHOST_PATH,
 ) -> None:
     composition = build_app(config)
+    starter_schema = composition.prepare()
     composition.runner.run()
-    server = build_mcp_server(RtgMcpToolset(composition.controller))
+    server = build_mcp_server(RtgMcpToolset(composition.controller, starter_schema))
     if transport == "stdio":
         server.run(transport=transport)
         return

@@ -1,6 +1,6 @@
 # component.rtg.graph
 
-Generated from textual SysML v2 by `just model-render`; do not edit by hand.
+Generated from textual SysML v2 by `just model-render` as a non-normative reading projection; do not edit by hand.
 
 - Model definition: `RtgGraph`
 - Lifecycle: `accepted`
@@ -140,7 +140,7 @@ Generated from textual SysML v2 by `just model-render`; do not edit by hand.
 
 | Public definition | Kind | Fields | Meaning |
 |---|---|---|---|
-| `RtgSystem` | `attribute` | `live[0..1]: Boolean` = `true` | JSON-safe caller metadata. Missing live normalizes to true; when supplied it is Boolean. Other keys are preserved without component-assigned meaning. |
+| `RtgSystem` | `attribute` | `kind: JsonKind`, `members[0..*]: JsonMember`, `live[0..1]: Boolean` = `true` | JSON-safe caller metadata. Missing live normalizes to true; when supplied it is Boolean. Other keys are preserved without component-assigned meaning. |
 | `RtgObject` | `item` | `uuid[0..1]: Uuid`, `type: String`, `system: RtgSystem` | UUID may be absent only on a write request; every stored, returned, deleted, or snapshotted object has a concrete UUID. |
 | `RtgAnchor` | `item` | `uuid[0..1]: Uuid`, `type: String`, `system: RtgSystem`, `displayName[0..1]: String` | Stable typed ontological anchor. Display name is optional, non-unique, and non-authoritative. |
 | `RtgDataObject` | `item` | `uuid[0..1]: Uuid`, `type: String`, `system: RtgSystem`, `properties: JsonObject` | Typed JSON property store grounded through one or more direct anchor associations. |

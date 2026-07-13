@@ -16,6 +16,7 @@
     "BibliotekViews": "model/bibliotek/views/BibliotekViews.sysml",
     "SoftwareComponentModeling": "model/foundation/SoftwareComponentModeling.sysml",
     "Vellis": "model/vellis/Vellis.sysml",
+    "VellisEverydayLifeOntology": "model/vellis/EverydayLifeOntology.sysml",
     "VellisLocalPythonRealization": "model/vellis/realizations/VellisLocalPython.sysml",
     "VellisMcpPythonRealization": "model/vellis/realizations/VellisMcpPython.sysml",
     "VellisOperations": "model/vellis/VellisOperations.sysml",
@@ -26,7 +27,7 @@
     "Bibliotek": {
       "element_counts": {
         "ActionDefinition": 89,
-        "AttributeDefinition": 204,
+        "AttributeDefinition": 203,
         "CalculationDefinition": 6,
         "ConstraintDefinition": 1,
         "Documentation": 6,
@@ -35,7 +36,7 @@
         "LibraryPackage": 1,
         "PartDefinition": 11,
         "PartUsage": 9,
-        "RequirementUsage": 295,
+        "RequirementUsage": 296,
         "VerificationCaseDefinition": 99
       },
       "named_elements": [
@@ -669,10 +670,6 @@
         },
         {
           "kind": "AttributeDefinition",
-          "name": "RtgControllerValidationTrackChoice"
-        },
-        {
-          "kind": "AttributeDefinition",
           "name": "RtgDataObjectList"
         },
         {
@@ -1121,6 +1118,10 @@
         },
         {
           "kind": "AttributeDefinition",
+          "name": "SqlNamedScalar"
+        },
+        {
+          "kind": "AttributeDefinition",
           "name": "SqlOperation"
         },
         {
@@ -1142,10 +1143,6 @@
         {
           "kind": "AttributeDefinition",
           "name": "SqlRow"
-        },
-        {
-          "kind": "AttributeDefinition",
-          "name": "SqlScalar"
         },
         {
           "kind": "AttributeDefinition",
@@ -2883,6 +2880,11 @@
         },
         {
           "kind": "RequirementUsage",
+          "name": "validationOptionSemantics",
+          "short_name": "contract.rtg.change_validation.options"
+        },
+        {
+          "kind": "RequirementUsage",
           "name": "validationReportAuthoritative",
           "short_name": "invariant.rtg.controller.validation_report_authoritative"
         },
@@ -3340,28 +3342,28 @@
         "ActionDefinition": 2,
         "ActionUsage": 4,
         "AttributeDefinition": 22,
-        "AttributeUsage": 107,
-        "ConstraintUsage": 20,
+        "AttributeUsage": 116,
+        "ConstraintUsage": 21,
         "Dependency": 25,
-        "Documentation": 48,
+        "Documentation": 50,
         "EnumerationDefinition": 3,
         "EnumerationUsage": 19,
-        "Feature": 27,
-        "FeatureReferenceExpression": 22,
+        "Feature": 28,
+        "FeatureReferenceExpression": 23,
         "ItemUsage": 6,
         "LibraryPackage": 1,
         "LiteralInfinity": 26,
-        "LiteralInteger": 56,
+        "LiteralInteger": 58,
         "LiteralString": 9,
         "MetadataUsage": 10,
-        "Multiplicity": 50,
-        "MultiplicityRange": 42,
+        "Multiplicity": 48,
+        "MultiplicityRange": 43,
         "PartDefinition": 1,
         "PartUsage": 2,
         "PerformActionUsage": 34,
-        "ReferenceUsage": 119,
-        "RequirementUsage": 43,
-        "SatisfyRequirementUsage": 20,
+        "ReferenceUsage": 123,
+        "RequirementUsage": 45,
+        "SatisfyRequirementUsage": 21,
         "SuccessionAsUsage": 3,
         "VerificationCaseDefinition": 3
       },
@@ -3652,6 +3654,15 @@
         {
           "kind": "RequirementUsage",
           "name": "validateRtgGraphStateFailureSemantics"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "validationOptionSemantics",
+          "short_name": "contract.rtg.change_validation.options"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "validationOptionSemantics"
         },
         {
           "kind": "RequirementUsage",
@@ -4096,8 +4107,8 @@
       "element_counts": {
         "ActionDefinition": 23,
         "ActionUsage": 36,
-        "AttributeDefinition": 33,
-        "AttributeUsage": 218,
+        "AttributeDefinition": 32,
+        "AttributeUsage": 226,
         "BindingConnectorAsUsage": 8,
         "ConstraintUsage": 81,
         "Dependency": 151,
@@ -4112,11 +4123,11 @@
         "LibraryPackage": 1,
         "LiteralBoolean": 4,
         "LiteralInfinity": 31,
-        "LiteralInteger": 103,
+        "LiteralInteger": 115,
         "LiteralString": 64,
         "MetadataUsage": 58,
-        "Multiplicity": 184,
-        "MultiplicityRange": 75,
+        "Multiplicity": 176,
+        "MultiplicityRange": 81,
         "NullExpression": 1,
         "OperatorExpression": 11,
         "PartDefinition": 1,
@@ -4333,10 +4344,6 @@
         {
           "kind": "AttributeDefinition",
           "name": "RtgControllerValidationOptions"
-        },
-        {
-          "kind": "AttributeDefinition",
-          "name": "RtgControllerValidationTrackChoice"
         },
         {
           "kind": "AttributeDefinition",
@@ -5338,14 +5345,17 @@
     "BibliotekRtgDiagnostics": {
       "element_counts": {
         "AttributeDefinition": 1,
-        "AttributeUsage": 4,
-        "Documentation": 2,
+        "AttributeUsage": 11,
+        "Documentation": 4,
         "Feature": 1,
         "LibraryPackage": 1,
-        "LiteralInfinity": 1,
-        "LiteralInteger": 1,
-        "Multiplicity": 3,
-        "MultiplicityRange": 1
+        "LiteralBoolean": 1,
+        "LiteralInfinity": 2,
+        "LiteralInteger": 6,
+        "LiteralString": 1,
+        "Multiplicity": 6,
+        "MultiplicityRange": 4,
+        "ReferenceUsage": 1
       },
       "named_elements": [
         {
@@ -5359,10 +5369,10 @@
       "element_counts": {
         "ActionDefinition": 4,
         "AttributeDefinition": 7,
-        "AttributeUsage": 23,
+        "AttributeUsage": 33,
         "ConstraintUsage": 12,
         "Dependency": 3,
-        "Documentation": 25,
+        "Documentation": 26,
         "EnumerationUsage": 5,
         "Feature": 3,
         "FeatureReferenceExpression": 1,
@@ -5370,11 +5380,11 @@
         "ItemUsage": 2,
         "LibraryPackage": 1,
         "LiteralInfinity": 10,
-        "LiteralInteger": 10,
+        "LiteralInteger": 16,
         "LiteralString": 12,
         "MetadataUsage": 10,
-        "Multiplicity": 23,
-        "MultiplicityRange": 11,
+        "Multiplicity": 20,
+        "MultiplicityRange": 14,
         "NullExpression": 2,
         "OperatorExpression": 1,
         "PartDefinition": 1,
@@ -6942,11 +6952,11 @@
       "element_counts": {
         "ActionDefinition": 1,
         "AttributeDefinition": 18,
-        "AttributeUsage": 65,
+        "AttributeUsage": 75,
         "CalculationDefinition": 4,
         "ConstraintUsage": 23,
         "Dependency": 1,
-        "Documentation": 38,
+        "Documentation": 39,
         "EnumerationDefinition": 5,
         "EnumerationUsage": 28,
         "Feature": 49,
@@ -6955,11 +6965,11 @@
         "LibraryPackage": 1,
         "LiteralBoolean": 3,
         "LiteralInfinity": 29,
-        "LiteralInteger": 41,
+        "LiteralInteger": 45,
         "LiteralString": 5,
         "MetadataUsage": 4,
-        "Multiplicity": 35,
-        "MultiplicityRange": 36,
+        "Multiplicity": 33,
+        "MultiplicityRange": 38,
         "OperatorExpression": 1,
         "PartDefinition": 1,
         "PartUsage": 2,
@@ -8332,31 +8342,30 @@
         "ActionDefinition": 4,
         "ActionUsage": 2,
         "AttributeDefinition": 15,
-        "AttributeUsage": 21,
+        "AttributeUsage": 23,
         "ConstraintDefinition": 1,
-        "ConstraintUsage": 15,
+        "ConstraintUsage": 13,
         "Dependency": 3,
         "Documentation": 30,
         "EnumerationDefinition": 1,
         "EnumerationUsage": 8,
-        "Feature": 29,
-        "FeatureChainExpression": 2,
+        "Feature": 27,
         "FeatureReferenceExpression": 15,
         "ItemDefinition": 1,
         "ItemUsage": 1,
         "LibraryPackage": 1,
         "LiteralBoolean": 1,
-        "LiteralInfinity": 7,
-        "LiteralInteger": 11,
+        "LiteralInfinity": 9,
+        "LiteralInteger": 17,
         "LiteralString": 11,
         "MetadataUsage": 10,
         "Multiplicity": 21,
-        "MultiplicityRange": 10,
+        "MultiplicityRange": 14,
         "OperatorExpression": 5,
         "PartDefinition": 1,
         "PartUsage": 3,
         "PerformActionUsage": 3,
-        "ReferenceUsage": 90,
+        "ReferenceUsage": 85,
         "RequirementUsage": 31,
         "SatisfyRequirementUsage": 13,
         "VerificationCaseDefinition": 5
@@ -8388,6 +8397,10 @@
         },
         {
           "kind": "AttributeDefinition",
+          "name": "SqlNamedScalar"
+        },
+        {
+          "kind": "AttributeDefinition",
           "name": "SqlOperation"
         },
         {
@@ -8409,10 +8422,6 @@
         {
           "kind": "AttributeDefinition",
           "name": "SqlRow"
-        },
-        {
-          "kind": "AttributeDefinition",
-          "name": "SqlScalar"
         },
         {
           "kind": "AttributeDefinition",
@@ -8736,12 +8745,12 @@
         "ItemUsage": 9,
         "LiteralString": 3,
         "MetadataUsage": 12,
-        "Multiplicity": 33,
+        "Multiplicity": 34,
         "MultiplicityRange": 9,
         "Package": 1,
         "PartDefinition": 1,
-        "PartUsage": 21,
-        "PerformActionUsage": 134,
+        "PartUsage": 22,
+        "PerformActionUsage": 135,
         "ReferenceUsage": 38,
         "RequirementUsage": 7,
         "SatisfyRequirementUsage": 3,
@@ -8791,27 +8800,286 @@
       ],
       "source": "model/vellis/Vellis.sysml"
     },
+    "VellisEverydayLifeOntology": {
+      "element_counts": {
+        "ActionDefinition": 1,
+        "AttributeDefinition": 14,
+        "AttributeUsage": 96,
+        "ConstraintUsage": 5,
+        "Documentation": 10,
+        "EnumerationDefinition": 1,
+        "EnumerationUsage": 3,
+        "Feature": 73,
+        "FeatureReferenceExpression": 5,
+        "ItemDefinition": 9,
+        "ItemUsage": 31,
+        "LiteralInfinity": 3,
+        "LiteralInteger": 99,
+        "LiteralString": 73,
+        "MetadataDefinition": 2,
+        "MetadataUsage": 22,
+        "Multiplicity": 46,
+        "MultiplicityRange": 52,
+        "OperatorExpression": 13,
+        "Package": 1,
+        "PartDefinition": 13,
+        "PartUsage": 1,
+        "PerformActionUsage": 1,
+        "ReferenceUsage": 95,
+        "RequirementUsage": 11,
+        "SatisfyRequirementUsage": 5,
+        "VerificationCaseDefinition": 1
+      },
+      "named_elements": [
+        {
+          "kind": "ActionDefinition",
+          "name": "InstallEverydayLifeOntology"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "AreaFacts"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "DecisionFacts"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "EventFacts"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "EverydayLifeInstallationResult"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "EverydayLifeOntologyIdentity"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "GoalFacts"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "GroupFacts"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "NoteFacts"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "PersonFacts"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "PlaceFacts"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "ProjectFacts"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "ResourceFacts"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "RoutineFacts"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "TaskFacts"
+        },
+        {
+          "kind": "EnumerationDefinition",
+          "name": "EverydayLifeInstallationStatus"
+        },
+        {
+          "kind": "ItemDefinition",
+          "name": "BelongsTo"
+        },
+        {
+          "kind": "ItemDefinition",
+          "name": "DependsOn"
+        },
+        {
+          "kind": "ItemDefinition",
+          "name": "Documents"
+        },
+        {
+          "kind": "ItemDefinition",
+          "name": "Involves"
+        },
+        {
+          "kind": "ItemDefinition",
+          "name": "LocatedAt"
+        },
+        {
+          "kind": "ItemDefinition",
+          "name": "MemberOf"
+        },
+        {
+          "kind": "ItemDefinition",
+          "name": "Mentions"
+        },
+        {
+          "kind": "ItemDefinition",
+          "name": "ResponsibleFor"
+        },
+        {
+          "kind": "ItemDefinition",
+          "name": "Supports"
+        },
+        {
+          "kind": "MetadataDefinition",
+          "name": "StarterAnchorDefinition"
+        },
+        {
+          "kind": "MetadataDefinition",
+          "name": "StarterLinkDefinition"
+        },
+        {
+          "kind": "PartDefinition",
+          "name": "Area",
+          "short_name": "ontology.vellis.everyday_life.Area"
+        },
+        {
+          "kind": "PartDefinition",
+          "name": "Decision",
+          "short_name": "ontology.vellis.everyday_life.Decision"
+        },
+        {
+          "kind": "PartDefinition",
+          "name": "Event",
+          "short_name": "ontology.vellis.everyday_life.Event"
+        },
+        {
+          "kind": "PartDefinition",
+          "name": "EverydayLifeOntologyInstaller"
+        },
+        {
+          "kind": "PartDefinition",
+          "name": "Goal",
+          "short_name": "ontology.vellis.everyday_life.Goal"
+        },
+        {
+          "kind": "PartDefinition",
+          "name": "Group",
+          "short_name": "ontology.vellis.everyday_life.Group"
+        },
+        {
+          "kind": "PartDefinition",
+          "name": "Note",
+          "short_name": "ontology.vellis.everyday_life.Note"
+        },
+        {
+          "kind": "PartDefinition",
+          "name": "Person",
+          "short_name": "ontology.vellis.everyday_life.Person"
+        },
+        {
+          "kind": "PartDefinition",
+          "name": "Place",
+          "short_name": "ontology.vellis.everyday_life.Place"
+        },
+        {
+          "kind": "PartDefinition",
+          "name": "Project",
+          "short_name": "ontology.vellis.everyday_life.Project"
+        },
+        {
+          "kind": "PartDefinition",
+          "name": "Resource",
+          "short_name": "ontology.vellis.everyday_life.Resource"
+        },
+        {
+          "kind": "PartDefinition",
+          "name": "Routine",
+          "short_name": "ontology.vellis.everyday_life.Routine"
+        },
+        {
+          "kind": "PartDefinition",
+          "name": "Task",
+          "short_name": "ontology.vellis.everyday_life.Task"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "atomicInstallation",
+          "short_name": "contract.vellis.everyday_life.atomic"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "atomicInstallation"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "emptyOnly",
+          "short_name": "contract.vellis.everyday_life.empty_only"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "emptyOnly"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "extensionCompatibility",
+          "short_name": "contract.vellis.everyday_life.extension"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "extensionCompatibility"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "obj"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "recoveryFirst",
+          "short_name": "contract.vellis.startup.recovery_first"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "recoveryFirst"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "schemaOnly",
+          "short_name": "contract.vellis.everyday_life.schema_only"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "schemaOnly"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
+          "name": "EverydayLifeOntologyVerification"
+        }
+      ],
+      "source": "model/vellis/EverydayLifeOntology.sysml"
+    },
     "VellisLocalPythonRealization": {
       "element_counts": {
         "ActionUsage": 39,
-        "AllocationUsage": 38,
+        "AllocationUsage": 39,
         "AttributeUsage": 5,
         "BindingConnectorAsUsage": 9,
         "Dependency": 151,
-        "Documentation": 39,
-        "EnumerationUsage": 15,
-        "Feature": 13,
-        "FeatureReferenceExpression": 12,
+        "Documentation": 42,
+        "EnumerationUsage": 16,
+        "Feature": 14,
+        "FeatureReferenceExpression": 13,
         "ItemUsage": 9,
-        "LiteralString": 36,
-        "MetadataUsage": 50,
-        "Multiplicity": 91,
-        "MultiplicityRange": 27,
+        "LiteralString": 39,
+        "MetadataUsage": 51,
+        "Multiplicity": 94,
+        "MultiplicityRange": 28,
         "Package": 1,
-        "PartDefinition": 12,
-        "PartUsage": 32,
-        "PerformActionUsage": 101,
-        "ReferenceUsage": 200,
+        "PartDefinition": 13,
+        "PartUsage": 34,
+        "PerformActionUsage": 103,
+        "ReferenceUsage": 207,
         "SuccessionAsUsage": 13
       },
       "named_elements": [
@@ -8845,6 +9113,10 @@
         },
         {
           "kind": "PartDefinition",
+          "name": "PythonEverydayLifeOntologyInstaller"
+        },
+        {
+          "kind": "PartDefinition",
           "name": "PythonVellisFacade"
         },
         {
@@ -8871,14 +9143,14 @@
         "ActionUsage": 66,
         "AllocationUsage": 27,
         "AttributeDefinition": 4,
-        "AttributeUsage": 169,
+        "AttributeUsage": 178,
         "BindingConnectorAsUsage": 10,
         "ConjugatedPortDefinition": 1,
         "ConstraintDefinition": 1,
         "ConstraintUsage": 6,
-        "Documentation": 58,
+        "Documentation": 87,
         "EnumerationDefinition": 1,
-        "EnumerationUsage": 30,
+        "EnumerationUsage": 32,
         "Feature": 183,
         "FeatureChainExpression": 75,
         "FeatureReferenceExpression": 12,
@@ -8891,19 +9163,19 @@
         "LiteralBoolean": 6,
         "LiteralInfinity": 30,
         "LiteralInteger": 41,
-        "LiteralString": 143,
+        "LiteralString": 62,
         "MetadataDefinition": 1,
         "MetadataUsage": 62,
-        "Multiplicity": 91,
+        "Multiplicity": 88,
         "MultiplicityRange": 138,
         "OperatorExpression": 28,
         "Package": 1,
         "PartDefinition": 3,
-        "PartUsage": 18,
+        "PartUsage": 19,
         "PerformActionUsage": 81,
         "PortDefinition": 1,
         "PortUsage": 6,
-        "ReferenceUsage": 491,
+        "ReferenceUsage": 410,
         "RequirementUsage": 14,
         "SatisfyRequirementUsage": 6,
         "SuccessionAsUsage": 13,
@@ -9048,24 +9320,24 @@
       "element_counts": {
         "ActionDefinition": 27,
         "ActionUsage": 39,
-        "AttributeDefinition": 29,
-        "AttributeUsage": 258,
+        "AttributeDefinition": 31,
+        "AttributeUsage": 275,
         "ConstraintUsage": 35,
         "Dependency": 101,
-        "Documentation": 117,
-        "EnumerationDefinition": 6,
-        "EnumerationUsage": 53,
+        "Documentation": 119,
+        "EnumerationDefinition": 7,
+        "EnumerationUsage": 58,
         "Feature": 193,
         "FeatureChainExpression": 93,
         "FeatureReferenceExpression": 48,
         "ItemUsage": 2,
         "LiteralBoolean": 4,
-        "LiteralInfinity": 40,
-        "LiteralInteger": 152,
+        "LiteralInfinity": 42,
+        "LiteralInteger": 156,
         "LiteralString": 62,
         "MetadataUsage": 79,
-        "Multiplicity": 130,
-        "MultiplicityRange": 135,
+        "Multiplicity": 133,
+        "MultiplicityRange": 138,
         "OperatorExpression": 22,
         "Package": 1,
         "PartDefinition": 1,
@@ -9327,6 +9599,14 @@
         },
         {
           "kind": "AttributeDefinition",
+          "name": "VellisStarterSchemaSummary"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "VellisSystemState"
+        },
+        {
+          "kind": "AttributeDefinition",
           "name": "VellisUsageGuide"
         },
         {
@@ -9348,6 +9628,10 @@
         {
           "kind": "EnumerationDefinition",
           "name": "VellisSnapshotSummaryStatus"
+        },
+        {
+          "kind": "EnumerationDefinition",
+          "name": "VellisStarterSchemaState"
         },
         {
           "kind": "EnumerationDefinition",
@@ -9914,7 +10198,7 @@
         "MultiplicityRange": 8,
         "Package": 1,
         "PartDefinition": 3,
-        "PartUsage": 46,
+        "PartUsage": 47,
         "PerformActionUsage": 45,
         "ReferenceUsage": 97,
         "RequirementUsage": 16,
@@ -10124,7 +10408,7 @@
     }
   },
   "schema_version": 1,
-  "source_digest": "5b254c7e4231022e37bcddfc3e99427469e734fe55d8e3d76887368740d476b1",
+  "source_digest": "2bc63f5918985939f3f9886598faa0b52889ce3260006969d03d8b8a291672f0",
   "validator": {
     "implementation_version": "0.50.0",
     "provider": "Systems-Modeling/SysML-v2-Pilot-Implementation",

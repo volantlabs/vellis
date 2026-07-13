@@ -1,6 +1,6 @@
 # component.rtg.query
 
-Generated from textual SysML v2 by `just model-render`; do not edit by hand.
+Generated from textual SysML v2 by `just model-render` as a non-normative reading projection; do not edit by hand.
 
 - Model definition: `RtgQueryEngine`
 - Lifecycle: `accepted`
@@ -87,10 +87,10 @@ Generated from textual SysML v2 by `just model-render`; do not edit by hand.
 | `RtgQueryNamedObjectBinding` | `attribute` | `name: String`, `objectUuid: Uuid` | One unique query name to matched graph-object identity binding. |
 | `RtgQueryBindingRow` | `attribute` | `rowIndex: Integer`, `anchors[1..*]: RtgQueryNamedObjectBinding`, `links[0..*]: RtgQueryNamedObjectBinding`, `dataObjects[0..*]: RtgQueryNamedObjectBinding` | Defined by its typed fields and action requirements. |
 | `RtgQueryReturnRow` | `attribute` | `rowIndex: Integer`, `anchors[0..*]: RtgQueryNamedObjectBinding`, `links[0..*]: RtgQueryNamedObjectBinding`, `dataObjects[0..*]: RtgQueryNamedObjectBinding`, `properties: JsonObject` | Binding entry collections have unique names and realization codecs encode them as JSON objects from name to UUID. |
-| `RtgQueryDiagnostic` | `attribute` | `severity: RtgQueryDiagnosticSeverity`, `code: String`, `message: String`, `suggestion[0..1]: String`, `affectedTerms[0..*]: String`, `diagnostic[0..1]: JsonObject` | Defined by its typed fields and action requirements. |
+| `RtgQueryDiagnostic` | `attribute` | `severity: RtgQueryDiagnosticSeverity`, `code: String`, `message: String`, `suggestion[0..1]: String`, `affectedTerms[0..*]: String`, `diagnostic[0..1]: RtgDiagnostic` | Defined by its typed fields and action requirements. |
 | `RtgQueryResult` | `attribute` | `bindings[0..*]: RtgQueryBindingRow`, `returns[0..*]: RtgQueryReturnRow`, `diagnostics[0..*]: RtgQueryDiagnostic` | Defined by its typed fields and action requirements. |
-| `RtgQuerySpecInvalid` | `attribute` | `message: String`, `diagnostic: JsonObject` | Defined by its typed fields and action requirements. |
-| `RtgQueryUnsupported` | `attribute` | `message: String`, `diagnostic: JsonObject` | Defined by its typed fields and action requirements. |
+| `RtgQuerySpecInvalid` | `attribute` | `message: String`, `diagnostic[0..1]: RtgDiagnostic` | Defined by its typed fields and action requirements. |
+| `RtgQueryUnsupported` | `attribute` | `message: String`, `diagnostic[0..1]: RtgDiagnostic` | Defined by its typed fields and action requirements. |
 
 ## Public enumerations
 

@@ -9,12 +9,13 @@ server is connected.
 Start from a fresh storage root:
 
 ```sh
-just rtg-eval-info /tmp/vellis-beta-001
+uv run vellis-rtg-knowledge-graph mcp-config --storage-root .data/vellis-beta-001 --empty --manual-recovery
 ```
 
-Copy the generated `mcp.client_config` into an MCP client and start the server. If the agent should
-attach to an already-running local app instead, run `just rtg-mcp-http /tmp/vellis-beta-001` and use
-`http://127.0.0.1:8765/mcp` or `mcp.transports.localhost_http.client_config`.
+Merge the complete generated `mcpServers` block into an MCP client and restart/reload the client;
+the client starts the stdio server. If the agent should attach to an already-running local app
+instead, run `uv run vellis serve-mcp --transport http --storage-root .data/vellis-beta-001 --empty --manual-recovery` and use
+`http://127.0.0.1:8765/mcp`.
 
 The first call is:
 

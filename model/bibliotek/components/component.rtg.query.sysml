@@ -1,6 +1,7 @@
 library package BibliotekRtgQuery {
     private import SoftwareComponentModeling::*;
     private import BibliotekSoftwareValues::*;
+    private import BibliotekRtgDiagnostics::*;
     private import ScalarValues::*;
     private import BibliotekRtgGraph::*;
 
@@ -108,15 +109,15 @@ library package BibliotekRtgQuery {
         attribute 'message' : String;
         attribute suggestion[0..1] : String;
         attribute affectedTerms[0..*] : String;
-        attribute diagnostic[0..1] : JsonObject;
+        attribute diagnostic[0..1] : RtgDiagnostic;
     }
     attribute def RtgQueryResult {
         attribute bindings[0..*] : RtgQueryBindingRow;
         attribute returns[0..*] : RtgQueryReturnRow;
         attribute diagnostics[0..*] : RtgQueryDiagnostic;
     }
-    attribute def RtgQuerySpecInvalid { attribute 'message' : String; attribute diagnostic : JsonObject; }
-    attribute def RtgQueryUnsupported { attribute 'message' : String; attribute diagnostic : JsonObject; }
+    attribute def RtgQuerySpecInvalid { attribute 'message' : String; attribute diagnostic[0..1] : RtgDiagnostic; }
+    attribute def RtgQueryUnsupported { attribute 'message' : String; attribute diagnostic[0..1] : RtgDiagnostic; }
 
     action def ExecuteRtgQuery {
         in graph : RtgGraphReadView;
