@@ -8,8 +8,12 @@ Install `uv` and `just` first — see the Development Setup section of `README.m
 
 ```sh
 just setup
+just model-setup
 just check
 ```
+
+`just model-setup` downloads and checksum-verifies the pinned model references and validator assets
+that `just check` requires. Run it once after cloning and whenever the model lock files change.
 
 Use `uv` for Python commands and `just` for project tasks.
 

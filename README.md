@@ -223,9 +223,13 @@ Set up the local development environment:
 
 ```sh
 just setup
+just model-setup
 ```
 
-Run checks:
+`just model-setup` downloads and checksum-verifies the pinned model references and validator assets
+required by the model checks. Run it once after cloning and again when the model lock files change.
+
+Then run checks:
 
 ```sh
 just check
