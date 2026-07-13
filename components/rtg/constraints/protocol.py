@@ -20,6 +20,7 @@ class RtgConstraintQueryPatternPayload:
 class RtgConstraintCardinalityPayload:
     query_spec: object
     counted_binding: str
+    group_by_bindings: tuple[str, ...] = ()
     minimum: int | None = None
     maximum: int | None = None
 

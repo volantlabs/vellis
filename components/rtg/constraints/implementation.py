@@ -128,9 +128,7 @@ class InMemoryRtgConstraints:
         )
         if uuid_value in self._constraints and self._constraints[uuid_value].kind != kind:
             raise RtgConstraintUuidConflict(str(uuid_value))
-        target_type_keys = tuple(
-            _validate_type_key(item) for item in constraint.target_type_keys
-        )
+        target_type_keys = tuple(_validate_type_key(item) for item in constraint.target_type_keys)
         if len(set(target_type_keys)) != len(target_type_keys):
             raise RtgConstraintDefinitionInvalid("target type keys must be unique")
         return RtgConstraintDefinition(
@@ -186,6 +184,14 @@ def _validate_payload(kind: str, payload: RtgConstraintPayload) -> RtgConstraint
             raise RtgConstraintPayloadInvalid("cardinality counted_binding is required")
         if payload.minimum is None and payload.maximum is None:
             raise RtgConstraintPayloadInvalid("cardinality requires minimum or maximum")
+        if payload.minimum is not None and (
+            isinstance(payload.minimum, bool) or not isinstance(payload.minimum, int)
+        ):
+            raise RtgConstraintPayloadInvalid("minimum must be an integer")
+        if payload.maximum is not None and (
+            isinstance(payload.maximum, bool) or not isinstance(payload.maximum, int)
+        ):
+            raise RtgConstraintPayloadInvalid("maximum must be an integer")
         if payload.minimum is not None and payload.minimum < 0:
             raise RtgConstraintPayloadInvalid("minimum must be non-negative")
         if payload.maximum is not None and payload.maximum < 0:
@@ -196,6 +202,12 @@ def _validate_payload(kind: str, payload: RtgConstraintPayload) -> RtgConstraint
             and payload.minimum > payload.maximum
         ):
             raise RtgConstraintPayloadInvalid("minimum must not exceed maximum")
+        if not isinstance(payload.group_by_bindings, tuple):
+            raise RtgConstraintPayloadInvalid("group_by_bindings must be a tuple")
+        if len(set(payload.group_by_bindings)) != len(payload.group_by_bindings):
+            raise RtgConstraintPayloadInvalid("group_by_bindings must be unique")
+        if any(not isinstance(item, str) or not item for item in payload.group_by_bindings):
+            raise RtgConstraintPayloadInvalid("group_by_bindings must be non-empty names")
         return copy.deepcopy(payload)
     raise RtgConstraintDefinitionInvalid(f"payload does not match constraint kind {kind!r}")
 

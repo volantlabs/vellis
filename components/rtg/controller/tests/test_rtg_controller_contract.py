@@ -348,6 +348,34 @@ def test_restore_validates_combined_candidate_before_any_visible_replacement(
     assert controller.export_system_snapshot() == before
 
 
+def test_replay_can_resume_from_a_structurally_valid_skip_mode_snapshot(
+    tmp_path: Path,
+) -> None:
+    source = build_controller(tmp_path / "source")
+    source.apply_live_graph_changes(
+        RtgGraphChangeSet(
+            anchor_writes=(
+                RtgGraphAnchorWrite(RtgChangeReference(local_ref="person"), "Person"),
+            )
+        ),
+        validation_mode="skip",
+    )
+    skip_mode_snapshot = source.export_system_snapshot()
+    assert source.validate_graph().accepted is False
+    with pytest.raises(RtgControllerSnapshotFailed):
+        source.restore_from_snapshot(
+            skip_mode_snapshot, RtgControllerRestoreOptions(ledger_mode="skip")
+        )
+
+    replay = build_controller(tmp_path / "replay")
+    result = replay.replay_ledger(
+        RtgControllerReplayOptions(start_snapshot=skip_mode_snapshot)
+    )
+
+    assert result.status == "replay_applied"
+    assert replay.export_system_snapshot().graph == skip_mode_snapshot.graph
+
+
 def test_failed_recorded_restore_preserves_components_but_may_advance_audit_pointer(
     tmp_path: Path,
 ) -> None:
@@ -456,13 +484,19 @@ def test_live_graph_lane_resolves_local_refs_validates_applies_and_ledgers(
     assert result.status == "applied"
     assert result.ledger_position is not None
     assert result.applied_changes.graph_writes == 2
+    assert set(result.generated_ids) == {"person", "profile"}
+    assert result.generated_ids["person"] == query_result.bindings[0].anchors["person"]
     assert len(query_result.bindings) == 1
     replay_controller = build_controller(tmp_path)
     ledger_records_seen = replay_controller.replay_ledger(
         RtgControllerReplayOptions(start_snapshot=baseline)
     ).details["ledger_records_seen"]
+    replayed_query = replay_controller.execute_query(
+        RtgQuerySpec(anchor_buckets=(RtgQueryAnchorBucket("person", ("Person",)),))
+    )
     assert isinstance(ledger_records_seen, int)
     assert ledger_records_seen >= 2
+    assert replayed_query.bindings[0].anchors["person"] == result.generated_ids["person"]
 
 
 def test_validate_live_graph_changes_resolves_without_mutation_or_ledger(
@@ -1170,11 +1204,70 @@ def test_verify_replay_from_ledger_uses_scratch_state_and_preserves_current_stat
         == verified.replay_window["start_ledger_position"]
     )
     assert verified.validation_report.accepted is True
+    assert verified.state_equivalent_to_live is True
+    assert verified.replayed_state_digest == verified.live_state_digest
+    assert verified.start_summary == verified.pre_summary
+    assert verified.replayed_summary == verified.post_summary
+    assert verified.replay_delta == verified.count_diffs
+    assert verified.ledger_records_scanned == verified.ledger_records_seen
+    assert verified.request_records_seen == 1
+    assert verified.eligible_mutating_requests == 1
+    assert verified.administrative_records_skipped == 1
+    assert verified.terminal_records_skipped == 1
+    assert verified.ledger_records_scanned == (
+        verified.eligible_mutating_requests
+        + verified.failed_or_rejected_transactions_skipped
+        + verified.administrative_records_skipped
+        + verified.terminal_records_skipped
+    )
     graph_diffs = json_object(verified.count_diffs["graph_counts"])
     anchor_diffs = json_object(graph_diffs["anchor"])
     assert anchor_diffs["Person"] == 1
     assert controller.export_system_snapshot() == current
     assert baseline.schema.definitions
+
+
+def test_replay_verification_restores_invalid_current_instances_exactly(tmp_path: Path) -> None:
+    ledger_path = tmp_path / "ledger.sqlite"
+    controller = build_controller_with_sql(tmp_path, SqliteStorage.open(ledger_path))
+    baseline = controller.export_system_snapshot()
+    first = controller.apply_live_graph_changes(
+        RtgGraphChangeSet(
+            anchor_writes=(
+                RtgGraphAnchorWrite(RtgChangeReference(local_ref="ada"), "Person"),
+            ),
+            data_object_writes=(
+                RtgGraphDataObjectWrite(
+                    ref=RtgChangeReference(local_ref="ada-profile"),
+                    type="Profile",
+                    properties={"name": "Ada"},
+                    anchor_refs=(RtgChangeReference(local_ref="ada"),),
+                ),
+            ),
+        )
+    )
+    controller.apply_live_graph_changes(
+        RtgGraphChangeSet(
+            delete_data_objects=(
+                RtgChangeReference(resource_id=first.generated_ids["ada-profile"]),
+            )
+        ),
+        validation_mode="skip",
+    )
+    current = controller.export_system_snapshot()
+    assert controller.validate_graph().accepted is False
+
+    verified = controller.verify_replay_from_ledger(
+        RtgControllerReplayOptions(
+            start_snapshot=baseline,
+            through_ledger_position=first.ledger_position,
+        )
+    )
+
+    assert verified.state_equivalent_to_live is False
+    assert verified.validation_report.accepted is True
+    assert controller.export_system_snapshot() == current
+    assert controller.validate_graph().accepted is False
 
 
 def test_replay_reconstructs_cutover_from_ledgered_request_after_pruning(
@@ -1372,6 +1465,155 @@ def test_failed_strict_cutover_status_is_replayable(tmp_path: Path) -> None:
     assert replay_controller.validate_graph().accepted is True
 
 
+def test_replay_equivalence_detects_equal_counts_with_different_fact_values(
+    tmp_path: Path,
+) -> None:
+    controller = build_controller_with_sql(tmp_path, SqliteStorage.open(tmp_path / "ledger.sqlite"))
+    baseline = controller.export_system_snapshot()
+    first = controller.apply_live_graph_changes(
+        RtgGraphChangeSet(
+            anchor_writes=(RtgGraphAnchorWrite(RtgChangeReference(local_ref="person"), "Person"),),
+            data_object_writes=(
+                RtgGraphDataObjectWrite(
+                    RtgChangeReference(local_ref="profile"),
+                    "Profile",
+                    {"name": "Ada"},
+                    anchor_refs=(RtgChangeReference(local_ref="person"),),
+                ),
+            ),
+        )
+    )
+    profile_id = first.generated_ids["profile"]
+    controller.apply_live_graph_changes(
+        RtgGraphChangeSet(
+            data_object_writes=(
+                RtgGraphDataObjectWrite(
+                    RtgChangeReference(resource_id=profile_id),
+                    "Profile",
+                    {"name": "Grace"},
+                    anchor_refs=(RtgChangeReference(resource_id=first.generated_ids["person"]),),
+                ),
+            )
+        )
+    )
+    verified = controller.verify_replay_from_ledger(
+        RtgControllerReplayOptions(
+            start_snapshot=baseline, through_ledger_position=first.ledger_position
+        )
+    )
+    assert verified.live_count_diffs["graph_counts"] == {
+        "anchor": {"Person": 0},
+        "data_object": {"Profile": 0},
+        "link": {},
+    }
+    assert verified.state_equivalent_to_live is False
+    assert verified.replayed_state_digest != verified.live_state_digest
+
+
+def test_rejected_staging_is_projected_from_existing_ledger_error(
+    tmp_path: Path,
+) -> None:
+    ledger_path = tmp_path / "ledger.sqlite"
+    controller = build_controller_with_sql(tmp_path, SqliteStorage.open(ledger_path))
+    controller.apply_live_graph_changes(
+        RtgGraphChangeSet(
+            anchor_writes=(RtgGraphAnchorWrite(RtgChangeReference(local_ref="ada"), "Person"),),
+            data_object_writes=(
+                RtgGraphDataObjectWrite(
+                    ref=RtgChangeReference(local_ref="ada-profile"),
+                    type="Profile",
+                    properties={"name": "Ada"},
+                    anchor_refs=(RtgChangeReference(local_ref="ada"),),
+                ),
+            ),
+        )
+    )
+    old_profile = controller.get_schema_pack(
+        ("Person",)
+    ).schema_pack.associated_data_object_schemas[0]
+    replacement = RtgSchemaDefinition(
+        uuid=uuid4(),
+        kind="data_object",
+        type_key="Profile",
+        description="Profile requiring a missing sponsor.",
+        payload=RtgDataObjectSchemaPayload(
+            properties={"sponsor": RtgSchemaField(True, ("string",))}
+        ),
+        system={"live": False},
+    )
+    with pytest.raises(RtgControllerValidationFailed):
+        controller.stage_knowledge_changes(
+            RtgChangeBatch(
+                schema_changes=RtgSchemaChangeSet(
+                    definition_writes=(
+                        RtgSchemaDefinitionWrite(
+                            RtgChangeReference(resource_id=concrete_uuid(replacement.uuid)),
+                            replacement,
+                        ),
+                    )
+                ),
+                migration_changes=RtgMigrationChangeSet(
+                    migration_writes=(
+                        RtgMigrationRecordWrite(
+                            RtgChangeReference(resource_id="rejected-profile-v2"),
+                            RtgMigrationRecord(
+                                migration_id="rejected-profile-v2",
+                                description="Reject incompatible required sponsor.",
+                                status="ready",
+                                schema_make_live=(concrete_uuid(replacement.uuid),),
+                                schema_make_non_live=(concrete_uuid(old_profile.uuid),),
+                            ),
+                        ),
+                    )
+                ),
+            )
+        )
+    assert controller.list_migrations().migrations == ()
+    event = controller.list_migration_history().events[-1]
+    assert event.event_type == "staging_rejected"
+    assert event.migration_id == "rejected-profile-v2"
+    assert event.staged is False
+    assert event.mutation_state == "not_mutated"
+    assert event.finding_count > 0
+    assert event.validation_report is not None
+    assert event.validation_report.accepted is False
+
+
+def test_unprojectable_staging_is_rejected_and_has_a_terminal_ledger_outcome(
+    tmp_path: Path,
+) -> None:
+    controller = build_controller(tmp_path)
+    missing = uuid4()
+
+    with pytest.raises(RtgControllerValidationFailed) as raised:
+        controller.stage_knowledge_changes(
+            RtgChangeBatch(
+                graph_changes=RtgGraphChangeSet(
+                    delete_anchors=(RtgChangeReference(resource_id=missing),)
+                ),
+                migration_changes=RtgMigrationChangeSet(
+                    migration_writes=(
+                        RtgMigrationRecordWrite(
+                            RtgChangeReference(resource_id="unprojectable-staging"),
+                            RtgMigrationRecord(
+                                migration_id="unprojectable-staging",
+                                description="Must be rejected with a terminal outcome.",
+                                status="ready",
+                            ),
+                        ),
+                    )
+                ),
+            )
+        )
+
+    assert raised.value.validation_report is not None
+    assert raised.value.validation_report.findings[0].code == "change_projection.failed"
+    event = controller.list_migration_history().events[-1]
+    assert event.event_type == "staging_rejected"
+    assert event.migration_id == "unprojectable-staging"
+    assert event.finding_codes == ("change_projection.failed",)
+
+
 def test_migration_history_is_reconstructed_from_ledger(
     tmp_path: Path,
 ) -> None:
@@ -1436,11 +1678,18 @@ def test_migration_history_is_reconstructed_from_ledger(
     reloaded = build_controller_with_sql(tmp_path, SqliteStorage.open(ledger_path))
 
     history = reloaded.list_migration_history()
-    event_types = [event["event_type"] for event in history.events]
+    event_types = [event.event_type for event in history.events]
 
     assert event_types == ["staged", "cutover_failed", "abandoned"]
-    assert {str(event["migration_id"]) for event in history.events} == {"profile-schema-v2"}
-    assert all(event["ledger_position"] is not None for event in history.events)
+    assert {event.migration_id for event in history.events} == {"profile-schema-v2"}
+    assert all(event.ledger_position > 0 for event in history.events)
+    staged, cutover_failed, abandoned = history.events
+    assert staged.finding_count == 0
+    assert abandoned.finding_count == 0
+    assert cutover_failed.finding_count > 0
+    assert cutover_failed.finding_codes
+    assert cutover_failed.validation_report is not None
+    assert cutover_failed.validation_report.accepted is False
 
 
 def test_restore_request_response_are_ledgered_and_replayed(tmp_path: Path) -> None:

@@ -16,6 +16,11 @@ class RtgSchemaField:
     value_kinds: tuple[str, ...]
     properties: dict[str, RtgSchemaField] = field(default_factory=dict)
     items: RtgSchemaField | None = None
+    allowed_values: tuple[JsonScalar, ...] = ()
+    format: str | None = None
+    minimum: int | float | None = None
+    maximum: int | float | None = None
+    pattern: str | None = None
 
 
 @dataclass(frozen=True, slots=True)

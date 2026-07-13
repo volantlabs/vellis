@@ -10,12 +10,10 @@ BIBLIOTEK_MODEL_ROOT = MODEL_ROOT / "bibliotek"
 COMPONENT_MODEL_ROOT = BIBLIOTEK_MODEL_ROOT / "components"
 VELLIS_MODEL_ROOT = MODEL_ROOT / "vellis"
 MODEL_CONFIG_ROOT = MODEL_ROOT / "config"
-MODEL_MIGRATION_ROOT = MODEL_ROOT / "migration"
 
 ALLOWED_CONSTRUCTS_PATH = MODEL_CONFIG_ROOT / "allowed-constructs.json"
 LANGUAGE_LOCK_PATH = MODEL_CONFIG_ROOT / "language.lock.json"
 VALIDATOR_LOCK_PATH = MODEL_CONFIG_ROOT / "validator.lock.json"
-CUTOVER_STATUS_PATH = MODEL_MIGRATION_ROOT / "cutover-status.json"
 MODEL_FIXTURE_ROOT = ROOT / "tests" / "model" / "fixtures"
 SOFTWARE_COMPONENT_PATTERN_PATH = MODEL_FIXTURE_ROOT / "SoftwareComponentPattern.sysml"
 
@@ -28,9 +26,7 @@ GENERATED_MODEL_ROOT = GENERATED_ROOT / "model"
 GENERATED_FORMAL_INDEX = GENERATED_MODEL_ROOT / "formal-model-index.json"
 GENERATED_CONFORMANCE_OBJECTIVES = GENERATED_MODEL_ROOT / "conformance-objectives.json"
 GENERATED_EVIDENCE_INDEX = GENERATED_MODEL_ROOT / "verification-evidence.json"
-GENERATED_MANIFEST = (
-    ROOT / "apps" / "rtg_knowledge_graph" / "resources" / "model_app_manifest.json"
-)
+GENERATED_MANIFEST = ROOT / "apps" / "rtg_knowledge_graph" / "resources" / "model_app_manifest.json"
 GENERATED_STARTER_SCHEMA = (
     ROOT / "apps" / "rtg_knowledge_graph" / "resources" / "everyday_life_schema.json"
 )

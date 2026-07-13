@@ -27,6 +27,7 @@ from apps.rtg_knowledge_graph.mcp_codec import (
     decode_query_spec,
     decode_restore_options,
     decode_schema_changes,
+    decode_schema_definition,
     decode_schema_field,
     decode_schema_pack_options,
     decode_validation_options,
@@ -546,6 +547,11 @@ def test_mcp_toolset_validates_and_applies_live_anchor_records(
         },
         response_options={"format": "properties_only"},
     )
+    full_query = toolset.rtg_execute_query(
+        {
+            "anchor_buckets": [{"name": "person", "anchor_type_keys": ["Person"]}],
+        }
+    )
 
     assert preview["ok"] is True
     assert preview["result"]["validation"]["mutation_state"] == "not_mutated"
@@ -556,11 +562,119 @@ def test_mcp_toolset_validates_and_applies_live_anchor_records(
     ]
     assert query_after_preview["result"]["bindings"] == []
     assert applied["ok"] is True
+    assert applied["result"]["format"] == "compact"
+    assert "submitted_graph_changes" not in applied["result"]
+    assert set(applied["result"]["generated_ids"]) == {"ada", "ada-fact-1"}
+    assert applied["result"]["generated_ids"] == applied["result"]["operation"]["generated_ids"]
     assert applied["result"]["operation"]["status"] == "applied"
     assert compact_query["result"]["format"] == "properties_only"
+    assert compact_query["result"]["kind"] == "properties_only"
     assert compact_query["result"]["row_count"] == 1
     assert compact_query["result"]["rows"][0]["properties"]["profile"]["name"] == "Ada"
     assert "bindings" not in compact_query["result"]
+    assert "next_offset" not in compact_query["result"]
+    assert full_query["result"]["kind"] == "full"
+    assert "next_offset" not in full_query["result"]
+
+
+def test_compact_mutation_response_is_materially_smaller_than_full(tmp_path: Path) -> None:
+    records = [
+        {
+            "ref": {"local_ref": f"person-{index}"},
+            "type": "Person",
+            "display_name": f"Person {index}",
+            "facts": [
+                {
+                    "type": "Profile",
+                    "properties": {"name": f"Person {index} " + "planning context " * 15},
+                }
+            ],
+        }
+        for index in range(29)
+    ]
+    compact = build_toolset(tmp_path / "compact").rtg_apply_live_anchor_records(records)
+    full = build_toolset(tmp_path / "full").rtg_apply_live_anchor_records(
+        records, response_options={"format": "full"}
+    )
+    compact_bytes = len(json.dumps(compact, separators=(",", ":")))
+    full_bytes = len(json.dumps(full, separators=(",", ":")))
+    assert compact["result"]["format"] == "compact"
+    assert full["result"]["format"] == "full"
+    assert "submitted_graph_changes" in full["result"]
+    assert compact_bytes <= full_bytes * 0.4
+    assert compact["result"]["generated_ids"].keys() == full["result"]["generated_ids"].keys()
+
+
+def test_properties_only_preserves_aggregation_rows_and_pagination_metadata(
+    tmp_path: Path,
+) -> None:
+    toolset = build_toolset(tmp_path)
+    toolset.rtg_apply_live_anchor_records(
+        [
+            {
+                "ref": {"local_ref": f"ada-{index}"},
+                "type": "Person",
+                "facts": [{"type": "Profile", "properties": {"name": "Ada"}}],
+            }
+            for index in range(2)
+        ]
+    )
+
+    compact = toolset.rtg_execute_query(
+        {
+            "anchor_buckets": [{"name": "person", "anchor_type_keys": ["Person"]}],
+            "data_requirements": [
+                {
+                    "name": "profile",
+                    "anchor_bucket": "person",
+                    "data_type_key": "Profile",
+                }
+            ],
+            "return_spec": {
+                "properties": [["profile", ["name"]]],
+                "group_by": [["profile", ["name"]]],
+                "aggregations": [
+                    {"name": "person_count", "function": "count", "binding": "person"}
+                ],
+            },
+        },
+        response_options={"format": "properties_only"},
+    )
+
+    result = compact["result"]
+    assert result["kind"] == "properties_only"
+    assert result["rows"] == [
+        {
+            "row_index": 0,
+            "group_by": {"profile": {"name": "Ada"}},
+            "person_count": 2,
+        }
+    ]
+    assert result["row_count"] == 1
+    assert result["total_row_count"] == 1
+    assert result["returned_row_count"] == 1
+    assert "next_offset" not in result
+
+
+def test_invalid_mutation_response_format_fails_before_controller_invocation(
+    tmp_path: Path,
+) -> None:
+    toolset = build_toolset(tmp_path)
+    rejected = toolset.rtg_apply_live_anchor_records(
+        [
+            {
+                "ref": {"local_ref": "ada"},
+                "type": "Person",
+                "facts": [{"type": "Profile", "properties": {"name": "Ada"}}],
+            }
+        ],
+        response_options={"format": "verbose"},
+    )
+    state = toolset.rtg_get_system_state()["result"]
+    assert rejected["ok"] is False
+    assert rejected["error"]["diagnostic"]["path"] == "response_options.format"
+    assert state["ledger_record_count"] == 0
+    assert state["live_object_counts"]["counts"] == []
 
 
 def test_mcp_properties_only_without_returned_properties_teaches_return_spec(
@@ -696,6 +810,12 @@ def test_mcp_toolset_stages_cuts_over_and_reads_schema_migration(
     old_schema = toolset.rtg_get_schema_pack(["Person"])["result"]["schema_pack"]["anchor_schemas"][
         0
     ]
+    assert decode_schema_definition(old_schema).type_key == "Person"
+    profile_schema = toolset.rtg_get_schema_pack(["Person"])["result"]["schema_pack"][
+        "associated_data_object_schemas"
+    ][0]
+    assert "allowed_values" not in profile_schema["payload"]["properties"]["name"]
+    assert decode_schema_definition(profile_schema).type_key == "Profile"
     replacement_uuid = str(uuid4())
     migration_uuid = str(uuid4())
     knowledge_changes = {
@@ -767,6 +887,8 @@ def test_mcp_toolset_snapshot_ledger_restore_tools(
     restored = toolset.rtg_restore_from_snapshot(snapshot["result"])
 
     assert snapshot["ok"] is True
+    assert snapshot["result"]["kind"] == "full"
+    assert compact_snapshot["result"]["kind"] == "summary"
     assert compact_snapshot["result"]["status"] == "snapshot_exported"
     assert "snapshot" not in compact_snapshot["result"]
     assert persisted["result"]["status"] == "snapshot_persisted"
@@ -835,6 +957,32 @@ def test_mcp_toolset_system_state_guides_schema_staging_and_abandonment(
     assert "empty state is intentional" in " ".join(final_state["result"]["recommended_next_steps"])
 
 
+def test_schema_migration_rejects_duplicate_definition_correlation_keys_before_mutation(
+    tmp_path: Path,
+) -> None:
+    toolset = build_empty_toolset(tmp_path)
+    duplicate = {
+        "kind": "anchor",
+        "type_key": "Item",
+        "description": "An item.",
+        "payload": {"required_data_types": []},
+    }
+
+    rejected = toolset.rtg_stage_schema_migration(
+        migration_id="duplicate-item-schema",
+        description="Must not create an ambiguous generated-ID mapping.",
+        schema_definitions=[duplicate, duplicate],
+    )
+    state = toolset.rtg_get_system_state()["result"]
+
+    assert rejected["ok"] is False
+    assert rejected["error"]["type"] == "RtgMcpInputInvalid"
+    assert "unique kind and type_key pairs" in rejected["error"]["message"]
+    assert state["ledger_record_count"] == 0
+    assert state["live_schema_counts"]["total"] == 0
+    assert state["migration_counts_by_status"]["total"] == 0
+
+
 def test_mcp_toolset_system_state_workflows_for_schema_and_populated_states(
     tmp_path: Path,
 ) -> None:
@@ -880,9 +1028,32 @@ def test_mcp_usage_guides_are_packaged_and_do_not_return_fake_snapshot_payloads(
     query = toolset.rtg_get_usage_guide("query_examples")
     shapes = toolset.rtg_get_usage_guide("tool_call_shapes")
     history = toolset.rtg_get_usage_guide("migration_history")
+    capabilities = toolset.rtg_get_usage_guide("capabilities")
     missing_beta_schema = toolset.rtg_get_usage_guide("life_graph_schema_v1")
 
     assert checklist["ok"] is True
+    assert capabilities["ok"] is True
+    assert len(capabilities["result"]["tools"]) == len(TOOL_NAMES)
+    assert {item["name"] for item in capabilities["result"]["tools"]} == set(TOOL_NAMES)
+    capability_map = {item["name"]: item for item in capabilities["result"]["tools"]}
+    assert capability_map["rtg_apply_live_anchor_records"]["recommended_predecessors"] == [
+        "rtg_validate_live_anchor_records"
+    ]
+    assert (
+        capability_map["rtg_apply_live_anchor_records"]["dry_run_tool"]
+        == "rtg_validate_live_anchor_records"
+    )
+    assert (
+        capability_map["rtg_apply_live_graph_changes"]["dry_run_tool"]
+        == "rtg_validate_live_graph_changes"
+    )
+    assert capability_map["rtg_execute_query"]["dry_run_tool"] is None
+    assert capability_map["rtg_replay_ledger"]["recommended_predecessors"] == [
+        "rtg_get_system_state"
+    ]
+    assert (
+        "rtg_get_schema_pack" not in capability_map["rtg_replay_ledger"]["recommended_predecessors"]
+    )
     assert workflows["ok"] is True
     assert requests["ok"] is True
     assert checklist["result"]["steps"][0]["tool"] == "rtg_validate_graph"
@@ -893,13 +1064,18 @@ def test_mcp_usage_guides_are_packaged_and_do_not_return_fake_snapshot_payloads(
         step.get("arguments") == {"topic": "tool_call_shapes"}
         for step in checklist["result"]["steps"]
     )
-    assert any(
-        "Every ref-like field is an object" in note
-        for note in checklist["result"]["notes"]
-    )
+    assert any("Every ref-like field is an object" in note for note in checklist["result"]["notes"])
     assert any(
         step.get("tool") == "rtg_resolve_anchor_by_fact" for step in checklist["result"]["steps"]
     )
+    replay_check = next(
+        step
+        for step in checklist["result"]["steps"]
+        if step.get("tool") == "rtg_verify_replay_from_ledger"
+    )
+    assert "domain-state equivalence" in replay_check["why"]
+    assert "ledger-cursor equivalence separately" in replay_check["why"]
+    assert any("rejected" in note and "failed" in note for note in checklist["result"]["notes"])
     assert missing_beta_schema["ok"] is False
     assert "schema_staging_minimal" in missing_beta_schema["error"]["message"]
     assert "life_graph_schema_v1" not in missing_beta_schema["error"]["message"]
@@ -946,8 +1122,7 @@ def test_mcp_usage_guides_are_packaged_and_do_not_return_fake_snapshot_payloads(
         "live_filter": "live"
     }
     assert any(
-        "Every ref-like field is a JSON object" in note
-        for note in shapes["result"]["notes"]
+        "Every ref-like field is a JSON object" in note for note in shapes["result"]["notes"]
     )
     assert shapes["result"]["rtg_validate_live_graph_changes"]["arguments"][
         "validation_options"
@@ -1023,7 +1198,10 @@ def test_mcp_exposes_modeled_everyday_life_and_schema_design_guidance(tmp_path: 
     assert schema_design["ok"] is True
     assert any("human approval" in step for step in schema_design["result"]["workflow"])
     assert any(
-        "generic JSON blobs" in principle
+        "generic JSON blobs" in principle for principle in schema_design["result"]["principles"]
+    )
+    assert any(
+        "allowed_values" in principle and "RE2 pattern" in principle
         for principle in schema_design["result"]["principles"]
     )
 
@@ -1045,6 +1223,7 @@ def test_mcp_toolset_stage_schema_migration_can_replace_live_schema(
             }
         ],
         retire_live_schema=[{"kind": "anchor", "type_key": "Person"}],
+        response_options={"format": "full"},
     )
     cutover = toolset.rtg_apply_migration_cutover("person-schema-v2")
 
@@ -1110,6 +1289,8 @@ def test_mcp_toolset_replay_path_and_migration_history(tmp_path: Path) -> None:
         "staged",
         "cutover_applied",
     ]
+    assert all(event["finding_count"] == 0 for event in history["result"]["events"])
+    assert all(event["finding_codes"] == [] for event in history["result"]["events"])
 
 
 def test_mcp_toolset_keeps_error_shape_for_unexpected_exceptions(
@@ -1165,9 +1346,10 @@ def test_mcp_toolset_rejects_unsupported_controller_options(tmp_path: Path) -> N
     assert bad_restore["ok"] is False
     assert bad_restore["error"]["type"] == "RtgControllerSnapshotFailed"
     assert bad_validation_options["ok"] is False
-    assert "dry-run tools do not accept validation_options.mode" in bad_validation_options[
-        "error"
-    ]["message"]
+    assert (
+        "dry-run tools do not accept validation_options.mode"
+        in bad_validation_options["error"]["message"]
+    )
     assert "top-level validation_mode" in bad_validation_options["error"]["message"]
     assert bad_validation_options["error"]["diagnostic"]["code"] == "mcp.input.unsupported_field"
     assert bad_validation_options["error"]["diagnostic"]["path"] == "validation_options.mode"
@@ -1176,9 +1358,10 @@ def test_mcp_toolset_rejects_unsupported_controller_options(tmp_path: Path) -> N
         "live_write",
     ]
     assert nested_query_options["ok"] is False
-    assert "top-level rtg_execute_query argument query_options" in nested_query_options["error"][
-        "message"
-    ]
+    assert (
+        "top-level rtg_execute_query argument query_options"
+        in nested_query_options["error"]["message"]
+    )
     assert nested_query_options["error"]["diagnostic"]["path"] == "query_spec.query_options"
     assert nested_query_options["error"]["diagnostic"]["minimal_example"]["query_options"] == {
         "live_filter": "live"
@@ -1188,10 +1371,7 @@ def test_mcp_toolset_rejects_unsupported_controller_options(tmp_path: Path) -> N
         "top-level rtg_execute_query argument response_options"
         in nested_response_options["error"]["message"]
     )
-    assert (
-        nested_response_options["error"]["diagnostic"]["path"]
-        == "query_spec.response_options"
-    )
+    assert nested_response_options["error"]["diagnostic"]["path"] == "query_spec.response_options"
     assert bad_response_options["ok"] is False
     assert "Accepted field(s): 'format'" in bad_response_options["error"]["message"]
     assert '{"format": "properties_only"}' in bad_response_options["error"]["message"]
@@ -1205,9 +1385,7 @@ def test_mcp_toolset_rejects_unsupported_controller_options(tmp_path: Path) -> N
 def test_mcp_toolset_errors_include_ref_and_uuid_diagnostics(tmp_path: Path) -> None:
     toolset = build_toolset(tmp_path)
 
-    missing_ref = toolset.rtg_apply_live_graph_changes(
-        {"anchor_writes": [{"type": "Person"}]}
-    )
+    missing_ref = toolset.rtg_apply_live_graph_changes({"anchor_writes": [{"type": "Person"}]})
     string_ref = toolset.rtg_apply_live_graph_changes(
         {"anchor_writes": [{"ref": "person", "type": "Person"}]}
     )
@@ -1271,57 +1449,26 @@ def test_diagnostic_json_normalization_preserves_nested_sequences() -> None:
     }
 
 
-def test_mcp_tool_metadata_excludes_eval_prompt_and_includes_payload_hints() -> None:
-    metadata = {item["name"]: item["description"] for item in mcp_tool_metadata()}
+def test_mcp_tool_metadata_is_concise_complete_and_annotated() -> None:
+    entries = mcp_tool_metadata()
+    metadata = {item["name"]: item for item in entries}
 
-    assert len(metadata) == len(TOOL_NAMES)
+    assert len(metadata) == len(TOOL_NAMES) == 27
     assert "rtg_get_agent_affordance_eval_prompt" not in metadata
-    assert "rtg_validate_live_graph_changes" in metadata
-    assert "rtg_validate_live_anchor_records" in metadata
-    assert "rtg_apply_live_anchor_records" in metadata
-    assert "rtg_resolve_anchor_by_fact" in metadata
-    assert "without mutating or ledgering" in metadata["rtg_validate_live_graph_changes"]
-    assert "anchor_records" in metadata["rtg_apply_live_anchor_records"]
-    assert "submitted_query" in metadata["rtg_resolve_anchor_by_fact"]
-    assert (
-        "validation_options{tracks,finding_limit}" in metadata["rtg_validate_live_anchor_records"]
-    )
-    assert "validation_options{tracks,finding_limit}" in metadata["rtg_validate_live_graph_changes"]
-    assert "properties_only" in metadata["rtg_execute_query"]
-    assert "lookup_examples" in metadata["rtg_get_usage_guide"]
-    assert "tool_call_shapes" in metadata["rtg_get_usage_guide"]
-    assert "mcp_bootstrap_checklist" in metadata["rtg_get_usage_guide"]
-    assert "workflow_patterns" in metadata["rtg_get_usage_guide"]
-    assert "request_patterns" in metadata["rtg_get_usage_guide"]
-    assert "anchor_writes[{ref:{local_ref|resource_id}" in metadata["rtg_apply_live_graph_changes"]
-    assert (
-        "Link writes require existing or same-request endpoint anchors"
-        in metadata["rtg_apply_live_graph_changes"]
-    )
-    assert "local_ref is request-local only" in metadata["rtg_apply_live_graph_changes"]
-    assert "validation_report" in metadata["rtg_apply_live_graph_changes"]
-    assert "definition_writes[{ref" in metadata["rtg_stage_knowledge_changes"]
-    assert "data_object payload uses properties" in metadata["rtg_stage_knowledge_changes"]
-    assert "constraint_changes.constraint_writes" in metadata["rtg_stage_knowledge_changes"]
-    assert "query_pattern|cardinality" in metadata["rtg_stage_knowledge_changes"]
-    assert "same request" in metadata["rtg_stage_knowledge_changes"]
-    assert (
-        "graph_make_live must include every candidate anchor"
-        in metadata["rtg_stage_knowledge_changes"]
-    )
-    assert (
-        "Strict staging validates the projected migration cutover"
-        in metadata["rtg_stage_knowledge_changes"]
-    )
-    assert "strict|skip" in metadata["rtg_apply_migration_cutover"]
-    assert "restore_pre_cutover_snapshot" in metadata["rtg_apply_migration_cutover"]
-    assert (
-        "restores or preserves the previous live state" in metadata["rtg_apply_migration_cutover"]
-    )
-    assert "anchor_buckets[{name, anchor_type_keys}]" in metadata["rtg_execute_query"]
-    assert "properties:[[data_requirement_name,[property,...]]]" in metadata["rtg_execute_query"]
-    assert "positive integer" in metadata["rtg_validate_graph"]
-    assert "ledger_mode(record|skip)" in metadata["rtg_restore_from_snapshot"]
+    assert sum(len(item["description"].encode("utf-8")) for item in entries) <= 5 * 1024
+    assert all("Lane:" in item["description"] for item in entries)
+    assert metadata["rtg_execute_query"]["annotations"] == {
+        "readOnlyHint": True,
+        "destructiveHint": False,
+        "idempotentHint": True,
+        "openWorldHint": False,
+    }
+    assert metadata["rtg_apply_live_graph_changes"]["annotations"] == {
+        "readOnlyHint": False,
+        "destructiveHint": True,
+        "idempotentHint": False,
+        "openWorldHint": False,
+    }
 
 
 def test_mcp_server_stdio_protocol_lists_tools_from_non_repo_cwd(tmp_path: Path) -> None:
@@ -1349,11 +1496,23 @@ def test_mcp_server_stdio_protocol_lists_tools_from_non_repo_cwd(tmp_path: Path)
                 await session.initialize()
                 tools = await session.list_tools()
                 tool_names = {tool.name for tool in tools.tools}
+                serialized_tools = json.dumps(
+                    [
+                        tool.model_dump(mode="json", by_alias=True, exclude_none=True)
+                        for tool in tools.tools
+                    ],
+                    separators=(",", ":"),
+                )
+                description_bytes = sum(
+                    len((tool.description or "").encode("utf-8")) for tool in tools.tools
+                )
                 result = await session.call_tool("rtg_validate_graph", {})
 
         payload = _tool_result_payload(result)
 
         assert len(tool_names) == len(TOOL_NAMES)
+        assert len(serialized_tools.encode("utf-8")) <= 16 * 1024
+        assert description_bytes <= 5 * 1024
         assert "rtg_validate_graph" in tool_names
         assert "rtg_get_agent_affordance_eval_prompt" not in tool_names
         assert result.isError is False

@@ -16,7 +16,8 @@ Read [schema-design.md](references/schema-design.md) before authoring or approvi
 2. Inspect the existing schema and representative live data when evolving a graph.
 3. Identify independently addressable things as anchors, coherent typed facts as associated data,
    and meaningful navigable relationships as links.
-4. Define stable type keys, property kinds, required fields, and allowed link endpoints.
+4. Define stable type keys, property kinds, required fields, deliberate field refinements, and
+   allowed link endpoints.
 5. Walk through incomplete, duplicate, evolving, and query scenarios. Remove requirements that
    would force agents to invent facts.
 6. Explain the proposed semantics and compatibility impact. Obtain human approval before a
@@ -30,7 +31,7 @@ Produce a reviewable schema proposal containing:
 
 - the user outcomes and queries it supports;
 - anchor, associated-data, and link definitions with rationale;
-- exact property kinds, optionality, and link endpoint sets;
+- exact property kinds, optionality, justified refinements, and link endpoint sets;
 - identity, naming, and duplicate-handling rules;
 - compatibility and migration effects on existing data;
 - validation and acceptance scenarios;

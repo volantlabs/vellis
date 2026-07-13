@@ -6,7 +6,6 @@ This directory contains the authored textual SysML v2 design products for the re
 - `bibliotek/` is the reusable component library and its shared values and views.
 - `vellis/` is the application composition, façade, use cases, views, and realizations.
 - `config/` pins the allowed language profile, formal libraries, and validator runtime.
-- `migration/` retains the completed source-of-truth cutover record.
 
 Foundation and Bibliotek are independently packageable `library package` products. Vellis is an
 application package that consumes Bibliotek. Bibliotek must never import Vellis. KPARs are derived
@@ -30,6 +29,6 @@ The normal edit loop is `just model-render`, review with `just model-diff`, then
 command, authoring, review, and troubleshooting guidance lives in
 [`docs/engineering/sysml-modeling.md`](../docs/engineering/sysml-modeling.md).
 
-The model is the normative design authority. `migration/cutover-status.json` records the completed
-human and technical acceptance gates; it is evidence of the transition, not a second source of
-contract meaning.
+The model is the normative design authority. Git history retains superseded transition material;
+the current tree contains only active model, configuration, generated projection, and verification
+artifacts.

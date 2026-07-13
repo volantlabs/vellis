@@ -150,10 +150,12 @@ For a restart check, start a fresh server process against the same storage root 
 count and `rtg_validate_graph({})`. Without a restart, call `rtg_verify_replay_from_ledger` to
 exercise replay in scratch state without mutating the live controller.
 
-Expected result: replay or replay verification reports `replay_window`, ledger records seen,
-mutating requests replayed, count summaries, and a passing validation report. If
-`start_snapshot_path` points at an end-of-run snapshot, replaying zero mutating requests after that
-snapshot can be correct; `replay_window` should make that ledger position behavior explicit.
+Expected result: replay verification reports `state_equivalent_to_live`, replayed and live
+domain-state digests, `ledger_cursor_equivalent_to_live`, detailed replay accounting, count
+summaries, and a passing validation report. Exact graph recovery requires domain-state equivalence;
+cursor equivalence is separate evidence. If `start_snapshot_path` points at an end-of-run snapshot,
+replaying zero mutating requests after that snapshot can be correct; the accounting and
+`replay_window` should make that ledger position behavior explicit.
 
 ## Completion Brief
 

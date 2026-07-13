@@ -19,7 +19,9 @@ invariants.
 
 ## Workflow
 
-1. Identify the canonical model or implementation change.
+1. Inventory canonical model, implementation, generated, documentation, and skill changes from
+   version-control status and diffs. Include untracked files; an ordinary diff omits newly added
+   documentation and can hide an incomplete sync.
 2. Run `just model-render` for parser-backed inventories, model-derived views, conformance
    objectives, and manifests.
 3. Review generated component pages for actions, signatures/defaults, typed failures, state access,
@@ -40,8 +42,8 @@ invariants.
    project findings, and repository-specific package maps in repository guidance.
 10. Update skill UI metadata when a skill's purpose changes.
 11. Confirm packaged products validate independently and downstream products consume packaged
-    dependencies, then run `just skills-check`, `just model-check`, and the narrowest relevant
-    repository checks.
+    dependencies, then run `just skills-check`, `just model-check`, local-link and documentation-
+    guidance checks when available, and the narrowest relevant repository checks.
 
 ## Documentation Roles
 

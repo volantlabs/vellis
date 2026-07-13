@@ -90,7 +90,9 @@ def test_composed_app_runs_and_writes_manifest(
                 "individual_life_graph": {
                     "title": "RTG Individual Life Graph Beta Prompt",
                     "path": str(
-                        Path("docs/guides/vellis/evals/rtg-individual-life-graph-beta-prompt.md").resolve()
+                        Path(
+                            "docs/guides/vellis/evals/rtg-individual-life-graph-beta-prompt.md"
+                        ).resolve()
                     ),
                     "description": (
                         "Initial single-user personal and professional life-graph beta scenario."
@@ -266,6 +268,26 @@ def test_composed_app_runs_and_writes_manifest(
             },
         }
     ]
+
+
+def test_persisted_manifest_preserves_configured_startup_modes(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(mcp_launch, "_uv_command", lambda: "uv")
+    config = RtgKnowledgeGraphConfig(
+        storage_root=tmp_path / "storage",
+        sql_database_path=tmp_path / "controller.sqlite",
+        install_starter_schema=False,
+        automatic_recovery=False,
+    )
+
+    status = build_app(config).runner.run()
+    manifest = json.loads((config.storage_root / status.manifest_path).read_text(encoding="utf-8"))
+    interface = manifest["interfaces"][0]
+
+    assert interface["state_mode"] == "manual_recovery"
+    assert "--empty" in interface["launch"]["args"]
+    assert "--manual-recovery" in interface["launch"]["args"]
 
 
 def test_cli_runs_full_app(tmp_path: Path) -> None:
@@ -530,9 +552,7 @@ def test_cli_treats_mcp_keyboard_interrupt_as_clean_shutdown(
 
 
 def test_powershell_quoting_preserves_paths_and_embedded_quotes() -> None:
-    assert app_main._powershell_quote(r"C:\Program Files\uv.exe") == (
-        r"'C:\Program Files\uv.exe'"
-    )
+    assert app_main._powershell_quote(r"C:\Program Files\uv.exe") == (r"'C:\Program Files\uv.exe'")
     assert app_main._powershell_quote("person's-path") == "'person''s-path'"
 
 

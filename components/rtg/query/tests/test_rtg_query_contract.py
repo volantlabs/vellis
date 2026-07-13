@@ -3,6 +3,8 @@ from __future__ import annotations
 from typing import cast
 from uuid import UUID, uuid4
 
+import pytest
+
 from components.rtg.graph import (
     InMemoryRtgGraph,
     JsonObject,
@@ -11,6 +13,7 @@ from components.rtg.graph import (
     RtgLink,
 )
 from components.rtg.query import (
+    RtgQueryAggregation,
     RtgQueryAnchorBucket,
     RtgQueryDataRequirement,
     RtgQueryLinkRequirement,
@@ -101,9 +104,7 @@ def test_query_reports_return_property_diagnostics_for_unresolved_paths() -> Non
 
     assert result.returns[0].properties == {}
     assert result.diagnostics[0].code == "query.return_property_path_unresolved"
-    assert (
-        result.diagnostics[0].diagnostic["path"] == "query_spec.return_spec.properties[0][1]"
-    )
+    assert result.diagnostics[0].diagnostic["path"] == "query_spec.return_spec.properties[0][1]"
 
 
 def test_query_reports_return_property_diagnostics_for_unbound_requirements() -> None:
@@ -189,6 +190,38 @@ def test_query_orders_by_returned_property_path() -> None:
     ]
 
 
+def test_query_orders_arbitrary_precision_numbers_exactly() -> None:
+    graph = InMemoryRtgGraph.empty()
+    values = (10**40 + 2, 10**40 + 1)
+    for index, value in enumerate(values, start=1):
+        anchor_uuid = UUID(int=index)
+        graph.put_anchor(RtgAnchor(uuid=anchor_uuid, type="Thing"))
+        graph.put_data_object(
+            RtgDataObject(
+                uuid=UUID(int=index + 100),
+                type="Facts",
+                properties={"value": value},
+            ),
+            (anchor_uuid,),
+        )
+    query = RtgQuerySpec(
+        anchor_buckets=(RtgQueryAnchorBucket("thing", ("Thing",)),),
+        data_requirements=(RtgQueryDataRequirement("facts", "thing", "Facts"),),
+        return_spec=RtgQueryReturnSpec(properties=(("facts", ("value",)),)),
+    )
+
+    result = SimpleRtgQueryEngine().execute(
+        graph,
+        query,
+        RtgQueryOptions(order_by=(RtgQueryOrderBy("facts", ("value",)),)),
+    )
+
+    returned_values = [
+        cast(JsonObject, row.properties["facts"])["value"] for row in result.returns
+    ]
+    assert returned_values == sorted(values)
+
+
 def test_query_order_by_must_reference_returned_property() -> None:
     graph = InMemoryRtgGraph.empty()
     task = graph.put_anchor(RtgAnchor(uuid=uuid4(), type="Task"))
@@ -220,6 +253,197 @@ def test_query_order_by_must_reference_returned_property() -> None:
         raise AssertionError("query should reject non-returned order_by paths")
 
 
+def test_query_paginates_after_distinct_projection() -> None:
+    graph = InMemoryRtgGraph.empty()
+    for title in ("Same", "Same", "Different"):
+        task = graph.put_anchor(RtgAnchor(uuid=uuid4(), type="Task"))
+        graph.put_data_object(
+            RtgDataObject(uuid=uuid4(), type="TaskFacts", properties={"title": title}),
+            (concrete_uuid(task.uuid),),
+        )
+    query = RtgQuerySpec(
+        anchor_buckets=(RtgQueryAnchorBucket("task", ("Task",)),),
+        data_requirements=(RtgQueryDataRequirement("facts", "task", "TaskFacts"),),
+        return_spec=RtgQueryReturnSpec(properties=(("facts", ("title",)),)),
+    )
+    result = SimpleRtgQueryEngine().execute(
+        graph, query, RtgQueryOptions(distinct_rows=True, limit=1, offset=0)
+    )
+    assert result.total_row_count == 2
+    assert result.returned_row_count == 1
+    assert result.next_offset == 1
+    assert result.returns[0].row_index == 0
+
+
+def test_query_count_aggregation_groups_and_counts_distinct_bindings() -> None:
+    graph = InMemoryRtgGraph.empty()
+    for status in ("next", "next", "waiting"):
+        task = graph.put_anchor(RtgAnchor(uuid=uuid4(), type="Task"))
+        graph.put_data_object(
+            RtgDataObject(uuid=uuid4(), type="TaskFacts", properties={"status": status}),
+            (concrete_uuid(task.uuid),),
+        )
+    query = RtgQuerySpec(
+        anchor_buckets=(RtgQueryAnchorBucket("task", ("Task",)),),
+        data_requirements=(RtgQueryDataRequirement("facts", "task", "TaskFacts"),),
+        return_spec=RtgQueryReturnSpec(
+            properties=(("facts", ("status",)),),
+            group_by=(("facts", ("status",)),),
+            aggregations=(RtgQueryAggregation("task_count", "count", "task"),),
+        ),
+    )
+    result = SimpleRtgQueryEngine().execute(graph, query)
+    assert result.aggregations == (
+        {"row_index": 0, "group_by": {"facts": {"status": "next"}}, "task_count": 2},
+        {"row_index": 1, "group_by": {"facts": {"status": "waiting"}}, "task_count": 1},
+    )
+    assert result.total_row_count == 2
+    assert result.bindings == ()
+    assert result.returns == ()
+
+
+def test_query_rejects_ambiguous_binding_names_and_invalid_pagination_options() -> None:
+    graph = InMemoryRtgGraph.empty()
+    anchor = graph.put_anchor(RtgAnchor(uuid=uuid4(), type="Thing"))
+    graph.put_data_object(
+        RtgDataObject(uuid=uuid4(), type="Facts", properties={}),
+        (concrete_uuid(anchor.uuid),),
+    )
+    ambiguous = RtgQuerySpec(
+        anchor_buckets=(RtgQueryAnchorBucket("item", ("Thing",)),),
+        data_requirements=(RtgQueryDataRequirement("item", "item", "Facts"),),
+    )
+    with pytest.raises(RtgQuerySpecInvalid, match="globally unique"):
+        SimpleRtgQueryEngine().execute(graph, ambiguous)
+
+    query = RtgQuerySpec(anchor_buckets=(RtgQueryAnchorBucket("item", ("Thing",)),))
+    for options in (
+        RtgQueryOptions(limit=True),
+        RtgQueryOptions(offset=False),
+        RtgQueryOptions(limit=1.5),  # type: ignore[arg-type]
+    ):
+        with pytest.raises(RtgQuerySpecInvalid):
+            SimpleRtgQueryEngine().execute(graph, query, options)
+
+    aggregate = RtgQuerySpec(
+        anchor_buckets=(RtgQueryAnchorBucket("item", ("Thing",)),),
+        return_spec=RtgQueryReturnSpec(
+            aggregations=(RtgQueryAggregation("item_count", "count", "item"),)
+        ),
+    )
+    with pytest.raises(RtgQuerySpecInvalid, match="distinct_rows"):
+        SimpleRtgQueryEngine().execute(
+            graph, aggregate, RtgQueryOptions(distinct_rows=True)
+        )
+
+
+def test_optional_link_requirement_preserves_unlinked_source_rows() -> None:
+    graph = InMemoryRtgGraph.empty()
+    linked = graph.put_anchor(RtgAnchor(uuid=uuid4(), type="Project"))
+    unlinked = graph.put_anchor(RtgAnchor(uuid=uuid4(), type="Project"))
+    area = graph.put_anchor(RtgAnchor(uuid=uuid4(), type="Area"))
+    graph.put_anchor(RtgAnchor(uuid=uuid4(), type="Area"))
+    graph.put_link(
+        RtgLink(
+            uuid=uuid4(),
+            type="belongs_to",
+            source_uuid=concrete_uuid(linked.uuid),
+            target_uuid=concrete_uuid(area.uuid),
+        )
+    )
+    query = RtgQuerySpec(
+        anchor_buckets=(
+            RtgQueryAnchorBucket("project", ("Project",)),
+            RtgQueryAnchorBucket("area", ("Area",)),
+        ),
+        link_requirements=(
+            RtgQueryLinkRequirement(
+                "membership", "project", "area", ("belongs_to",), required=False
+            ),
+        ),
+    )
+    result = SimpleRtgQueryEngine().execute(graph, query)
+    assert len(result.bindings) == 2
+    rows = {row.anchors["project"]: row for row in result.bindings}
+    assert rows[concrete_uuid(linked.uuid)].links["membership"]
+    assert "area" not in rows[concrete_uuid(unlinked.uuid)].anchors
+
+
+def test_chained_optional_links_preserve_rows_when_intermediate_source_is_unbound() -> None:
+    graph = InMemoryRtgGraph.empty()
+    project = graph.put_anchor(RtgAnchor(uuid=uuid4(), type="Project"))
+    graph.put_anchor(RtgAnchor(uuid=uuid4(), type="Area"))
+    graph.put_anchor(RtgAnchor(uuid=uuid4(), type="Goal"))
+    query = RtgQuerySpec(
+        anchor_buckets=(
+            RtgQueryAnchorBucket("project", ("Project",)),
+            RtgQueryAnchorBucket("area", ("Area",)),
+            RtgQueryAnchorBucket("goal", ("Goal",)),
+        ),
+        link_requirements=(
+            RtgQueryLinkRequirement(
+                "membership", "project", "area", ("belongs_to",), required=False
+            ),
+            RtgQueryLinkRequirement(
+                "alignment", "area", "goal", ("supports",), required=False
+            ),
+        ),
+    )
+
+    result = SimpleRtgQueryEngine().execute(graph, query)
+
+    assert len(result.bindings) == 1
+    assert result.bindings[0].anchors == {"project": concrete_uuid(project.uuid)}
+    assert result.bindings[0].links == {}
+
+
+def test_query_grouping_preserves_distinct_large_json_integers() -> None:
+    graph = InMemoryRtgGraph.empty()
+    values = (10**40 + 1, 10**40 + 2)
+    for value in values:
+        thing = graph.put_anchor(RtgAnchor(uuid=uuid4(), type="Thing"))
+        graph.put_data_object(
+            RtgDataObject(uuid=uuid4(), type="Facts", properties={"value": value}),
+            (concrete_uuid(thing.uuid),),
+        )
+    query = RtgQuerySpec(
+        anchor_buckets=(RtgQueryAnchorBucket("thing", ("Thing",)),),
+        data_requirements=(RtgQueryDataRequirement("facts", "thing", "Facts"),),
+        return_spec=RtgQueryReturnSpec(
+            properties=(("facts", ("value",)),),
+            group_by=(("facts", ("value",)),),
+            aggregations=(RtgQueryAggregation("thing_count", "count", "thing"),),
+        ),
+    )
+
+    result = SimpleRtgQueryEngine().execute(graph, query)
+
+    grouped_values: list[int] = []
+    counts: list[int] = []
+    for row in result.aggregations:
+        group_by = cast(JsonObject, row["group_by"])
+        facts = cast(JsonObject, group_by["facts"])
+        grouped_values.append(cast(int, facts["value"]))
+        counts.append(cast(int, row["thing_count"]))
+    assert set(grouped_values) == set(values)
+    assert set(counts) == {1}
+
+
+@pytest.mark.parametrize("name", ["row_index", "group_by"])
+def test_query_rejects_reserved_aggregation_names(name: str) -> None:
+    graph = InMemoryRtgGraph.empty()
+    graph.put_anchor(RtgAnchor(uuid=uuid4(), type="Thing"))
+    query = RtgQuerySpec(
+        anchor_buckets=(RtgQueryAnchorBucket("thing", ("Thing",)),),
+        return_spec=RtgQueryReturnSpec(aggregations=(RtgQueryAggregation(name, "count", "thing"),)),
+    )
+
+    with pytest.raises(RtgQuerySpecInvalid) as error:
+        SimpleRtgQueryEngine().execute(graph, query)
+
+    assert error.value.diagnostic["code"] == "query.aggregation.reserved_name"
+
+
 def test_query_invalid_operator_has_structured_diagnostic() -> None:
     graph = InMemoryRtgGraph.empty()
     query = RtgQuerySpec(
@@ -229,9 +453,7 @@ def test_query_invalid_operator_has_structured_diagnostic() -> None:
                 "facts",
                 "task",
                 "TaskFacts",
-                predicates=(
-                    RtgQueryPropertyPredicate(("title",), "sounds_like", value="A"),
-                ),
+                predicates=(RtgQueryPropertyPredicate(("title",), "sounds_like", value="A"),),
             ),
         ),
     )
@@ -277,14 +499,8 @@ def test_query_json_equality_is_kind_sensitive_and_recursive() -> None:
     assert not matches(RtgQueryPropertyPredicate(("boolean",), "equals", value=1))
     assert matches(RtgQueryPropertyPredicate(("number",), "equals", value=1.0))
     assert not matches(RtgQueryPropertyPredicate(("array",), "contains", value=1))
-    assert matches(
-        RtgQueryPropertyPredicate(
-            ("array",), "equals", value=[True, {"number": 1.0}]
-        )
-    )
-    assert not matches(
-        RtgQueryPropertyPredicate(("object",), "equals", value={"a": 1, "b": 1})
-    )
+    assert matches(RtgQueryPropertyPredicate(("array",), "equals", value=[True, {"number": 1.0}]))
+    assert not matches(RtgQueryPropertyPredicate(("object",), "equals", value={"a": 1, "b": 1}))
 
 
 def test_query_regex_uses_re2_dialect_and_declared_flags() -> None:

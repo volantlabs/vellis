@@ -2,6 +2,7 @@
 
 from components.rtg.query.implementation import SimpleRtgQueryEngine
 from components.rtg.query.protocol import (
+    RtgQueryAggregation,
     RtgQueryAnchorBucket,
     RtgQueryBindingRow,
     RtgQueryDataRequirement,
@@ -22,6 +23,7 @@ from components.rtg.query.protocol import (
 )
 
 __all__ = [
+    "RtgQueryAggregation",
     "RtgQueryAnchorBucket",
     "RtgQueryBindingRow",
     "RtgQueryDataRequirement",

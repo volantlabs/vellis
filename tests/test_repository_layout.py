@@ -74,9 +74,7 @@ def test_local_markdown_links_resolve() -> None:
             if not target or target.startswith(("#", "http://", "https://", "mailto:", "app://")):
                 continue
             target = unquote(target.split("#", 1)[0])
-            resolved = (
-                ROOT / target.lstrip("/") if target.startswith("/") else path.parent / target
-            )
+            resolved = ROOT / target.lstrip("/") if target.startswith("/") else path.parent / target
             if not resolved.exists():
                 missing.append(f"{path.relative_to(ROOT)} -> {raw_target}")
 
@@ -104,9 +102,7 @@ def test_authored_products_generated_outputs_and_fixture_are_separated() -> None
 
 def test_model_cache_and_packages_are_ignored() -> None:
     for path in (model_layout.SYSML_CACHE_ROOT, model_layout.MODEL_PACKAGE_ROOT):
-        result = subprocess.run(
-            ["git", "check-ignore", "-q", str(path)], cwd=ROOT, check=False
-        )
+        result = subprocess.run(["git", "check-ignore", "-q", str(path)], cwd=ROOT, check=False)
         assert result.returncode == 0, path
 
 

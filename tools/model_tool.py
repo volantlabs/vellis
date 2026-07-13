@@ -21,7 +21,6 @@ try:
         BIBLIOTEK_MODEL_ROOT,
         BIBLIOTEK_REFERENCE_ROOT,
         COMPONENT_MODEL_ROOT,
-        CUTOVER_STATUS_PATH,
         FORMAL_CACHE_ROOT,
         GENERATED_CONFORMANCE_OBJECTIVES,
         GENERATED_EVIDENCE_INDEX,
@@ -41,7 +40,6 @@ except ImportError:  # pragma: no cover - direct script execution
         BIBLIOTEK_MODEL_ROOT,
         BIBLIOTEK_REFERENCE_ROOT,
         COMPONENT_MODEL_ROOT,
-        CUTOVER_STATUS_PATH,
         FORMAL_CACHE_ROOT,
         GENERATED_CONFORMANCE_OBJECTIVES,
         GENERATED_EVIDENCE_INDEX,
@@ -978,9 +976,7 @@ def _check_native_behavior_realizations() -> list[Finding]:
                     rf"\s+redefines\s+{re.escape(call_type)}::{field_pattern}\s*=",
                     call_block,
                 )
-                consumed = bool(
-                    re.search(rf"\b{call_name}\.{field_pattern}", outer_block)
-                )
+                consumed = bool(re.search(rf"\b{call_name}\.{field_pattern}", outer_block))
                 if not directly_bound and not consumed:
                     findings.append(
                         Finding(
@@ -1241,9 +1237,7 @@ def _conformance_objectives_data() -> dict[str, object]:
         text = path.read_text(encoding="utf-8")
         requirements = {
             name: stable_id
-            for stable_id, name in re.findall(
-                r"\brequirement\s+<'([^']+)'>\s+(\w+)\s*\{", text
-            )
+            for stable_id, name in re.findall(r"\brequirement\s+<'([^']+)'>\s+(\w+)\s*\{", text)
         }
         requirements_by_source[path] = requirements
         for name, stable_id in requirements.items():
@@ -1347,9 +1341,7 @@ def _check_formal_model_index() -> list[Finding]:
         }
         text = path.read_text(encoding="utf-8")
         for keyword, formal_kind in expected_kinds.items():
-            for name in re.findall(
-                rf"\b{keyword}\s+def\s+{OPTIONAL_IDENTIFICATION}(\w+)", text
-            ):
+            for name in re.findall(rf"\b{keyword}\s+def\s+{OPTIONAL_IDENTIFICATION}(\w+)", text):
                 if (formal_kind, name) not in parsed:
                     findings.append(
                         Finding(
@@ -1391,9 +1383,7 @@ def _check_vellis_use_cases() -> list[Finding]:
         block = _extract_braced_block(text, match.start())
         if not re.search(r"actor\s+users\[1\.\.\*]\s*:\s*VellisUser", block):
             findings.append(Finding(path, "use case must bind one or more VellisUser actors"))
-    operations_text = (MODEL_ROOT / "vellis" / "VellisOperations.sysml").read_text(
-        encoding="utf-8"
-    )
+    operations_text = (MODEL_ROOT / "vellis" / "VellisOperations.sysml").read_text(encoding="utf-8")
     operation_types = set(
         re.findall(rf"\baction def\s+{OPTIONAL_IDENTIFICATION}(\w+)", operations_text)
     )
@@ -1403,9 +1393,7 @@ def _check_vellis_use_cases() -> list[Finding]:
             rf"\bperform\s+({SYSML_IDENTIFIER})\.({SYSML_IDENTIFIER})\s*;", text
         )
     }
-    actor_occurrences = dict(
-        re.findall(r"\bpart\s+(\w+)\s*:\s*(HumanOperator|AiAgent)\s*;", text)
-    )
+    actor_occurrences = dict(re.findall(r"\bpart\s+(\w+)\s*:\s*(HumanOperator|AiAgent)\s*;", text))
     for match in re.finditer(
         rf"\buse case\s+(?!def\b)({SYSML_IDENTIFIER})\s*:\s*(\w+)\s*\{{", text
     ):
@@ -1446,7 +1434,10 @@ def _python_tool_names() -> tuple[str, ...]:
         for decorator in node.decorator_list:
             if not isinstance(decorator, ast.Call):
                 continue
-            if not isinstance(decorator.func, ast.Attribute) or decorator.func.attr != "tool":
+            if not (
+                (isinstance(decorator.func, ast.Attribute) and decorator.func.attr == "tool")
+                or (isinstance(decorator.func, ast.Name) and decorator.func.id == "_tool")
+            ):
                 continue
             name_keyword = next(
                 (keyword for keyword in decorator.keywords if keyword.arg == "name"), None
@@ -1584,6 +1575,47 @@ def _model_tool_descriptions() -> dict[str, str]:
             continue
         descriptions[tool_match.group(1)] = _documentation(block)
     return descriptions
+
+
+def _model_tool_capabilities() -> dict[str, dict[str, Any]]:
+    text = (MODEL_ROOT / "vellis" / "realizations" / "VellisMcpPython.sysml").read_text(
+        encoding="utf-8"
+    )
+    capabilities: dict[str, dict[str, Any]] = {}
+    for block in re.findall(r"@McpToolBinding\s*\{(.*?)\}", text, re.DOTALL):
+        name_match = re.search(r'toolName\s*=\s*"([^"]+)"', block)
+        lane_match = re.search(r"lane\s*=\s*McpOperationalLane::(\w+)", block)
+        audience_match = re.search(r"audience\s*=\s*McpAudienceKind::(\w+)", block)
+        if name_match is None or lane_match is None or audience_match is None:
+            continue
+
+        def boolean(name: str, source: str = block) -> bool:
+            match = re.search(rf"\b{name}\s*=\s*(true|false)", source)
+            return match is not None and match.group(1) == "true"
+
+        predecessors_match = re.search(
+            r"\brecommendedPredecessors\s*=\s*\((.*?)\)", block, re.DOTALL
+        )
+        recommended_predecessors = (
+            re.findall(r'"([^"]+)"', predecessors_match.group(1))
+            if predecessors_match is not None
+            else []
+        )
+        dry_run_match = re.search(r'\bdryRunTool\s*=\s*"([^"]+)"', block)
+        capabilities[name_match.group(1)] = {
+            "lane": lane_match.group(1),
+            "audience": audience_match.group(1),
+            "ledgers": boolean("ledgers"),
+            "recommended_predecessors": recommended_predecessors,
+            "dry_run_tool": dry_run_match.group(1) if dry_run_match is not None else None,
+            "annotations": {
+                "readOnlyHint": boolean("readOnlyHint"),
+                "destructiveHint": boolean("destructiveHint"),
+                "idempotentHint": boolean("idempotentHint"),
+                "openWorldHint": boolean("openWorldHint"),
+            },
+        }
+    return capabilities
 
 
 def _model_operation_ids() -> tuple[str, ...]:
@@ -1907,71 +1939,6 @@ def _check_forbidden_component_imports() -> list[Finding]:
     return findings
 
 
-def _check_cutover_state() -> list[Finding]:
-    """Keep the completed model-authority cutover fail closed."""
-    try:
-        status = _read_json(CUTOVER_STATUS_PATH)
-    except (OSError, ValueError, json.JSONDecodeError) as error:
-        return [Finding(CUTOVER_STATUS_PATH, f"invalid cutover status: {error}")]
-
-    phase = status.get("phase")
-    gates = status.get("gates")
-    if not isinstance(gates, dict):
-        return [Finding(CUTOVER_STATUS_PATH, "cutover status has no gates object")]
-    findings: list[Finding] = []
-    if phase == "normative":
-        retired_baseline = ROOT / "docs" / "migration" / "component-spec-baseline"
-        if any(retired_baseline.glob("component.*.md")):
-            findings.append(
-                Finding(
-                    retired_baseline,
-                    "normative phase cannot retain predecessor specifications",
-                )
-            )
-        if "frozen_migration_baseline" in status:
-            findings.append(
-                Finding(CUTOVER_STATUS_PATH, "normative phase cannot name a frozen baseline")
-            )
-        required_gates = {
-            "native_action_invocation_patterns",
-            "accepted_contract_preservation",
-            "black_box_rebuild_readiness",
-            "representative_pilots",
-            "legacy_contract_knowledge_disposition",
-            "legacy_non_contract_knowledge_preservation",
-            "bibliotek_human_acceptance",
-            "vellis_human_acceptance",
-        }
-        incomplete = sorted(
-            gate for gate in required_gates if gates.get(gate) not in {"accepted", "implemented"}
-        )
-        if incomplete:
-            findings.append(
-                Finding(
-                    CUTOVER_STATUS_PATH,
-                    f"normative phase has incomplete acceptance gates: {incomplete}",
-                )
-            )
-        if gates.get("markdown_retirement") != "completed":
-            findings.append(
-                Finding(CUTOVER_STATUS_PATH, "normative phase requires completed retirement")
-            )
-        transitional_guidance = {
-            ROOT / "AGENTS.md": "still marked `shadow`",
-            ROOT / "CONTRIBUTING.md": "component-spec-baseline/",
-        }
-        for path, phrase in transitional_guidance.items():
-            if path.exists() and phrase in path.read_text(encoding="utf-8"):
-                findings.append(
-                    Finding(path, "normative phase retains shadow-migration guidance")
-                )
-    else:
-        findings.append(
-            Finding(CUTOVER_STATUS_PATH, f"model authority must remain normative, found {phase!r}")
-        )
-    return findings
-
-
 def check(scope: str = "all", *, require_external: bool = False) -> list[Finding]:
     findings: list[Finding] = []
     files = _sysml_files(scope)
@@ -1985,9 +1952,6 @@ def check(scope: str = "all", *, require_external: bool = False) -> list[Finding
     findings.extend(_check_connected_formal_semantics(files))
     findings.extend(_check_discriminated_public_alternatives(files))
     findings.extend(_check_requirement_and_verification_semantics(files))
-    if scope == "all":
-        findings.extend(_check_cutover_state())
-
     stable_ids: dict[str, Path] = {}
     for path in files:
         text = path.read_text(encoding="utf-8")
@@ -2101,7 +2065,9 @@ def check(scope: str = "all", *, require_external: bool = False) -> list[Finding
         toolset_text = toolset_path.read_text(encoding="utf-8")
         if (
             'joinpath("model_app_manifest.json")' not in toolset_text
-            or "TOOL_NAMES, TOOL_DESCRIPTIONS = _load_model_tool_metadata()" not in toolset_text
+            or "TOOL_NAMES, TOOL_DESCRIPTIONS, _MODELED_TOOL_CAPABILITIES = "
+            "_load_model_tool_metadata()"
+            not in toolset_text
             or re.search(r"TOOL_DESCRIPTIONS\s*:\s*dict[^=]*=\s*\{", toolset_text)
         ):
             findings.append(
@@ -2194,8 +2160,7 @@ def _feature_signature(block: str) -> str:
         return "—"
     return "; ".join(
         f"{direction} `{_identifier_value(name)}: {type_name}{before or after or ''}"
-        f"{modifiers}`"
-        + (f" = `{default.strip()}`" if default else "")
+        f"{modifiers}`" + (f" = `{default.strip()}`" if default else "")
         for direction, name, before, modifiers, type_name, after, default in features
     )
 
@@ -2254,9 +2219,7 @@ def _public_field_signatures(
 
 def _component_page(path: Path) -> str:
     text = path.read_text(encoding="utf-8")
-    all_model_text = "\n".join(
-        source.read_text(encoding="utf-8") for source in _sysml_files("all")
-    )
+    all_model_text = "\n".join(source.read_text(encoding="utf-8") for source in _sysml_files("all"))
     component_id = _component_id(text) or path.stem
     component_name = _component_definition_name(text) or path.stem
     component_block = _definition_block(text, "part def", component_name)
@@ -2703,15 +2666,9 @@ def _render_operation_summary() -> str:
     for definition in starter_definitions:
         if definition["kind"] != "link":
             continue
-        sources = ", ".join(
-            f"`{value}`" for value in definition["payload"]["allowed_source_types"]
-        )
-        targets = ", ".join(
-            f"`{value}`" for value in definition["payload"]["allowed_target_types"]
-        )
-        starter_link_rows.append(
-            f"| `{definition['type_key']}` | {sources} | {targets} |"
-        )
+        sources = ", ".join(f"`{value}`" for value in definition["payload"]["allowed_source_types"])
+        targets = ", ".join(f"`{value}`" for value in definition["payload"]["allowed_target_types"])
+        starter_link_rows.append(f"| `{definition['type_key']}` | {sources} | {targets} |")
     operation_blocks: dict[str, str] = {}
     for match in re.finditer(r"\baction def\s+(?:<'([^']+)'>\s+)?\w+\s*\{", operation_text):
         block = _extract_braced_block(operation_text, match.start())
@@ -2781,9 +2738,7 @@ def _render_operation_summary() -> str:
         MODEL_ROOT / "vellis" / "realizations" / "VellisLocalPython.sysml"
     ).read_text(encoding="utf-8")
     realization_definitions: dict[str, tuple[str, str]] = {}
-    for definition in re.finditer(
-        r"\bpart def\s+(\w+)\s*:>\s*(\w+)\s*\{", local_realization_text
-    ):
+    for definition in re.finditer(r"\bpart def\s+(\w+)\s*:>\s*(\w+)\s*\{", local_realization_text):
         block = _extract_braced_block(local_realization_text, definition.start())
         symbol = re.search(r'\bsymbol\s*=\s*"([^"]+)"', block)
         if symbol:
@@ -2796,9 +2751,7 @@ def _render_operation_summary() -> str:
         r"\bpart\s+:>>\s+(\w+)\s*:\s*(\w+)\s*;", local_realization_text
     ):
         logical_type, symbol = realization_definitions.get(realization, ("unmapped", "unmapped"))
-        python_role_rows.append(
-            f"| `{role}` | `{logical_type}` | `{realization}` | `{symbol}` |"
-        )
+        python_role_rows.append(f"| `{role}` | `{logical_type}` | `{realization}` | `{symbol}` |")
     use_case_text = "\n".join(
         path.read_text(encoding="utf-8")
         for path in sorted((MODEL_ROOT / "vellis" / "use-cases").glob("*.sysml"))
@@ -2908,6 +2861,7 @@ def _render_operation_summary() -> str:
 def _manifest_data() -> dict[str, Any]:
     operation_parameters = _model_tool_parameters()
     tool_descriptions = _model_tool_descriptions()
+    tool_capabilities = _model_tool_capabilities()
     return {
         "app_name": "rtg_knowledge_graph",
         "schema_version": 1,
@@ -2920,6 +2874,7 @@ def _manifest_data() -> dict[str, Any]:
                 "name": tool,
                 "operation_id": f"operation.vellis.{tool}",
                 "description": tool_descriptions[tool],
+                **tool_capabilities[tool],
                 "parameters": [
                     {
                         "name": name,
@@ -3086,9 +3041,7 @@ def render() -> None:
     (BIBLIOTEK_REFERENCE_ROOT / "index.md").write_text(
         _render_component_summary(), encoding="utf-8"
     )
-    (VELLIS_REFERENCE_ROOT / "index.md").write_text(
-        _render_operation_summary(), encoding="utf-8"
-    )
+    (VELLIS_REFERENCE_ROOT / "index.md").write_text(_render_operation_summary(), encoding="utf-8")
     GENERATED_MANIFEST.write_text(
         json.dumps(_manifest_data(), indent=2, sort_keys=True) + "\n", encoding="utf-8"
     )
@@ -3111,9 +3064,7 @@ def check_generated() -> list[Finding]:
         BIBLIOTEK_REFERENCE_ROOT / "index.md": _render_component_summary(),
         VELLIS_REFERENCE_ROOT / "index.md": _render_operation_summary(),
         GENERATED_MANIFEST: json.dumps(_manifest_data(), indent=2, sort_keys=True) + "\n",
-        GENERATED_STARTER_SCHEMA: json.dumps(
-            _starter_schema_data(), indent=2, sort_keys=True
-        )
+        GENERATED_STARTER_SCHEMA: json.dumps(_starter_schema_data(), indent=2, sort_keys=True)
         + "\n",
         GENERATED_EVIDENCE_INDEX: json.dumps(
             _verification_evidence_data(), indent=2, sort_keys=True
@@ -3231,9 +3182,8 @@ def handoff(target: str) -> int:
     )
     if target == "application.vellis":
         matches = sorted((MODEL_ROOT / "vellis").rglob("*.sysml"))
-    status = _read_json(CUTOVER_STATUS_PATH)
     print(f"Target: {target}")
-    print(f"Model phase: {status.get('phase')}")
+    print("Model authority: normative textual SysML")
     if is_component:
         print("Model product: build/model/packages/bibliotek-0.1.0.kpar")
         print(f"Generated view: generated/reference/bibliotek/components/{target}.md")
@@ -3241,13 +3191,11 @@ def handoff(target: str) -> int:
         print("Model product: build/model/packages/vellis-0.1.0.kpar")
         print("Generated view: generated/reference/vellis/index.md")
         print(
-            "Generated starter schema: "
-            "apps/rtg_knowledge_graph/resources/everyday_life_schema.json"
+            "Generated starter schema: apps/rtg_knowledge_graph/resources/everyday_life_schema.json"
         )
     else:
         print(
-            "Model product: "
-            "build/model/packages/software-component-modeling-foundation-0.1.0.kpar"
+            "Model product: build/model/packages/software-component-modeling-foundation-0.1.0.kpar"
         )
     print("Model sources:")
     foundation = MODEL_ROOT / "foundation" / "SoftwareComponentModeling.sysml"

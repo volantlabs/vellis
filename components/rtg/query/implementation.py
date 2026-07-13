@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import itertools
+from typing import Any
 from uuid import UUID
 
 import re2
@@ -12,6 +13,11 @@ from components.rtg.graph.protocol import (
     RtgAnchor,
     RtgDataObject,
     RtgGraph,
+)
+from components.rtg.query.json_values import (
+    canonical_json_key,
+    json_number_decimal,
+    json_value_equal,
 )
 from components.rtg.query.protocol import (
     RtgQueryBindingRow,
@@ -57,6 +63,10 @@ class SimpleRtgQueryEngine(RtgQueryEngine):
         options = query_options or RtgQueryOptions()
         _validate_options(options)
         _validate_spec(query_spec)
+        if query_spec.return_spec.aggregations and options.distinct_rows:
+            raise RtgQuerySpecInvalid(
+                "query_options.distinct_rows cannot be combined with aggregation"
+            )
         _validate_order_by_against_spec(query_spec, options)
 
         diagnostics: list[RtgQueryDiagnostic] = []
@@ -83,29 +93,35 @@ class SimpleRtgQueryEngine(RtgQueryEngine):
                     )
 
         bucket_names = tuple(bucket.name for bucket in query_spec.anchor_buckets)
+        optional_target_buckets = {
+            requirement.target_bucket
+            for requirement in query_spec.link_requirements
+            if not requirement.required
+        }
         bindings: list[RtgQueryBindingRow] = []
-        for anchor_values in itertools.product(*(bucket_candidates[name] for name in bucket_names)):
-            anchor_binding = dict(
-                zip(bucket_names, (anchor.uuid for anchor in anchor_values), strict=True)
-            )
+        product_candidates = tuple(
+            bucket_candidates[name]
+            if bucket_candidates[name] or name not in optional_target_buckets
+            else (None,)
+            for name in bucket_names
+        )
+        for anchor_values in itertools.product(*product_candidates):
+            anchor_binding = {
+                name: anchor.uuid
+                for name, anchor in zip(bucket_names, anchor_values, strict=True)
+                if anchor is not None and anchor.uuid is not None
+            }
             if any(value is None for value in anchor_binding.values()):
                 continue
-            partial_rows = [RtgQueryBindingRow(row_index=0, anchors=anchor_binding)]  # type: ignore[arg-type]
-            for link_requirement in query_spec.link_requirements:
-                partial_rows = _expand_link_requirement(
-                    graph, options, partial_rows, link_requirement
-                )
-                if not partial_rows:
-                    break
-            if not partial_rows:
-                continue
-            for data_requirement in query_spec.data_requirements:
-                partial_rows = _expand_data_requirement(
-                    graph, options, partial_rows, data_requirement
-                )
-                if not partial_rows:
-                    break
-            bindings.extend(partial_rows)
+            bindings.append(RtgQueryBindingRow(row_index=0, anchors=anchor_binding))
+        for link_requirement in query_spec.link_requirements:
+            bindings = _expand_link_requirement(graph, options, bindings, link_requirement)
+            if not bindings:
+                break
+        for data_requirement in query_spec.data_requirements:
+            bindings = _expand_data_requirement(graph, options, bindings, data_requirement)
+            if not bindings:
+                break
 
         ordered = sorted(bindings, key=lambda row: _row_sort_key(row, query_spec))
         indexed = tuple(
@@ -121,7 +137,36 @@ class SimpleRtgQueryEngine(RtgQueryEngine):
         if options.order_by:
             indexed, returns = _apply_return_ordering(indexed, returns, options.order_by)
         diagnostics.extend(_return_property_diagnostics(query_spec, indexed, returns))
-        return RtgQueryResult(bindings=indexed, returns=returns, diagnostics=tuple(diagnostics))
+        if query_spec.return_spec.aggregations:
+            aggregation_rows = _aggregate_rows(indexed, returns, query_spec)
+            total = len(aggregation_rows)
+            sliced_aggregations, next_offset = _slice_rows(aggregation_rows, options)
+            indexed_aggregations = [
+                {"row_index": index, **row} for index, row in enumerate(sliced_aggregations)
+            ]
+            return RtgQueryResult(
+                bindings=(),
+                returns=(),
+                diagnostics=tuple(diagnostics),
+                aggregations=tuple(indexed_aggregations),
+                total_row_count=total,
+                returned_row_count=len(indexed_aggregations),
+                next_offset=next_offset,
+            )
+        pairs = list(zip(indexed, returns, strict=True))
+        if options.distinct_rows:
+            pairs = _distinct_return_pairs(pairs)
+        total = len(pairs)
+        sliced_pairs, next_offset = _slice_rows(pairs, options)
+        final_bindings, final_returns = _reindex_pairs(sliced_pairs)
+        return RtgQueryResult(
+            bindings=final_bindings,
+            returns=final_returns,
+            diagnostics=tuple(diagnostics),
+            total_row_count=total,
+            returned_row_count=len(final_returns),
+            next_offset=next_offset,
+        )
 
 
 def _expand_link_requirement(
@@ -130,10 +175,14 @@ def _expand_link_requirement(
     rows: list[RtgQueryBindingRow],
     requirement: RtgQueryLinkRequirement,
 ) -> list[RtgQueryBindingRow]:
+    if not requirement.required:
+        return _expand_optional_link_requirement(graph, options, rows, requirement)
     expanded: list[RtgQueryBindingRow] = []
     for row in rows:
-        source_uuid = row.anchors[requirement.source_bucket]
-        target_uuid = row.anchors[requirement.target_bucket]
+        source_uuid = row.anchors.get(requirement.source_bucket)
+        target_uuid = row.anchors.get(requirement.target_bucket)
+        if source_uuid is None or target_uuid is None:
+            continue
         matches = [
             link
             for link in graph.list_incident_links(source_uuid, "source").links
@@ -152,7 +201,77 @@ def _expand_link_requirement(
                     data_objects=row.data_objects,
                 )
             )
-    return expanded
+    return _dedupe_binding_rows(expanded)
+
+
+def _expand_optional_link_requirement(
+    graph: RtgGraph,
+    options: RtgQueryOptions,
+    rows: list[RtgQueryBindingRow],
+    requirement: RtgQueryLinkRequirement,
+) -> list[RtgQueryBindingRow]:
+    grouped: dict[
+        tuple[tuple[tuple[str, UUID], ...], ...],
+        tuple[RtgQueryBindingRow, list[RtgQueryBindingRow]],
+    ] = {}
+    for row in rows:
+        source_uuid = row.anchors.get(requirement.source_bucket)
+        unbound_anchors = dict(row.anchors)
+        unbound_anchors.pop(requirement.target_bucket, None)
+        unbound = RtgQueryBindingRow(
+            row_index=0,
+            anchors=unbound_anchors,
+            links=row.links,
+            data_objects=row.data_objects,
+        )
+        key = (
+            tuple(sorted(unbound.anchors.items())),
+            tuple(sorted(unbound.links.items())),
+            tuple(sorted(unbound.data_objects.items())),
+        )
+        if key not in grouped:
+            grouped[key] = (unbound, [])
+        if source_uuid is None:
+            continue
+        target_uuid = row.anchors.get(requirement.target_bucket)
+        if target_uuid is None:
+            continue
+        matches = [
+            link
+            for link in graph.list_incident_links(source_uuid, "source").links
+            if link.target_uuid == target_uuid
+            and link.type in requirement.link_type_keys
+            and _matches_live(link, options)
+        ]
+        for link in sorted(matches, key=lambda item: str(item.uuid)):
+            if link.uuid is not None:
+                grouped[key][1].append(
+                    RtgQueryBindingRow(
+                        row_index=0,
+                        anchors=row.anchors,
+                        links={**row.links, requirement.name: link.uuid},
+                        data_objects=row.data_objects,
+                    )
+                )
+    expanded: list[RtgQueryBindingRow] = []
+    for unbound, matches in grouped.values():
+        expanded.extend(matches or [unbound])
+    return _dedupe_binding_rows(expanded)
+
+
+def _dedupe_binding_rows(rows: list[RtgQueryBindingRow]) -> list[RtgQueryBindingRow]:
+    seen: set[tuple[tuple[tuple[str, UUID], ...], ...]] = set()
+    result: list[RtgQueryBindingRow] = []
+    for row in rows:
+        key = (
+            tuple(sorted(row.anchors.items())),
+            tuple(sorted(row.links.items())),
+            tuple(sorted(row.data_objects.items())),
+        )
+        if key not in seen:
+            seen.add(key)
+            result.append(row)
+    return result
 
 
 def _expand_data_requirement(
@@ -163,7 +282,11 @@ def _expand_data_requirement(
 ) -> list[RtgQueryBindingRow]:
     expanded: list[RtgQueryBindingRow] = []
     for row in rows:
-        anchor_uuid = row.anchors[requirement.anchor_bucket]
+        anchor_uuid = row.anchors.get(requirement.anchor_bucket)
+        if anchor_uuid is None:
+            if not requirement.required:
+                expanded.append(row)
+            continue
         matches = [
             data
             for data in graph.list_anchor_data(anchor_uuid).data_objects
@@ -238,9 +361,10 @@ def _return_property_diagnostics(
         resolved_count = 0
         for row in returns:
             returned_properties = row.properties.get(requirement_name)
-            if isinstance(returned_properties, dict) and _resolve_path(
-                returned_properties, path
-            )[0]:
+            if (
+                isinstance(returned_properties, dict)
+                and _resolve_path(returned_properties, path)[0]
+            ):
                 resolved_count += 1
         path_label = ".".join(path)
         if bound_count == 0:
@@ -384,36 +508,7 @@ def _compare_numbers(left: int | float, right: int | float, operator: str) -> bo
 
 
 def _json_equal(left: JsonValue, right: JsonValue) -> bool:
-    """Compare JSON values without Python's Boolean/number equivalence."""
-    if left is None or right is None:
-        return left is None and right is None
-    if isinstance(left, bool) or isinstance(right, bool):
-        return isinstance(left, bool) and isinstance(right, bool) and left == right
-    if isinstance(left, int | float) or isinstance(right, int | float):
-        return (
-            isinstance(left, int | float)
-            and not isinstance(left, bool)
-            and isinstance(right, int | float)
-            and not isinstance(right, bool)
-            and left == right
-        )
-    if isinstance(left, str) or isinstance(right, str):
-        return isinstance(left, str) and isinstance(right, str) and left == right
-    if isinstance(left, list) or isinstance(right, list):
-        return (
-            isinstance(left, list)
-            and isinstance(right, list)
-            and len(left) == len(right)
-            and all(_json_equal(a, b) for a, b in zip(left, right, strict=True))
-        )
-    if isinstance(left, dict) or isinstance(right, dict):
-        return (
-            isinstance(left, dict)
-            and isinstance(right, dict)
-            and left.keys() == right.keys()
-            and all(_json_equal(left[key], right[key]) for key in left)
-        )
-    return False
+    return json_value_equal(left, right)
 
 
 def _regex_matches(actual: JsonValue, predicate: RtgQueryPropertyPredicate) -> bool:
@@ -428,9 +523,7 @@ def _regex_matches(actual: JsonValue, predicate: RtgQueryPropertyPredicate) -> b
         else:
             raise RtgQuerySpecInvalid(f"unsupported regex flag: {flag}")
     pattern = (
-        f"(?{''.join(option_letters)}){predicate.value}"
-        if option_letters
-        else predicate.value
+        f"(?{''.join(option_letters)}){predicate.value}" if option_letters else predicate.value
     )
     try:
         return re2.search(pattern, actual) is not None
@@ -462,9 +555,9 @@ def _assign_nested(target: JsonValue, path: tuple[str, ...], value: JsonValue) -
 def _row_sort_key(row: RtgQueryBindingRow, query_spec: RtgQuerySpec) -> tuple[str, ...]:
     keys: list[str] = []
     for bucket in query_spec.anchor_buckets:
-        keys.append(str(row.anchors[bucket.name]))
+        keys.append(str(row.anchors.get(bucket.name, UUID(int=0))))
     for requirement in query_spec.link_requirements:
-        keys.append(str(row.links[requirement.name]))
+        keys.append(str(row.links.get(requirement.name, UUID(int=0))))
     for requirement in query_spec.data_requirements:
         keys.append(str(row.data_objects.get(requirement.name, UUID(int=0))))
     return tuple(keys)
@@ -514,13 +607,126 @@ def _return_sort_key(row: RtgQueryReturnRow, order: RtgQueryOrderBy) -> tuple[in
     if not found or isinstance(value, bool):
         return (1, "", "")
     if isinstance(value, int | float):
-        return (0, "number", float(value))
+        return (0, "number", json_number_decimal(value))
     if isinstance(value, str):
         return (0, "string", value)
     return (1, "", "")
 
 
+def _distinct_return_pairs(
+    pairs: list[tuple[RtgQueryBindingRow, RtgQueryReturnRow]],
+) -> list[tuple[RtgQueryBindingRow, RtgQueryReturnRow]]:
+    seen: set[str] = set()
+    result: list[tuple[RtgQueryBindingRow, RtgQueryReturnRow]] = []
+    for pair in pairs:
+        returned = pair[1]
+        projection = {
+            "anchors": {key: str(value) for key, value in returned.anchors.items()},
+            "links": {key: str(value) for key, value in returned.links.items()},
+            "data_objects": {key: str(value) for key, value in returned.data_objects.items()},
+            "properties": returned.properties,
+        }
+        key = canonical_json_key(projection)
+        if key not in seen:
+            seen.add(key)
+            result.append(pair)
+    return result
+
+
+def _reindex_pairs(
+    pairs: list[tuple[RtgQueryBindingRow, RtgQueryReturnRow]],
+) -> tuple[tuple[RtgQueryBindingRow, ...], tuple[RtgQueryReturnRow, ...]]:
+    bindings: list[RtgQueryBindingRow] = []
+    returns: list[RtgQueryReturnRow] = []
+    for index, (binding, returned) in enumerate(pairs):
+        bindings.append(
+            RtgQueryBindingRow(
+                row_index=index,
+                anchors=binding.anchors,
+                links=binding.links,
+                data_objects=binding.data_objects,
+            )
+        )
+        returns.append(
+            RtgQueryReturnRow(
+                row_index=index,
+                anchors=returned.anchors,
+                links=returned.links,
+                data_objects=returned.data_objects,
+                properties=returned.properties,
+            )
+        )
+    return tuple(bindings), tuple(returns)
+
+
+def _slice_rows(rows: list[Any], options: RtgQueryOptions) -> tuple[list[Any], int | None]:
+    start = options.offset
+    stop = None if options.limit is None else start + options.limit
+    sliced = rows[start:stop]
+    next_offset = start + len(sliced)
+    return sliced, next_offset if next_offset < len(rows) else None
+
+
+def _aggregate_rows(
+    bindings: tuple[RtgQueryBindingRow, ...],
+    returns: tuple[RtgQueryReturnRow, ...],
+    query_spec: RtgQuerySpec,
+) -> list[JsonObject]:
+    grouped: dict[str, tuple[list[JsonValue], list[set[UUID]]]] = {}
+    aggregations = query_spec.return_spec.aggregations
+    for binding, returned in zip(bindings, returns, strict=True):
+        group_values: list[JsonValue] = []
+        for requirement, path in query_spec.return_spec.group_by:
+            properties = returned.properties.get(requirement)
+            found, value = (
+                _resolve_path(properties, path) if isinstance(properties, dict) else (False, None)
+            )
+            group_values.append(value if found else None)
+        group_key = canonical_json_key(group_values)
+        if group_key not in grouped:
+            grouped[group_key] = (group_values, [set() for _ in aggregations])
+        distinct_sets = grouped[group_key][1]
+        for index, aggregation in enumerate(aggregations):
+            uuid_value = _binding_uuid(binding, aggregation.binding)
+            if uuid_value is not None:
+                distinct_sets[index].add(uuid_value)
+    if not grouped and not query_spec.return_spec.group_by:
+        grouped["[]"] = ([], [set() for _ in aggregations])
+    rows: list[JsonObject] = []
+    for group_key in sorted(grouped):
+        group_values, distinct_sets = grouped[group_key]
+        group_payload: JsonObject = {}
+        for (requirement, path), value in zip(
+            query_spec.return_spec.group_by, group_values, strict=True
+        ):
+            group_payload.setdefault(requirement, {})
+            _assign_nested(group_payload[requirement], path, value)
+        row: JsonObject = {"group_by": group_payload}
+        for aggregation, values in zip(aggregations, distinct_sets, strict=True):
+            row[aggregation.name] = len(values)
+        rows.append(row)
+    return rows
+
+
+def _binding_uuid(row: RtgQueryBindingRow, name: str) -> UUID | None:
+    return row.anchors.get(name) or row.links.get(name) or row.data_objects.get(name)
+
+
 def _validate_options(options: RtgQueryOptions) -> None:
+    if options.limit is not None and (
+        isinstance(options.limit, bool)
+        or not isinstance(options.limit, int)
+        or options.limit <= 0
+    ):
+        raise RtgQuerySpecInvalid("query_options.limit must be a positive integer")
+    if (
+        isinstance(options.offset, bool)
+        or not isinstance(options.offset, int)
+        or options.offset < 0
+    ):
+        raise RtgQuerySpecInvalid("query_options.offset must be a non-negative integer")
+    if not isinstance(options.distinct_rows, bool):
+        raise RtgQuerySpecInvalid("query_options.distinct_rows must be boolean")
     if options.live_filter not in _LIVE_FILTERS:
         raise RtgQuerySpecInvalid(
             f"invalid live_filter: {options.live_filter}",
@@ -575,8 +781,17 @@ def _validate_spec(query_spec: RtgQuerySpec) -> None:
     for bucket in query_spec.anchor_buckets:
         if not bucket.anchor_type_keys:
             raise RtgQuerySpecInvalid(f"anchor bucket {bucket.name!r} has no type keys")
-    _names("link requirement", tuple(item.name for item in query_spec.link_requirements))
-    _names("data requirement", tuple(item.name for item in query_spec.data_requirements))
+    link_names = _names(
+        "link requirement", tuple(item.name for item in query_spec.link_requirements)
+    )
+    data_names = _names(
+        "data requirement", tuple(item.name for item in query_spec.data_requirements)
+    )
+    all_binding_names = (*bucket_names, *link_names, *data_names)
+    if len(set(all_binding_names)) != len(all_binding_names):
+        raise RtgQuerySpecInvalid(
+            "anchor bucket, link requirement, and data requirement names must be globally unique"
+        )
     for link in query_spec.link_requirements:
         if link.source_bucket not in bucket_names or link.target_bucket not in bucket_names:
             raise RtgQuerySpecInvalid(
@@ -589,8 +804,7 @@ def _validate_spec(query_spec: RtgQuerySpec) -> None:
                         "A link requirement references an anchor bucket name that is not defined."
                     ),
                     remedy=(
-                        "Define both endpoint names in query_spec.anchor_buckets before using "
-                        "them."
+                        "Define both endpoint names in query_spec.anchor_buckets before using them."
                     ),
                     minimal_example={
                         "anchor_buckets": [
@@ -660,6 +874,38 @@ def _validate_spec(query_spec: RtgQuerySpec) -> None:
                         guide_topics=("workflow_patterns", "query_examples"),
                     ),
                 )
+    returned_properties = set(query_spec.return_spec.properties)
+    for group_path in query_spec.return_spec.group_by:
+        if group_path not in returned_properties:
+            raise RtgQuerySpecInvalid(
+                "group_by paths must also be listed in return_spec.properties"
+            )
+    binding_names = bucket_names | link_names | data_names
+    aggregation_names = _names(
+        "aggregation",
+        tuple(item.name for item in query_spec.return_spec.aggregations),
+    )
+    reserved_aggregation_names = aggregation_names & {"group_by", "row_index"}
+    if reserved_aggregation_names:
+        raise RtgQuerySpecInvalid(
+            "aggregation names cannot use reserved result fields",
+            diagnostic=rtg_diagnostic(
+                code="query.aggregation.reserved_name",
+                category="query_contract",
+                path="query_spec.return_spec.aggregations.name",
+                problem="Aggregation names would overwrite structural result fields.",
+                remedy="Choose names other than row_index and group_by.",
+                accepted_fields=("non-reserved unique aggregation name",),
+                guide_topics=("query_examples", "tool_call_shapes"),
+            ),
+        )
+    for aggregation in query_spec.return_spec.aggregations:
+        if aggregation.function != "count":
+            raise RtgQuerySpecInvalid("only count aggregation is supported")
+        if aggregation.binding not in binding_names:
+            raise RtgQuerySpecInvalid(f"aggregation {aggregation.name!r} names unknown binding")
+    if query_spec.return_spec.group_by and not aggregation_names:
+        raise RtgQuerySpecInvalid("group_by requires at least one aggregation")
 
 
 def _validate_order_by_against_spec(
@@ -681,9 +927,7 @@ def _validate_order_by_against_spec(
                         "query_spec.return_spec.properties before using it in order_by."
                     ),
                     minimal_example={
-                        "query_spec": {
-                            "return_spec": {"properties": [["facts", ["due"]]]}
-                        },
+                        "query_spec": {"return_spec": {"properties": [["facts", ["due"]]]}},
                         "query_options": {
                             "order_by": [
                                 {

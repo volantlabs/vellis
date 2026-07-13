@@ -2,8 +2,12 @@ from __future__ import annotations
 
 import dataclasses
 import json
+from datetime import date, datetime
 from typing import Any, cast
+from urllib.parse import urlparse
 from uuid import UUID
+
+import re2
 
 from components.rtg.change_validation.protocol import (
     RtgChangeBatch,
@@ -95,9 +99,20 @@ class DeterministicRtgChangeValidator(RtgChangeValidator):
                 _project_batch(graph, schema, constraints, migration, change_batch, tracks)
             )
         except (RtgGraphError, RtgSchemaError, RtgConstraintError, RtgMigrationError) as error:
-            raise RtgValidationInputInvalid(
-                f"selected change section cannot be projected: {error}"
-            ) from error
+            return _report(
+                [
+                    _finding(
+                        _projection_failure_track(error),
+                        "change_projection.failed",
+                        str(error),
+                        suggestion=(
+                            "Repair references or operations that cannot be applied to the "
+                            "current state, then validate the batch again."
+                        ),
+                    ),
+                ],
+                options,
+            )
         post_state_findings: list[RtgValidationFinding] = []
         if "schema_object" in tracks:
             post_state_findings.extend(_validate_current_graph(projected_graph, projected_schema))
@@ -875,10 +890,8 @@ def _validate_constraints(
         payload = constraint.payload
         if isinstance(payload, RtgConstraintQueryPatternPayload):
             try:
-                result = query.execute(
-                    graph, _as_query_spec(payload.query_spec), RtgQueryOptions()
-                )
-            except (RtgValidationInputInvalid, RtgQueryError):
+                result = query.execute(graph, _as_query_spec(payload.query_spec), RtgQueryOptions())
+            except RtgValidationInputInvalid, RtgQueryError:
                 findings.append(_constraint_payload_unevaluable(constraint))
                 continue
             if payload.expectation == "must_match_at_least_one" and not result.bindings:
@@ -900,26 +913,55 @@ def _validate_constraints(
         elif isinstance(payload, RtgConstraintCardinalityPayload):
             try:
                 query_spec = _as_query_spec(payload.query_spec)
-                if payload.counted_binding not in _query_binding_names(query_spec):
+                binding_names = _query_binding_names(query_spec)
+                if payload.counted_binding not in binding_names or any(
+                    name not in binding_names for name in payload.group_by_bindings
+                ):
                     findings.append(_constraint_payload_unevaluable(constraint))
                     continue
                 result = query.execute(graph, query_spec, RtgQueryOptions())
-            except (RtgValidationInputInvalid, RtgQueryError):
+            except RtgValidationInputInvalid, RtgQueryError:
                 findings.append(_constraint_payload_unevaluable(constraint))
                 continue
-            count = sum(
-                1 for row in result.bindings if _binding_present(row, payload.counted_binding)
-            )
-            if (payload.minimum is not None and count < payload.minimum) or (
-                payload.maximum is not None and count > payload.maximum
-            ):
-                findings.append(
-                    _finding(
-                        "constraint_network",
-                        "constraint_network.cardinality_out_of_bounds",
-                        str(constraint.uuid),
+            group_counts: dict[tuple[UUID, ...], int] = {}
+            if payload.group_by_bindings:
+                groups: dict[tuple[UUID, ...], set[UUID]] = {}
+                for row in result.bindings:
+                    group_values = tuple(
+                        value
+                        for name in payload.group_by_bindings
+                        if (value := _binding_uuid(row, name)) is not None
                     )
-                )
+                    if len(group_values) != len(payload.group_by_bindings):
+                        continue
+                    groups.setdefault(group_values, set())
+                    counted = _binding_uuid(row, payload.counted_binding)
+                    if counted is not None:
+                        groups[group_values].add(counted)
+                group_counts = {group: len(values) for group, values in groups.items()}
+            else:
+                counted_values = {
+                    value
+                    for row in result.bindings
+                    if (value := _binding_uuid(row, payload.counted_binding)) is not None
+                }
+                group_counts[()] = len(counted_values)
+            for group, count in group_counts.items():
+                if (payload.minimum is not None and count < payload.minimum) or (
+                    payload.maximum is not None and count > payload.maximum
+                ):
+                    affected = f"{constraint.uuid}:group={','.join(map(str, group))}:count={count}"
+                    findings.append(
+                        _finding(
+                            "constraint_network",
+                            "constraint_network.cardinality_out_of_bounds",
+                            affected,
+                            diagnostic={
+                                "group_bindings": [str(value) for value in group],
+                                "observed_count": count,
+                            },
+                        )
+                    )
     return findings
 
 
@@ -1232,6 +1274,22 @@ def _validate_migration_ids(
 def _value_matches_field(value: object, field: RtgSchemaField) -> bool:
     if not any(_value_satisfies_schema_kind(value, kind) for kind in field.value_kinds):
         return False
+    if field.allowed_values and not any(
+        _canonical_scalar_equal(value, allowed) for allowed in field.allowed_values
+    ):
+        return False
+    if isinstance(value, bool) and (field.minimum is not None or field.maximum is not None):
+        return False
+    if isinstance(value, int | float) and not isinstance(value, bool):
+        if field.minimum is not None and value < field.minimum:
+            return False
+        if field.maximum is not None and value > field.maximum:
+            return False
+    if isinstance(value, str):
+        if field.format is not None and not _matches_string_format(value, field.format):
+            return False
+        if field.pattern is not None and re2.search(field.pattern, value) is None:
+            return False
     if isinstance(value, dict) and "object" in field.value_kinds:
         if set(value).difference(field.properties):
             return False
@@ -1243,6 +1301,52 @@ def _value_matches_field(value: object, field: RtgSchemaField) -> bool:
     if isinstance(value, list) and "list" in field.value_kinds and field.items is not None:
         return all(_value_matches_field(item, field.items) for item in value)
     return True
+
+
+def _canonical_scalar_equal(left: object, right: object) -> bool:
+    if isinstance(left, bool) or isinstance(right, bool):
+        return isinstance(left, bool) and isinstance(right, bool) and left == right
+    if isinstance(left, int | float) or isinstance(right, int | float):
+        return (
+            isinstance(left, int | float)
+            and not isinstance(left, bool)
+            and isinstance(right, int | float)
+            and not isinstance(right, bool)
+            and left == right
+        )
+    return type(left) is type(right) and left == right
+
+
+def _matches_string_format(value: str, format_name: str) -> bool:
+    if format_name == "date":
+        if re2.fullmatch(r"\d{4}-\d{2}-\d{2}", value) is None:
+            return False
+        try:
+            date.fromisoformat(value)
+            return True
+        except ValueError:
+            return False
+    if format_name == "date_time":
+        if (
+            re2.fullmatch(
+                r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})",
+                value,
+            )
+            is None
+        ):
+            return False
+        try:
+            parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+            return parsed.tzinfo is not None
+        except ValueError:
+            return False
+    if format_name == "uri":
+        try:
+            parsed = urlparse(value)
+        except ValueError:
+            return False
+        return bool(parsed.scheme) and not any(character.isspace() for character in value)
+    return False
 
 
 def _value_satisfies_schema_kind(value: object, kind: str) -> bool:
@@ -1383,11 +1487,19 @@ def _finding(
     )
 
 
-def _binding_present(row: object, name: str) -> bool:
+def _projection_failure_track(error: Exception) -> str:
+    if isinstance(error, RtgConstraintError):
+        return "constraint_network"
+    if isinstance(error, RtgMigrationError):
+        return "migration_cutover"
+    return "schema_object"
+
+
+def _binding_uuid(row: object, name: str) -> UUID | None:
     anchors = getattr(row, "anchors", {})
     links = getattr(row, "links", {})
     data_objects = getattr(row, "data_objects", {})
-    return name in anchors or name in links or name in data_objects
+    return anchors.get(name) or links.get(name) or data_objects.get(name)
 
 
 def _as_query_spec(value: object) -> RtgQuerySpec:

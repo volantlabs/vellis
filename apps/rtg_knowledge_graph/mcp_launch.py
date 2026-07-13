@@ -288,10 +288,9 @@ def _state_mode(config: RtgKnowledgeGraphConfig) -> str:
 
 def _find_repository_root(start: Path) -> Path | None:
     for candidate in (start, *start.parents):
-        if (
-            (candidate / "pyproject.toml").is_file()
-            and (candidate / "apps" / "rtg_knowledge_graph").is_dir()
-        ):
+        if (candidate / "pyproject.toml").is_file() and (
+            candidate / "apps" / "rtg_knowledge_graph"
+        ).is_dir():
             return candidate
     return None
 

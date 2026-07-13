@@ -15,8 +15,8 @@ every authored public definition and requirement with this inventory. The comple
 IDs, and concrete evidence nodes into a language-neutral implementation handoff.
 
 The official Java pilot is pinned and qualified for headless syntax, linking, and semantic
-validation. Human and technical acceptance are complete, and textual SysML is the normative design
-authority. `model/migration/cutover-status.json` retains the completed transition record.
+validation. Textual SysML is the normative design authority; Git history retains superseded
+transition material without adding historical status files to the active model tree.
 
 ## Start here
 
@@ -53,7 +53,6 @@ not repair it by editing generated files.
 |---|---|---:|---:|
 | `model/foundation/`, `model/bibliotek/`, `model/vellis/` | Normative SysML design | yes | yes |
 | `model/config/` | Pinned language, profile, library, and validator policy | yes | deliberately |
-| `model/migration/cutover-status.json` | Completed transition evidence, not contract meaning | yes | rarely |
 | `tests/model/fixtures/` | Modeling-pattern fixture validated separately from products | yes | yes |
 | `generated/reference/` | Generated human-readable model views | yes | no |
 | `generated/model/` | Generated parser inventory, conformance objectives, and evidence index | yes | no |

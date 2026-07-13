@@ -81,9 +81,12 @@ def test_migration_replacement_obeys_lifecycle_and_has_no_effect_on_rejection() 
 
     assert migration.get_migration("m1").description == "Lifecycle"
     assert migration.get_migration("m1").status == "draft"
-    assert migration.put_migration(
-        RtgMigrationRecord(migration_id="m1", description="Ready", status="ready")
-    ).status == "ready"
+    assert (
+        migration.put_migration(
+            RtgMigrationRecord(migration_id="m1", description="Ready", status="ready")
+        ).status
+        == "ready"
+    )
 
 
 def test_migration_status_metadata_is_replaced_even_when_empty_or_same_status() -> None:
@@ -151,9 +154,7 @@ def test_migration_snapshot_import_rejects_duplicate_and_malformed_records_atomi
     with pytest.raises(RtgMigrationIdConflict):
         InMemoryRtgMigration.import_snapshot(RtgMigrationSnapshot((record, record)))
 
-    malformed = RtgMigrationSnapshot(
-        cast(tuple[RtgMigrationRecord, ...], (record, object()))
-    )
+    malformed = RtgMigrationSnapshot(cast(tuple[RtgMigrationRecord, ...], (record, object())))
     with pytest.raises(RtgMigrationSnapshotInvalid):
         InMemoryRtgMigration.import_snapshot(malformed)
 

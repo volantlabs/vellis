@@ -41,7 +41,15 @@
   "schema_version": 1,
   "tools": [
     {
-      "description": "Read controller state for MCP-only agents. Returns state_classification (empty|schema_only|populated|has_staged_work|needs_replay), typed starter_schema status and available type keys, live schema summary, live/non-live counts, current migration-store status counts, persisted snapshot paths, ledger count, last ledger/transaction pointers, migration history hints, and recommended_workflows plus recommended_next_steps. Use everyday_life_schema, workflow_patterns, or request_patterns when entering cold.",
+      "annotations": {
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false,
+        "readOnlyHint": true
+      },
+      "audience": "everyday",
+      "description": "Inspect RTG state and workflow guidance; Lane: state_and_discovery; call this before schema-dependent work.",
+      "dry_run_tool": null,
       "failure_envelope": {
         "error": {
           "message": "<message>",
@@ -54,9 +62,12 @@
           "validation_report"
         ]
       },
+      "lane": "state_and_discovery",
+      "ledgers": false,
       "name": "rtg_get_system_state",
       "operation_id": "operation.vellis.rtg_get_system_state",
       "parameters": [],
+      "recommended_predecessors": [],
       "success_envelope": {
         "ok": true,
         "result": "<encoded action result>"
@@ -67,7 +78,15 @@
       ]
     },
     {
-      "description": "Return MCP-accessible usage guidance and complete examples. topic values: everyday_life_schema, schema_design, mcp_bootstrap_checklist, operator_card, workflow_patterns, request_patterns, schema_staging_minimal, tool_call_shapes, live_write, lookup_examples, query_examples, recovery_and_replay, migration_history, migration_abandonment. Everyday Life guidance describes the installed Vellis ontology; generic examples teach RTG operation shapes without silently replacing application schema.",
+      "annotations": {
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false,
+        "readOnlyHint": true
+      },
+      "audience": "everyday",
+      "description": "Read detailed RTG request shapes and workflows; Lane: state_and_discovery; use topic capabilities for the tool map.",
+      "dry_run_tool": null,
       "failure_envelope": {
         "error": {
           "message": "<message>",
@@ -80,6 +99,8 @@
           "validation_report"
         ]
       },
+      "lane": "state_and_discovery",
+      "ledgers": false,
       "name": "rtg_get_usage_guide",
       "operation_id": "operation.vellis.rtg_get_usage_guide",
       "parameters": [
@@ -88,6 +109,7 @@
           "required": true
         }
       ],
+      "recommended_predecessors": [],
       "success_envelope": {
         "ok": true,
         "result": "<encoded action result>"
@@ -98,7 +120,15 @@
       ]
     },
     {
-      "description": "Ergonomic schema staging for agents. Inputs: migration_id, description, schema_definitions[{kind:anchor|data_object|link,type_key,description,payload}], optional retire_live_schema[{kind,type_key}], validation_mode. Generates candidate UUIDs, sets system.live=false, fills schema_make_live/schema_make_non_live, submits the canonical rtg_stage_knowledge_changes payload, and returns that payload. Use after schema_bootstrap or schema_evolution workflow planning; next call is usually rtg_apply_migration_cutover.",
+      "annotations": {
+        "destructiveHint": true,
+        "idempotentHint": false,
+        "openWorldHint": false,
+        "readOnlyHint": false
+      },
+      "audience": "advanced",
+      "description": "Stage an ergonomic schema migration; Lane: knowledge_engineering; inspect current schema and obtain approval first.",
+      "dry_run_tool": null,
       "failure_envelope": {
         "error": {
           "message": "<message>",
@@ -111,6 +141,8 @@
           "validation_report"
         ]
       },
+      "lane": "knowledge_engineering",
+      "ledgers": true,
       "name": "rtg_stage_schema_migration",
       "operation_id": "operation.vellis.rtg_stage_schema_migration",
       "parameters": [
@@ -134,7 +166,15 @@
           "default": "strict",
           "name": "validation_mode",
           "required": false
+        },
+        {
+          "name": "response_options",
+          "required": false
         }
+      ],
+      "recommended_predecessors": [
+        "rtg_get_system_state",
+        "rtg_get_schema_pack"
       ],
       "success_envelope": {
         "ok": true,
@@ -146,7 +186,15 @@
       ]
     },
     {
-      "description": "Validate ergonomic live anchor records without mutating or ledgering. Inputs: anchor_records[{ref,type,display_name?,system?,facts:[{ref?,type,properties,system?}]}], optional link_writes, optional validation_options{tracks,finding_limit}. Compiles to canonical graph_changes and returns submitted_graph_changes plus validation result.",
+      "annotations": {
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false,
+        "readOnlyHint": true
+      },
+      "audience": "everyday",
+      "description": "Dry-run ergonomic anchor records without mutation or ledgering; Lane: live_graph.",
+      "dry_run_tool": null,
       "failure_envelope": {
         "error": {
           "message": "<message>",
@@ -159,6 +207,8 @@
           "validation_report"
         ]
       },
+      "lane": "live_graph",
+      "ledgers": false,
       "name": "rtg_validate_live_anchor_records",
       "operation_id": "operation.vellis.rtg_validate_live_anchor_records",
       "parameters": [
@@ -175,6 +225,7 @@
           "required": false
         }
       ],
+      "recommended_predecessors": [],
       "success_envelope": {
         "ok": true,
         "result": "<encoded action result>"
@@ -185,7 +236,15 @@
       ]
     },
     {
-      "description": "Apply ergonomic live anchor records after schema exists. Inputs: anchor_records[{ref,type,display_name?,system?,facts:[{ref?,type,properties,system?}]}], optional link_writes, validation_mode(strict|skip). Compiles to canonical graph_changes and returns submitted_graph_changes plus the underlying operation result.",
+      "annotations": {
+        "destructiveHint": true,
+        "idempotentHint": false,
+        "openWorldHint": false,
+        "readOnlyHint": false
+      },
+      "audience": "everyday",
+      "description": "Apply ergonomic anchor records to live state; Lane: live_graph; discover schema first.",
+      "dry_run_tool": "rtg_validate_live_anchor_records",
       "failure_envelope": {
         "error": {
           "message": "<message>",
@@ -198,6 +257,8 @@
           "validation_report"
         ]
       },
+      "lane": "live_graph",
+      "ledgers": true,
       "name": "rtg_apply_live_anchor_records",
       "operation_id": "operation.vellis.rtg_apply_live_anchor_records",
       "parameters": [
@@ -213,7 +274,14 @@
           "default": "strict",
           "name": "validation_mode",
           "required": false
+        },
+        {
+          "name": "response_options",
+          "required": false
         }
+      ],
+      "recommended_predecessors": [
+        "rtg_validate_live_anchor_records"
       ],
       "success_envelope": {
         "ok": true,
@@ -225,7 +293,15 @@
       ]
     },
     {
-      "description": "Validate normal live graph CRUD without mutating or ledgering it. Inputs: graph_changes with the same shape as rtg_apply_live_graph_changes and optional validation_options{tracks,finding_limit}. Do not pass validation_options.mode; mutation tools use validation_mode. Resolves local_ref values exactly like a real write, returns generated_ids, resolved_graph_changes, and validation_report, and leaves graph state and the controller ledger unchanged. Use before risky imports, safe_update, or validation_error_recovery probes.",
+      "annotations": {
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false,
+        "readOnlyHint": true
+      },
+      "audience": "everyday",
+      "description": "Dry-run normalized live graph changes without mutation or ledgering; Lane: live_graph.",
+      "dry_run_tool": null,
       "failure_envelope": {
         "error": {
           "message": "<message>",
@@ -238,6 +314,8 @@
           "validation_report"
         ]
       },
+      "lane": "live_graph",
+      "ledgers": false,
       "name": "rtg_validate_live_graph_changes",
       "operation_id": "operation.vellis.rtg_validate_live_graph_changes",
       "parameters": [
@@ -250,6 +328,7 @@
           "required": false
         }
       ],
+      "recommended_predecessors": [],
       "success_envelope": {
         "ok": true,
         "result": "<encoded action result>"
@@ -260,7 +339,15 @@
       ]
     },
     {
-      "description": "Apply normal live graph CRUD only. Use this after the live schema exists. graph_changes keys: anchor_writes[{ref:{local_ref|resource_id}, type, display_name?, system?}], data_object_writes[{ref, type, properties, anchor_refs:[ref], system?}], link_writes[{ref, type, source_ref, target_ref, system?}], associate_data[{anchor_ref,data_ref}], dissociate_data, delete_anchors, delete_data_objects, delete_links, set_live[{object_ref,live}]. Link writes require existing or same-request endpoint anchors and a live link schema allowing their types. local_ref is request-local only; use resource_id values returned by earlier calls for existing objects. Strict invalid writes return validation_report findings. Rejects schema, constraint, migration, and non-live candidate work.",
+      "annotations": {
+        "destructiveHint": true,
+        "idempotentHint": false,
+        "openWorldHint": false,
+        "readOnlyHint": false
+      },
+      "audience": "everyday",
+      "description": "Apply normalized live graph changes; Lane: live_graph; use the validation predecessor for risky writes.",
+      "dry_run_tool": "rtg_validate_live_graph_changes",
       "failure_envelope": {
         "error": {
           "message": "<message>",
@@ -273,6 +360,8 @@
           "validation_report"
         ]
       },
+      "lane": "live_graph",
+      "ledgers": true,
       "name": "rtg_apply_live_graph_changes",
       "operation_id": "operation.vellis.rtg_apply_live_graph_changes",
       "parameters": [
@@ -286,6 +375,9 @@
           "required": false
         }
       ],
+      "recommended_predecessors": [
+        "rtg_validate_live_graph_changes"
+      ],
       "success_envelope": {
         "ok": true,
         "result": "<encoded action result>"
@@ -296,7 +388,15 @@
       ]
     },
     {
-      "description": "Advanced normalized-batch staging for migration-scoped knowledge-engineering changes. For ordinary schema bootstrap/evolution, prefer rtg_stage_schema_migration because it generates candidate UUIDs and migration membership. knowledge_changes is a change batch with schema_changes, constraint_changes, migration_changes, and optional non-live graph_changes. Schema writes use schema_changes.definition_writes[{ref, definition:{uuid?, kind: anchor|data_object|link, type_key, description, payload, system:{live:false}}}], where anchor payload uses required_data_types/optional_data_types, data_object payload uses properties:{field:{required,value_kinds,properties?,items?}}, and link payload uses allowed_source_types/allowed_target_types. Constraint writes use constraint_changes.constraint_writes[{ref,constraint:{uuid?, kind: query_pattern|cardinality, target_type_keys, display_name, description, payload, system:{live:false}}}], where query_pattern payload uses query_spec+expectation and cardinality payload uses query_spec+counted_binding+minimum/maximum. Migration writes use migration_changes.migration_writes[{ref, migration:{migration_id, description, status:ready, schema_make_live?, schema_make_non_live?, graph_make_live?, constraint_make_live?}}]. New candidates must be referenced by a migration record in the same request. For non-live graph_changes, graph_make_live must include every candidate anchor, data object, and link UUID. Strict staging validates the projected migration cutover; use validation_mode:skip only for controlled recovery or intentionally invalid cutover tests.",
+      "annotations": {
+        "destructiveHint": true,
+        "idempotentHint": false,
+        "openWorldHint": false,
+        "readOnlyHint": false
+      },
+      "audience": "advanced",
+      "description": "Stage an advanced normalized knowledge batch; Lane: knowledge_engineering; prefer ergonomic staging for ordinary schema work.",
+      "dry_run_tool": null,
       "failure_envelope": {
         "error": {
           "message": "<message>",
@@ -309,6 +409,8 @@
           "validation_report"
         ]
       },
+      "lane": "knowledge_engineering",
+      "ledgers": true,
       "name": "rtg_stage_knowledge_changes",
       "operation_id": "operation.vellis.rtg_stage_knowledge_changes",
       "parameters": [
@@ -322,6 +424,10 @@
           "required": false
         }
       ],
+      "recommended_predecessors": [
+        "rtg_get_system_state",
+        "rtg_validate_graph"
+      ],
       "success_envelope": {
         "ok": true,
         "result": "<encoded action result>"
@@ -332,7 +438,15 @@
       ]
     },
     {
-      "description": "Apply an explicit migration cutover. The migration record decides which staged schema, constraint, or graph candidates become live and which records retire. Use after rtg_stage_knowledge_changes returns ok:true. cutover_options keys: validation_mode (strict|skip, default strict), prune_retired (default true), failure_restore (only restore_pre_cutover_snapshot in v1). Strict cutover returns validation_report findings, restores or preserves the previous live state on blocking failures, and marks the migration failed so replay can reproduce that status.",
+      "annotations": {
+        "destructiveHint": true,
+        "idempotentHint": false,
+        "openWorldHint": false,
+        "readOnlyHint": false
+      },
+      "audience": "advanced",
+      "description": "Apply a staged migration atomically; Lane: migration; validate the projected state first.",
+      "dry_run_tool": null,
       "failure_envelope": {
         "error": {
           "message": "<message>",
@@ -345,6 +459,8 @@
           "validation_report"
         ]
       },
+      "lane": "migration",
+      "ledgers": true,
       "name": "rtg_apply_migration_cutover",
       "operation_id": "operation.vellis.rtg_apply_migration_cutover",
       "parameters": [
@@ -357,6 +473,10 @@
           "required": false
         }
       ],
+      "recommended_predecessors": [
+        "rtg_get_migration",
+        "rtg_validate_graph"
+      ],
       "success_envelope": {
         "ok": true,
         "result": "<encoded action result>"
@@ -367,7 +487,15 @@
       ]
     },
     {
-      "description": "Abandon draft/ready/failed staged work and prune safe non-live make-live candidates. Never deletes live records or make-non-live targets. Use when exploratory schema, constraint, or non-live graph candidates should not proceed.",
+      "annotations": {
+        "destructiveHint": true,
+        "idempotentHint": false,
+        "openWorldHint": false,
+        "readOnlyHint": false
+      },
+      "audience": "advanced",
+      "description": "Abandon staged migration work and prune safe non-live candidates; Lane: migration.",
+      "dry_run_tool": null,
       "failure_envelope": {
         "error": {
           "message": "<message>",
@@ -380,6 +508,8 @@
           "validation_report"
         ]
       },
+      "lane": "migration",
+      "ledgers": true,
       "name": "rtg_abandon_migration",
       "operation_id": "operation.vellis.rtg_abandon_migration",
       "parameters": [
@@ -392,6 +522,9 @@
           "required": false
         }
       ],
+      "recommended_predecessors": [
+        "rtg_get_migration"
+      ],
       "success_envelope": {
         "ok": true,
         "result": "<encoded action result>"
@@ -402,7 +535,15 @@
       ]
     },
     {
-      "description": "Execute a read-only RTG query. query_spec keys: anchor_buckets[{name, anchor_type_keys}], link_requirements[{name, source_bucket, target_bucket, link_type_keys}], data_requirements[{name, anchor_bucket, data_type_key, required?, predicates:[{path:[property,...], operator, value?, values?, case_sensitive?, regex_flags?}]}], return_spec:{anchor_buckets?, link_requirements?, data_requirements?, properties:[[data_requirement_name,[property,...]]]}. Operators: exists, equals, not_equals, lt, lte, gt, gte, contains, in, substring, regex. query_options keys: live_filter(all|live|non_live), live_status_overlay, order_by[{data_requirement,path,direction:ascending|descending}]. order_by may only reference paths listed in return_spec.properties. Optional response_options supports format:full or properties_only.",
+      "annotations": {
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false,
+        "readOnlyHint": true
+      },
+      "audience": "everyday",
+      "description": "Execute a read-only RTG query; Lane: query; detailed grammar and examples are in usage guides.",
+      "dry_run_tool": null,
       "failure_envelope": {
         "error": {
           "message": "<message>",
@@ -415,6 +556,8 @@
           "validation_report"
         ]
       },
+      "lane": "query",
+      "ledgers": false,
       "name": "rtg_execute_query",
       "operation_id": "operation.vellis.rtg_execute_query",
       "parameters": [
@@ -431,6 +574,7 @@
           "required": false
         }
       ],
+      "recommended_predecessors": [],
       "success_envelope": {
         "ok": true,
         "result": "<encoded action result>"
@@ -441,7 +585,15 @@
       ]
     },
     {
-      "description": "Resolve live anchor UUIDs through the canonical query contract. Inputs: anchor_type, data_type, property_path, value, optional case_sensitive. Compiles to rtg_execute_query and returns match_count, matches[{resource_id, properties}], submitted_query, and guidance for zero or multiple matches.",
+      "annotations": {
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false,
+        "readOnlyHint": true
+      },
+      "audience": "everyday",
+      "description": "Resolve zero, one, or multiple live anchors by typed fact; Lane: query; never guess among multiple matches.",
+      "dry_run_tool": null,
       "failure_envelope": {
         "error": {
           "message": "<message>",
@@ -454,6 +606,8 @@
           "validation_report"
         ]
       },
+      "lane": "query",
+      "ledgers": false,
       "name": "rtg_resolve_anchor_by_fact",
       "operation_id": "operation.vellis.rtg_resolve_anchor_by_fact",
       "parameters": [
@@ -479,6 +633,7 @@
           "required": false
         }
       ],
+      "recommended_predecessors": [],
       "success_envelope": {
         "ok": true,
         "result": "<encoded action result>"
@@ -489,7 +644,15 @@
       ]
     },
     {
-      "description": "Read one RTG graph object by UUID.",
+      "annotations": {
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false,
+        "readOnlyHint": true
+      },
+      "audience": "everyday",
+      "description": "Read one RTG graph object by UUID; Lane: state_and_discovery.",
+      "dry_run_tool": null,
       "failure_envelope": {
         "error": {
           "message": "<message>",
@@ -502,6 +665,8 @@
           "validation_report"
         ]
       },
+      "lane": "state_and_discovery",
+      "ledgers": false,
       "name": "rtg_get_object",
       "operation_id": "operation.vellis.rtg_get_object",
       "parameters": [
@@ -510,6 +675,7 @@
           "required": true
         }
       ],
+      "recommended_predecessors": [],
       "success_envelope": {
         "ok": true,
         "result": "<encoded action result>"
@@ -520,7 +686,15 @@
       ]
     },
     {
-      "description": "List RTG migration records, optionally filtered by status.",
+      "annotations": {
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false,
+        "readOnlyHint": true
+      },
+      "audience": "everyday",
+      "description": "List current migration-store records; Lane: migration; use history for pruned or rejected work.",
+      "dry_run_tool": null,
       "failure_envelope": {
         "error": {
           "message": "<message>",
@@ -533,6 +707,8 @@
           "validation_report"
         ]
       },
+      "lane": "migration",
+      "ledgers": false,
       "name": "rtg_list_migrations",
       "operation_id": "operation.vellis.rtg_list_migrations",
       "parameters": [
@@ -541,6 +717,7 @@
           "required": false
         }
       ],
+      "recommended_predecessors": [],
       "success_envelope": {
         "ok": true,
         "result": "<encoded action result>"
@@ -551,7 +728,15 @@
       ]
     },
     {
-      "description": "Read one RTG migration record by ID.",
+      "annotations": {
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false,
+        "readOnlyHint": true
+      },
+      "audience": "everyday",
+      "description": "Read one current migration-store record by ID; Lane: migration.",
+      "dry_run_tool": null,
       "failure_envelope": {
         "error": {
           "message": "<message>",
@@ -564,6 +749,8 @@
           "validation_report"
         ]
       },
+      "lane": "migration",
+      "ledgers": false,
       "name": "rtg_get_migration",
       "operation_id": "operation.vellis.rtg_get_migration",
       "parameters": [
@@ -572,6 +759,7 @@
           "required": true
         }
       ],
+      "recommended_predecessors": [],
       "success_envelope": {
         "ok": true,
         "result": "<encoded action result>"
@@ -582,7 +770,15 @@
       ]
     },
     {
-      "description": "Validate current or migration-projected RTG state without mutation. Use rtg_validate_graph({}) as the first MCP smoke check. Pass migration_ids to validate a staged cutover projection. validation_options keys: tracks (all or list), finding_limit (positive integer).",
+      "annotations": {
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false,
+        "readOnlyHint": true
+      },
+      "audience": "everyday",
+      "description": "Validate current or migration-projected RTG state without mutation; Lane: live_graph.",
+      "dry_run_tool": null,
       "failure_envelope": {
         "error": {
           "message": "<message>",
@@ -595,6 +791,8 @@
           "validation_report"
         ]
       },
+      "lane": "live_graph",
+      "ledgers": false,
       "name": "rtg_validate_graph",
       "operation_id": "operation.vellis.rtg_validate_graph",
       "parameters": [
@@ -607,6 +805,7 @@
           "required": false
         }
       ],
+      "recommended_predecessors": [],
       "success_envelope": {
         "ok": true,
         "result": "<encoded action result>"
@@ -617,7 +816,15 @@
       ]
     },
     {
-      "description": "Return live anchor type keys and descriptions for discovery. discovery_options keys: include_non_live, limit (positive integer). Use before guessing anchor_type_keys.",
+      "annotations": {
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false,
+        "readOnlyHint": true
+      },
+      "audience": "everyday",
+      "description": "Discover anchor types and live counts; Lane: state_and_discovery; use before guessing type keys.",
+      "dry_run_tool": null,
       "failure_envelope": {
         "error": {
           "message": "<message>",
@@ -630,6 +837,8 @@
           "validation_report"
         ]
       },
+      "lane": "state_and_discovery",
+      "ledgers": false,
       "name": "rtg_discover_anchor_types",
       "operation_id": "operation.vellis.rtg_discover_anchor_types",
       "parameters": [
@@ -638,6 +847,7 @@
           "required": false
         }
       ],
+      "recommended_predecessors": [],
       "success_envelope": {
         "ok": true,
         "result": "<encoded action result>"
@@ -648,7 +858,15 @@
       ]
     },
     {
-      "description": "Return schema details and optional live counts for anchor types. Provide anchor_type_keys. schema_pack_options keys: live (true, false, or null), include_live_counts. Use this before writing data_object_writes or query data_requirements so required data types and property names are known.",
+      "annotations": {
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false,
+        "readOnlyHint": true
+      },
+      "audience": "everyday",
+      "description": "Read schema details for selected anchor types; Lane: state_and_discovery; use before writes.",
+      "dry_run_tool": null,
       "failure_envelope": {
         "error": {
           "message": "<message>",
@@ -661,6 +879,8 @@
           "validation_report"
         ]
       },
+      "lane": "state_and_discovery",
+      "ledgers": false,
       "name": "rtg_get_schema_pack",
       "operation_id": "operation.vellis.rtg_get_schema_pack",
       "parameters": [
@@ -673,6 +893,7 @@
           "required": false
         }
       ],
+      "recommended_predecessors": [],
       "success_envelope": {
         "ok": true,
         "result": "<encoded action result>"
@@ -683,7 +904,15 @@
       ]
     },
     {
-      "description": "Export a coordinated JSON-safe RTG system snapshot for graph, schema, constraints, migration state, and ledger position. Pass summary:true for compact counts and ledger pointers instead of the full graph payload.",
+      "annotations": {
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false,
+        "readOnlyHint": true
+      },
+      "audience": "everyday",
+      "description": "Export current coordinated RTG state or a compact summary; Lane: recovery_and_audit.",
+      "dry_run_tool": null,
       "failure_envelope": {
         "error": {
           "message": "<message>",
@@ -696,6 +925,8 @@
           "validation_report"
         ]
       },
+      "lane": "recovery_and_audit",
+      "ledgers": false,
       "name": "rtg_export_system_snapshot",
       "operation_id": "operation.vellis.rtg_export_system_snapshot",
       "parameters": [
@@ -705,6 +936,7 @@
           "required": false
         }
       ],
+      "recommended_predecessors": [],
       "success_envelope": {
         "ok": true,
         "result": "<encoded action result>"
@@ -715,7 +947,15 @@
       ]
     },
     {
-      "description": "Persist a coordinated system snapshot through JSON File Storage at relative_path. Pass return_snapshot:false to omit the full snapshot payload and return compact summary metadata.",
+      "annotations": {
+        "destructiveHint": true,
+        "idempotentHint": false,
+        "openWorldHint": false,
+        "readOnlyHint": false
+      },
+      "audience": "everyday",
+      "description": "Persist a coordinated RTG snapshot; Lane: recovery_and_audit; this records an administrative ledger event.",
+      "dry_run_tool": null,
       "failure_envelope": {
         "error": {
           "message": "<message>",
@@ -728,6 +968,8 @@
           "validation_report"
         ]
       },
+      "lane": "recovery_and_audit",
+      "ledgers": true,
       "name": "rtg_persist_system_snapshot",
       "operation_id": "operation.vellis.rtg_persist_system_snapshot",
       "parameters": [
@@ -741,6 +983,7 @@
           "required": false
         }
       ],
+      "recommended_predecessors": [],
       "success_envelope": {
         "ok": true,
         "result": "<encoded action result>"
@@ -751,7 +994,15 @@
       ]
     },
     {
-      "description": "List persisted system snapshots visible through JSON File Storage. Does not expose arbitrary filesystem access.",
+      "annotations": {
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false,
+        "readOnlyHint": true
+      },
+      "audience": "everyday",
+      "description": "List RTG snapshots visible through configured storage; Lane: recovery_and_audit.",
+      "dry_run_tool": null,
       "failure_envelope": {
         "error": {
           "message": "<message>",
@@ -764,9 +1015,12 @@
           "validation_report"
         ]
       },
+      "lane": "recovery_and_audit",
+      "ledgers": false,
       "name": "rtg_list_persisted_snapshots",
       "operation_id": "operation.vellis.rtg_list_persisted_snapshots",
       "parameters": [],
+      "recommended_predecessors": [],
       "success_envelope": {
         "ok": true,
         "result": "<encoded action result>"
@@ -777,7 +1031,15 @@
       ]
     },
     {
-      "description": "Load one persisted system snapshot by relative JSON File Storage path. Use the returned snapshot with rtg_restore_from_snapshot or rtg_replay_ledger start_snapshot. Pass return_snapshot:false to return only relative_path and compact summary.",
+      "annotations": {
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false,
+        "readOnlyHint": true
+      },
+      "audience": "everyday",
+      "description": "Load one persisted RTG snapshot without restoring it; Lane: recovery_and_audit.",
+      "dry_run_tool": null,
       "failure_envelope": {
         "error": {
           "message": "<message>",
@@ -790,6 +1052,8 @@
           "validation_report"
         ]
       },
+      "lane": "recovery_and_audit",
+      "ledgers": false,
       "name": "rtg_load_persisted_snapshot",
       "operation_id": "operation.vellis.rtg_load_persisted_snapshot",
       "parameters": [
@@ -803,6 +1067,7 @@
           "required": false
         }
       ],
+      "recommended_predecessors": [],
       "success_envelope": {
         "ok": true,
         "result": "<encoded action result>"
@@ -813,7 +1078,15 @@
       ]
     },
     {
-      "description": "Replay mutating controller ledger requests into an empty or snapshot-seeded controller. replay_options keys: start_snapshot, start_snapshot_path, after_ledger_position, through_ledger_position. Ordinary startup replays automatically; this explicit surface supports controlled recovery, audits, and manual-recovery evaluation.",
+      "annotations": {
+        "destructiveHint": true,
+        "idempotentHint": false,
+        "openWorldHint": false,
+        "readOnlyHint": false
+      },
+      "audience": "operator",
+      "description": "Replay eligible mutations into empty or snapshot-seeded state; Lane: recovery_and_audit; operator use.",
+      "dry_run_tool": null,
       "failure_envelope": {
         "error": {
           "message": "<message>",
@@ -826,6 +1099,8 @@
           "validation_report"
         ]
       },
+      "lane": "recovery_and_audit",
+      "ledgers": false,
       "name": "rtg_replay_ledger",
       "operation_id": "operation.vellis.rtg_replay_ledger",
       "parameters": [
@@ -834,36 +1109,8 @@
           "required": false
         }
       ],
-      "success_envelope": {
-        "ok": true,
-        "result": "<encoded action result>"
-      },
-      "transports": [
-        "stdio",
-        "http"
-      ]
-    },
-    {
-      "description": "Replay mutating controller ledger requests into isolated scratch state and restore the current state before returning. Accepts the same replay_options as rtg_replay_ledger, including start_snapshot_path. Returns pre/post summaries, count diffs, replay counts, and validation result without appending ledger entries.",
-      "failure_envelope": {
-        "error": {
-          "message": "<message>",
-          "type": "<failure type>"
-        },
-        "ok": false,
-        "optional": [
-          "error.diagnostic",
-          "transaction_id",
-          "validation_report"
-        ]
-      },
-      "name": "rtg_verify_replay_from_ledger",
-      "operation_id": "operation.vellis.rtg_verify_replay_from_ledger",
-      "parameters": [
-        {
-          "name": "replay_options",
-          "required": false
-        }
+      "recommended_predecessors": [
+        "rtg_get_system_state"
       ],
       "success_envelope": {
         "ok": true,
@@ -875,7 +1122,15 @@
       ]
     },
     {
-      "description": "Return ledger-backed migration audit events, including staged, cutover_applied, cutover_failed, and abandoned events. Applied migrations may be absent from the live migration store but remain visible here.",
+      "annotations": {
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false,
+        "readOnlyHint": true
+      },
+      "audience": "everyday",
+      "description": "Verify replay in isolated scratch state and restore live state exactly; Lane: recovery_and_audit.",
+      "dry_run_tool": null,
       "failure_envelope": {
         "error": {
           "message": "<message>",
@@ -888,9 +1143,54 @@
           "validation_report"
         ]
       },
+      "lane": "recovery_and_audit",
+      "ledgers": false,
+      "name": "rtg_verify_replay_from_ledger",
+      "operation_id": "operation.vellis.rtg_verify_replay_from_ledger",
+      "parameters": [
+        {
+          "name": "replay_options",
+          "required": false
+        }
+      ],
+      "recommended_predecessors": [],
+      "success_envelope": {
+        "ok": true,
+        "result": "<encoded action result>"
+      },
+      "transports": [
+        "stdio",
+        "http"
+      ]
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false,
+        "readOnlyHint": true
+      },
+      "audience": "everyday",
+      "description": "Read ledger-projected migration events, including rejected proposals; Lane: migration.",
+      "dry_run_tool": null,
+      "failure_envelope": {
+        "error": {
+          "message": "<message>",
+          "type": "<failure type>"
+        },
+        "ok": false,
+        "optional": [
+          "error.diagnostic",
+          "transaction_id",
+          "validation_report"
+        ]
+      },
+      "lane": "migration",
+      "ledgers": false,
       "name": "rtg_list_migration_history",
       "operation_id": "operation.vellis.rtg_list_migration_history",
       "parameters": [],
+      "recommended_predecessors": [],
       "success_envelope": {
         "ok": true,
         "result": "<encoded action result>"
@@ -901,7 +1201,15 @@
       ]
     },
     {
-      "description": "Flush queued controller ledger failures to SQL storage.",
+      "annotations": {
+        "destructiveHint": true,
+        "idempotentHint": false,
+        "openWorldHint": false,
+        "readOnlyHint": false
+      },
+      "audience": "operator",
+      "description": "Retry queued controller ledger writes; Lane: recovery_and_audit; operator use.",
+      "dry_run_tool": null,
       "failure_envelope": {
         "error": {
           "message": "<message>",
@@ -914,9 +1222,14 @@
           "validation_report"
         ]
       },
+      "lane": "recovery_and_audit",
+      "ledgers": false,
       "name": "rtg_flush_ledger_failures",
       "operation_id": "operation.vellis.rtg_flush_ledger_failures",
       "parameters": [],
+      "recommended_predecessors": [
+        "rtg_get_system_state"
+      ],
       "success_envelope": {
         "ok": true,
         "result": "<encoded action result>"
@@ -927,7 +1240,15 @@
       ]
     },
     {
-      "description": "Restore RTG state from a supplied system snapshot. restore_options keys: ledger_mode(record|skip). Use with rtg_export_system_snapshot or a persisted snapshot payload.",
+      "annotations": {
+        "destructiveHint": true,
+        "idempotentHint": false,
+        "openWorldHint": false,
+        "readOnlyHint": false
+      },
+      "audience": "operator",
+      "description": "Restore coordinated RTG state from a supplied snapshot; Lane: recovery_and_audit; operator use.",
+      "dry_run_tool": null,
       "failure_envelope": {
         "error": {
           "message": "<message>",
@@ -940,6 +1261,8 @@
           "validation_report"
         ]
       },
+      "lane": "recovery_and_audit",
+      "ledgers": true,
       "name": "rtg_restore_from_snapshot",
       "operation_id": "operation.vellis.rtg_restore_from_snapshot",
       "parameters": [
@@ -951,6 +1274,9 @@
           "name": "restore_options",
           "required": false
         }
+      ],
+      "recommended_predecessors": [
+        "rtg_load_persisted_snapshot"
       ],
       "success_envelope": {
         "ok": true,

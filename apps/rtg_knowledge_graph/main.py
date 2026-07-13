@@ -185,8 +185,7 @@ def _run_command(args: argparse.Namespace, config: RtgKnowledgeGraphConfig) -> i
         else:
             if result.client == "generic-json":
                 print(
-                    f"\nAdd the complete MCP configuration at {result.registration} "
-                    "to your client."
+                    f"\nAdd the complete MCP configuration at {result.registration} to your client."
                 )
             print("\nVellis is ready. Restart or reload your MCP client, then say:\n")
             print(f'  "{result.first_prompt}"')
@@ -290,8 +289,10 @@ def _codex_mcp_add_command(client_config: object) -> str:
     else:
         executable = raw_server.get("command")
         args = raw_server.get("args")
-        if not isinstance(executable, str) or not isinstance(args, list) or not all(
-            isinstance(value, str) for value in args
+        if (
+            not isinstance(executable, str)
+            or not isinstance(args, list)
+            or not all(isinstance(value, str) for value in args)
         ):
             raise ValueError("stdio MCP server configuration has an invalid command or arguments")
         command = ["codex", "mcp", "add", server_name, "--", executable, *args]

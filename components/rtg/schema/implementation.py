@@ -2,10 +2,16 @@ from __future__ import annotations
 
 import copy
 import json
+import math
+from decimal import Decimal
+from typing import cast
 from uuid import UUID, uuid4
+
+import re2
 
 from components.rtg.schema.protocol import (
     JsonObject,
+    JsonScalar,
     JsonValue,
     RtgAnchorSchemaPayload,
     RtgDataObjectSchemaPayload,
@@ -395,12 +401,118 @@ def _normalize_field(field: RtgSchemaField) -> RtgSchemaField:
             raise RtgSchemaPayloadInvalid("nested property names must be non-empty strings")
         properties[name] = _normalize_field(nested)
     items = _normalize_field(field.items) if field.items is not None else None
+    allowed_values = _normalize_allowed_values(field.allowed_values, field.value_kinds)
+    if field.format is not None:
+        if field.format not in {"date", "date_time", "uri"}:
+            raise RtgSchemaPayloadInvalid(f"unsupported field format: {field.format}")
+        if "string" not in field.value_kinds:
+            raise RtgSchemaPayloadInvalid("field.format requires string in value_kinds")
+    if field.minimum is not None or field.maximum is not None:
+        if not ({"integer", "number"} & set(field.value_kinds)):
+            raise RtgSchemaPayloadInvalid(
+                "field minimum/maximum requires integer or number in value_kinds"
+            )
+        for label, bound in (("minimum", field.minimum), ("maximum", field.maximum)):
+            if isinstance(bound, bool) or (
+                bound is not None
+                and (not isinstance(bound, int | float) or not math.isfinite(bound))
+            ):
+                raise RtgSchemaPayloadInvalid(f"field.{label} must be a finite number")
+        if (
+            field.minimum is not None
+            and field.maximum is not None
+            and field.minimum > field.maximum
+        ):
+            raise RtgSchemaPayloadInvalid("field.minimum may not exceed field.maximum")
+    if field.pattern is not None:
+        if not isinstance(field.pattern, str):
+            raise RtgSchemaPayloadInvalid("field.pattern must be a string")
+        if "string" not in field.value_kinds:
+            raise RtgSchemaPayloadInvalid("field.pattern requires string in value_kinds")
+        try:
+            re2.compile(field.pattern)
+        except Exception as error:
+            raise RtgSchemaPayloadInvalid(f"invalid RE2 field.pattern: {error}") from error
     return RtgSchemaField(
         required=field.required,
         value_kinds=tuple(sorted(field.value_kinds, key=_VALUE_KIND_ORDER.__getitem__)),
         properties={name: properties[name] for name in sorted(properties)},
         items=items,
+        allowed_values=allowed_values,
+        format=field.format,
+        minimum=field.minimum,
+        maximum=field.maximum,
+        pattern=field.pattern,
     )
+
+
+def _normalize_allowed_values(
+    values: tuple[object, ...], value_kinds: tuple[str, ...]
+) -> tuple[JsonScalar, ...]:
+    if not isinstance(values, tuple):
+        raise RtgSchemaPayloadInvalid("field.allowed_values must be a tuple")
+    normalized: list[JsonScalar] = []
+    seen: set[str] = set()
+    for value in values:
+        if not (value is None or isinstance(value, str | int | float | bool)):
+            raise RtgSchemaPayloadInvalid("field.allowed_values must contain JSON scalars")
+        if not any(_scalar_matches_kind(value, kind) for kind in value_kinds):
+            raise RtgSchemaPayloadInvalid(
+                "field.allowed_values contains a value incompatible with value_kinds"
+            )
+        try:
+            json.dumps(value, allow_nan=False)
+            key = _canonical_scalar_key(value)
+        except (TypeError, ValueError) as error:
+            raise RtgSchemaPayloadInvalid(
+                "field.allowed_values must contain finite JSON scalars"
+            ) from error
+        if key in seen:
+            raise RtgSchemaPayloadInvalid("field.allowed_values must be unique")
+        seen.add(key)
+        normalized.append(value)
+    return tuple(normalized)
+
+
+def _canonical_scalar_key(value: JsonScalar) -> str:
+    if value is None:
+        return "null"
+    if isinstance(value, bool):
+        return f"boolean:{str(value).lower()}"
+    if isinstance(value, int | float):
+        number = Decimal(value) if isinstance(value, int) else Decimal(str(value))
+        if number == 0:
+            return "number:0"
+        sign, raw_digits, decimal_exponent = number.as_tuple()
+        exponent = int(decimal_exponent)
+        digits = list(raw_digits)
+        while digits and digits[-1] == 0:
+            digits.pop()
+            exponent += 1
+        magnitude = "".join(str(digit) for digit in digits)
+        prefix = "-" if sign else ""
+        return f"number:{prefix}{magnitude}e{exponent}"
+    return f"string:{json.dumps(value, ensure_ascii=False)}"
+
+
+def _scalar_matches_kind(value: JsonScalar, kind: str) -> bool:
+    if kind == "null":
+        return value is None
+    if kind == "boolean":
+        return isinstance(value, bool)
+    if kind == "integer":
+        return isinstance(value, int) and not isinstance(value, bool)
+    if kind == "number":
+        return isinstance(value, int | float) and not isinstance(value, bool)
+    if kind == "string":
+        return isinstance(value, str)
+    if kind == "uuid" and isinstance(value, str):
+        try:
+            UUID(value)
+            return True
+        except ValueError:
+            return False
+    return False
 
 
 def _normalize_system(value: JsonObject) -> JsonObject:
@@ -452,13 +564,35 @@ def _field_to_json(field: RtgSchemaField) -> JsonObject:
         }
     if field.items is not None:
         result["items"] = _field_to_json(field.items)
+    if field.allowed_values:
+        result["allowed_values"] = list(field.allowed_values)
+    if field.format is not None:
+        result["format"] = field.format
+    if field.minimum is not None:
+        result["minimum"] = field.minimum
+    if field.maximum is not None:
+        result["maximum"] = field.maximum
+    if field.pattern is not None:
+        result["pattern"] = field.pattern
     return result
 
 
 def _field_from_json(value: JsonValue) -> RtgSchemaField:
     if not isinstance(value, dict):
         raise RtgSchemaPayloadInvalid("field must be an object")
-    unknown = set(value).difference({"required", "value_kinds", "properties", "items"})
+    unknown = set(value).difference(
+        {
+            "required",
+            "value_kinds",
+            "properties",
+            "items",
+            "allowed_values",
+            "format",
+            "minimum",
+            "maximum",
+            "pattern",
+        }
+    )
     if unknown:
         raise RtgSchemaPayloadInvalid(f"unknown field keys: {sorted(unknown)}")
     required = value.get("required")
@@ -468,6 +602,9 @@ def _field_from_json(value: JsonValue) -> RtgSchemaField:
     properties = value.get("properties", {})
     if not isinstance(properties, dict):
         raise RtgSchemaPayloadInvalid("field.properties must be an object")
+    allowed_values = value.get("allowed_values", [])
+    if not isinstance(allowed_values, list):
+        raise RtgSchemaPayloadInvalid("field.allowed_values must be a list")
     return RtgSchemaField(
         required=required,
         value_kinds=value_kinds,
@@ -477,6 +614,11 @@ def _field_from_json(value: JsonValue) -> RtgSchemaField:
             if "items" in value and value["items"] is not None
             else None
         ),
+        allowed_values=tuple(cast(JsonScalar, item) for item in allowed_values),
+        format=(str(value["format"]) if value.get("format") is not None else None),
+        minimum=cast(int | float | None, value.get("minimum")),
+        maximum=cast(int | float | None, value.get("maximum")),
+        pattern=(str(value["pattern"]) if value.get("pattern") is not None else None),
     )
 
 

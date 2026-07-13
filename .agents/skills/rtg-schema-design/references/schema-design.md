@@ -19,6 +19,9 @@ is queryable and semantically stable.
 - Keep unknown values absent. Never require placeholder dates, statuses, names, or priorities.
 - Use Boolean, number, and string kinds deliberately; specify date-like string conventions only
   when consumers depend on them.
+- Add `allowed_values`, `date`/`date_time`/`uri` format, inclusive numeric bounds, or an RE2 pattern
+  only when the restriction is stable domain meaning rather than a current-data accident. Apply
+  the same rule recursively to object properties and list items.
 - Prefer stable singular PascalCase type keys and clear snake_case property keys unless the host
   system already has a compatible convention.
 - Distinguish identity from display names. Define how duplicates and ambiguous lookups are handled.

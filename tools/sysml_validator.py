@@ -282,6 +282,18 @@ def _packaged_model_files(scope: str, destination: Path) -> tuple[list[Path], li
     unexpected = sorted(set(extracted_by_name) - {path.name for path in files})
     if unexpected:
         raise RuntimeError(f"packaged {scope} product has unexpected SysML files: {unexpected}")
+    source_by_name = {Path(relative).name: MODEL_ROOT / relative for relative in relatives}
+    stale = [
+        name
+        for name, packaged_path in extracted_by_name.items()
+        if name in source_by_name
+        and packaged_path.read_bytes() != source_by_name[name].read_bytes()
+    ]
+    if stale:
+        raise RuntimeError(
+            f"packaged {scope} product is stale for current model sources: {sorted(stale)}; "
+            "run `just model-package`"
+        )
     return files, labels
 
 
@@ -398,7 +410,7 @@ def _validate_files(
         return 1
     print(
         f"Formal SysML validation passed for {product_label} ({len(files)} files) "
-        f"with official Java pilot { _lock()['implementation_version'] }."
+        f"with official Java pilot {_lock()['implementation_version']}."
     )
     return 0
 
@@ -523,10 +535,7 @@ def export_index(output: Path) -> None:
     }
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(json.dumps(value, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-    print(
-        "Exported official parser-backed model index to "
-        f"{output.resolve().relative_to(ROOT)}."
-    )
+    print(f"Exported official parser-backed model index to {output.resolve().relative_to(ROOT)}.")
 
 
 def main() -> int:

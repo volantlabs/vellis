@@ -270,7 +270,10 @@ Agents should operate the RTG MCP server in this order:
 
 Dry-run validation tools accept `validation_options.tracks` and `validation_options.finding_limit`;
 mutation tools use `validation_mode`. Use `return_snapshot:false` for compact snapshot
-persistence/load and report replay `replay_window` when verifying recovery.
+persistence/load. When verifying recovery, report `state_equivalent_to_live` with the replayed and
+live domain-state digests; report `ledger_cursor_equivalent_to_live` separately, and use the replay
+accounting plus `replay_window` to explain which ledger records were scanned, eligible, replayed,
+administrative, terminal, or failed/rejected.
 `rtg_get_system_state.migration_counts_by_status` is the current migration-store view; use
 `rtg_list_migration_history` for ledger-backed migration audit after cutover or abandonment.
 
@@ -282,7 +285,8 @@ when the rule fits one of the documented v1 payloads:
   `payload` contains `query_spec` plus `expectation` such as `must_match_at_least_one` or
   `must_match_none`.
 - `cardinality`: same wrapper shape, with `constraint.kind` set to `cardinality` and `payload`
-  containing `query_spec`, `counted_binding`, and optional `minimum` or `maximum`.
+  containing `query_spec`, `counted_binding`, optional `minimum` or `maximum`, and optional
+  `group_by_bindings` when the bound must be enforced independently for each unique binding tuple.
 
 Constraint candidates must be non-live and listed in the migration's `constraint_make_live`.
 Do not invent new constraint kinds from prose alone.

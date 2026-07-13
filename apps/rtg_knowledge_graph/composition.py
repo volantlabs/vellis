@@ -48,5 +48,7 @@ def build_app(config: RtgKnowledgeGraphConfig) -> RtgKnowledgeGraphComposition:
         controller=controller,
         storage_root=config.storage_root,
         sql_database_path=config.sql_database_path,
+        install_starter_schema=config.install_starter_schema,
+        automatic_recovery=config.automatic_recovery,
     )
     return RtgKnowledgeGraphComposition(config=config, controller=controller, runner=runner)

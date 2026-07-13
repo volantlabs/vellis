@@ -137,6 +137,7 @@ The RTG Knowledge Graph MCP server uses standalone FastMCP v3 from the `fastmcp`
 Manual evaluation prompts include:
 
 - [`docs/guides/vellis/evals/rtg-beta-known-good-walkthrough.md`](docs/guides/vellis/evals/rtg-beta-known-good-walkthrough.md): a compact known-good walkthrough for the default life-graph beta path.
+- [`docs/guides/vellis/evals/rtg-broad-beta-gates.md`](docs/guides/vellis/evals/rtg-broad-beta-gates.md): the separate repo-blind, ordinary-onboarding, and existing-beta upgrade gates for broad beta.
 - [`docs/guides/vellis/evals/rtg-agent-affordance-eval-prompt.md`](docs/guides/vellis/evals/rtg-agent-affordance-eval-prompt.md): a copy-pastable agent eval for using RTG as an evolving memory, knowledge graph, and database.
 - [`docs/guides/vellis/evals/rtg-agent-affordance-eval-runbook.md`](docs/guides/vellis/evals/rtg-agent-affordance-eval-runbook.md): launch and prompt-sequencing guidance for running the RTG MCP eval.
 - [`docs/guides/vellis/evals/rtg-individual-life-graph-beta-prompt.md`](docs/guides/vellis/evals/rtg-individual-life-graph-beta-prompt.md): the initial individual multi-domain life-graph beta prompt for personal and professional planning.

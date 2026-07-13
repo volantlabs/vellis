@@ -27,11 +27,11 @@
     "Bibliotek": {
       "element_counts": {
         "ActionDefinition": 89,
-        "AttributeDefinition": 203,
+        "AttributeDefinition": 204,
         "CalculationDefinition": 6,
         "ConstraintDefinition": 1,
         "Documentation": 6,
-        "EnumerationDefinition": 31,
+        "EnumerationDefinition": 33,
         "ItemDefinition": 11,
         "LibraryPackage": 1,
         "PartDefinition": 11,
@@ -902,6 +902,10 @@
         },
         {
           "kind": "AttributeDefinition",
+          "name": "RtgQueryAggregation"
+        },
+        {
+          "kind": "AttributeDefinition",
           "name": "RtgQueryAnchorBucket"
         },
         {
@@ -1310,6 +1314,10 @@
         },
         {
           "kind": "EnumerationDefinition",
+          "name": "RtgQueryAggregationFunction"
+        },
+        {
+          "kind": "EnumerationDefinition",
           "name": "RtgQueryDiagnosticSeverity"
         },
         {
@@ -1339,6 +1347,10 @@
         {
           "kind": "EnumerationDefinition",
           "name": "RtgSchemaParticipationQueryDirection"
+        },
+        {
+          "kind": "EnumerationDefinition",
+          "name": "RtgSchemaStringFormat"
         },
         {
           "kind": "EnumerationDefinition",
@@ -3702,7 +3714,7 @@
         "ActionDefinition": 8,
         "ActionUsage": 4,
         "AttributeDefinition": 15,
-        "AttributeUsage": 30,
+        "AttributeUsage": 31,
         "ConstraintUsage": 21,
         "Dependency": 6,
         "Documentation": 41,
@@ -3713,12 +3725,12 @@
         "ItemDefinition": 1,
         "ItemUsage": 4,
         "LibraryPackage": 1,
-        "LiteralInfinity": 10,
-        "LiteralInteger": 24,
+        "LiteralInfinity": 11,
+        "LiteralInteger": 25,
         "LiteralString": 22,
         "MetadataUsage": 18,
         "Multiplicity": 27,
-        "MultiplicityRange": 18,
+        "MultiplicityRange": 19,
         "NullExpression": 2,
         "OperatorExpression": 3,
         "PartDefinition": 1,
@@ -4108,13 +4120,13 @@
         "ActionDefinition": 23,
         "ActionUsage": 36,
         "AttributeDefinition": 32,
-        "AttributeUsage": 226,
+        "AttributeUsage": 256,
         "BindingConnectorAsUsage": 8,
         "ConstraintUsage": 81,
         "Dependency": 151,
         "Documentation": 172,
         "EnumerationDefinition": 12,
-        "EnumerationUsage": 52,
+        "EnumerationUsage": 54,
         "Feature": 202,
         "FeatureChainExpression": 43,
         "FeatureReferenceExpression": 104,
@@ -4122,12 +4134,12 @@
         "ItemUsage": 16,
         "LibraryPackage": 1,
         "LiteralBoolean": 4,
-        "LiteralInfinity": 31,
-        "LiteralInteger": 115,
+        "LiteralInfinity": 32,
+        "LiteralInteger": 122,
         "LiteralString": 64,
         "MetadataUsage": 58,
-        "Multiplicity": 176,
-        "MultiplicityRange": 81,
+        "Multiplicity": 195,
+        "MultiplicityRange": 85,
         "NullExpression": 1,
         "OperatorExpression": 11,
         "PartDefinition": 1,
@@ -6951,25 +6963,25 @@
     "BibliotekRtgQuery": {
       "element_counts": {
         "ActionDefinition": 1,
-        "AttributeDefinition": 18,
-        "AttributeUsage": 75,
+        "AttributeDefinition": 19,
+        "AttributeUsage": 88,
         "CalculationDefinition": 4,
         "ConstraintUsage": 23,
         "Dependency": 1,
         "Documentation": 39,
-        "EnumerationDefinition": 5,
-        "EnumerationUsage": 28,
+        "EnumerationDefinition": 6,
+        "EnumerationUsage": 29,
         "Feature": 49,
         "FeatureReferenceExpression": 30,
         "InvocationExpression": 2,
         "LibraryPackage": 1,
-        "LiteralBoolean": 3,
-        "LiteralInfinity": 29,
-        "LiteralInteger": 45,
+        "LiteralBoolean": 5,
+        "LiteralInfinity": 32,
+        "LiteralInteger": 53,
         "LiteralString": 5,
         "MetadataUsage": 4,
-        "Multiplicity": 33,
-        "MultiplicityRange": 38,
+        "Multiplicity": 41,
+        "MultiplicityRange": 43,
         "OperatorExpression": 1,
         "PartDefinition": 1,
         "PartUsage": 2,
@@ -6983,6 +6995,10 @@
         {
           "kind": "ActionDefinition",
           "name": "ExecuteRtgQuery"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "RtgQueryAggregation"
         },
         {
           "kind": "AttributeDefinition",
@@ -7071,6 +7087,10 @@
         {
           "kind": "CalculationDefinition",
           "name": "RtgQueryJsonEqual"
+        },
+        {
+          "kind": "EnumerationDefinition",
+          "name": "RtgQueryAggregationFunction"
         },
         {
           "kind": "EnumerationDefinition",
@@ -7319,25 +7339,25 @@
         "ActionDefinition": 12,
         "ActionUsage": 4,
         "AttributeDefinition": 26,
-        "AttributeUsage": 45,
+        "AttributeUsage": 51,
         "CalculationDefinition": 1,
         "ConstraintUsage": 30,
         "Dependency": 10,
         "Documentation": 59,
-        "EnumerationDefinition": 4,
-        "EnumerationUsage": 23,
+        "EnumerationDefinition": 5,
+        "EnumerationUsage": 26,
         "Feature": 52,
         "FeatureReferenceExpression": 32,
         "ItemDefinition": 1,
         "ItemUsage": 7,
         "LibraryPackage": 1,
         "LiteralBoolean": 4,
-        "LiteralInfinity": 30,
-        "LiteralInteger": 50,
+        "LiteralInfinity": 31,
+        "LiteralInteger": 59,
         "LiteralString": 30,
         "MetadataUsage": 26,
         "Multiplicity": 36,
-        "MultiplicityRange": 41,
+        "MultiplicityRange": 46,
         "NullExpression": 3,
         "OperatorExpression": 7,
         "PartDefinition": 1,
@@ -7516,6 +7536,10 @@
         {
           "kind": "EnumerationDefinition",
           "name": "RtgSchemaParticipationQueryDirection"
+        },
+        {
+          "kind": "EnumerationDefinition",
+          "name": "RtgSchemaStringFormat"
         },
         {
           "kind": "EnumerationDefinition",
@@ -9079,7 +9103,7 @@
         "PartDefinition": 13,
         "PartUsage": 34,
         "PerformActionUsage": 103,
-        "ReferenceUsage": 207,
+        "ReferenceUsage": 209,
         "SuccessionAsUsage": 13
       },
       "named_elements": [
@@ -9143,39 +9167,39 @@
         "ActionUsage": 66,
         "AllocationUsage": 27,
         "AttributeDefinition": 4,
-        "AttributeUsage": 178,
+        "AttributeUsage": 210,
         "BindingConnectorAsUsage": 10,
         "ConjugatedPortDefinition": 1,
         "ConstraintDefinition": 1,
         "ConstraintUsage": 6,
-        "Documentation": 87,
-        "EnumerationDefinition": 1,
-        "EnumerationUsage": 32,
-        "Feature": 183,
-        "FeatureChainExpression": 75,
-        "FeatureReferenceExpression": 12,
+        "Documentation": 89,
+        "EnumerationDefinition": 3,
+        "EnumerationUsage": 96,
+        "Feature": 242,
+        "FeatureChainExpression": 77,
+        "FeatureReferenceExpression": 66,
         "FlowEnd": 4,
         "FlowUsage": 2,
         "InterfaceDefinition": 1,
         "InterfaceUsage": 1,
         "ItemDefinition": 2,
         "ItemUsage": 38,
-        "LiteralBoolean": 6,
-        "LiteralInfinity": 30,
-        "LiteralInteger": 41,
-        "LiteralString": 62,
+        "LiteralBoolean": 141,
+        "LiteralInfinity": 31,
+        "LiteralInteger": 44,
+        "LiteralString": 70,
         "MetadataDefinition": 1,
         "MetadataUsage": 62,
-        "Multiplicity": 88,
-        "MultiplicityRange": 138,
-        "OperatorExpression": 28,
+        "Multiplicity": 95,
+        "MultiplicityRange": 142,
+        "OperatorExpression": 31,
         "Package": 1,
         "PartDefinition": 3,
         "PartUsage": 19,
         "PerformActionUsage": 81,
         "PortDefinition": 1,
         "PortUsage": 6,
-        "ReferenceUsage": 410,
+        "ReferenceUsage": 616,
         "RequirementUsage": 14,
         "SatisfyRequirementUsage": 6,
         "SuccessionAsUsage": 13,
@@ -9205,6 +9229,14 @@
         {
           "kind": "ConstraintDefinition",
           "name": "VellisMcpOutcomeExclusive"
+        },
+        {
+          "kind": "EnumerationDefinition",
+          "name": "McpAudienceKind"
+        },
+        {
+          "kind": "EnumerationDefinition",
+          "name": "McpOperationalLane"
         },
         {
           "kind": "EnumerationDefinition",
@@ -9320,30 +9352,30 @@
       "element_counts": {
         "ActionDefinition": 27,
         "ActionUsage": 39,
-        "AttributeDefinition": 31,
-        "AttributeUsage": 275,
+        "AttributeDefinition": 32,
+        "AttributeUsage": 308,
         "ConstraintUsage": 35,
         "Dependency": 101,
-        "Documentation": 119,
-        "EnumerationDefinition": 7,
-        "EnumerationUsage": 58,
-        "Feature": 193,
-        "FeatureChainExpression": 93,
-        "FeatureReferenceExpression": 48,
+        "Documentation": 121,
+        "EnumerationDefinition": 8,
+        "EnumerationUsage": 62,
+        "Feature": 196,
+        "FeatureChainExpression": 95,
+        "FeatureReferenceExpression": 49,
         "ItemUsage": 2,
         "LiteralBoolean": 4,
         "LiteralInfinity": 42,
-        "LiteralInteger": 156,
+        "LiteralInteger": 166,
         "LiteralString": 62,
         "MetadataUsage": 79,
-        "Multiplicity": 133,
-        "MultiplicityRange": 138,
+        "Multiplicity": 140,
+        "MultiplicityRange": 143,
         "OperatorExpression": 22,
         "Package": 1,
         "PartDefinition": 1,
         "PartUsage": 11,
         "PerformActionUsage": 76,
-        "ReferenceUsage": 502,
+        "ReferenceUsage": 506,
         "RequirementUsage": 98,
         "SatisfyRequirementUsage": 35,
         "SuccessionAsUsage": 13,
@@ -9543,6 +9575,10 @@
         },
         {
           "kind": "AttributeDefinition",
+          "name": "VellisMutationResponseOptions"
+        },
+        {
+          "kind": "AttributeDefinition",
           "name": "VellisPersistedSnapshotResult"
         },
         {
@@ -9608,6 +9644,10 @@
         {
           "kind": "AttributeDefinition",
           "name": "VellisUsageGuide"
+        },
+        {
+          "kind": "EnumerationDefinition",
+          "name": "VellisMutationResponseFormat"
         },
         {
           "kind": "EnumerationDefinition",
@@ -10200,7 +10240,7 @@
         "PartDefinition": 3,
         "PartUsage": 47,
         "PerformActionUsage": 45,
-        "ReferenceUsage": 97,
+        "ReferenceUsage": 98,
         "RequirementUsage": 16,
         "SuccessionAsUsage": 10,
         "UseCaseDefinition": 8,
@@ -10408,7 +10448,7 @@
     }
   },
   "schema_version": 1,
-  "source_digest": "2bc63f5918985939f3f9886598faa0b52889ce3260006969d03d8b8a291672f0",
+  "source_digest": "0b99f0a406dea5930411cf8d538341a84b962993bacf7bbeadb9ec8e0f685b8f",
   "validator": {
     "implementation_version": "0.50.0",
     "provider": "Systems-Modeling/SysML-v2-Pilot-Implementation",

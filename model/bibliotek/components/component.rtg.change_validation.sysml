@@ -107,7 +107,7 @@ library package BibliotekRtgChangeValidation {
     requirement <'contract.rtg.change_validation.references'> referenceSemantics {
         subject validator : RtgChangeValidator;
         require constraint {
-            doc /* Each change reference has exactly one existing/caller identity or one batch-local identity. Local references resolve consistently across the selected projection; unresolved, duplicate, or kind-incompatible references are reported without mutation. */
+            doc /* Each change reference has exactly one existing/caller identity or one batch-local identity. Local references resolve consistently across the selected projection; unresolved, duplicate, kind-incompatible, or otherwise unprojectable operations are reported as blocking findings without mutation rather than escaping as foreign component failures. */
         }
     }
 

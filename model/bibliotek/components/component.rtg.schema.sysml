@@ -15,6 +15,7 @@ library package BibliotekRtgSchema {
         enum 'null';
         enum object; enum list; enum uuid;
     }
+    enum def RtgSchemaStringFormat { enum date; enum date_time; enum uri; }
 
     calc def SchemaValueKindCompatible {
         in actual : RtgSchemaValueKind;
@@ -35,7 +36,12 @@ library package BibliotekRtgSchema {
         attribute valueKinds[1..*] : RtgSchemaValueKind;
         attribute properties[0..*] : RtgSchemaProperty;
         attribute items[0..1] : RtgSchemaField;
-        doc /* Recursive field schema. Allowed value kinds and property names are unique unordered sets. Properties is non-empty only when object is allowed; items is present only when list is allowed. */
+        attribute allowedValues[0..*] : JsonScalar;
+        attribute format[0..1] : RtgSchemaStringFormat;
+        attribute minimum[0..1] : Real;
+        attribute maximum[0..1] : Real;
+        attribute pattern[0..1] : String;
+        doc /* Recursive field schema. Allowed value kinds, allowed scalar values, and property names are unique unordered sets. Properties is non-empty only when object is allowed; items is present only when list is allowed. Optional format and pattern refine strings, while inclusive minimum/maximum refine numbers. */
     }
     abstract attribute def RtgSchemaPayload { doc /* One native anchor, data-object, or link schema payload selected by definition kind. */ }
     attribute def RtgAnchorSchemaPayload :> RtgSchemaPayload {
@@ -128,7 +134,7 @@ library package BibliotekRtgSchema {
     requirement <'contract.rtg.schema.field_semantics'> fieldSemantics {
         subject schema : RtgSchema;
         require constraint {
-            doc /* A field has a non-empty unique unordered value-kind set. Compatibility follows SchemaValueKindCompatible: Boolean never satisfies a numeric kind; integer satisfies integer and number; a fractional number satisfies number; every string satisfies string and a canonical UUID string also satisfies uuid. Nested properties are permitted only with object, items only with list, null is permitted only when explicitly listed, required fields must be present, and strict data-object payloads reject undeclared properties recursively. */
+            doc /* A field has a non-empty unique unordered value-kind set. Compatibility follows SchemaValueKindCompatible: Boolean never satisfies a numeric kind; integer satisfies integer and number; a fractional number satisfies number; every string satisfies string and a canonical UUID string also satisfies uuid. allowedValues is an optional non-empty unique scalar set compatible with the declared kinds. date is an RFC 3339 full-date, date_time is an RFC 3339 datetime with explicit timezone, uri is an absolute URI with scheme, pattern is a valid RE2 unanchored search, and inclusive numeric bounds require a numeric kind with minimum no greater than maximum. Nested properties are permitted only with object, items only with list, null is permitted only when explicitly listed, required fields must be present, and strict data-object payloads reject undeclared properties recursively. */
         }
     }
 

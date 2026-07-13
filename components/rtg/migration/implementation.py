@@ -72,9 +72,7 @@ class InMemoryRtgMigration:
         migration_id = _record_id(normalized)
         current = self._migrations.get(migration_id)
         if current is not None and not _transition_allowed(current.status, normalized.status):
-            raise RtgMigrationStatusTransitionInvalid(
-                f"{current.status} -> {normalized.status}"
-            )
+            raise RtgMigrationStatusTransitionInvalid(f"{current.status} -> {normalized.status}")
         self._migrations[migration_id] = normalized
         return _copy_record(normalized)
 
@@ -296,9 +294,7 @@ def _normalize_replacements(
     if len(set(old_ids)) != len(old_ids) or len(set(new_ids)) != len(new_ids):
         raise RtgMigrationRecordInvalid(f"{label} replacements must be one-to-one")
     if any(value not in make_non_live for value in old_ids):
-        raise RtgMigrationRecordInvalid(
-            f"{label} replacement old IDs must be in make_non_live"
-        )
+        raise RtgMigrationRecordInvalid(f"{label} replacement old IDs must be in make_non_live")
     if any(value not in make_live for value in new_ids):
         raise RtgMigrationRecordInvalid(f"{label} replacement new IDs must be in make_live")
     return tuple(
@@ -324,9 +320,7 @@ def _validate_evidence(evidence: RtgMigrationEvidence) -> RtgMigrationEvidence:
     )
 
 
-def _validate_json_object(
-    value: object, label: str, *, evidence: bool = False
-) -> JsonObject:
+def _validate_json_object(value: object, label: str, *, evidence: bool = False) -> JsonObject:
     error_type = RtgMigrationEvidenceInvalid if evidence else RtgMigrationRecordInvalid
     if not isinstance(value, dict) or any(not isinstance(key, str) for key in value):
         raise error_type(f"{label} must be a JSON object")
@@ -341,9 +335,7 @@ def _is_json_value(value: object) -> bool:
     if isinstance(value, list):
         return all(_is_json_value(item) for item in value)
     if isinstance(value, dict):
-        return all(
-            isinstance(key, str) and _is_json_value(item) for key, item in value.items()
-        )
+        return all(isinstance(key, str) and _is_json_value(item) for key, item in value.items())
     return False
 
 

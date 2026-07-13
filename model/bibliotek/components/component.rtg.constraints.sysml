@@ -23,7 +23,8 @@ library package BibliotekRtgConstraints {
         attribute countedBinding : String;
         attribute minimum[0..1] : Integer;
         attribute maximum[0..1] : Integer;
-        doc /* Bounds are non-negative and at least one is present. */
+        attribute groupByBindings[0..*] : String;
+        doc /* Bounds are non-negative and at least one is present. groupByBindings contains unique non-empty names from the query's global binding namespace. Empty groupByBindings preserves global cardinality; otherwise each unique group-binding UUID tuple counts distinct counted-binding UUIDs independently. */
     }
     item def RtgConstraintDefinition {
         attribute uuid[0..1] : Uuid;
@@ -140,7 +141,7 @@ library package BibliotekRtgConstraints {
     requirement <'invariant.rtg.constraints.cardinality_rules_live_here'> cardinalityRulesLiveHere {
         subject constraints : RtgConstraints;
         require constraint {
-            doc /* Query-binding cardinality rule definitions are owned here rather than in schema definitions. */
+            doc /* Query-binding cardinality rule definitions are owned here rather than in schema definitions. Global rules count distinct binding UUIDs across the result; grouped rules apply bounds independently to each unique group-binding UUID tuple, including zero-count groups exposed by optional link requirements. */
         }
     }
 

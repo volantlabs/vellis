@@ -50,7 +50,7 @@ package VellisLocalPythonRealization {
         @ImplementationBinding { implementationLanguage = ImplementationLanguage::python; codeRoot = "apps/rtg_knowledge_graph"; symbol = "apps.rtg_knowledge_graph.runner.RtgKnowledgeGraphRunner"; realization = "VellisLocalPython"; }
     }
     part def PythonEverydayLifeOntologyInstaller :> EverydayLifeOntologyInstaller {
-        @ImplementationBinding { implementationLanguage = ImplementationLanguage::python; codeRoot = "apps/rtg_knowledge_graph"; symbol = "apps.rtg_knowledge_graph.starter_schema.prepare_controller"; realization = "generated schema bundle staged and cut over through the controller"; }
+        @ImplementationBinding { implementationLanguage = ImplementationLanguage::python; codeRoot = "apps/rtg_knowledge_graph"; symbol = "apps.rtg_knowledge_graph.starter_schema.install_everyday_life_ontology"; realization = "generated schema bundle staged and cut over through the controller"; }
         perform action :>> install : InstallEverydayLifeOntology;
     }
 

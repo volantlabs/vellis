@@ -19,6 +19,14 @@ class RtgQueryLinkRequirement:
     source_bucket: str
     target_bucket: str
     link_type_keys: tuple[str, ...]
+    required: bool = True
+
+
+@dataclass(frozen=True, slots=True)
+class RtgQueryAggregation:
+    name: str
+    function: str
+    binding: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -46,6 +54,8 @@ class RtgQueryReturnSpec:
     link_requirements: tuple[str, ...] = ()
     data_requirements: tuple[str, ...] = ()
     properties: tuple[tuple[str, tuple[str, ...]], ...] = ()
+    group_by: tuple[tuple[str, tuple[str, ...]], ...] = ()
+    aggregations: tuple[RtgQueryAggregation, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -68,6 +78,9 @@ class RtgQueryOptions:
     live_filter: str = "all"
     live_status_overlay: dict[UUID, bool] = field(default_factory=dict)
     order_by: tuple[RtgQueryOrderBy, ...] = ()
+    limit: int | None = None
+    offset: int = 0
+    distinct_rows: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -109,6 +122,10 @@ class RtgQueryResult:
     bindings: tuple[RtgQueryBindingRow, ...]
     returns: tuple[RtgQueryReturnRow, ...]
     diagnostics: tuple[RtgQueryDiagnostic, ...] = ()
+    aggregations: tuple[JsonObject, ...] = ()
+    total_row_count: int = 0
+    returned_row_count: int = 0
+    next_offset: int | None = None
 
 
 class RtgQueryError(Exception):

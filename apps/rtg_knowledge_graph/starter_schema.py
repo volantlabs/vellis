@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from importlib.resources import files
 from typing import Any, cast
 from uuid import NAMESPACE_URL, UUID, uuid5
@@ -36,10 +36,22 @@ class StarterSchemaStatus:
         }
 
 
+@dataclass(frozen=True, slots=True)
+class EverydayLifeOntologyIdentity:
+    ontology_id: str
+    version: str
+    bootstrap_migration_id: str
+
+
+@dataclass(frozen=True, slots=True)
+class EverydayLifeInstallationResult:
+    status: str
+    ontology: EverydayLifeOntologyIdentity
+    schema_definition_count: int
+
+
 def load_starter_schema_bundle() -> JsonObject:
-    resource = files("apps.rtg_knowledge_graph.resources").joinpath(
-        "everyday_life_schema.json"
-    )
+    resource = files("apps.rtg_knowledge_graph.resources").joinpath("everyday_life_schema.json")
     value = json.loads(resource.read_text(encoding="utf-8"))
     if not isinstance(value, dict):
         raise VellisStartupFailed("generated Everyday Life ontology bundle is not an object")
@@ -70,9 +82,7 @@ def prepare_controller(
             controller.replay_ledger()
             report = controller.validate_graph()
             if not report.accepted:
-                raise VellisStartupFailed(
-                    "replayed durable graph state did not pass validation"
-                )
+                raise VellisStartupFailed("replayed durable graph state did not pass validation")
         except Exception as error:  # noqa: BLE001 - startup must fail closed
             raise VellisStartupFailed(
                 "Vellis could not reconstruct and validate durable graph state from the "
@@ -83,10 +93,32 @@ def prepare_controller(
         recovery = "ledger_replayed"
 
     status = starter_schema_status(controller, bundle=bundle, recovery=recovery)
-    if status.status == "custom" and _has_starter_schema_collision(controller, bundle):
+    if _is_recoverable_staged_installation(controller, bundle):
+        try:
+            if install_starter_schema:
+                controller.apply_migration_cutover(str(bundle["bootstrap_migration_id"]))
+                report = controller.validate_graph()
+                if not report.accepted:
+                    raise VellisStartupFailed(
+                        "completed starter schema cutover did not pass validation"
+                    )
+                recovery = "starter_install_completed"
+            else:
+                controller.abandon_migration(
+                    str(bundle["bootstrap_migration_id"]),
+                    "starter schema installation disabled after interrupted staging",
+                )
+                recovery = "starter_install_abandoned"
+        except Exception as error:  # noqa: BLE001 - startup recovery must fail closed
+            raise VellisStartupFailed(
+                f"interrupted Everyday Life ontology installation could not be recovered: {error}"
+            ) from error
+        status = starter_schema_status(controller, bundle=bundle, recovery=recovery)
+    integrity_issue = _starter_schema_integrity_issue(controller, bundle)
+    if integrity_issue is not None:
         raise VellisStartupFailed(
-            "existing schema collides with starter ontology identities or type keys; "
-            "the existing graph was preserved without changes"
+            f"{integrity_issue}; the existing graph was preserved without changes. "
+            "Run `uv run vellis doctor` with the same storage arguments for diagnostics"
         )
     if install_starter_schema and status.status == "empty":
         snapshot = controller.export_system_snapshot()
@@ -97,8 +129,7 @@ def prepare_controller(
             or snapshot.constraints.constraints
             or snapshot.migration.migrations
             or any(
-                _definition_is_non_live(definition)
-                for definition in snapshot.schema.definitions
+                _definition_is_non_live(definition) for definition in snapshot.schema.definitions
             )
         )
         if has_staged_or_graph_state:
@@ -147,6 +178,31 @@ def prepare_controller(
     return status
 
 
+def install_everyday_life_ontology(
+    controller: InProcessRtgController,
+) -> EverydayLifeInstallationResult:
+    """Realize the modeled ontology installation action over one controller."""
+    bundle = load_starter_schema_bundle()
+    before = starter_schema_status(controller, bundle=bundle)
+    after = prepare_controller(controller)
+    if before.status == "installed":
+        installation_status = "alreadyInstalled"
+    elif after.status == "installed":
+        installation_status = "installed"
+    else:
+        installation_status = "customPreserved"
+    writes = bundle["knowledge_changes"]["schema_changes"]["definition_writes"]
+    return EverydayLifeInstallationResult(
+        status=installation_status,
+        ontology=EverydayLifeOntologyIdentity(
+            ontology_id=str(bundle["ontology_id"]),
+            version=str(bundle["version"]),
+            bootstrap_migration_id=str(bundle["bootstrap_migration_key"]),
+        ),
+        schema_definition_count=(len(writes) if after.status == "installed" else 0),
+    )
+
+
 def starter_schema_status(
     controller: InProcessRtgController,
     *,
@@ -155,10 +211,7 @@ def starter_schema_status(
 ) -> StarterSchemaStatus:
     value = bundle or load_starter_schema_bundle()
     writes = value["knowledge_changes"]["schema_changes"]["definition_writes"]
-    expected = {
-        (str(item["definition"]["uuid"]), str(item["definition"]["type_key"]))
-        for item in writes
-    }
+    expected = {str(item["definition"]["uuid"]): item["definition"] for item in writes}
     anchor_types = tuple(
         sorted(
             str(item["definition"]["type_key"])
@@ -174,12 +227,16 @@ def starter_schema_status(
         )
     )
     snapshot = controller.export_system_snapshot()
-    live = {
-        (str(item.get("uuid")), str(item.get("type_key")))
+    live_by_id = {
+        str(item.get("uuid")): item
         for item in snapshot.schema.definitions
-        if _definition_is_live(item)
+        if isinstance(item, dict) and _definition_is_live(item)
     }
-    if expected <= live:
+    if all(
+        definition_id in live_by_id
+        and _definitions_are_compatible(live_by_id[definition_id], expected_definition)
+        for definition_id, expected_definition in expected.items()
+    ):
         status = "installed"
     elif (
         snapshot.schema.definitions
@@ -202,22 +259,102 @@ def starter_schema_status(
     )
 
 
-def _has_starter_schema_collision(
+def _starter_schema_integrity_issue(
+    controller: InProcessRtgController,
+    bundle: JsonObject,
+) -> str | None:
+    writes = bundle["knowledge_changes"]["schema_changes"]["definition_writes"]
+    expected = {str(item["definition"]["uuid"]): item["definition"] for item in writes}
+    snapshot = controller.export_system_snapshot()
+    installed_by_id = {
+        str(definition.get("uuid")): definition
+        for definition in snapshot.schema.definitions
+        if isinstance(definition, dict) and str(definition.get("uuid")) in expected
+    }
+    if not installed_by_id:
+        return None
+    for definition_id, definition in installed_by_id.items():
+        if not _definitions_are_compatible(definition, expected[definition_id]):
+            return (
+                "existing schema reuses an Everyday Life deterministic definition UUID "
+                "for an incompatible definition"
+            )
+    if len(installed_by_id) != len(expected) or any(
+        not _definition_is_live(definition) for definition in installed_by_id.values()
+    ):
+        return "existing schema contains a partial Everyday Life ontology installation"
+    return None
+
+
+def _is_recoverable_staged_installation(
     controller: InProcessRtgController,
     bundle: JsonObject,
 ) -> bool:
-    writes = bundle["knowledge_changes"]["schema_changes"]["definition_writes"]
-    expected_ids = {str(item["definition"]["uuid"]) for item in writes}
-    expected_keys = {str(item["definition"]["type_key"]) for item in writes}
     snapshot = controller.export_system_snapshot()
-    for definition in snapshot.schema.definitions:
-        if not isinstance(definition, dict):
-            continue
-        if str(definition.get("uuid")) in expected_ids:
-            return True
-        if str(definition.get("type_key")) in expected_keys:
-            return True
-    return False
+    if (
+        snapshot.graph.anchors
+        or snapshot.graph.data_objects
+        or snapshot.graph.links
+        or snapshot.constraints.constraints
+    ):
+        return False
+    writes = bundle["knowledge_changes"]["schema_changes"]["definition_writes"]
+    expected = {str(item["definition"]["uuid"]): item["definition"] for item in writes}
+    installed = {
+        str(definition.get("uuid")): definition
+        for definition in snapshot.schema.definitions
+        if isinstance(definition, dict)
+    }
+    if set(installed) != set(expected) or any(
+        not _definition_is_non_live(definition)
+        or not _definitions_are_compatible(definition, expected[definition_id])
+        for definition_id, definition in installed.items()
+    ):
+        return False
+    changes = decode_change_batch(bundle["knowledge_changes"])
+    expected_migrations = tuple(
+        write.migration for write in changes.migration_changes.migration_writes
+    )
+    if len(snapshot.migration.migrations) != 1 or len(expected_migrations) != 1:
+        return False
+    actual_migration = snapshot.migration.migrations[0]
+    expected_migration = expected_migrations[0]
+    return actual_migration == replace(
+        expected_migration,
+        schema_make_live=actual_migration.schema_make_live,
+    ) and set(actual_migration.schema_make_live) == set(expected_migration.schema_make_live)
+
+
+def _definitions_are_compatible(
+    installed: JsonObject,
+    expected: JsonObject,
+) -> bool:
+    if not all(
+        installed.get(key) == expected.get(key)
+        for key in ("uuid", "kind", "type_key", "description")
+    ):
+        return False
+    expected_payload = expected.get("payload")
+    if not isinstance(expected_payload, dict):
+        return installed.get("payload") == expected_payload
+    normalized_payload = dict(expected_payload)
+    if expected.get("kind") == "anchor":
+        normalized_payload.setdefault("required_data_types", [])
+        normalized_payload.setdefault("optional_data_types", [])
+    installed_payload = installed.get("payload")
+    if expected.get("kind") == "link" and isinstance(installed_payload, dict):
+        for key in ("allowed_source_types", "allowed_target_types"):
+            normalized_payload[key] = sorted(cast(list[str], normalized_payload.get(key, [])))
+        installed_payload = {
+            **installed_payload,
+            "allowed_source_types": sorted(
+                cast(list[str], installed_payload.get("allowed_source_types", []))
+            ),
+            "allowed_target_types": sorted(
+                cast(list[str], installed_payload.get("allowed_target_types", []))
+            ),
+        }
+    return installed_payload == normalized_payload
 
 
 def _definition_is_live(definition: object) -> bool:

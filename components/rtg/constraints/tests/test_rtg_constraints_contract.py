@@ -147,6 +147,42 @@ def test_constraint_validation_failures_are_boundary_specific() -> None:
         raise AssertionError("invalid target lookup key was accepted")
 
 
+@pytest.mark.parametrize(
+    "payload",
+    [
+        RtgConstraintCardinalityPayload(
+            query_spec=RtgQuerySpec(
+                anchor_buckets=(RtgQueryAnchorBucket("component", ("Component",)),)
+            ),
+            counted_binding="component",
+            minimum=True,
+        ),
+        RtgConstraintCardinalityPayload(
+            query_spec=RtgQuerySpec(
+                anchor_buckets=(RtgQueryAnchorBucket("component", ("Component",)),)
+            ),
+            counted_binding="component",
+            group_by_bindings=("component", "component"),
+            minimum=0,
+        ),
+    ],
+)
+def test_cardinality_payload_rejects_invalid_bounds_and_group_names(
+    payload: RtgConstraintCardinalityPayload,
+) -> None:
+    with pytest.raises(RtgConstraintPayloadInvalid):
+        create_reference_component().put_constraint(
+            RtgConstraintDefinition(
+                uuid=uuid4(),
+                kind="cardinality",
+                target_type_keys=("Component",),
+                display_name="Invalid cardinality",
+                description="Invalid cardinality details are rejected.",
+                payload=payload,
+            )
+        )
+
+
 def test_constraint_targets_realize_an_unordered_unique_set() -> None:
     constraints = create_reference_component()
     query_spec = RtgQuerySpec(anchor_buckets=(RtgQueryAnchorBucket("component", ("Component",)),))

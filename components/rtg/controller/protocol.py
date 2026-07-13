@@ -162,8 +162,23 @@ class RtgControllerLiveGraphValidationResult:
 class RtgControllerReplayVerificationResult:
     status: str
     ledger_records_seen: int
+    ledger_records_scanned: int
+    request_records_seen: int
+    eligible_mutating_requests: int
     mutating_requests_replayed: int
+    administrative_records_skipped: int
+    terminal_records_skipped: int
+    failed_or_rejected_transactions_skipped: int
     replay_window: JsonObject
+    start_summary: JsonObject
+    replayed_summary: JsonObject
+    live_summary: JsonObject
+    replay_delta: JsonObject
+    live_count_diffs: JsonObject
+    replayed_state_digest: str
+    live_state_digest: str
+    state_equivalent_to_live: bool
+    ledger_cursor_equivalent_to_live: bool
     pre_summary: JsonObject
     post_summary: JsonObject
     count_diffs: JsonObject
@@ -171,8 +186,27 @@ class RtgControllerReplayVerificationResult:
 
 
 @dataclass(frozen=True, slots=True)
+class RtgControllerMigrationHistoryEvent:
+    event_type: str
+    migration_id: str
+    description: str | None
+    transaction_id: UUID
+    ledger_position: int
+    status: str
+    recorded_at: str
+    summary: str
+    operation_name: str
+    staged: bool
+    finding_count: int
+    finding_codes: tuple[str, ...] = ()
+    mutation_state: str | None = None
+    validation_report: RtgValidationReport | None = None
+    error: JsonObject | None = None
+
+
+@dataclass(frozen=True, slots=True)
 class RtgControllerMigrationHistory:
-    events: tuple[JsonObject, ...]
+    events: tuple[RtgControllerMigrationHistoryEvent, ...]
 
 
 @dataclass(frozen=True, slots=True)
@@ -201,6 +235,7 @@ class RtgControllerOperationResult:
     status: str
     transaction_id: UUID
     ledger_position: int | None = None
+    generated_ids: dict[str, UUID] = field(default_factory=dict)
     applied_changes: RtgControllerAppliedChanges = field(
         default_factory=RtgControllerAppliedChanges
     )

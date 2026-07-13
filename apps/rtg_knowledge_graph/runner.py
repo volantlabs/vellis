@@ -44,11 +44,15 @@ class RtgKnowledgeGraphRunner:
         controller: InProcessRtgController,
         storage_root: Path,
         sql_database_path: Path,
+        install_starter_schema: bool = True,
+        automatic_recovery: bool = True,
     ) -> None:
         self._document_storage = document_storage
         self._controller = controller
         self._storage_root = storage_root
         self._sql_database_path = sql_database_path
+        self._install_starter_schema = install_starter_schema
+        self._automatic_recovery = automatic_recovery
 
     def run(self) -> RtgKnowledgeGraphRunStatus:
         self._controller.export_system_snapshot()
@@ -71,6 +75,8 @@ class RtgKnowledgeGraphRunner:
             RtgKnowledgeGraphConfig(
                 storage_root=self._storage_root,
                 sql_database_path=self._sql_database_path,
+                install_starter_schema=self._install_starter_schema,
+                automatic_recovery=self._automatic_recovery,
             )
         )
         resource = files("apps.rtg_knowledge_graph.resources").joinpath("model_app_manifest.json")

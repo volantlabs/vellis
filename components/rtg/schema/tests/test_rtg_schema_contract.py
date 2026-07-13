@@ -191,6 +191,70 @@ def test_recursive_fields_require_coherent_unique_kind_sets() -> None:
             )
 
 
+def test_schema_field_refinements_are_normalized_and_reject_invalid_combinations() -> None:
+    schema = create_reference_component()
+    stored = schema.put_definition(
+        RtgSchemaDefinition(
+            uuid=uuid4(),
+            kind="data_object",
+            type_key="PlanFacts",
+            description="Facts with reusable semantic field refinements.",
+            payload=RtgDataObjectSchemaPayload(
+                properties={
+                    "status": RtgSchemaField(True, ("string",), allowed_values=("next", "waiting")),
+                    "due": RtgSchemaField(True, ("string",), format="date"),
+                    "score": RtgSchemaField(True, ("number",), minimum=0, maximum=1),
+                    "code": RtgSchemaField(True, ("string",), pattern=r"^[A-Z]+$"),
+                }
+            ),
+        )
+    )
+    assert isinstance(stored.payload, RtgDataObjectSchemaPayload)
+    assert stored.payload.properties["status"].allowed_values == ("next", "waiting")
+    assert InMemoryRtgSchema.import_snapshot(schema.export_snapshot()).export_snapshot() == (
+        schema.export_snapshot()
+    )
+
+    invalid_fields = (
+        RtgSchemaField(True, ("string",), allowed_values=("same", "same")),
+        RtgSchemaField(True, ("string",), minimum=0),
+        RtgSchemaField(True, ("number",), minimum=2, maximum=1),
+        RtgSchemaField(True, ("number",), format="date"),
+        RtgSchemaField(True, ("string",), pattern="(?=unsupported)"),
+    )
+    for index, field in enumerate(invalid_fields):
+        with pytest.raises(RtgSchemaPayloadInvalid):
+            schema.put_definition(
+                RtgSchemaDefinition(
+                    uuid=uuid4(),
+                    kind="data_object",
+                    type_key=f"InvalidRefinement{index}",
+                    description="Invalid refinement probe.",
+                    payload=RtgDataObjectSchemaPayload(properties={"value": field}),
+                )
+            )
+
+
+def test_allowed_values_preserve_distinct_large_json_integers() -> None:
+    schema = create_reference_component()
+    values = (10**40 + 1, 10**40 + 2)
+
+    stored = schema.put_definition(
+        RtgSchemaDefinition(
+            uuid=uuid4(),
+            kind="data_object",
+            type_key="LargeIntegerFacts",
+            description="Facts with exact large integer alternatives.",
+            payload=RtgDataObjectSchemaPayload(
+                properties={"value": RtgSchemaField(True, ("integer",), allowed_values=values)}
+            ),
+        )
+    )
+
+    assert isinstance(stored.payload, RtgDataObjectSchemaPayload)
+    assert stored.payload.properties["value"].allowed_values == values
+
+
 def test_schema_payload_sets_are_unique_disjoint_and_canonical() -> None:
     schema = create_reference_component()
     stored_anchor = schema.put_definition(

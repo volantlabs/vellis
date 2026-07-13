@@ -47,6 +47,8 @@ library package BibliotekRtgController {
     enum def RtgControllerLedgerRecordKind { enum request; enum response; enum error; }
     enum def RtgControllerMigrationEventType {
         enum staged;
+        enum staging_rejected;
+        enum staging_failed;
         enum cutover_applied;
         enum cutover_failed;
         enum abandoned;
@@ -80,19 +82,35 @@ library package BibliotekRtgController {
         attribute validationReport[0..1] : RtgValidationReport;
         attribute 'snapshot'[0..1] : RtgSystemSnapshot;
         attribute details : JsonObject;
+        attribute generatedIds : JsonObject;
     }
     attribute def RtgControllerLiveGraphValidationResult { attribute status : RtgControllerValidationStatus; attribute mutationState : RtgControllerMutationState; attribute accepted : Boolean; attribute generatedIds : JsonObject; attribute resolvedGraphChanges : RtgGraphChangeSet; attribute validationReport : RtgValidationReport; doc /* generatedIds maps each request-local reference to its resolved UUID exactly as apply would. */ }
     attribute def RtgControllerReplayVerificationResult {
         attribute status : RtgControllerReplayVerificationStatus;
         attribute ledgerRecordsSeen : Integer;
+        attribute ledgerRecordsScanned : Integer;
         attribute mutatingRequestsReplayed : Integer;
         attribute replayWindow : JsonObject;
         attribute preSummary : JsonObject;
         attribute postSummary : JsonObject;
         attribute countDiffs : JsonObject;
+        attribute startSummary : JsonObject;
+        attribute replayedSummary : JsonObject;
+        attribute liveSummary : JsonObject;
+        attribute replayDelta : JsonObject;
+        attribute liveCountDiffs : JsonObject;
+        attribute replayedStateDigest : String;
+        attribute liveStateDigest : String;
+        attribute stateEquivalentToLive : Boolean;
+        attribute ledgerCursorEquivalentToLive : Boolean;
+        attribute requestRecordsSeen : Integer;
+        attribute eligibleMutatingRequests : Integer;
+        attribute administrativeRecordsSkipped : Integer;
+        attribute terminalRecordsSkipped : Integer;
+        attribute failedOrRejectedTransactionsSkipped : Integer;
         attribute validationReport : RtgValidationReport;
     }
-    attribute def RtgControllerMigrationHistoryEvent { attribute eventType : RtgControllerMigrationEventType; attribute migrationId : String; attribute description[0..1] : String; attribute transactionId : Uuid; attribute ledgerPosition : Integer; attribute status : String; attribute recordedAt : Timestamp; attribute summary : String; }
+    attribute def RtgControllerMigrationHistoryEvent { attribute eventType : RtgControllerMigrationEventType; attribute migrationId : String; attribute description[0..1] : String; attribute transactionId : Uuid; attribute ledgerPosition : Integer; attribute status : String; attribute recordedAt : Timestamp; attribute summary : String; attribute operationName : String; attribute staged : Boolean; attribute mutationState[0..1] : String; attribute findingCount : Integer; attribute findingCodes[0..*] : String; attribute validationReport[0..1] : RtgValidationReport; attribute error[0..1] : JsonObject; }
     attribute def RtgControllerMigrationHistory { attribute events[0..*] : RtgControllerMigrationHistoryEvent; }
     attribute def RtgControllerLedgerFailureRecord {
         attribute transactionId : Uuid;
@@ -704,7 +722,7 @@ library package BibliotekRtgController {
     requirement <'contract.rtg.controller.replay_flow'> replayFlow {
         subject operation : ReplayLedger;
         require constraint {
-            doc /* Start from empty or explicitly supplied snapshot state, replay resolved mutating requests after the selected cursor through the optional stop cursor in ledger order, and keep replay itself ledger-silent. The replay_applied result details contain ledger_records_seen, mutating_requests_replayed, and replay_window. */
+            doc /* Start from empty or an explicitly supplied structurally valid snapshot state, including a snapshot captured after a skip-mode mutation, replay resolved mutating requests after the selected cursor through the optional stop cursor in ledger order, and keep replay itself ledger-silent. Public restore remains semantically validating; rollback and replay may reinstate a previously visible skip-mode state so recovery does not strand it. The replay_applied result details contain ledger_records_seen, mutating_requests_replayed, and replay_window. */
         }
     }
 
@@ -718,14 +736,14 @@ library package BibliotekRtgController {
     requirement <'contract.rtg.controller.replay_verification'> replayVerification {
         subject operation : VerifyReplayFromLedger;
         require constraint {
-            doc /* Replay verification uses isolated scratch state, returns replay_verified with seed/result summaries, count differences, replay-window details, records seen, requests replayed, and post-replay validation, then leaves current state and source ledger unchanged. */
+            doc /* Replay verification uses isolated scratch component instances, never mutates the captured current instances, preserves the existing preSummary/postSummary/countDiffs meanings, and also reports start/replayed/live summaries, exact canonical graph-schema-constraint-migration digests and equality, separate ledger-cursor equality, live count differences, replay-window details, and post-replay validation. Accounting satisfies ledgerRecordsScanned = eligibleMutatingRequests + failedOrRejectedTransactionsSkipped + administrativeRecordsSkipped + terminalRecordsSkipped; requestRecordsSeen counts every request record independently, administrativeRecordsSkipped counts records for non-replayable operations, and terminalRecordsSkipped counts response/error records for replayable operations. Verification restores the exact captured instances and cursor metadata even when current domain state does not validate, and never appends ledger records. */
         }
     }
 
     requirement <'contract.rtg.controller.migration_history'> migrationHistorySemantics {
         subject operation : ListMigrationHistory;
         require constraint {
-            doc /* Migration history reconstructs staged, cutover_applied, cutover_failed, and abandoned events in ledger order even when terminal migration records are absent from the current migration store. */
+            doc /* Migration history reconstructs one typed staged, staging_rejected, staging_failed, cutover_applied, cutover_failed, or abandoned event per affected migration in terminal-ledger order even when no migration record entered or remains in the current migration store. Every event reports accurate finding count and codes; successful events report zero findings. Rejected staging and validation-failed cutover retain their canonical validation reports, failed staging retains only recorded structured error information, and rejected staging is neither staged nor replayable. */
         }
     }
 
@@ -739,7 +757,7 @@ library package BibliotekRtgController {
     requirement <'contract.rtg.controller.operation_results'> operationResultSemantics {
         subject controller : RtgController;
         require constraint {
-            doc /* State-changing results use only applied, cutover_applied, cutover_failed, migration_abandoned, snapshot_persisted, restore_applied, replay_applied, or ledger_failures_flushed. Zero visible state change reports zero applied counts; validationReport is absent when skipped; details carries operation-specific JSON-safe evidence. */
+            doc /* State-changing results use only applied, cutover_applied, cutover_failed, migration_abandoned, snapshot_persisted, restore_applied, replay_applied, or ledger_failures_flushed. generatedIds maps every request-local reference resolved by that operation and is empty when none are generated. Zero visible state change reports zero applied counts; validationReport is absent when skipped; details carries operation-specific JSON-safe evidence. */
         }
     }
 

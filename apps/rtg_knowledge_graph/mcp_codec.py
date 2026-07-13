@@ -47,6 +47,7 @@ from components.rtg.migration import (
     RtgMigrationSnapshot,
 )
 from components.rtg.query import (
+    RtgQueryAggregation,
     RtgQueryAnchorBucket,
     RtgQueryDataRequirement,
     RtgQueryDiagnosticOptions,
@@ -54,6 +55,7 @@ from components.rtg.query import (
     RtgQueryOptions,
     RtgQueryOrderBy,
     RtgQueryPropertyPredicate,
+    RtgQueryResult,
     RtgQueryReturnSpec,
     RtgQuerySpec,
 )
@@ -77,7 +79,14 @@ class RtgMcpInputInvalid(ValueError):
 
 def encode_json(value: object) -> JsonValue:
     if dataclasses.is_dataclass(value):
-        data = dataclasses.asdict(cast(Any, value))
+        data = {
+            field.name: getattr(value, field.name)
+            for field in dataclasses.fields(cast(Any, value))
+        }
+        if isinstance(value, RtgQueryResult) and value.next_offset is None:
+            data.pop("next_offset", None)
+        if isinstance(value, RtgSchemaField) and not value.allowed_values:
+            data.pop("allowed_values", None)
         return {key: encode_json(item) for key, item in data.items()}
     if isinstance(value, UUID):
         return str(value)
@@ -498,11 +507,24 @@ def decode_schema_field(value: object) -> RtgSchemaField:
     data = _object(value, "schema_field")
     _reject_unknown_keys(
         data,
-        {"required", "value_kinds", "properties", "items"},
+        {
+            "required",
+            "value_kinds",
+            "properties",
+            "items",
+            "allowed_values",
+            "format",
+            "minimum",
+            "maximum",
+            "pattern",
+        },
         "schema_field",
         {"kind": "value_kinds", "type": "value_kinds", "types": "value_kinds"},
     )
     items = data.get("items")
+    allowed_values = _list(data.get("allowed_values", []), "schema_field.allowed_values")
+    if "allowed_values" in data and not allowed_values:
+        raise RtgMcpInputInvalid("schema_field.allowed_values must be non-empty when supplied")
     return RtgSchemaField(
         required=_required_bool(data, "required"),
         value_kinds=_str_tuple(data.get("value_kinds", []), "schema_field.value_kinds"),
@@ -511,6 +533,13 @@ def decode_schema_field(value: object) -> RtgSchemaField:
             for key, item in _object(data.get("properties", {}), "properties").items()
         },
         items=decode_schema_field(items) if items is not None else None,
+        allowed_values=tuple(
+            _json_scalar(item, "schema_field.allowed_values") for item in allowed_values
+        ),
+        format=_optional_str(data.get("format")),
+        minimum=_optional_number(data.get("minimum"), "schema_field.minimum"),
+        maximum=_optional_number(data.get("maximum"), "schema_field.maximum"),
+        pattern=_optional_str(data.get("pattern")),
     )
 
 
@@ -538,7 +567,7 @@ def decode_constraint_definition(value: object) -> RtgConstraintDefinition:
     elif kind == "cardinality":
         _reject_unknown_keys(
             payload,
-            {"query_spec", "counted_binding", "minimum", "maximum"},
+            {"query_spec", "counted_binding", "group_by_bindings", "minimum", "maximum"},
             "constraint_definition.payload",
             {
                 "query": "query_spec",
@@ -550,6 +579,10 @@ def decode_constraint_definition(value: object) -> RtgConstraintDefinition:
         decoded_payload = RtgConstraintCardinalityPayload(
             query_spec=decode_query_spec(payload["query_spec"]),
             counted_binding=_required_str(payload, "counted_binding"),
+            group_by_bindings=_str_tuple(
+                payload.get("group_by_bindings", []),
+                "constraint_definition.payload.group_by_bindings",
+            ),
             minimum=_optional_int(payload.get("minimum"), "constraint_definition.payload.minimum"),
             maximum=_optional_int(payload.get("maximum"), "constraint_definition.payload.maximum"),
         )
@@ -734,7 +767,7 @@ def _decode_query_link_requirement(value: object, index: int) -> RtgQueryLinkReq
     data = _object(value, label)
     _reject_unknown_keys(
         data,
-        {"name", "source_bucket", "target_bucket", "link_type_keys"},
+        {"name", "source_bucket", "target_bucket", "link_type_keys", "required"},
         label,
         {
             "source": "source_bucket",
@@ -748,6 +781,7 @@ def _decode_query_link_requirement(value: object, index: int) -> RtgQueryLinkReq
         source_bucket=_required_str(data, "source_bucket"),
         target_bucket=_required_str(data, "target_bucket"),
         link_type_keys=_str_tuple(data.get("link_type_keys", []), f"{label}.link_type_keys"),
+        required=_optional_bool(data.get("required"), True, f"{label}.required"),
     )
 
 
@@ -785,7 +819,7 @@ def decode_query_options(value: object | None) -> RtgQueryOptions | None:
     data = _object(value, "query_options")
     _reject_unknown_keys(
         data,
-        {"live_filter", "live_status_overlay", "order_by"},
+        {"live_filter", "live_status_overlay", "order_by", "limit", "offset", "distinct_rows"},
         "query_options",
     )
     overlay = _object(data.get("live_status_overlay", {}), "live_status_overlay")
@@ -795,6 +829,11 @@ def decode_query_options(value: object | None) -> RtgQueryOptions | None:
         order_by=tuple(
             _decode_query_order_by(item, index)
             for index, item in enumerate(_list(data.get("order_by", []), "query_options.order_by"))
+        ),
+        limit=_optional_int(data.get("limit"), "query_options.limit"),
+        offset=_optional_int(data.get("offset"), "query_options.offset") or 0,
+        distinct_rows=_optional_bool(
+            data.get("distinct_rows"), False, "query_options.distinct_rows"
         ),
     )
 
@@ -841,7 +880,14 @@ def decode_query_return_spec(value: object) -> RtgQueryReturnSpec:
     data = _object(value, "query_return_spec")
     _reject_unknown_keys(
         data,
-        {"anchor_buckets", "link_requirements", "data_requirements", "properties"},
+        {
+            "anchor_buckets",
+            "link_requirements",
+            "data_requirements",
+            "properties",
+            "group_by",
+            "aggregations",
+        },
         "query_return_spec",
         {
             "anchors": "anchor_buckets",
@@ -866,6 +912,29 @@ def decode_query_return_spec(value: object) -> RtgQueryReturnSpec:
                 _list(data.get("properties", []), "query_return_spec.properties")
             )
         ),
+        group_by=tuple(
+            _decode_query_return_property(item, index)
+            for index, item in enumerate(
+                _list(data.get("group_by", []), "query_return_spec.group_by")
+            )
+        ),
+        aggregations=tuple(
+            _decode_query_aggregation(item, index)
+            for index, item in enumerate(
+                _list(data.get("aggregations", []), "query_return_spec.aggregations")
+            )
+        ),
+    )
+
+
+def _decode_query_aggregation(value: object, index: int) -> RtgQueryAggregation:
+    label = f"query_return_spec.aggregations[{index}]"
+    data = _object(value, label)
+    _reject_unknown_keys(data, {"name", "function", "binding"}, label)
+    return RtgQueryAggregation(
+        name=_required_str(data, "name"),
+        function=_required_str(data, "function"),
+        binding=_required_str(data, "binding"),
     )
 
 
@@ -1296,6 +1365,20 @@ def _optional_str(value: object) -> str | None:
     if not isinstance(value, str):
         raise _type_error("value", "string or null", "value must be a string or null")
     return value
+
+
+def _optional_number(value: object, label: str) -> int | float | None:
+    if value is None:
+        return None
+    if isinstance(value, bool) or not isinstance(value, int | float):
+        raise _type_error(label, "number or null", f"{label} must be numeric or null")
+    return value
+
+
+def _json_scalar(value: object, label: str) -> str | int | float | bool | None:
+    if value is None or isinstance(value, str | int | float | bool):
+        return value
+    raise _type_error(label, "JSON scalar", f"{label} must contain scalar values")
 
 
 def _required_bool(data: dict[str, object], key: str, label: str | None = None) -> bool:

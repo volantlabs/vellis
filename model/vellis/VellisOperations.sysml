@@ -16,16 +16,14 @@ package VellisOperations {
         enum requestPatterns; enum schemaStagingMinimal; enum toolCallShapes;
         enum liveWrite; enum lookupExamples; enum queryExamples;
         enum recoveryAndReplay; enum migrationHistory; enum migrationAbandonment;
-        enum everydayLifeSchema; enum schemaDesign;
+        enum everydayLifeSchema; enum schemaDesign; enum capabilities;
     }
     enum def VellisQueryResponseFormat {
         enum full;
         enum properties_only;
     }
-    enum def VellisQueryResponseKind {
-        enum full;
-        enum propertiesOnly;
-    }
+    enum def VellisMutationResponseFormat { enum compact; enum full; }
+    enum def VellisQueryResponseKind { enum full; enum properties_only; }
     enum def VellisResolutionStatus { enum resolved; }
     enum def VellisSnapshotSummaryStatus {
         enum snapshot_exported;
@@ -35,19 +33,20 @@ package VellisOperations {
     attribute def JsonObjectList { attribute values[0..*] : JsonObject; doc /* Encodes directly as a JSON array, not an object containing values. */ }
     attribute def StringList { attribute values[0..*] : String; doc /* Encodes directly as a JSON array, not an object containing values. */ }
     attribute def RtgGraphLinkWriteList { attribute values[0..*] : RtgGraphLinkWrite; doc /* Encodes directly as a JSON array of canonical link-write objects. */ }
-    attribute def VellisUsageGuide { attribute topic : VellisUsageGuideTopic; attribute content : JsonObject; }
+    attribute def VellisUsageGuide { attribute topic : VellisUsageGuideTopic; attribute content : JsonObject; doc /* The logical guide has one typed topic and topic-specific JSON content. The MCP realization uses an explicit flattened codec that emits topic alongside the content fields for compatibility with the established guide wire format. */ }
     attribute def VellisStarterSchemaSummary {
         attribute ontologyId : String;
-        attribute ontologyVersion : String;
+        attribute version : String;
         attribute status : VellisStarterSchemaState;
         attribute anchorTypeKeys[0..*] : String;
         attribute linkTypeKeys[0..*] : String;
+        attribute recovery : String;
     }
     attribute def VellisSystemState :> RtgControllerSystemState {
         attribute starterSchema : VellisStarterSchemaSummary;
     }
     attribute def VellisSchemaDefinitionRequest { attribute kind : RtgSchemaDefinitionKind; attribute typeKey : String; attribute description : String; attribute payload : RtgSchemaPayload; doc /* Description and typeKey are non-empty; payload family must match kind. */ }
-    attribute def VellisSchemaDefinitionRequestList { attribute definitions[1..*] : VellisSchemaDefinitionRequest; doc /* Encodes directly as the schema_definitions JSON array. */ }
+    attribute def VellisSchemaDefinitionRequestList { attribute definitions[1..*] : VellisSchemaDefinitionRequest; doc /* Encodes directly as the schema_definitions JSON array. Each kind-and-typeKey pair is unique within one request so generated-schema identity correlation is lossless. */ }
     attribute def VellisSchemaRetirement { attribute kind : RtgSchemaDefinitionKind; attribute typeKey : String; }
     attribute def VellisSchemaRetirementList { attribute definitions[0..*] : VellisSchemaRetirement; doc /* Encodes directly as the retire_live_schema JSON array. */ }
     attribute def VellisAnchorFact { attribute 'ref'[0..1] : RtgChangeReference; attribute type : String; attribute properties : JsonObject; attribute system : JsonObject; }
@@ -55,9 +54,10 @@ package VellisOperations {
     attribute def VellisAnchorRecordList { attribute records[1..*] : VellisAnchorRecord; doc /* Encodes directly as the anchor_records JSON array. */ }
     attribute def VellisGeneratedFactReference { attribute anchorIndex : Integer; attribute factIndex : Integer; attribute localRef : String; }
     attribute def VellisGeneratedReferences { attribute facts[0..*] : VellisGeneratedFactReference; }
-    attribute def VellisSchemaMigrationResult { attribute generatedSchemaIds : JsonObject; attribute submittedKnowledgeChanges : RtgChangeBatch; attribute operation : RtgControllerOperationResult; }
+    attribute def VellisMutationResponseOptions { attribute format : VellisMutationResponseFormat = VellisMutationResponseFormat::compact; }
+    attribute def VellisSchemaMigrationResult { attribute format : VellisMutationResponseFormat; attribute generatedSchemaIds : JsonObject; attribute submittedKnowledgeChanges[0..1] : RtgChangeBatch; attribute operation : RtgControllerOperationResult; doc /* generatedSchemaIds maps each unique kind:type_key request key to the generated durable UUID. */ }
     attribute def VellisAnchorValidationResult { attribute submittedGraphChanges : RtgGraphChangeSet; attribute generatedRefs : VellisGeneratedReferences; attribute validation : RtgControllerLiveGraphValidationResult; }
-    attribute def VellisAnchorApplyResult { attribute submittedGraphChanges : RtgGraphChangeSet; attribute generatedRefs : VellisGeneratedReferences; attribute operation : RtgControllerOperationResult; }
+    attribute def VellisAnchorApplyResult { attribute format : VellisMutationResponseFormat; attribute generatedIds : JsonObject; attribute submittedGraphChanges[0..1] : RtgGraphChangeSet; attribute generatedRefs : VellisGeneratedReferences; attribute operation : RtgControllerOperationResult; }
     attribute def VellisQueryResponseOptions { attribute format : VellisQueryResponseFormat = VellisQueryResponseFormat::full; }
     attribute def VellisQueryPropertiesRow { attribute rowIndex : Integer; attribute properties : JsonObject; }
     abstract attribute def VellisQueryResponse {
@@ -68,7 +68,7 @@ package VellisOperations {
         :>> kind = VellisQueryResponseKind::full;
         doc /* Full response retaining the complete canonical query result shape. */
     }
-    attribute def VellisQueryPropertiesResponse :> VellisQueryResponse { :>> kind = VellisQueryResponseKind::propertiesOnly; attribute status : String; attribute format : VellisQueryResponseFormat = VellisQueryResponseFormat::properties_only; attribute rowCount : Integer; attribute rows[0..*] : VellisQueryPropertiesRow; attribute diagnostics[0..*] : RtgQueryDiagnostic; doc /* Compact response retaining final row order, selected properties, and diagnostics; status is query_executed and format is properties_only. */ }
+    attribute def VellisQueryPropertiesResponse :> VellisQueryResponse { :>> kind = VellisQueryResponseKind::properties_only; attribute status : String; attribute format : VellisQueryResponseFormat = VellisQueryResponseFormat::properties_only; attribute rowCount : Integer; attribute rows[0..*] : JsonObject; attribute totalRowCount : Integer; attribute returnedRowCount : Integer; attribute nextOffset[0..1] : Integer; attribute diagnostics[0..*] : RtgQueryDiagnostic; doc /* Compact response retaining final row order, pagination metadata, and diagnostics; kind and format are properties_only and status is query_executed. Non-aggregate rows encode VellisQueryPropertiesRow. Aggregate rows preserve the canonical aggregation row object: row_index, group_by, and each caller-named aggregation value. */ }
     attribute def VellisResolvedAnchor { attribute resourceId : Uuid; attribute properties : JsonObject; }
     attribute def VellisAnchorResolutionResult { attribute status : VellisResolutionStatus; attribute matchCount : Integer; attribute matches[0..*] : VellisResolvedAnchor; attribute submittedQuery : JsonObject; attribute diagnostics[0..*] : RtgQueryDiagnostic; attribute guidance[0..*] : String; }
     enum def VellisSnapshotExportKind { enum full; enum summary; }
@@ -97,8 +97,8 @@ package VellisOperations {
         in migration_id : String[1]; in description : String[1];
         in schema_definitions : VellisSchemaDefinitionRequestList[1];
         in retire_live_schema : VellisSchemaRetirementList[0..1];
-        in validation_mode : RtgControllerValidationMode[0..1] default = RtgControllerValidationMode::strict; out result : VellisSchemaMigrationResult[1];
-        doc /* Generate a UUID for each schema candidate, force each candidate non-live, resolve each retirement to exactly one live definition, create a ready migration whose membership covers those candidates, submit canonical staged knowledge changes, and return generated IDs, submitted changes, and the controller outcome. */
+        in validation_mode : RtgControllerValidationMode[0..1] default = RtgControllerValidationMode::strict; in response_options : VellisMutationResponseOptions[0..1]; out result : VellisSchemaMigrationResult[1];
+        doc /* Generate a UUID for each schema candidate, force each candidate non-live, resolve each retirement to exactly one live definition, create a ready migration whose membership covers those candidates, and submit canonical staged knowledge changes. Compact is the default and omits submittedKnowledgeChanges; full adds exactly the submitted batch without changing the operation. */
         @FailureContract { errorIds = ("VellisRequestInvalid", "RtgControllerValidationFailed", "RtgControllerPreconditionFailed", "RtgControllerApplyFailed"); }
     }
     action def <'operation.vellis.rtg_validate_live_anchor_records'> RtgValidateLiveAnchorRecords {
@@ -109,8 +109,8 @@ package VellisOperations {
     }
     action def <'operation.vellis.rtg_apply_live_anchor_records'> RtgApplyLiveAnchorRecords {
         in anchor_records : VellisAnchorRecordList[1]; in link_writes : RtgGraphLinkWriteList[0..1];
-        in validation_mode : RtgControllerValidationMode[0..1] default = RtgControllerValidationMode::strict; out result : VellisAnchorApplyResult[1];
-        doc /* Compile anchor-with-facts input identically to the validation action, apply the canonical graph changes through the controller, and return compiled changes, generated fact references, and operation outcome. */
+        in validation_mode : RtgControllerValidationMode[0..1] default = RtgControllerValidationMode::strict; in response_options : VellisMutationResponseOptions[0..1]; out result : VellisAnchorApplyResult[1];
+        doc /* Compile anchor-with-facts input identically to validation and apply it once through the controller. Compact is the default and returns all generated local-reference UUIDs plus generated fact references while omitting submittedGraphChanges; full adds exactly the submitted graph changes without changing the operation. */
         @FailureContract { errorIds = ("VellisRequestInvalid", "RtgControllerValidationFailed", "RtgControllerApplyFailed"); }
     }
     action def <'operation.vellis.rtg_validate_live_graph_changes'> RtgValidateLiveGraphChanges {
@@ -145,7 +145,7 @@ package VellisOperations {
     action def <'operation.vellis.rtg_execute_query'> RtgExecuteQuery {
         in query_spec : RtgQuerySpec[1]; in query_options : RtgQueryOptions[0..1];
         in response_options : VellisQueryResponseOptions[0..1]; out result : VellisQueryResponse[1];
-        doc /* Execute the canonical read-only query. full returns RtgQueryResult unchanged; properties_only returns row_index plus requested properties, row count, and diagnostics, adding empty-return-property guidance when appropriate. */
+        doc /* Execute the canonical read-only query. full returns RtgQueryResult unchanged. properties_only returns pagination metadata and diagnostics plus either row_index with requested properties for non-aggregate queries or canonical aggregation rows for aggregate queries, adding empty-return-property guidance when appropriate. */
         @FailureContract { errorIds = ("VellisRequestInvalid", "RtgQuerySpecInvalid", "RtgQueryUnsupported"); }
     }
     action def <'operation.vellis.rtg_resolve_anchor_by_fact'> RtgResolveAnchorByFact {
@@ -171,7 +171,7 @@ package VellisOperations {
     action def <'operation.vellis.rtg_load_persisted_snapshot'> RtgLoadPersistedSnapshot { in relative_path : JsonRelativePath[1]; in return_snapshot : Boolean[0..1] default = true; out result : VellisLoadedSnapshotResult[1]; doc /* Load and validate one persisted snapshot, always return path and compact summary, and omit the full snapshot only when requested; do not apply it. */ @FailureContract { errorIds = ("VellisRequestInvalid", "RtgControllerSnapshotFailed"); } }
     action def <'operation.vellis.rtg_replay_ledger'> RtgReplayLedger { in replay_options : RtgControllerReplayOptions[0..1]; out result : RtgControllerOperationResult[1]; doc /* Reconstruct state from an empty or explicit snapshot seed using the selected ascending ledger window. */ @FailureContract { errorIds = ("VellisRequestInvalid", "RtgControllerReplayFailed"); } }
     action def <'operation.vellis.rtg_verify_replay_from_ledger'> RtgVerifyReplayFromLedger { in replay_options : RtgControllerReplayOptions[0..1]; out result : RtgControllerReplayVerificationResult[1]; doc /* Replay into isolated state and return summaries, count differences, replay window, and validation without replacing current state. */ @FailureContract { errorIds = ("VellisRequestInvalid", "RtgControllerReplayFailed"); } }
-    action def <'operation.vellis.rtg_list_migration_history'> RtgListMigrationHistory { out result : RtgControllerMigrationHistory[1]; doc /* Return ledger-backed staged, cutover-applied, cutover-failed, and abandoned events in ledger order. */ @FailureContract { errorIds = ("RtgControllerReplayFailed"); } }
+    action def <'operation.vellis.rtg_list_migration_history'> RtgListMigrationHistory { out result : RtgControllerMigrationHistory[1]; doc /* Return ledger-backed staged, staging-rejected, staging-failed, cutover-applied, cutover-failed, and abandoned events in ledger order. */ @FailureContract { errorIds = ("RtgControllerReplayFailed"); } }
     action def <'operation.vellis.rtg_flush_ledger_failures'> RtgFlushLedgerFailures { out result : RtgControllerOperationResult[1]; doc /* Retry queued audit records in original order and report remaining degraded-audit state. */ @FailureContract { errorIds = ("RtgControllerApplyFailed"); } }
     action def <'operation.vellis.rtg_restore_from_snapshot'> RtgRestoreFromSnapshot { in 'snapshot' : RtgSystemSnapshot[1]; in restore_options : RtgControllerRestoreOptions[0..1]; out result : RtgControllerOperationResult[1]; doc /* Validate and atomically restore coordinated state; record the operation by default and reserve skip for internal recovery. */ @FailureContract { errorIds = ("VellisRequestInvalid", "RtgControllerSnapshotFailed"); } }
 
@@ -193,28 +193,28 @@ package VellisOperations {
     requirement <'contract.vellis.facade.usage_guides'> usageGuideSemantics {
         subject operation : RtgGetUsageGuide;
         require constraint {
-            doc /* The fourteen guide topics cover: the installed Everyday Life schema; safe RTG schema design and evolution; MCP bootstrap sequence; concise operator rules; state-driven workflows; ordinary-request-to-workflow mapping; minimal schema staging; exact top-level tool shapes; live writes; identity lookup before links; query construction; snapshot/restore/replay recovery; durable migration history; and safe abandonment. Generic examples do not silently replace or specialize an application's modeled schema. */
+            doc /* The fifteen guide topics cover: the installed Everyday Life schema; safe RTG schema design and evolution; compact machine-readable tool capabilities; MCP bootstrap sequence; concise operator rules; state-driven workflows; ordinary-request-to-workflow mapping; minimal schema staging; exact top-level tool shapes; live writes; identity lookup before links; query construction; snapshot/restore/replay recovery; durable migration history; and safe abandonment. Generic examples do not silently replace or specialize an application's modeled schema. */
         }
     }
 
     requirement <'contract.vellis.facade.schema_migration_compilation'> schemaMigrationCompilation {
         subject operation : RtgStageSchemaMigration;
         require constraint {
-            doc /* Each requested definition becomes one newly identified non-live schema write and one schema_make_live member. Each retirement selector must resolve to exactly one live definition and becomes schema_make_non_live. One ready migration with the supplied ID and description owns the membership; the returned submitted batch is exactly the batch passed to staging. */
+            doc /* Each unique kind-and-typeKey request becomes one newly identified non-live schema write and one schema_make_live member; duplicate request keys are rejected before controller invocation. generatedSchemaIds maps kind:type_key to that UUID. Each retirement selector must resolve to exactly one live definition and becomes schema_make_non_live. One ready migration with the supplied ID and description owns the membership. Compact response is default and full response adds the exact submitted batch; shaping has no mutation effect. */
         }
     }
 
     requirement <'contract.vellis.facade.anchor_record_compilation'> anchorRecordCompilation {
         subject facade : VellisApplicationFacade;
         require constraint {
-            doc /* Each anchor record becomes one canonical anchor write. Each nested fact becomes one data-object write associated to that anchor; an omitted fact reference receives a unique request-local reference reported in generatedRefs. Link writes pass through unchanged. Validation and apply use the identical compilation. */
+            doc /* Each anchor record becomes one canonical anchor write. Each nested fact becomes one data-object write associated to that anchor; an omitted fact reference receives a unique request-local reference reported in generatedRefs. Link writes pass through unchanged. Validation and apply use identical compilation. Apply returns every resolved local-reference UUID; compact is default and full additionally returns the exact submitted graph changes. */
         }
     }
 
     requirement <'contract.vellis.facade.query_semantics'> queryFacadeSemantics {
         subject facade : VellisApplicationFacade;
         require constraint {
-            doc /* Full query responses preserve the canonical query result. properties_only retains final row order, row_index, selected properties, and diagnostics while omitting bindings and unrequested records. Anchor resolution compiles one live-only equality query and returns every deterministic match without guessing uniqueness. */
+            doc /* Full query responses preserve the canonical query result. properties_only retains final row order, pagination metadata, and diagnostics while omitting bindings and unrequested records; non-aggregate rows contain row_index plus selected properties, while aggregate rows preserve row_index, group_by, and caller-named aggregation values. Anchor resolution compiles one live-only equality query and returns every deterministic match without guessing uniqueness. */
         }
     }
 
@@ -289,8 +289,9 @@ package VellisOperations {
             action shapeResult {
                 in attribute submittedChanges = compileMigration.knowledgeChanges;
                 in attribute operation = invokeStageKnowledgeChanges.result;
+                in attribute responseOptions = rtgStageSchemaMigration.response_options;
                 out attribute result = rtgStageSchemaMigration.result;
-                doc /* Return generated identities, the submitted canonical changes, and the controller outcome. */
+                doc /* Return compact generated identities and controller evidence by default; include submitted canonical changes only when full response detail is requested. */
             }
             first invokeExportSystemSnapshot then compileMigration;
             first compileMigration then invokeStageKnowledgeChanges;
@@ -333,6 +334,7 @@ package VellisOperations {
                 in attribute graphChanges = compileRecords.graphChanges;
                 in attribute generatedRefs = compileRecords.generatedRefs;
                 in attribute operation = invokeController.result;
+                in attribute responseOptions = rtgApplyLiveAnchorRecords.response_options;
                 out attribute result = rtgApplyLiveAnchorRecords.result;
             }
             first compileRecords then invokeController;

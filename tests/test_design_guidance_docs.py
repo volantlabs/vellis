@@ -29,6 +29,8 @@ def test_documentation_sync_guidance_uses_model_to_projection_direction() -> Non
         "generated",
         "projection",
         "second source of component truth",
+        "Include untracked files",
+        "local-link",
     ):
         assert term in text
 
@@ -57,10 +59,24 @@ def test_documentation_retirement_preserves_non_contract_knowledge() -> None:
         assert term in text
 
 
-def test_component_authoring_distinguishes_library_application_and_distribution() -> None:
-    text = Path(
-        ".agents/skills/component-authoring/references/model-organization.md"
+def test_rtg_guidance_covers_schema_refinements_and_grouped_cardinality() -> None:
+    schema_text = Path(
+        ".agents/skills/rtg-schema-design/references/schema-design.md"
     ).read_text(encoding="utf-8")
+    operation_text = Path(".agents/skills/rtg-knowledge-graph-mcp/SKILL.md").read_text(
+        encoding="utf-8"
+    )
+
+    for term in ("allowed_values", "date_time", "numeric bounds", "RE2"):
+        assert term in schema_text
+    for term in ("capabilities", "group_by_bindings", "unique tuple", "one global count"):
+        assert term in operation_text
+
+
+def test_component_authoring_distinguishes_library_application_and_distribution() -> None:
+    text = Path(".agents/skills/component-authoring/references/model-organization.md").read_text(
+        encoding="utf-8"
+    )
 
     for term in (
         "library package",

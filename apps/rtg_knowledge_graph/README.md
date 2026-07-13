@@ -128,6 +128,13 @@ The same config is emitted at `mcp.transports.localhost_http.client_config`. Kee
 to `127.0.0.1`; it is intentionally unauthenticated and intended only for local agents on the same
 machine.
 
+On restart, recovered nonempty schema that is not the exact deterministic Everyday Life ontology is
+served as `custom`, even when it uses keys such as `Person`, `Project`, or `Task`. Type-key overlap
+never installs or overlays starter schema. Reuse of a deterministic ontology UUID for an
+incompatible definition, or a partial deterministic ontology installation, fails closed with
+`vellis doctor` guidance and leaves recovered state unchanged. `--empty` disables starter
+installation; it does not reject healthy custom state.
+
 Agent-facing RTG MCP usage guidance lives in
 `.agents/skills/rtg-knowledge-graph-mcp/SKILL.md`. Claude Code sees the same source through the
 `.claude/skills/rtg-knowledge-graph-mcp` symlink; run `just skills-sync` if the link is missing.
@@ -135,20 +142,36 @@ Agent-facing RTG MCP usage guidance lives in
 The MCP surface includes low-level controller tools plus agent-facing response shaping:
 
 - Use `rtg_stage_schema_migration` for normal schema bootstrap/evolution and
-  `rtg_stage_knowledge_changes` only for advanced normalized batches.
+  `rtg_stage_knowledge_changes` only for advanced normalized batches. Definition `(kind,
+  type_key)` pairs must be unique within one ergonomic request; compact results correlate every
+  generated candidate UUID through `generated_schema_ids["kind:type_key"]`.
 - Use `rtg_validate_live_anchor_records` and `rtg_apply_live_anchor_records` for repeated
-  anchor-with-required-facts ingestion; they compile to canonical `graph_changes`.
+  anchor-with-required-facts ingestion; they compile to canonical `graph_changes`. Successful
+  applies default to `response_options: {"format":"compact"}`, return durable UUIDs in
+  `generated_ids`, and retain generated fact-position mapping. Use `format:"full"` only when the
+  submitted canonical payload is needed for debugging.
 - Use `rtg_validate_live_graph_changes` or `rtg_validate_live_anchor_records` before risky
   writes. Their `validation_options` support `tracks` and `finding_limit`; mutation tools use
   `validation_mode`.
 - Use `rtg_resolve_anchor_by_fact` for common exact anchor lookups before link writes; it returns
   the submitted `rtg_execute_query` payload so query remains the canonical read language.
 - Use `rtg_execute_query` with `response_options: {"format": "properties_only"}` for compact
-  human-facing rows when UUID bindings are not needed.
+  human-facing rows when UUID bindings are not needed. Non-aggregate rows contain selected
+  `properties`; aggregate rows retain `group_by` and caller-named count fields directly. Response
+  `kind` is `full` or `properties_only`. Binding names are unique across anchor, link, and data
+  requirements, and aggregation cannot be combined with `distinct_rows`.
 - Use `rtg_persist_system_snapshot(..., return_snapshot:false)` and
   `rtg_load_persisted_snapshot(..., return_snapshot:false)` to keep MCP transcripts compact.
-- Use replay `details.replay_window` and replay verification `replay_window` to explain which
-  ledger positions were considered, especially when starting from `start_snapshot_path`.
+  Direct snapshot exports identify their response as `kind:"full"` or `kind:"summary"`.
+- Use replay verification `state_equivalent_to_live` and the domain digests for exact recovery
+  evidence. `ledger_cursor_equivalent_to_live` is separate; accounting fields explain scanned,
+  eligible, replayed, administrative, terminal, and rejected records.
+- Use `rtg_list_migration_history` for successful, abandoned, rejected, and failed schema
+  proposals even when current migration-store counts are zero.
+- Use `rtg_get_usage_guide(topic="capabilities")` for lanes, mutation/ledger behavior, dry-run
+  predecessors, and audience metadata for all registered tools.
+- Query options support deterministic `limit`/`offset` pagination and `distinct_rows`; return
+  aggregation supports grouping returned property paths and distinct UUID `count`.
 - Cold agents can call `rtg_get_usage_guide` with `topic: "workflow_patterns"` for common RTG
   operating sequences, or `topic: "request_patterns"` to map ordinary user requests to workflow
   IDs. `rtg_get_system_state` returns `recommended_workflows` for the current state.
@@ -306,6 +329,7 @@ Agent operation notes:
 Manual eval materials:
 
 - `docs/guides/vellis/evals/rtg-beta-known-good-walkthrough.md`
+- `docs/guides/vellis/evals/rtg-broad-beta-gates.md`
 - `docs/guides/vellis/evals/rtg-agent-affordance-eval-runbook.md`
 - `docs/guides/vellis/evals/rtg-agent-affordance-eval-prompt.md`
 - `docs/guides/vellis/evals/rtg-individual-life-graph-beta-prompt.md`

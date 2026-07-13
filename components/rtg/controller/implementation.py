@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import dataclasses
+import hashlib
 import json
 import threading
 from datetime import UTC, datetime
@@ -26,6 +27,7 @@ from components.rtg.change_validation.protocol import (
     RtgMigrationStatusChange,
     RtgSchemaChangeSet,
     RtgSchemaDefinitionWrite,
+    RtgValidationFinding,
     RtgValidationOptions,
     RtgValidationReport,
 )
@@ -49,6 +51,7 @@ from components.rtg.controller.protocol import (
     RtgControllerLiveGraphValidationResult,
     RtgControllerMigrationCounts,
     RtgControllerMigrationHistory,
+    RtgControllerMigrationHistoryEvent,
     RtgControllerObjectNotFound,
     RtgControllerOperationResult,
     RtgControllerPreconditionFailed,
@@ -91,6 +94,7 @@ from components.rtg.migration.protocol import (
     RtgMigrationSnapshot,
 )
 from components.rtg.query.protocol import (
+    RtgQueryAggregation,
     RtgQueryAnchorBucket,
     RtgQueryDataRequirement,
     RtgQueryDiagnosticOptions,
@@ -278,7 +282,7 @@ class InProcessRtgController:
             raise RtgControllerPreconditionFailed("validation_mode must be strict or skip")
         transaction_id = uuid4()
         with self._lock:
-            resolved = self._resolve_batch(change_batch)
+            resolved, generated_ids = self._resolve_batch_with_generated_ids(change_batch)
             if operation_name == "apply_live_graph_changes":
                 self._validate_live_graph_lane(resolved.graph_changes)
             if operation_name == "stage_knowledge_changes":
@@ -316,6 +320,7 @@ class InProcessRtgController:
             result = RtgControllerOperationResult(
                 status="applied",
                 transaction_id=transaction_id,
+                generated_ids=generated_ids,
                 applied_changes=applied,
                 validation_report=validation_report,
                 details=_operation_details(operation_name, resolved),
@@ -431,9 +436,7 @@ class InProcessRtgController:
                 )
             except Exception as error:
                 try:
-                    self.restore_from_snapshot(
-                        pre_snapshot, RtgControllerRestoreOptions(ledger_mode="skip")
-                    )
+                    self._replace_state_from_snapshot(pre_snapshot, validate_semantics=False)
                 except Exception as restore_error:
                     message = f"{error}; restore failed: {restore_error}"
                     self._record_ledger(
@@ -658,8 +661,9 @@ class InProcessRtgController:
                 ledger_record_count=ledger_record_count,
                 migration_counts_scope="current_migration_store",
                 migration_history_hint=(
-                    "Current migration counts are clean; ledger-backed migration events are "
-                    "available through rtg_list_migration_history."
+                    "Migration counts describe only the current migration store; ledger-backed "
+                    "migration events may include staged, terminal, rejected, or failed proposals "
+                    "through rtg_list_migration_history."
                     if migration_history_available
                     else None
                 ),
@@ -822,58 +826,7 @@ class InProcessRtgController:
                 if request_failure is not None:
                     ledger_failures.append(request_failure)
             try:
-                candidate_graph = type(self._graph).import_snapshot(snapshot.graph)
-                candidate_schema = type(self._schema).import_snapshot(snapshot.schema)
-                candidate_constraints = type(self._constraints).import_snapshot(
-                    snapshot.constraints
-                )
-                candidate_migration = type(self._migration).import_snapshot(snapshot.migration)
-                validation_report = self._change_validator.validate_graph_state(
-                    candidate_graph,
-                    candidate_schema,
-                    candidate_constraints,
-                    candidate_migration,
-                    self._query_engine,
-                    validation_options=RtgValidationOptions(),
-                )
-                if not validation_report.accepted:
-                    codes = ", ".join(
-                        sorted({finding.code for finding in validation_report.findings})
-                    )
-                    raise RtgControllerSnapshotFailed(
-                        f"snapshot state violates controller invariants: {codes}",
-                        diagnostic=rtg_diagnostic(
-                            code="controller.snapshot.semantic_validation_failed",
-                            category="snapshot_recovery",
-                            path="snapshot",
-                            problem=(
-                                "The coordinated snapshot is structurally valid but "
-                                "semantically inconsistent."
-                            ),
-                            remedy=(
-                                "Repair or select a snapshot whose graph, schema, constraints, "
-                                "and migration state validate together."
-                            ),
-                            mutation_state="live_state_preserved",
-                        ),
-                    )
-                (
-                    self._graph,
-                    self._schema,
-                    self._constraints,
-                    self._migration,
-                    self._last_ledger_position,
-                    self._last_transaction_id,
-                    self._last_transaction_timestamp,
-                ) = (
-                    candidate_graph,
-                    candidate_schema,
-                    candidate_constraints,
-                    candidate_migration,
-                    snapshot.last_ledger_position,
-                    snapshot.last_transaction_id,
-                    snapshot.last_transaction_timestamp,
-                )
+                self._replace_state_from_snapshot(snapshot, validate_semantics=True)
             except Exception as error:
                 if should_record:
                     self._record_ledger(
@@ -899,6 +852,64 @@ class InProcessRtgController:
                     )
             return result
 
+    def _replace_state_from_snapshot(
+        self,
+        snapshot: RtgSystemSnapshot,
+        *,
+        validate_semantics: bool,
+    ) -> None:
+        candidate_graph = type(self._graph).import_snapshot(snapshot.graph)
+        candidate_schema = type(self._schema).import_snapshot(snapshot.schema)
+        candidate_constraints = type(self._constraints).import_snapshot(snapshot.constraints)
+        candidate_migration = type(self._migration).import_snapshot(snapshot.migration)
+        if validate_semantics:
+            validation_report = self._change_validator.validate_graph_state(
+                candidate_graph,
+                candidate_schema,
+                candidate_constraints,
+                candidate_migration,
+                self._query_engine,
+                validation_options=RtgValidationOptions(),
+            )
+            if not validation_report.accepted:
+                codes = ", ".join(
+                    sorted({finding.code for finding in validation_report.findings})
+                )
+                raise RtgControllerSnapshotFailed(
+                    f"snapshot state violates controller invariants: {codes}",
+                    diagnostic=rtg_diagnostic(
+                        code="controller.snapshot.semantic_validation_failed",
+                        category="snapshot_recovery",
+                        path="snapshot",
+                        problem=(
+                            "The coordinated snapshot is structurally valid but semantically "
+                            "inconsistent."
+                        ),
+                        remedy=(
+                            "Repair or select a snapshot whose graph, schema, constraints, and "
+                            "migration state validate together."
+                        ),
+                        mutation_state="live_state_preserved",
+                    ),
+                )
+        (
+            self._graph,
+            self._schema,
+            self._constraints,
+            self._migration,
+            self._last_ledger_position,
+            self._last_transaction_id,
+            self._last_transaction_timestamp,
+        ) = (
+            candidate_graph,
+            candidate_schema,
+            candidate_constraints,
+            candidate_migration,
+            snapshot.last_ledger_position,
+            snapshot.last_transaction_id,
+            snapshot.last_transaction_timestamp,
+        )
+
     def replay_ledger(
         self,
         replay_options: RtgControllerReplayOptions | None = None,
@@ -908,9 +919,7 @@ class InProcessRtgController:
             start_source = _replay_start_source(options)
             start_snapshot = self._resolve_replay_start_snapshot(options)
             if start_snapshot is not None:
-                self.restore_from_snapshot(
-                    start_snapshot, RtgControllerRestoreOptions(ledger_mode="skip")
-                )
+                self._replace_state_from_snapshot(start_snapshot, validate_semantics=False)
             elif not self._controller_state_empty():
                 raise RtgControllerReplayFailed(
                     "replay requires an empty controller state or an explicit start snapshot; "
@@ -960,6 +969,7 @@ class InProcessRtgController:
                 ledger_records_seen=len(rows),
             )
             successful_transactions = _successful_transaction_metadata(rows)
+            accounting = _replay_accounting(rows, successful_transactions)
             replayed = 0
             for row in rows:
                 if row["record_kind"] != "request":
@@ -1035,6 +1045,7 @@ class InProcessRtgController:
                 transaction_id=uuid4(),
                 details={
                     "ledger_records_seen": len(rows),
+                    **accounting,
                     "mutating_requests_replayed": replayed,
                     "replay_window": replay_window,
                 },
@@ -1047,11 +1058,20 @@ class InProcessRtgController:
         with self._lock:
             options = replay_options or RtgControllerReplayOptions()
             start_source = _replay_start_source(options)
+            preserved_instances = (
+                self._graph,
+                self._schema,
+                self._constraints,
+                self._migration,
+                self._last_ledger_position,
+                self._last_transaction_id,
+                self._last_transaction_timestamp,
+            )
             preserved = self.export_system_snapshot()
             start_snapshot = self._resolve_replay_start_snapshot(options)
             if start_snapshot is None:
                 start_snapshot = self._empty_system_snapshot()
-            pre_summary = _snapshot_summary(start_snapshot)
+            start_summary = _snapshot_summary(start_snapshot)
             try:
                 replay_result = self.replay_ledger(
                     dataclasses.replace(
@@ -1059,12 +1079,36 @@ class InProcessRtgController:
                     )
                 )
                 post_snapshot = self.export_system_snapshot()
+                replayed_summary = _snapshot_summary(post_snapshot)
+                live_summary = _snapshot_summary(preserved)
+                replay_delta = _summary_count_diffs(start_summary, replayed_summary)
+                live_count_diffs = _summary_count_diffs(replayed_summary, live_summary)
+                replayed_digest = _domain_state_digest(post_snapshot)
+                live_digest = _domain_state_digest(preserved)
                 validation_report = self.validate_graph()
                 return RtgControllerReplayVerificationResult(
                     status="replay_verified",
                     ledger_records_seen=_json_int(replay_result.details.get("ledger_records_seen")),
+                    ledger_records_scanned=_json_int(
+                        replay_result.details.get("ledger_records_seen")
+                    ),
+                    request_records_seen=_json_int(
+                        replay_result.details.get("request_records_seen")
+                    ),
+                    eligible_mutating_requests=_json_int(
+                        replay_result.details.get("eligible_mutating_requests")
+                    ),
                     mutating_requests_replayed=int(
                         _json_int(replay_result.details.get("mutating_requests_replayed"))
+                    ),
+                    administrative_records_skipped=_json_int(
+                        replay_result.details.get("administrative_records_skipped")
+                    ),
+                    terminal_records_skipped=_json_int(
+                        replay_result.details.get("terminal_records_skipped")
+                    ),
+                    failed_or_rejected_transactions_skipped=_json_int(
+                        replay_result.details.get("failed_or_rejected_transactions_skipped")
                     ),
                     replay_window=cast(
                         JsonObject,
@@ -1073,15 +1117,32 @@ class InProcessRtgController:
                             "start_source": start_source,
                         },
                     ),
-                    pre_summary=pre_summary,
-                    post_summary=_snapshot_summary(post_snapshot),
-                    count_diffs=_summary_count_diffs(pre_summary, _snapshot_summary(post_snapshot)),
+                    start_summary=start_summary,
+                    replayed_summary=replayed_summary,
+                    live_summary=live_summary,
+                    replay_delta=replay_delta,
+                    live_count_diffs=live_count_diffs,
+                    replayed_state_digest=replayed_digest,
+                    live_state_digest=live_digest,
+                    state_equivalent_to_live=replayed_digest == live_digest,
+                    ledger_cursor_equivalent_to_live=(
+                        post_snapshot.last_ledger_position == preserved.last_ledger_position
+                    ),
+                    pre_summary=start_summary,
+                    post_summary=replayed_summary,
+                    count_diffs=replay_delta,
                     validation_report=validation_report,
                 )
             finally:
-                self.restore_from_snapshot(
-                    preserved, RtgControllerRestoreOptions(ledger_mode="skip")
-                )
+                (
+                    self._graph,
+                    self._schema,
+                    self._constraints,
+                    self._migration,
+                    self._last_ledger_position,
+                    self._last_transaction_id,
+                    self._last_transaction_timestamp,
+                ) = preserved_instances
 
     def list_migration_history(self) -> RtgControllerMigrationHistory:
         with self._lock:
@@ -1094,20 +1155,31 @@ class InProcessRtgController:
                 """
             ).rows
             successful_transactions = _successful_transaction_metadata(rows)
-            events: list[JsonObject] = []
+            terminal_errors = _terminal_error_rows(rows)
+            events: list[RtgControllerMigrationHistoryEvent] = []
             for row in rows:
                 if row["record_kind"] != "request":
                     continue
                 transaction_id_text = str(row["transaction_id"])
                 transaction = successful_transactions.get(transaction_id_text)
-                if transaction is None:
-                    continue
                 payload_json = row["payload_json"]
                 if not isinstance(payload_json, str):
                     continue
                 try:
                     payload = _object(json.loads(payload_json))
                 except Exception:
+                    continue
+                if transaction is None:
+                    error_row = terminal_errors.get(transaction_id_text)
+                    if error_row is not None:
+                        events.extend(
+                            _rejected_staging_history_events(
+                                operation_name=str(row["operation_name"]),
+                                payload=cast(JsonObject, payload),
+                                transaction_id=transaction_id_text,
+                                error_row=error_row,
+                            )
+                        )
                     continue
                 events.extend(
                     _migration_history_events_for_request(
@@ -1351,7 +1423,11 @@ class InProcessRtgController:
                 return str(ref.resource_id)
             if ref.local_ref is None:
                 raise RtgControllerPreconditionFailed("missing migration local reference")
-            value = resolved.setdefault(ref.local_ref, str(uuid4()))
+            if ref.local_ref not in resolved:
+                generated = uuid4()
+                resolved[ref.local_ref] = str(generated)
+                generated_ids[ref.local_ref] = generated
+            value = resolved[ref.local_ref]
             if not isinstance(value, str):
                 raise RtgControllerPreconditionFailed("local reference kind mismatch")
             return value
@@ -1932,9 +2008,7 @@ class InProcessRtgController:
                 transaction_id=None,
             )
         except Exception:
-            self.restore_from_snapshot(
-                pre_snapshot, RtgControllerRestoreOptions(ledger_mode="skip")
-            )
+            self._replace_state_from_snapshot(pre_snapshot, validate_semantics=False)
             raise
 
     def _validate_live_graph_lane(self, graph_changes: RtgGraphChangeSet) -> None:
@@ -2496,6 +2570,53 @@ def _summary_count_diffs(before: JsonObject, after: JsonObject) -> JsonObject:
     }
 
 
+def _domain_state_digest(snapshot: RtgSystemSnapshot) -> str:
+    graph = cast(JsonObject, _object(_to_json_value(snapshot.graph)))
+    schema = cast(JsonObject, _object(_to_json_value(snapshot.schema)))
+    constraints = cast(JsonObject, _object(_to_json_value(snapshot.constraints)))
+    migration = cast(JsonObject, _object(_to_json_value(snapshot.migration)))
+    for container, keys in (
+        (graph, ("anchors", "data_objects", "links")),
+        (schema, ("definitions",)),
+        (constraints, ("constraints",)),
+        (migration, ("migrations",)),
+    ):
+        for key in keys:
+            container[key] = _sorted_component_values(container.get(key, []))
+    domain_state: JsonObject = {
+        "graph": graph,
+        "schema": schema,
+        "constraints": constraints,
+        "migration": migration,
+    }
+    canonical = _canonical_json_value(domain_state)
+    encoded = json.dumps(
+        canonical,
+        ensure_ascii=False,
+        separators=(",", ":"),
+        sort_keys=True,
+    ).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def _canonical_json_value(value: JsonValue) -> JsonValue:
+    if isinstance(value, dict):
+        return {key: _canonical_json_value(value[key]) for key in sorted(value)}
+    if isinstance(value, list):
+        return [_canonical_json_value(item) for item in value]
+    return value
+
+
+def _sorted_component_values(value: JsonValue) -> list[JsonValue]:
+    normalized = [_canonical_json_value(cast(JsonValue, item)) for item in _list(value)]
+    return sorted(
+        normalized,
+        key=lambda item: json.dumps(
+            item, ensure_ascii=False, separators=(",", ":"), sort_keys=True
+        ),
+    )
+
+
 def _nested_count_diff(before: JsonObject, after: JsonObject) -> JsonObject:
     keys = sorted(set(before) | set(after))
     return {
@@ -2528,7 +2649,7 @@ def _migration_history_events_for_request(
     ledger_position: int | None,
     recorded_at: str | None,
     response_payload: JsonObject,
-) -> list[JsonObject]:
+) -> list[RtgControllerMigrationHistoryEvent]:
     if operation_name == "stage_knowledge_changes":
         batch = _change_batch_from_json(payload)
         return [
@@ -2549,6 +2670,12 @@ def _migration_history_events_for_request(
         migration_id = _concrete_migration_id(request_migration.migration_id)
         status = str(response_payload.get("status"))
         details = _object(response_payload.get("details", {}))
+        report_value = response_payload.get("validation_report")
+        validation_report = (
+            _validation_report_from_json(report_value)
+            if status == "cutover_failed" and isinstance(report_value, dict)
+            else None
+        )
         return [
             _migration_history_event(
                 event_type=("cutover_failed" if status == "cutover_failed" else "cutover_applied"),
@@ -2563,6 +2690,7 @@ def _migration_history_events_for_request(
                 transaction_id=transaction_id,
                 ledger_position=ledger_position,
                 recorded_at=recorded_at,
+                validation_report=validation_report,
             )
         ]
     if operation_name == "abandon_migration":
@@ -2591,17 +2719,139 @@ def _migration_history_event(
     transaction_id: str,
     ledger_position: int | None,
     recorded_at: str | None,
-) -> JsonObject:
-    return {
-        "event_type": event_type,
-        "migration_id": migration_id,
-        "description": description,
-        "transaction_id": transaction_id,
-        "ledger_position": ledger_position,
-        "recorded_at": recorded_at,
-        "status": status,
-        "summary": summary,
-    }
+    validation_report: RtgValidationReport | None = None,
+) -> RtgControllerMigrationHistoryEvent:
+    if ledger_position is None or recorded_at is None:
+        raise RtgControllerReplayFailed("migration history terminal record is incomplete")
+    return RtgControllerMigrationHistoryEvent(
+        event_type=event_type,
+        migration_id=migration_id,
+        description=description,
+        transaction_id=UUID(transaction_id),
+        ledger_position=ledger_position,
+        recorded_at=recorded_at,
+        status=status,
+        summary=summary,
+        operation_name={
+            "staged": "stage_knowledge_changes",
+            "cutover_applied": "apply_migration_cutover",
+            "cutover_failed": "apply_migration_cutover",
+            "abandoned": "abandon_migration",
+        }[event_type],
+        staged=event_type == "staged",
+        mutation_state="mutated",
+        finding_count=(len(validation_report.findings) if validation_report is not None else 0),
+        finding_codes=(
+            tuple(sorted({finding.code for finding in validation_report.findings}))
+            if validation_report is not None
+            else ()
+        ),
+        validation_report=validation_report,
+    )
+
+
+def _terminal_error_rows(rows: object) -> dict[str, JsonObject]:
+    terminal: dict[str, JsonObject] = {}
+    for row in cast(Any, rows):
+        if row["record_kind"] == "error":
+            terminal[str(row["transaction_id"])] = cast(JsonObject, row)
+    return terminal
+
+
+def _rejected_staging_history_events(
+    *,
+    operation_name: str,
+    payload: JsonObject,
+    transaction_id: str,
+    error_row: JsonObject,
+) -> list[RtgControllerMigrationHistoryEvent]:
+    if operation_name != "stage_knowledge_changes":
+        return []
+    try:
+        batch = _change_batch_from_json(payload)
+    except Exception:
+        return []
+    migration_writes = batch.migration_changes.migration_writes
+    if not migration_writes:
+        return []
+    error_payload: JsonValue
+    try:
+        payload_json = error_row.get("payload_json")
+        error_payload = json.loads(str(payload_json))
+    except Exception:
+        error_payload = str(error_row.get("payload_json", ""))
+    report = error_payload if isinstance(error_payload, dict) else None
+    findings = _list(report.get("findings", [])) if report is not None else []
+    is_rejected = report is not None and report.get("accepted") is False
+    finding_items = [item for item in findings if isinstance(item, dict)]
+    finding_codes = sorted(
+        {str(item.get("code")) for item in finding_items if item.get("code") is not None}
+    )
+    event_type = "staging_rejected" if is_rejected else "staging_failed"
+    ledger_position = error_row.get("ledger_position")
+    recorded_at = error_row.get("recorded_at")
+    if not isinstance(ledger_position, int) or not isinstance(recorded_at, str):
+        raise RtgControllerReplayFailed("migration history error record is incomplete")
+    validation_report = _validation_report_from_json(report) if is_rejected and report else None
+    structured_error = None
+    if not is_rejected:
+        structured_error = (
+            cast(JsonObject, error_payload)
+            if isinstance(error_payload, dict)
+            else cast(JsonObject, {"message": str(error_payload)})
+        )
+    result: list[RtgControllerMigrationHistoryEvent] = []
+    for write in migration_writes:
+        result.append(
+            RtgControllerMigrationHistoryEvent(
+                event_type=event_type,
+                migration_id=_concrete_migration_id(write.migration.migration_id),
+                description=write.migration.description,
+                transaction_id=UUID(transaction_id),
+                ledger_position=ledger_position,
+                recorded_at=recorded_at,
+                operation_name=operation_name,
+                staged=False,
+                mutation_state="not_mutated",
+                finding_count=len(finding_items),
+                finding_codes=tuple(finding_codes),
+                status="rejected" if is_rejected else "failed",
+                summary=(
+                    "projected validation rejected the staging request"
+                    if is_rejected
+                    else "staging request ended in a recorded operational error"
+                ),
+                validation_report=validation_report,
+                error=structured_error,
+            )
+        )
+    return result
+
+
+def _validation_report_from_json(value: JsonObject) -> RtgValidationReport:
+    findings: list[RtgValidationFinding] = []
+    for item in _list(value.get("findings", [])):
+        finding = _object(item)
+        findings.append(
+            RtgValidationFinding(
+                track=str(finding.get("track", "")),
+                severity=str(finding.get("severity", "")),
+                code=str(finding.get("code", "")),
+                message=str(finding.get("message", "")),
+                suggestion=(
+                    str(finding["suggestion"]) if finding.get("suggestion") is not None else None
+                ),
+                affected_references=tuple(
+                    str(item) for item in _list(finding.get("affected_references", []))
+                ),
+                diagnostic=cast(JsonObject, _object(finding.get("diagnostic", {}))),
+            )
+        )
+    return RtgValidationReport(
+        accepted=value.get("accepted") is True,
+        findings=tuple(findings),
+        evidence=cast(JsonObject, _object(value.get("evidence", {}))),
+    )
 
 
 def _successful_transaction_metadata(rows: object) -> dict[str, _ReplayTransactionMetadata]:
@@ -2635,6 +2885,46 @@ def _successful_transaction_metadata(rows: object) -> dict[str, _ReplayTransacti
                 response_payload=cast(JsonObject, payload),
             )
     return successful
+
+
+def _replay_accounting(
+    rows: object,
+    successful_transactions: dict[str, _ReplayTransactionMetadata],
+) -> JsonObject:
+    replayable_operations = {
+        "apply_live_graph_changes",
+        "stage_knowledge_changes",
+        "apply_migration_cutover",
+        "restore_from_snapshot",
+        "abandon_migration",
+    }
+    request_records_seen = 0
+    eligible_mutating_requests = 0
+    failed_or_rejected = 0
+    administrative_records = 0
+    terminal_records = 0
+    for row in cast(Any, rows):
+        operation_name = str(row["operation_name"])
+        record_kind = str(row["record_kind"])
+        if record_kind == "request":
+            request_records_seen += 1
+        if operation_name not in replayable_operations:
+            administrative_records += 1
+            continue
+        if record_kind != "request":
+            terminal_records += 1
+            continue
+        if str(row["transaction_id"]) in successful_transactions:
+            eligible_mutating_requests += 1
+        else:
+            failed_or_rejected += 1
+    return {
+        "request_records_seen": request_records_seen,
+        "eligible_mutating_requests": eligible_mutating_requests,
+        "administrative_records_skipped": administrative_records,
+        "terminal_records_skipped": terminal_records,
+        "failed_or_rejected_transactions_skipped": failed_or_rejected,
+    }
 
 
 def _to_json_value(value: object) -> JsonValue:
@@ -2923,6 +3213,14 @@ def _schema_field_from_json(value: object) -> RtgSchemaField:
             for key, item in _object(data.get("properties", {})).items()
         },
         items=_schema_field_from_json(items) if items is not None else None,
+        allowed_values=tuple(
+            cast(str | int | float | bool | None, item)
+            for item in _list(data.get("allowed_values", []))
+        ),
+        format=str(data["format"]) if data.get("format") is not None else None,
+        minimum=cast(int | float | None, data.get("minimum")),
+        maximum=cast(int | float | None, data.get("maximum")),
+        pattern=str(data["pattern"]) if data.get("pattern") is not None else None,
     )
 
 
@@ -2939,6 +3237,9 @@ def _constraint_definition_from_json(value: object) -> RtgConstraintDefinition:
         payload = RtgConstraintCardinalityPayload(
             query_spec=_query_spec_from_json(payload_data["query_spec"]),
             counted_binding=str(payload_data["counted_binding"]),
+            group_by_bindings=tuple(
+                str(item) for item in _list(payload_data.get("group_by_bindings", []))
+            ),
             minimum=cast(int | None, payload_data.get("minimum")),
             maximum=cast(int | None, payload_data.get("maximum")),
         )
@@ -3044,6 +3345,7 @@ def _query_spec_from_json(value: object) -> RtgQuerySpec:
                 source_bucket=str(item["source_bucket"]),
                 target_bucket=str(item["target_bucket"]),
                 link_type_keys=tuple(str(key) for key in _list(item["link_type_keys"])),
+                required=bool(item.get("required", True)),
             )
             for item in _objects(data.get("link_requirements", []))
         ),
@@ -3089,6 +3391,19 @@ def _query_return_spec_from_json(value: object) -> RtgQueryReturnSpec:
             (str(item[0]), tuple(str(path_item) for path_item in _list(item[1])))
             for item in _list(data.get("properties", []))
             if isinstance(item, list | tuple) and len(item) == 2
+        ),
+        group_by=tuple(
+            (str(item[0]), tuple(str(path_item) for path_item in _list(item[1])))
+            for item in _list(data.get("group_by", []))
+            if isinstance(item, list | tuple) and len(item) == 2
+        ),
+        aggregations=tuple(
+            RtgQueryAggregation(
+                name=str(item["name"]),
+                function=str(item["function"]),
+                binding=str(item["binding"]),
+            )
+            for item in _objects(data.get("aggregations", []))
         ),
     )
 

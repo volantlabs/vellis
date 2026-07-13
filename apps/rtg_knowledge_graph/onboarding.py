@@ -425,18 +425,27 @@ def _replay_check(config: RtgKnowledgeGraphConfig) -> JsonObject:
         return {
             "id": "replay_feasibility",
             "ok": True,
-            "detail": status.recovery,
+            "detail": {"status": status.status, "recovery": status.recovery},
         }
     except Exception as error:  # noqa: BLE001 - doctor reports rather than raises
         return {"id": "replay_feasibility", "ok": False, "detail": str(error)}
 
 
 def _ignored_data_check(data_dir: Path) -> JsonObject:
+    repo_root = repository_root()
+    resolved = data_dir.expanduser().resolve(strict=False)
+    if repo_root is None or not resolved.is_relative_to(repo_root):
+        return {
+            "id": "git_ignore",
+            "ok": True,
+            "detail": "outside repository",
+        }
     result = subprocess.run(
         ["git", "check-ignore", "-q", str(data_dir)],
         check=False,
         capture_output=True,
         text=True,
+        cwd=repo_root,
     )
     return {
         "id": "git_ignore",

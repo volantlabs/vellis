@@ -19,20 +19,28 @@ from components.rtg.change_validation import (
 )
 from components.rtg.constraints import (
     InMemoryRtgConstraints,
+    RtgConstraintCardinalityPayload,
     RtgConstraintDefinition,
     RtgConstraintQueryPatternPayload,
 )
-from components.rtg.graph import InMemoryRtgGraph, RtgAnchor, RtgDataObject
+from components.rtg.graph import InMemoryRtgGraph, RtgAnchor, RtgDataObject, RtgLink
 from components.rtg.migration import (
     InMemoryRtgMigration,
     RtgMigrationRecord,
     RtgMigrationReplacement,
 )
-from components.rtg.query import SimpleRtgQueryEngine
+from components.rtg.query import (
+    RtgQueryAnchorBucket,
+    RtgQueryDataRequirement,
+    RtgQueryLinkRequirement,
+    RtgQuerySpec,
+    SimpleRtgQueryEngine,
+)
 from components.rtg.schema import (
     InMemoryRtgSchema,
     RtgAnchorSchemaPayload,
     RtgDataObjectSchemaPayload,
+    RtgLinkSchemaPayload,
     RtgSchemaDefinition,
     RtgSchemaField,
 )
@@ -41,6 +49,210 @@ from components.rtg.schema import (
 def concrete_uuid(value: UUID | None) -> UUID:
     assert value is not None
     return value
+
+
+def _validate_refined_value(value: str | int | float | bool | None, field: RtgSchemaField) -> bool:
+    schema = InMemoryRtgSchema.empty()
+    schema.put_definition(
+        RtgSchemaDefinition(
+            uuid=uuid4(),
+            kind="anchor",
+            type_key="Item",
+            description="Item.",
+            payload=RtgAnchorSchemaPayload(required_data_types=("ItemFacts",)),
+        )
+    )
+    schema.put_definition(
+        RtgSchemaDefinition(
+            uuid=uuid4(),
+            kind="data_object",
+            type_key="ItemFacts",
+            description="Refined item facts.",
+            payload=RtgDataObjectSchemaPayload(properties={"value": field}),
+        )
+    )
+    graph = InMemoryRtgGraph.empty()
+    anchor = graph.put_anchor(RtgAnchor(uuid=uuid4(), type="Item"))
+    graph.put_data_object(
+        RtgDataObject(uuid=uuid4(), type="ItemFacts", properties={"value": value}),
+        (concrete_uuid(anchor.uuid),),
+    )
+    return (
+        DeterministicRtgChangeValidator()
+        .validate_graph_state(
+            graph,
+            schema,
+            InMemoryRtgConstraints.empty(),
+            InMemoryRtgMigration.empty(),
+            SimpleRtgQueryEngine(),
+        )
+        .accepted
+    )
+
+
+def test_semantic_field_refinements_validate_values_recursively() -> None:
+    assert _validate_refined_value(
+        "next", RtgSchemaField(True, ("string",), allowed_values=("next", "waiting"))
+    )
+    assert not _validate_refined_value(
+        "done", RtgSchemaField(True, ("string",), allowed_values=("next", "waiting"))
+    )
+    assert _validate_refined_value("2026-07-12", RtgSchemaField(True, ("string",), format="date"))
+    assert not _validate_refined_value(
+        "2026-02-30", RtgSchemaField(True, ("string",), format="date")
+    )
+    assert _validate_refined_value(
+        "2026-07-12T12:00:00-07:00",
+        RtgSchemaField(True, ("string",), format="date_time"),
+    )
+    assert not _validate_refined_value(
+        "2026-07-12T12:00:00",
+        RtgSchemaField(True, ("string",), format="date_time"),
+    )
+    assert _validate_refined_value(
+        "https://example.com/a", RtgSchemaField(True, ("string",), format="uri")
+    )
+    assert not _validate_refined_value(
+        "http://[", RtgSchemaField(True, ("string",), format="uri")
+    )
+    assert _validate_refined_value(1, RtgSchemaField(True, ("number",), minimum=0, maximum=1))
+    assert not _validate_refined_value(
+        True, RtgSchemaField(True, ("number",), minimum=0, maximum=1)
+    )
+    assert _validate_refined_value(
+        "prefix-ABC-suffix", RtgSchemaField(True, ("string",), pattern="[A-Z]{3}")
+    )
+
+
+def test_grouped_cardinality_counts_distinct_targets_per_source() -> None:
+    schema = InMemoryRtgSchema.empty()
+    for type_key in ("Project", "Area"):
+        schema.put_definition(
+            RtgSchemaDefinition(
+                uuid=uuid4(),
+                kind="anchor",
+                type_key=type_key,
+                description=f"{type_key}.",
+                payload=RtgAnchorSchemaPayload(),
+            )
+        )
+    schema.put_definition(
+        RtgSchemaDefinition(
+            uuid=uuid4(),
+            kind="link",
+            type_key="belongs_to",
+            description="Membership.",
+            payload=RtgLinkSchemaPayload(("Project",), ("Area",)),
+        )
+    )
+    graph = InMemoryRtgGraph.empty()
+    project = graph.put_anchor(RtgAnchor(uuid=uuid4(), type="Project"))
+    graph.put_anchor(RtgAnchor(uuid=uuid4(), type="Project"))
+    areas = [graph.put_anchor(RtgAnchor(uuid=uuid4(), type="Area")) for _ in range(2)]
+    for area in areas:
+        graph.put_link(
+            RtgLink(
+                uuid=uuid4(),
+                type="belongs_to",
+                source_uuid=concrete_uuid(project.uuid),
+                target_uuid=concrete_uuid(area.uuid),
+            )
+        )
+    constraints = InMemoryRtgConstraints.empty()
+    constraints.put_constraint(
+        RtgConstraintDefinition(
+            uuid=uuid4(),
+            kind="cardinality",
+            target_type_keys=("Project",),
+            display_name="One primary area",
+            description="Projects have at most one area.",
+            payload=RtgConstraintCardinalityPayload(
+                query_spec=RtgQuerySpec(
+                    anchor_buckets=(
+                        RtgQueryAnchorBucket("project", ("Project",)),
+                        RtgQueryAnchorBucket("area", ("Area",)),
+                    ),
+                    link_requirements=(
+                        RtgQueryLinkRequirement(
+                            "membership", "project", "area", ("belongs_to",), required=False
+                        ),
+                    ),
+                ),
+                counted_binding="area",
+                group_by_bindings=("project",),
+                maximum=1,
+            ),
+        )
+    )
+    report = DeterministicRtgChangeValidator().validate_graph_state(
+        graph, schema, constraints, InMemoryRtgMigration.empty(), SimpleRtgQueryEngine()
+    )
+    finding = next(
+        item
+        for item in report.findings
+        if item.code == "constraint_network.cardinality_out_of_bounds"
+    )
+    assert finding.diagnostic["observed_count"] == 2
+    assert finding.diagnostic["group_bindings"] == [str(project.uuid)]
+
+
+def test_global_cardinality_counts_distinct_bindings_not_expanded_rows() -> None:
+    schema = InMemoryRtgSchema.empty()
+    schema.put_definition(
+        RtgSchemaDefinition(
+            uuid=uuid4(),
+            kind="anchor",
+            type_key="Thing",
+            description="Thing.",
+            payload=RtgAnchorSchemaPayload(optional_data_types=("Facts",)),
+        )
+    )
+    schema.put_definition(
+        RtgSchemaDefinition(
+            uuid=uuid4(),
+            kind="data_object",
+            type_key="Facts",
+            description="Facts.",
+            payload=RtgDataObjectSchemaPayload(),
+        )
+    )
+    graph = InMemoryRtgGraph.empty()
+    anchor = graph.put_anchor(RtgAnchor(uuid=uuid4(), type="Thing"))
+    for _ in range(2):
+        graph.put_data_object(
+            RtgDataObject(uuid=uuid4(), type="Facts", properties={}),
+            (concrete_uuid(anchor.uuid),),
+        )
+    constraints = InMemoryRtgConstraints.empty()
+    constraints.put_constraint(
+        RtgConstraintDefinition(
+            uuid=uuid4(),
+            kind="cardinality",
+            target_type_keys=("Thing",),
+            display_name="One thing",
+            description="Expanded rows still identify one thing.",
+            payload=RtgConstraintCardinalityPayload(
+                query_spec=RtgQuerySpec(
+                    anchor_buckets=(RtgQueryAnchorBucket("thing", ("Thing",)),),
+                    data_requirements=(
+                        RtgQueryDataRequirement("facts", "thing", "Facts"),
+                    ),
+                ),
+                counted_binding="thing",
+                maximum=1,
+            ),
+        )
+    )
+
+    report = DeterministicRtgChangeValidator().validate_graph_state(
+        graph, schema, constraints, InMemoryRtgMigration.empty(), SimpleRtgQueryEngine()
+    )
+
+    assert report.accepted is True
+    assert not any(
+        finding.code == "constraint_network.cardinality_out_of_bounds"
+        for finding in report.findings
+    )
 
 
 def build_schema() -> InMemoryRtgSchema:
@@ -213,6 +425,27 @@ def test_validation_rejects_malformed_proposed_data_batch() -> None:
     assert "schema_object.undeclared_property" in {finding.code for finding in report.findings}
 
 
+def test_validation_reports_an_unprojectable_delete_as_a_blocking_finding() -> None:
+    missing = uuid4()
+    report = DeterministicRtgChangeValidator().validate_batch(
+        InMemoryRtgGraph.empty(),
+        build_schema(),
+        InMemoryRtgConstraints.empty(),
+        InMemoryRtgMigration.empty(),
+        SimpleRtgQueryEngine(),
+        RtgChangeBatch(
+            graph_changes=RtgGraphChangeSet(
+                delete_anchors=(RtgChangeReference(resource_id=missing),)
+            )
+        ),
+    )
+
+    assert report.accepted is False
+    assert report.findings[0].track == "schema_object"
+    assert report.findings[0].code == "change_projection.failed"
+    assert str(missing) in report.findings[0].affected_references
+
+
 def test_unselected_malformed_sections_do_not_affect_selected_track() -> None:
     report = DeterministicRtgChangeValidator().validate_batch(
         InMemoryRtgGraph.empty(),
@@ -221,9 +454,7 @@ def test_unselected_malformed_sections_do_not_affect_selected_track() -> None:
         None,
         object(),
         RtgChangeBatch(
-            constraint_changes=RtgConstraintChangeSet(
-                delete_constraints=(RtgChangeReference(),)
-            )
+            constraint_changes=RtgConstraintChangeSet(delete_constraints=(RtgChangeReference(),))
         ),
         RtgValidationOptions(tracks=("schema_object",)),
     )
@@ -403,9 +634,7 @@ def test_migration_projection_reports_replacement_type_mismatch_as_warning() -> 
 def test_finding_limit_does_not_hide_blocking_acceptance() -> None:
     schema = build_schema()
     live_person = schema.list_definitions_by_type_key("Person", kind="anchor").definitions[0]
-    live_profile = schema.list_definitions_by_type_key(
-        "Profile", kind="data_object"
-    ).definitions[0]
+    live_profile = schema.list_definitions_by_type_key("Profile", kind="data_object").definitions[0]
     project_candidate = RtgSchemaDefinition(
         uuid=uuid4(),
         kind="anchor",

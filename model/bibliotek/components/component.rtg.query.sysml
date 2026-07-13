@@ -22,6 +22,7 @@ library package BibliotekRtgQuery {
     enum def RtgQueryOrderDirection { enum ascending; enum descending; }
     enum def RtgQueryUnknownTermGuidance { enum none; enum suggest_discovery; }
     enum def RtgQueryDiagnosticSeverity { enum warning; enum info; }
+    enum def RtgQueryAggregationFunction { enum count; }
 
     attribute def RtgQueryAnchorBucket {
         attribute name : String;
@@ -32,6 +33,7 @@ library package BibliotekRtgQuery {
         attribute sourceBucket : String;
         attribute targetBucket : String;
         attribute linkTypeKeys[1..*] : String;
+        attribute required : Boolean = true;
     }
     attribute def RtgQueryPropertyPredicate {
         attribute path[1..*] : String;
@@ -52,11 +54,18 @@ library package BibliotekRtgQuery {
         attribute dataRequirement : String;
         attribute path[1..*] : String;
     }
+    attribute def RtgQueryAggregation {
+        attribute name : String;
+        attribute function : RtgQueryAggregationFunction;
+        attribute 'binding' : String;
+    }
     attribute def RtgQueryReturnSpec {
         attribute anchorBuckets[0..*] : String;
         attribute linkRequirements[0..*] : String;
         attribute dataRequirements[0..*] : String;
         attribute properties[0..*] : RtgQueryReturnProperty;
+        attribute groupBy[0..*] : RtgQueryReturnProperty;
+        attribute aggregations[0..*] : RtgQueryAggregation;
     }
     attribute def RtgQueryDiagnosticOptions {
         attribute includeNonFatal : Boolean = true;
@@ -78,6 +87,9 @@ library package BibliotekRtgQuery {
         attribute liveFilter : RtgQueryLiveFilter = RtgQueryLiveFilter::'all';
         attribute liveStatusOverlay[0..*] : RtgQueryLiveStatusOverride;
         attribute orderBy[0..*] : RtgQueryOrderBy;
+        attribute limit[0..1] : Integer;
+        attribute offset : Integer = 0;
+        attribute distinctRows : Boolean = false;
     }
     attribute def RtgQueryLiveStatusOverride {
         attribute objectUuid : Uuid;
@@ -115,6 +127,10 @@ library package BibliotekRtgQuery {
         attribute bindings[0..*] : RtgQueryBindingRow;
         attribute returns[0..*] : RtgQueryReturnRow;
         attribute diagnostics[0..*] : RtgQueryDiagnostic;
+        attribute aggregations[0..*] : JsonObject;
+        attribute totalRowCount : Integer;
+        attribute returnedRowCount : Integer;
+        attribute nextOffset[0..1] : Integer;
     }
     attribute def RtgQuerySpecInvalid { attribute 'message' : String; attribute diagnostic[0..1] : RtgDiagnostic; }
     attribute def RtgQueryUnsupported { attribute 'message' : String; attribute diagnostic[0..1] : RtgDiagnostic; }
@@ -161,14 +177,14 @@ library package BibliotekRtgQuery {
     requirement <'contract.rtg.query.valid_spec'> validQuerySpec {
         subject operation : ExecuteRtgQuery;
         require constraint {
-            doc /* Names are unique, references resolve, predicate operands fit their operators, and order_by refers only to returned properties. */
+            doc /* Anchor-bucket, link-requirement, and data-requirement names share one globally unique binding namespace so aggregation and constraint references are unambiguous. References resolve, predicate operands fit their operators, order_by refers only to returned properties, aggregation names cannot use the reserved result fields row_index or group_by, a present limit is a positive Integer, offset is a nonnegative Integer, and distinct_rows cannot be combined with aggregation. */
         }
     }
 
     requirement <'contract.rtg.query.defaults'> defaultSemantics {
         subject operation : ExecuteRtgQuery;
         require constraint {
-            doc /* Data requirements default required=true; predicate case sensitivity defaults false; diagnostic inclusion defaults true with suggest-discovery guidance; absent query options mean all live states, empty overlay, and no order_by; absent order direction means ascending. */
+            doc /* Link and data requirements default required=true; predicate case sensitivity defaults false; diagnostic inclusion defaults true with suggest-discovery guidance; absent query options mean all live states, empty overlay, no order_by, no limit, offset zero, and no distinct-row projection; absent order direction means ascending. */
         }
     }
 
@@ -183,14 +199,14 @@ library package BibliotekRtgQuery {
     requirement <'contract.rtg.query.matching'> matchingSemantics {
         subject operation : ExecuteRtgQuery;
         require constraint {
-            doc /* Anchor buckets select matching anchor types; link requirements match directed typed links between bound buckets; data requirements match directly associated typed data objects. Predicates on one data requirement must hold on the same object. */
+            doc /* Anchor buckets select matching anchor types; required link requirements match directed typed links between bound buckets, while an optional link preserves exactly one unbound row for a source context only when no target in that bucket matches. A later optional link also preserves that row when its source bucket was left unbound by an earlier optional link. Data requirements match directly associated typed data objects. Predicates on one data requirement must hold on the same object. */
         }
     }
 
     requirement <'contract.rtg.query.binding_expansion'> bindingExpansion {
         subject operation : ExecuteRtgQuery;
         require constraint {
-            doc /* Independent required matches expand to their Cartesian product. A missing required match removes the candidate row; a missing optional match preserves it without that binding. */
+            doc /* Independent required matches expand to their Cartesian product. A missing required match removes the candidate row. Optional-link expansion is left-outer by source context: matching targets produce only their bound rows, while no match across the complete target bucket produces one row without the link or target binding. */
         }
     }
 
@@ -211,14 +227,14 @@ library package BibliotekRtgQuery {
     requirement <'contract.rtg.query.deterministic_result'> deterministicResult {
         subject operation : ExecuteRtgQuery;
         require constraint {
-            doc /* Base order compares anchor UUIDs in bucket declaration order, then link UUIDs in requirement order, then data UUIDs in requirement order; absent optional data sorts before present UUIDs. order_by applies returned-property keys in caller order and keeps base order as stable tie-breaker; missing/Boolean/object/array keys sort last. rowIndex is zero-based final order. */
+            doc /* Base order compares anchor UUIDs in bucket declaration order, then link UUIDs in requirement order, then data UUIDs in requirement order; absent optional bindings sort before present UUIDs. order_by applies returned-property keys in caller order, compares numbers without loss of JSON numeric precision, and keeps base order as stable tie-breaker; missing/Boolean/object/array keys sort last. Exact returned rows may be de-duplicated after projection, count aggregation counts distinct binding UUIDs by returned group properties using JSON-kind-aware canonical equality that preserves arbitrary-precision integers, and limit/offset slice the final deterministic rows. rowIndex is zero-based final order. */
         }
     }
 
     requirement <'contract.rtg.query.return_shaping'> returnShaping {
         subject operation : ExecuteRtgQuery;
         require constraint {
-            doc /* Return selection never changes matching. Bindings contain names to matched UUIDs; independent matches form a Cartesian product. Returns align one-for-one by rowIndex, include only selected records, and reconstruct selected property paths as nested JSON without delimiter ambiguity. Missing optional bindings or paths are omitted and may produce non-fatal diagnostics. */
+            doc /* Return selection never changes matching. Bindings contain names to matched UUIDs; independent matches form a Cartesian product. Non-aggregate results use bindings and returns, aligned one-for-one by final rowIndex, include only selected records, and reconstruct selected property paths as nested JSON without delimiter ambiguity; their aggregations collection is empty. Aggregate results use aggregations exclusively and return empty bindings and returns. count aggregation counts distinct selected binding UUIDs globally or per group; a missing group path is represented by JSON null. Result metadata reports total rows before pagination, returned rows, and a next offset only when more rows remain. Missing optional bindings or paths in non-aggregate returns are omitted and may produce non-fatal diagnostics. */
         }
     }
 

@@ -29,64 +29,8 @@ def test_vellis_has_nine_bibliotek_roles_and_exact_mcp_surface() -> None:
     assert model_tool._python_tool_description_names() == set(model_tool._python_tool_names())
     model_descriptions = model_tool._model_tool_descriptions()
     manifest = json.loads(model_layout.GENERATED_MANIFEST.read_text(encoding="utf-8"))
-    assert model_descriptions == {
-        tool["name"]: tool["description"] for tool in manifest["tools"]
-    }
+    assert model_descriptions == {tool["name"]: tool["description"] for tool in manifest["tools"]}
     assert len(set(model_tool._model_operation_ids())) == 27
-
-
-def test_model_phase_and_retirement_gates_are_consistent() -> None:
-    status = json.loads(model_layout.CUTOVER_STATUS_PATH.read_text(encoding="utf-8"))
-
-    assert status["phase"] == "normative"
-    assert status["cutover_completed"] == "2026-07-11"
-    assert status["authored_design"] == "model/{foundation,bibliotek,vellis}/**/*.sysml"
-    assert status["generated_documentation"] == "generated/reference/**/*.md"
-    assert status["generated_machine_projections"] == "generated/model/*.json"
-    assert status["gates"]["external_sysml_validator"] == "implemented-qualified-headless"
-    assert status["gates"]["packaged_product_validation"] == "implemented"
-    assert status["gates"]["parser_backed_model_index"] == "implemented"
-    assert status["gates"]["model_derived_conformance_objectives"] == "implemented"
-    assert status["gates"]["implementation_decision_reconciliation"] == "implemented"
-    assert model_tool._check_cutover_state() == []
-
-    assert "frozen_migration_baseline" not in status
-    assert status["gates"]["bibliotek_human_acceptance"] == "accepted"
-    assert status["gates"]["vellis_human_acceptance"] == "accepted"
-    assert status["gates"]["markdown_retirement"] == "completed"
-
-
-def test_cutover_state_rejects_non_normative_or_incomplete_authority(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    status_path = tmp_path / "cutover-status.json"
-    monkeypatch.setattr(model_tool, "CUTOVER_STATUS_PATH", status_path)
-
-    status_path.write_text(
-        json.dumps(
-            {
-                "phase": "shadow",
-                "gates": {"markdown_retirement": "blocked"},
-            }
-        ),
-        encoding="utf-8",
-    )
-    assert any(
-        "must remain normative" in finding.message
-        for finding in model_tool._check_cutover_state()
-    )
-
-    status_path.write_text(
-        json.dumps(
-            {
-                "phase": "normative",
-                "gates": {"markdown_retirement": "blocked"},
-            }
-        ),
-        encoding="utf-8",
-    )
-    findings = model_tool._check_cutover_state()
-    assert any("incomplete acceptance" in finding.message for finding in findings)
 
 
 def test_formal_validator_is_pinned_and_covers_every_authored_model() -> None:
@@ -96,22 +40,25 @@ def test_formal_validator_is_pinned_and_covers_every_authored_model() -> None:
     assert lock["release"] == "2025-06"
     assert lock["language_baseline"] == {"sysml": "2.0", "kerml": "1.0"}
     assert len(lock["kernel"]["sha256"]) == 64
-    assert "--self-test" in json.loads(
-        model_layout.LANGUAGE_LOCK_PATH.read_text(encoding="utf-8")
-    )["validator"]["command"]
-    assert json.loads(model_layout.LANGUAGE_LOCK_PATH.read_text(encoding="utf-8"))["validator"][
-        "external_validation"
-    ] == "required"
+    assert (
+        "--self-test"
+        in json.loads(model_layout.LANGUAGE_LOCK_PATH.read_text(encoding="utf-8"))["validator"][
+            "command"
+        ]
+    )
+    assert (
+        json.loads(model_layout.LANGUAGE_LOCK_PATH.read_text(encoding="utf-8"))["validator"][
+            "external_validation"
+        ]
+        == "required"
+    )
     assert len(sysml_validator._model_files("all")) == 22
     assert all(path.exists() for path in sysml_validator._model_files("all"))
     assert model_layout.SOFTWARE_COMPONENT_PATTERN_PATH not in sysml_validator._model_files("all")
 
 
 def test_formal_validator_diagnostic_parser_captures_cell_location() -> None:
-    diagnostic = (
-        "ERROR:Couldn't resolve reference to Type 'Missing'"
-        "(7.sysml line : 12 column : 9)"
-    )
+    diagnostic = "ERROR:Couldn't resolve reference to Type 'Missing'(7.sysml line : 12 column : 9)"
 
     match = sysml_validator.DIAGNOSTIC.search(diagnostic)
 
@@ -128,9 +75,7 @@ def test_formal_validator_diagnostic_parser_captures_cell_location() -> None:
 def test_formal_validator_inventory_and_import_order_are_fail_closed(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    (tmp_path / "A.sysml").write_text(
-        "package A { private import B::*; }", encoding="utf-8"
-    )
+    (tmp_path / "A.sysml").write_text("package A { private import B::*; }", encoding="utf-8")
     (tmp_path / "B.sysml").write_text("package B {}", encoding="utf-8")
     monkeypatch.setattr(sysml_validator, "MODEL_ROOT", tmp_path)
     monkeypatch.setattr(sysml_validator, "MODEL_ORDER", ("A.sysml", "B.sysml"))
@@ -144,6 +89,39 @@ def test_formal_validator_inventory_and_import_order_are_fail_closed(
 
     with pytest.raises(RuntimeError, match="unlisted"):
         sysml_validator._check_inventory_and_order()
+
+
+def test_packaged_validation_rejects_stale_model_sources(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    model_root = tmp_path / "model"
+    package_root = tmp_path / "packages"
+    model_source = model_root / "foundation" / "Foundation.sysml"
+    model_source.parent.mkdir(parents=True)
+    package_root.mkdir()
+    model_source.write_text("library package Foundation {}", encoding="utf-8")
+    archive = package_root / "foundation.kpar"
+    with zipfile.ZipFile(archive, "w") as packaged:
+        packaged.writestr(
+            "Foundation/Foundation.sysml",
+            "library package Foundation { doc /* stale */ }",
+        )
+
+    monkeypatch.setattr(sysml_validator, "MODEL_ROOT", model_root)
+    monkeypatch.setattr(sysml_validator, "MODEL_PACKAGE_ROOT", package_root)
+    monkeypatch.setattr(
+        sysml_validator,
+        "MODEL_ORDER",
+        ("foundation/Foundation.sysml",),
+    )
+    monkeypatch.setattr(
+        sysml_validator,
+        "PACKAGE_ARCHIVES",
+        {"foundation": archive.name},
+    )
+
+    with pytest.raises(RuntimeError, match="stale for current model sources"):
+        sysml_validator._packaged_model_files("foundation", tmp_path / "extract")
 
 
 def test_generated_conformance_objectives_resolve_model_requirements_and_evidence() -> None:
@@ -619,9 +597,3 @@ def test_model_packages_exclude_fixture_configuration_and_migration(
         assert "SoftwareComponentPattern.sysml" not in actual
         assert project["version"] == "0.1.0"
         assert metadata["status"] == "formally-validated"
-
-
-def test_retired_markdown_baseline_is_absent() -> None:
-    baseline = ROOT / "docs" / "migration" / "component-spec-baseline"
-    assert not list(baseline.glob("component.*.md"))
-    assert not list((ROOT / "docs").glob("components/component.*.md"))
