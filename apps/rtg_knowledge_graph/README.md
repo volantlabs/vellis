@@ -89,6 +89,15 @@ or a generic JSON client. The generated launch uses absolute paths and the clien
 process. The same `uv run vellis setup` path works on native Windows without Bash or `just`. Use
 `uv run vellis doctor` for a non-destructive check.
 
+The `setup --json` and `doctor --json` forms are non-interactive interfaces for scripts and agents.
+They emit exactly one JSON document on stdout and never prompt. Pass `--yes` to authorize setup and
+pass `--client` when automatic detection would be ambiguous, for example:
+
+```sh
+uv run vellis setup --json --client codex --yes
+uv run vellis doctor --json --client codex
+```
+
 `mcp-config`, `just rtg-mcp`, `just rtg-mcp-info`, and the evaluation prompts remain developer and
 protocol-debugging surfaces. Evaluations run with `--empty --manual-recovery` so they can still test
 schema construction and explicit replay from a blank RTG.
@@ -239,9 +248,10 @@ at the same time as a client-owned stdio instance.
 - **Windows asks for Bash, WSL, `just`, or a manual Python install:** stop using the convenience
   recipe and run `uv run vellis setup` from PowerShell. `uv` manages Python 3.14 and installs the
   locked dependencies.
-- **Setup or the client reports a path/configuration problem:** run `uv run vellis doctor` (or add
-  `--json` for an agent-readable report). Setup records the absolute `uv`, repository, data, and
-  SQLite paths rather than relying on the GUI application's working directory or `PATH`.
+- **Setup or the client reports a path/configuration problem:** run `uv run vellis doctor` (or use
+  `uv run vellis doctor --json --client CLIENT` for a non-interactive, agent-readable report).
+  Setup records the absolute `uv`, repository, data, and SQLite paths rather than relying on the
+  GUI application's working directory or `PATH`.
 - **The config command prints pages of tool metadata:** that is the diagnostic `*-info` command.
   Use `mcp-config` for the small client block.
 - **The raw server command seems frozen:** stdio is waiting for JSON-RPC on standard input. Stop it

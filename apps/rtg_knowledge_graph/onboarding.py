@@ -84,7 +84,13 @@ def detected_clients(*, home: Path | None = None) -> tuple[str, ...]:
     return tuple(detected)
 
 
-def select_client(requested: str, *, input_stream: Any = None) -> str:
+def select_client(
+    requested: str,
+    *,
+    interactive: bool = True,
+    input_stream: Any = None,
+    output_stream: Any = None,
+) -> str:
     if requested != "auto":
         return requested
     choices = detected_clients()
@@ -92,17 +98,22 @@ def select_client(requested: str, *, input_stream: Any = None) -> str:
         return choices[0]
     if not choices:
         return "generic-json"
-    stream = input_stream or sys.stdin
-    if not stream.isatty():
+    input_handle = input_stream or sys.stdin
+    if not interactive or not input_handle.isatty():
         joined = ", ".join(choices)
         raise VellisStartupFailed(
             f"multiple MCP clients were detected ({joined}); rerun with --client CLIENT"
         )
-    print("Multiple MCP clients were detected:")
+    output_handle = output_stream or sys.stdout
+    print("Multiple MCP clients were detected:", file=output_handle)
     for number, client in enumerate(choices, start=1):
-        print(f"  {number}. {client}")
+        print(f"  {number}. {client}", file=output_handle)
     while True:
-        answer = input("Choose a client number: ").strip()
+        answer = _prompt(
+            "Choose a client number: ",
+            input_stream=input_handle,
+            output_stream=output_handle,
+        ).strip()
         if answer.isdigit() and 1 <= int(answer) <= len(choices):
             return choices[int(answer) - 1]
 
@@ -112,11 +123,19 @@ def setup_vellis(
     *,
     client: str,
     yes: bool,
+    interactive: bool = True,
     input_stream: Any = None,
     output_stream: Any = None,
     env: Mapping[str, str] | None = None,
 ) -> SetupResult:
-    selected = select_client(client, input_stream=input_stream)
+    selected = select_client(
+        client,
+        interactive=interactive,
+        input_stream=input_stream,
+        output_stream=output_stream,
+    )
+    if not yes and not interactive:
+        raise VellisStartupFailed("non-interactive setup requires --yes")
     metadata = mcp_launch_metadata(config)
     server = _single_server(metadata["client_config"])
     data_dir = _data_dir_for_config(config)
@@ -137,7 +156,11 @@ def setup_vellis(
         stream = input_stream or sys.stdin
         if not stream.isatty():
             raise VellisStartupFailed("setup confirmation requires a terminal or --yes")
-        answer = input("Continue? [y/N] ").strip().lower()
+        answer = _prompt(
+            "Continue? [y/N] ",
+            input_stream=stream,
+            output_stream=output,
+        ).strip().lower()
         if answer not in {"y", "yes"}:
             raise VellisStartupFailed("setup cancelled")
 
@@ -209,6 +232,9 @@ def doctor_report(
     config: RtgKnowledgeGraphConfig,
     *,
     client: str,
+    interactive: bool = True,
+    input_stream: Any = None,
+    output_stream: Any = None,
     env: Mapping[str, str] | None = None,
 ) -> JsonObject:
     checks: list[JsonObject] = []
@@ -243,7 +269,12 @@ def doctor_report(
     checks.append(_ledger_check(config.sql_database_path))
     checks.append(_replay_check(config))
     checks.append(_ignored_data_check(data_dir))
-    selected = select_client(client)
+    selected = select_client(
+        client,
+        interactive=interactive,
+        input_stream=input_stream,
+        output_stream=output_stream,
+    )
     metadata = mcp_launch_metadata(config)
     server = _single_server(metadata["client_config"])
     checks.append(_registration_check(selected, server, data_dir=data_dir, env=env))
@@ -260,6 +291,14 @@ def doctor_report(
         "data_dir": str(data_dir),
         "checks": checks,
     }
+
+
+def _prompt(message: str, *, input_stream: Any, output_stream: Any) -> str:
+    print(message, end="", file=output_stream, flush=True)
+    answer = input_stream.readline()
+    if answer == "":
+        raise VellisStartupFailed("interactive input ended before a response was provided")
+    return cast(str, answer)
 
 
 def _register_cli_client(

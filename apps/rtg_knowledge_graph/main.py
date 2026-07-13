@@ -70,7 +70,10 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "--json",
         action="store_true",
-        help="Print machine-readable JSON status.",
+        help=(
+            "Print machine-readable JSON status. Setup and doctor do not prompt in JSON mode; "
+            "setup requires --yes and ambiguous client detection requires --client."
+        ),
     )
     parser.add_argument(
         "--client",
@@ -84,7 +87,10 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "--yes",
         action="store_true",
-        help="Accept the one setup confirmation after human authorization.",
+        help=(
+            "Accept the one setup confirmation after human authorization; required for "
+            "setup --json."
+        ),
     )
     parser.add_argument(
         "--empty",
@@ -178,6 +184,7 @@ def _run_command(args: argparse.Namespace, config: RtgKnowledgeGraphConfig) -> i
             config,
             client=args.client,
             yes=args.yes,
+            interactive=not args.json,
             output_stream=io.StringIO() if args.json else None,
         )
         if args.json:
@@ -192,7 +199,7 @@ def _run_command(args: argparse.Namespace, config: RtgKnowledgeGraphConfig) -> i
         return 0
 
     if args.command == "doctor":
-        report = doctor_report(config, client=args.client)
+        report = doctor_report(config, client=args.client, interactive=not args.json)
         if args.json:
             print(json.dumps(report, sort_keys=True))
         else:

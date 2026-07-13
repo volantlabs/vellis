@@ -3,13 +3,24 @@ from __future__ import annotations
 import json
 import subprocess
 from collections.abc import Sequence
+from io import StringIO
 from pathlib import Path
 
 import pytest
 
 from apps.rtg_knowledge_graph import onboarding
 from apps.rtg_knowledge_graph.main import main
-from apps.rtg_knowledge_graph.onboarding import config_for_data_dir, register_client
+from apps.rtg_knowledge_graph.onboarding import (
+    config_for_data_dir,
+    register_client,
+    select_client,
+    setup_vellis,
+)
+
+
+class TtyStringIO(StringIO):
+    def isatty(self) -> bool:
+        return True
 
 
 def test_setup_json_is_single_document_and_repeated_setup_is_noop(
@@ -52,6 +63,102 @@ def test_setup_json_is_single_document_and_repeated_setup_is_noop(
     second = json.loads(capsys.readouterr().out)
     assert second["registration"] == "already_configured"
     assert second["starter_schema"]["recovery"] == "ledger_replayed"
+
+
+def test_setup_json_requires_yes_without_prompting(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    assert (
+        main(
+            [
+                "setup",
+                "--client",
+                "generic-json",
+                "--data-dir",
+                str(tmp_path / "data"),
+                "--json",
+            ]
+        )
+        == 1
+    )
+    captured = capsys.readouterr()
+    result = json.loads(captured.out)
+    assert result == {
+        "error": "non-interactive setup requires --yes",
+        "ok": False,
+    }
+    assert captured.err == ""
+    assert not (tmp_path / "data").exists()
+
+
+@pytest.mark.parametrize("command", ["setup", "doctor"])
+def test_json_commands_require_explicit_ambiguous_client_without_prompting(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+    command: str,
+) -> None:
+    monkeypatch.setattr(onboarding, "detected_clients", lambda: ("codex", "claude-code"))
+    arguments = [command, "--data-dir", str(tmp_path / command), "--json"]
+    if command == "setup":
+        arguments.append("--yes")
+
+    assert main(arguments) == 1
+    captured = capsys.readouterr()
+    result = json.loads(captured.out)
+    assert result["ok"] is False
+    assert "rerun with --client CLIENT" in result["error"]
+    assert "Multiple MCP clients" not in captured.out
+    assert captured.err == ""
+
+
+def test_client_selection_uses_injected_streams(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(onboarding, "detected_clients", lambda: ("codex", "claude-code"))
+    input_stream = TtyStringIO("2\n")
+    output_stream = StringIO()
+
+    assert (
+        select_client(
+            "auto",
+            input_stream=input_stream,
+            output_stream=output_stream,
+        )
+        == "claude-code"
+    )
+    assert output_stream.getvalue() == (
+        "Multiple MCP clients were detected:\n"
+        "  1. codex\n"
+        "  2. claude-code\n"
+        "Choose a client number: "
+    )
+
+
+def test_client_selection_reports_eof_cleanly(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(onboarding, "detected_clients", lambda: ("codex", "claude-code"))
+
+    with pytest.raises(onboarding.VellisStartupFailed, match="interactive input ended"):
+        select_client(
+            "auto",
+            input_stream=TtyStringIO(),
+            output_stream=StringIO(),
+        )
+
+
+def test_setup_remains_interactive_with_injected_streams(tmp_path: Path) -> None:
+    data_dir = tmp_path / "interactive"
+    output_stream = StringIO()
+
+    result = setup_vellis(
+        config_for_data_dir(data_dir),
+        client="generic-json",
+        yes=False,
+        input_stream=TtyStringIO("yes\n"),
+        output_stream=output_stream,
+    )
+
+    assert result.client == "generic-json"
+    assert result.registration.startswith("written:")
+    assert output_stream.getvalue().endswith("Continue? [y/N] ")
 
 
 def test_setup_preserves_legacy_flat_storage_root_as_the_data_location(

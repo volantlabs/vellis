@@ -68,6 +68,11 @@ by Git, and recovered automatically across MCP process restarts. See the
 [plain-language getting-started guide](docs/guides/vellis/getting-started.md) for backups, reset,
 troubleshooting with `uv run vellis doctor`, shared-family use, and advanced local HTTP mode.
 
+For scripts and agents, `setup --json` and `doctor --json` print exactly one JSON document and never
+prompt. Supply the choices explicitly, for example
+`uv run vellis setup --json --client codex --yes` or
+`uv run vellis doctor --json --client codex`.
+
 ## Design Values
 
 Vellis favors modular, reusable components with narrow scope and explicit invariant ownership.

@@ -61,12 +61,17 @@ Run the non-destructive doctor and share its output with your agent:
 
 ```sh
 uv run vellis doctor
-uv run vellis doctor --json
+uv run vellis doctor --json --client codex
 ```
 
 If more than one supported client is installed, choose one with `--client codex`,
 `--client claude-code`, or `--client claude-desktop`. Other MCP clients can use
 `--client generic-json`; setup writes a complete configuration file and reports its location.
+The `setup --json` and `doctor --json` forms are non-interactive and print exactly one JSON
+document, so scripts and agents must provide an explicit `--client` when automatic detection finds
+more than one client. Automated setup must also include prior human authorization through `--yes`,
+for example `uv run vellis setup --json --client codex --yes`. Ordinary `vellis setup` remains
+interactive.
 
 The ordinary connection uses local stdio: the client starts Vellis directly and no network server
 is opened. Localhost HTTP is an explicit advanced mode and must remain bound to `127.0.0.1`.
