@@ -30,6 +30,85 @@ def concrete_uuid(value: UUID | None) -> UUID:
     return value
 
 
+MODEL_EVIDENCE = {
+    "PutSchemaDefinitionContractVerification": (
+        "test_schema_stores_definitions_snapshots_and_schema_packs",
+        "test_live_type_key_uniqueness_allows_non_live_candidates",
+        "test_recursive_fields_require_coherent_unique_kind_sets",
+        "test_schema_field_refinements_are_normalized_and_reject_invalid_combinations",
+        "test_allowed_values_preserve_distinct_large_json_integers",
+        "test_schema_payload_sets_are_unique_disjoint_and_canonical",
+        "test_schema_failure_vocabulary_is_boundary_specific",
+    ),
+    "DeleteSchemaDefinitionContractVerification": (
+        "test_schema_stores_definitions_snapshots_and_schema_packs",
+        "test_schema_failure_vocabulary_is_boundary_specific",
+    ),
+    "ExportSchemaSnapshotContractVerification": (
+        "test_schema_stores_definitions_snapshots_and_schema_packs",
+        "test_schema_field_refinements_are_normalized_and_reject_invalid_combinations",
+        "test_schema_snapshot_rejects_duplicate_and_coercive_input",
+    ),
+    "GetSchemaDefinitionContractVerification": (
+        "test_schema_stores_definitions_snapshots_and_schema_packs",
+        "test_link_participation_distinguishes_query_and_result_directions",
+        "test_schema_pack_selection_is_unique_and_ordered",
+    ),
+    "ListSchemaDefinitionsContractVerification": (
+        "test_schema_stores_definitions_snapshots_and_schema_packs",
+        "test_link_participation_distinguishes_query_and_result_directions",
+        "test_schema_snapshot_rejects_duplicate_and_coercive_input",
+    ),
+    "ListDefinitionsByTypeKeyContractVerification": (
+        "test_schema_stores_definitions_snapshots_and_schema_packs",
+        "test_link_participation_distinguishes_query_and_result_directions",
+        "test_schema_snapshot_rejects_duplicate_and_coercive_input",
+    ),
+    "ListAnchorDataTypeKeysContractVerification": (
+        "test_schema_stores_definitions_snapshots_and_schema_packs",
+        "test_live_type_key_uniqueness_allows_non_live_candidates",
+        "test_schema_payload_sets_are_unique_disjoint_and_canonical",
+        "test_schema_snapshot_rejects_duplicate_and_coercive_input",
+    ),
+    "ListLinkParticipationContractVerification": (
+        "test_link_participation_distinguishes_query_and_result_directions",
+    ),
+    "ListAnchorTypeSummariesContractVerification": (
+        "test_schema_stores_definitions_snapshots_and_schema_packs",
+        "test_live_type_key_uniqueness_allows_non_live_candidates",
+        "test_link_participation_distinguishes_query_and_result_directions",
+        "test_schema_payload_sets_are_unique_disjoint_and_canonical",
+        "test_schema_failure_vocabulary_is_boundary_specific",
+        "test_schema_snapshot_rejects_duplicate_and_coercive_input",
+        "test_schema_pack_selection_is_unique_and_ordered",
+    ),
+    "GetSchemaPackContractVerification": (
+        "test_schema_stores_definitions_snapshots_and_schema_packs",
+        "test_schema_pack_selection_is_unique_and_ordered",
+    ),
+    "CreateEmptyRtgSchemaContractVerification": (
+        "test_schema_stores_definitions_snapshots_and_schema_packs",
+    ),
+    "ImportRtgSchemaSnapshotContractVerification": (
+        "test_schema_stores_definitions_snapshots_and_schema_packs",
+        "test_schema_field_refinements_are_normalized_and_reject_invalid_combinations",
+        "test_schema_snapshot_rejects_duplicate_and_coercive_input",
+    ),
+    "RtgSchemaBoundaryVerification": (
+        "test_schema_stores_definitions_snapshots_and_schema_packs",
+        "test_live_type_key_uniqueness_allows_non_live_candidates",
+        "test_link_participation_distinguishes_query_and_result_directions",
+        "test_recursive_fields_require_coherent_unique_kind_sets",
+        "test_schema_field_refinements_are_normalized_and_reject_invalid_combinations",
+        "test_allowed_values_preserve_distinct_large_json_integers",
+        "test_schema_payload_sets_are_unique_disjoint_and_canonical",
+        "test_schema_failure_vocabulary_is_boundary_specific",
+        "test_schema_snapshot_rejects_duplicate_and_coercive_input",
+        "test_schema_pack_selection_is_unique_and_ordered",
+    ),
+}
+
+
 def test_schema_stores_definitions_snapshots_and_schema_packs() -> None:
     schema = create_reference_component()
     person = schema.put_definition(

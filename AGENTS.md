@@ -15,6 +15,23 @@ Prefer reusable, self-contained behavior over one-off application code. Treat ap
 
 Use textual SysML v2 under `model/` as the normative source for component and application design. The pinned official Java validator is mandatory through `just model-check`; repository regex/profile checks are not formal language validation. Validate Foundation, Bibliotek, and Vellis from independently packaged KPAR contents, and keep the official parser-backed inventory and structured conformance objectives current through `just model-render`. Generated explanatory pages live under `generated/reference/`, while generated machine projections live under `generated/model/`. Do not introduce a parallel hand-authored component specification.
 
+Before making or reviewing a SysML/KerML syntax or semantics decision, use
+`.agents/skills/sysml-reference/SKILL.md` and search the generated, checksum-pinned page corpus under
+`reference/specifications/`. Read the smallest sufficient page set, follow normative cross-references,
+and state the specification section and page basis for consequential conclusions. Distinguish official
+language semantics from informative examples, Vellis modeling conventions, and agent inference. The
+official PDFs downloaded by `just model-setup` remain authoritative; the committed Markdown corpus is
+a generated retrieval projection and must not be edited by hand. Validation complements rather than
+replaces specification consultation.
+
+Use `.agents/skills/model-hygiene-review/SKILL.md` for periodic audits or suspected
+model/implementation drift. Run `just model-audit [stable-id]` to collect an ignored advisory
+evidence bundle, then inspect accepted-model ownership, realization behavior, consumers, exact test
+evidence, predecessor contracts, and git chronology before proposing a fix. Neither the model nor
+the implementation wins automatically: classify model drift, implementation drift, intentional
+codec/freedom, tooling/evidence gaps, or a required human decision. The audit never changes files
+and is not a CI gate.
+
 Keep three separately packageable model layers: the software-component modeling foundation,
 Bibliotek reusable components, and the Vellis application. In SysML terms, the foundation and
 Bibliotek are reusable `library package` products; Vellis is an application `package`; KPARs are
@@ -252,9 +269,13 @@ Default recipes:
 - `just model-check`: run official SysML validation plus profile, architecture, implementation-binding, and generated-artifact checks.
 - `just model-check-formal`: run the pinned official SysML validator directly.
 - `just model-render`: regenerate model-derived documentation views and the static Vellis application manifest.
+- `just model-reference-render`: regenerate searchable SysML and KerML Markdown from the pinned PDFs.
+- `just model-reference-check`: reject stale or manually edited specification reference projections.
+- `just model-reference-find "<question>"`: rank relevant specification sections and page snippets.
 - `just model-diff`: review authored model, generated projection, and runtime-manifest changes together.
 - `just model-package`: build independently packageable KPAR products.
 - `just model-handoff TARGET=<stable-id>`: inspect the model slice and verification objectives for an implementation handoff.
+- `just model-audit [stable-id]`: write an ignored advisory model/implementation evidence bundle without changing either side.
 - `just check`: run lint, type checking, skill validation, model checks, and tests.
 
 Run Python commands through `uv run` unless there is a specific reason to use another interpreter.

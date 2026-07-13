@@ -12,7 +12,7 @@ from components.rtg.graph.protocol import (
     JsonValue,
     RtgAnchor,
     RtgDataObject,
-    RtgGraph,
+    RtgGraphReadView,
 )
 from components.rtg.query.json_values import (
     canonical_json_key,
@@ -56,7 +56,7 @@ class SimpleRtgQueryEngine(RtgQueryEngine):
 
     def execute(
         self,
-        graph: RtgGraph,
+        graph: RtgGraphReadView,
         query_spec: RtgQuerySpec,
         query_options: RtgQueryOptions | None = None,
     ) -> RtgQueryResult:
@@ -64,8 +64,10 @@ class SimpleRtgQueryEngine(RtgQueryEngine):
         _validate_options(options)
         _validate_spec(query_spec)
         if query_spec.return_spec.aggregations and options.distinct_rows:
-            raise RtgQuerySpecInvalid(
-                "query_options.distinct_rows cannot be combined with aggregation"
+            raise _invalid(
+                "query_options.distinct_rows cannot be combined with aggregation",
+                path="query_options.distinct_rows",
+                remedy="Disable distinct_rows when return_spec.aggregations is present.",
             )
         _validate_order_by_against_spec(query_spec, options)
 
@@ -111,7 +113,7 @@ class SimpleRtgQueryEngine(RtgQueryEngine):
                 for name, anchor in zip(bucket_names, anchor_values, strict=True)
                 if anchor is not None and anchor.uuid is not None
             }
-            if any(value is None for value in anchor_binding.values()):
+            if not anchor_binding:
                 continue
             bindings.append(RtgQueryBindingRow(row_index=0, anchors=anchor_binding))
         for link_requirement in query_spec.link_requirements:
@@ -170,7 +172,7 @@ class SimpleRtgQueryEngine(RtgQueryEngine):
 
 
 def _expand_link_requirement(
-    graph: RtgGraph,
+    graph: RtgGraphReadView,
     options: RtgQueryOptions,
     rows: list[RtgQueryBindingRow],
     requirement: RtgQueryLinkRequirement,
@@ -205,7 +207,7 @@ def _expand_link_requirement(
 
 
 def _expand_optional_link_requirement(
-    graph: RtgGraph,
+    graph: RtgGraphReadView,
     options: RtgQueryOptions,
     rows: list[RtgQueryBindingRow],
     requirement: RtgQueryLinkRequirement,
@@ -275,7 +277,7 @@ def _dedupe_binding_rows(rows: list[RtgQueryBindingRow]) -> list[RtgQueryBinding
 
 
 def _expand_data_requirement(
-    graph: RtgGraph,
+    graph: RtgGraphReadView,
     options: RtgQueryOptions,
     rows: list[RtgQueryBindingRow],
     requirement: RtgQueryDataRequirement,
@@ -314,7 +316,7 @@ def _expand_data_requirement(
 
 
 def _shape_return_row(
-    graph: RtgGraph,
+    graph: RtgGraphReadView,
     query_spec: RtgQuerySpec,
     row: RtgQueryBindingRow,
 ) -> RtgQueryReturnRow:
@@ -370,7 +372,7 @@ def _return_property_diagnostics(
         if bound_count == 0:
             diagnostics.append(
                 RtgQueryDiagnostic(
-                    severity="informational",
+                    severity="info",
                     code="query.return_property_requirement_unbound",
                     message=(
                         f"Returned property {requirement_name}.{path_label} resolved no values "
@@ -405,7 +407,7 @@ def _return_property_diagnostics(
         elif resolved_count == 0:
             diagnostics.append(
                 RtgQueryDiagnostic(
-                    severity="informational",
+                    severity="info",
                     code="query.return_property_path_unresolved",
                     message=(
                         f"Returned property {requirement_name}.{path_label} resolved no values "
@@ -451,7 +453,13 @@ def _matches_live(obj: RtgAnchor | RtgDataObject | object, options: RtgQueryOpti
 
 def _predicate_matches(properties: JsonObject, predicate: RtgQueryPropertyPredicate) -> bool:
     if predicate.operator not in _OPERATORS:
-        raise RtgQuerySpecInvalid(f"unsupported predicate operator: {predicate.operator}")
+        raise _invalid(
+            f"unsupported predicate operator: {predicate.operator}",
+            path="query_spec.data_requirements.predicates.operator",
+            remedy="Use a supported query predicate operator.",
+            code="query.predicate.unsupported_operator",
+            accepted_fields=tuple(sorted(_OPERATORS)),
+        )
     found, actual = _resolve_path(properties, predicate.path)
     if predicate.operator == "exists":
         return found
@@ -521,14 +529,23 @@ def _regex_matches(actual: JsonValue, predicate: RtgQueryPropertyPredicate) -> b
         elif flag == "multiline":
             option_letters.append("m")
         else:
-            raise RtgQuerySpecInvalid(f"unsupported regex flag: {flag}")
+            raise _invalid(
+                f"unsupported regex flag: {flag}",
+                path="query_spec.data_requirements.predicates.regex_flags",
+                remedy="Use only case_insensitive or multiline.",
+                accepted_fields=("case_insensitive", "multiline"),
+            )
     pattern = (
         f"(?{''.join(option_letters)}){predicate.value}" if option_letters else predicate.value
     )
     try:
         return re2.search(pattern, actual) is not None
     except re2.error as error:
-        raise RtgQuerySpecInvalid(f"unsupported regex pattern: {error}") from error
+        raise _invalid(
+            f"unsupported regex pattern: {error}",
+            path="query_spec.data_requirements.predicates.value",
+            remedy="Use a valid RE2 pattern without unsupported constructs.",
+        ) from error
 
 
 def _resolve_path(properties: JsonObject, path: tuple[str, ...]) -> tuple[bool, JsonValue]:
@@ -714,19 +731,29 @@ def _binding_uuid(row: RtgQueryBindingRow, name: str) -> UUID | None:
 
 def _validate_options(options: RtgQueryOptions) -> None:
     if options.limit is not None and (
-        isinstance(options.limit, bool)
-        or not isinstance(options.limit, int)
-        or options.limit <= 0
+        isinstance(options.limit, bool) or not isinstance(options.limit, int) or options.limit <= 0
     ):
-        raise RtgQuerySpecInvalid("query_options.limit must be a positive integer")
+        raise _invalid(
+            "query_options.limit must be a positive integer",
+            path="query_options.limit",
+            remedy="Use a positive integer or omit limit.",
+        )
     if (
         isinstance(options.offset, bool)
         or not isinstance(options.offset, int)
         or options.offset < 0
     ):
-        raise RtgQuerySpecInvalid("query_options.offset must be a non-negative integer")
+        raise _invalid(
+            "query_options.offset must be a non-negative integer",
+            path="query_options.offset",
+            remedy="Use zero or a positive integer.",
+        )
     if not isinstance(options.distinct_rows, bool):
-        raise RtgQuerySpecInvalid("query_options.distinct_rows must be boolean")
+        raise _invalid(
+            "query_options.distinct_rows must be boolean",
+            path="query_options.distinct_rows",
+            remedy="Use true or false.",
+        )
     if options.live_filter not in _LIVE_FILTERS:
         raise RtgQuerySpecInvalid(
             f"invalid live_filter: {options.live_filter}",
@@ -767,9 +794,17 @@ def _validate_options(options: RtgQueryOptions) -> None:
                 ),
             )
         if not order.data_requirement:
-            raise RtgQuerySpecInvalid("order_by data_requirement must be non-empty")
+            raise _invalid(
+                "order_by data_requirement must be non-empty",
+                path="query_options.order_by.data_requirement",
+                remedy="Name a returned data requirement.",
+            )
         if not order.path:
-            raise RtgQuerySpecInvalid("order_by path must be non-empty")
+            raise _invalid(
+                "order_by path must be non-empty",
+                path="query_options.order_by.path",
+                remedy="Supply at least one property path segment.",
+            )
 
 
 def _validate_spec(query_spec: RtgQuerySpec) -> None:
@@ -777,10 +812,18 @@ def _validate_spec(query_spec: RtgQuerySpec) -> None:
         "anchor bucket", tuple(bucket.name for bucket in query_spec.anchor_buckets)
     )
     if not bucket_names:
-        raise RtgQuerySpecInvalid("at least one anchor bucket is required")
+        raise _invalid(
+            "at least one anchor bucket is required",
+            path="query_spec.anchor_buckets",
+            remedy="Define at least one named anchor bucket.",
+        )
     for bucket in query_spec.anchor_buckets:
         if not bucket.anchor_type_keys:
-            raise RtgQuerySpecInvalid(f"anchor bucket {bucket.name!r} has no type keys")
+            raise _invalid(
+                f"anchor bucket {bucket.name!r} has no type keys",
+                path="query_spec.anchor_buckets.anchor_type_keys",
+                remedy="Supply at least one anchor type key.",
+            )
     link_names = _names(
         "link requirement", tuple(item.name for item in query_spec.link_requirements)
     )
@@ -789,8 +832,12 @@ def _validate_spec(query_spec: RtgQuerySpec) -> None:
     )
     all_binding_names = (*bucket_names, *link_names, *data_names)
     if len(set(all_binding_names)) != len(all_binding_names):
-        raise RtgQuerySpecInvalid(
-            "anchor bucket, link requirement, and data requirement names must be globally unique"
+        raise _invalid(
+            "anchor bucket, link requirement, and data requirement names must be globally unique",
+            path="query_spec",
+            remedy=(
+                "Give every anchor bucket, link requirement, and data requirement a unique name."
+            ),
         )
     for link in query_spec.link_requirements:
         if link.source_bucket not in bucket_names or link.target_bucket not in bucket_names:
@@ -824,7 +871,11 @@ def _validate_spec(query_spec: RtgQuerySpec) -> None:
                 ),
             )
         if not link.link_type_keys:
-            raise RtgQuerySpecInvalid(f"link requirement {link.name!r} has no link type keys")
+            raise _invalid(
+                f"link requirement {link.name!r} has no link type keys",
+                path="query_spec.link_requirements.link_type_keys",
+                remedy="Supply at least one link type key.",
+            )
     for data in query_spec.data_requirements:
         if data.anchor_bucket not in bucket_names:
             raise RtgQuerySpecInvalid(
@@ -854,7 +905,11 @@ def _validate_spec(query_spec: RtgQuerySpec) -> None:
                 ),
             )
         if not data.data_type_key:
-            raise RtgQuerySpecInvalid(f"data requirement {data.name!r} has no data type")
+            raise _invalid(
+                f"data requirement {data.name!r} has no data type",
+                path="query_spec.data_requirements.data_type_key",
+                remedy="Supply a non-empty data type key.",
+            )
         for predicate in data.predicates:
             if predicate.operator not in _OPERATORS:
                 raise RtgQuerySpecInvalid(
@@ -874,11 +929,55 @@ def _validate_spec(query_spec: RtgQuerySpec) -> None:
                         guide_topics=("workflow_patterns", "query_examples"),
                     ),
                 )
+    if query_spec.diagnostic_options.unknown_term_guidance not in {
+        "none",
+        "suggest_discovery",
+    }:
+        raise _invalid(
+            "unknown_term_guidance must be none or suggest_discovery",
+            path="query_spec.diagnostic_options.unknown_term_guidance",
+            remedy="Use 'none' or 'suggest_discovery'.",
+            accepted_fields=("none", "suggest_discovery"),
+        )
+    for label, selected, declared in (
+        ("anchor_buckets", query_spec.return_spec.anchor_buckets, bucket_names),
+        ("link_requirements", query_spec.return_spec.link_requirements, link_names),
+        ("data_requirements", query_spec.return_spec.data_requirements, data_names),
+    ):
+        unknown = set(selected) - declared
+        if unknown:
+            raise _invalid(
+                f"return_spec.{label} names unknown requirement {sorted(unknown)[0]!r}",
+                path=f"query_spec.return_spec.{label}",
+                remedy="Select only names declared by this query specification.",
+            )
+    for label, properties in (
+        ("properties", query_spec.return_spec.properties),
+        ("group_by", query_spec.return_spec.group_by),
+    ):
+        for data_requirement, path in properties:
+            if data_requirement not in data_names:
+                raise _invalid(
+                    f"return_spec.{label} names unknown data requirement {data_requirement!r}",
+                    path=f"query_spec.return_spec.{label}",
+                    remedy=(
+                        "Reference a declared data requirement, including an optional one when "
+                        "appropriate."
+                    ),
+                )
+            if not path:
+                raise _invalid(
+                    f"return_spec.{label} property path must be non-empty",
+                    path=f"query_spec.return_spec.{label}",
+                    remedy="Supply at least one property path segment.",
+                )
     returned_properties = set(query_spec.return_spec.properties)
     for group_path in query_spec.return_spec.group_by:
         if group_path not in returned_properties:
-            raise RtgQuerySpecInvalid(
-                "group_by paths must also be listed in return_spec.properties"
+            raise _invalid(
+                "group_by paths must also be listed in return_spec.properties",
+                path="query_spec.return_spec.group_by",
+                remedy="Add every group_by pair to return_spec.properties.",
             )
     binding_names = bucket_names | link_names | data_names
     aggregation_names = _names(
@@ -901,11 +1000,24 @@ def _validate_spec(query_spec: RtgQuerySpec) -> None:
         )
     for aggregation in query_spec.return_spec.aggregations:
         if aggregation.function != "count":
-            raise RtgQuerySpecInvalid("only count aggregation is supported")
+            raise _invalid(
+                "only count aggregation is supported",
+                path="query_spec.return_spec.aggregations.function",
+                remedy="Use the count aggregation function.",
+                accepted_fields=("count",),
+            )
         if aggregation.binding not in binding_names:
-            raise RtgQuerySpecInvalid(f"aggregation {aggregation.name!r} names unknown binding")
+            raise _invalid(
+                f"aggregation {aggregation.name!r} names unknown binding",
+                path="query_spec.return_spec.aggregations.binding",
+                remedy="Reference a declared anchor, link, or data binding name.",
+            )
     if query_spec.return_spec.group_by and not aggregation_names:
-        raise RtgQuerySpecInvalid("group_by requires at least one aggregation")
+        raise _invalid(
+            "group_by requires at least one aggregation",
+            path="query_spec.return_spec.group_by",
+            remedy="Add at least one count aggregation or remove group_by.",
+        )
 
 
 def _validate_order_by_against_spec(
@@ -945,10 +1057,40 @@ def _validate_order_by_against_spec(
 
 def _names(label: str, names: tuple[str, ...]) -> set[str]:
     if any(not name for name in names):
-        raise RtgQuerySpecInvalid(f"{label} names must be non-empty")
+        raise _invalid(
+            f"{label} names must be non-empty",
+            path=f"query_spec.{label.replace(' ', '_')}s.name",
+            remedy=f"Give every {label} a non-empty name.",
+        )
     if len(set(names)) != len(names):
-        raise RtgQuerySpecInvalid(f"{label} names must be unique")
+        raise _invalid(
+            f"{label} names must be unique",
+            path=f"query_spec.{label.replace(' ', '_')}s.name",
+            remedy=f"Give every {label} a unique name.",
+        )
     return set(names)
+
+
+def _invalid(
+    message: str,
+    *,
+    path: str,
+    remedy: str,
+    code: str = "query.spec.invalid",
+    accepted_fields: tuple[str, ...] = (),
+) -> RtgQuerySpecInvalid:
+    return RtgQuerySpecInvalid(
+        message,
+        diagnostic=rtg_diagnostic(
+            code=code,
+            category="query_contract",
+            path=path,
+            problem=message,
+            remedy=remedy,
+            accepted_fields=accepted_fields,
+            guide_topics=("workflow_patterns", "query_examples", "tool_call_shapes"),
+        ),
+    )
 
 
 def _discovery_suggestion(query_spec: RtgQuerySpec) -> str | None:

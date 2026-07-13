@@ -34,6 +34,15 @@ just model-setup   # downloads and checksum-verifies the pinned validator and fo
 just model-check
 ```
 
+Before choosing or interpreting a SysML/KerML construct, use the repo-local `sysml-reference` skill.
+Unless an exact section or page is already known, always start with
+`just model-reference-find "<question>"`, review its ranked outline-aware results, then read
+the containing section and only the adjacent pages needed for context. Search outline headings before
+falling back to raw page-text search, and follow normative cross-references between SysML and KerML.
+Consequential modeling conclusions should name the specification section and page that supports them
+and separately identify repository conventions or inference. The Markdown is a generated search
+projection; the checksum-pinned PDFs under `.cache/sysml/formal/` remain authoritative.
+
 For an ordinary model change:
 
 ```sh
@@ -53,6 +62,7 @@ not repair it by editing generated files.
 |---|---|---:|---:|
 | `model/foundation/`, `model/bibliotek/`, `model/vellis/` | Normative SysML design | yes | yes |
 | `model/config/` | Pinned language, profile, library, and validator policy | yes | deliberately |
+| `reference/specifications/` | Generated searchable SysML/KerML page corpus, outlines, and manifests | yes | no |
 | `tests/model/fixtures/` | Modeling-pattern fixture validated separately from products | yes | yes |
 | `generated/reference/` | Generated human-readable model views | yes | no |
 | `generated/model/` | Generated parser inventory, conformance objectives, and evidence index | yes | no |
@@ -246,7 +256,12 @@ For review, check both directions:
   helpers, algorithms, framework mechanics, and language-specific inheritance remain private.
 
 If code exposes an ambiguity or disagrees with an accepted model, stop and surface the decision.
-Do not silently redefine the model from implementation behavior.
+Do not silently redefine the model from implementation behavior, but do not assume accepted status
+proves that a migration preserved every predecessor contract or used SysML correctly. Use the
+`model-hygiene-review` skill and `just model-audit <stable-id>` to inspect chronology, predecessor
+material, consumers, realization codecs, and exact evidence before classifying which side drifted.
+Audit bundles are ignored, advisory artifacts under `build/model-audits/`; they never mutate either
+side and do not gate CI.
 
 ## Generated views and checks
 
@@ -262,6 +277,9 @@ unrecorded drift.
 | Command | Purpose |
 |---|---|
 | `just model-setup` | Fetch and checksum-verify the pinned validator, Java runtime, specifications, and formal libraries. |
+| `just model-reference-render` | Regenerate committed page Markdown, outline indexes, and manifests from the pinned PDFs. |
+| `just model-reference-check` | Regenerate temporarily and reject stale, missing, extra, or hand-edited reference files. |
+| `just model-reference-find "<question>"` | Rank relevant sections and page snippets without loading whole specifications. |
 | `just model-render` | Regenerate committed human references, parser inventory, conformance/evidence projections, and runtime manifest. |
 | `just model-diff` | Show authored model, generated reference/machine projection, and runtime-manifest changes together. |
 | `just model-check-foundation` | Run fast repository-profile checks over Foundation sources. |
@@ -271,6 +289,7 @@ unrecorded drift.
 | `just model-check-formal` | Package and validate Foundation, Bibliotek, and Vellis through fresh official Java kernels. |
 | `just model-check` | Mandatory full model gate: package, formally validate, run repository architecture/realization checks, and reject stale generated files. |
 | `just model-handoff TARGET=<stable-id>` | Print the model product, sources, generated view, and verification-objective count for implementation. |
+| `just model-audit [stable-id]` | Collect an advisory model/implementation/history/evidence bundle for one component or all accepted components. |
 | `just check` | Run lint, type checking, skills, the mandatory model gate, and all tests. |
 
 Scoped checks are useful feedback while editing, but they do not replace `just model-check` or
@@ -286,12 +305,24 @@ those formal product checks directly. The published BNF is useful for syntax too
 replace the pilot's linking, type, multiplicity, specialization, and other semantic diagnostics.
 KPAR outputs are independently validated model products.
 
+### Specification reference upgrades
+
+The SysML and KerML PDFs are singular, checksum-pinned sources. Each physical source page is stored
+once as generated Markdown; the embedded PDF outlines provide section hierarchy and page routing
+without duplicating parent and child section text. To upgrade a specification baseline, update its
+URL, checksum, document metadata, expected page count, and expected outline count in
+`model/config/language.lock.json`; run `just model-setup` and `just model-reference-render`; inspect
+`just model-diff`; then run `just model-reference-check` and the full model gate. Do not preserve a
+second active reference version or repair generated pages manually.
+
 ## Troubleshooting
 
 - **Generated artifact is stale:** run `just model-render`, inspect `just model-diff`, and rerun the
   check. Never hand-edit the generated artifact.
 - **Validator or library asset is missing:** run `just model-setup`. Downloads are checksum-pinned
   under `.cache/sysml/` and may be safely recreated.
+- **Specification reference is stale or its source PDF is missing:** run `just model-setup`, then
+  `just model-reference-render`; inspect the diff rather than editing page Markdown.
 - **Formal syntax, linking, or semantic error:** use the reported `.sysml` line and column. Fix the
   authored model rather than weakening repository profile checks.
 - **Implementation binding does not resolve:** update the realization allocation/binding or the

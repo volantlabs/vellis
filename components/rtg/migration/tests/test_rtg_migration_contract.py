@@ -20,6 +20,63 @@ from components.rtg.migration import (
 )
 from components.rtg.migration.reference import create_reference_component
 
+MODEL_EVIDENCE = {
+    "PutMigrationContractVerification": (
+        "test_migration_tracks_cutover_membership_and_evidence",
+        "test_migration_status_and_delete_rules",
+        "test_migration_replacement_obeys_lifecycle_and_has_no_effect_on_rejection",
+        "test_migration_status_metadata_is_replaced_even_when_empty_or_same_status",
+        "test_migration_membership_is_unique_consistent_and_canonical",
+        "test_migration_cutover_sets_must_be_disjoint",
+    ),
+    "SetMigrationStatusContractVerification": (
+        "test_migration_tracks_cutover_membership_and_evidence",
+        "test_migration_status_and_delete_rules",
+        "test_migration_status_metadata_is_replaced_even_when_empty_or_same_status",
+    ),
+    "AddMigrationEvidenceContractVerification": (
+        "test_migration_tracks_cutover_membership_and_evidence",
+    ),
+    "DeleteMigrationContractVerification": ("test_migration_status_and_delete_rules",),
+    "BuildMigrationCutoverPlanContractVerification": (
+        "test_migration_tracks_cutover_membership_and_evidence",
+    ),
+    "ExportMigrationSnapshotContractVerification": (
+        "test_migration_tracks_cutover_membership_and_evidence",
+    ),
+    "GetMigrationContractVerification": (
+        "test_migration_tracks_cutover_membership_and_evidence",
+        "test_migration_status_and_delete_rules",
+        "test_migration_replacement_obeys_lifecycle_and_has_no_effect_on_rejection",
+        "test_migration_snapshot_accepts_independent_terminal_records",
+    ),
+    "ListMigrationsContractVerification": (
+        "test_migration_status_and_delete_rules",
+        "test_migration_replacement_obeys_lifecycle_and_has_no_effect_on_rejection",
+        "test_migration_membership_is_unique_consistent_and_canonical",
+        "test_migration_snapshot_import_rejects_duplicate_and_malformed_records_atomically",
+        "test_migration_snapshot_accepts_independent_terminal_records",
+    ),
+    "CreateEmptyRtgMigrationContractVerification": (
+        "test_migration_status_metadata_is_replaced_even_when_empty_or_same_status",
+    ),
+    "ImportRtgMigrationSnapshotContractVerification": (
+        "test_migration_tracks_cutover_membership_and_evidence",
+        "test_migration_snapshot_import_rejects_duplicate_and_malformed_records_atomically",
+        "test_migration_snapshot_accepts_independent_terminal_records",
+    ),
+    "RtgMigrationBoundaryVerification": (
+        "test_migration_tracks_cutover_membership_and_evidence",
+        "test_migration_status_and_delete_rules",
+        "test_migration_replacement_obeys_lifecycle_and_has_no_effect_on_rejection",
+        "test_migration_status_metadata_is_replaced_even_when_empty_or_same_status",
+        "test_migration_membership_is_unique_consistent_and_canonical",
+        "test_migration_snapshot_import_rejects_duplicate_and_malformed_records_atomically",
+        "test_migration_snapshot_accepts_independent_terminal_records",
+        "test_migration_cutover_sets_must_be_disjoint",
+    ),
+}
+
 
 def test_migration_tracks_cutover_membership_and_evidence() -> None:
     migration = create_reference_component()

@@ -56,6 +56,14 @@ library package SoftwareComponentModeling {
         attribute realization : String;
     }
 
+    metadata def ImplementationCodec {
+        :> annotatedElement : SysML::PartDefinition;
+        attribute logicalType : String;
+        attribute implementationType : String;
+        attribute normalization : String;
+        doc /* Realization-only traceability for a non-isomorphic but lossless public encoding. */
+    }
+
     metadata def EvidenceBinding {
         :>> annotatedElement : SysML::VerificationCaseDefinition;
         attribute evidenceId : String;

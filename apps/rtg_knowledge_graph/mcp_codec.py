@@ -48,16 +48,21 @@ from components.rtg.migration import (
 )
 from components.rtg.query import (
     RtgQueryAggregation,
+    RtgQueryAggregationFunction,
     RtgQueryAnchorBucket,
     RtgQueryDataRequirement,
     RtgQueryDiagnosticOptions,
     RtgQueryLinkRequirement,
+    RtgQueryLiveFilter,
+    RtgQueryOperator,
     RtgQueryOptions,
     RtgQueryOrderBy,
+    RtgQueryOrderDirection,
     RtgQueryPropertyPredicate,
     RtgQueryResult,
     RtgQueryReturnSpec,
     RtgQuerySpec,
+    RtgQueryUnknownTermGuidance,
 )
 from components.rtg.schema import (
     RtgAnchorSchemaPayload,
@@ -80,8 +85,7 @@ class RtgMcpInputInvalid(ValueError):
 def encode_json(value: object) -> JsonValue:
     if dataclasses.is_dataclass(value):
         data = {
-            field.name: getattr(value, field.name)
-            for field in dataclasses.fields(cast(Any, value))
+            field.name: getattr(value, field.name) for field in dataclasses.fields(cast(Any, value))
         }
         if isinstance(value, RtgQueryResult) and value.next_offset is None:
             data.pop("next_offset", None)
@@ -824,7 +828,7 @@ def decode_query_options(value: object | None) -> RtgQueryOptions | None:
     )
     overlay = _object(data.get("live_status_overlay", {}), "live_status_overlay")
     return RtgQueryOptions(
-        live_filter=_optional_str(data.get("live_filter")) or "all",
+        live_filter=cast(RtgQueryLiveFilter, _optional_str(data.get("live_filter")) or "all"),
         live_status_overlay={UUID(str(key)): _bool(item) for key, item in overlay.items()},
         order_by=tuple(
             _decode_query_order_by(item, index)
@@ -850,7 +854,7 @@ def _decode_query_order_by(value: object, index: int) -> RtgQueryOrderBy:
     return RtgQueryOrderBy(
         data_requirement=_required_str(data, "data_requirement"),
         path=_str_tuple(data.get("path", []), f"{label}.path"),
-        direction=direction,
+        direction=cast(RtgQueryOrderDirection, direction),
     )
 
 
@@ -864,7 +868,7 @@ def decode_query_property_predicate(value: object) -> RtgQueryPropertyPredicate:
     )
     return RtgQueryPropertyPredicate(
         path=_str_tuple(data.get("path", []), "query_predicate.path"),
-        operator=_required_str(data, "operator"),
+        operator=cast(RtgQueryOperator, _required_str(data, "operator")),
         value=cast(JsonValue, data.get("value")),
         values=tuple(
             cast(str | int | float | bool | None, item) for item in _list(data.get("values", []))
@@ -933,7 +937,7 @@ def _decode_query_aggregation(value: object, index: int) -> RtgQueryAggregation:
     _reject_unknown_keys(data, {"name", "function", "binding"}, label)
     return RtgQueryAggregation(
         name=_required_str(data, "name"),
-        function=_required_str(data, "function"),
+        function=cast(RtgQueryAggregationFunction, _required_str(data, "function")),
         binding=_required_str(data, "binding"),
     )
 
@@ -957,14 +961,28 @@ def decode_query_diagnostic_options(value: object) -> RtgQueryDiagnosticOptions:
         {"include_non_fatal", "unknown_term_guidance"},
         "query_diagnostic_options",
     )
+    guidance = _optional_str(data.get("unknown_term_guidance")) or "suggest_discovery"
+    if guidance not in {"none", "suggest_discovery"}:
+        raise RtgMcpInputInvalid(
+            "query_diagnostic_options.unknown_term_guidance must be none or suggest_discovery",
+            diagnostic=rtg_diagnostic(
+                code="mcp.input.query_unknown_term_guidance",
+                category="input_shape",
+                path="query_diagnostic_options.unknown_term_guidance",
+                problem="The query diagnostic guidance literal is not supported.",
+                remedy="Use 'none' or 'suggest_discovery'.",
+                accepted_fields=("none", "suggest_discovery"),
+                minimal_example={"unknown_term_guidance": "suggest_discovery"},
+                guide_topics=("query_examples", "tool_call_shapes"),
+            ),
+        )
     return RtgQueryDiagnosticOptions(
         include_non_fatal=_optional_bool(
             data.get("include_non_fatal"),
             True,
             "query_diagnostic_options.include_non_fatal",
         ),
-        unknown_term_guidance=_optional_str(data.get("unknown_term_guidance"))
-        or "suggest_discovery",
+        unknown_term_guidance=cast(RtgQueryUnknownTermGuidance, guidance),
     )
 
 

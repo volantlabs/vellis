@@ -32,7 +32,7 @@ library package BibliotekRtgMigration {
     item def RtgMigrationRecord {
         attribute migrationId[0..1] : String;
         attribute description : String;
-        attribute status : RtgMigrationStatus = RtgMigrationStatus::draft;
+        attribute status : RtgMigrationStatus default = RtgMigrationStatus::draft;
         attribute schemaMakeLive[0..*] : Uuid;
         attribute schemaMakeNonLive[0..*] : Uuid;
         attribute constraintMakeLive[0..*] : Uuid;

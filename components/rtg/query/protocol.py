@@ -1,10 +1,30 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Protocol
+from typing import Literal, Protocol
 from uuid import UUID
 
-from components.rtg.graph.protocol import JsonObject, JsonScalar, JsonValue, RtgGraph
+from components.rtg.diagnostics import rtg_diagnostic
+from components.rtg.graph.protocol import JsonObject, JsonScalar, JsonValue, RtgGraphReadView
+
+type RtgQueryOperator = Literal[
+    "exists",
+    "equals",
+    "not_equals",
+    "lt",
+    "lte",
+    "gt",
+    "gte",
+    "contains",
+    "in",
+    "substring",
+    "regex",
+]
+type RtgQueryLiveFilter = Literal["all", "live", "non_live"]
+type RtgQueryOrderDirection = Literal["ascending", "descending"]
+type RtgQueryUnknownTermGuidance = Literal["none", "suggest_discovery"]
+type RtgQueryDiagnosticSeverity = Literal["warning", "info"]
+type RtgQueryAggregationFunction = Literal["count"]
 
 
 @dataclass(frozen=True, slots=True)
@@ -25,14 +45,14 @@ class RtgQueryLinkRequirement:
 @dataclass(frozen=True, slots=True)
 class RtgQueryAggregation:
     name: str
-    function: str
+    function: RtgQueryAggregationFunction
     binding: str
 
 
 @dataclass(frozen=True, slots=True)
 class RtgQueryPropertyPredicate:
     path: tuple[str, ...]
-    operator: str
+    operator: RtgQueryOperator
     value: JsonValue = None
     values: tuple[JsonScalar, ...] = ()
     case_sensitive: bool = False
@@ -61,7 +81,7 @@ class RtgQueryReturnSpec:
 @dataclass(frozen=True, slots=True)
 class RtgQueryDiagnosticOptions:
     include_non_fatal: bool = True
-    unknown_term_guidance: str = "suggest_discovery"
+    unknown_term_guidance: RtgQueryUnknownTermGuidance = "suggest_discovery"
 
 
 @dataclass(frozen=True, slots=True)
@@ -75,7 +95,7 @@ class RtgQuerySpec:
 
 @dataclass(frozen=True, slots=True)
 class RtgQueryOptions:
-    live_filter: str = "all"
+    live_filter: RtgQueryLiveFilter = "all"
     live_status_overlay: dict[UUID, bool] = field(default_factory=dict)
     order_by: tuple[RtgQueryOrderBy, ...] = ()
     limit: int | None = None
@@ -87,7 +107,7 @@ class RtgQueryOptions:
 class RtgQueryOrderBy:
     data_requirement: str
     path: tuple[str, ...]
-    direction: str = "ascending"
+    direction: RtgQueryOrderDirection = "ascending"
 
 
 @dataclass(frozen=True, slots=True)
@@ -109,7 +129,7 @@ class RtgQueryReturnRow:
 
 @dataclass(frozen=True, slots=True)
 class RtgQueryDiagnostic:
-    severity: str
+    severity: RtgQueryDiagnosticSeverity
     code: str
     message: str
     suggestion: str | None = None
@@ -131,23 +151,37 @@ class RtgQueryResult:
 class RtgQueryError(Exception):
     """Base class for RTG Query errors."""
 
+    diagnostic_code = "query.error"
+
     def __init__(self, message: str, *, diagnostic: JsonObject | None = None) -> None:
         super().__init__(message)
-        self.diagnostic = diagnostic or {}
+        self.diagnostic = diagnostic or rtg_diagnostic(
+            code=self.diagnostic_code,
+            category="query_contract",
+            problem=message,
+            remedy=(
+                "Correct the query specification or options and retry without changing graph state."
+            ),
+            guide_topics=("workflow_patterns", "query_examples", "tool_call_shapes"),
+        )
 
 
 class RtgQuerySpecInvalid(RtgQueryError):
     """A query specification is malformed."""
 
+    diagnostic_code = "query.spec.invalid"
+
 
 class RtgQueryUnsupported(RtgQueryError):
     """A query asks for unsupported behavior."""
+
+    diagnostic_code = "query.unsupported"
 
 
 class RtgQueryEngine(Protocol):
     def execute(
         self,
-        graph: RtgGraph,
+        graph: RtgGraphReadView,
         query_spec: RtgQuerySpec,
         query_options: RtgQueryOptions | None = None,
     ) -> RtgQueryResult:

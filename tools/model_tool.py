@@ -1202,14 +1202,56 @@ def _test_functions(path: Path) -> list[str]:
     )
 
 
+def _evidence_group_map(path: Path) -> dict[str, tuple[str, ...]]:
+    try:
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+    except OSError, SyntaxError:
+        return {}
+    for node in tree.body:
+        if not isinstance(node, (ast.Assign, ast.AnnAssign)):
+            continue
+        targets = node.targets if isinstance(node, ast.Assign) else [node.target]
+        if not any(
+            isinstance(target, ast.Name) and target.id == "MODEL_EVIDENCE" for target in targets
+        ):
+            continue
+        value_node = node.value
+        if value_node is None:
+            return {}
+        try:
+            value = ast.literal_eval(value_node)
+        except ValueError, SyntaxError:
+            return {}
+        if not isinstance(value, dict):
+            return {}
+        result: dict[str, tuple[str, ...]] = {}
+        for group, symbols in value.items():
+            if not isinstance(group, str) or not isinstance(symbols, tuple | list):
+                return {}
+            if not symbols or any(not isinstance(symbol, str) for symbol in symbols):
+                return {}
+            normalized = tuple(symbols)
+            if len(set(normalized)) != len(normalized):
+                return {}
+            result[group] = normalized
+        return result
+    return {}
+
+
 def _evidence_test_nodes(evidence_id: str) -> list[str]:
-    source = evidence_id.split("#", 1)[0]
+    source, _, group = evidence_id.partition("#")
     if source == "pending":
         return []
     if "::" in source:
         path_text, symbol = source.split("::", 1)
         return [f"{path_text}::{symbol}"] if symbol in _test_functions(ROOT / path_text) else []
-    return [f"{source}::{name}" for name in _test_functions(ROOT / source)]
+    if not group:
+        return []
+    tests = set(_test_functions(ROOT / source))
+    symbols = _evidence_group_map(ROOT / source).get(group, ())
+    if any(symbol not in tests for symbol in symbols):
+        return []
+    return [f"{source}::{symbol}" for symbol in symbols]
 
 
 def _verification_evidence_data() -> dict[str, object]:
@@ -1220,7 +1262,13 @@ def _verification_evidence_data() -> dict[str, object]:
             groups[evidence_id] = {
                 "model_source": str(path.relative_to(ROOT)),
                 "test_nodes": _evidence_test_nodes(evidence_id),
-                "status": "pending" if evidence_id.startswith("pending#") else "resolved",
+                "status": (
+                    "pending"
+                    if evidence_id.startswith("pending#")
+                    else "resolved"
+                    if _evidence_test_nodes(evidence_id)
+                    else "unresolved"
+                ),
             }
     return {
         "description": (
@@ -1228,6 +1276,434 @@ def _verification_evidence_data() -> dict[str, object]:
         ),
         "groups": dict(sorted(groups.items())),
     }
+
+
+def _audit_python_boundary(component_id: str) -> dict[str, object]:
+    code_root = ROOT / "components" / Path(*component_id.removeprefix("component.").split("."))
+    protocol_path = code_root / "protocol.py"
+    if not protocol_path.exists():
+        return {"protocol": None, "records": {}, "literal_aliases": {}}
+    tree = ast.parse(protocol_path.read_text(encoding="utf-8"))
+    records: dict[str, dict[str, object]] = {}
+    literal_aliases: dict[str, list[str]] = {}
+    for node in tree.body:
+        if isinstance(node, ast.ClassDef):
+            fields: dict[str, object] = {}
+            for member in node.body:
+                if not isinstance(member, ast.AnnAssign) or not isinstance(member.target, ast.Name):
+                    continue
+                fields[_normalized_name(member.target.id)] = {
+                    "python_name": member.target.id,
+                    "annotation": ast.unparse(member.annotation),
+                    "has_default": member.value is not None,
+                    "default_expression": (
+                        ast.unparse(member.value) if member.value is not None else None
+                    ),
+                }
+            if fields:
+                records[node.name] = fields
+        elif isinstance(node, ast.TypeAlias) and isinstance(node.name, ast.Name):
+            values = [
+                value.value
+                for value in ast.walk(node.value)
+                if isinstance(value, ast.Constant) and isinstance(value.value, str)
+            ]
+            if values:
+                literal_aliases[node.name.id] = values
+    return {
+        "protocol": str(protocol_path.relative_to(ROOT)),
+        "records": records,
+        "literal_aliases": literal_aliases,
+    }
+
+
+def _audit_model_boundary(path: Path) -> dict[str, object]:
+    text = path.read_text(encoding="utf-8")
+    records: dict[str, dict[str, object]] = {}
+    bases: dict[str, str] = {}
+    for match in re.finditer(
+        rf"\b(?:attribute|item) def\s+{OPTIONAL_IDENTIFICATION}(\w+)\s*(?:[^{{;]*)\{{",
+        text,
+    ):
+        base = re.search(r":>\s*(\w+)", match.group(0))
+        if base:
+            bases[match.group(1)] = base.group(1)
+        block = _extract_braced_block(text, match.start())
+        fields: dict[str, object] = {}
+        for field in re.finditer(
+            rf"\b(?:attribute|item|ref item)\s+{OPTIONAL_IDENTIFICATION}({SYSML_IDENTIFIER})"
+            r"(?P<multiplicity>\[[^]]+\])?\s*:\s*(?P<type>[\w:']+)"
+            r"(?P<value>\s+default\s*=|\s*=)?",
+            block,
+        ):
+            name = field.group(1).strip("'")
+            value_kind = field.group("value") or ""
+            fields[_normalized_name(name)] = {
+                "model_name": name,
+                "type": field.group("type"),
+                "multiplicity": field.group("multiplicity") or "[1]",
+                "value_kind": (
+                    "default"
+                    if "default" in value_kind
+                    else "fixed"
+                    if "=" in value_kind
+                    else "none"
+                ),
+            }
+        if fields:
+            records[match.group(1)] = fields
+
+    def inherited_fields(record_name: str, seen: frozenset[str] = frozenset()) -> dict[str, object]:
+        if record_name in seen:
+            return dict(records.get(record_name, {}))
+        result: dict[str, object] = {}
+        base_name = bases.get(record_name)
+        if base_name in records:
+            result.update(inherited_fields(base_name, seen | {record_name}))
+        result.update(records.get(record_name, {}))
+        return result
+
+    records = {record_name: inherited_fields(record_name) for record_name in records}
+    enums: dict[str, list[str]] = {}
+    for match in re.finditer(r"\benum def\s+(\w+)\s*\{", text):
+        block = _extract_braced_block(text, match.start())
+        enums[match.group(1)] = [
+            value.strip("'") for value in re.findall(r"\benum\s+([\w']+)", block) if value != "def"
+        ]
+    return {"records": records, "enums": enums}
+
+
+def _audit_component(component_id: str) -> dict[str, object]:
+    model_path = COMPONENT_MODEL_ROOT / f"{component_id}.sysml"
+    if not model_path.exists():
+        raise ValueError(f"unknown component target: {component_id}")
+    model = _audit_model_boundary(model_path)
+    python = _audit_python_boundary(component_id)
+    findings: list[dict[str, object]] = []
+    comparisons: list[dict[str, object]] = []
+    model_records = model["records"]
+    python_records = python["records"]
+    assert isinstance(model_records, dict) and isinstance(python_records, dict)
+    for record_name in sorted(set(model_records) & set(python_records)):
+        model_fields = model_records[record_name]
+        python_fields = python_records[record_name]
+        assert isinstance(model_fields, dict) and isinstance(python_fields, dict)
+        for field_name in sorted(set(model_fields) | set(python_fields)):
+            if field_name not in model_fields:
+                findings.append(
+                    {
+                        "kind": "python_field_missing_from_model",
+                        "candidate_classification": "model_drift",
+                        "record": record_name,
+                        "field": field_name,
+                    }
+                )
+                continue
+            if field_name not in python_fields:
+                findings.append(
+                    {
+                        "kind": "model_field_missing_from_python",
+                        "candidate_classification": "implementation_drift",
+                        "record": record_name,
+                        "field": field_name,
+                    }
+                )
+                continue
+            model_field = model_fields[field_name]
+            python_field = python_fields[field_name]
+            assert isinstance(model_field, dict) and isinstance(python_field, dict)
+            model_default = model_field["value_kind"] == "default"
+            model_optional = str(model_field["multiplicity"]).startswith("[0")
+            python_default = bool(python_field["has_default"])
+            if (model_default and not python_default) or (
+                python_default and not model_default and not model_optional
+            ):
+                findings.append(
+                    {
+                        "kind": "default_mismatch",
+                        "candidate_classification": "human_decision_required",
+                        "record": record_name,
+                        "field": field_name,
+                        "model": model_field,
+                        "python": python_field,
+                    }
+                )
+            if (
+                model_field["multiplicity"] == "[0..1]"
+                and model_field["type"] == "JsonValue"
+                and python_field.get("default_expression") == "None"
+            ):
+                findings.append(
+                    {
+                        "kind": "optional_json_null_normalization",
+                        "candidate_classification": "human_decision_required",
+                        "record": record_name,
+                        "field": field_name,
+                        "model": model_field,
+                        "python": python_field,
+                        "question": (
+                            "Python uses None for modeled absence even though JSON null is also a "
+                            "valid present value; decide whether the distinction is contract-"
+                            "significant or declare a codec."
+                        ),
+                    }
+                )
+            comparisons.append(
+                {
+                    "kind": "type_comparison",
+                    "record": record_name,
+                    "field": field_name,
+                    "model": {
+                        "type": model_field["type"],
+                        "multiplicity": model_field["multiplicity"],
+                    },
+                    "python": {"annotation": python_field["annotation"]},
+                }
+            )
+    literal_aliases = python["literal_aliases"]
+    enums = model["enums"]
+    assert isinstance(literal_aliases, dict) and isinstance(enums, dict)
+    for enum_name in sorted(set(enums) & set(literal_aliases)):
+        if set(enums[enum_name]) != set(literal_aliases[enum_name]):
+            findings.append(
+                {
+                    "kind": "enum_literal_mismatch",
+                    "candidate_classification": "human_decision_required",
+                    "type": enum_name,
+                    "model": enums[enum_name],
+                    "python": literal_aliases[enum_name],
+                }
+            )
+    model_text = model_path.read_text(encoding="utf-8")
+    evidence = {
+        evidence_id: _evidence_test_nodes(evidence_id)
+        for evidence_id in re.findall(r'evidenceId\s*=\s*"([^"]+)"', model_text)
+    }
+    codecs: list[dict[str, str]] = []
+    for realization_path in (MODEL_ROOT / "vellis" / "realizations").glob("*.sysml"):
+        realization_text = realization_path.read_text(encoding="utf-8")
+        code_root = (
+            f'codeRoot = "components/{component_id.removeprefix("component.").replace(".", "/")}"'
+        )
+        for part in re.finditer(r"\bpart def\s+[^\n{]+\{", realization_text):
+            part_block = _extract_braced_block(realization_text, part.start())
+            if code_root not in part_block:
+                continue
+            for block in re.findall(r"@ImplementationCodec\s*\{([^}]*)\}", part_block):
+                values = dict(
+                    re.findall(
+                        r'(logicalType|implementationType|normalization)\s*=\s*"([^"]*)"',
+                        block,
+                    )
+                )
+                if values:
+                    codecs.append(values)
+    history = subprocess.run(
+        [
+            "git",
+            "log",
+            "--follow",
+            "-n",
+            "8",
+            "--format=%h %ad %s",
+            "--date=short",
+            "--",
+            str(model_path.relative_to(ROOT)),
+        ],
+        cwd=ROOT,
+        check=False,
+        text=True,
+        capture_output=True,
+    ).stdout.splitlines()
+    predecessor_path = Path("docs/components") / f"{component_id}.md"
+    predecessor_history = subprocess.run(
+        [
+            "git",
+            "log",
+            "--all",
+            "-n",
+            "8",
+            "--format=%h %ad %s",
+            "--date=short",
+            "--",
+            str(predecessor_path),
+        ],
+        cwd=ROOT,
+        check=False,
+        text=True,
+        capture_output=True,
+    ).stdout.splitlines()
+    python_module = component_id.removeprefix("component.").replace(".", ".")
+    package_name = "Bibliotek" + "".join(
+        segment.title() for segment in component_id.removeprefix("component.").split(".")
+    )
+    consumer_search = subprocess.run(
+        [
+            "rg",
+            "-l",
+            "--glob",
+            "!reference/**",
+            "--glob",
+            "!generated/reference/**",
+            "--glob",
+            "!build/**",
+            f"{re.escape(component_id)}|components\\.{re.escape(python_module)}|{package_name}",
+            ".",
+        ],
+        cwd=ROOT,
+        check=False,
+        text=True,
+        capture_output=True,
+    ).stdout.splitlines()
+    action_signature_findings = [
+        finding.message
+        for finding in _check_protocol_action_signatures()
+        if finding.path == model_path
+    ]
+    return {
+        "component_id": component_id,
+        "lifecycle": _component_model_statuses().get(component_id),
+        "model_source": str(model_path.relative_to(ROOT)),
+        "python_boundary": python,
+        "model_boundary": model,
+        "implementation_codecs": codecs,
+        "evidence_groups": evidence,
+        "history": history,
+        "predecessor_contract": {
+            "path": str(predecessor_path),
+            "history": predecessor_history,
+        },
+        "consumer_references": sorted(
+            path.removeprefix("./")
+            for path in consumer_search
+            if path.removeprefix("./") != str(model_path.relative_to(ROOT))
+        ),
+        "action_signature_findings": action_signature_findings,
+        "boundary_comparisons": comparisons,
+        "candidate_findings": findings,
+    }
+
+
+def model_audit(target: str | None, output_root: Path | None = None) -> tuple[Path, Path]:
+    statuses = _component_model_statuses()
+    targets = (
+        [target]
+        if target
+        else sorted(key for key, value in statuses.items() if value == "accepted")
+    )
+    unknown = [component_id for component_id in targets if component_id not in statuses]
+    if unknown:
+        raise ValueError(f"unknown component target: {unknown[0]}")
+    payload = {
+        "description": (
+            "Advisory evidence bundle; candidate findings require authority triage before mutation."
+        ),
+        "classifications": [
+            "model_drift",
+            "implementation_drift",
+            "intentional_codec",
+            "intentional_implementation_freedom",
+            "tooling_gap",
+            "evidence_gap",
+            "human_decision_required",
+        ],
+        "components": [_audit_component(component_id) for component_id in targets],
+    }
+    destination = output_root or ROOT / "build" / "model-audits"
+    destination.mkdir(parents=True, exist_ok=True)
+    stem = target or "all-accepted"
+    json_path = destination / f"{stem}.json"
+    markdown_path = destination / f"{stem}.md"
+    json_path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    lines = [
+        f"# Model hygiene audit: {stem}",
+        "",
+        (
+            "Advisory only. Classify each candidate with history and consumer evidence before "
+            "changing an accepted model or realization."
+        ),
+        "",
+    ]
+    for component in payload["components"]:
+        assert isinstance(component, dict)
+        findings = component["candidate_findings"]
+        evidence = component["evidence_groups"]
+        assert isinstance(findings, list) and isinstance(evidence, dict)
+        lines.extend(
+            [
+                f"## {component['component_id']}",
+                "",
+                f"- Lifecycle: {component['lifecycle']}",
+                f"- Candidate findings: {len(findings)}",
+                f"- Boundary field comparisons: {len(component['boundary_comparisons'])}",
+                f"- Action signature findings: {len(component['action_signature_findings'])}",
+                f"- Evidence groups: {len(evidence)}",
+                f"- Explicit codecs: {len(component['implementation_codecs'])}",
+                "",
+            ]
+        )
+        if findings:
+            lines.extend(["### Candidate findings", ""])
+            for finding in findings:
+                assert isinstance(finding, dict)
+                model_detail = finding.get("model")
+                field_name = finding.get("field")
+                if isinstance(model_detail, dict):
+                    field_name = model_detail.get("model_name", field_name)
+                subject = ".".join(
+                    str(value) for value in (finding.get("record"), field_name) if value
+                )
+                lines.append(
+                    f"- `{finding['kind']}` ({finding['candidate_classification']})"
+                    + (f": `{subject}`" if subject else "")
+                    + (f" — {finding['question']}" if finding.get("question") else "")
+                )
+            lines.append("")
+        codecs = component["implementation_codecs"]
+        assert isinstance(codecs, list)
+        if codecs:
+            lines.extend(["### Declared realization codecs", ""])
+            for codec in codecs:
+                assert isinstance(codec, dict)
+                lines.append(
+                    f"- `{codec.get('logicalType', '?')}` ↔ "
+                    f"`{codec.get('implementationType', '?')}`: "
+                    f"{codec.get('normalization', '')}"
+                )
+            lines.append("")
+        lines.extend(["### Evidence resolution", ""])
+        for evidence_id, nodes in sorted(evidence.items()):
+            assert isinstance(nodes, list)
+            lines.append(f"- `{evidence_id}`: {len(nodes)} concrete test node(s)")
+        lines.append("")
+        action_findings = component["action_signature_findings"]
+        assert isinstance(action_findings, list)
+        if action_findings:
+            lines.extend(["### Action signature findings", ""])
+            lines.extend(f"- {finding}" for finding in action_findings)
+            lines.append("")
+        predecessor = component["predecessor_contract"]
+        consumers = component["consumer_references"]
+        history = component["history"]
+        assert isinstance(predecessor, dict)
+        assert isinstance(consumers, list)
+        assert isinstance(history, list)
+        lines.extend(
+            [
+                "### Authority evidence",
+                "",
+                f"- Current model history entries: {len(history)}",
+                f"- Predecessor candidate: `{predecessor['path']}` "
+                f"({len(predecessor['history'])} history entries)",
+                f"- Consumer/reference files: {len(consumers)}",
+            ]
+        )
+        lines.extend(f"  - `{path}`" for path in consumers[:20])
+        if len(consumers) > 20:
+            lines.append(f"  - … {len(consumers) - 20} more in the JSON bundle")
+        lines.append("")
+    markdown_path.write_text("\n".join(lines), encoding="utf-8")
+    return json_path, markdown_path
 
 
 def _conformance_objectives_data() -> dict[str, object]:
@@ -3310,6 +3786,8 @@ def main() -> int:
     subparsers.add_parser("setup")
     handoff_parser = subparsers.add_parser("handoff")
     handoff_parser.add_argument("target")
+    audit_parser = subparsers.add_parser("audit")
+    audit_parser.add_argument("target", nargs="?")
     subparsers.add_parser("diff")
     args = parser.parse_args()
 
@@ -3329,6 +3807,17 @@ def main() -> int:
         return setup_status()
     if args.command == "handoff":
         return handoff(args.target)
+    if args.command == "audit":
+        try:
+            json_path, markdown_path = model_audit(args.target)
+        except (OSError, ValueError, SyntaxError) as error:
+            print(f"Model audit failed: {error}", file=sys.stderr)
+            return 2
+        print(
+            "Wrote advisory audit bundles: "
+            f"{json_path.relative_to(ROOT)}, {markdown_path.relative_to(ROOT)}"
+        )
+        return 0
     result = subprocess.run(
         [
             "git",
@@ -3336,6 +3825,21 @@ def main() -> int:
             "--",
             "model",
             "generated",
+            "components",
+            "tests",
+            "apps/rtg_knowledge_graph",
+            "reference/specifications",
+            ".agents/skills",
+            ".github/workflows/check.yml",
+            "AGENTS.md",
+            "README.md",
+            "docs/engineering/sysml-modeling.md",
+            "justfile",
+            "pyproject.toml",
+            "tools/sysml_reference.py",
+            "tools/model_tool.py",
+            "tests/test_sysml_reference.py",
+            "uv.lock",
             str(GENERATED_MANIFEST.relative_to(ROOT)),
         ],
         cwd=ROOT,

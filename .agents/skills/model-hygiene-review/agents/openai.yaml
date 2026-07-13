@@ -1,0 +1,4 @@
+interface:
+  display_name: "Model Hygiene Review"
+  short_description: "Audit model and realization drift safely"
+  default_prompt: "Use $model-hygiene-review to audit an accepted component model against its realization, history, consumers, and evidence before proposing any change."

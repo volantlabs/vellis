@@ -45,6 +45,23 @@ from components.rtg.schema import (
 from components.storage.json_file.implementation import LocalJsonFileStorage
 from components.storage.sql import SqliteStorage
 
+MODEL_EVIDENCE = {
+    "EverydayLifeOntologyVerification": (
+        "test_everyday_life_bundle_is_exact_schema_only_and_deterministic",
+        "test_modeled_ontology_installer_reports_installation_and_reuse",
+        "test_everyday_life_ontology_install_is_idempotent_and_replayable",
+        "test_custom_schema_is_preserved_and_not_overlaid",
+        "test_replayed_beta_shaped_custom_graph_with_overlapping_keys_starts",
+        "test_installed_ontology_can_be_extended_without_bootstrap_overwrite",
+        "test_starter_identity_collision_fails_without_partial_effects",
+        "test_partial_starter_installation_fails_without_partial_effects",
+        "test_startup_completes_an_exact_interrupted_starter_staging",
+        "test_empty_mode_abandons_an_exact_interrupted_starter_staging",
+        "test_manual_recovery_does_not_overlay_durable_history",
+        "test_failed_starter_cutover_removes_staged_state_and_replays_cleanly",
+    ),
+}
+
 
 def test_everyday_life_bundle_is_exact_schema_only_and_deterministic() -> None:
     first = load_starter_schema_bundle()

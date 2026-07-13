@@ -11,8 +11,8 @@ library package BibliotekRtgDiagnostics {
         attribute acceptedFields[0..*] : String;
         attribute minimalExample[0..1] : JsonObject;
         attribute guideTopics[0..*] : String;
-        attribute safeToRetry : Boolean = true;
-        attribute mutationState : String = "not_mutated";
+        attribute safeToRetry : Boolean default = true;
+        attribute mutationState : String default = "not_mutated";
         doc /* Generic JSON-safe corrective guidance. code is stable within its owning contract; category groups the problem; optional fields refine location, accepted shape, examples, workflow guidance, retry safety, and the observable mutation outcome. */
     }
 }

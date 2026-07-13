@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import sqlite3
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Iterator, Mapping, Sequence
+from contextlib import contextmanager
 from os import PathLike
 from pathlib import Path
 from threading import RLock
@@ -57,11 +58,12 @@ class SqliteStorage:
         normalized_parameters = _validate_parameters(parameters)
         with self._lock:
             try:
-                cursor = self._connection.execute(statement, normalized_parameters)
+                with _track_user_table_insert(self._connection) as inserted:
+                    cursor = self._connection.execute(statement, normalized_parameters)
                 self._connection.commit()
                 return SqlExecutionResult(
                     affected_row_count=cursor.rowcount,
-                    last_inserted_row_id=cursor.lastrowid,
+                    last_inserted_row_id=cursor.lastrowid if inserted() else None,
                 )
             except sqlite3.ProgrammingError as error:
                 raise SqlParameterInvalid(str(error)) from error
@@ -78,8 +80,9 @@ class SqliteStorage:
         normalized_parameters = _validate_parameters(parameters)
         try:
             with self._lock:
-                cursor = self._connection.execute(statement, normalized_parameters)
-                rows = tuple(_row_to_json_object(row) for row in cursor.fetchall())
+                with _read_only_statement(self._connection):
+                    cursor = self._connection.execute(statement, normalized_parameters)
+                    rows = tuple(_row_to_json_object(row) for row in cursor.fetchall())
             return SqlQueryResult(rows=rows)
         except sqlite3.ProgrammingError as error:
             raise SqlParameterInvalid(str(error)) from error
@@ -97,7 +100,8 @@ class SqliteStorage:
                     for operation in operations:
                         self._validate_statement(operation.statement)
                         parameters = _validate_parameters(operation.parameters)
-                        cursor = self._connection.execute(operation.statement, parameters)
+                        with _track_user_table_insert(self._connection) as inserted:
+                            cursor = self._connection.execute(operation.statement, parameters)
                         if operation.returns_rows:
                             results.append(
                                 SqlQueryResult(
@@ -110,7 +114,9 @@ class SqliteStorage:
                             results.append(
                                 SqlExecutionResult(
                                     affected_row_count=cursor.rowcount,
-                                    last_inserted_row_id=cursor.lastrowid,
+                                    last_inserted_row_id=(
+                                        cursor.lastrowid if inserted() else None
+                                    ),
                                 )
                             )
         except sqlite3.ProgrammingError as error:
@@ -163,3 +169,85 @@ def _row_to_json_object(row: sqlite3.Row) -> dict[str, SqlScalar]:
         _validate_scalar(value)
         result[key] = value
     return result
+
+
+_SQLITE_WRITE_ACTIONS = frozenset(
+    action
+    for action in (
+        sqlite3.SQLITE_ALTER_TABLE,
+        sqlite3.SQLITE_ANALYZE,
+        sqlite3.SQLITE_ATTACH,
+        sqlite3.SQLITE_CREATE_INDEX,
+        sqlite3.SQLITE_CREATE_TABLE,
+        sqlite3.SQLITE_CREATE_TEMP_INDEX,
+        sqlite3.SQLITE_CREATE_TEMP_TABLE,
+        sqlite3.SQLITE_CREATE_TEMP_TRIGGER,
+        sqlite3.SQLITE_CREATE_TEMP_VIEW,
+        sqlite3.SQLITE_CREATE_TRIGGER,
+        sqlite3.SQLITE_CREATE_VIEW,
+        sqlite3.SQLITE_DELETE,
+        sqlite3.SQLITE_DETACH,
+        sqlite3.SQLITE_DROP_INDEX,
+        sqlite3.SQLITE_DROP_TABLE,
+        sqlite3.SQLITE_DROP_TEMP_INDEX,
+        sqlite3.SQLITE_DROP_TEMP_TABLE,
+        sqlite3.SQLITE_DROP_TEMP_TRIGGER,
+        sqlite3.SQLITE_DROP_TEMP_VIEW,
+        sqlite3.SQLITE_DROP_TRIGGER,
+        sqlite3.SQLITE_DROP_VIEW,
+        sqlite3.SQLITE_INSERT,
+        sqlite3.SQLITE_REINDEX,
+        sqlite3.SQLITE_UPDATE,
+    )
+)
+
+
+@contextmanager
+def _read_only_statement(connection: sqlite3.Connection) -> Iterator[None]:
+    def authorize(
+        action: int,
+        _argument_one: str | None,
+        argument_two: str | None,
+        _database: str | None,
+        _trigger: str | None,
+    ) -> int:
+        if action in _SQLITE_WRITE_ACTIONS:
+            return sqlite3.SQLITE_DENY
+        if action == sqlite3.SQLITE_PRAGMA and argument_two is not None:
+            return sqlite3.SQLITE_DENY
+        return sqlite3.SQLITE_OK
+
+    connection.set_authorizer(authorize)
+    try:
+        yield
+    finally:
+        connection.set_authorizer(None)
+
+
+@contextmanager
+def _track_user_table_insert(
+    connection: sqlite3.Connection,
+) -> Iterator[Callable[[], bool]]:
+    inserted = False
+
+    def authorize(
+        action: int,
+        argument_one: str | None,
+        _argument_two: str | None,
+        _database: str | None,
+        _trigger: str | None,
+    ) -> int:
+        nonlocal inserted
+        if (
+            action == sqlite3.SQLITE_INSERT
+            and argument_one is not None
+            and not argument_one.startswith("sqlite_")
+        ):
+            inserted = True
+        return sqlite3.SQLITE_OK
+
+    connection.set_authorizer(authorize)
+    try:
+        yield lambda: inserted
+    finally:
+        connection.set_authorizer(None)

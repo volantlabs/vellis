@@ -11,7 +11,7 @@ library package BibliotekRtgGraph {
     enum def RtgLinkDirection { enum source; enum target; enum both; }
 
     attribute def RtgSystem :> JsonObject {
-        attribute live[0..1] : Boolean = true;
+        attribute live[0..1] : Boolean default = true;
         doc /* JSON-safe caller metadata. Missing live normalizes to true; when supplied it is Boolean. Other keys are preserved without component-assigned meaning. */
     }
     abstract item def RtgObject {

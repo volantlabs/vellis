@@ -46,6 +46,7 @@ model-check:
     @uv run python tools/model_tool.py package
     @uv run python tools/model_tool.py check --scope all --require-external
     @uv run python tools/model_tool.py check-generated
+    @uv run python tools/sysml_reference.py check
 
 model-check-formal:
     @uv run python tools/model_tool.py package
@@ -55,6 +56,15 @@ model-render:
     @uv run python tools/sysml_validator.py export-index --output generated/model/formal-model-index.json
     @uv run python tools/model_tool.py render
 
+model-reference-render:
+    @uv run python tools/sysml_reference.py render
+
+model-reference-check:
+    @uv run python tools/sysml_reference.py check
+
+model-reference-find query:
+    @uv run python tools/sysml_reference.py find "{{query}}"
+
 model-package:
     @uv run python tools/model_tool.py package
 
@@ -63,6 +73,10 @@ model-diff:
 
 model-handoff *args:
     @target="{{args}}"; target="${target#TARGET=}"; test -n "$target" || { echo "Set TARGET=<stable-id>" >&2; exit 2; }; uv run python tools/model_tool.py handoff "$target"
+
+# Generate a read-only advisory model/implementation evidence bundle.
+model-audit target="":
+    @target="{{target}}"; if test -n "$target"; then uv run python tools/model_tool.py audit "$target"; else uv run python tools/model_tool.py audit; fi
 
 # Run the RTG Knowledge Graph app with default .data storage.
 rtg:

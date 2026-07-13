@@ -95,16 +95,19 @@ from components.rtg.migration.protocol import (
 )
 from components.rtg.query.protocol import (
     RtgQueryAggregation,
+    RtgQueryAggregationFunction,
     RtgQueryAnchorBucket,
     RtgQueryDataRequirement,
     RtgQueryDiagnosticOptions,
     RtgQueryEngine,
     RtgQueryLinkRequirement,
+    RtgQueryOperator,
     RtgQueryOptions,
     RtgQueryPropertyPredicate,
     RtgQueryResult,
     RtgQueryReturnSpec,
     RtgQuerySpec,
+    RtgQueryUnknownTermGuidance,
 )
 from components.rtg.schema.protocol import (
     RtgAnchorSchemaPayload,
@@ -872,9 +875,7 @@ class InProcessRtgController:
                 validation_options=RtgValidationOptions(),
             )
             if not validation_report.accepted:
-                codes = ", ".join(
-                    sorted({finding.code for finding in validation_report.findings})
-                )
+                codes = ", ".join(sorted({finding.code for finding in validation_report.findings}))
                 raise RtgControllerSnapshotFailed(
                     f"snapshot state violates controller invariants: {codes}",
                     diagnostic=rtg_diagnostic(
@@ -3371,7 +3372,7 @@ def _query_predicate_from_json(value: object) -> RtgQueryPropertyPredicate:
     data = _object(value)
     return RtgQueryPropertyPredicate(
         path=tuple(str(item) for item in _list(data.get("path", []))),
-        operator=str(data["operator"]),
+        operator=cast(RtgQueryOperator, str(data["operator"])),
         value=cast(JsonValue, data.get("value")),
         values=tuple(
             cast(str | int | float | bool | None, item) for item in _list(data.get("values", []))
@@ -3400,7 +3401,7 @@ def _query_return_spec_from_json(value: object) -> RtgQueryReturnSpec:
         aggregations=tuple(
             RtgQueryAggregation(
                 name=str(item["name"]),
-                function=str(item["function"]),
+                function=cast(RtgQueryAggregationFunction, str(item["function"])),
                 binding=str(item["binding"]),
             )
             for item in _objects(data.get("aggregations", []))
@@ -3412,7 +3413,10 @@ def _query_diagnostic_options_from_json(value: object) -> RtgQueryDiagnosticOpti
     data = _object(value)
     return RtgQueryDiagnosticOptions(
         include_non_fatal=bool(data.get("include_non_fatal", True)),
-        unknown_term_guidance=str(data.get("unknown_term_guidance", "suggest_discovery")),
+        unknown_term_guidance=cast(
+            RtgQueryUnknownTermGuidance,
+            str(data.get("unknown_term_guidance", "suggest_discovery")),
+        ),
     )
 
 

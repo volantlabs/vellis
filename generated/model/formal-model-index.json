@@ -8706,8 +8706,8 @@
     },
     "SoftwareComponentModeling": {
       "element_counts": {
-        "AttributeUsage": 17,
-        "Documentation": 6,
+        "AttributeUsage": 20,
+        "Documentation": 7,
         "EnumerationDefinition": 3,
         "EnumerationUsage": 12,
         "Feature": 90,
@@ -8715,10 +8715,10 @@
         "LibraryPackage": 1,
         "LiteralInfinity": 1,
         "LiteralInteger": 1,
-        "MetadataDefinition": 5,
-        "Multiplicity": 9,
+        "MetadataDefinition": 6,
+        "Multiplicity": 12,
         "MultiplicityRange": 2,
-        "ReferenceUsage": 7
+        "ReferenceUsage": 8
       },
       "named_elements": [
         {
@@ -8744,6 +8744,10 @@
         {
           "kind": "MetadataDefinition",
           "name": "ImplementationBinding"
+        },
+        {
+          "kind": "MetadataDefinition",
+          "name": "ImplementationCodec"
         },
         {
           "kind": "MetadataDefinition",
@@ -9090,20 +9094,20 @@
         "AttributeUsage": 5,
         "BindingConnectorAsUsage": 9,
         "Dependency": 151,
-        "Documentation": 42,
+        "Documentation": 43,
         "EnumerationUsage": 16,
         "Feature": 14,
         "FeatureReferenceExpression": 13,
         "ItemUsage": 9,
-        "LiteralString": 39,
-        "MetadataUsage": 51,
-        "Multiplicity": 94,
+        "LiteralString": 66,
+        "MetadataUsage": 60,
+        "Multiplicity": 97,
         "MultiplicityRange": 28,
         "Package": 1,
         "PartDefinition": 13,
         "PartUsage": 34,
         "PerformActionUsage": 103,
-        "ReferenceUsage": 209,
+        "ReferenceUsage": 237,
         "SuccessionAsUsage": 13
       },
       "named_elements": [
@@ -10448,7 +10452,7 @@
     }
   },
   "schema_version": 1,
-  "source_digest": "0b99f0a406dea5930411cf8d538341a84b962993bacf7bbeadb9ec8e0f685b8f",
+  "source_digest": "81161882fcc6e2c2484e2dd33b62db85309eec3520c8b3fe66e35b11820090f9",
   "validator": {
     "implementation_version": "0.50.0",
     "provider": "Systems-Modeling/SysML-v2-Pilot-Implementation",

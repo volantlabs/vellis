@@ -158,7 +158,7 @@ library package BibliotekRtgController {
         attribute liveObjectCounts : RtgTypeCountList;
         attribute nonLiveCandidateCounts : RtgControllerCandidateCounts;
         attribute migrationCountsByStatus : RtgControllerMigrationCounts;
-        attribute migrationCountsScope : RtgControllerMigrationCountScope = RtgControllerMigrationCountScope::current_migration_store;
+        attribute migrationCountsScope : RtgControllerMigrationCountScope default = RtgControllerMigrationCountScope::current_migration_store;
         attribute migrationHistoryHint[0..1] : String;
         attribute persistedSnapshotPaths[0..*] ordered : JsonRelativePath;
         attribute ledgerRecordCount : Integer;

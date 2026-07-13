@@ -20,6 +20,26 @@ from apps.rtg_knowledge_graph.config import (
     RtgKnowledgeGraphConfig,
 )
 
+MODEL_EVIDENCE = {
+    "VellisCompositionVerification": (
+        "test_config_uses_default_storage_root_relative_to_cwd",
+        "test_config_uses_env_storage_root",
+        "test_composed_app_runs_and_writes_manifest",
+        "test_persisted_manifest_preserves_configured_startup_modes",
+        "test_cli_runs_full_app",
+        "test_cli_reports_mcp_dry_run_metadata",
+        "test_cli_prints_focused_stdio_client_config_without_initializing_app",
+        "test_cli_prints_focused_http_client_config",
+        "test_cli_prints_exact_codex_stdio_registration_command",
+        "test_cli_prints_exact_codex_http_registration_command",
+        "test_cli_help_explains_both_first_run_client_paths",
+        "test_cli_treats_mcp_keyboard_interrupt_as_clean_shutdown",
+        "test_powershell_quoting_preserves_paths_and_embedded_quotes",
+        "test_cli_reports_custom_http_mcp_dry_run_metadata",
+        "test_mcp_launch_metadata_has_installed_package_fallback",
+    ),
+}
+
 
 def test_config_uses_default_storage_root_relative_to_cwd(tmp_path: Path) -> None:
     config = RtgKnowledgeGraphConfig.from_env(env={}, cwd=tmp_path)
@@ -351,9 +371,10 @@ def test_cli_reports_mcp_dry_run_metadata(tmp_path: Path) -> None:
     assert status["mcp"]["transport"] == "stdio"
     assert status["mcp"]["launch_mode"] == "repository_checkout"
     assert status["mcp"]["state_mode"] == "durable_local_auto_replay"
-    assert Path(status["mcp"]["eval_prompt_path"]) == Path(
-        "docs/guides/vellis/evals/rtg-individual-life-graph-beta-prompt.md"
-    ).resolve()
+    assert (
+        Path(status["mcp"]["eval_prompt_path"])
+        == Path("docs/guides/vellis/evals/rtg-individual-life-graph-beta-prompt.md").resolve()
+    )
     assert status["mcp"]["recommended_eval_prompt"] == "individual_life_graph"
     assert set(status["mcp"]["eval_prompts"]) == {
         "individual_life_graph",
@@ -363,9 +384,10 @@ def test_cli_reports_mcp_dry_run_metadata(tmp_path: Path) -> None:
     assert status["mcp"]["eval_prompts"]["individual_life_graph"]["available"] is True
     assert status["mcp"]["eval_prompts"]["component_repo_affordance"]["recommended"] is False
     assert status["mcp"]["guides"]["known_good_walkthrough"]["available"] is True
-    assert Path(status["mcp"]["guides"]["known_good_walkthrough"]["path"]) == Path(
-        "docs/guides/vellis/evals/rtg-beta-known-good-walkthrough.md"
-    ).resolve()
+    assert (
+        Path(status["mcp"]["guides"]["known_good_walkthrough"]["path"])
+        == Path("docs/guides/vellis/evals/rtg-beta-known-good-walkthrough.md").resolve()
+    )
     assert set(status["mcp"]["guides"]) == {"known_good_walkthrough"}
     assert status["mcp"]["first_call"] == {
         "tool": "rtg_validate_graph",

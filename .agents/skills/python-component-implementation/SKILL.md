@@ -49,10 +49,13 @@ obligations.
 
 If code or tests disagree with the model:
 
-1. Preserve the accepted model unless the human owner approves a contract change.
-2. Report the model element, implementation symbol, difference, expected behavior, and verification
+1. Use `model-hygiene-review` when the disagreement may reflect migration loss, a predecessor
+   contract, an intentional codec, or a later implementation decision.
+2. Preserve the accepted model unless evidence establishes a correction to already approved meaning
+   or the human owner approves a contract change.
+3. Report the model element, implementation symbol, difference, expected behavior, and verification
    needed using the repository's drift or decision workflow.
-3. Do not expand the model to mirror incidental Python behavior.
+4. Do not expand the model to mirror incidental Python behavior.
 
 ## Python Shape
 

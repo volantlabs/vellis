@@ -33,21 +33,21 @@ library package BibliotekRtgQuery {
         attribute sourceBucket : String;
         attribute targetBucket : String;
         attribute linkTypeKeys[1..*] : String;
-        attribute required : Boolean = true;
+        attribute required : Boolean default = true;
     }
     attribute def RtgQueryPropertyPredicate {
         attribute path[1..*] : String;
         attribute operator : RtgQueryOperator;
         attribute value[0..1] : JsonValue;
         attribute values[0..*] : JsonScalar;
-        attribute caseSensitive : Boolean = false;
+        attribute caseSensitive : Boolean default = false;
         attribute regexFlags[0..*] : String;
     }
     attribute def RtgQueryDataRequirement {
         attribute name : String;
         attribute anchorBucket : String;
         attribute dataTypeKey : String;
-        attribute required : Boolean = true;
+        attribute required : Boolean default = true;
         attribute predicates[0..*] : RtgQueryPropertyPredicate;
     }
     attribute def RtgQueryReturnProperty {
@@ -68,8 +68,8 @@ library package BibliotekRtgQuery {
         attribute aggregations[0..*] : RtgQueryAggregation;
     }
     attribute def RtgQueryDiagnosticOptions {
-        attribute includeNonFatal : Boolean = true;
-        attribute unknownTermGuidance : RtgQueryUnknownTermGuidance = RtgQueryUnknownTermGuidance::suggest_discovery;
+        attribute includeNonFatal : Boolean default = true;
+        attribute unknownTermGuidance : RtgQueryUnknownTermGuidance default = RtgQueryUnknownTermGuidance::suggest_discovery;
     }
     attribute def RtgQuerySpec {
         attribute anchorBuckets[1..*] : RtgQueryAnchorBucket;
@@ -81,15 +81,15 @@ library package BibliotekRtgQuery {
     attribute def RtgQueryOrderBy {
         attribute dataRequirement : String;
         attribute path[1..*] : String;
-        attribute direction : RtgQueryOrderDirection = RtgQueryOrderDirection::ascending;
+        attribute direction : RtgQueryOrderDirection default = RtgQueryOrderDirection::ascending;
     }
     attribute def RtgQueryOptions {
-        attribute liveFilter : RtgQueryLiveFilter = RtgQueryLiveFilter::'all';
+        attribute liveFilter : RtgQueryLiveFilter default = RtgQueryLiveFilter::'all';
         attribute liveStatusOverlay[0..*] : RtgQueryLiveStatusOverride;
         attribute orderBy[0..*] : RtgQueryOrderBy;
         attribute limit[0..1] : Integer;
-        attribute offset : Integer = 0;
-        attribute distinctRows : Boolean = false;
+        attribute offset : Integer default = 0;
+        attribute distinctRows : Boolean default = false;
     }
     attribute def RtgQueryLiveStatusOverride {
         attribute objectUuid : Uuid;
@@ -177,7 +177,7 @@ library package BibliotekRtgQuery {
     requirement <'contract.rtg.query.valid_spec'> validQuerySpec {
         subject operation : ExecuteRtgQuery;
         require constraint {
-            doc /* Anchor-bucket, link-requirement, and data-requirement names share one globally unique binding namespace so aggregation and constraint references are unambiguous. References resolve, predicate operands fit their operators, order_by refers only to returned properties, aggregation names cannot use the reserved result fields row_index or group_by, a present limit is a positive Integer, offset is a nonnegative Integer, and distinct_rows cannot be combined with aggregation. */
+            doc /* Anchor-bucket, link-requirement, and data-requirement names share one globally unique binding namespace so aggregation and constraint references are unambiguous. Every return selection, returned property, group-by, aggregation, and ordering reference resolves to its declared query element. Predicate paths and operators are structurally well formed, while a resolved runtime value of an incompatible JSON kind is a non-match under predicateSemantics rather than an invalid query. order_by refers only to returned properties, aggregation names cannot use the reserved result fields row_index or group_by, a present limit is a positive Integer, offset is a nonnegative Integer, and distinct_rows cannot be combined with aggregation. */
         }
     }
 
@@ -234,14 +234,14 @@ library package BibliotekRtgQuery {
     requirement <'contract.rtg.query.return_shaping'> returnShaping {
         subject operation : ExecuteRtgQuery;
         require constraint {
-            doc /* Return selection never changes matching. Bindings contain names to matched UUIDs; independent matches form a Cartesian product. Non-aggregate results use bindings and returns, aligned one-for-one by final rowIndex, include only selected records, and reconstruct selected property paths as nested JSON without delimiter ambiguity; their aggregations collection is empty. Aggregate results use aggregations exclusively and return empty bindings and returns. count aggregation counts distinct selected binding UUIDs globally or per group; a missing group path is represented by JSON null. Result metadata reports total rows before pagination, returned rows, and a next offset only when more rows remain. Missing optional bindings or paths in non-aggregate returns are omitted and may produce non-fatal diagnostics. */
+            doc /* Return selection never changes matching. Bindings contain names to matched UUIDs; independent matches form a Cartesian product. Non-aggregate results use bindings and returns, aligned one-for-one by final rowIndex, include only selected records, and reconstruct selected property paths as nested JSON without delimiter ambiguity; their aggregations collection is empty. Aggregate results use aggregations exclusively and return empty bindings and returns. count aggregation counts distinct selected binding UUIDs globally or per group; a missing group path is represented by JSON null. Result metadata reports total rows before pagination, returned rows, and a next offset only when more rows remain. Missing bindings for declared optional requirements or missing paths in non-aggregate returns are omitted and may produce non-fatal diagnostics. Undeclared return references are invalid query specifications. */
         }
     }
 
     requirement <'contract.rtg.query.diagnostics'> diagnosticSemantics {
         subject operation : ExecuteRtgQuery;
         require constraint {
-            doc /* Valid queries may return warning/info diagnostics without changing results. Malformed structure, unsupported operators, flags, or ordering references raise declared errors. Stable diagnostic codes distinguish unbound return requirements and unresolved returned property paths and carry generic repair guidance only. */
+            doc /* Valid queries may return warning/info diagnostics without changing results. Malformed structure, unsupported operators, flags, or unresolved references raise declared errors. The stable code query.return_property_requirement_unbound identifies a declared return requirement with no row binding; query.return_property_path_unresolved identifies a selected path that does not resolve on a bound data object. Diagnostics carry generic repair guidance only. */
         }
     }
 

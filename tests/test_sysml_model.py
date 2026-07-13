@@ -280,7 +280,13 @@ def test_evidence_groups_resolve_to_concrete_test_nodes(
 ) -> None:
     evidence = tmp_path / "test_evidence.py"
     evidence.write_text(
-        "def test_contract_behavior() -> None:\n    pass\n",
+        "MODEL_EVIDENCE = {\n"
+        "    'ContractVerification': ('test_contract_behavior', 'test_contract_edge'),\n"
+        "    'OtherVerification': ('test_other_behavior',),\n"
+        "}\n"
+        "def test_contract_behavior() -> None:\n    pass\n"
+        "def test_contract_edge() -> None:\n    pass\n"
+        "def test_other_behavior() -> None:\n    pass\n",
         encoding="utf-8",
     )
     monkeypatch.setattr(model_tool, "ROOT", tmp_path)
@@ -289,11 +295,97 @@ def test_evidence_groups_resolve_to_concrete_test_nodes(
         "test_evidence.py::test_contract_behavior#ContractVerification"
     ) == ["test_evidence.py::test_contract_behavior"]
     assert model_tool._evidence_test_nodes("test_evidence.py#ContractVerification") == [
-        "test_evidence.py::test_contract_behavior"
+        "test_evidence.py::test_contract_behavior",
+        "test_evidence.py::test_contract_edge",
     ]
+    assert model_tool._evidence_test_nodes("test_evidence.py#OtherVerification") == [
+        "test_evidence.py::test_other_behavior"
+    ]
+    assert model_tool._evidence_test_nodes("test_evidence.py#MissingVerification") == []
     assert (
         model_tool._evidence_test_nodes("test_evidence.py::missing_test#ContractVerification") == []
     )
+
+
+def test_evidence_groups_reject_duplicate_missing_and_non_test_symbols(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    evidence = tmp_path / "test_evidence.py"
+    evidence.write_text(
+        "MODEL_EVIDENCE = {\n"
+        "    'DuplicateVerification': ('test_one', 'test_one'),\n"
+        "}\n"
+        "def test_one() -> None:\n    pass\n"
+        "def helper() -> None:\n    pass\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(model_tool, "ROOT", tmp_path)
+
+    assert model_tool._evidence_group_map(evidence) == {}
+    assert model_tool._evidence_test_nodes("test_evidence.py#DuplicateVerification") == []
+    assert model_tool._evidence_test_nodes("test_evidence.py::helper#ExplicitVerification") == []
+
+
+def test_generated_evidence_status_reports_resolution_not_execution(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    evidence = tmp_path / "test_evidence.py"
+    evidence.write_text(
+        "MODEL_EVIDENCE = {'KnownVerification': ('test_known',)}\n"
+        "def test_known() -> None:\n    pass\n",
+        encoding="utf-8",
+    )
+    model = tmp_path / "Evidence.sysml"
+    model.write_text(
+        '@EvidenceBinding { evidenceId = "test_evidence.py#KnownVerification"; }\n'
+        '@EvidenceBinding { evidenceId = "test_evidence.py#MissingVerification"; }\n',
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(model_tool, "ROOT", tmp_path)
+    monkeypatch.setattr(model_tool, "_sysml_files", lambda _scope: [model])
+
+    groups = model_tool._verification_evidence_data()["groups"]
+
+    assert groups["test_evidence.py#KnownVerification"]["status"] == "resolved"
+    assert groups["test_evidence.py#MissingVerification"]["status"] == "unresolved"
+    assert all(group["status"] != "passed" for group in groups.values())
+
+
+def test_model_defaults_distinguish_overridable_values_from_fixed_identities() -> None:
+    query = (model_tool.COMPONENT_MODEL_ROOT / "component.rtg.query.sysml").read_text()
+    ontology = (model_tool.MODEL_ROOT / "vellis" / "EverydayLifeOntology.sysml").read_text()
+    mcp = (model_tool.MODEL_ROOT / "vellis" / "realizations" / "VellisMcpPython.sysml").read_text()
+
+    assert "attribute required : Boolean default = true;" in query
+    assert "attribute liveFilter : RtgQueryLiveFilter default =" in query
+    assert 'attribute ontologyId : String = "ontology.vellis.everyday_life";' in ontology
+    assert "attribute ok : Boolean = false;" in mcp
+
+
+def test_model_audit_writes_advisory_bundle(tmp_path: Path) -> None:
+    json_path, markdown_path = model_tool.model_audit("component.rtg.query", tmp_path)
+    payload = json.loads(json_path.read_text(encoding="utf-8"))
+
+    assert payload["components"][0]["component_id"] == "component.rtg.query"
+    assert payload["components"][0]["implementation_codecs"]
+    assert payload["components"][0]["boundary_comparisons"]
+    assert "Advisory only" in markdown_path.read_text(encoding="utf-8")
+
+
+def test_model_audit_flattens_inherited_sysml_boundary_fields(tmp_path: Path) -> None:
+    model = tmp_path / "component.example.sysml"
+    model.write_text(
+        """package Example {
+        item def Base { attribute identity : String; }
+        item def Child :> Base { attribute detail[0..1] : String; }
+        }
+        """,
+        encoding="utf-8",
+    )
+
+    boundary = model_tool._audit_model_boundary(model)
+
+    assert set(boundary["records"]["Child"]) == {"identity", "detail"}
 
 
 def test_requirement_checker_rejects_documentation_only_and_incompatible_verification(

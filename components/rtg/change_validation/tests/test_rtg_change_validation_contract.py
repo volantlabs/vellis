@@ -90,6 +90,46 @@ def _validate_refined_value(value: str | int | float | bool | None, field: RtgSc
     )
 
 
+MODEL_EVIDENCE = {
+    "ValidateRtgChangeBatchContractVerification": (
+        "test_validation_rejects_malformed_proposed_data_batch",
+        "test_validation_reports_an_unprojectable_delete_as_a_blocking_finding",
+        "test_unselected_malformed_sections_do_not_affect_selected_track",
+        "test_validation_reports_unresolved_link_endpoints_with_paths",
+        "test_staged_migration_batch_validates_projected_cutover_state",
+    ),
+    "ValidateRtgGraphStateContractVerification": (
+        "test_grouped_cardinality_counts_distinct_targets_per_source",
+        "test_global_cardinality_counts_distinct_bindings_not_expanded_rows",
+        "test_validation_reports_schema_object_findings_without_mutation",
+        "test_schema_value_kind_refinements_and_nested_strictness",
+        "test_duplicate_findings_collapse_before_evidence_and_acceptance",
+        "test_unevaluable_constraint_payload_is_a_catalog_finding",
+        "test_migration_projection_reports_wrong_live_state",
+        "test_migration_projection_reports_replacement_type_mismatch_as_warning",
+        "test_finding_limit_does_not_hide_blocking_acceptance",
+        "test_staged_migration_batch_validates_projected_cutover_state",
+    ),
+    "RtgChangeValidationBoundaryVerification": (
+        "test_semantic_field_refinements_validate_values_recursively",
+        "test_grouped_cardinality_counts_distinct_targets_per_source",
+        "test_global_cardinality_counts_distinct_bindings_not_expanded_rows",
+        "test_validation_reports_schema_object_findings_without_mutation",
+        "test_schema_value_kind_refinements_and_nested_strictness",
+        "test_validation_rejects_malformed_proposed_data_batch",
+        "test_validation_reports_an_unprojectable_delete_as_a_blocking_finding",
+        "test_unselected_malformed_sections_do_not_affect_selected_track",
+        "test_duplicate_findings_collapse_before_evidence_and_acceptance",
+        "test_unevaluable_constraint_payload_is_a_catalog_finding",
+        "test_validation_reports_unresolved_link_endpoints_with_paths",
+        "test_migration_projection_reports_wrong_live_state",
+        "test_migration_projection_reports_replacement_type_mismatch_as_warning",
+        "test_finding_limit_does_not_hide_blocking_acceptance",
+        "test_staged_migration_batch_validates_projected_cutover_state",
+    ),
+}
+
+
 def test_semantic_field_refinements_validate_values_recursively() -> None:
     assert _validate_refined_value(
         "next", RtgSchemaField(True, ("string",), allowed_values=("next", "waiting"))
@@ -112,9 +152,7 @@ def test_semantic_field_refinements_validate_values_recursively() -> None:
     assert _validate_refined_value(
         "https://example.com/a", RtgSchemaField(True, ("string",), format="uri")
     )
-    assert not _validate_refined_value(
-        "http://[", RtgSchemaField(True, ("string",), format="uri")
-    )
+    assert not _validate_refined_value("http://[", RtgSchemaField(True, ("string",), format="uri"))
     assert _validate_refined_value(1, RtgSchemaField(True, ("number",), minimum=0, maximum=1))
     assert not _validate_refined_value(
         True, RtgSchemaField(True, ("number",), minimum=0, maximum=1)
@@ -234,9 +272,7 @@ def test_global_cardinality_counts_distinct_bindings_not_expanded_rows() -> None
             payload=RtgConstraintCardinalityPayload(
                 query_spec=RtgQuerySpec(
                     anchor_buckets=(RtgQueryAnchorBucket("thing", ("Thing",)),),
-                    data_requirements=(
-                        RtgQueryDataRequirement("facts", "thing", "Facts"),
-                    ),
+                    data_requirements=(RtgQueryDataRequirement("facts", "thing", "Facts"),),
                 ),
                 counted_binding="thing",
                 maximum=1,

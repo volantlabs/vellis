@@ -240,12 +240,16 @@ Useful recipes:
 - `just format`: format Python code with Ruff
 - `just build`: build source and wheel distributions for release validation
 - `just model-setup`: fetch and verify the official Java validator, formal libraries, and Java runtime
+- `just model-reference-render`: regenerate searchable SysML/KerML pages from pinned official PDFs
+- `just model-reference-check`: verify the committed specification corpus against those PDFs
+- `just model-reference-find "<question>"`: find ranked SysML/KerML sections and source pages
 - `just model-check`: validate packaged model products plus architecture, realization, and generated files
 - `just model-check-formal`: run the pinned official SysML validator directly
 - `just model-render`: regenerate the parser inventory, conformance objectives, views, and manifest
 - `just model-package`: build independently packageable KPAR products
 - `just model-diff`: review authored model, generated projection, and runtime-manifest changes
 - `just model-handoff TARGET=<stable-id>`: inspect a model slice for an implementation handoff
+- `just model-audit [stable-id]`: collect an advisory model/implementation drift evidence bundle
 - `just skills-check`: validate repo-local skill metadata
 - `just skills-sync`: expose source-of-truth repo skills in Claude Code's project-skill layout
 - `just rtg`: launch the RTG Knowledge Graph app with default local `.data/` storage

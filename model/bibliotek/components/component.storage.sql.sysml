@@ -14,7 +14,7 @@ library package BibliotekStorageSql {
         doc /* One uniquely named SQL parameter or result-column value. */
     }
     attribute def SqlParameters {
-        attribute kind : SqlParameterKind = SqlParameterKind::positional;
+        attribute kind : SqlParameterKind default = SqlParameterKind::positional;
         attribute positional[0..*] : JsonScalar;
         attribute named[0..*] : SqlNamedScalar;
         doc /* Exactly one positional or named parameter representation is used for an invocation. Named entries have unique names. Empty positional parameters are the default. */
@@ -27,7 +27,7 @@ library package BibliotekStorageSql {
     attribute def SqlOperation {
         attribute statement : String;
         attribute parameters[0..1] : SqlParameters;
-        attribute returnsRows : Boolean = false;
+        attribute returnsRows : Boolean default = false;
         doc /* One execute or query operation in a transaction; omitted parameters mean an empty positional parameter set and returnsRows selects the result kind. */
     }
     attribute def SqlRow {

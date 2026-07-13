@@ -52,7 +52,7 @@ library package BibliotekRtgChangeValidation {
         doc /* An absent section is an empty change set. Categories remain explicit and use their component-owned public write values. */
     }
     attribute def RtgValidationOptions {
-        attribute selection : RtgValidationTrackSelection = RtgValidationTrackSelection::'all';
+        attribute selection : RtgValidationTrackSelection default = RtgValidationTrackSelection::'all';
         attribute tracks[0..*] : RtgValidationTrack;
         attribute findingLimit[0..1] : Integer;
         doc /* Canonical normalized options. all requires an empty tracks collection and executes every track; selected requires a non-empty unique tracks collection and executes exactly those tracks. findingLimit, when present, is positive and limits returned findings only. */

@@ -22,6 +22,67 @@ def open_storage(root: Path) -> JsonFileStorage:
     return LocalJsonFileStorage.open(root)
 
 
+MODEL_EVIDENCE = {
+    "WriteJsonDocumentContractVerification": (
+        "test_write_read_list_delete_round_trip",
+        "test_write_replaces_whole_document",
+        "test_write_recreates_parent_directories_after_delete_cleanup",
+        "test_list_is_recursive_and_metadata_only",
+        "test_document_paths_must_remain_json_files_inside_root",
+        "test_existing_symlink_document_that_escapes_root_is_rejected",
+        "test_write_through_symlink_parent_that_escapes_root_is_rejected",
+        "test_read_invalid_json_reports_document_invalid",
+        "test_failed_replace_preserves_previous_complete_document",
+        "test_storage_handle_does_not_redirect_roots",
+    ),
+    "ReadJsonDocumentContractVerification": (
+        "test_write_read_list_delete_round_trip",
+        "test_write_replaces_whole_document",
+        "test_write_recreates_parent_directories_after_delete_cleanup",
+        "test_existing_symlink_document_that_escapes_root_is_rejected",
+        "test_read_invalid_json_reports_document_invalid",
+        "test_failed_replace_preserves_previous_complete_document",
+        "test_storage_handle_does_not_redirect_roots",
+    ),
+    "DeleteJsonDocumentContractVerification": (
+        "test_write_read_list_delete_round_trip",
+        "test_write_recreates_parent_directories_after_delete_cleanup",
+        "test_existing_symlink_document_that_escapes_root_is_rejected",
+    ),
+    "ListJsonDocumentsContractVerification": (
+        "test_write_read_list_delete_round_trip",
+        "test_list_is_recursive_and_metadata_only",
+    ),
+    "OpenJsonFileStorageContractVerification": (
+        "test_document_paths_must_remain_json_files_inside_root",
+        "test_write_through_symlink_parent_that_escapes_root_is_rejected",
+        "test_written_file_contains_valid_json",
+        "test_open_rejects_file_root",
+        "test_open_rejects_empty_root",
+    ),
+    "JsonFileStorageBoundaryVerification": (
+        "test_write_read_list_delete_round_trip",
+        "test_write_replaces_whole_document",
+        "test_write_recreates_parent_directories_after_delete_cleanup",
+        "test_list_is_recursive_and_metadata_only",
+        "test_document_paths_must_remain_json_files_inside_root",
+        "test_existing_symlink_document_that_escapes_root_is_rejected",
+        "test_write_through_symlink_parent_that_escapes_root_is_rejected",
+        "test_read_invalid_json_reports_document_invalid",
+        "test_write_rejects_unserializable_value_without_partial_target",
+        "test_write_rejects_non_finite_float_without_partial_target",
+        "test_failed_replace_preserves_previous_complete_document",
+        "test_missing_directory_list_reports_not_found",
+        "test_reference_component_is_usable",
+        "test_no_forbidden_dependency_imports",
+        "test_written_file_contains_valid_json",
+        "test_open_rejects_file_root",
+        "test_open_rejects_empty_root",
+        "test_storage_handle_does_not_redirect_roots",
+    ),
+}
+
+
 def test_write_read_list_delete_round_trip(tmp_path: Path) -> None:
     storage = open_storage(tmp_path)
 

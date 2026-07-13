@@ -110,6 +110,56 @@ def build_empty_toolset(tmp_path: Path) -> RtgMcpToolset:
     return RtgMcpToolset(controller)
 
 
+MODEL_EVIDENCE = {
+    "VellisMcpOutcomeContractVerification": (
+        "test_mcp_codec_decodes_changes_and_encodes_json",
+        "test_mcp_toolset_live_graph_query_get_object_and_validation_error",
+        "test_mcp_toolset_keeps_error_shape_for_unexpected_exceptions",
+        "test_mcp_toolset_errors_include_ref_and_uuid_diagnostics",
+    ),
+    "VellisMcpBoundaryVerification": (
+        "test_mcp_codec_decodes_changes_and_encodes_json",
+        "test_mcp_codec_rejects_malformed_boolean_options",
+        "test_mcp_codec_reports_path_specific_reference_and_uuid_errors",
+        "test_mcp_codec_rejects_query_aliases_that_would_be_ignored",
+        "test_mcp_codec_rejects_malformed_query_return_properties",
+        "test_mcp_codec_rejects_non_string_query_terms",
+        "test_mcp_codec_rejects_non_string_option_terms",
+        "test_mcp_codec_rejects_mutation_aliases_that_would_be_ignored",
+        "test_mcp_toolset_rejects_wrong_mutation_fields_instead_of_noop",
+        "test_mcp_codec_accepts_schema_field_null_items_from_json_round_trip",
+        "test_rtg_mcp_skill_item_schema_live_write_and_query_path_runs",
+        "test_mcp_toolset_live_graph_query_get_object_and_validation_error",
+        "test_mcp_toolset_validates_live_graph_changes_without_mutation_or_ledger",
+        "test_mcp_toolset_validates_and_applies_live_anchor_records",
+        "test_compact_mutation_response_is_materially_smaller_than_full",
+        "test_properties_only_preserves_aggregation_rows_and_pagination_metadata",
+        "test_invalid_mutation_response_format_fails_before_controller_invocation",
+        "test_mcp_properties_only_without_returned_properties_teaches_return_spec",
+        "test_mcp_toolset_resolves_anchor_by_fact_through_query_facade",
+        "test_mcp_toolset_resolve_anchor_by_fact_reports_ambiguous_matches",
+        "test_mcp_toolset_stages_cuts_over_and_reads_schema_migration",
+        "test_mcp_toolset_snapshot_ledger_restore_tools",
+        "test_mcp_toolset_system_state_guides_schema_staging_and_abandonment",
+        "test_schema_migration_rejects_duplicate_definition_correlation_keys_before_mutation",
+        "test_mcp_toolset_system_state_workflows_for_schema_and_populated_states",
+        "test_mcp_usage_guides_are_packaged_and_do_not_return_fake_snapshot_payloads",
+        "test_mcp_generic_usage_guides_do_not_leak_beta_domain_terms",
+        "test_mcp_exposes_modeled_everyday_life_and_schema_design_guidance",
+        "test_mcp_toolset_stage_schema_migration_can_replace_live_schema",
+        "test_mcp_toolset_persisted_snapshot_readback",
+        "test_mcp_toolset_replay_path_and_migration_history",
+        "test_mcp_toolset_keeps_error_shape_for_unexpected_exceptions",
+        "test_mcp_toolset_rejects_unsupported_controller_options",
+        "test_mcp_toolset_errors_include_ref_and_uuid_diagnostics",
+        "test_diagnostic_json_normalization_preserves_nested_sequences",
+        "test_mcp_tool_metadata_is_concise_complete_and_annotated",
+        "test_mcp_server_stdio_protocol_lists_tools_from_non_repo_cwd",
+        "test_mcp_server_http_protocol_lists_tools_from_non_repo_cwd",
+    ),
+}
+
+
 def test_mcp_codec_decodes_changes_and_encodes_json() -> None:
     payload = {
         "anchor_writes": [
@@ -152,6 +202,24 @@ def test_mcp_codec_rejects_malformed_boolean_options() -> None:
     )
 
     assert valid.data_requirements[0].required is False
+    assert valid.return_spec.properties == ()
+    assert valid.diagnostic_options.include_non_fatal is True
+    assert valid.diagnostic_options.unknown_term_guidance == "suggest_discovery"
+
+    with_property = decode_query_spec(
+        {
+            "anchor_buckets": [{"name": "person", "anchor_type_keys": ["Person"]}],
+            "data_requirements": [
+                {
+                    "name": "profile",
+                    "anchor_bucket": "person",
+                    "data_type_key": "Profile",
+                }
+            ],
+            "return_spec": {"properties": [["profile", ["name"]]]},
+        }
+    )
+    assert with_property.return_spec.properties == (("profile", ("name",)),)
 
     malformed_payloads = (
         lambda: decode_query_spec(
@@ -307,6 +375,7 @@ def test_mcp_codec_rejects_non_string_option_terms() -> None:
     malformed_payloads = (
         lambda: decode_query_options({"live_filter": 1}),
         lambda: decode_query_diagnostic_options({"unknown_term_guidance": 1}),
+        lambda: decode_query_diagnostic_options({"unknown_term_guidance": "invent_schema"}),
         lambda: decode_cutover_options({"validation_mode": 1}),
         lambda: decode_cutover_options({"failure_restore": 1}),
         lambda: decode_validation_options({"tracks": [1]}),

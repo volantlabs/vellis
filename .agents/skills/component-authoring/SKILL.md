@@ -36,6 +36,8 @@ implementation fidelity the default completeness criterion.
 
 ## Required Resources
 
+- Use the `sysml-reference` skill before making or reviewing a SysML/KerML syntax or semantics
+  decision. Cite the relevant specification section and page for consequential choices.
 - Read `references/component-modeling-pattern.md` before authoring or materially revising a model.
 - Read `references/behavior-detail.md` when deciding how much behavior to formalize.
 - Read `references/model-organization.md` when creating or changing a model library, package
@@ -45,6 +47,10 @@ implementation fidelity the default completeness criterion.
 - Read `references/examples.md` when a representative storage, query, or controller pattern helps.
 
 ## Workflow
+
+Before following the component workflow, search the pinned SysML/KerML reference corpus for every
+language construct whose syntax or semantics affects the design. Record the specification, section,
+and page basis, and distinguish it from repository modeling conventions.
 
 1. Locate or create the owning model package and confirm its library, application, view, or
    realization layer.
@@ -110,6 +116,11 @@ defaults, failures, state ownership, ordering promises, invariants, or collabora
 as an intentional reviewed contract change. Construction actions are public contracts when callers
 depend on them. Implementation evidence may reveal a design question; it does not silently redefine
 the model.
+
+When the task is specifically to audit model/realization drift, use `model-hygiene-review` before
+authoring changes. Inspect predecessor contracts and chronology: an accepted model can contain a
+migration omission or incorrect language transcription, while implementation behavior can be
+intentional, incidental, or stale. Classify the authority question before revising either side.
 
 ## Hard Stop Rule
 

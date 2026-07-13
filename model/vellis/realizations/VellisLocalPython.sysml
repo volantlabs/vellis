@@ -18,6 +18,10 @@ package VellisLocalPythonRealization {
         @ImplementationBinding { implementationLanguage = ImplementationLanguage::python; codeRoot = "components/storage/json_file"; symbol = "components.storage.json_file.LocalJsonFileStorage"; realization = "VellisLocalPython"; }
     }
     part def SqliteStorage :> SqlStorage {
+        @ImplementationCodec { logicalType = "SqlParameters"; implementationType = "tuple[SqlScalar, ...] | dict[str, SqlScalar]"; normalization = "The positional tuple and named dictionary alternatives preserve the modeled kind and ordered or uniquely named scalar values losslessly."; }
+        @ImplementationCodec { logicalType = "SqlOperation::parameters"; implementationType = "SqlParameters"; normalization = "An omitted logical parameter record decodes to an empty positional tuple and encodes equivalently."; }
+        @ImplementationCodec { logicalType = "SqlRow::columns"; implementationType = "dict[str, SqlScalar]"; normalization = "Unique modeled column names become dictionary keys while preserving every JSON-compatible scalar value."; }
+        @ImplementationCodec { logicalType = "SysML lowerCamelCase public feature names"; implementationType = "Python snake_case dataclass and argument names"; normalization = "The realization maps names mechanically without changing values, multiplicities, or operation meaning."; }
         @ImplementationBinding { implementationLanguage = ImplementationLanguage::python; codeRoot = "components/storage/sql"; symbol = "components.storage.sql.SqliteStorage"; realization = "VellisLocalPython"; }
     }
     part def InMemoryRtgGraph :> RtgGraph {
@@ -33,6 +37,11 @@ package VellisLocalPythonRealization {
         @ImplementationBinding { implementationLanguage = ImplementationLanguage::python; codeRoot = "components/rtg/migration"; symbol = "components.rtg.migration.InMemoryRtgMigration"; realization = "VellisLocalPython"; }
     }
     part def SimpleRtgQueryEngine :> RtgQueryEngine {
+        @ImplementationCodec { logicalType = "RtgQueryReturnProperty"; implementationType = "tuple[str, tuple[str, ...]]"; normalization = "The pair preserves dataRequirement and ordered path losslessly."; }
+        @ImplementationCodec { logicalType = "RtgQuerySpec::returnSpec"; implementationType = "RtgQueryReturnSpec"; normalization = "An absent logical returnSpec decodes to the empty default record and encodes equivalently."; }
+        @ImplementationCodec { logicalType = "RtgQuerySpec::diagnosticOptions"; implementationType = "RtgQueryDiagnosticOptions"; normalization = "Absent logical options decode to includeNonFatal=true and suggest_discovery and encode equivalently."; }
+        @ImplementationCodec { logicalType = "RtgQueryNamedObjectBinding[0..*]"; implementationType = "dict[str, UUID]"; normalization = "Unique binding names become dictionary keys and preserve every name-to-object identity pair losslessly."; }
+        @ImplementationCodec { logicalType = "RtgQueryLiveStatusOverride[0..*]"; implementationType = "dict[UUID, bool]"; normalization = "The unique object-UUID override map preserves every modeled override losslessly."; }
         @ImplementationBinding { implementationLanguage = ImplementationLanguage::python; codeRoot = "components/rtg/query"; symbol = "components.rtg.query.SimpleRtgQueryEngine"; realization = "VellisLocalPython"; }
     }
     part def DeterministicRtgChangeValidator :> RtgChangeValidator {
