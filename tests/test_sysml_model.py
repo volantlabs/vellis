@@ -362,13 +362,19 @@ def test_model_defaults_distinguish_overridable_values_from_fixed_identities() -
     assert "attribute ok : Boolean = false;" in mcp
 
 
-def test_model_audit_writes_advisory_bundle(tmp_path: Path) -> None:
+def test_model_audit_writes_advisory_bundle_without_ripgrep(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(model_tool.shutil, "which", lambda _command: None)
     json_path, markdown_path = model_tool.model_audit("component.rtg.query", tmp_path)
     payload = json.loads(json_path.read_text(encoding="utf-8"))
 
     assert payload["components"][0]["component_id"] == "component.rtg.query"
     assert payload["components"][0]["implementation_codecs"]
     assert payload["components"][0]["boundary_comparisons"]
+    assert "components/rtg/query/implementation.py" in payload["components"][0][
+        "consumer_references"
+    ]
     assert "Advisory only" in markdown_path.read_text(encoding="utf-8")
 
 

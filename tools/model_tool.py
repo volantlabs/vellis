@@ -5,6 +5,7 @@ import ast
 import hashlib
 import json
 import re
+import shutil
 import subprocess
 import sys
 import urllib.request
@@ -1537,24 +1538,9 @@ def _audit_component(component_id: str) -> dict[str, object]:
     package_name = "Bibliotek" + "".join(
         segment.title() for segment in component_id.removeprefix("component.").split(".")
     )
-    consumer_search = subprocess.run(
-        [
-            "rg",
-            "-l",
-            "--glob",
-            "!reference/**",
-            "--glob",
-            "!generated/reference/**",
-            "--glob",
-            "!build/**",
-            f"{re.escape(component_id)}|components\\.{re.escape(python_module)}|{package_name}",
-            ".",
-        ],
-        cwd=ROOT,
-        check=False,
-        text=True,
-        capture_output=True,
-    ).stdout.splitlines()
+    consumer_search = _consumer_reference_paths(
+        f"{re.escape(component_id)}|components\\.{re.escape(python_module)}|{package_name}"
+    )
     action_signature_findings = [
         finding.message
         for finding in _check_protocol_action_signatures()
@@ -1582,6 +1568,53 @@ def _audit_component(component_id: str) -> dict[str, object]:
         "boundary_comparisons": comparisons,
         "candidate_findings": findings,
     }
+
+
+def _consumer_reference_paths(pattern: str) -> list[str]:
+    excluded_prefixes = ("reference/", "generated/reference/", "build/")
+    if shutil.which("rg"):
+        return subprocess.run(
+            [
+                "rg",
+                "-l",
+                "--glob",
+                "!reference/**",
+                "--glob",
+                "!generated/reference/**",
+                "--glob",
+                "!build/**",
+                pattern,
+                ".",
+            ],
+            cwd=ROOT,
+            check=False,
+            text=True,
+            capture_output=True,
+        ).stdout.splitlines()
+
+    tracked_and_untracked = subprocess.run(
+        ["git", "ls-files", "--cached", "--others", "--exclude-standard"],
+        cwd=ROOT,
+        check=False,
+        text=True,
+        capture_output=True,
+    ).stdout.splitlines()
+    expression = re.compile(pattern)
+    matches: list[str] = []
+    for relative in tracked_and_untracked:
+        normalized = relative.removeprefix("./")
+        if normalized.startswith(excluded_prefixes):
+            continue
+        path = ROOT / normalized
+        if not path.is_file():
+            continue
+        try:
+            text = path.read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError):
+            continue
+        if expression.search(text):
+            matches.append(normalized)
+    return matches
 
 
 def model_audit(target: str | None, output_root: Path | None = None) -> tuple[Path, Path]:
