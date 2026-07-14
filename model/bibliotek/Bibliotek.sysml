@@ -2,6 +2,7 @@ library package Bibliotek {
     private import SoftwareComponentModeling::*;
     public import BibliotekSoftwareValues::*;
     public import BibliotekAppCatalog::*;
+    public import BibliotekAppLauncher::*;
     public import BibliotekStorageJsonFile::*;
     public import BibliotekStorageSql::*;
     public import BibliotekRtgDiagnostics::*;

@@ -49,6 +49,7 @@ MODEL_ORDER = (
     "bibliotek/shared-values/SoftwareValues.sysml",
     "bibliotek/shared-values/RtgDiagnostics.sysml",
     "bibliotek/components/component.app.catalog.sysml",
+    "bibliotek/components/component.app.launcher.sysml",
     "bibliotek/components/component.storage.json_file.sysml",
     "bibliotek/components/component.storage.sql.sysml",
     "bibliotek/components/component.rtg.graph.sysml",

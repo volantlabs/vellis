@@ -121,6 +121,219 @@
       "verification": "RemoveAppContractVerification"
     },
     {
+      "evidence_id": "components/app/launcher/tests/test_app_launcher_contract.py#AppLauncherBoundaryVerification",
+      "evidence_nodes": [
+        "components/app/launcher/tests/test_app_launcher_contract.py::test_open_does_not_start_or_attach_apps",
+        "components/app/launcher/tests/test_app_launcher_contract.py::test_launch_starts_declared_surface_and_records_owned_session",
+        "components/app/launcher/tests/test_app_launcher_contract.py::test_handoff_launch_returns_receipt_without_recording_session",
+        "components/app/launcher/tests/test_app_launcher_contract.py::test_launch_reuses_existing_owned_session_by_default",
+        "components/app/launcher/tests/test_app_launcher_contract.py::test_launch_allows_multiple_sessions_when_surface_declares_policy",
+        "components/app/launcher/tests/test_app_launcher_contract.py::test_attach_records_external_session_without_runtime_ownership",
+        "components/app/launcher/tests/test_app_launcher_contract.py::test_stop_session_only_stops_launcher_owned_sessions",
+        "components/app/launcher/tests/test_app_launcher_contract.py::test_session_probe_marks_exited_managed_runtime",
+        "components/app/launcher/tests/test_app_launcher_contract.py::test_list_sessions_filters_known_sessions",
+        "components/app/launcher/tests/test_app_launcher_contract.py::test_missing_app_and_surface_fail_before_runtime_start",
+        "components/app/launcher/tests/test_app_launcher_contract.py::test_mode_and_runtime_support_are_checked_before_runtime_start",
+        "components/app/launcher/tests/test_app_launcher_contract.py::test_sessions_are_copied_on_read",
+        "components/app/launcher/tests/test_app_launcher_contract.py::test_reference_component_is_usable",
+        "components/app/launcher/tests/test_app_launcher_contract.py::test_configuration_validation",
+        "components/app/launcher/tests/test_app_launcher_contract.py::test_no_forbidden_dependency_imports"
+      ],
+      "model_source": "model/bibliotek/components/component.app.launcher.sysml",
+      "requirements": [
+        "invariant.app.launcher.declared_surface_only",
+        "invariant.app.launcher.ownership_controls_stop",
+        "invariant.app.launcher.handoff_not_session",
+        "invariant.app.launcher.managed_control",
+        "invariant.app.launcher.attach_external",
+        "contract.app.launcher.intentional_boundary"
+      ],
+      "status": "resolved",
+      "subject": {
+        "role": "launcher",
+        "type": "AppLauncher"
+      },
+      "verification": "AppLauncherBoundaryVerification"
+    },
+    {
+      "evidence_id": "components/app/launcher/tests/test_app_launcher_contract.py#AttachAppContractVerification",
+      "evidence_nodes": [
+        "components/app/launcher/tests/test_app_launcher_contract.py::test_attach_records_external_session_without_runtime_ownership",
+        "components/app/launcher/tests/test_app_launcher_contract.py::test_missing_app_and_surface_fail_before_runtime_start"
+      ],
+      "model_source": "model/bibliotek/components/component.app.launcher.sysml",
+      "requirements": [
+        "contract.app.launcher.attach_effect",
+        "contract.app.launcher.attach_app.failures"
+      ],
+      "status": "resolved",
+      "subject": {
+        "role": "operation",
+        "type": "AttachApp"
+      },
+      "verification": "AttachAppContractVerification"
+    },
+    {
+      "evidence_id": "components/app/launcher/tests/test_app_launcher_contract.py#AttachRuntimeSurfaceContractVerification",
+      "evidence_nodes": [
+        "components/app/launcher/tests/test_app_launcher_contract.py::test_attach_records_external_session_without_runtime_ownership"
+      ],
+      "model_source": "model/bibliotek/components/component.app.launcher.sysml",
+      "requirements": [
+        "contract.app.launcher.attach_runtime_surface.failures"
+      ],
+      "status": "resolved",
+      "subject": {
+        "role": "operation",
+        "type": "AttachRuntimeSurface"
+      },
+      "verification": "AttachRuntimeSurfaceContractVerification"
+    },
+    {
+      "evidence_id": "components/app/launcher/tests/test_app_launcher_contract.py#LaunchAppContractVerification",
+      "evidence_nodes": [
+        "components/app/launcher/tests/test_app_launcher_contract.py::test_launch_starts_declared_surface_and_records_owned_session",
+        "components/app/launcher/tests/test_app_launcher_contract.py::test_handoff_launch_returns_receipt_without_recording_session",
+        "components/app/launcher/tests/test_app_launcher_contract.py::test_launch_reuses_existing_owned_session_by_default",
+        "components/app/launcher/tests/test_app_launcher_contract.py::test_launch_allows_multiple_sessions_when_surface_declares_policy",
+        "components/app/launcher/tests/test_app_launcher_contract.py::test_missing_app_and_surface_fail_before_runtime_start",
+        "components/app/launcher/tests/test_app_launcher_contract.py::test_mode_and_runtime_support_are_checked_before_runtime_start"
+      ],
+      "model_source": "model/bibliotek/components/component.app.launcher.sysml",
+      "requirements": [
+        "contract.app.launcher.launch_effect",
+        "contract.app.launcher.launch_app.failures"
+      ],
+      "status": "resolved",
+      "subject": {
+        "role": "operation",
+        "type": "LaunchApp"
+      },
+      "verification": "LaunchAppContractVerification"
+    },
+    {
+      "evidence_id": "components/app/launcher/tests/test_app_launcher_contract.py#ListSessionsContractVerification",
+      "evidence_nodes": [
+        "components/app/launcher/tests/test_app_launcher_contract.py::test_session_probe_marks_exited_managed_runtime",
+        "components/app/launcher/tests/test_app_launcher_contract.py::test_list_sessions_filters_known_sessions",
+        "components/app/launcher/tests/test_app_launcher_contract.py::test_sessions_are_copied_on_read"
+      ],
+      "model_source": "model/bibliotek/components/component.app.launcher.sysml",
+      "requirements": [
+        "contract.app.launcher.list_effect",
+        "contract.app.launcher.list_sessions.failures"
+      ],
+      "status": "resolved",
+      "subject": {
+        "role": "operation",
+        "type": "ListSessions"
+      },
+      "verification": "ListSessionsContractVerification"
+    },
+    {
+      "evidence_id": "components/app/launcher/tests/test_app_launcher_contract.py#OpenAppLauncherContractVerification",
+      "evidence_nodes": [
+        "components/app/launcher/tests/test_app_launcher_contract.py::test_open_does_not_start_or_attach_apps",
+        "components/app/launcher/tests/test_app_launcher_contract.py::test_configuration_validation"
+      ],
+      "model_source": "model/bibliotek/components/component.app.launcher.sysml",
+      "requirements": [
+        "contract.app.launcher.open_effect",
+        "contract.app.launcher.open.failures"
+      ],
+      "status": "resolved",
+      "subject": {
+        "role": "operation",
+        "type": "OpenAppLauncher"
+      },
+      "verification": "OpenAppLauncherContractVerification"
+    },
+    {
+      "evidence_id": "components/app/launcher/tests/test_app_launcher_contract.py#ProbeRuntimeSurfaceContractVerification",
+      "evidence_nodes": [
+        "components/app/launcher/tests/test_app_launcher_contract.py::test_session_probe_marks_exited_managed_runtime"
+      ],
+      "model_source": "model/bibliotek/components/component.app.launcher.sysml",
+      "requirements": [
+        "contract.app.launcher.probe_runtime_surface.failures"
+      ],
+      "status": "resolved",
+      "subject": {
+        "role": "operation",
+        "type": "ProbeRuntimeSurface"
+      },
+      "verification": "ProbeRuntimeSurfaceContractVerification"
+    },
+    {
+      "evidence_id": "components/app/launcher/tests/test_app_launcher_contract.py#StartRuntimeSurfaceContractVerification",
+      "evidence_nodes": [
+        "components/app/launcher/tests/test_app_launcher_contract.py::test_launch_starts_declared_surface_and_records_owned_session",
+        "components/app/launcher/tests/test_app_launcher_contract.py::test_handoff_launch_returns_receipt_without_recording_session"
+      ],
+      "model_source": "model/bibliotek/components/component.app.launcher.sysml",
+      "requirements": [
+        "contract.app.launcher.start_runtime_surface.failures"
+      ],
+      "status": "resolved",
+      "subject": {
+        "role": "operation",
+        "type": "StartRuntimeSurface"
+      },
+      "verification": "StartRuntimeSurfaceContractVerification"
+    },
+    {
+      "evidence_id": "components/app/launcher/tests/test_app_launcher_contract.py#StopRuntimeSurfaceContractVerification",
+      "evidence_nodes": [
+        "components/app/launcher/tests/test_app_launcher_contract.py::test_stop_session_only_stops_launcher_owned_sessions",
+        "components/app/launcher/tests/test_app_launcher_contract.py::test_attach_records_external_session_without_runtime_ownership"
+      ],
+      "model_source": "model/bibliotek/components/component.app.launcher.sysml",
+      "requirements": [
+        "contract.app.launcher.stop_runtime_surface.failures"
+      ],
+      "status": "resolved",
+      "subject": {
+        "role": "operation",
+        "type": "StopRuntimeSurface"
+      },
+      "verification": "StopRuntimeSurfaceContractVerification"
+    },
+    {
+      "evidence_id": "components/app/launcher/tests/test_app_launcher_contract.py#StopSessionContractVerification",
+      "evidence_nodes": [
+        "components/app/launcher/tests/test_app_launcher_contract.py::test_attach_records_external_session_without_runtime_ownership",
+        "components/app/launcher/tests/test_app_launcher_contract.py::test_stop_session_only_stops_launcher_owned_sessions",
+        "components/app/launcher/tests/test_app_launcher_contract.py::test_configuration_validation"
+      ],
+      "model_source": "model/bibliotek/components/component.app.launcher.sysml",
+      "requirements": [
+        "contract.app.launcher.stop_effect",
+        "contract.app.launcher.stop_session.failures"
+      ],
+      "status": "resolved",
+      "subject": {
+        "role": "operation",
+        "type": "StopSession"
+      },
+      "verification": "StopSessionContractVerification"
+    },
+    {
+      "evidence_id": "components/app/launcher/tests/test_app_launcher_contract.py#SupportsRuntimeSurfaceContractVerification",
+      "evidence_nodes": [
+        "components/app/launcher/tests/test_app_launcher_contract.py::test_mode_and_runtime_support_are_checked_before_runtime_start"
+      ],
+      "model_source": "model/bibliotek/components/component.app.launcher.sysml",
+      "requirements": [
+        "contract.app.launcher.supports_runtime_surface.failures"
+      ],
+      "status": "resolved",
+      "subject": {
+        "role": "operation",
+        "type": "SupportsRuntimeSurface"
+      },
+      "verification": "SupportsRuntimeSurfaceContractVerification"
+    },
+    {
       "evidence_id": "components/rtg/change_validation/tests/test_rtg_change_validation_contract.py#RtgChangeValidationBoundaryVerification",
       "evidence_nodes": [
         "components/rtg/change_validation/tests/test_rtg_change_validation_contract.py::test_semantic_field_refinements_validate_values_recursively",

@@ -2,6 +2,7 @@
   "authored_packages": {
     "Bibliotek": "model/bibliotek/Bibliotek.sysml",
     "BibliotekAppCatalog": "model/bibliotek/components/component.app.catalog.sysml",
+    "BibliotekAppLauncher": "model/bibliotek/components/component.app.launcher.sysml",
     "BibliotekLocalPythonRealization": "model/bibliotek/realizations/BibliotekLocalPython.sysml",
     "BibliotekRtgChangeValidation": "model/bibliotek/components/component.rtg.change_validation.sysml",
     "BibliotekRtgConstraints": "model/bibliotek/components/component.rtg.constraints.sysml",
@@ -28,18 +29,18 @@
   "packages": {
     "Bibliotek": {
       "element_counts": {
-        "ActionDefinition": 94,
-        "AttributeDefinition": 213,
+        "ActionDefinition": 104,
+        "AttributeDefinition": 228,
         "CalculationDefinition": 6,
         "ConstraintDefinition": 1,
-        "Documentation": 7,
+        "Documentation": 8,
         "EnumerationDefinition": 35,
-        "ItemDefinition": 13,
+        "ItemDefinition": 15,
         "LibraryPackage": 1,
-        "PartDefinition": 12,
-        "PartUsage": 10,
-        "RequirementUsage": 311,
-        "VerificationCaseDefinition": 105
+        "PartDefinition": 14,
+        "PartUsage": 11,
+        "RequirementUsage": 332,
+        "VerificationCaseDefinition": 116
       },
       "named_elements": [
         {
@@ -61,6 +62,14 @@
         {
           "kind": "ActionDefinition",
           "name": "AssociateData"
+        },
+        {
+          "kind": "ActionDefinition",
+          "name": "AttachApp"
+        },
+        {
+          "kind": "ActionDefinition",
+          "name": "AttachRuntimeSurface"
         },
         {
           "kind": "ActionDefinition",
@@ -228,6 +237,10 @@
         },
         {
           "kind": "ActionDefinition",
+          "name": "LaunchApp"
+        },
+        {
+          "kind": "ActionDefinition",
           "name": "ListAnchorData"
         },
         {
@@ -296,11 +309,19 @@
         },
         {
           "kind": "ActionDefinition",
+          "name": "ListSessions"
+        },
+        {
+          "kind": "ActionDefinition",
           "name": "LoadPersistedSnapshot"
         },
         {
           "kind": "ActionDefinition",
           "name": "OpenAppCatalog"
+        },
+        {
+          "kind": "ActionDefinition",
+          "name": "OpenAppLauncher"
         },
         {
           "kind": "ActionDefinition",
@@ -329,6 +350,10 @@
         {
           "kind": "ActionDefinition",
           "name": "PreviewDissociateData"
+        },
+        {
+          "kind": "ActionDefinition",
+          "name": "ProbeRuntimeSurface"
         },
         {
           "kind": "ActionDefinition",
@@ -396,6 +421,22 @@
         },
         {
           "kind": "ActionDefinition",
+          "name": "StartRuntimeSurface"
+        },
+        {
+          "kind": "ActionDefinition",
+          "name": "StopRuntimeSurface"
+        },
+        {
+          "kind": "ActionDefinition",
+          "name": "StopSession"
+        },
+        {
+          "kind": "ActionDefinition",
+          "name": "SupportsRuntimeSurface"
+        },
+        {
+          "kind": "ActionDefinition",
           "name": "ValidateGraph"
         },
         {
@@ -448,7 +489,35 @@
         },
         {
           "kind": "AttributeDefinition",
+          "name": "AppLaunchResult"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "AppLauncherConfigurationInvalid"
+        },
+        {
+          "kind": "AttributeDefinition",
           "name": "AppNotFound"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "AppSessionList"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "AppStartFailed"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "AppStopFailed"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "AttachFailed"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "AttachRequest"
         },
         {
           "kind": "AttributeDefinition",
@@ -525,6 +594,22 @@
         {
           "kind": "AttributeDefinition",
           "name": "JsonValueNotSerializable"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "LaunchRejected"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "LaunchRequest"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "LaunchSurfaceNotFound"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "LaunchSurfaceUnsupported"
         },
         {
           "kind": "AttributeDefinition",
@@ -1172,6 +1257,22 @@
         },
         {
           "kind": "AttributeDefinition",
+          "name": "RuntimeSurfaceResult"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "SessionNotFound"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "SessionNotLauncherOwned"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "SessionQuery"
+        },
+        {
+          "kind": "AttributeDefinition",
           "name": "SqlExecutionFailed"
         },
         {
@@ -1444,6 +1545,14 @@
         },
         {
           "kind": "ItemDefinition",
+          "name": "AppHandoff"
+        },
+        {
+          "kind": "ItemDefinition",
+          "name": "AppSession"
+        },
+        {
+          "kind": "ItemDefinition",
           "name": "JsonStorageRoot"
         },
         {
@@ -1497,6 +1606,11 @@
         },
         {
           "kind": "PartDefinition",
+          "name": "AppLauncher",
+          "short_name": "component.app.launcher"
+        },
+        {
+          "kind": "PartDefinition",
           "name": "JsonFileStorage",
           "short_name": "component.storage.json_file"
         },
@@ -1543,6 +1657,10 @@
           "kind": "PartDefinition",
           "name": "RtgSchema",
           "short_name": "component.rtg.schema"
+        },
+        {
+          "kind": "PartDefinition",
+          "name": "RuntimeAdapter"
         },
         {
           "kind": "PartDefinition",
@@ -1608,6 +1726,26 @@
           "kind": "RequirementUsage",
           "name": "atomicFullDocumentWrites",
           "short_name": "invariant.storage.json_file.atomic_full_document_writes"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "attachAppFailureSemantics",
+          "short_name": "contract.app.launcher.attach_app.failures"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "attachEffect",
+          "short_name": "contract.app.launcher.attach_effect"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "attachExternal",
+          "short_name": "invariant.app.launcher.attach_external"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "attachRuntimeSurfaceFailureSemantics",
+          "short_name": "contract.app.launcher.attach_runtime_surface.failures"
         },
         {
           "kind": "RequirementUsage",
@@ -1788,6 +1926,11 @@
           "kind": "RequirementUsage",
           "name": "declarativeSurfaces",
           "short_name": "invariant.app.catalog.declarative_surfaces"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "declaredSurfaceOnly",
+          "short_name": "invariant.app.launcher.declared_surface_only"
         },
         {
           "kind": "RequirementUsage",
@@ -2076,6 +2219,11 @@
         },
         {
           "kind": "RequirementUsage",
+          "name": "handoffNotSession",
+          "short_name": "invariant.app.launcher.handoff_not_session"
+        },
+        {
+          "kind": "RequirementUsage",
           "name": "idUnique",
           "short_name": "invariant.rtg.migration.id_unique"
         },
@@ -2113,6 +2261,11 @@
           "kind": "RequirementUsage",
           "name": "intentionalBoundary",
           "short_name": "contract.app.catalog.intentional_boundary"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "intentionalBoundary",
+          "short_name": "contract.app.launcher.intentional_boundary"
         },
         {
           "kind": "RequirementUsage",
@@ -2188,6 +2341,16 @@
           "kind": "RequirementUsage",
           "name": "knowledgeEngineerCurated",
           "short_name": "invariant.rtg.discovery.knowledge_engineer_curated"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "launchAppFailureSemantics",
+          "short_name": "contract.app.launcher.launch_app.failures"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "launchEffect",
+          "short_name": "contract.app.launcher.launch_effect"
         },
         {
           "kind": "RequirementUsage",
@@ -2272,6 +2435,11 @@
         {
           "kind": "RequirementUsage",
           "name": "listEffect",
+          "short_name": "contract.app.launcher.list_effect"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "listEffect",
           "short_name": "contract.storage.json_file.list_effect"
         },
         {
@@ -2316,6 +2484,11 @@
         },
         {
           "kind": "RequirementUsage",
+          "name": "listSessionsFailureSemantics",
+          "short_name": "contract.app.launcher.list_sessions.failures"
+        },
+        {
+          "kind": "RequirementUsage",
           "name": "liveFlipsViaFullRecordWrite",
           "short_name": "invariant.rtg.controller.live_flips_via_full_record_write"
         },
@@ -2353,6 +2526,11 @@
           "kind": "RequirementUsage",
           "name": "loadPersistedSnapshotFailureSemantics",
           "short_name": "contract.rtg.controller.load_persisted_snapshot.failures"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "managedControl",
+          "short_name": "invariant.app.launcher.managed_control"
         },
         {
           "kind": "RequirementUsage",
@@ -2501,8 +2679,18 @@
         },
         {
           "kind": "RequirementUsage",
+          "name": "openAppLauncherFailureSemantics",
+          "short_name": "contract.app.launcher.open.failures"
+        },
+        {
+          "kind": "RequirementUsage",
           "name": "openEffect",
           "short_name": "contract.app.catalog.open_effect"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "openEffect",
+          "short_name": "contract.app.launcher.open_effect"
         },
         {
           "kind": "RequirementUsage",
@@ -2533,6 +2721,11 @@
           "kind": "RequirementUsage",
           "name": "overlayFiltersOnly",
           "short_name": "invariant.rtg.query.overlay_filters_only"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "ownershipControlsStop",
+          "short_name": "invariant.app.launcher.ownership_controls_stop"
         },
         {
           "kind": "RequirementUsage",
@@ -2598,6 +2791,11 @@
           "kind": "RequirementUsage",
           "name": "previewMatchesDelete",
           "short_name": "invariant.rtg.graph.preview_matches_delete"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "probeRuntimeSurfaceFailureSemantics",
+          "short_name": "contract.app.launcher.probe_runtime_surface.failures"
         },
         {
           "kind": "RequirementUsage",
@@ -2891,6 +3089,11 @@
         },
         {
           "kind": "RequirementUsage",
+          "name": "startRuntimeSurfaceFailureSemantics",
+          "short_name": "contract.app.launcher.start_runtime_surface.failures"
+        },
+        {
+          "kind": "RequirementUsage",
           "name": "statusTrackingNotProof",
           "short_name": "invariant.rtg.migration.status_is_tracking_not_proof"
         },
@@ -2906,8 +3109,28 @@
         },
         {
           "kind": "RequirementUsage",
+          "name": "stopEffect",
+          "short_name": "contract.app.launcher.stop_effect"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "stopRuntimeSurfaceFailureSemantics",
+          "short_name": "contract.app.launcher.stop_runtime_surface.failures"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "stopSessionFailureSemantics",
+          "short_name": "contract.app.launcher.stop_session.failures"
+        },
+        {
+          "kind": "RequirementUsage",
           "name": "strictValidationDefault",
           "short_name": "invariant.rtg.controller.strict_validation_default"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "supportsRuntimeSurfaceFailureSemantics",
+          "short_name": "contract.app.launcher.supports_runtime_surface.failures"
         },
         {
           "kind": "RequirementUsage",
@@ -3118,6 +3341,10 @@
         },
         {
           "kind": "VerificationCaseDefinition",
+          "name": "AppLauncherBoundaryVerification"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
           "name": "ApplyLiveGraphChangesContractVerification"
         },
         {
@@ -3127,6 +3354,14 @@
         {
           "kind": "VerificationCaseDefinition",
           "name": "AssociateDataContractVerification"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
+          "name": "AttachAppContractVerification"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
+          "name": "AttachRuntimeSurfaceContractVerification"
         },
         {
           "kind": "VerificationCaseDefinition",
@@ -3298,6 +3533,10 @@
         },
         {
           "kind": "VerificationCaseDefinition",
+          "name": "LaunchAppContractVerification"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
           "name": "ListAnchorDataContractVerification"
         },
         {
@@ -3366,11 +3605,19 @@
         },
         {
           "kind": "VerificationCaseDefinition",
+          "name": "ListSessionsContractVerification"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
           "name": "LoadPersistedSnapshotContractVerification"
         },
         {
           "kind": "VerificationCaseDefinition",
           "name": "OpenAppCatalogContractVerification"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
+          "name": "OpenAppLauncherContractVerification"
         },
         {
           "kind": "VerificationCaseDefinition",
@@ -3399,6 +3646,10 @@
         {
           "kind": "VerificationCaseDefinition",
           "name": "PreviewDissociateDataContractVerification"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
+          "name": "ProbeRuntimeSurfaceContractVerification"
         },
         {
           "kind": "VerificationCaseDefinition",
@@ -3499,6 +3750,22 @@
         {
           "kind": "VerificationCaseDefinition",
           "name": "StageKnowledgeChangesContractVerification"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
+          "name": "StartRuntimeSurfaceContractVerification"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
+          "name": "StopRuntimeSurfaceContractVerification"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
+          "name": "StopSessionContractVerification"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
+          "name": "SupportsRuntimeSurfaceContractVerification"
         },
         {
           "kind": "VerificationCaseDefinition",
@@ -3822,26 +4089,461 @@
       ],
       "source": "model/bibliotek/components/component.app.catalog.sysml"
     },
+    "BibliotekAppLauncher": {
+      "element_counts": {
+        "ActionDefinition": 10,
+        "ActionUsage": 13,
+        "AttributeDefinition": 15,
+        "AttributeUsage": 49,
+        "ConstraintUsage": 21,
+        "Dependency": 14,
+        "Documentation": 49,
+        "EnumerationUsage": 5,
+        "Feature": 34,
+        "FeatureReferenceExpression": 22,
+        "ItemDefinition": 2,
+        "ItemUsage": 7,
+        "LibraryPackage": 1,
+        "LiteralBoolean": 1,
+        "LiteralInfinity": 11,
+        "LiteralInteger": 33,
+        "LiteralString": 27,
+        "MetadataUsage": 23,
+        "Multiplicity": 35,
+        "MultiplicityRange": 23,
+        "NullExpression": 3,
+        "OperatorExpression": 3,
+        "PartDefinition": 2,
+        "PartUsage": 5,
+        "PerformActionUsage": 13,
+        "ReferenceUsage": 151,
+        "RequirementUsage": 53,
+        "SatisfyRequirementUsage": 21,
+        "VerificationCaseDefinition": 11
+      },
+      "named_elements": [
+        {
+          "kind": "ActionDefinition",
+          "name": "AttachApp"
+        },
+        {
+          "kind": "ActionDefinition",
+          "name": "AttachRuntimeSurface"
+        },
+        {
+          "kind": "ActionDefinition",
+          "name": "LaunchApp"
+        },
+        {
+          "kind": "ActionDefinition",
+          "name": "ListSessions"
+        },
+        {
+          "kind": "ActionDefinition",
+          "name": "OpenAppLauncher"
+        },
+        {
+          "kind": "ActionDefinition",
+          "name": "ProbeRuntimeSurface"
+        },
+        {
+          "kind": "ActionDefinition",
+          "name": "StartRuntimeSurface"
+        },
+        {
+          "kind": "ActionDefinition",
+          "name": "StopRuntimeSurface"
+        },
+        {
+          "kind": "ActionDefinition",
+          "name": "StopSession"
+        },
+        {
+          "kind": "ActionDefinition",
+          "name": "SupportsRuntimeSurface"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "AppLaunchResult"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "AppLauncherConfigurationInvalid"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "AppSessionList"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "AppStartFailed"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "AppStopFailed"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "AttachFailed"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "AttachRequest"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "LaunchRejected"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "LaunchRequest"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "LaunchSurfaceNotFound"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "LaunchSurfaceUnsupported"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "RuntimeSurfaceResult"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "SessionNotFound"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "SessionNotLauncherOwned"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "SessionQuery"
+        },
+        {
+          "kind": "ItemDefinition",
+          "name": "AppHandoff"
+        },
+        {
+          "kind": "ItemDefinition",
+          "name": "AppSession"
+        },
+        {
+          "kind": "PartDefinition",
+          "name": "AppLauncher",
+          "short_name": "component.app.launcher"
+        },
+        {
+          "kind": "PartDefinition",
+          "name": "RuntimeAdapter"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "attachAppFailureSemantics",
+          "short_name": "contract.app.launcher.attach_app.failures"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "attachAppFailureSemantics"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "attachEffect",
+          "short_name": "contract.app.launcher.attach_effect"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "attachEffect"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "attachExternal",
+          "short_name": "invariant.app.launcher.attach_external"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "attachExternal"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "attachRuntimeSurfaceFailureSemantics",
+          "short_name": "contract.app.launcher.attach_runtime_surface.failures"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "attachRuntimeSurfaceFailureSemantics"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "declaredSurfaceOnly",
+          "short_name": "invariant.app.launcher.declared_surface_only"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "declaredSurfaceOnly"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "handoffNotSession",
+          "short_name": "invariant.app.launcher.handoff_not_session"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "handoffNotSession"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "intentionalBoundary",
+          "short_name": "contract.app.launcher.intentional_boundary"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "intentionalBoundary"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "launchAppFailureSemantics",
+          "short_name": "contract.app.launcher.launch_app.failures"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "launchAppFailureSemantics"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "launchEffect",
+          "short_name": "contract.app.launcher.launch_effect"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "launchEffect"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "listEffect",
+          "short_name": "contract.app.launcher.list_effect"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "listEffect"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "listSessionsFailureSemantics",
+          "short_name": "contract.app.launcher.list_sessions.failures"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "listSessionsFailureSemantics"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "managedControl",
+          "short_name": "invariant.app.launcher.managed_control"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "managedControl"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "obj"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "obj"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "obj"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "obj"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "obj"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "obj"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "obj"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "obj"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "obj"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "obj"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "obj"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "openAppLauncherFailureSemantics",
+          "short_name": "contract.app.launcher.open.failures"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "openAppLauncherFailureSemantics"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "openEffect",
+          "short_name": "contract.app.launcher.open_effect"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "openEffect"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "ownershipControlsStop",
+          "short_name": "invariant.app.launcher.ownership_controls_stop"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "ownershipControlsStop"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "probeRuntimeSurfaceFailureSemantics",
+          "short_name": "contract.app.launcher.probe_runtime_surface.failures"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "probeRuntimeSurfaceFailureSemantics"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "startRuntimeSurfaceFailureSemantics",
+          "short_name": "contract.app.launcher.start_runtime_surface.failures"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "startRuntimeSurfaceFailureSemantics"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "stopEffect",
+          "short_name": "contract.app.launcher.stop_effect"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "stopEffect"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "stopRuntimeSurfaceFailureSemantics",
+          "short_name": "contract.app.launcher.stop_runtime_surface.failures"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "stopRuntimeSurfaceFailureSemantics"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "stopSessionFailureSemantics",
+          "short_name": "contract.app.launcher.stop_session.failures"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "stopSessionFailureSemantics"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "supportsRuntimeSurfaceFailureSemantics",
+          "short_name": "contract.app.launcher.supports_runtime_surface.failures"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "supportsRuntimeSurfaceFailureSemantics"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
+          "name": "AppLauncherBoundaryVerification"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
+          "name": "AttachAppContractVerification"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
+          "name": "AttachRuntimeSurfaceContractVerification"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
+          "name": "LaunchAppContractVerification"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
+          "name": "ListSessionsContractVerification"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
+          "name": "OpenAppLauncherContractVerification"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
+          "name": "ProbeRuntimeSurfaceContractVerification"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
+          "name": "StartRuntimeSurfaceContractVerification"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
+          "name": "StopRuntimeSurfaceContractVerification"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
+          "name": "StopSessionContractVerification"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
+          "name": "SupportsRuntimeSurfaceContractVerification"
+        }
+      ],
+      "source": "model/bibliotek/components/component.app.launcher.sysml"
+    },
     "BibliotekLocalPythonRealization": {
       "element_counts": {
-        "Dependency": 4,
-        "Documentation": 4,
-        "EnumerationUsage": 4,
-        "Feature": 2,
-        "FeatureReferenceExpression": 1,
-        "ItemUsage": 1,
-        "LiteralString": 9,
-        "MetadataUsage": 4,
+        "Dependency": 14,
+        "Documentation": 5,
+        "EnumerationUsage": 5,
+        "Feature": 3,
+        "FeatureReferenceExpression": 2,
+        "ItemUsage": 2,
+        "LiteralString": 18,
+        "MetadataUsage": 8,
         "Multiplicity": 7,
         "Package": 1,
-        "PartDefinition": 1,
-        "PerformActionUsage": 4,
-        "ReferenceUsage": 13
+        "PartDefinition": 2,
+        "PartUsage": 2,
+        "PerformActionUsage": 8,
+        "ReferenceUsage": 23
       },
       "named_elements": [
         {
           "kind": "PartDefinition",
           "name": "InMemoryAppCatalog"
+        },
+        {
+          "kind": "PartDefinition",
+          "name": "InMemoryAppLauncher"
         }
       ],
       "source": "model/bibliotek/realizations/BibliotekLocalPython.sysml"
@@ -10949,7 +11651,7 @@
     }
   },
   "schema_version": 1,
-  "source_digest": "2af7f40adf164fab47d902f5c29214e0415de99618b54e461ad593b3c406d1d0",
+  "source_digest": "2581669ac88627e19c874df37a9377fd73df79188618a36ac21c1c70b94d6a8d",
   "validator": {
     "implementation_version": "0.50.0",
     "provider": "Systems-Modeling/SysML-v2-Pilot-Implementation",

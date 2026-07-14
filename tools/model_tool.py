@@ -296,6 +296,11 @@ def _model_action_for_method(component_id: str, method: str, actions: set[str]) 
         ("component.rtg.constraints", "list_constraints_by_target"): "ListConstraintsByTarget",
         ("component.rtg.change_validation", "validate_batch"): "ValidateRtgChangeBatch",
         ("component.rtg.change_validation", "validate_graph_state"): "ValidateRtgGraphState",
+        ("component.app.launcher", "supports"): "SupportsRuntimeSurface",
+        ("component.app.launcher", "start"): "StartRuntimeSurface",
+        ("component.app.launcher", "attach"): "AttachRuntimeSurface",
+        ("component.app.launcher", "stop"): "StopRuntimeSurface",
+        ("component.app.launcher", "probe"): "ProbeRuntimeSurface",
     }
     alias = aliases.get((component_id, method))
     if alias:
@@ -498,7 +503,17 @@ def _check_protocol_action_signatures() -> list[Finding]:
                 rf"{SYSML_IDENTIFIER}(?:\[[^]]+\])?\s*:\s*([\w:]+)",
                 action_blocks[action],
             )
-            expected_outputs = () if return_type in {None, "None"} else (return_type,)
+            type_aliases = {
+                "bool": "Boolean",
+                "float": "Real",
+                "int": "Integer",
+                "str": "String",
+            }
+            if return_type in {None, "None"}:
+                expected_outputs: tuple[str, ...] = ()
+            else:
+                assert isinstance(return_type, str)
+                expected_outputs = (type_aliases.get(return_type, return_type),)
             if tuple(model_outputs) != expected_outputs:
                 findings.append(
                     Finding(
@@ -2529,9 +2544,9 @@ def check(scope: str = "all", *, require_external: bool = False) -> list[Finding
         if re.search(r"\bimport\s+Vellis", bibliotek_text):
             findings.append(Finding(MODEL_ROOT / "bibliotek", "Bibliotek must not import Vellis"))
         models = _component_model_statuses()
-        if len(models) != 11:
+        if len(models) != 12:
             findings.append(
-                Finding(COMPONENT_MODEL_ROOT, f"expected 11 components, found {len(models)}")
+                Finding(COMPONENT_MODEL_ROOT, f"expected 12 components, found {len(models)}")
             )
         findings.extend(_check_forbidden_component_imports())
         findings.extend(_check_protocol_action_coverage())
