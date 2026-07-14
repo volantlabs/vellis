@@ -461,6 +461,72 @@
       "verification": "SwitchAppContractVerification"
     },
     {
+      "evidence_id": "components/rtg/bridge_traversal/tests/test_rtg_bridge_traversal_contract.py#OpenRtgBridgeTraverserContractVerification",
+      "evidence_nodes": [
+        "components/rtg/bridge_traversal/tests/test_rtg_bridge_traversal_contract.py::test_open_retains_dependencies_without_reading"
+      ],
+      "model_source": "model/bibliotek/components/component.rtg.bridge_traversal.sysml",
+      "requirements": [
+        "contract.rtg.bridge_traversal.open.failures"
+      ],
+      "status": "resolved",
+      "subject": {
+        "role": "operation",
+        "type": "OpenRtgBridgeTraverser"
+      },
+      "verification": "OpenRtgBridgeTraverserContractVerification"
+    },
+    {
+      "evidence_id": "components/rtg/bridge_traversal/tests/test_rtg_bridge_traversal_contract.py#RtgBridgeTraverserBoundaryVerification",
+      "evidence_nodes": [
+        "components/rtg/bridge_traversal/tests/test_rtg_bridge_traversal_contract.py::test_open_retains_dependencies_without_reading",
+        "components/rtg/bridge_traversal/tests/test_rtg_bridge_traversal_contract.py::test_traverse_resolves_one_active_bridge_without_mutation",
+        "components/rtg/bridge_traversal/tests/test_rtg_bridge_traversal_contract.py::test_traverse_reports_partial_and_unresolved_endpoint_results",
+        "components/rtg/bridge_traversal/tests/test_rtg_bridge_traversal_contract.py::test_traverse_rejects_revoked_bridge_before_resolution",
+        "components/rtg/bridge_traversal/tests/test_rtg_bridge_traversal_contract.py::test_traverse_does_not_accept_candidate_or_malformed_identifier",
+        "components/rtg/bridge_traversal/tests/test_rtg_bridge_traversal_contract.py::test_traverse_rejects_mismatched_endpoint_resolution_identity",
+        "components/rtg/bridge_traversal/tests/test_rtg_bridge_traversal_contract.py::test_traverser_surface_does_not_expose_adjacent_operations"
+      ],
+      "model_source": "model/bibliotek/components/component.rtg.bridge_traversal.sysml",
+      "requirements": [
+        "invariant.rtg.bridge_traversal.confirmed_active_only",
+        "invariant.rtg.bridge_traversal.single_bridge",
+        "invariant.rtg.bridge_traversal.graph_qualified_endpoints",
+        "invariant.rtg.bridge_traversal.no_join",
+        "invariant.rtg.bridge_traversal.read_only",
+        "contract.rtg.bridge_traversal.intentional_boundary"
+      ],
+      "status": "resolved",
+      "subject": {
+        "role": "traverser",
+        "type": "RtgBridgeTraverser"
+      },
+      "verification": "RtgBridgeTraverserBoundaryVerification"
+    },
+    {
+      "evidence_id": "components/rtg/bridge_traversal/tests/test_rtg_bridge_traversal_contract.py#TraverseBridgeContractVerification",
+      "evidence_nodes": [
+        "components/rtg/bridge_traversal/tests/test_rtg_bridge_traversal_contract.py::test_traverse_resolves_one_active_bridge_without_mutation",
+        "components/rtg/bridge_traversal/tests/test_rtg_bridge_traversal_contract.py::test_traverse_reports_partial_and_unresolved_endpoint_results",
+        "components/rtg/bridge_traversal/tests/test_rtg_bridge_traversal_contract.py::test_traverse_rejects_revoked_bridge_before_resolution",
+        "components/rtg/bridge_traversal/tests/test_rtg_bridge_traversal_contract.py::test_traverse_does_not_accept_candidate_or_malformed_identifier",
+        "components/rtg/bridge_traversal/tests/test_rtg_bridge_traversal_contract.py::test_traverse_rejects_mismatched_endpoint_resolution_identity",
+        "components/rtg/bridge_traversal/tests/test_rtg_bridge_traversal_contract.py::test_traverse_rejects_invalid_source_status_before_target_resolution"
+      ],
+      "model_source": "model/bibliotek/components/component.rtg.bridge_traversal.sysml",
+      "requirements": [
+        "contract.rtg.bridge_traversal.result_semantics",
+        "contract.rtg.bridge_traversal.sequence",
+        "contract.rtg.bridge_traversal.traverse.failures"
+      ],
+      "status": "resolved",
+      "subject": {
+        "role": "operation",
+        "type": "TraverseBridge"
+      },
+      "verification": "TraverseBridgeContractVerification"
+    },
+    {
       "evidence_id": "components/rtg/change_validation/tests/test_rtg_change_validation_contract.py#RtgChangeValidationBoundaryVerification",
       "evidence_nodes": [
         "components/rtg/change_validation/tests/test_rtg_change_validation_contract.py::test_semantic_field_refinements_validate_values_recursively",

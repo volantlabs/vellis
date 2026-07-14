@@ -5,6 +5,7 @@
     "BibliotekAppLauncher": "model/bibliotek/components/component.app.launcher.sysml",
     "BibliotekAppShell": "model/bibliotek/components/component.app.shell.sysml",
     "BibliotekLocalPythonRealization": "model/bibliotek/realizations/BibliotekLocalPython.sysml",
+    "BibliotekRtgBridgeTraversal": "model/bibliotek/components/component.rtg.bridge_traversal.sysml",
     "BibliotekRtgChangeValidation": "model/bibliotek/components/component.rtg.change_validation.sysml",
     "BibliotekRtgCitationResolution": "model/bibliotek/components/component.rtg.citation_resolution.sysml",
     "BibliotekRtgConstraints": "model/bibliotek/components/component.rtg.constraints.sysml",
@@ -35,18 +36,18 @@
   "packages": {
     "Bibliotek": {
       "element_counts": {
-        "ActionDefinition": 131,
-        "AttributeDefinition": 261,
+        "ActionDefinition": 134,
+        "AttributeDefinition": 266,
         "CalculationDefinition": 6,
         "ConstraintDefinition": 1,
-        "Documentation": 12,
-        "EnumerationDefinition": 42,
+        "Documentation": 13,
+        "EnumerationDefinition": 43,
         "ItemDefinition": 19,
         "LibraryPackage": 1,
-        "PartDefinition": 20,
-        "PartUsage": 16,
-        "RequirementUsage": 407,
-        "VerificationCaseDefinition": 147
+        "PartDefinition": 22,
+        "PartUsage": 17,
+        "RequirementUsage": 417,
+        "VerificationCaseDefinition": 150
       },
       "named_elements": [
         {
@@ -403,6 +404,10 @@
         },
         {
           "kind": "ActionDefinition",
+          "name": "OpenRtgBridgeTraverser"
+        },
+        {
+          "kind": "ActionDefinition",
           "name": "OpenRtgCitationResolver"
         },
         {
@@ -507,6 +512,10 @@
         },
         {
           "kind": "ActionDefinition",
+          "name": "ResolveBridgeEndpoint"
+        },
+        {
+          "kind": "ActionDefinition",
           "name": "ResolveCitation"
         },
         {
@@ -548,6 +557,10 @@
         {
           "kind": "ActionDefinition",
           "name": "SwitchApp"
+        },
+        {
+          "kind": "ActionDefinition",
+          "name": "TraverseBridge"
         },
         {
           "kind": "ActionDefinition",
@@ -772,6 +785,26 @@
         {
           "kind": "AttributeDefinition",
           "name": "RtgAnchorTypeDiscoveryResult"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "RtgBridgeTraversalEndpoint"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "RtgBridgeTraversalInvalid"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "RtgBridgeTraversalNotAllowed"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "RtgBridgeTraversalRecord"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "RtgBridgeTraversalRequest"
         },
         {
           "kind": "AttributeDefinition",
@@ -1655,6 +1688,10 @@
         },
         {
           "kind": "EnumerationDefinition",
+          "name": "RtgBridgeTraversalStatus"
+        },
+        {
+          "kind": "EnumerationDefinition",
           "name": "RtgCitationResolutionStatus"
         },
         {
@@ -1908,6 +1945,15 @@
           "kind": "PartDefinition",
           "name": "JsonFileStorage",
           "short_name": "component.storage.json_file"
+        },
+        {
+          "kind": "PartDefinition",
+          "name": "RtgBridgeEndpointResolver"
+        },
+        {
+          "kind": "PartDefinition",
+          "name": "RtgBridgeTraverser",
+          "short_name": "component.rtg.bridge_traversal"
         },
         {
           "kind": "PartDefinition",
@@ -2199,6 +2245,11 @@
           "kind": "RequirementUsage",
           "name": "completedHistoryExternal",
           "short_name": "invariant.rtg.migration.completed_history_is_external"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "confirmedActiveOnly",
+          "short_name": "invariant.rtg.bridge_traversal.confirmed_active_only"
         },
         {
           "kind": "RequirementUsage",
@@ -2697,6 +2748,11 @@
         },
         {
           "kind": "RequirementUsage",
+          "name": "graphQualifiedEndpoints",
+          "short_name": "invariant.rtg.bridge_traversal.graph_qualified_endpoints"
+        },
+        {
+          "kind": "RequirementUsage",
           "name": "graphQualifiedIdentity",
           "short_name": "invariant.rtg.citation_resolution.graph_qualified_identity"
         },
@@ -2829,6 +2885,11 @@
           "kind": "RequirementUsage",
           "name": "intentionalBoundary",
           "short_name": "contract.rtg.citation_resolution.intentional_boundary"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "intentionalBoundary",
+          "short_name": "contract.rtg.bridge_traversal.intentional_boundary"
         },
         {
           "kind": "RequirementUsage",
@@ -3157,6 +3218,11 @@
         },
         {
           "kind": "RequirementUsage",
+          "name": "noJoin",
+          "short_name": "invariant.rtg.bridge_traversal.no_join"
+        },
+        {
+          "kind": "RequirementUsage",
           "name": "noLinkToLinkEdges",
           "short_name": "invariant.rtg.graph.no_link_to_link_edges"
         },
@@ -3254,6 +3320,11 @@
           "kind": "RequirementUsage",
           "name": "openJsonFileStorageFailureSemantics",
           "short_name": "contract.storage.json_file.open_json_file_storage.failures"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "openRtgBridgeTraverserFailureSemantics",
+          "short_name": "contract.rtg.bridge_traversal.open.failures"
         },
         {
           "kind": "RequirementUsage",
@@ -3512,6 +3583,11 @@
         },
         {
           "kind": "RequirementUsage",
+          "name": "readOnly",
+          "short_name": "invariant.rtg.bridge_traversal.read_only"
+        },
+        {
+          "kind": "RequirementUsage",
           "name": "readerCapability",
           "short_name": "contract.rtg.citation_resolution.reader_capability"
         },
@@ -3627,6 +3703,11 @@
         },
         {
           "kind": "RequirementUsage",
+          "name": "resultSemantics",
+          "short_name": "contract.rtg.bridge_traversal.result_semantics"
+        },
+        {
+          "kind": "RequirementUsage",
           "name": "returnShaping",
           "short_name": "contract.rtg.query.return_shaping"
         },
@@ -3714,6 +3795,11 @@
           "kind": "RequirementUsage",
           "name": "setMigrationStatusFailureSemantics",
           "short_name": "contract.rtg.migration.set_migration_status.failures"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "singleBridge",
+          "short_name": "invariant.rtg.bridge_traversal.single_bridge"
         },
         {
           "kind": "RequirementUsage",
@@ -3864,6 +3950,16 @@
           "kind": "RequirementUsage",
           "name": "transactionIdsUuids",
           "short_name": "invariant.rtg.controller.transaction_ids_are_uuids"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "traversalSequence",
+          "short_name": "contract.rtg.bridge_traversal.sequence"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "traverseBridgeFailureSemantics",
+          "short_name": "contract.rtg.bridge_traversal.traverse.failures"
         },
         {
           "kind": "RequirementUsage",
@@ -4390,6 +4486,10 @@
         },
         {
           "kind": "VerificationCaseDefinition",
+          "name": "OpenRtgBridgeTraverserContractVerification"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
           "name": "OpenRtgCitationResolverContractVerification"
         },
         {
@@ -4506,6 +4606,10 @@
         },
         {
           "kind": "VerificationCaseDefinition",
+          "name": "RtgBridgeTraverserBoundaryVerification"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
           "name": "RtgChangeValidationBoundaryVerification"
         },
         {
@@ -4583,6 +4687,10 @@
         {
           "kind": "VerificationCaseDefinition",
           "name": "SwitchAppContractVerification"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
+          "name": "TraverseBridgeContractVerification"
         },
         {
           "kind": "VerificationCaseDefinition",
@@ -5639,21 +5747,25 @@
     "BibliotekLocalPythonRealization": {
       "element_counts": {
         "Dependency": 48,
-        "Documentation": 10,
-        "EnumerationUsage": 10,
-        "Feature": 8,
-        "FeatureReferenceExpression": 7,
+        "Documentation": 11,
+        "EnumerationUsage": 11,
+        "Feature": 9,
+        "FeatureReferenceExpression": 8,
         "ItemUsage": 7,
-        "LiteralString": 126,
-        "MetadataUsage": 49,
+        "LiteralString": 144,
+        "MetadataUsage": 56,
         "Multiplicity": 7,
         "Package": 1,
-        "PartDefinition": 7,
-        "PartUsage": 6,
-        "PerformActionUsage": 32,
-        "ReferenceUsage": 136
+        "PartDefinition": 8,
+        "PartUsage": 8,
+        "PerformActionUsage": 33,
+        "ReferenceUsage": 155
       },
       "named_elements": [
+        {
+          "kind": "PartDefinition",
+          "name": "DeterministicRtgBridgeTraverser"
+        },
         {
           "kind": "PartDefinition",
           "name": "DeterministicRtgCitationResolver"
@@ -5684,6 +5796,203 @@
         }
       ],
       "source": "model/bibliotek/realizations/BibliotekLocalPython.sysml"
+    },
+    "BibliotekRtgBridgeTraversal": {
+      "element_counts": {
+        "ActionDefinition": 3,
+        "ActionUsage": 8,
+        "AttributeDefinition": 5,
+        "AttributeUsage": 32,
+        "BindingConnectorAsUsage": 2,
+        "ConstraintUsage": 10,
+        "Dependency": 13,
+        "Documentation": 35,
+        "EnumerationDefinition": 1,
+        "EnumerationUsage": 8,
+        "Feature": 26,
+        "FeatureChainExpression": 9,
+        "FeatureReferenceExpression": 11,
+        "ItemUsage": 3,
+        "LibraryPackage": 1,
+        "LiteralInfinity": 2,
+        "LiteralInteger": 4,
+        "LiteralString": 7,
+        "MetadataUsage": 9,
+        "Multiplicity": 29,
+        "MultiplicityRange": 5,
+        "NullExpression": 1,
+        "OperatorExpression": 1,
+        "PartDefinition": 2,
+        "PartUsage": 5,
+        "PerformActionUsage": 16,
+        "ReferenceUsage": 98,
+        "RequirementUsage": 23,
+        "SatisfyRequirementUsage": 10,
+        "SuccessionAsUsage": 5,
+        "VerificationCaseDefinition": 3
+      },
+      "named_elements": [
+        {
+          "kind": "ActionDefinition",
+          "name": "OpenRtgBridgeTraverser"
+        },
+        {
+          "kind": "ActionDefinition",
+          "name": "ResolveBridgeEndpoint"
+        },
+        {
+          "kind": "ActionDefinition",
+          "name": "TraverseBridge"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "RtgBridgeTraversalEndpoint"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "RtgBridgeTraversalInvalid"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "RtgBridgeTraversalNotAllowed"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "RtgBridgeTraversalRecord"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "RtgBridgeTraversalRequest"
+        },
+        {
+          "kind": "EnumerationDefinition",
+          "name": "RtgBridgeTraversalStatus"
+        },
+        {
+          "kind": "PartDefinition",
+          "name": "RtgBridgeEndpointResolver"
+        },
+        {
+          "kind": "PartDefinition",
+          "name": "RtgBridgeTraverser",
+          "short_name": "component.rtg.bridge_traversal"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "confirmedActiveOnly",
+          "short_name": "invariant.rtg.bridge_traversal.confirmed_active_only"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "confirmedActiveOnly"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "graphQualifiedEndpoints",
+          "short_name": "invariant.rtg.bridge_traversal.graph_qualified_endpoints"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "graphQualifiedEndpoints"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "intentionalBoundary",
+          "short_name": "contract.rtg.bridge_traversal.intentional_boundary"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "intentionalBoundary"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "noJoin",
+          "short_name": "invariant.rtg.bridge_traversal.no_join"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "noJoin"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "obj"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "obj"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "obj"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "openRtgBridgeTraverserFailureSemantics",
+          "short_name": "contract.rtg.bridge_traversal.open.failures"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "openRtgBridgeTraverserFailureSemantics"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "readOnly",
+          "short_name": "invariant.rtg.bridge_traversal.read_only"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "readOnly"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "resultSemantics",
+          "short_name": "contract.rtg.bridge_traversal.result_semantics"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "resultSemantics"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "singleBridge",
+          "short_name": "invariant.rtg.bridge_traversal.single_bridge"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "singleBridge"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "traversalSequence",
+          "short_name": "contract.rtg.bridge_traversal.sequence"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "traversalSequence"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "traverseBridgeFailureSemantics",
+          "short_name": "contract.rtg.bridge_traversal.traverse.failures"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "traverseBridgeFailureSemantics"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
+          "name": "OpenRtgBridgeTraverserContractVerification"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
+          "name": "RtgBridgeTraverserBoundaryVerification"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
+          "name": "TraverseBridgeContractVerification"
+        }
+      ],
+      "source": "model/bibliotek/components/component.rtg.bridge_traversal.sysml"
     },
     "BibliotekRtgChangeValidation": {
       "element_counts": {
@@ -13972,7 +14281,7 @@
     }
   },
   "schema_version": 1,
-  "source_digest": "5ee53a6aecb1a6806891b69a5ed4065f7f2ad3a7ae12b354aaf9d1406e2361a9",
+  "source_digest": "265c9785a33fc6ed6f71df8ea07d74dde50c7ae4bd7fda98bd1bbf5ad14fd4ab",
   "validator": {
     "implementation_version": "0.50.0",
     "provider": "Systems-Modeling/SysML-v2-Pilot-Implementation",

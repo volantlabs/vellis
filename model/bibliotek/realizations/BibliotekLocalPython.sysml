@@ -7,6 +7,7 @@ package BibliotekLocalPythonRealization {
     private import BibliotekRtgGraphRegistry::*;
     private import BibliotekRtgGraphBridge::*;
     private import BibliotekRtgCitationResolution::*;
+    private import BibliotekRtgBridgeTraversal::*;
 
     part def InMemoryAppCatalog :> AppCatalog {
         @ImplementationCodec { logicalType = "LaunchSurfaceMode and RuntimeControl"; implementationType = "str"; normalization = "The Python realization accepts and emits exactly the modeled enumeration literal names."; }
@@ -69,5 +70,14 @@ package BibliotekLocalPythonRealization {
         @ImplementationCodec { logicalType = "JsonObject"; implementationType = "dict[str, JsonValue]"; normalization = "Python preserves finite JSON-compatible values losslessly and deep-copies caller-owned mutable containers at the component boundary."; }
         @ImplementationCodec { logicalType = "retained catalog and reader roles"; implementationType = "constructor-held Protocol references"; normalization = "The Python resolver retains exactly the two supplied read-only collaborators and invokes only their modeled public methods."; }
         @ImplementationBinding { implementationLanguage = ImplementationLanguage::python; codeRoot = "components/rtg/citation_resolution"; symbol = "components.rtg.citation_resolution.DeterministicRtgCitationResolver"; realization = "BibliotekLocalPython"; }
+    }
+
+    part def DeterministicRtgBridgeTraverser :> RtgBridgeTraverser {
+        @ImplementationCodec { logicalType = "SysML lowerCamelCase public feature names"; implementationType = "Python snake_case dataclass and argument names"; normalization = "The realization maps names mechanically without changing values, multiplicities, ordering, or operation meaning."; }
+        @ImplementationCodec { logicalType = "Uuid"; implementationType = "uuid.UUID or canonical UUID str"; normalization = "Bridge endpoint references use Python UUID values and citation-resolution records use canonical UUID text while preserving the same modeled graph-local identity."; }
+        @ImplementationCodec { logicalType = "RtgBridgeTraversalStatus"; implementationType = "str"; normalization = "Python accepts and emits exactly the modeled lower-case enumeration literal names."; }
+        @ImplementationCodec { logicalType = "retained bridgeStore and citationResolver roles"; implementationType = "constructor-held Protocol references"; normalization = "The Python traverser retains exactly the supplied confirmed-bridge store and bounded citation resolver and invokes only their modeled read methods."; }
+        @ImplementationCodec { logicalType = "returned bridge and endpoint records"; implementationType = "deep-copied frozen dataclass records"; normalization = "Python preserves modeled values and endpoint separation while removing mutable aliases to dependency-owned metadata, records, and provenance."; }
+        @ImplementationBinding { implementationLanguage = ImplementationLanguage::python; codeRoot = "components/rtg/bridge_traversal"; symbol = "components.rtg.bridge_traversal.DeterministicRtgBridgeTraverser"; realization = "BibliotekLocalPython"; }
     }
 }

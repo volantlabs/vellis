@@ -537,6 +537,38 @@
         "components/app/shell/tests/test_app_shell_contract.py::test_missing_session_errors_preserve_launcher_meaning"
       ]
     },
+    "components/rtg/bridge_traversal/tests/test_rtg_bridge_traversal_contract.py#OpenRtgBridgeTraverserContractVerification": {
+      "model_source": "model/bibliotek/components/component.rtg.bridge_traversal.sysml",
+      "status": "resolved",
+      "test_nodes": [
+        "components/rtg/bridge_traversal/tests/test_rtg_bridge_traversal_contract.py::test_open_retains_dependencies_without_reading"
+      ]
+    },
+    "components/rtg/bridge_traversal/tests/test_rtg_bridge_traversal_contract.py#RtgBridgeTraverserBoundaryVerification": {
+      "model_source": "model/bibliotek/components/component.rtg.bridge_traversal.sysml",
+      "status": "resolved",
+      "test_nodes": [
+        "components/rtg/bridge_traversal/tests/test_rtg_bridge_traversal_contract.py::test_open_retains_dependencies_without_reading",
+        "components/rtg/bridge_traversal/tests/test_rtg_bridge_traversal_contract.py::test_traverse_resolves_one_active_bridge_without_mutation",
+        "components/rtg/bridge_traversal/tests/test_rtg_bridge_traversal_contract.py::test_traverse_reports_partial_and_unresolved_endpoint_results",
+        "components/rtg/bridge_traversal/tests/test_rtg_bridge_traversal_contract.py::test_traverse_rejects_revoked_bridge_before_resolution",
+        "components/rtg/bridge_traversal/tests/test_rtg_bridge_traversal_contract.py::test_traverse_does_not_accept_candidate_or_malformed_identifier",
+        "components/rtg/bridge_traversal/tests/test_rtg_bridge_traversal_contract.py::test_traverse_rejects_mismatched_endpoint_resolution_identity",
+        "components/rtg/bridge_traversal/tests/test_rtg_bridge_traversal_contract.py::test_traverser_surface_does_not_expose_adjacent_operations"
+      ]
+    },
+    "components/rtg/bridge_traversal/tests/test_rtg_bridge_traversal_contract.py#TraverseBridgeContractVerification": {
+      "model_source": "model/bibliotek/components/component.rtg.bridge_traversal.sysml",
+      "status": "resolved",
+      "test_nodes": [
+        "components/rtg/bridge_traversal/tests/test_rtg_bridge_traversal_contract.py::test_traverse_resolves_one_active_bridge_without_mutation",
+        "components/rtg/bridge_traversal/tests/test_rtg_bridge_traversal_contract.py::test_traverse_reports_partial_and_unresolved_endpoint_results",
+        "components/rtg/bridge_traversal/tests/test_rtg_bridge_traversal_contract.py::test_traverse_rejects_revoked_bridge_before_resolution",
+        "components/rtg/bridge_traversal/tests/test_rtg_bridge_traversal_contract.py::test_traverse_does_not_accept_candidate_or_malformed_identifier",
+        "components/rtg/bridge_traversal/tests/test_rtg_bridge_traversal_contract.py::test_traverse_rejects_mismatched_endpoint_resolution_identity",
+        "components/rtg/bridge_traversal/tests/test_rtg_bridge_traversal_contract.py::test_traverse_rejects_invalid_source_status_before_target_resolution"
+      ]
+    },
     "components/rtg/change_validation/tests/test_rtg_change_validation_contract.py#RtgChangeValidationBoundaryVerification": {
       "model_source": "model/bibliotek/components/component.rtg.change_validation.sysml",
       "status": "resolved",
