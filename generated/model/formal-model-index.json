@@ -11,6 +11,7 @@
     "BibliotekRtgDiagnostics": "model/bibliotek/shared-values/RtgDiagnostics.sysml",
     "BibliotekRtgDiscovery": "model/bibliotek/components/component.rtg.discovery.sysml",
     "BibliotekRtgGraph": "model/bibliotek/components/component.rtg.graph.sysml",
+    "BibliotekRtgGraphBridge": "model/bibliotek/components/component.rtg.graph_bridge.sysml",
     "BibliotekRtgGraphRegistry": "model/bibliotek/components/component.rtg.graph_registry.sysml",
     "BibliotekRtgMigration": "model/bibliotek/components/component.rtg.migration.sysml",
     "BibliotekRtgQuery": "model/bibliotek/components/component.rtg.query.sysml",
@@ -31,18 +32,18 @@
   "packages": {
     "Bibliotek": {
       "element_counts": {
-        "ActionDefinition": 115,
-        "AttributeDefinition": 249,
+        "ActionDefinition": 127,
+        "AttributeDefinition": 256,
         "CalculationDefinition": 6,
         "ConstraintDefinition": 1,
-        "Documentation": 10,
-        "EnumerationDefinition": 37,
-        "ItemDefinition": 17,
+        "Documentation": 11,
+        "EnumerationDefinition": 41,
+        "ItemDefinition": 19,
         "LibraryPackage": 1,
-        "PartDefinition": 16,
-        "PartUsage": 14,
-        "RequirementUsage": 365,
-        "VerificationCaseDefinition": 129
+        "PartDefinition": 17,
+        "PartUsage": 15,
+        "RequirementUsage": 393,
+        "VerificationCaseDefinition": 142
       },
       "named_elements": [
         {
@@ -116,6 +117,10 @@
         {
           "kind": "ActionDefinition",
           "name": "CreateEmptyRtgGraph"
+        },
+        {
+          "kind": "ActionDefinition",
+          "name": "CreateEmptyRtgGraphBridge"
         },
         {
           "kind": "ActionDefinition",
@@ -203,11 +208,27 @@
         },
         {
           "kind": "ActionDefinition",
+          "name": "FindBridges"
+        },
+        {
+          "kind": "ActionDefinition",
+          "name": "FindCandidates"
+        },
+        {
+          "kind": "ActionDefinition",
           "name": "FlushLedgerFailures"
         },
         {
           "kind": "ActionDefinition",
           "name": "GetApp"
+        },
+        {
+          "kind": "ActionDefinition",
+          "name": "GetBridge"
+        },
+        {
+          "kind": "ActionDefinition",
+          "name": "GetCandidate"
         },
         {
           "kind": "ActionDefinition",
@@ -280,6 +301,14 @@
         {
           "kind": "ActionDefinition",
           "name": "ListApps"
+        },
+        {
+          "kind": "ActionDefinition",
+          "name": "ListBridges"
+        },
+        {
+          "kind": "ActionDefinition",
+          "name": "ListCandidates"
         },
         {
           "kind": "ActionDefinition",
@@ -395,7 +424,19 @@
         },
         {
           "kind": "ActionDefinition",
+          "name": "PromoteCandidate"
+        },
+        {
+          "kind": "ActionDefinition",
           "name": "PutAnchor"
+        },
+        {
+          "kind": "ActionDefinition",
+          "name": "PutBridge"
+        },
+        {
+          "kind": "ActionDefinition",
+          "name": "PutCandidate"
         },
         {
           "kind": "ActionDefinition",
@@ -439,6 +480,10 @@
         },
         {
           "kind": "ActionDefinition",
+          "name": "RejectCandidate"
+        },
+        {
+          "kind": "ActionDefinition",
           "name": "RemoveApp"
         },
         {
@@ -448,6 +493,10 @@
         {
           "kind": "ActionDefinition",
           "name": "RestoreFromSnapshot"
+        },
+        {
+          "kind": "ActionDefinition",
+          "name": "RevokeBridge"
         },
         {
           "kind": "ActionDefinition",
@@ -943,6 +992,30 @@
         },
         {
           "kind": "AttributeDefinition",
+          "name": "RtgGraphBridgeCandidateDraft"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "RtgGraphBridgeCandidateList"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "RtgGraphBridgeDraft"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "RtgGraphBridgeInvalid"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "RtgGraphBridgeList"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "RtgGraphBridgeNotFound"
+        },
+        {
+          "kind": "AttributeDefinition",
           "name": "RtgGraphChangeSet"
         },
         {
@@ -996,6 +1069,10 @@
         {
           "kind": "AttributeDefinition",
           "name": "RtgGraphLiveStatusChange"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "RtgGraphLocalReference"
         },
         {
           "kind": "AttributeDefinition",
@@ -1595,6 +1672,22 @@
         },
         {
           "kind": "EnumerationDefinition",
+          "name": "RtgGraphBridgeCandidateStatus"
+        },
+        {
+          "kind": "EnumerationDefinition",
+          "name": "RtgGraphBridgeCandidateStatusFilter"
+        },
+        {
+          "kind": "EnumerationDefinition",
+          "name": "RtgGraphBridgeStatus"
+        },
+        {
+          "kind": "EnumerationDefinition",
+          "name": "RtgGraphBridgeStatusFilter"
+        },
+        {
+          "kind": "EnumerationDefinition",
           "name": "RtgGraphMcpTransport"
         },
         {
@@ -1723,6 +1816,14 @@
         },
         {
           "kind": "ItemDefinition",
+          "name": "RtgGraphBridgeAssertion"
+        },
+        {
+          "kind": "ItemDefinition",
+          "name": "RtgGraphBridgeCandidate"
+        },
+        {
+          "kind": "ItemDefinition",
           "name": "RtgGraphDescriptor"
         },
         {
@@ -1789,6 +1890,11 @@
           "kind": "PartDefinition",
           "name": "RtgGraph",
           "short_name": "component.rtg.graph"
+        },
+        {
+          "kind": "PartDefinition",
+          "name": "RtgGraphBridge",
+          "short_name": "component.rtg.graph_bridge"
         },
         {
           "kind": "PartDefinition",
@@ -1865,6 +1971,11 @@
         },
         {
           "kind": "RequirementUsage",
+          "name": "assertionReads",
+          "short_name": "contract.rtg.graph_bridge.assertion_reads"
+        },
+        {
+          "kind": "RequirementUsage",
           "name": "associateDataFailureSemantics",
           "short_name": "contract.rtg.graph.associate_data.failures"
         },
@@ -1925,6 +2036,11 @@
         },
         {
           "kind": "RequirementUsage",
+          "name": "bridgeValidity",
+          "short_name": "contract.rtg.graph_bridge.bridge_validity"
+        },
+        {
+          "kind": "RequirementUsage",
           "name": "buildMigrationCutoverPlanFailureSemantics",
           "short_name": "contract.rtg.migration.build_migration_cutover_plan.failures"
         },
@@ -1932,6 +2048,36 @@
           "kind": "RequirementUsage",
           "name": "callerSchemaNeutrality",
           "short_name": "invariant.storage.json_file.caller_schema_neutrality"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "candidateIdentity",
+          "short_name": "invariant.rtg.graph_bridge.candidate_identity"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "candidatePutEffect",
+          "short_name": "contract.rtg.graph_bridge.candidate_put_effect"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "candidateReads",
+          "short_name": "contract.rtg.graph_bridge.candidate_reads"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "candidateReviewEffect",
+          "short_name": "contract.rtg.graph_bridge.candidate_review"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "candidateValidity",
+          "short_name": "contract.rtg.graph_bridge.candidate_validity"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "candidatesAreNotBridges",
+          "short_name": "invariant.rtg.graph_bridge.candidates_are_not_bridges"
         },
         {
           "kind": "RequirementUsage",
@@ -2050,6 +2196,11 @@
         },
         {
           "kind": "RequirementUsage",
+          "name": "createEmptyRtgGraphBridgeFailureSemantics",
+          "short_name": "contract.rtg.graph_bridge.create_empty.failures"
+        },
+        {
+          "kind": "RequirementUsage",
           "name": "createEmptyRtgGraphFailureSemantics",
           "short_name": "contract.rtg.graph.create_empty_rtg_graph.failures"
         },
@@ -2072,6 +2223,11 @@
           "kind": "RequirementUsage",
           "name": "crossGraphIdentityIsExplicit",
           "short_name": "invariant.rtg.graph_registry.cross_graph_identity_is_explicit"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "crossGraphOnly",
+          "short_name": "invariant.rtg.graph_bridge.cross_graph_only"
         },
         {
           "kind": "RequirementUsage",
@@ -2192,6 +2348,11 @@
           "kind": "RequirementUsage",
           "name": "descriptorValidity",
           "short_name": "contract.rtg.graph_registry.descriptor_validity"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "deterministicIdentity",
+          "short_name": "invariant.rtg.graph_bridge.deterministic_identity"
         },
         {
           "kind": "RequirementUsage",
@@ -2350,6 +2511,16 @@
         },
         {
           "kind": "RequirementUsage",
+          "name": "findBridgesFailureSemantics",
+          "short_name": "contract.rtg.graph_bridge.find_bridges.failures"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "findCandidatesFailureSemantics",
+          "short_name": "contract.rtg.graph_bridge.find_candidates.failures"
+        },
+        {
+          "kind": "RequirementUsage",
           "name": "findingsAgentActionable",
           "short_name": "invariant.rtg.change_validation.findings_are_agent_actionable"
         },
@@ -2372,6 +2543,16 @@
           "kind": "RequirementUsage",
           "name": "getAppFailureSemantics",
           "short_name": "contract.app.catalog.get_app.failures"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "getBridgeFailureSemantics",
+          "short_name": "contract.rtg.graph_bridge.get_bridge.failures"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "getCandidateFailureSemantics",
+          "short_name": "contract.rtg.graph_bridge.get_candidate.failures"
         },
         {
           "kind": "RequirementUsage",
@@ -2427,6 +2608,11 @@
           "kind": "RequirementUsage",
           "name": "globalUuidUniqueness",
           "short_name": "invariant.rtg.graph.global_uuid_uniqueness"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "graphLocalIdentity",
+          "short_name": "invariant.rtg.graph_bridge.graph_local_identity"
         },
         {
           "kind": "RequirementUsage",
@@ -2551,6 +2737,11 @@
         {
           "kind": "RequirementUsage",
           "name": "intentionalBoundary",
+          "short_name": "contract.rtg.graph_bridge.intentional_boundary"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "intentionalBoundary",
           "short_name": "contract.rtg.controller.intentional_boundary"
         },
         {
@@ -2637,6 +2828,16 @@
           "kind": "RequirementUsage",
           "name": "listAppsFailureSemantics",
           "short_name": "contract.app.catalog.list_apps.failures"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "listBridgesFailureSemantics",
+          "short_name": "contract.rtg.graph_bridge.list_bridges.failures"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "listCandidatesFailureSemantics",
+          "short_name": "contract.rtg.graph_bridge.list_candidates.failures"
         },
         {
           "kind": "RequirementUsage",
@@ -3080,6 +3281,16 @@
         },
         {
           "kind": "RequirementUsage",
+          "name": "promoteCandidateFailureSemantics",
+          "short_name": "contract.rtg.graph_bridge.promote_candidate.failures"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "provenanceRequired",
+          "short_name": "invariant.rtg.graph_bridge.provenance_required"
+        },
+        {
+          "kind": "RequirementUsage",
           "name": "publicContractsOnly",
           "short_name": "invariant.rtg.controller.public_contracts_only"
         },
@@ -3092,6 +3303,16 @@
           "kind": "RequirementUsage",
           "name": "putAnchorFailureSemantics",
           "short_name": "contract.rtg.graph.put_anchor.failures"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "putBridgeFailureSemantics",
+          "short_name": "contract.rtg.graph_bridge.put_bridge.failures"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "putCandidateFailureSemantics",
+          "short_name": "contract.rtg.graph_bridge.put_candidate.failures"
         },
         {
           "kind": "RequirementUsage",
@@ -3117,6 +3338,11 @@
           "kind": "RequirementUsage",
           "name": "putEffect",
           "short_name": "contract.rtg.graph_registry.put_effect"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "putEffect",
+          "short_name": "contract.rtg.graph_bridge.put_effect"
         },
         {
           "kind": "RequirementUsage",
@@ -3205,6 +3431,16 @@
         },
         {
           "kind": "RequirementUsage",
+          "name": "reifiedMetadata",
+          "short_name": "invariant.rtg.graph_bridge.reified_metadata"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "rejectCandidateFailureSemantics",
+          "short_name": "contract.rtg.graph_bridge.reject_candidate.failures"
+        },
+        {
+          "kind": "RequirementUsage",
           "name": "removeAppFailureSemantics",
           "short_name": "contract.app.catalog.remove_app.failures"
         },
@@ -3267,6 +3503,16 @@
           "kind": "RequirementUsage",
           "name": "returnShaping",
           "short_name": "contract.rtg.query.return_shaping"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "revocationEffect",
+          "short_name": "contract.rtg.graph_bridge.revocation"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "revokeBridgeFailureSemantics",
+          "short_name": "contract.rtg.graph_bridge.revoke_bridge.failures"
         },
         {
           "kind": "RequirementUsage",
@@ -3730,6 +3976,10 @@
         },
         {
           "kind": "VerificationCaseDefinition",
+          "name": "CreateEmptyRtgGraphBridgeContractVerification"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
           "name": "CreateEmptyRtgGraphContractVerification"
         },
         {
@@ -3818,11 +4068,27 @@
         },
         {
           "kind": "VerificationCaseDefinition",
+          "name": "FindBridgesContractVerification"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
+          "name": "FindCandidatesContractVerification"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
           "name": "FlushLedgerFailuresContractVerification"
         },
         {
           "kind": "VerificationCaseDefinition",
           "name": "GetAppContractVerification"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
+          "name": "GetBridgeContractVerification"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
+          "name": "GetCandidateContractVerification"
         },
         {
           "kind": "VerificationCaseDefinition",
@@ -3899,6 +4165,14 @@
         {
           "kind": "VerificationCaseDefinition",
           "name": "ListAppsContractVerification"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
+          "name": "ListBridgesContractVerification"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
+          "name": "ListCandidatesContractVerification"
         },
         {
           "kind": "VerificationCaseDefinition",
@@ -4014,7 +4288,19 @@
         },
         {
           "kind": "VerificationCaseDefinition",
+          "name": "PromoteCandidateContractVerification"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
           "name": "PutAnchorContractVerification"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
+          "name": "PutBridgeContractVerification"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
+          "name": "PutCandidateContractVerification"
         },
         {
           "kind": "VerificationCaseDefinition",
@@ -4058,6 +4344,10 @@
         },
         {
           "kind": "VerificationCaseDefinition",
+          "name": "RejectCandidateContractVerification"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
           "name": "RemoveAppContractVerification"
         },
         {
@@ -4067,6 +4357,10 @@
         {
           "kind": "VerificationCaseDefinition",
           "name": "RestoreFromSnapshotContractVerification"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
+          "name": "RevokeBridgeContractVerification"
         },
         {
           "kind": "VerificationCaseDefinition",
@@ -4087,6 +4381,10 @@
         {
           "kind": "VerificationCaseDefinition",
           "name": "RtgGraphBoundaryVerification"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
+          "name": "RtgGraphBridgeBoundaryVerification"
         },
         {
           "kind": "VerificationCaseDefinition",
@@ -5194,20 +5492,20 @@
     },
     "BibliotekLocalPythonRealization": {
       "element_counts": {
-        "Dependency": 33,
-        "Documentation": 8,
-        "EnumerationUsage": 8,
-        "Feature": 6,
-        "FeatureReferenceExpression": 5,
-        "ItemUsage": 5,
-        "LiteralString": 66,
-        "MetadataUsage": 27,
+        "Dependency": 46,
+        "Documentation": 9,
+        "EnumerationUsage": 9,
+        "Feature": 7,
+        "FeatureReferenceExpression": 6,
+        "ItemUsage": 7,
+        "LiteralString": 96,
+        "MetadataUsage": 38,
         "Multiplicity": 7,
         "Package": 1,
-        "PartDefinition": 5,
+        "PartDefinition": 6,
         "PartUsage": 4,
-        "PerformActionUsage": 20,
-        "ReferenceUsage": 74
+        "PerformActionUsage": 31,
+        "ReferenceUsage": 105
       },
       "named_elements": [
         {
@@ -5225,6 +5523,10 @@
         {
           "kind": "PartDefinition",
           "name": "InMemoryRtgDiscovery"
+        },
+        {
+          "kind": "PartDefinition",
+          "name": "InMemoryRtgGraphBridge"
         },
         {
           "kind": "PartDefinition",
@@ -8360,6 +8662,503 @@
         }
       ],
       "source": "model/bibliotek/components/component.rtg.graph.sysml"
+    },
+    "BibliotekRtgGraphBridge": {
+      "element_counts": {
+        "ActionDefinition": 12,
+        "ActionUsage": 2,
+        "AttributeDefinition": 7,
+        "AttributeUsage": 51,
+        "ConstraintUsage": 28,
+        "Dependency": 13,
+        "Documentation": 53,
+        "EnumerationDefinition": 4,
+        "EnumerationUsage": 23,
+        "Feature": 57,
+        "FeatureReferenceExpression": 35,
+        "ItemDefinition": 2,
+        "ItemUsage": 4,
+        "LibraryPackage": 1,
+        "LiteralInfinity": 19,
+        "LiteralInteger": 33,
+        "LiteralString": 33,
+        "MetadataUsage": 26,
+        "Multiplicity": 44,
+        "MultiplicityRange": 27,
+        "NullExpression": 1,
+        "OperatorExpression": 5,
+        "PartDefinition": 1,
+        "PartUsage": 3,
+        "PerformActionUsage": 11,
+        "ReferenceUsage": 198,
+        "RequirementUsage": 69,
+        "SatisfyRequirementUsage": 28,
+        "VerificationCaseDefinition": 13
+      },
+      "named_elements": [
+        {
+          "kind": "ActionDefinition",
+          "name": "CreateEmptyRtgGraphBridge"
+        },
+        {
+          "kind": "ActionDefinition",
+          "name": "FindBridges"
+        },
+        {
+          "kind": "ActionDefinition",
+          "name": "FindCandidates"
+        },
+        {
+          "kind": "ActionDefinition",
+          "name": "GetBridge"
+        },
+        {
+          "kind": "ActionDefinition",
+          "name": "GetCandidate"
+        },
+        {
+          "kind": "ActionDefinition",
+          "name": "ListBridges"
+        },
+        {
+          "kind": "ActionDefinition",
+          "name": "ListCandidates"
+        },
+        {
+          "kind": "ActionDefinition",
+          "name": "PromoteCandidate"
+        },
+        {
+          "kind": "ActionDefinition",
+          "name": "PutBridge"
+        },
+        {
+          "kind": "ActionDefinition",
+          "name": "PutCandidate"
+        },
+        {
+          "kind": "ActionDefinition",
+          "name": "RejectCandidate"
+        },
+        {
+          "kind": "ActionDefinition",
+          "name": "RevokeBridge"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "RtgGraphBridgeCandidateDraft"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "RtgGraphBridgeCandidateList"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "RtgGraphBridgeDraft"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "RtgGraphBridgeInvalid"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "RtgGraphBridgeList"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "RtgGraphBridgeNotFound"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "RtgGraphLocalReference"
+        },
+        {
+          "kind": "EnumerationDefinition",
+          "name": "RtgGraphBridgeCandidateStatus"
+        },
+        {
+          "kind": "EnumerationDefinition",
+          "name": "RtgGraphBridgeCandidateStatusFilter"
+        },
+        {
+          "kind": "EnumerationDefinition",
+          "name": "RtgGraphBridgeStatus"
+        },
+        {
+          "kind": "EnumerationDefinition",
+          "name": "RtgGraphBridgeStatusFilter"
+        },
+        {
+          "kind": "ItemDefinition",
+          "name": "RtgGraphBridgeAssertion"
+        },
+        {
+          "kind": "ItemDefinition",
+          "name": "RtgGraphBridgeCandidate"
+        },
+        {
+          "kind": "PartDefinition",
+          "name": "RtgGraphBridge",
+          "short_name": "component.rtg.graph_bridge"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "assertionReads",
+          "short_name": "contract.rtg.graph_bridge.assertion_reads"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "assertionReads"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "bridgeValidity",
+          "short_name": "contract.rtg.graph_bridge.bridge_validity"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "bridgeValidity"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "candidateIdentity",
+          "short_name": "invariant.rtg.graph_bridge.candidate_identity"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "candidateIdentity"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "candidatePutEffect",
+          "short_name": "contract.rtg.graph_bridge.candidate_put_effect"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "candidatePutEffect"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "candidateReads",
+          "short_name": "contract.rtg.graph_bridge.candidate_reads"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "candidateReads"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "candidateReviewEffect",
+          "short_name": "contract.rtg.graph_bridge.candidate_review"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "candidateReviewEffect"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "candidateValidity",
+          "short_name": "contract.rtg.graph_bridge.candidate_validity"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "candidateValidity"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "candidatesAreNotBridges",
+          "short_name": "invariant.rtg.graph_bridge.candidates_are_not_bridges"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "candidatesAreNotBridges"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "createEmptyRtgGraphBridgeFailureSemantics",
+          "short_name": "contract.rtg.graph_bridge.create_empty.failures"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "createEmptyRtgGraphBridgeFailureSemantics"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "crossGraphOnly",
+          "short_name": "invariant.rtg.graph_bridge.cross_graph_only"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "crossGraphOnly"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "deterministicIdentity",
+          "short_name": "invariant.rtg.graph_bridge.deterministic_identity"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "deterministicIdentity"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "findBridgesFailureSemantics",
+          "short_name": "contract.rtg.graph_bridge.find_bridges.failures"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "findBridgesFailureSemantics"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "findCandidatesFailureSemantics",
+          "short_name": "contract.rtg.graph_bridge.find_candidates.failures"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "findCandidatesFailureSemantics"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "getBridgeFailureSemantics",
+          "short_name": "contract.rtg.graph_bridge.get_bridge.failures"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "getBridgeFailureSemantics"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "getCandidateFailureSemantics",
+          "short_name": "contract.rtg.graph_bridge.get_candidate.failures"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "getCandidateFailureSemantics"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "graphLocalIdentity",
+          "short_name": "invariant.rtg.graph_bridge.graph_local_identity"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "graphLocalIdentity"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "intentionalBoundary",
+          "short_name": "contract.rtg.graph_bridge.intentional_boundary"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "intentionalBoundary"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "listBridgesFailureSemantics",
+          "short_name": "contract.rtg.graph_bridge.list_bridges.failures"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "listBridgesFailureSemantics"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "listCandidatesFailureSemantics",
+          "short_name": "contract.rtg.graph_bridge.list_candidates.failures"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "listCandidatesFailureSemantics"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "obj"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "obj"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "obj"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "obj"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "obj"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "obj"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "obj"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "obj"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "obj"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "obj"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "obj"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "obj"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "obj"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "promoteCandidateFailureSemantics",
+          "short_name": "contract.rtg.graph_bridge.promote_candidate.failures"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "promoteCandidateFailureSemantics"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "provenanceRequired",
+          "short_name": "invariant.rtg.graph_bridge.provenance_required"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "provenanceRequired"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "putBridgeFailureSemantics",
+          "short_name": "contract.rtg.graph_bridge.put_bridge.failures"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "putBridgeFailureSemantics"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "putCandidateFailureSemantics",
+          "short_name": "contract.rtg.graph_bridge.put_candidate.failures"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "putCandidateFailureSemantics"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "putEffect",
+          "short_name": "contract.rtg.graph_bridge.put_effect"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "putEffect"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "reifiedMetadata",
+          "short_name": "invariant.rtg.graph_bridge.reified_metadata"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "reifiedMetadata"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "rejectCandidateFailureSemantics",
+          "short_name": "contract.rtg.graph_bridge.reject_candidate.failures"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "rejectCandidateFailureSemantics"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "revocationEffect",
+          "short_name": "contract.rtg.graph_bridge.revocation"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "revocationEffect"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "revokeBridgeFailureSemantics",
+          "short_name": "contract.rtg.graph_bridge.revoke_bridge.failures"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "revokeBridgeFailureSemantics"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
+          "name": "CreateEmptyRtgGraphBridgeContractVerification"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
+          "name": "FindBridgesContractVerification"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
+          "name": "FindCandidatesContractVerification"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
+          "name": "GetBridgeContractVerification"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
+          "name": "GetCandidateContractVerification"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
+          "name": "ListBridgesContractVerification"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
+          "name": "ListCandidatesContractVerification"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
+          "name": "PromoteCandidateContractVerification"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
+          "name": "PutBridgeContractVerification"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
+          "name": "PutCandidateContractVerification"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
+          "name": "RejectCandidateContractVerification"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
+          "name": "RevokeBridgeContractVerification"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
+          "name": "RtgGraphBridgeBoundaryVerification"
+        }
+      ],
+      "source": "model/bibliotek/components/component.rtg.graph_bridge.sysml"
     },
     "BibliotekRtgGraphRegistry": {
       "element_counts": {
@@ -12664,7 +13463,7 @@
     }
   },
   "schema_version": 1,
-  "source_digest": "3d8451e32bb1a6b1fe26dfddb03d384875062ee9a35290aca93c1e50e17ca931",
+  "source_digest": "00b959b47d608507da3b3ebf2b8e6a2c8845f3e17b332298b1cb431ae49bba7b",
   "validator": {
     "implementation_version": "0.50.0",
     "provider": "Systems-Modeling/SysML-v2-Pilot-Implementation",

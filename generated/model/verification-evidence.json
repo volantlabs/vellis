@@ -1367,6 +1367,126 @@
         "components/rtg/graph/tests/test_rtg_graph_contract.py::test_no_forbidden_dependency_imports"
       ]
     },
+    "components/rtg/graph_bridge/tests/test_rtg_graph_bridge_contract.py#CreateEmptyRtgGraphBridgeContractVerification": {
+      "model_source": "model/bibliotek/components/component.rtg.graph_bridge.sysml",
+      "status": "resolved",
+      "test_nodes": [
+        "components/rtg/graph_bridge/tests/test_rtg_graph_bridge_contract.py::test_empty_bridge_store_has_no_records"
+      ]
+    },
+    "components/rtg/graph_bridge/tests/test_rtg_graph_bridge_contract.py#FindBridgesContractVerification": {
+      "model_source": "model/bibliotek/components/component.rtg.graph_bridge.sysml",
+      "status": "resolved",
+      "test_nodes": [
+        "components/rtg/graph_bridge/tests/test_rtg_graph_bridge_contract.py::test_bridge_finds_connected_assertions_and_filters_revoked_by_default",
+        "components/rtg/graph_bridge/tests/test_rtg_graph_bridge_contract.py::test_bridge_rejects_invalid_filters_and_references_without_mutation"
+      ]
+    },
+    "components/rtg/graph_bridge/tests/test_rtg_graph_bridge_contract.py#FindCandidatesContractVerification": {
+      "model_source": "model/bibliotek/components/component.rtg.graph_bridge.sysml",
+      "status": "resolved",
+      "test_nodes": [
+        "components/rtg/graph_bridge/tests/test_rtg_graph_bridge_contract.py::test_bridge_candidates_are_separate_from_confirmed_bridges",
+        "components/rtg/graph_bridge/tests/test_rtg_graph_bridge_contract.py::test_bridge_rejects_invalid_filters_and_references_without_mutation"
+      ]
+    },
+    "components/rtg/graph_bridge/tests/test_rtg_graph_bridge_contract.py#GetBridgeContractVerification": {
+      "model_source": "model/bibliotek/components/component.rtg.graph_bridge.sysml",
+      "status": "resolved",
+      "test_nodes": [
+        "components/rtg/graph_bridge/tests/test_rtg_graph_bridge_contract.py::test_bridge_stores_lists_fetches_and_returns_copies",
+        "components/rtg/graph_bridge/tests/test_rtg_graph_bridge_contract.py::test_bridge_reports_missing_or_malformed_ids"
+      ]
+    },
+    "components/rtg/graph_bridge/tests/test_rtg_graph_bridge_contract.py#GetCandidateContractVerification": {
+      "model_source": "model/bibliotek/components/component.rtg.graph_bridge.sysml",
+      "status": "resolved",
+      "test_nodes": [
+        "components/rtg/graph_bridge/tests/test_rtg_graph_bridge_contract.py::test_bridge_candidates_are_separate_from_confirmed_bridges",
+        "components/rtg/graph_bridge/tests/test_rtg_graph_bridge_contract.py::test_bridge_reports_missing_or_malformed_ids"
+      ]
+    },
+    "components/rtg/graph_bridge/tests/test_rtg_graph_bridge_contract.py#ListBridgesContractVerification": {
+      "model_source": "model/bibliotek/components/component.rtg.graph_bridge.sysml",
+      "status": "resolved",
+      "test_nodes": [
+        "components/rtg/graph_bridge/tests/test_rtg_graph_bridge_contract.py::test_empty_bridge_store_has_no_records",
+        "components/rtg/graph_bridge/tests/test_rtg_graph_bridge_contract.py::test_bridge_stores_lists_fetches_and_returns_copies",
+        "components/rtg/graph_bridge/tests/test_rtg_graph_bridge_contract.py::test_bridge_identity_is_deterministic_and_direction_sensitive",
+        "components/rtg/graph_bridge/tests/test_rtg_graph_bridge_contract.py::test_bridge_rejects_invalid_filters_and_references_without_mutation"
+      ]
+    },
+    "components/rtg/graph_bridge/tests/test_rtg_graph_bridge_contract.py#ListCandidatesContractVerification": {
+      "model_source": "model/bibliotek/components/component.rtg.graph_bridge.sysml",
+      "status": "resolved",
+      "test_nodes": [
+        "components/rtg/graph_bridge/tests/test_rtg_graph_bridge_contract.py::test_empty_bridge_store_has_no_records",
+        "components/rtg/graph_bridge/tests/test_rtg_graph_bridge_contract.py::test_bridge_candidates_are_separate_from_confirmed_bridges",
+        "components/rtg/graph_bridge/tests/test_rtg_graph_bridge_contract.py::test_bridge_candidate_can_be_promoted_or_rejected",
+        "components/rtg/graph_bridge/tests/test_rtg_graph_bridge_contract.py::test_bridge_rejects_invalid_filters_and_references_without_mutation"
+      ]
+    },
+    "components/rtg/graph_bridge/tests/test_rtg_graph_bridge_contract.py#PromoteCandidateContractVerification": {
+      "model_source": "model/bibliotek/components/component.rtg.graph_bridge.sysml",
+      "status": "resolved",
+      "test_nodes": [
+        "components/rtg/graph_bridge/tests/test_rtg_graph_bridge_contract.py::test_bridge_candidate_can_be_promoted_or_rejected",
+        "components/rtg/graph_bridge/tests/test_rtg_graph_bridge_contract.py::test_bridge_mutations_are_failure_atomic",
+        "components/rtg/graph_bridge/tests/test_rtg_graph_bridge_contract.py::test_candidate_review_rejects_repeated_transitions_without_mutation"
+      ]
+    },
+    "components/rtg/graph_bridge/tests/test_rtg_graph_bridge_contract.py#PutBridgeContractVerification": {
+      "model_source": "model/bibliotek/components/component.rtg.graph_bridge.sysml",
+      "status": "resolved",
+      "test_nodes": [
+        "components/rtg/graph_bridge/tests/test_rtg_graph_bridge_contract.py::test_bridge_stores_lists_fetches_and_returns_copies",
+        "components/rtg/graph_bridge/tests/test_rtg_graph_bridge_contract.py::test_bridge_identity_is_deterministic_and_direction_sensitive",
+        "components/rtg/graph_bridge/tests/test_rtg_graph_bridge_contract.py::test_bridge_validates_graph_qualified_cross_graph_references",
+        "components/rtg/graph_bridge/tests/test_rtg_graph_bridge_contract.py::test_bridge_rejects_non_finite_numbers_without_replacing_records"
+      ]
+    },
+    "components/rtg/graph_bridge/tests/test_rtg_graph_bridge_contract.py#PutCandidateContractVerification": {
+      "model_source": "model/bibliotek/components/component.rtg.graph_bridge.sysml",
+      "status": "resolved",
+      "test_nodes": [
+        "components/rtg/graph_bridge/tests/test_rtg_graph_bridge_contract.py::test_bridge_candidates_are_separate_from_confirmed_bridges",
+        "components/rtg/graph_bridge/tests/test_rtg_graph_bridge_contract.py::test_bridge_candidate_identity_is_deterministic_and_evidence_sensitive",
+        "components/rtg/graph_bridge/tests/test_rtg_graph_bridge_contract.py::test_bridge_validates_candidate_shape",
+        "components/rtg/graph_bridge/tests/test_rtg_graph_bridge_contract.py::test_bridge_rejects_non_finite_numbers_without_replacing_records"
+      ]
+    },
+    "components/rtg/graph_bridge/tests/test_rtg_graph_bridge_contract.py#RejectCandidateContractVerification": {
+      "model_source": "model/bibliotek/components/component.rtg.graph_bridge.sysml",
+      "status": "resolved",
+      "test_nodes": [
+        "components/rtg/graph_bridge/tests/test_rtg_graph_bridge_contract.py::test_bridge_candidate_can_be_promoted_or_rejected",
+        "components/rtg/graph_bridge/tests/test_rtg_graph_bridge_contract.py::test_candidate_review_rejects_repeated_transitions_without_mutation"
+      ]
+    },
+    "components/rtg/graph_bridge/tests/test_rtg_graph_bridge_contract.py#RevokeBridgeContractVerification": {
+      "model_source": "model/bibliotek/components/component.rtg.graph_bridge.sysml",
+      "status": "resolved",
+      "test_nodes": [
+        "components/rtg/graph_bridge/tests/test_rtg_graph_bridge_contract.py::test_bridge_finds_connected_assertions_and_filters_revoked_by_default",
+        "components/rtg/graph_bridge/tests/test_rtg_graph_bridge_contract.py::test_bridge_mutations_are_failure_atomic"
+      ]
+    },
+    "components/rtg/graph_bridge/tests/test_rtg_graph_bridge_contract.py#RtgGraphBridgeBoundaryVerification": {
+      "model_source": "model/bibliotek/components/component.rtg.graph_bridge.sysml",
+      "status": "resolved",
+      "test_nodes": [
+        "components/rtg/graph_bridge/tests/test_rtg_graph_bridge_contract.py::test_empty_bridge_store_has_no_records",
+        "components/rtg/graph_bridge/tests/test_rtg_graph_bridge_contract.py::test_bridge_stores_lists_fetches_and_returns_copies",
+        "components/rtg/graph_bridge/tests/test_rtg_graph_bridge_contract.py::test_bridge_identity_is_deterministic_and_direction_sensitive",
+        "components/rtg/graph_bridge/tests/test_rtg_graph_bridge_contract.py::test_bridge_finds_connected_assertions_and_filters_revoked_by_default",
+        "components/rtg/graph_bridge/tests/test_rtg_graph_bridge_contract.py::test_bridge_candidates_are_separate_from_confirmed_bridges",
+        "components/rtg/graph_bridge/tests/test_rtg_graph_bridge_contract.py::test_bridge_candidate_identity_is_deterministic_and_evidence_sensitive",
+        "components/rtg/graph_bridge/tests/test_rtg_graph_bridge_contract.py::test_bridge_candidate_can_be_promoted_or_rejected",
+        "components/rtg/graph_bridge/tests/test_rtg_graph_bridge_contract.py::test_bridge_validates_graph_qualified_cross_graph_references",
+        "components/rtg/graph_bridge/tests/test_rtg_graph_bridge_contract.py::test_bridge_validates_candidate_shape",
+        "components/rtg/graph_bridge/tests/test_rtg_graph_bridge_contract.py::test_bridge_surface_does_not_expose_adjacent_component_operations"
+      ]
+    },
     "components/rtg/graph_registry/tests/test_rtg_graph_registry_contract.py#CompileFederatedIntentContractVerification": {
       "model_source": "model/bibliotek/components/component.rtg.graph_registry.sysml",
       "status": "resolved",

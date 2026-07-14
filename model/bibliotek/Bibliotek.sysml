@@ -15,6 +15,7 @@ library package Bibliotek {
     public import BibliotekRtgChangeValidation::*;
     public import BibliotekRtgDiscovery::*;
     public import BibliotekRtgGraphRegistry::*;
+    public import BibliotekRtgGraphBridge::*;
     public import BibliotekRtgController::*;
 
     doc /*

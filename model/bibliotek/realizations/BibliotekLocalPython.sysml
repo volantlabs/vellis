@@ -5,6 +5,7 @@ package BibliotekLocalPythonRealization {
     private import BibliotekAppShell::*;
     private import BibliotekRtgDiscovery::*;
     private import BibliotekRtgGraphRegistry::*;
+    private import BibliotekRtgGraphBridge::*;
 
     part def InMemoryAppCatalog :> AppCatalog {
         @ImplementationCodec { logicalType = "LaunchSurfaceMode and RuntimeControl"; implementationType = "str"; normalization = "The Python realization accepts and emits exactly the modeled enumeration literal names."; }
@@ -41,5 +42,18 @@ package BibliotekLocalPythonRealization {
         @ImplementationCodec { logicalType = "JsonObject"; implementationType = "dict[str, JsonValue]"; normalization = "Python preserves finite JSON-compatible values losslessly and deep-copies caller-owned mutable containers at the component boundary."; }
         @ImplementationCodec { logicalType = "Real"; implementationType = "float"; normalization = "Python finite floating-point scores encode the modeled real routing score in the closed interval from zero through one."; }
         @ImplementationBinding { implementationLanguage = ImplementationLanguage::python; codeRoot = "components/rtg/graph_registry"; symbol = "components.rtg.graph_registry.InMemoryRtgGraphRegistry"; realization = "BibliotekLocalPython"; }
+    }
+
+    part def InMemoryRtgGraphBridge :> RtgGraphBridge {
+        @ImplementationCodec { logicalType = "SysML lowerCamelCase public feature names"; implementationType = "Python snake_case dataclass and argument names"; normalization = "The realization maps names mechanically without changing values, multiplicities, ordering, or operation meaning."; }
+        @ImplementationCodec { logicalType = "Uuid"; implementationType = "uuid.UUID"; normalization = "Python UUID values encode as canonical lowercase textual UUID values and decode without changing identity."; }
+        @ImplementationCodec { logicalType = "RtgGraphBridgeStatus and RtgGraphBridgeCandidateStatus"; implementationType = "str"; normalization = "Python accepts and emits exactly the modeled lower-case enumeration literal names."; }
+        @ImplementationCodec { logicalType = "RtgGraphBridgeStatusFilter and RtgGraphBridgeCandidateStatusFilter"; implementationType = "str | None"; normalization = "Python None encodes the modeled all filter; other values use exactly the modeled lower-case status literals."; }
+        @ImplementationCodec { logicalType = "ordered multiplicities"; implementationType = "tuple"; normalization = "Python tuples preserve modeled order and immutable result ordering."; }
+        @ImplementationCodec { logicalType = "optional values"; implementationType = "T | None"; normalization = "None represents modeled absence and a present Python value represents the single optional modeled occurrence."; }
+        @ImplementationCodec { logicalType = "RtgGraphBridgeDraft::metadata and RtgGraphBridgeCandidateDraft::metadata"; implementationType = "field(default_factory=dict)"; normalization = "An omitted Python constructor argument creates the required present empty logical JsonObject and encodes equivalently."; }
+        @ImplementationCodec { logicalType = "JsonObject"; implementationType = "dict[str, JsonValue]"; normalization = "Python preserves finite JSON-compatible values losslessly and deep-copies caller-owned mutable containers at the component boundary."; }
+        @ImplementationCodec { logicalType = "Real"; implementationType = "float"; normalization = "Python finite floating-point confidence values encode the modeled real value in the closed interval from zero through one."; }
+        @ImplementationBinding { implementationLanguage = ImplementationLanguage::python; codeRoot = "components/rtg/graph_bridge"; symbol = "components.rtg.graph_bridge.InMemoryRtgGraphBridge"; realization = "BibliotekLocalPython"; }
     }
 }

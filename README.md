@@ -118,6 +118,7 @@ Current generated component views include:
 - [`component.rtg.query`](generated/reference/bibliotek/components/component.rtg.query.md): declarative graph query evaluator.
 - [`component.rtg.discovery`](generated/reference/bibliotek/components/component.rtg.discovery.md): draft curated discovery-view component.
 - [`component.rtg.graph_registry`](generated/reference/bibliotek/components/component.rtg.graph_registry.md): draft graph-directory and deterministic advisory-routing component.
+- [`component.rtg.graph_bridge`](generated/reference/bibliotek/components/component.rtg.graph_bridge.md): draft store for explicit graph-qualified bridge assertions and separately reviewable candidates.
 - [`component.rtg.controller`](generated/reference/bibliotek/components/component.rtg.controller.md): cross-component orchestration and invariant owner.
 
 Current Python implementations include:
@@ -131,6 +132,7 @@ Current Python implementations include:
 - [`components/rtg/query`](components/rtg/query/): stateless RTG query engine implementation and boundary tests.
 - [`components/rtg/discovery`](components/rtg/discovery/): in-memory curated discovery-view registry implementation and boundary tests.
 - [`components/rtg/graph_registry`](components/rtg/graph_registry/): in-memory graph descriptor registry and deterministic routing implementation with boundary tests.
+- [`components/rtg/graph_bridge`](components/rtg/graph_bridge/): in-memory bridge assertion and candidate-review implementation with boundary tests.
 - [`components/rtg/change_validation`](components/rtg/change_validation/): deterministic no-mutation RTG change validator implementation and boundary tests.
 - [`components/rtg/controller`](components/rtg/controller/): in-process RTG controller implementation with validation, snapshots, cutover, and SQL-backed ledger behavior.
 
