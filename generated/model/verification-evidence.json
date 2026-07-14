@@ -1176,6 +1176,44 @@
         "components/rtg/discovery/tests/test_rtg_discovery_contract.py::test_select_rejects_missing_view_and_invalid_coordinates"
       ]
     },
+    "components/rtg/evidence_bounded_synthesis/tests/test_rtg_evidence_bounded_synthesis_contract.py#OpenRtgEvidenceBoundedSynthesizerContractVerification": {
+      "model_source": "model/bibliotek/components/component.rtg.evidence_bounded_synthesis.sysml",
+      "status": "resolved",
+      "test_nodes": [
+        "components/rtg/evidence_bounded_synthesis/tests/test_rtg_evidence_bounded_synthesis_contract.py::test_open_requires_a_semantic_draft_generator"
+      ]
+    },
+    "components/rtg/evidence_bounded_synthesis/tests/test_rtg_evidence_bounded_synthesis_contract.py#RtgEvidenceBoundedSynthesizerBoundaryVerification": {
+      "model_source": "model/bibliotek/components/component.rtg.evidence_bounded_synthesis.sysml",
+      "status": "resolved",
+      "test_nodes": [
+        "components/rtg/evidence_bounded_synthesis/tests/test_rtg_evidence_bounded_synthesis_contract.py::test_accepts_cross_graph_claim_with_source_bound_citations",
+        "components/rtg/evidence_bounded_synthesis/tests/test_rtg_evidence_bounded_synthesis_contract.py::test_rejects_claims_that_escape_evidence_bounds",
+        "components/rtg/evidence_bounded_synthesis/tests/test_rtg_evidence_bounded_synthesis_contract.py::test_does_not_invoke_generator_without_graph_qualified_evidence",
+        "components/rtg/evidence_bounded_synthesis/tests/test_rtg_evidence_bounded_synthesis_contract.py::test_generator_receives_a_copy_and_component_exposes_no_write_operations",
+        "components/rtg/evidence_bounded_synthesis/tests/test_rtg_evidence_bounded_synthesis_contract.py::test_reference_component_produces_only_source_bound_summary_claims"
+      ]
+    },
+    "components/rtg/evidence_bounded_synthesis/tests/test_rtg_evidence_bounded_synthesis_contract.py#SemanticDraftGeneratorContractVerification": {
+      "model_source": "model/bibliotek/components/component.rtg.evidence_bounded_synthesis.sysml",
+      "status": "resolved",
+      "test_nodes": [
+        "components/rtg/evidence_bounded_synthesis/tests/test_rtg_evidence_bounded_synthesis_contract.py::test_reference_component_produces_only_source_bound_summary_claims",
+        "components/rtg/evidence_bounded_synthesis/tests/test_rtg_evidence_bounded_synthesis_contract.py::test_generator_receives_a_copy_and_component_exposes_no_write_operations"
+      ]
+    },
+    "components/rtg/evidence_bounded_synthesis/tests/test_rtg_evidence_bounded_synthesis_contract.py#SynthesizeEvidenceBoundedClaimsContractVerification": {
+      "model_source": "model/bibliotek/components/component.rtg.evidence_bounded_synthesis.sysml",
+      "status": "resolved",
+      "test_nodes": [
+        "components/rtg/evidence_bounded_synthesis/tests/test_rtg_evidence_bounded_synthesis_contract.py::test_accepts_cross_graph_claim_with_source_bound_citations",
+        "components/rtg/evidence_bounded_synthesis/tests/test_rtg_evidence_bounded_synthesis_contract.py::test_rejects_claims_that_escape_evidence_bounds",
+        "components/rtg/evidence_bounded_synthesis/tests/test_rtg_evidence_bounded_synthesis_contract.py::test_propagates_source_and_generator_limitations",
+        "components/rtg/evidence_bounded_synthesis/tests/test_rtg_evidence_bounded_synthesis_contract.py::test_does_not_invoke_generator_without_graph_qualified_evidence",
+        "components/rtg/evidence_bounded_synthesis/tests/test_rtg_evidence_bounded_synthesis_contract.py::test_requires_the_source_and_semantic_intents_to_match",
+        "components/rtg/evidence_bounded_synthesis/tests/test_rtg_evidence_bounded_synthesis_contract.py::test_open_requires_a_semantic_draft_generator"
+      ]
+    },
     "components/rtg/federated_synthesis/tests/test_rtg_federated_synthesis_contract.py#RtgFederatedSynthesizerBoundaryVerification": {
       "model_source": "model/bibliotek/components/component.rtg.federated_synthesis.sysml",
       "status": "resolved",

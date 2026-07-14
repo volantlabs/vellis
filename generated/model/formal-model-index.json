@@ -12,6 +12,7 @@
     "BibliotekRtgController": "model/bibliotek/components/component.rtg.controller.sysml",
     "BibliotekRtgDiagnostics": "model/bibliotek/shared-values/RtgDiagnostics.sysml",
     "BibliotekRtgDiscovery": "model/bibliotek/components/component.rtg.discovery.sysml",
+    "BibliotekRtgEvidenceBoundedSynthesis": "model/bibliotek/components/component.rtg.evidence_bounded_synthesis.sysml",
     "BibliotekRtgFederatedSynthesis": "model/bibliotek/components/component.rtg.federated_synthesis.sysml",
     "BibliotekRtgGraph": "model/bibliotek/components/component.rtg.graph.sysml",
     "BibliotekRtgGraphBridge": "model/bibliotek/components/component.rtg.graph_bridge.sysml",
@@ -38,18 +39,18 @@
   "packages": {
     "Bibliotek": {
       "element_counts": {
-        "ActionDefinition": 137,
-        "AttributeDefinition": 277,
+        "ActionDefinition": 140,
+        "AttributeDefinition": 284,
         "CalculationDefinition": 6,
         "ConstraintDefinition": 1,
-        "Documentation": 15,
-        "EnumerationDefinition": 47,
+        "Documentation": 16,
+        "EnumerationDefinition": 50,
         "ItemDefinition": 19,
         "LibraryPackage": 1,
-        "PartDefinition": 24,
-        "PartUsage": 19,
-        "RequirementUsage": 436,
-        "VerificationCaseDefinition": 155
+        "PartDefinition": 26,
+        "PartUsage": 20,
+        "RequirementUsage": 448,
+        "VerificationCaseDefinition": 159
       },
       "named_elements": [
         {
@@ -231,6 +232,10 @@
         {
           "kind": "ActionDefinition",
           "name": "FlushLedgerFailures"
+        },
+        {
+          "kind": "ActionDefinition",
+          "name": "GenerateSemanticDraft"
         },
         {
           "kind": "ActionDefinition",
@@ -426,6 +431,10 @@
         },
         {
           "kind": "ActionDefinition",
+          "name": "OpenRtgEvidenceBoundedSynthesizer"
+        },
+        {
+          "kind": "ActionDefinition",
           "name": "OpenSqlStorage"
         },
         {
@@ -567,6 +576,10 @@
         {
           "kind": "ActionDefinition",
           "name": "SwitchApp"
+        },
+        {
+          "kind": "ActionDefinition",
+          "name": "SynthesizeEvidenceBoundedClaims"
         },
         {
           "kind": "ActionDefinition",
@@ -1062,6 +1075,26 @@
         },
         {
           "kind": "AttributeDefinition",
+          "name": "RtgEvidenceBoundedClaim"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "RtgEvidenceBoundedSynthesisInvalid"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "RtgEvidenceBoundedSynthesisRecord"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "RtgEvidenceBoundedSynthesisRequest"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "RtgEvidenceCitationRef"
+        },
+        {
+          "kind": "AttributeDefinition",
           "name": "RtgFederatedBridgeContext"
         },
         {
@@ -1546,6 +1579,14 @@
         },
         {
           "kind": "AttributeDefinition",
+          "name": "RtgSemanticClaimDraft"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "RtgSemanticSynthesisDraft"
+        },
+        {
+          "kind": "AttributeDefinition",
           "name": "RtgSystem"
         },
         {
@@ -1810,6 +1851,14 @@
         },
         {
           "kind": "EnumerationDefinition",
+          "name": "RtgEntailmentStatus"
+        },
+        {
+          "kind": "EnumerationDefinition",
+          "name": "RtgEvidenceBoundedSynthesisStatus"
+        },
+        {
+          "kind": "EnumerationDefinition",
           "name": "RtgFederatedGraphReadStatus"
         },
         {
@@ -1903,6 +1952,10 @@
         {
           "kind": "EnumerationDefinition",
           "name": "RtgSchemaValueKind"
+        },
+        {
+          "kind": "EnumerationDefinition",
+          "name": "RtgSemanticClaimKind"
         },
         {
           "kind": "EnumerationDefinition",
@@ -2064,6 +2117,11 @@
         },
         {
           "kind": "PartDefinition",
+          "name": "RtgEvidenceBoundedSynthesizer",
+          "short_name": "component.rtg.evidence_bounded_synthesis"
+        },
+        {
+          "kind": "PartDefinition",
           "name": "RtgFederatedSynthesizer",
           "short_name": "component.rtg.federated_synthesis"
         },
@@ -2105,6 +2163,10 @@
           "kind": "PartDefinition",
           "name": "RtgSchema",
           "short_name": "component.rtg.schema"
+        },
+        {
+          "kind": "PartDefinition",
+          "name": "RtgSemanticDraftGenerator"
         },
         {
           "kind": "PartDefinition",
@@ -2452,6 +2514,11 @@
         },
         {
           "kind": "RequirementUsage",
+          "name": "crossGraphComparison",
+          "short_name": "invariant.rtg.evidence_bounded_synthesis.cross_graph_comparison"
+        },
+        {
+          "kind": "RequirementUsage",
           "name": "crossGraphIdentityIsExplicit",
           "short_name": "invariant.rtg.graph_registry.cross_graph_identity_is_explicit"
         },
@@ -2737,6 +2804,11 @@
         },
         {
           "kind": "RequirementUsage",
+          "name": "failClosedDraft",
+          "short_name": "contract.rtg.evidence_bounded_synthesis.fail_closed_draft"
+        },
+        {
+          "kind": "RequirementUsage",
           "name": "failedCutoverLegible",
           "short_name": "invariant.rtg.controller.failed_cutover_is_legible"
         },
@@ -2784,6 +2856,11 @@
           "kind": "RequirementUsage",
           "name": "gateDecision",
           "short_name": "contract.rtg.route_pack.gate_decision"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "generatorCapability",
+          "short_name": "contract.rtg.evidence_bounded_synthesis.generator_capability"
         },
         {
           "kind": "RequirementUsage",
@@ -2942,6 +3019,11 @@
         },
         {
           "kind": "RequirementUsage",
+          "name": "inferenceDisclosure",
+          "short_name": "invariant.rtg.evidence_bounded_synthesis.inference_disclosure"
+        },
+        {
+          "kind": "RequirementUsage",
           "name": "intentionalBoundary",
           "short_name": "contract.app.catalog.intentional_boundary"
         },
@@ -3029,6 +3111,11 @@
           "kind": "RequirementUsage",
           "name": "intentionalBoundary",
           "short_name": "contract.rtg.federated_synthesis.intentional_boundary"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "intentionalBoundary",
+          "short_name": "contract.rtg.evidence_bounded_synthesis.intentional_boundary"
         },
         {
           "kind": "RequirementUsage",
@@ -3334,6 +3421,16 @@
           "kind": "RequirementUsage",
           "name": "noDanglingReferencesAfterDelete",
           "short_name": "invariant.rtg.graph.no_dangling_references_after_delete"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "noEntailmentClaim",
+          "short_name": "invariant.rtg.evidence_bounded_synthesis.no_entailment_claim"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "noEvidenceShortCircuit",
+          "short_name": "contract.rtg.evidence_bounded_synthesis.no_evidence_short_circuit"
         },
         {
           "kind": "RequirementUsage",
@@ -3752,6 +3849,11 @@
         },
         {
           "kind": "RequirementUsage",
+          "name": "readOnly",
+          "short_name": "invariant.rtg.evidence_bounded_synthesis.read_only"
+        },
+        {
+          "kind": "RequirementUsage",
           "name": "readerCapability",
           "short_name": "contract.rtg.citation_resolution.reader_capability"
         },
@@ -3997,6 +4099,16 @@
         },
         {
           "kind": "RequirementUsage",
+          "name": "sourceBoundClaims",
+          "short_name": "invariant.rtg.evidence_bounded_synthesis.source_bound_claims"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "sourceEnvelope",
+          "short_name": "contract.rtg.evidence_bounded_synthesis.source_envelope"
+        },
+        {
+          "kind": "RequirementUsage",
           "name": "sourceOfTruthExternal",
           "short_name": "invariant.rtg.change_validation.source_of_truth_external"
         },
@@ -4074,6 +4186,16 @@
           "kind": "RequirementUsage",
           "name": "synthesisStatus",
           "short_name": "contract.rtg.federated_synthesis.status"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "synthesisStatus",
+          "short_name": "contract.rtg.evidence_bounded_synthesis.status"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "synthesizeFailureSemantics",
+          "short_name": "contract.rtg.evidence_bounded_synthesis.synthesize.failures"
         },
         {
           "kind": "RequirementUsage",
@@ -4685,6 +4807,10 @@
         },
         {
           "kind": "VerificationCaseDefinition",
+          "name": "OpenRtgEvidenceBoundedSynthesizerContractVerification"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
           "name": "OpenSqlStorageContractVerification"
         },
         {
@@ -4817,6 +4943,10 @@
         },
         {
           "kind": "VerificationCaseDefinition",
+          "name": "RtgEvidenceBoundedSynthesizerBoundaryVerification"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
           "name": "RtgFederatedSynthesizerBoundaryVerification"
         },
         {
@@ -4853,6 +4983,10 @@
         },
         {
           "kind": "VerificationCaseDefinition",
+          "name": "SemanticDraftGeneratorContractVerification"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
           "name": "SetMigrationStatusContractVerification"
         },
         {
@@ -4882,6 +5016,10 @@
         {
           "kind": "VerificationCaseDefinition",
           "name": "SwitchAppContractVerification"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
+          "name": "SynthesizeEvidenceBoundedClaimsContractVerification"
         },
         {
           "kind": "VerificationCaseDefinition",
@@ -5945,20 +6083,20 @@
     },
     "BibliotekLocalPythonRealization": {
       "element_counts": {
-        "Dependency": 48,
-        "Documentation": 13,
-        "EnumerationUsage": 13,
-        "Feature": 11,
-        "FeatureReferenceExpression": 10,
+        "Dependency": 49,
+        "Documentation": 14,
+        "EnumerationUsage": 14,
+        "Feature": 12,
+        "FeatureReferenceExpression": 11,
         "ItemUsage": 7,
-        "LiteralString": 189,
-        "MetadataUsage": 73,
+        "LiteralString": 213,
+        "MetadataUsage": 82,
         "Multiplicity": 7,
         "Package": 1,
-        "PartDefinition": 10,
-        "PartUsage": 8,
-        "PerformActionUsage": 36,
-        "ReferenceUsage": 202
+        "PartDefinition": 11,
+        "PartUsage": 9,
+        "PerformActionUsage": 37,
+        "ReferenceUsage": 227
       },
       "named_elements": [
         {
@@ -5976,6 +6114,10 @@
         {
           "kind": "PartDefinition",
           "name": "DeterministicRtgRoutePack"
+        },
+        {
+          "kind": "PartDefinition",
+          "name": "EvidenceBoundedRtgSynthesizer"
         },
         {
           "kind": "PartDefinition",
@@ -8717,6 +8859,244 @@
         }
       ],
       "source": "model/bibliotek/components/component.rtg.discovery.sysml"
+    },
+    "BibliotekRtgEvidenceBoundedSynthesis": {
+      "element_counts": {
+        "ActionDefinition": 3,
+        "AttributeDefinition": 7,
+        "AttributeUsage": 35,
+        "BindingConnectorAsUsage": 1,
+        "ConstraintUsage": 12,
+        "Dependency": 1,
+        "Documentation": 33,
+        "EnumerationDefinition": 3,
+        "EnumerationUsage": 16,
+        "Feature": 21,
+        "FeatureReferenceExpression": 14,
+        "LibraryPackage": 1,
+        "LiteralInfinity": 9,
+        "LiteralInteger": 14,
+        "LiteralString": 11,
+        "MetadataUsage": 8,
+        "Multiplicity": 22,
+        "MultiplicityRange": 13,
+        "NullExpression": 1,
+        "PartDefinition": 2,
+        "PartUsage": 5,
+        "PerformActionUsage": 2,
+        "ReferenceUsage": 75,
+        "RequirementUsage": 29,
+        "SatisfyRequirementUsage": 12,
+        "VerificationCaseDefinition": 4
+      },
+      "named_elements": [
+        {
+          "kind": "ActionDefinition",
+          "name": "GenerateSemanticDraft"
+        },
+        {
+          "kind": "ActionDefinition",
+          "name": "OpenRtgEvidenceBoundedSynthesizer"
+        },
+        {
+          "kind": "ActionDefinition",
+          "name": "SynthesizeEvidenceBoundedClaims"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "RtgEvidenceBoundedClaim"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "RtgEvidenceBoundedSynthesisInvalid"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "RtgEvidenceBoundedSynthesisRecord"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "RtgEvidenceBoundedSynthesisRequest"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "RtgEvidenceCitationRef"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "RtgSemanticClaimDraft"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "RtgSemanticSynthesisDraft"
+        },
+        {
+          "kind": "EnumerationDefinition",
+          "name": "RtgEntailmentStatus"
+        },
+        {
+          "kind": "EnumerationDefinition",
+          "name": "RtgEvidenceBoundedSynthesisStatus"
+        },
+        {
+          "kind": "EnumerationDefinition",
+          "name": "RtgSemanticClaimKind"
+        },
+        {
+          "kind": "PartDefinition",
+          "name": "RtgEvidenceBoundedSynthesizer",
+          "short_name": "component.rtg.evidence_bounded_synthesis"
+        },
+        {
+          "kind": "PartDefinition",
+          "name": "RtgSemanticDraftGenerator"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "crossGraphComparison",
+          "short_name": "invariant.rtg.evidence_bounded_synthesis.cross_graph_comparison"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "crossGraphComparison"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "failClosedDraft",
+          "short_name": "contract.rtg.evidence_bounded_synthesis.fail_closed_draft"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "failClosedDraft"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "generatorCapability",
+          "short_name": "contract.rtg.evidence_bounded_synthesis.generator_capability"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "generatorCapability"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "inferenceDisclosure",
+          "short_name": "invariant.rtg.evidence_bounded_synthesis.inference_disclosure"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "inferenceDisclosure"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "intentionalBoundary",
+          "short_name": "contract.rtg.evidence_bounded_synthesis.intentional_boundary"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "intentionalBoundary"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "intentionalBoundary"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "noEntailmentClaim",
+          "short_name": "invariant.rtg.evidence_bounded_synthesis.no_entailment_claim"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "noEntailmentClaim"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "noEvidenceShortCircuit",
+          "short_name": "contract.rtg.evidence_bounded_synthesis.no_evidence_short_circuit"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "noEvidenceShortCircuit"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "obj"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "obj"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "obj"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "obj"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "readOnly",
+          "short_name": "invariant.rtg.evidence_bounded_synthesis.read_only"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "readOnly"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "sourceBoundClaims",
+          "short_name": "invariant.rtg.evidence_bounded_synthesis.source_bound_claims"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "sourceBoundClaims"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "sourceEnvelope",
+          "short_name": "contract.rtg.evidence_bounded_synthesis.source_envelope"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "sourceEnvelope"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "synthesisStatus",
+          "short_name": "contract.rtg.evidence_bounded_synthesis.status"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "synthesisStatus"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "synthesizeFailureSemantics",
+          "short_name": "contract.rtg.evidence_bounded_synthesis.synthesize.failures"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "synthesizeFailureSemantics"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
+          "name": "OpenRtgEvidenceBoundedSynthesizerContractVerification"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
+          "name": "RtgEvidenceBoundedSynthesizerBoundaryVerification"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
+          "name": "SemanticDraftGeneratorContractVerification"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
+          "name": "SynthesizeEvidenceBoundedClaimsContractVerification"
+        }
+      ],
+      "source": "model/bibliotek/components/component.rtg.evidence_bounded_synthesis.sysml"
     },
     "BibliotekRtgFederatedSynthesis": {
       "element_counts": {
@@ -14841,7 +15221,7 @@
     }
   },
   "schema_version": 1,
-  "source_digest": "845342a8fab770420023bacb60b8d9e0c4a44002dce7455453124dd962f03ef3",
+  "source_digest": "351f79332d9be806cb9fa29b7a012a1cce171af65b267068cdbd0b7eef3935f4",
   "validator": {
     "implementation_version": "0.50.0",
     "provider": "Systems-Modeling/SysML-v2-Pilot-Implementation",

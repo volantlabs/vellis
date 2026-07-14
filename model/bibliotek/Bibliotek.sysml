@@ -20,6 +20,7 @@ library package Bibliotek {
     public import BibliotekRtgBridgeTraversal::*;
     public import BibliotekRtgRoutePack::*;
     public import BibliotekRtgFederatedSynthesis::*;
+    public import BibliotekRtgEvidenceBoundedSynthesis::*;
     public import BibliotekRtgController::*;
 
     doc /*

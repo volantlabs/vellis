@@ -126,6 +126,7 @@ Current generated component views include:
 - [`component.rtg.bridge_traversal`](generated/reference/bibliotek/components/component.rtg.bridge_traversal.md): draft read-only traversal of one active confirmed bridge through independent endpoint resolutions.
 - [`component.rtg.route_pack`](generated/reference/bibliotek/components/component.rtg.route_pack.md): draft assembly and hazard gate for advisory routed-work execution context.
 - [`component.rtg.federated_synthesis`](generated/reference/bibliotek/components/component.rtg.federated_synthesis.md): draft deterministic evidence envelope for graph-local reads, bridge context, limitations, and graph-qualified citations.
+- [`component.rtg.evidence_bounded_synthesis`](generated/reference/bibliotek/components/component.rtg.evidence_bounded_synthesis.md): draft provider-neutral semantic synthesis whose untrusted claims remain bounded to deterministic graph-qualified evidence.
 - [`component.rtg.controller`](generated/reference/bibliotek/components/component.rtg.controller.md): cross-component orchestration and invariant owner.
 
 Current Python implementations include:
@@ -147,6 +148,7 @@ Current Python implementations include:
 - [`components/rtg/bridge_traversal`](components/rtg/bridge_traversal/): deterministic single-bridge traversal with separate bounded endpoint resolutions and boundary tests.
 - [`components/rtg/route_pack`](components/rtg/route_pack/): deterministic advisory route-pack assembly and execution gating with boundary tests.
 - [`components/rtg/federated_synthesis`](components/rtg/federated_synthesis/): deterministic read-only aggregation of graph-local evidence, bridge context, and graph-qualified citations.
+- [`components/rtg/evidence_bounded_synthesis`](components/rtg/evidence_bounded_synthesis/): fail-closed validation of untrusted semantic claims against deterministic graph-qualified evidence.
 - [`components/rtg/change_validation`](components/rtg/change_validation/): deterministic no-mutation RTG change validator implementation and boundary tests.
 - [`components/rtg/controller`](components/rtg/controller/): in-process RTG controller implementation with validation, snapshots, cutover, and SQL-backed ledger behavior.
 

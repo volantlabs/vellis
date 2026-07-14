@@ -10,6 +10,7 @@ package BibliotekLocalPythonRealization {
     private import BibliotekRtgBridgeTraversal::*;
     private import BibliotekRtgRoutePack::*;
     private import BibliotekRtgFederatedSynthesis::*;
+    private import BibliotekRtgEvidenceBoundedSynthesis::*;
 
     part def InMemoryAppCatalog :> AppCatalog {
         @ImplementationCodec { logicalType = "LaunchSurfaceMode and RuntimeControl"; implementationType = "str"; normalization = "The Python realization accepts and emits exactly the modeled enumeration literal names."; }
@@ -102,5 +103,16 @@ package BibliotekLocalPythonRealization {
         @ImplementationCodec { logicalType = "RtgFederatedGraphRead::summary"; implementationType = "field(default_factory=dict)"; normalization = "An omitted Python constructor argument creates the required present empty logical JsonObject and encodes equivalently."; }
         @ImplementationCodec { logicalType = "Real"; implementationType = "float"; normalization = "Python finite floating-point bridge confidence encodes the modeled real value in the closed interval from zero through one."; }
         @ImplementationBinding { implementationLanguage = ImplementationLanguage::python; codeRoot = "components/rtg/federated_synthesis"; symbol = "components.rtg.federated_synthesis.DeterministicRtgFederatedSynthesizer"; realization = "BibliotekLocalPython"; }
+    }
+
+    part def EvidenceBoundedRtgSynthesizer :> RtgEvidenceBoundedSynthesizer {
+        @ImplementationCodec { logicalType = "SysML lowerCamelCase public feature names"; implementationType = "Python snake_case dataclass and argument names"; normalization = "The realization maps names mechanically without changing values, multiplicities, ordering, or operation meaning."; }
+        @ImplementationCodec { logicalType = "Uuid"; implementationType = "canonical UUID str"; normalization = "Python validates and canonicalizes every source citation and generated citation reference UUID while preserving graph-qualified identity."; }
+        @ImplementationCodec { logicalType = "RtgEvidenceBoundedSynthesisStatus, RtgSemanticClaimKind, RtgEntailmentStatus, and RtgFederatedSynthesisStatus"; implementationType = "str"; normalization = "Python accepts and emits exactly the modeled lower-case enumeration literal names."; }
+        @ImplementationCodec { logicalType = "ordered multiplicities"; implementationType = "tuple"; normalization = "Python tuples preserve modeled claim, citation-reference, limitation, and result order; duplicate citations retain first-use order."; }
+        @ImplementationCodec { logicalType = "optional values"; implementationType = "T | None"; normalization = "None represents modeled absence and a present Python value represents the single optional modeled occurrence."; }
+        @ImplementationCodec { logicalType = "retained generator role"; implementationType = "constructor-held RtgSemanticDraftGenerator Protocol reference"; normalization = "The Python synthesizer retains exactly the supplied read-only draft generator and invokes only its modeled generate method when usable source evidence exists."; }
+        @ImplementationCodec { logicalType = "isolated generator request"; implementationType = "deep-copied frozen dataclass envelope"; normalization = "Python deep-copies the full request and source record before generator invocation so nested mutable JSON values cannot alias caller-owned state."; }
+        @ImplementationBinding { implementationLanguage = ImplementationLanguage::python; codeRoot = "components/rtg/evidence_bounded_synthesis"; symbol = "components.rtg.evidence_bounded_synthesis.EvidenceBoundedRtgSynthesizer"; realization = "BibliotekLocalPython"; }
     }
 }
