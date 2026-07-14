@@ -9,6 +9,7 @@ package BibliotekLocalPythonRealization {
     private import BibliotekRtgCitationResolution::*;
     private import BibliotekRtgBridgeTraversal::*;
     private import BibliotekRtgRoutePack::*;
+    private import BibliotekRtgFederatedSynthesis::*;
 
     part def InMemoryAppCatalog :> AppCatalog {
         @ImplementationCodec { logicalType = "LaunchSurfaceMode and RuntimeControl"; implementationType = "str"; normalization = "The Python realization accepts and emits exactly the modeled enumeration literal names."; }
@@ -89,5 +90,17 @@ package BibliotekLocalPythonRealization {
         @ImplementationCodec { logicalType = "RtgRoutePackAssemblyRequest ordered collections"; implementationType = "tuple inputs copied to list outputs"; normalization = "Python tuples preserve caller order at the request boundary and the returned JSON records preserve that order in independent lists."; }
         @ImplementationCodec { logicalType = "one logical component with assemble and evaluate actions"; implementationType = "DeterministicRtgRoutePack with narrow builder and gate compatibility classes"; normalization = "The stateless Python component exposes both modeled actions while retaining the predecessor's narrow capability classes without changing behavior."; }
         @ImplementationBinding { implementationLanguage = ImplementationLanguage::python; codeRoot = "components/rtg/route_pack"; symbol = "components.rtg.route_pack.DeterministicRtgRoutePack"; realization = "BibliotekLocalPython"; }
+    }
+
+    part def DeterministicRtgFederatedSynthesizer :> RtgFederatedSynthesizer {
+        @ImplementationCodec { logicalType = "SysML lowerCamelCase public feature names"; implementationType = "Python snake_case dataclass, dictionary key, and argument names"; normalization = "The realization maps names mechanically without changing values, multiplicities, ordering, or operation meaning."; }
+        @ImplementationCodec { logicalType = "Uuid"; implementationType = "canonical UUID str"; normalization = "Python validates and canonicalizes every citation and bridge endpoint UUID while preserving graph-qualified identity."; }
+        @ImplementationCodec { logicalType = "RtgFederatedSynthesisStatus and RtgFederatedGraphReadStatus"; implementationType = "str"; normalization = "Python accepts and emits exactly the modeled lower-case enumeration literal names."; }
+        @ImplementationCodec { logicalType = "ordered multiplicities"; implementationType = "tuple"; normalization = "Python tuples preserve modeled input and result order; citation output is sorted by canonical graph-qualified identity as modeled."; }
+        @ImplementationCodec { logicalType = "optional values"; implementationType = "T | None"; normalization = "None represents modeled absence and a present Python value represents the single optional modeled occurrence."; }
+        @ImplementationCodec { logicalType = "JsonObject"; implementationType = "dict[str, JsonValue]"; normalization = "Python preserves finite JSON-compatible values losslessly and deep-copies caller-owned mutable containers at the component boundary."; }
+        @ImplementationCodec { logicalType = "RtgFederatedGraphRead::summary"; implementationType = "field(default_factory=dict)"; normalization = "An omitted Python constructor argument creates the required present empty logical JsonObject and encodes equivalently."; }
+        @ImplementationCodec { logicalType = "Real"; implementationType = "float"; normalization = "Python finite floating-point bridge confidence encodes the modeled real value in the closed interval from zero through one."; }
+        @ImplementationBinding { implementationLanguage = ImplementationLanguage::python; codeRoot = "components/rtg/federated_synthesis"; symbol = "components.rtg.federated_synthesis.DeterministicRtgFederatedSynthesizer"; realization = "BibliotekLocalPython"; }
     }
 }

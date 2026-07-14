@@ -19,6 +19,7 @@ library package Bibliotek {
     public import BibliotekRtgCitationResolution::*;
     public import BibliotekRtgBridgeTraversal::*;
     public import BibliotekRtgRoutePack::*;
+    public import BibliotekRtgFederatedSynthesis::*;
     public import BibliotekRtgController::*;
 
     doc /*

@@ -2555,9 +2555,9 @@ def check(scope: str = "all", *, require_external: bool = False) -> list[Finding
         if re.search(r"\bimport\s+Vellis", bibliotek_text):
             findings.append(Finding(MODEL_ROOT / "bibliotek", "Bibliotek must not import Vellis"))
         models = _component_model_statuses()
-        if len(models) != 18:
+        if len(models) != 19:
             findings.append(
-                Finding(COMPONENT_MODEL_ROOT, f"expected 18 components, found {len(models)}")
+                Finding(COMPONENT_MODEL_ROOT, f"expected 19 components, found {len(models)}")
             )
         findings.extend(_check_forbidden_component_imports())
         findings.extend(_check_protocol_action_coverage())

@@ -65,6 +65,7 @@ MODEL_ORDER = (
     "bibliotek/components/component.rtg.citation_resolution.sysml",
     "bibliotek/components/component.rtg.bridge_traversal.sysml",
     "bibliotek/components/component.rtg.route_pack.sysml",
+    "bibliotek/components/component.rtg.federated_synthesis.sysml",
     "bibliotek/components/component.rtg.controller.sysml",
     "bibliotek/realizations/BibliotekLocalPython.sysml",
     "bibliotek/Bibliotek.sysml",

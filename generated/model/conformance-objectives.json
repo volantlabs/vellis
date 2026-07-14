@@ -1651,6 +1651,58 @@
       "verification": "SelectDiscoveryAnchorTypesContractVerification"
     },
     {
+      "evidence_id": "components/rtg/federated_synthesis/tests/test_rtg_federated_synthesis_contract.py#RtgFederatedSynthesizerBoundaryVerification",
+      "evidence_nodes": [
+        "components/rtg/federated_synthesis/tests/test_rtg_federated_synthesis_contract.py::test_synthesizes_complete_record_with_graph_qualified_citations",
+        "components/rtg/federated_synthesis/tests/test_rtg_federated_synthesis_contract.py::test_synthesizes_partial_record_with_candidate_and_unsupported_limitations",
+        "components/rtg/federated_synthesis/tests/test_rtg_federated_synthesis_contract.py::test_synthesizes_no_supported_reads_without_inventing_facts",
+        "components/rtg/federated_synthesis/tests/test_rtg_federated_synthesis_contract.py::test_deduplicates_canonical_citation_identity_without_using_presentation_kind",
+        "components/rtg/federated_synthesis/tests/test_rtg_federated_synthesis_contract.py::test_synthesis_returns_isolated_records_without_input_mutation",
+        "components/rtg/federated_synthesis/tests/test_rtg_federated_synthesis_contract.py::test_synthesizer_does_not_expose_graph_or_bridge_mutation_operations"
+      ],
+      "model_source": "model/bibliotek/components/component.rtg.federated_synthesis.sysml",
+      "requirements": [
+        "invariant.rtg.federated_synthesis.graph_qualified_citations",
+        "invariant.rtg.federated_synthesis.no_candidate_traversal",
+        "invariant.rtg.federated_synthesis.no_hidden_facts",
+        "invariant.rtg.federated_synthesis.read_only",
+        "contract.rtg.federated_synthesis.intentional_boundary"
+      ],
+      "status": "resolved",
+      "subject": {
+        "role": "synthesizer",
+        "type": "RtgFederatedSynthesizer"
+      },
+      "verification": "RtgFederatedSynthesizerBoundaryVerification"
+    },
+    {
+      "evidence_id": "components/rtg/federated_synthesis/tests/test_rtg_federated_synthesis_contract.py#SynthesizeFederatedContextContractVerification",
+      "evidence_nodes": [
+        "components/rtg/federated_synthesis/tests/test_rtg_federated_synthesis_contract.py::test_synthesizes_complete_record_with_graph_qualified_citations",
+        "components/rtg/federated_synthesis/tests/test_rtg_federated_synthesis_contract.py::test_synthesizes_partial_record_with_candidate_and_unsupported_limitations",
+        "components/rtg/federated_synthesis/tests/test_rtg_federated_synthesis_contract.py::test_synthesizes_no_supported_reads_without_inventing_facts",
+        "components/rtg/federated_synthesis/tests/test_rtg_federated_synthesis_contract.py::test_validates_citation_and_read_shapes",
+        "components/rtg/federated_synthesis/tests/test_rtg_federated_synthesis_contract.py::test_deduplicates_canonical_citation_identity_without_using_presentation_kind",
+        "components/rtg/federated_synthesis/tests/test_rtg_federated_synthesis_contract.py::test_rejects_non_finite_bridge_and_summary_values",
+        "components/rtg/federated_synthesis/tests/test_rtg_federated_synthesis_contract.py::test_rejects_invalid_bridge_and_candidate_context",
+        "components/rtg/federated_synthesis/tests/test_rtg_federated_synthesis_contract.py::test_synthesis_returns_isolated_records_without_input_mutation"
+      ],
+      "model_source": "model/bibliotek/components/component.rtg.federated_synthesis.sysml",
+      "requirements": [
+        "contract.rtg.federated_synthesis.status",
+        "contract.rtg.federated_synthesis.answer",
+        "contract.rtg.federated_synthesis.citation_deduplication",
+        "contract.rtg.federated_synthesis.bridge_context",
+        "contract.rtg.federated_synthesis.synthesize.failures"
+      ],
+      "status": "resolved",
+      "subject": {
+        "role": "operation",
+        "type": "SynthesizeFederatedContext"
+      },
+      "verification": "SynthesizeFederatedContextContractVerification"
+    },
+    {
       "evidence_id": "components/rtg/graph/tests/test_rtg_graph_contract.py#AssociateDataContractVerification",
       "evidence_nodes": [
         "components/rtg/graph/tests/test_rtg_graph_contract.py::test_association_is_idempotent_and_metadata_free"

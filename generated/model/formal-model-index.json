@@ -12,6 +12,7 @@
     "BibliotekRtgController": "model/bibliotek/components/component.rtg.controller.sysml",
     "BibliotekRtgDiagnostics": "model/bibliotek/shared-values/RtgDiagnostics.sysml",
     "BibliotekRtgDiscovery": "model/bibliotek/components/component.rtg.discovery.sysml",
+    "BibliotekRtgFederatedSynthesis": "model/bibliotek/components/component.rtg.federated_synthesis.sysml",
     "BibliotekRtgGraph": "model/bibliotek/components/component.rtg.graph.sysml",
     "BibliotekRtgGraphBridge": "model/bibliotek/components/component.rtg.graph_bridge.sysml",
     "BibliotekRtgGraphRegistry": "model/bibliotek/components/component.rtg.graph_registry.sysml",
@@ -37,18 +38,18 @@
   "packages": {
     "Bibliotek": {
       "element_counts": {
-        "ActionDefinition": 136,
-        "AttributeDefinition": 270,
+        "ActionDefinition": 137,
+        "AttributeDefinition": 277,
         "CalculationDefinition": 6,
         "ConstraintDefinition": 1,
-        "Documentation": 14,
-        "EnumerationDefinition": 45,
+        "Documentation": 15,
+        "EnumerationDefinition": 47,
         "ItemDefinition": 19,
         "LibraryPackage": 1,
-        "PartDefinition": 23,
-        "PartUsage": 18,
-        "RequirementUsage": 426,
-        "VerificationCaseDefinition": 153
+        "PartDefinition": 24,
+        "PartUsage": 19,
+        "RequirementUsage": 436,
+        "VerificationCaseDefinition": 155
       },
       "named_elements": [
         {
@@ -569,6 +570,10 @@
         },
         {
           "kind": "ActionDefinition",
+          "name": "SynthesizeFederatedContext"
+        },
+        {
+          "kind": "ActionDefinition",
           "name": "TraverseBridge"
         },
         {
@@ -1054,6 +1059,34 @@
         {
           "kind": "AttributeDefinition",
           "name": "RtgDiscoveryViewNotFound"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "RtgFederatedBridgeContext"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "RtgFederatedCandidateNotice"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "RtgFederatedCitation"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "RtgFederatedGraphRead"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "RtgFederatedSynthesisInvalid"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "RtgFederatedSynthesisRecord"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "RtgFederatedSynthesisRequest"
         },
         {
           "kind": "AttributeDefinition",
@@ -1777,6 +1810,14 @@
         },
         {
           "kind": "EnumerationDefinition",
+          "name": "RtgFederatedGraphReadStatus"
+        },
+        {
+          "kind": "EnumerationDefinition",
+          "name": "RtgFederatedSynthesisStatus"
+        },
+        {
+          "kind": "EnumerationDefinition",
           "name": "RtgGraphBridgeCandidateStatus"
         },
         {
@@ -2023,6 +2064,11 @@
         },
         {
           "kind": "PartDefinition",
+          "name": "RtgFederatedSynthesizer",
+          "short_name": "component.rtg.federated_synthesis"
+        },
+        {
+          "kind": "PartDefinition",
           "name": "RtgGraph",
           "short_name": "component.rtg.graph"
         },
@@ -2103,6 +2149,11 @@
           "kind": "RequirementUsage",
           "name": "anchorDisplayNameNonAuthoritative",
           "short_name": "invariant.rtg.graph.anchor_display_name_non_authoritative"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "answerEnvelope",
+          "short_name": "contract.rtg.federated_synthesis.answer"
         },
         {
           "kind": "RequirementUsage",
@@ -2196,6 +2247,11 @@
         },
         {
           "kind": "RequirementUsage",
+          "name": "bridgeContext",
+          "short_name": "contract.rtg.federated_synthesis.bridge_context"
+        },
+        {
+          "kind": "RequirementUsage",
           "name": "bridgeValidity",
           "short_name": "contract.rtg.graph_bridge.bridge_validity"
         },
@@ -2268,6 +2324,11 @@
           "kind": "RequirementUsage",
           "name": "catalogCapability",
           "short_name": "contract.rtg.citation_resolution.catalog_capability"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "citationDeduplication",
+          "short_name": "contract.rtg.federated_synthesis.citation_deduplication"
         },
         {
           "kind": "RequirementUsage",
@@ -2811,6 +2872,11 @@
         },
         {
           "kind": "RequirementUsage",
+          "name": "graphQualifiedCitations",
+          "short_name": "invariant.rtg.federated_synthesis.graph_qualified_citations"
+        },
+        {
+          "kind": "RequirementUsage",
           "name": "graphQualifiedEndpoints",
           "short_name": "invariant.rtg.bridge_traversal.graph_qualified_endpoints"
         },
@@ -2958,6 +3024,11 @@
           "kind": "RequirementUsage",
           "name": "intentionalBoundary",
           "short_name": "contract.rtg.route_pack.intentional_boundary"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "intentionalBoundary",
+          "short_name": "contract.rtg.federated_synthesis.intentional_boundary"
         },
         {
           "kind": "RequirementUsage",
@@ -3251,6 +3322,11 @@
         },
         {
           "kind": "RequirementUsage",
+          "name": "noCandidateTraversal",
+          "short_name": "invariant.rtg.federated_synthesis.no_candidate_traversal"
+        },
+        {
+          "kind": "RequirementUsage",
           "name": "noChangeSetOwnership",
           "short_name": "invariant.rtg.schema.no_change_set_ownership"
         },
@@ -3263,6 +3339,11 @@
           "kind": "RequirementUsage",
           "name": "noGraphDependency",
           "short_name": "invariant.rtg.discovery.no_graph_dependency"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "noHiddenFacts",
+          "short_name": "invariant.rtg.federated_synthesis.no_hidden_facts"
         },
         {
           "kind": "RequirementUsage",
@@ -3666,6 +3747,11 @@
         },
         {
           "kind": "RequirementUsage",
+          "name": "readOnly",
+          "short_name": "invariant.rtg.federated_synthesis.read_only"
+        },
+        {
+          "kind": "RequirementUsage",
           "name": "readerCapability",
           "short_name": "contract.rtg.citation_resolution.reader_capability"
         },
@@ -3983,6 +4069,16 @@
           "kind": "RequirementUsage",
           "name": "switchEffect",
           "short_name": "contract.app.shell.switch_effect"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "synthesisStatus",
+          "short_name": "contract.rtg.federated_synthesis.status"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "synthesizeFederatedContextFailureSemantics",
+          "short_name": "contract.rtg.federated_synthesis.synthesize.failures"
         },
         {
           "kind": "RequirementUsage",
@@ -4721,6 +4817,10 @@
         },
         {
           "kind": "VerificationCaseDefinition",
+          "name": "RtgFederatedSynthesizerBoundaryVerification"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
           "name": "RtgGraphBoundaryVerification"
         },
         {
@@ -4782,6 +4882,10 @@
         {
           "kind": "VerificationCaseDefinition",
           "name": "SwitchAppContractVerification"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
+          "name": "SynthesizeFederatedContextContractVerification"
         },
         {
           "kind": "VerificationCaseDefinition",
@@ -5842,19 +5946,19 @@
     "BibliotekLocalPythonRealization": {
       "element_counts": {
         "Dependency": 48,
-        "Documentation": 12,
-        "EnumerationUsage": 12,
-        "Feature": 10,
-        "FeatureReferenceExpression": 9,
+        "Documentation": 13,
+        "EnumerationUsage": 13,
+        "Feature": 11,
+        "FeatureReferenceExpression": 10,
         "ItemUsage": 7,
-        "LiteralString": 162,
-        "MetadataUsage": 63,
+        "LiteralString": 189,
+        "MetadataUsage": 73,
         "Multiplicity": 7,
         "Package": 1,
-        "PartDefinition": 9,
+        "PartDefinition": 10,
         "PartUsage": 8,
-        "PerformActionUsage": 35,
-        "ReferenceUsage": 174
+        "PerformActionUsage": 36,
+        "ReferenceUsage": 202
       },
       "named_elements": [
         {
@@ -5864,6 +5968,10 @@
         {
           "kind": "PartDefinition",
           "name": "DeterministicRtgCitationResolver"
+        },
+        {
+          "kind": "PartDefinition",
+          "name": "DeterministicRtgFederatedSynthesizer"
         },
         {
           "kind": "PartDefinition",
@@ -8609,6 +8717,187 @@
         }
       ],
       "source": "model/bibliotek/components/component.rtg.discovery.sysml"
+    },
+    "BibliotekRtgFederatedSynthesis": {
+      "element_counts": {
+        "ActionDefinition": 1,
+        "AttributeDefinition": 7,
+        "AttributeUsage": 36,
+        "ConstraintUsage": 10,
+        "Documentation": 26,
+        "EnumerationDefinition": 2,
+        "EnumerationUsage": 12,
+        "Feature": 17,
+        "FeatureReferenceExpression": 11,
+        "LibraryPackage": 1,
+        "LiteralInfinity": 11,
+        "LiteralInteger": 15,
+        "LiteralString": 7,
+        "MetadataUsage": 4,
+        "Multiplicity": 27,
+        "MultiplicityRange": 14,
+        "PartDefinition": 1,
+        "PartUsage": 2,
+        "PerformActionUsage": 1,
+        "ReferenceUsage": 53,
+        "RequirementUsage": 22,
+        "SatisfyRequirementUsage": 10,
+        "VerificationCaseDefinition": 2
+      },
+      "named_elements": [
+        {
+          "kind": "ActionDefinition",
+          "name": "SynthesizeFederatedContext"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "RtgFederatedBridgeContext"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "RtgFederatedCandidateNotice"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "RtgFederatedCitation"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "RtgFederatedGraphRead"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "RtgFederatedSynthesisInvalid"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "RtgFederatedSynthesisRecord"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "RtgFederatedSynthesisRequest"
+        },
+        {
+          "kind": "EnumerationDefinition",
+          "name": "RtgFederatedGraphReadStatus"
+        },
+        {
+          "kind": "EnumerationDefinition",
+          "name": "RtgFederatedSynthesisStatus"
+        },
+        {
+          "kind": "PartDefinition",
+          "name": "RtgFederatedSynthesizer",
+          "short_name": "component.rtg.federated_synthesis"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "answerEnvelope",
+          "short_name": "contract.rtg.federated_synthesis.answer"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "answerEnvelope"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "bridgeContext",
+          "short_name": "contract.rtg.federated_synthesis.bridge_context"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "bridgeContext"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "citationDeduplication",
+          "short_name": "contract.rtg.federated_synthesis.citation_deduplication"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "citationDeduplication"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "graphQualifiedCitations",
+          "short_name": "invariant.rtg.federated_synthesis.graph_qualified_citations"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "graphQualifiedCitations"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "intentionalBoundary",
+          "short_name": "contract.rtg.federated_synthesis.intentional_boundary"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "intentionalBoundary"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "noCandidateTraversal",
+          "short_name": "invariant.rtg.federated_synthesis.no_candidate_traversal"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "noCandidateTraversal"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "noHiddenFacts",
+          "short_name": "invariant.rtg.federated_synthesis.no_hidden_facts"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "noHiddenFacts"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "obj"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "obj"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "readOnly",
+          "short_name": "invariant.rtg.federated_synthesis.read_only"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "readOnly"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "synthesisStatus",
+          "short_name": "contract.rtg.federated_synthesis.status"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "synthesisStatus"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "synthesizeFederatedContextFailureSemantics",
+          "short_name": "contract.rtg.federated_synthesis.synthesize.failures"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "synthesizeFederatedContextFailureSemantics"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
+          "name": "RtgFederatedSynthesizerBoundaryVerification"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
+          "name": "SynthesizeFederatedContextContractVerification"
+        }
+      ],
+      "source": "model/bibliotek/components/component.rtg.federated_synthesis.sysml"
     },
     "BibliotekRtgGraph": {
       "element_counts": {
@@ -14552,7 +14841,7 @@
     }
   },
   "schema_version": 1,
-  "source_digest": "dee65341a6f8290930cdb6281b0fea5ee4875e4b8045de7c0505427f47fbc6c3",
+  "source_digest": "845342a8fab770420023bacb60b8d9e0c4a44002dce7455453124dd962f03ef3",
   "validator": {
     "implementation_version": "0.50.0",
     "provider": "Systems-Modeling/SysML-v2-Pilot-Implementation",
