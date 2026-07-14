@@ -1,6 +1,8 @@
 {
   "authored_packages": {
     "Bibliotek": "model/bibliotek/Bibliotek.sysml",
+    "BibliotekAppCatalog": "model/bibliotek/components/component.app.catalog.sysml",
+    "BibliotekLocalPythonRealization": "model/bibliotek/realizations/BibliotekLocalPython.sysml",
     "BibliotekRtgChangeValidation": "model/bibliotek/components/component.rtg.change_validation.sysml",
     "BibliotekRtgConstraints": "model/bibliotek/components/component.rtg.constraints.sysml",
     "BibliotekRtgController": "model/bibliotek/components/component.rtg.controller.sysml",
@@ -26,18 +28,18 @@
   "packages": {
     "Bibliotek": {
       "element_counts": {
-        "ActionDefinition": 89,
-        "AttributeDefinition": 204,
+        "ActionDefinition": 94,
+        "AttributeDefinition": 213,
         "CalculationDefinition": 6,
         "ConstraintDefinition": 1,
-        "Documentation": 6,
-        "EnumerationDefinition": 33,
-        "ItemDefinition": 11,
+        "Documentation": 7,
+        "EnumerationDefinition": 35,
+        "ItemDefinition": 13,
         "LibraryPackage": 1,
-        "PartDefinition": 11,
-        "PartUsage": 9,
-        "RequirementUsage": 296,
-        "VerificationCaseDefinition": 99
+        "PartDefinition": 12,
+        "PartUsage": 10,
+        "RequirementUsage": 311,
+        "VerificationCaseDefinition": 105
       },
       "named_elements": [
         {
@@ -178,6 +180,10 @@
         },
         {
           "kind": "ActionDefinition",
+          "name": "GetApp"
+        },
+        {
+          "kind": "ActionDefinition",
           "name": "GetConstraint"
         },
         {
@@ -234,6 +240,10 @@
         },
         {
           "kind": "ActionDefinition",
+          "name": "ListApps"
+        },
+        {
+          "kind": "ActionDefinition",
           "name": "ListConstraints"
         },
         {
@@ -287,6 +297,10 @@
         {
           "kind": "ActionDefinition",
           "name": "LoadPersistedSnapshot"
+        },
+        {
+          "kind": "ActionDefinition",
+          "name": "OpenAppCatalog"
         },
         {
           "kind": "ActionDefinition",
@@ -354,6 +368,14 @@
         },
         {
           "kind": "ActionDefinition",
+          "name": "RegisterApp"
+        },
+        {
+          "kind": "ActionDefinition",
+          "name": "RemoveApp"
+        },
+        {
+          "kind": "ActionDefinition",
           "name": "ReplayLedger"
         },
         {
@@ -395,6 +417,42 @@
         {
           "kind": "ActionDefinition",
           "name": "WriteJsonDocument"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "AppCatalogReadFailed"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "AppCatalogStoreInvalid"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "AppCatalogUnavailable"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "AppCatalogWriteFailed"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "AppDescriptorInvalid"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "AppDescriptorList"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "AppIdConflict"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "AppNotFound"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "CatalogQuery"
         },
         {
           "kind": "AttributeDefinition",
@@ -1246,6 +1304,10 @@
         },
         {
           "kind": "EnumerationDefinition",
+          "name": "LaunchSurfaceMode"
+        },
+        {
+          "kind": "EnumerationDefinition",
           "name": "RtgConstraintExpectation"
         },
         {
@@ -1370,11 +1432,23 @@
         },
         {
           "kind": "EnumerationDefinition",
+          "name": "RuntimeControl"
+        },
+        {
+          "kind": "EnumerationDefinition",
           "name": "SqlParameterKind"
         },
         {
           "kind": "ItemDefinition",
+          "name": "AppDescriptor"
+        },
+        {
+          "kind": "ItemDefinition",
           "name": "JsonStorageRoot"
+        },
+        {
+          "kind": "ItemDefinition",
+          "name": "LaunchSurface"
         },
         {
           "kind": "ItemDefinition",
@@ -1415,6 +1489,11 @@
         {
           "kind": "ItemDefinition",
           "name": "SqlDatabase"
+        },
+        {
+          "kind": "PartDefinition",
+          "name": "AppCatalog",
+          "short_name": "component.app.catalog"
         },
         {
           "kind": "PartDefinition",
@@ -1707,6 +1786,11 @@
         },
         {
           "kind": "RequirementUsage",
+          "name": "declarativeSurfaces",
+          "short_name": "invariant.app.catalog.declarative_surfaces"
+        },
+        {
+          "kind": "RequirementUsage",
           "name": "defaultIncludesNonLive",
           "short_name": "invariant.rtg.query.default_includes_non_live"
         },
@@ -1842,6 +1926,11 @@
         },
         {
           "kind": "RequirementUsage",
+          "name": "domainStateExclusion",
+          "short_name": "invariant.app.catalog.domain_state_exclusion"
+        },
+        {
+          "kind": "RequirementUsage",
           "name": "evidenceEffect",
           "short_name": "contract.rtg.migration.evidence_effect"
         },
@@ -1932,6 +2021,11 @@
         },
         {
           "kind": "RequirementUsage",
+          "name": "getAppFailureSemantics",
+          "short_name": "contract.app.catalog.get_app.failures"
+        },
+        {
+          "kind": "RequirementUsage",
           "name": "getConstraintFailureSemantics",
           "short_name": "contract.rtg.constraints.get_constraint.failures"
         },
@@ -1939,6 +2033,11 @@
           "kind": "RequirementUsage",
           "name": "getControllerSchemaPackFailureSemantics",
           "short_name": "contract.rtg.controller.get_controller_schema_pack.failures"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "getEffect",
+          "short_name": "contract.app.catalog.get_effect"
         },
         {
           "kind": "RequirementUsage",
@@ -2009,6 +2108,11 @@
           "kind": "RequirementUsage",
           "name": "indexesMatchRecords",
           "short_name": "invariant.rtg.constraints.indexes_match_records"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "intentionalBoundary",
+          "short_name": "contract.app.catalog.intentional_boundary"
         },
         {
           "kind": "RequirementUsage",
@@ -2132,6 +2236,11 @@
         },
         {
           "kind": "RequirementUsage",
+          "name": "listAppsFailureSemantics",
+          "short_name": "contract.app.catalog.list_apps.failures"
+        },
+        {
+          "kind": "RequirementUsage",
           "name": "listConstraintsByTargetFailureSemantics",
           "short_name": "contract.rtg.constraints.list_constraints_by_target.failures"
         },
@@ -2154,6 +2263,11 @@
           "kind": "RequirementUsage",
           "name": "listDiscoveryViewsFailureSemantics",
           "short_name": "contract.rtg.discovery.list_discovery_views.failures"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "listEffect",
+          "short_name": "contract.app.catalog.list_effect"
         },
         {
           "kind": "RequirementUsage",
@@ -2382,6 +2496,16 @@
         },
         {
           "kind": "RequirementUsage",
+          "name": "openAppCatalogFailureSemantics",
+          "short_name": "contract.app.catalog.open.failures"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "openEffect",
+          "short_name": "contract.app.catalog.open_effect"
+        },
+        {
+          "kind": "RequirementUsage",
           "name": "openJsonFileStorageFailureSemantics",
           "short_name": "contract.storage.json_file.open_json_file_storage.failures"
         },
@@ -2584,6 +2708,26 @@
           "kind": "RequirementUsage",
           "name": "referencesAreData",
           "short_name": "invariant.rtg.migration.references_are_data"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "registerAppFailureSemantics",
+          "short_name": "contract.app.catalog.register_app.failures"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "registerEffect",
+          "short_name": "contract.app.catalog.register_effect"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "removeAppFailureSemantics",
+          "short_name": "contract.app.catalog.remove_app.failures"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "removeEffect",
+          "short_name": "contract.app.catalog.remove_effect"
         },
         {
           "kind": "RequirementUsage",
@@ -2832,6 +2976,11 @@
         },
         {
           "kind": "RequirementUsage",
+          "name": "uniqueIdentity",
+          "short_name": "invariant.app.catalog.unique_identity"
+        },
+        {
+          "kind": "RequirementUsage",
           "name": "uuidGeneration",
           "short_name": "invariant.rtg.graph.uuid_generation"
         },
@@ -2859,6 +3008,11 @@
           "kind": "RequirementUsage",
           "name": "validQuerySpec",
           "short_name": "contract.rtg.query.valid_spec"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "validVisibleState",
+          "short_name": "invariant.app.catalog.valid_visible_state"
         },
         {
           "kind": "RequirementUsage",
@@ -2957,6 +3111,10 @@
         {
           "kind": "VerificationCaseDefinition",
           "name": "AddMigrationEvidenceContractVerification"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
+          "name": "AppCatalogBoundaryVerification"
         },
         {
           "kind": "VerificationCaseDefinition",
@@ -3088,6 +3246,10 @@
         },
         {
           "kind": "VerificationCaseDefinition",
+          "name": "GetAppContractVerification"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
           "name": "GetConstraintContractVerification"
         },
         {
@@ -3148,6 +3310,10 @@
         },
         {
           "kind": "VerificationCaseDefinition",
+          "name": "ListAppsContractVerification"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
           "name": "ListConstraintsByTargetContractVerification"
         },
         {
@@ -3201,6 +3367,10 @@
         {
           "kind": "VerificationCaseDefinition",
           "name": "LoadPersistedSnapshotContractVerification"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
+          "name": "OpenAppCatalogContractVerification"
         },
         {
           "kind": "VerificationCaseDefinition",
@@ -3265,6 +3435,14 @@
         {
           "kind": "VerificationCaseDefinition",
           "name": "ReadJsonDocumentContractVerification"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
+          "name": "RegisterAppContractVerification"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
+          "name": "RemoveAppContractVerification"
         },
         {
           "kind": "VerificationCaseDefinition",
@@ -3348,6 +3526,325 @@
         }
       ],
       "source": "model/bibliotek/Bibliotek.sysml"
+    },
+    "BibliotekAppCatalog": {
+      "element_counts": {
+        "ActionDefinition": 5,
+        "ActionUsage": 3,
+        "AttributeDefinition": 9,
+        "AttributeUsage": 24,
+        "ConstraintUsage": 15,
+        "Dependency": 4,
+        "Documentation": 30,
+        "EnumerationDefinition": 2,
+        "EnumerationUsage": 11,
+        "Feature": 30,
+        "FeatureReferenceExpression": 17,
+        "ItemDefinition": 2,
+        "ItemUsage": 3,
+        "LibraryPackage": 1,
+        "LiteralInfinity": 9,
+        "LiteralInteger": 19,
+        "LiteralString": 14,
+        "MetadataUsage": 12,
+        "Multiplicity": 24,
+        "MultiplicityRange": 15,
+        "OperatorExpression": 4,
+        "PartDefinition": 1,
+        "PartUsage": 3,
+        "PerformActionUsage": 4,
+        "ReferenceUsage": 95,
+        "RequirementUsage": 36,
+        "SatisfyRequirementUsage": 15,
+        "VerificationCaseDefinition": 6
+      },
+      "named_elements": [
+        {
+          "kind": "ActionDefinition",
+          "name": "GetApp"
+        },
+        {
+          "kind": "ActionDefinition",
+          "name": "ListApps"
+        },
+        {
+          "kind": "ActionDefinition",
+          "name": "OpenAppCatalog"
+        },
+        {
+          "kind": "ActionDefinition",
+          "name": "RegisterApp"
+        },
+        {
+          "kind": "ActionDefinition",
+          "name": "RemoveApp"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "AppCatalogReadFailed"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "AppCatalogStoreInvalid"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "AppCatalogUnavailable"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "AppCatalogWriteFailed"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "AppDescriptorInvalid"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "AppDescriptorList"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "AppIdConflict"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "AppNotFound"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "CatalogQuery"
+        },
+        {
+          "kind": "EnumerationDefinition",
+          "name": "LaunchSurfaceMode"
+        },
+        {
+          "kind": "EnumerationDefinition",
+          "name": "RuntimeControl"
+        },
+        {
+          "kind": "ItemDefinition",
+          "name": "AppDescriptor"
+        },
+        {
+          "kind": "ItemDefinition",
+          "name": "LaunchSurface"
+        },
+        {
+          "kind": "PartDefinition",
+          "name": "AppCatalog",
+          "short_name": "component.app.catalog"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "declarativeSurfaces",
+          "short_name": "invariant.app.catalog.declarative_surfaces"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "declarativeSurfaces"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "domainStateExclusion",
+          "short_name": "invariant.app.catalog.domain_state_exclusion"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "domainStateExclusion"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "getAppFailureSemantics",
+          "short_name": "contract.app.catalog.get_app.failures"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "getAppFailureSemantics"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "getEffect",
+          "short_name": "contract.app.catalog.get_effect"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "getEffect"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "intentionalBoundary",
+          "short_name": "contract.app.catalog.intentional_boundary"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "intentionalBoundary"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "listAppsFailureSemantics",
+          "short_name": "contract.app.catalog.list_apps.failures"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "listAppsFailureSemantics"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "listEffect",
+          "short_name": "contract.app.catalog.list_effect"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "listEffect"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "obj"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "obj"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "obj"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "obj"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "obj"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "obj"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "openAppCatalogFailureSemantics",
+          "short_name": "contract.app.catalog.open.failures"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "openAppCatalogFailureSemantics"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "openEffect",
+          "short_name": "contract.app.catalog.open_effect"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "openEffect"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "registerAppFailureSemantics",
+          "short_name": "contract.app.catalog.register_app.failures"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "registerAppFailureSemantics"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "registerEffect",
+          "short_name": "contract.app.catalog.register_effect"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "registerEffect"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "removeAppFailureSemantics",
+          "short_name": "contract.app.catalog.remove_app.failures"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "removeAppFailureSemantics"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "removeEffect",
+          "short_name": "contract.app.catalog.remove_effect"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "removeEffect"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "uniqueIdentity",
+          "short_name": "invariant.app.catalog.unique_identity"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "uniqueIdentity"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "validVisibleState",
+          "short_name": "invariant.app.catalog.valid_visible_state"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "validVisibleState"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
+          "name": "AppCatalogBoundaryVerification"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
+          "name": "GetAppContractVerification"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
+          "name": "ListAppsContractVerification"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
+          "name": "OpenAppCatalogContractVerification"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
+          "name": "RegisterAppContractVerification"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
+          "name": "RemoveAppContractVerification"
+        }
+      ],
+      "source": "model/bibliotek/components/component.app.catalog.sysml"
+    },
+    "BibliotekLocalPythonRealization": {
+      "element_counts": {
+        "Dependency": 4,
+        "Documentation": 4,
+        "EnumerationUsage": 4,
+        "Feature": 2,
+        "FeatureReferenceExpression": 1,
+        "ItemUsage": 1,
+        "LiteralString": 9,
+        "MetadataUsage": 4,
+        "Multiplicity": 7,
+        "Package": 1,
+        "PartDefinition": 1,
+        "PerformActionUsage": 4,
+        "ReferenceUsage": 13
+      },
+      "named_elements": [
+        {
+          "kind": "PartDefinition",
+          "name": "InMemoryAppCatalog"
+        }
+      ],
+      "source": "model/bibliotek/realizations/BibliotekLocalPython.sysml"
     },
     "BibliotekRtgChangeValidation": {
       "element_counts": {
@@ -10452,7 +10949,7 @@
     }
   },
   "schema_version": 1,
-  "source_digest": "81161882fcc6e2c2484e2dd33b62db85309eec3520c8b3fe66e35b11820090f9",
+  "source_digest": "2af7f40adf164fab47d902f5c29214e0415de99618b54e461ad593b3c406d1d0",
   "validator": {
     "implementation_version": "0.50.0",
     "provider": "Systems-Modeling/SysML-v2-Pilot-Implementation",

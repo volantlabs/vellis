@@ -302,6 +302,62 @@
         "apps/rtg_knowledge_graph/tests/test_starter_schema.py::test_failed_starter_cutover_removes_staged_state_and_replays_cleanly"
       ]
     },
+    "components/app/catalog/tests/test_app_catalog_contract.py#AppCatalogBoundaryVerification": {
+      "model_source": "model/bibliotek/components/component.app.catalog.sysml",
+      "status": "resolved",
+      "test_nodes": [
+        "components/app/catalog/tests/test_app_catalog_contract.py::test_register_get_list_remove_round_trip",
+        "components/app/catalog/tests/test_app_catalog_contract.py::test_register_replaces_existing_descriptor_for_same_app_id",
+        "components/app/catalog/tests/test_app_catalog_contract.py::test_open_rejects_duplicate_descriptor_identity",
+        "components/app/catalog/tests/test_app_catalog_contract.py::test_list_apps_is_deterministic_and_filterable",
+        "components/app/catalog/tests/test_app_catalog_contract.py::test_launch_surfaces_are_sorted_metadata_not_runtime_state",
+        "components/app/catalog/tests/test_app_catalog_contract.py::test_invalid_descriptors_are_not_visible",
+        "components/app/catalog/tests/test_app_catalog_contract.py::test_catalog_returns_canonical_copies_not_mutable_input_state",
+        "components/app/catalog/tests/test_app_catalog_contract.py::test_reference_component_is_usable",
+        "components/app/catalog/tests/test_app_catalog_contract.py::test_no_forbidden_dependency_imports"
+      ]
+    },
+    "components/app/catalog/tests/test_app_catalog_contract.py#GetAppContractVerification": {
+      "model_source": "model/bibliotek/components/component.app.catalog.sysml",
+      "status": "resolved",
+      "test_nodes": [
+        "components/app/catalog/tests/test_app_catalog_contract.py::test_register_get_list_remove_round_trip",
+        "components/app/catalog/tests/test_app_catalog_contract.py::test_catalog_returns_canonical_copies_not_mutable_input_state"
+      ]
+    },
+    "components/app/catalog/tests/test_app_catalog_contract.py#ListAppsContractVerification": {
+      "model_source": "model/bibliotek/components/component.app.catalog.sysml",
+      "status": "resolved",
+      "test_nodes": [
+        "components/app/catalog/tests/test_app_catalog_contract.py::test_list_apps_is_deterministic_and_filterable",
+        "components/app/catalog/tests/test_app_catalog_contract.py::test_launch_surfaces_are_sorted_metadata_not_runtime_state"
+      ]
+    },
+    "components/app/catalog/tests/test_app_catalog_contract.py#OpenAppCatalogContractVerification": {
+      "model_source": "model/bibliotek/components/component.app.catalog.sysml",
+      "status": "resolved",
+      "test_nodes": [
+        "components/app/catalog/tests/test_app_catalog_contract.py::test_open_rejects_duplicate_descriptor_identity",
+        "components/app/catalog/tests/test_app_catalog_contract.py::test_reference_component_is_usable"
+      ]
+    },
+    "components/app/catalog/tests/test_app_catalog_contract.py#RegisterAppContractVerification": {
+      "model_source": "model/bibliotek/components/component.app.catalog.sysml",
+      "status": "resolved",
+      "test_nodes": [
+        "components/app/catalog/tests/test_app_catalog_contract.py::test_register_get_list_remove_round_trip",
+        "components/app/catalog/tests/test_app_catalog_contract.py::test_register_replaces_existing_descriptor_for_same_app_id",
+        "components/app/catalog/tests/test_app_catalog_contract.py::test_invalid_descriptors_are_not_visible",
+        "components/app/catalog/tests/test_app_catalog_contract.py::test_catalog_returns_canonical_copies_not_mutable_input_state"
+      ]
+    },
+    "components/app/catalog/tests/test_app_catalog_contract.py#RemoveAppContractVerification": {
+      "model_source": "model/bibliotek/components/component.app.catalog.sysml",
+      "status": "resolved",
+      "test_nodes": [
+        "components/app/catalog/tests/test_app_catalog_contract.py::test_register_get_list_remove_round_trip"
+      ]
+    },
     "components/rtg/change_validation/tests/test_rtg_change_validation_contract.py#RtgChangeValidationBoundaryVerification": {
       "model_source": "model/bibliotek/components/component.rtg.change_validation.sysml",
       "status": "resolved",

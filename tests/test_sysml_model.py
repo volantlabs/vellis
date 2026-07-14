@@ -394,6 +394,25 @@ def test_model_audit_flattens_inherited_sysml_boundary_fields(tmp_path: Path) ->
     assert set(boundary["records"]["Child"]) == {"identity", "detail"}
 
 
+def test_model_audit_preserves_ordered_multivalued_boundary_fields(tmp_path: Path) -> None:
+    model = tmp_path / "component.example.sysml"
+    model.write_text(
+        """package Example {
+        item def Record {
+            attribute tags[0..*] ordered : String;
+            item children[0..*] ordered : Record;
+        }
+        }
+        """,
+        encoding="utf-8",
+    )
+
+    boundary = model_tool._audit_model_boundary(model)
+
+    assert boundary["records"]["Record"]["tags"]["multiplicity"] == "[0..*]"
+    assert boundary["records"]["Record"]["children"]["multiplicity"] == "[0..*]"
+
+
 def test_requirement_checker_rejects_documentation_only_and_incompatible_verification(
     tmp_path: Path,
 ) -> None:

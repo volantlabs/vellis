@@ -1333,7 +1333,8 @@ def _audit_model_boundary(path: Path) -> dict[str, object]:
         fields: dict[str, object] = {}
         for field in re.finditer(
             rf"\b(?:attribute|item|ref item)\s+{OPTIONAL_IDENTIFICATION}({SYSML_IDENTIFIER})"
-            r"(?P<multiplicity>\[[^]]+\])?\s*:\s*(?P<type>[\w:']+)"
+            r"(?P<multiplicity>\[[^]]+\])?(?:\s+(?:ordered|nonunique))*"
+            r"\s*:\s*(?P<type>[\w:']+)"
             r"(?P<value>\s+default\s*=|\s*=)?",
             block,
         ):
@@ -1481,7 +1482,7 @@ def _audit_component(component_id: str) -> dict[str, object]:
         for evidence_id in re.findall(r'evidenceId\s*=\s*"([^"]+)"', model_text)
     }
     codecs: list[dict[str, str]] = []
-    for realization_path in (MODEL_ROOT / "vellis" / "realizations").glob("*.sysml"):
+    for realization_path in MODEL_ROOT.glob("**/realizations/*.sysml"):
         realization_text = realization_path.read_text(encoding="utf-8")
         code_root = (
             f'codeRoot = "components/{component_id.removeprefix("component.").replace(".", "/")}"'
@@ -2528,9 +2529,9 @@ def check(scope: str = "all", *, require_external: bool = False) -> list[Finding
         if re.search(r"\bimport\s+Vellis", bibliotek_text):
             findings.append(Finding(MODEL_ROOT / "bibliotek", "Bibliotek must not import Vellis"))
         models = _component_model_statuses()
-        if len(models) != 10:
+        if len(models) != 11:
             findings.append(
-                Finding(COMPONENT_MODEL_ROOT, f"expected 10 components, found {len(models)}")
+                Finding(COMPONENT_MODEL_ROOT, f"expected 11 components, found {len(models)}")
             )
         findings.extend(_check_forbidden_component_imports())
         findings.extend(_check_protocol_action_coverage())

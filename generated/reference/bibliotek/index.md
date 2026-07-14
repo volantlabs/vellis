@@ -8,6 +8,7 @@ Bibliotek is a reusable SysML library package. It imports the generic modeling f
 
 | Component | Status | Generated view |
 |---|---|---|
+| `component.app.catalog` | `draft` | [component view](components/component.app.catalog.md) |
 | `component.rtg.change_validation` | `accepted` | [component view](components/component.rtg.change_validation.md) |
 | `component.rtg.constraints` | `accepted` | [component view](components/component.rtg.constraints.md) |
 | `component.rtg.controller` | `accepted` | [component view](components/component.rtg.controller.md) |
