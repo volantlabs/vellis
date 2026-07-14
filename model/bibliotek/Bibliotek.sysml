@@ -18,6 +18,7 @@ library package Bibliotek {
     public import BibliotekRtgGraphBridge::*;
     public import BibliotekRtgCitationResolution::*;
     public import BibliotekRtgBridgeTraversal::*;
+    public import BibliotekRtgRoutePack::*;
     public import BibliotekRtgController::*;
 
     doc /*

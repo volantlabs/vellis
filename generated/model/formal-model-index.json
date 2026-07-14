@@ -17,6 +17,7 @@
     "BibliotekRtgGraphRegistry": "model/bibliotek/components/component.rtg.graph_registry.sysml",
     "BibliotekRtgMigration": "model/bibliotek/components/component.rtg.migration.sysml",
     "BibliotekRtgQuery": "model/bibliotek/components/component.rtg.query.sysml",
+    "BibliotekRtgRoutePack": "model/bibliotek/components/component.rtg.route_pack.sysml",
     "BibliotekRtgSchema": "model/bibliotek/components/component.rtg.schema.sysml",
     "BibliotekSoftwareValues": "model/bibliotek/shared-values/SoftwareValues.sysml",
     "BibliotekStorageJsonFile": "model/bibliotek/components/component.storage.json_file.sysml",
@@ -36,18 +37,18 @@
   "packages": {
     "Bibliotek": {
       "element_counts": {
-        "ActionDefinition": 134,
-        "AttributeDefinition": 266,
+        "ActionDefinition": 136,
+        "AttributeDefinition": 270,
         "CalculationDefinition": 6,
         "ConstraintDefinition": 1,
-        "Documentation": 13,
-        "EnumerationDefinition": 43,
+        "Documentation": 14,
+        "EnumerationDefinition": 45,
         "ItemDefinition": 19,
         "LibraryPackage": 1,
-        "PartDefinition": 22,
-        "PartUsage": 17,
-        "RequirementUsage": 417,
-        "VerificationCaseDefinition": 150
+        "PartDefinition": 23,
+        "PartUsage": 18,
+        "RequirementUsage": 426,
+        "VerificationCaseDefinition": 153
       },
       "named_elements": [
         {
@@ -65,6 +66,10 @@
         {
           "kind": "ActionDefinition",
           "name": "ApplyMigrationCutover"
+        },
+        {
+          "kind": "ActionDefinition",
+          "name": "AssembleRoutePack"
         },
         {
           "kind": "ActionDefinition",
@@ -173,6 +178,10 @@
         {
           "kind": "ActionDefinition",
           "name": "DissociateData"
+        },
+        {
+          "kind": "ActionDefinition",
+          "name": "EvaluateRoutePack"
         },
         {
           "kind": "ActionDefinition",
@@ -1388,6 +1397,22 @@
         },
         {
           "kind": "AttributeDefinition",
+          "name": "RtgRoutePackAssemblyRequest"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "RtgRoutePackGateRecord"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "RtgRoutePackInvalid"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "RtgRoutePackRecord"
+        },
+        {
+          "kind": "AttributeDefinition",
           "name": "RtgSchemaAnchorTypeSummary"
         },
         {
@@ -1812,6 +1837,14 @@
         },
         {
           "kind": "EnumerationDefinition",
+          "name": "RtgRoutePackDecision"
+        },
+        {
+          "kind": "EnumerationDefinition",
+          "name": "RtgRoutePackStatus"
+        },
+        {
+          "kind": "EnumerationDefinition",
           "name": "RtgSchemaDefinitionKind"
         },
         {
@@ -2019,6 +2052,11 @@
         },
         {
           "kind": "PartDefinition",
+          "name": "RtgRoutePack",
+          "short_name": "component.rtg.route_pack"
+        },
+        {
+          "kind": "PartDefinition",
           "name": "RtgSchema",
           "short_name": "component.rtg.schema"
         },
@@ -2058,6 +2096,11 @@
         },
         {
           "kind": "RequirementUsage",
+          "name": "advisoryContextOnly",
+          "short_name": "invariant.rtg.route_pack.advisory_context_only"
+        },
+        {
+          "kind": "RequirementUsage",
           "name": "anchorDisplayNameNonAuthoritative",
           "short_name": "invariant.rtg.graph.anchor_display_name_non_authoritative"
         },
@@ -2070,6 +2113,16 @@
           "kind": "RequirementUsage",
           "name": "applyMigrationCutoverFailureSemantics",
           "short_name": "contract.rtg.controller.apply_migration_cutover.failures"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "assembleRoutePackFailureSemantics",
+          "short_name": "contract.rtg.route_pack.assemble.failures"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "assemblySemantics",
+          "short_name": "contract.rtg.route_pack.assembly"
         },
         {
           "kind": "RequirementUsage",
@@ -2558,6 +2611,11 @@
         },
         {
           "kind": "RequirementUsage",
+          "name": "evaluateRoutePackFailureSemantics",
+          "short_name": "contract.rtg.route_pack.evaluate.failures"
+        },
+        {
+          "kind": "RequirementUsage",
           "name": "evidenceEffect",
           "short_name": "contract.rtg.migration.evidence_effect"
         },
@@ -2660,6 +2718,11 @@
           "kind": "RequirementUsage",
           "name": "flushLedgerFailuresFailureSemantics",
           "short_name": "contract.rtg.controller.flush_ledger_failures.failures"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "gateDecision",
+          "short_name": "contract.rtg.route_pack.gate_decision"
         },
         {
           "kind": "RequirementUsage",
@@ -2890,6 +2953,11 @@
           "kind": "RequirementUsage",
           "name": "intentionalBoundary",
           "short_name": "contract.rtg.bridge_traversal.intentional_boundary"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "intentionalBoundary",
+          "short_name": "contract.rtg.route_pack.intentional_boundary"
         },
         {
           "kind": "RequirementUsage",
@@ -3168,6 +3236,11 @@
         },
         {
           "kind": "RequirementUsage",
+          "name": "nextActionPrecedence",
+          "short_name": "contract.rtg.route_pack.next_action_precedence"
+        },
+        {
+          "kind": "RequirementUsage",
           "name": "noAppData",
           "short_name": "invariant.app.shell.no_app_data"
         },
@@ -3215,6 +3288,11 @@
           "kind": "RequirementUsage",
           "name": "noInheritanceCompositionV1",
           "short_name": "invariant.rtg.schema.no_inheritance_composition_v1"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "noInputMutation",
+          "short_name": "invariant.rtg.route_pack.no_input_mutation"
         },
         {
           "kind": "RequirementUsage",
@@ -3923,6 +4001,11 @@
         },
         {
           "kind": "RequirementUsage",
+          "name": "toolExposure",
+          "short_name": "contract.rtg.route_pack.tool_exposure"
+        },
+        {
+          "kind": "RequirementUsage",
           "name": "trackIsolation",
           "short_name": "contract.rtg.change_validation.track_isolation"
         },
@@ -4146,6 +4229,10 @@
         },
         {
           "kind": "VerificationCaseDefinition",
+          "name": "AssembleRoutePackContractVerification"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
           "name": "AssociateDataContractVerification"
         },
         {
@@ -4251,6 +4338,10 @@
         {
           "kind": "VerificationCaseDefinition",
           "name": "DissociateDataContractVerification"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
+          "name": "EvaluateRoutePackContractVerification"
         },
         {
           "kind": "VerificationCaseDefinition",
@@ -4647,6 +4738,10 @@
         {
           "kind": "VerificationCaseDefinition",
           "name": "RtgQueryBoundaryVerification"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
+          "name": "RtgRoutePackBoundaryVerification"
         },
         {
           "kind": "VerificationCaseDefinition",
@@ -5747,19 +5842,19 @@
     "BibliotekLocalPythonRealization": {
       "element_counts": {
         "Dependency": 48,
-        "Documentation": 11,
-        "EnumerationUsage": 11,
-        "Feature": 9,
-        "FeatureReferenceExpression": 8,
+        "Documentation": 12,
+        "EnumerationUsage": 12,
+        "Feature": 10,
+        "FeatureReferenceExpression": 9,
         "ItemUsage": 7,
-        "LiteralString": 144,
-        "MetadataUsage": 56,
+        "LiteralString": 162,
+        "MetadataUsage": 63,
         "Multiplicity": 7,
         "Package": 1,
-        "PartDefinition": 8,
+        "PartDefinition": 9,
         "PartUsage": 8,
-        "PerformActionUsage": 33,
-        "ReferenceUsage": 155
+        "PerformActionUsage": 35,
+        "ReferenceUsage": 174
       },
       "named_elements": [
         {
@@ -5769,6 +5864,10 @@
         {
           "kind": "PartDefinition",
           "name": "DeterministicRtgCitationResolver"
+        },
+        {
+          "kind": "PartDefinition",
+          "name": "DeterministicRtgRoutePack"
         },
         {
           "kind": "PartDefinition",
@@ -11057,6 +11156,178 @@
       ],
       "source": "model/bibliotek/components/component.rtg.query.sysml"
     },
+    "BibliotekRtgRoutePack": {
+      "element_counts": {
+        "ActionDefinition": 2,
+        "AttributeDefinition": 4,
+        "AttributeUsage": 39,
+        "ConstraintUsage": 9,
+        "Documentation": 23,
+        "EnumerationDefinition": 2,
+        "EnumerationUsage": 10,
+        "Feature": 17,
+        "FeatureReferenceExpression": 10,
+        "LibraryPackage": 1,
+        "LiteralInfinity": 16,
+        "LiteralInteger": 16,
+        "LiteralString": 9,
+        "MetadataUsage": 6,
+        "Multiplicity": 29,
+        "MultiplicityRange": 17,
+        "PartDefinition": 1,
+        "PartUsage": 2,
+        "PerformActionUsage": 2,
+        "ReferenceUsage": 55,
+        "RequirementUsage": 21,
+        "SatisfyRequirementUsage": 9,
+        "VerificationCaseDefinition": 3
+      },
+      "named_elements": [
+        {
+          "kind": "ActionDefinition",
+          "name": "AssembleRoutePack"
+        },
+        {
+          "kind": "ActionDefinition",
+          "name": "EvaluateRoutePack"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "RtgRoutePackAssemblyRequest"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "RtgRoutePackGateRecord"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "RtgRoutePackInvalid"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "RtgRoutePackRecord"
+        },
+        {
+          "kind": "EnumerationDefinition",
+          "name": "RtgRoutePackDecision"
+        },
+        {
+          "kind": "EnumerationDefinition",
+          "name": "RtgRoutePackStatus"
+        },
+        {
+          "kind": "PartDefinition",
+          "name": "RtgRoutePack",
+          "short_name": "component.rtg.route_pack"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "advisoryContextOnly",
+          "short_name": "invariant.rtg.route_pack.advisory_context_only"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "advisoryContextOnly"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "assembleRoutePackFailureSemantics",
+          "short_name": "contract.rtg.route_pack.assemble.failures"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "assembleRoutePackFailureSemantics"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "assemblySemantics",
+          "short_name": "contract.rtg.route_pack.assembly"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "assemblySemantics"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "evaluateRoutePackFailureSemantics",
+          "short_name": "contract.rtg.route_pack.evaluate.failures"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "evaluateRoutePackFailureSemantics"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "gateDecision",
+          "short_name": "contract.rtg.route_pack.gate_decision"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "gateDecision"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "intentionalBoundary",
+          "short_name": "contract.rtg.route_pack.intentional_boundary"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "intentionalBoundary"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "nextActionPrecedence",
+          "short_name": "contract.rtg.route_pack.next_action_precedence"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "nextActionPrecedence"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "noInputMutation",
+          "short_name": "invariant.rtg.route_pack.no_input_mutation"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "noInputMutation"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "obj"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "obj"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "obj"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "toolExposure",
+          "short_name": "contract.rtg.route_pack.tool_exposure"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "toolExposure"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
+          "name": "AssembleRoutePackContractVerification"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
+          "name": "EvaluateRoutePackContractVerification"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
+          "name": "RtgRoutePackBoundaryVerification"
+        }
+      ],
+      "source": "model/bibliotek/components/component.rtg.route_pack.sysml"
+    },
     "BibliotekRtgSchema": {
       "element_counts": {
         "ActionDefinition": 12,
@@ -14281,7 +14552,7 @@
     }
   },
   "schema_version": 1,
-  "source_digest": "265c9785a33fc6ed6f71df8ea07d74dde50c7ae4bd7fda98bd1bbf5ad14fd4ab",
+  "source_digest": "dee65341a6f8290930cdb6281b0fea5ee4875e4b8045de7c0505427f47fbc6c3",
   "validator": {
     "implementation_version": "0.50.0",
     "provider": "Systems-Modeling/SysML-v2-Pilot-Implementation",

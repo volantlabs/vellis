@@ -1796,6 +1796,42 @@
         "components/rtg/query/tests/test_rtg_query_contract.py::test_query_regex_uses_re2_dialect_and_declared_flags"
       ]
     },
+    "components/rtg/route_pack/tests/test_rtg_route_pack_contract.py#AssembleRoutePackContractVerification": {
+      "model_source": "model/bibliotek/components/component.rtg.route_pack.sysml",
+      "status": "resolved",
+      "test_nodes": [
+        "components/rtg/route_pack/tests/test_rtg_route_pack_contract.py::test_assemble_ready_pack_and_invoke_gate_preserve_inputs",
+        "components/rtg/route_pack/tests/test_rtg_route_pack_contract.py::test_warning_hazard_clarifies_and_hides_graph_local_tools",
+        "components/rtg/route_pack/tests/test_rtg_route_pack_contract.py::test_blocker_hazard_blocks_and_reports_blocker_code",
+        "components/rtg/route_pack/tests/test_rtg_route_pack_contract.py::test_assemble_rejects_non_finite_and_malformed_json"
+      ]
+    },
+    "components/rtg/route_pack/tests/test_rtg_route_pack_contract.py#EvaluateRoutePackContractVerification": {
+      "model_source": "model/bibliotek/components/component.rtg.route_pack.sysml",
+      "status": "resolved",
+      "test_nodes": [
+        "components/rtg/route_pack/tests/test_rtg_route_pack_contract.py::test_assemble_ready_pack_and_invoke_gate_preserve_inputs",
+        "components/rtg/route_pack/tests/test_rtg_route_pack_contract.py::test_invoke_uses_descriptor_read_without_graph_local_handoff",
+        "components/rtg/route_pack/tests/test_rtg_route_pack_contract.py::test_invoke_uses_federated_plan_for_multiple_graph_contexts",
+        "components/rtg/route_pack/tests/test_rtg_route_pack_contract.py::test_warning_hazard_clarifies_and_hides_graph_local_tools",
+        "components/rtg/route_pack/tests/test_rtg_route_pack_contract.py::test_blocker_hazard_blocks_and_reports_blocker_code",
+        "components/rtg/route_pack/tests/test_rtg_route_pack_contract.py::test_gate_rejects_malformed_route_pack",
+        "components/rtg/route_pack/tests/test_rtg_route_pack_contract.py::test_gate_rejects_status_hazard_inconsistency_and_malformed_hazard"
+      ]
+    },
+    "components/rtg/route_pack/tests/test_rtg_route_pack_contract.py#RtgRoutePackBoundaryVerification": {
+      "model_source": "model/bibliotek/components/component.rtg.route_pack.sysml",
+      "status": "resolved",
+      "test_nodes": [
+        "components/rtg/route_pack/tests/test_rtg_route_pack_contract.py::test_assemble_ready_pack_and_invoke_gate_preserve_inputs",
+        "components/rtg/route_pack/tests/test_rtg_route_pack_contract.py::test_invoke_uses_descriptor_read_without_graph_local_handoff",
+        "components/rtg/route_pack/tests/test_rtg_route_pack_contract.py::test_invoke_uses_federated_plan_for_multiple_graph_contexts",
+        "components/rtg/route_pack/tests/test_rtg_route_pack_contract.py::test_warning_hazard_clarifies_and_hides_graph_local_tools",
+        "components/rtg/route_pack/tests/test_rtg_route_pack_contract.py::test_blocker_hazard_blocks_and_reports_blocker_code",
+        "components/rtg/route_pack/tests/test_rtg_route_pack_contract.py::test_reference_factories_expose_split_stateless_realization",
+        "components/rtg/route_pack/tests/test_rtg_route_pack_contract.py::test_route_pack_surfaces_do_not_expose_execution_operations"
+      ]
+    },
     "components/rtg/schema/tests/test_rtg_schema_contract.py#CreateEmptyRtgSchemaContractVerification": {
       "model_source": "model/bibliotek/components/component.rtg.schema.sysml",
       "status": "resolved",

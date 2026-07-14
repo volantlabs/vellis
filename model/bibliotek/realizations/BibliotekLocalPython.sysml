@@ -8,6 +8,7 @@ package BibliotekLocalPythonRealization {
     private import BibliotekRtgGraphBridge::*;
     private import BibliotekRtgCitationResolution::*;
     private import BibliotekRtgBridgeTraversal::*;
+    private import BibliotekRtgRoutePack::*;
 
     part def InMemoryAppCatalog :> AppCatalog {
         @ImplementationCodec { logicalType = "LaunchSurfaceMode and RuntimeControl"; implementationType = "str"; normalization = "The Python realization accepts and emits exactly the modeled enumeration literal names."; }
@@ -79,5 +80,14 @@ package BibliotekLocalPythonRealization {
         @ImplementationCodec { logicalType = "retained bridgeStore and citationResolver roles"; implementationType = "constructor-held Protocol references"; normalization = "The Python traverser retains exactly the supplied confirmed-bridge store and bounded citation resolver and invokes only their modeled read methods."; }
         @ImplementationCodec { logicalType = "returned bridge and endpoint records"; implementationType = "deep-copied frozen dataclass records"; normalization = "Python preserves modeled values and endpoint separation while removing mutable aliases to dependency-owned metadata, records, and provenance."; }
         @ImplementationBinding { implementationLanguage = ImplementationLanguage::python; codeRoot = "components/rtg/bridge_traversal"; symbol = "components.rtg.bridge_traversal.DeterministicRtgBridgeTraverser"; realization = "BibliotekLocalPython"; }
+    }
+
+    part def DeterministicRtgRoutePack :> RtgRoutePack {
+        @ImplementationCodec { logicalType = "SysML lowerCamelCase public feature names"; implementationType = "Python snake_case dataclass, dictionary key, and argument names"; normalization = "The realization maps names mechanically without changing values, multiplicities, ordering, or operation meaning."; }
+        @ImplementationCodec { logicalType = "RtgRoutePackStatus and RtgRoutePackDecision"; implementationType = "str values inside JSON objects"; normalization = "Python accepts and emits exactly the modeled lower-case enumeration literal names."; }
+        @ImplementationCodec { logicalType = "RtgRoutePackRecord and RtgRoutePackGateRecord"; implementationType = "dict[str, JsonValue]"; normalization = "Python dictionary keys are the snake_case encoding of modeled fields and preserve every finite JSON value; ordered model collections map to Python lists."; }
+        @ImplementationCodec { logicalType = "RtgRoutePackAssemblyRequest ordered collections"; implementationType = "tuple inputs copied to list outputs"; normalization = "Python tuples preserve caller order at the request boundary and the returned JSON records preserve that order in independent lists."; }
+        @ImplementationCodec { logicalType = "one logical component with assemble and evaluate actions"; implementationType = "DeterministicRtgRoutePack with narrow builder and gate compatibility classes"; normalization = "The stateless Python component exposes both modeled actions while retaining the predecessor's narrow capability classes without changing behavior."; }
+        @ImplementationBinding { implementationLanguage = ImplementationLanguage::python; codeRoot = "components/rtg/route_pack"; symbol = "components.rtg.route_pack.DeterministicRtgRoutePack"; realization = "BibliotekLocalPython"; }
     }
 }

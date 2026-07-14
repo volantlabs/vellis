@@ -124,6 +124,7 @@ Current generated component views include:
 - [`component.rtg.graph_bridge`](generated/reference/bibliotek/components/component.rtg.graph_bridge.md): draft store for explicit graph-qualified bridge assertions and separately reviewable candidates.
 - [`component.rtg.citation_resolution`](generated/reference/bibliotek/components/component.rtg.citation_resolution.md): draft read-only resolver for graph-qualified citations through catalog-declared bounded projections.
 - [`component.rtg.bridge_traversal`](generated/reference/bibliotek/components/component.rtg.bridge_traversal.md): draft read-only traversal of one active confirmed bridge through independent endpoint resolutions.
+- [`component.rtg.route_pack`](generated/reference/bibliotek/components/component.rtg.route_pack.md): draft assembly and hazard gate for advisory routed-work execution context.
 - [`component.rtg.controller`](generated/reference/bibliotek/components/component.rtg.controller.md): cross-component orchestration and invariant owner.
 
 Current Python implementations include:
@@ -143,6 +144,7 @@ Current Python implementations include:
 - [`components/rtg/graph_bridge`](components/rtg/graph_bridge/): in-memory bridge assertion and candidate-review implementation with boundary tests.
 - [`components/rtg/citation_resolution`](components/rtg/citation_resolution/): deterministic bounded citation resolver with read-only catalog and projection dependencies.
 - [`components/rtg/bridge_traversal`](components/rtg/bridge_traversal/): deterministic single-bridge traversal with separate bounded endpoint resolutions and boundary tests.
+- [`components/rtg/route_pack`](components/rtg/route_pack/): deterministic advisory route-pack assembly and execution gating with boundary tests.
 - [`components/rtg/change_validation`](components/rtg/change_validation/): deterministic no-mutation RTG change validator implementation and boundary tests.
 - [`components/rtg/controller`](components/rtg/controller/): in-process RTG controller implementation with validation, snapshots, cutover, and SQL-backed ledger behavior.
 
