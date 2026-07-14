@@ -6,6 +6,7 @@
     "BibliotekAppShell": "model/bibliotek/components/component.app.shell.sysml",
     "BibliotekLocalPythonRealization": "model/bibliotek/realizations/BibliotekLocalPython.sysml",
     "BibliotekRtgChangeValidation": "model/bibliotek/components/component.rtg.change_validation.sysml",
+    "BibliotekRtgCitationResolution": "model/bibliotek/components/component.rtg.citation_resolution.sysml",
     "BibliotekRtgConstraints": "model/bibliotek/components/component.rtg.constraints.sysml",
     "BibliotekRtgController": "model/bibliotek/components/component.rtg.controller.sysml",
     "BibliotekRtgDiagnostics": "model/bibliotek/shared-values/RtgDiagnostics.sysml",
@@ -34,18 +35,18 @@
   "packages": {
     "Bibliotek": {
       "element_counts": {
-        "ActionDefinition": 127,
-        "AttributeDefinition": 256,
+        "ActionDefinition": 131,
+        "AttributeDefinition": 261,
         "CalculationDefinition": 6,
         "ConstraintDefinition": 1,
-        "Documentation": 11,
-        "EnumerationDefinition": 41,
+        "Documentation": 12,
+        "EnumerationDefinition": 42,
         "ItemDefinition": 19,
         "LibraryPackage": 1,
-        "PartDefinition": 17,
-        "PartUsage": 15,
-        "RequirementUsage": 393,
-        "VerificationCaseDefinition": 142
+        "PartDefinition": 20,
+        "PartUsage": 16,
+        "RequirementUsage": 407,
+        "VerificationCaseDefinition": 147
       },
       "named_elements": [
         {
@@ -234,6 +235,10 @@
         },
         {
           "kind": "ActionDefinition",
+          "name": "GetCitationProjection"
+        },
+        {
+          "kind": "ActionDefinition",
           "name": "GetConstraint"
         },
         {
@@ -398,6 +403,10 @@
         },
         {
           "kind": "ActionDefinition",
+          "name": "OpenRtgCitationResolver"
+        },
+        {
+          "kind": "ActionDefinition",
           "name": "OpenRtgController"
         },
         {
@@ -474,6 +483,10 @@
         },
         {
           "kind": "ActionDefinition",
+          "name": "ReadCitationProjection"
+        },
+        {
+          "kind": "ActionDefinition",
           "name": "ReadJsonDocument"
         },
         {
@@ -491,6 +504,10 @@
         {
           "kind": "ActionDefinition",
           "name": "ReplayLedger"
+        },
+        {
+          "kind": "ActionDefinition",
+          "name": "ResolveCitation"
         },
         {
           "kind": "ActionDefinition",
@@ -763,6 +780,26 @@
         {
           "kind": "AttributeDefinition",
           "name": "RtgChangeReference"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "RtgCitationProjectionRead"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "RtgCitationProjectionSpec"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "RtgCitationResolutionInvalid"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "RtgCitationResolutionRecord"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "RtgCitationResolutionRequest"
         },
         {
           "kind": "AttributeDefinition",
@@ -1618,6 +1655,10 @@
         },
         {
           "kind": "EnumerationDefinition",
+          "name": "RtgCitationResolutionStatus"
+        },
+        {
+          "kind": "EnumerationDefinition",
           "name": "RtgConstraintExpectation"
         },
         {
@@ -1875,6 +1916,19 @@
         },
         {
           "kind": "PartDefinition",
+          "name": "RtgCitationProjectionCatalog"
+        },
+        {
+          "kind": "PartDefinition",
+          "name": "RtgCitationProjectionReader"
+        },
+        {
+          "kind": "PartDefinition",
+          "name": "RtgCitationResolver",
+          "short_name": "component.rtg.citation_resolution"
+        },
+        {
+          "kind": "PartDefinition",
           "name": "RtgConstraints",
           "short_name": "component.rtg.constraints"
         },
@@ -2038,6 +2092,11 @@
         },
         {
           "kind": "RequirementUsage",
+          "name": "boundedProjection",
+          "short_name": "invariant.rtg.citation_resolution.bounded_projection"
+        },
+        {
+          "kind": "RequirementUsage",
           "name": "bridgeValidity",
           "short_name": "contract.rtg.graph_bridge.bridge_validity"
         },
@@ -2105,6 +2164,11 @@
           "kind": "RequirementUsage",
           "name": "cascadeEffectsFromPreview",
           "short_name": "invariant.rtg.change_validation.cascade_effects_from_graph_preview"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "catalogCapability",
+          "short_name": "contract.rtg.citation_resolution.catalog_capability"
         },
         {
           "kind": "RequirementUsage",
@@ -2348,6 +2412,11 @@
         },
         {
           "kind": "RequirementUsage",
+          "name": "dependencyIntegrity",
+          "short_name": "contract.rtg.citation_resolution.dependency_integrity"
+        },
+        {
+          "kind": "RequirementUsage",
           "name": "descriptorValidity",
           "short_name": "contract.rtg.graph_registry.descriptor_validity"
         },
@@ -2440,6 +2509,11 @@
           "kind": "RequirementUsage",
           "name": "evidenceEffect",
           "short_name": "contract.rtg.migration.evidence_effect"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "exactAnchorMatch",
+          "short_name": "invariant.rtg.citation_resolution.exact_anchor_match"
         },
         {
           "kind": "RequirementUsage",
@@ -2558,6 +2632,11 @@
         },
         {
           "kind": "RequirementUsage",
+          "name": "getCitationProjectionFailureSemantics",
+          "short_name": "contract.rtg.citation_resolution.get_projection.failures"
+        },
+        {
+          "kind": "RequirementUsage",
           "name": "getConstraintFailureSemantics",
           "short_name": "contract.rtg.constraints.get_constraint.failures"
         },
@@ -2615,6 +2694,11 @@
           "kind": "RequirementUsage",
           "name": "graphLocalIdentity",
           "short_name": "invariant.rtg.graph_bridge.graph_local_identity"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "graphQualifiedIdentity",
+          "short_name": "invariant.rtg.citation_resolution.graph_qualified_identity"
         },
         {
           "kind": "RequirementUsage",
@@ -2740,6 +2824,11 @@
           "kind": "RequirementUsage",
           "name": "intentionalBoundary",
           "short_name": "contract.rtg.graph_bridge.intentional_boundary"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "intentionalBoundary",
+          "short_name": "contract.rtg.citation_resolution.intentional_boundary"
         },
         {
           "kind": "RequirementUsage",
@@ -3168,6 +3257,11 @@
         },
         {
           "kind": "RequirementUsage",
+          "name": "openRtgCitationResolverFailureSemantics",
+          "short_name": "contract.rtg.citation_resolution.open.failures"
+        },
+        {
+          "kind": "RequirementUsage",
           "name": "openRtgControllerFailureSemantics",
           "short_name": "contract.rtg.controller.open_rtg_controller.failures"
         },
@@ -3288,6 +3382,11 @@
         },
         {
           "kind": "RequirementUsage",
+          "name": "provenancePreserved",
+          "short_name": "invariant.rtg.citation_resolution.provenance_preserved"
+        },
+        {
+          "kind": "RequirementUsage",
           "name": "provenanceRequired",
           "short_name": "invariant.rtg.graph_bridge.provenance_required"
         },
@@ -3388,6 +3487,11 @@
         },
         {
           "kind": "RequirementUsage",
+          "name": "readCitationProjectionFailureSemantics",
+          "short_name": "contract.rtg.citation_resolution.read_projection.failures"
+        },
+        {
+          "kind": "RequirementUsage",
           "name": "readEffect",
           "short_name": "contract.storage.json_file.read_effect"
         },
@@ -3400,6 +3504,16 @@
           "kind": "RequirementUsage",
           "name": "readJsonDocumentFailureSemantics",
           "short_name": "contract.storage.json_file.read_json_document.failures"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "readOnly",
+          "short_name": "invariant.rtg.citation_resolution.read_only"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "readerCapability",
+          "short_name": "contract.rtg.citation_resolution.reader_capability"
         },
         {
           "kind": "RequirementUsage",
@@ -3488,6 +3602,11 @@
         },
         {
           "kind": "RequirementUsage",
+          "name": "resolveCitationFailureSemantics",
+          "short_name": "contract.rtg.citation_resolution.resolve.failures"
+        },
+        {
+          "kind": "RequirementUsage",
           "name": "resolvedUuidsBeforeLedger",
           "short_name": "invariant.rtg.controller.resolved_uuids_before_ledger"
         },
@@ -3500,6 +3619,11 @@
           "kind": "RequirementUsage",
           "name": "restoreFromSnapshotFailureSemantics",
           "short_name": "contract.rtg.controller.restore_from_snapshot.failures"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "resultSemantics",
+          "short_name": "contract.rtg.citation_resolution.result_semantics"
         },
         {
           "kind": "RequirementUsage",
@@ -4094,6 +4218,10 @@
         },
         {
           "kind": "VerificationCaseDefinition",
+          "name": "GetCitationProjectionContractVerification"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
           "name": "GetConstraintContractVerification"
         },
         {
@@ -4262,6 +4390,10 @@
         },
         {
           "kind": "VerificationCaseDefinition",
+          "name": "OpenRtgCitationResolverContractVerification"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
           "name": "OpenRtgControllerContractVerification"
         },
         {
@@ -4338,6 +4470,10 @@
         },
         {
           "kind": "VerificationCaseDefinition",
+          "name": "ReadCitationProjectionContractVerification"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
           "name": "ReadJsonDocumentContractVerification"
         },
         {
@@ -4358,6 +4494,10 @@
         },
         {
           "kind": "VerificationCaseDefinition",
+          "name": "ResolveCitationContractVerification"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
           "name": "RestoreFromSnapshotContractVerification"
         },
         {
@@ -4367,6 +4507,10 @@
         {
           "kind": "VerificationCaseDefinition",
           "name": "RtgChangeValidationBoundaryVerification"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
+          "name": "RtgCitationResolverBoundaryVerification"
         },
         {
           "kind": "VerificationCaseDefinition",
@@ -5494,22 +5638,26 @@
     },
     "BibliotekLocalPythonRealization": {
       "element_counts": {
-        "Dependency": 46,
-        "Documentation": 9,
-        "EnumerationUsage": 9,
-        "Feature": 7,
-        "FeatureReferenceExpression": 6,
+        "Dependency": 48,
+        "Documentation": 10,
+        "EnumerationUsage": 10,
+        "Feature": 8,
+        "FeatureReferenceExpression": 7,
         "ItemUsage": 7,
-        "LiteralString": 96,
-        "MetadataUsage": 38,
+        "LiteralString": 126,
+        "MetadataUsage": 49,
         "Multiplicity": 7,
         "Package": 1,
-        "PartDefinition": 6,
-        "PartUsage": 4,
-        "PerformActionUsage": 31,
-        "ReferenceUsage": 105
+        "PartDefinition": 7,
+        "PartUsage": 6,
+        "PerformActionUsage": 32,
+        "ReferenceUsage": 136
       },
       "named_elements": [
+        {
+          "kind": "PartDefinition",
+          "name": "DeterministicRtgCitationResolver"
+        },
         {
           "kind": "PartDefinition",
           "name": "InMemoryAppCatalog"
@@ -5896,6 +6044,259 @@
         }
       ],
       "source": "model/bibliotek/components/component.rtg.change_validation.sysml"
+    },
+    "BibliotekRtgCitationResolution": {
+      "element_counts": {
+        "ActionDefinition": 4,
+        "ActionUsage": 2,
+        "AttributeDefinition": 5,
+        "AttributeUsage": 18,
+        "BindingConnectorAsUsage": 2,
+        "ConstraintUsage": 14,
+        "Dependency": 2,
+        "Documentation": 35,
+        "EnumerationDefinition": 1,
+        "EnumerationUsage": 8,
+        "Feature": 23,
+        "FeatureReferenceExpression": 15,
+        "LibraryPackage": 1,
+        "LiteralInfinity": 5,
+        "LiteralInteger": 13,
+        "LiteralString": 12,
+        "MetadataUsage": 10,
+        "Multiplicity": 24,
+        "MultiplicityRange": 11,
+        "NullExpression": 3,
+        "PartDefinition": 3,
+        "PartUsage": 7,
+        "PerformActionUsage": 3,
+        "ReferenceUsage": 91,
+        "RequirementUsage": 33,
+        "SatisfyRequirementUsage": 14,
+        "VerificationCaseDefinition": 5
+      },
+      "named_elements": [
+        {
+          "kind": "ActionDefinition",
+          "name": "GetCitationProjection"
+        },
+        {
+          "kind": "ActionDefinition",
+          "name": "OpenRtgCitationResolver"
+        },
+        {
+          "kind": "ActionDefinition",
+          "name": "ReadCitationProjection"
+        },
+        {
+          "kind": "ActionDefinition",
+          "name": "ResolveCitation"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "RtgCitationProjectionRead"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "RtgCitationProjectionSpec"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "RtgCitationResolutionInvalid"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "RtgCitationResolutionRecord"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "RtgCitationResolutionRequest"
+        },
+        {
+          "kind": "EnumerationDefinition",
+          "name": "RtgCitationResolutionStatus"
+        },
+        {
+          "kind": "PartDefinition",
+          "name": "RtgCitationProjectionCatalog"
+        },
+        {
+          "kind": "PartDefinition",
+          "name": "RtgCitationProjectionReader"
+        },
+        {
+          "kind": "PartDefinition",
+          "name": "RtgCitationResolver",
+          "short_name": "component.rtg.citation_resolution"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "boundedProjection",
+          "short_name": "invariant.rtg.citation_resolution.bounded_projection"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "boundedProjection"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "catalogCapability",
+          "short_name": "contract.rtg.citation_resolution.catalog_capability"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "catalogCapability"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "dependencyIntegrity",
+          "short_name": "contract.rtg.citation_resolution.dependency_integrity"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "dependencyIntegrity"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "exactAnchorMatch",
+          "short_name": "invariant.rtg.citation_resolution.exact_anchor_match"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "exactAnchorMatch"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "getCitationProjectionFailureSemantics",
+          "short_name": "contract.rtg.citation_resolution.get_projection.failures"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "getCitationProjectionFailureSemantics"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "graphQualifiedIdentity",
+          "short_name": "invariant.rtg.citation_resolution.graph_qualified_identity"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "graphQualifiedIdentity"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "intentionalBoundary",
+          "short_name": "contract.rtg.citation_resolution.intentional_boundary"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "intentionalBoundary"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "obj"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "obj"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "obj"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "obj"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "obj"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "openRtgCitationResolverFailureSemantics",
+          "short_name": "contract.rtg.citation_resolution.open.failures"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "openRtgCitationResolverFailureSemantics"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "provenancePreserved",
+          "short_name": "invariant.rtg.citation_resolution.provenance_preserved"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "provenancePreserved"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "readCitationProjectionFailureSemantics",
+          "short_name": "contract.rtg.citation_resolution.read_projection.failures"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "readCitationProjectionFailureSemantics"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "readOnly",
+          "short_name": "invariant.rtg.citation_resolution.read_only"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "readOnly"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "readerCapability",
+          "short_name": "contract.rtg.citation_resolution.reader_capability"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "readerCapability"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "resolveCitationFailureSemantics",
+          "short_name": "contract.rtg.citation_resolution.resolve.failures"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "resolveCitationFailureSemantics"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "resultSemantics",
+          "short_name": "contract.rtg.citation_resolution.result_semantics"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "resultSemantics"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
+          "name": "GetCitationProjectionContractVerification"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
+          "name": "OpenRtgCitationResolverContractVerification"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
+          "name": "ReadCitationProjectionContractVerification"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
+          "name": "ResolveCitationContractVerification"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
+          "name": "RtgCitationResolverBoundaryVerification"
+        }
+      ],
+      "source": "model/bibliotek/components/component.rtg.citation_resolution.sysml"
     },
     "BibliotekRtgConstraints": {
       "element_counts": {
@@ -13571,7 +13972,7 @@
     }
   },
   "schema_version": 1,
-  "source_digest": "f310720bec87ebf3d0964752bf74b0edd2a970c2dd2d5442cd97fc88a5a63364",
+  "source_digest": "5ee53a6aecb1a6806891b69a5ed4065f7f2ad3a7ae12b354aaf9d1406e2361a9",
   "validator": {
     "implementation_version": "0.50.0",
     "provider": "Systems-Modeling/SysML-v2-Pilot-Implementation",

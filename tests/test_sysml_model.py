@@ -16,11 +16,12 @@ def test_repository_model_profile_and_generated_artifacts_are_current() -> None:
     assert model_tool.check_generated() == []
 
 
-def test_bibliotek_model_has_all_fifteen_component_identities() -> None:
-    assert len(model_tool._component_model_statuses()) == 15
+def test_bibliotek_model_has_all_sixteen_component_identities() -> None:
+    assert len(model_tool._component_model_statuses()) == 16
     assert model_tool._component_model_statuses()["component.rtg.discovery"] == "draft"
     assert model_tool._component_model_statuses()["component.rtg.graph_registry"] == "draft"
     assert model_tool._component_model_statuses()["component.rtg.graph_bridge"] == "draft"
+    assert model_tool._component_model_statuses()["component.rtg.citation_resolution"] == "draft"
 
 
 def test_vellis_has_nine_bibliotek_roles_and_exact_mcp_surface() -> None:
@@ -54,7 +55,7 @@ def test_formal_validator_is_pinned_and_covers_every_authored_model() -> None:
         ]
         == "required"
     )
-    assert len(sysml_validator._model_files("all")) == 30
+    assert len(sysml_validator._model_files("all")) == 31
     assert all(path.exists() for path in sysml_validator._model_files("all"))
     assert model_layout.SOFTWARE_COMPONENT_PATTERN_PATH not in sysml_validator._model_files("all")
 
@@ -147,7 +148,7 @@ def test_generated_conformance_objectives_resolve_model_requirements_and_evidenc
 def test_official_parser_index_covers_authored_packages_and_public_definitions() -> None:
     index = json.loads(model_layout.GENERATED_FORMAL_INDEX.read_text(encoding="utf-8"))
 
-    assert len(index["authored_packages"]) == 30
+    assert len(index["authored_packages"]) == 31
     assert index["authored_packages"]["VellisPersonalLauncher"] == (
         "model/vellis/PersonalLauncher.sysml"
     )
@@ -596,7 +597,7 @@ def test_public_definitions_and_component_contracts_are_complete() -> None:
 def test_generated_component_views_cover_actions_state_and_invariants() -> None:
     pages = model_tool._component_pages()
 
-    assert len(pages) == 15
+    assert len(pages) == 16
     for content in pages.values():
         assert "## Provided actions" in content
         assert "## Construction actions" in content

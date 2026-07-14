@@ -501,7 +501,7 @@ def _check_protocol_action_signatures() -> list[Finding]:
                 continue
             model_outputs = re.findall(
                 rf"\bout\s+(?:ref\s+)?(?:attribute\s+|part\s+|item\s+)?"
-                rf"{SYSML_IDENTIFIER}(?:\[[^]]+\])?\s*:\s*([\w:]+)",
+                rf"{SYSML_IDENTIFIER}(\[[^]]+\])?\s*:\s*([\w:]+)",
                 action_blocks[action],
             )
             type_aliases = {
@@ -510,17 +510,27 @@ def _check_protocol_action_signatures() -> list[Finding]:
                 "int": "Integer",
                 "str": "String",
             }
+            optional_return = False
+            if isinstance(return_type, str) and " | " in return_type:
+                return_members = {member.strip() for member in return_type.split("|")}
+                if "None" in return_members and len(return_members) == 2:
+                    return_type = next(member for member in return_members if member != "None")
+                    optional_return = True
             if return_type in {None, "None"}:
                 expected_outputs: tuple[str, ...] = ()
             else:
                 assert isinstance(return_type, str)
                 expected_outputs = (type_aliases.get(return_type, return_type),)
-            if tuple(model_outputs) != expected_outputs:
+            model_output_types = tuple(output_type for _, output_type in model_outputs)
+            optionality_matches = not optional_return or (
+                len(model_outputs) == 1 and model_outputs[0][0] == "[0..1]"
+            )
+            if model_output_types != expected_outputs or not optionality_matches:
                 findings.append(
                     Finding(
                         path,
                         f"{method}/{action} return contract differs: "
-                        f"protocol={return_type}, model={tuple(model_outputs)}",
+                        f"protocol={return_type}, model={model_outputs}",
                     )
                 )
     return findings
@@ -2545,9 +2555,9 @@ def check(scope: str = "all", *, require_external: bool = False) -> list[Finding
         if re.search(r"\bimport\s+Vellis", bibliotek_text):
             findings.append(Finding(MODEL_ROOT / "bibliotek", "Bibliotek must not import Vellis"))
         models = _component_model_statuses()
-        if len(models) != 15:
+        if len(models) != 16:
             findings.append(
-                Finding(COMPONENT_MODEL_ROOT, f"expected 15 components, found {len(models)}")
+                Finding(COMPONENT_MODEL_ROOT, f"expected 16 components, found {len(models)}")
             )
         findings.extend(_check_forbidden_component_imports())
         findings.extend(_check_protocol_action_coverage())

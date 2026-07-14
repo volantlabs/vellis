@@ -62,6 +62,7 @@ MODEL_ORDER = (
     "bibliotek/components/component.rtg.discovery.sysml",
     "bibliotek/components/component.rtg.graph_registry.sysml",
     "bibliotek/components/component.rtg.graph_bridge.sysml",
+    "bibliotek/components/component.rtg.citation_resolution.sysml",
     "bibliotek/components/component.rtg.controller.sysml",
     "bibliotek/realizations/BibliotekLocalPython.sysml",
     "bibliotek/Bibliotek.sysml",

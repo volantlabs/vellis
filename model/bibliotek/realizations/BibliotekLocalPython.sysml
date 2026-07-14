@@ -6,6 +6,7 @@ package BibliotekLocalPythonRealization {
     private import BibliotekRtgDiscovery::*;
     private import BibliotekRtgGraphRegistry::*;
     private import BibliotekRtgGraphBridge::*;
+    private import BibliotekRtgCitationResolution::*;
 
     part def InMemoryAppCatalog :> AppCatalog {
         @ImplementationCodec { logicalType = "LaunchSurfaceMode and RuntimeControl"; implementationType = "str"; normalization = "The Python realization accepts and emits exactly the modeled enumeration literal names."; }
@@ -55,5 +56,18 @@ package BibliotekLocalPythonRealization {
         @ImplementationCodec { logicalType = "JsonObject"; implementationType = "dict[str, JsonValue]"; normalization = "Python preserves finite JSON-compatible values losslessly and deep-copies caller-owned mutable containers at the component boundary."; }
         @ImplementationCodec { logicalType = "Real"; implementationType = "float"; normalization = "Python finite floating-point confidence values encode the modeled real value in the closed interval from zero through one."; }
         @ImplementationBinding { implementationLanguage = ImplementationLanguage::python; codeRoot = "components/rtg/graph_bridge"; symbol = "components.rtg.graph_bridge.InMemoryRtgGraphBridge"; realization = "BibliotekLocalPython"; }
+    }
+
+    part def DeterministicRtgCitationResolver :> RtgCitationResolver {
+        @ImplementationCodec { logicalType = "SysML lowerCamelCase public feature names"; implementationType = "Python snake_case dataclass and argument names"; normalization = "The realization maps names mechanically without changing values, multiplicities, ordering, or operation meaning."; }
+        @ImplementationCodec { logicalType = "Uuid"; implementationType = "str"; normalization = "Python validates and canonicalizes UUID text before returning the same logical UUID identity."; }
+        @ImplementationCodec { logicalType = "RtgCitationResolutionStatus"; implementationType = "str"; normalization = "Python accepts and emits exactly the modeled lower-case enumeration literal names."; }
+        @ImplementationCodec { logicalType = "ordered multiplicities"; implementationType = "tuple"; normalization = "Python tuples preserve reader order and immutable result ordering."; }
+        @ImplementationCodec { logicalType = "optional values"; implementationType = "T | None"; normalization = "None represents modeled absence and a present Python value represents the single optional modeled occurrence."; }
+        @ImplementationCodec { logicalType = "RtgCitationProjectionRead::provenance and RtgCitationResolutionRecord::provenance"; implementationType = "field(default_factory=dict)"; normalization = "An omitted Python constructor argument creates the required present empty logical JsonObject and encodes equivalently."; }
+        @ImplementationCodec { logicalType = "RtgCitationResolutionRecord::records"; implementationType = "tuple default ()"; normalization = "An omitted Python constructor argument creates the required present empty ordered record sequence and encodes equivalently."; }
+        @ImplementationCodec { logicalType = "JsonObject"; implementationType = "dict[str, JsonValue]"; normalization = "Python preserves finite JSON-compatible values losslessly and deep-copies caller-owned mutable containers at the component boundary."; }
+        @ImplementationCodec { logicalType = "retained catalog and reader roles"; implementationType = "constructor-held Protocol references"; normalization = "The Python resolver retains exactly the two supplied read-only collaborators and invokes only their modeled public methods."; }
+        @ImplementationBinding { implementationLanguage = ImplementationLanguage::python; codeRoot = "components/rtg/citation_resolution"; symbol = "components.rtg.citation_resolution.DeterministicRtgCitationResolver"; realization = "BibliotekLocalPython"; }
     }
 }

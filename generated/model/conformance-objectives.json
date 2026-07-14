@@ -554,6 +554,117 @@
       "verification": "ValidateRtgGraphStateContractVerification"
     },
     {
+      "evidence_id": "components/rtg/citation_resolution/tests/test_rtg_citation_resolution_contract.py#GetCitationProjectionContractVerification",
+      "evidence_nodes": [
+        "components/rtg/citation_resolution/tests/test_rtg_citation_resolution_contract.py::test_open_retains_dependencies_without_reading",
+        "components/rtg/citation_resolution/tests/test_rtg_citation_resolution_contract.py::test_resolve_returns_exact_graph_local_row_and_preserves_inputs",
+        "components/rtg/citation_resolution/tests/test_rtg_citation_resolution_contract.py::test_resolve_returns_unsupported_without_reading",
+        "components/rtg/citation_resolution/tests/test_rtg_citation_resolution_contract.py::test_resolve_rejects_catalog_projection_for_different_graph_without_reading"
+      ],
+      "model_source": "model/bibliotek/components/component.rtg.citation_resolution.sysml",
+      "requirements": [
+        "contract.rtg.citation_resolution.catalog_capability",
+        "contract.rtg.citation_resolution.get_projection.failures"
+      ],
+      "status": "resolved",
+      "subject": {
+        "role": "operation",
+        "type": "GetCitationProjection"
+      },
+      "verification": "GetCitationProjectionContractVerification"
+    },
+    {
+      "evidence_id": "components/rtg/citation_resolution/tests/test_rtg_citation_resolution_contract.py#OpenRtgCitationResolverContractVerification",
+      "evidence_nodes": [
+        "components/rtg/citation_resolution/tests/test_rtg_citation_resolution_contract.py::test_open_retains_dependencies_without_reading",
+        "components/rtg/citation_resolution/tests/test_rtg_citation_resolution_contract.py::test_reference_component_resolves_example"
+      ],
+      "model_source": "model/bibliotek/components/component.rtg.citation_resolution.sysml",
+      "requirements": [
+        "contract.rtg.citation_resolution.open.failures"
+      ],
+      "status": "resolved",
+      "subject": {
+        "role": "operation",
+        "type": "OpenRtgCitationResolver"
+      },
+      "verification": "OpenRtgCitationResolverContractVerification"
+    },
+    {
+      "evidence_id": "components/rtg/citation_resolution/tests/test_rtg_citation_resolution_contract.py#ReadCitationProjectionContractVerification",
+      "evidence_nodes": [
+        "components/rtg/citation_resolution/tests/test_rtg_citation_resolution_contract.py::test_resolve_returns_exact_graph_local_row_and_preserves_inputs",
+        "components/rtg/citation_resolution/tests/test_rtg_citation_resolution_contract.py::test_resolve_rejects_projection_mismatch",
+        "components/rtg/citation_resolution/tests/test_rtg_citation_resolution_contract.py::test_resolve_rejects_rows_without_declared_anchor_identity",
+        "components/rtg/citation_resolution/tests/test_rtg_citation_resolution_contract.py::test_resolve_rejects_non_finite_rows_and_provenance"
+      ],
+      "model_source": "model/bibliotek/components/component.rtg.citation_resolution.sysml",
+      "requirements": [
+        "contract.rtg.citation_resolution.reader_capability",
+        "contract.rtg.citation_resolution.read_projection.failures"
+      ],
+      "status": "resolved",
+      "subject": {
+        "role": "operation",
+        "type": "ReadCitationProjection"
+      },
+      "verification": "ReadCitationProjectionContractVerification"
+    },
+    {
+      "evidence_id": "components/rtg/citation_resolution/tests/test_rtg_citation_resolution_contract.py#ResolveCitationContractVerification",
+      "evidence_nodes": [
+        "components/rtg/citation_resolution/tests/test_rtg_citation_resolution_contract.py::test_resolve_returns_exact_graph_local_row_and_preserves_inputs",
+        "components/rtg/citation_resolution/tests/test_rtg_citation_resolution_contract.py::test_resolve_returns_not_found_with_projection_provenance",
+        "components/rtg/citation_resolution/tests/test_rtg_citation_resolution_contract.py::test_resolve_returns_unsupported_without_reading",
+        "components/rtg/citation_resolution/tests/test_rtg_citation_resolution_contract.py::test_resolve_rejects_malformed_graph_qualified_identity",
+        "components/rtg/citation_resolution/tests/test_rtg_citation_resolution_contract.py::test_resolve_rejects_projection_mismatch",
+        "components/rtg/citation_resolution/tests/test_rtg_citation_resolution_contract.py::test_resolve_preserves_multiple_rows_for_one_anchor",
+        "components/rtg/citation_resolution/tests/test_rtg_citation_resolution_contract.py::test_resolve_rejects_rows_without_declared_anchor_identity",
+        "components/rtg/citation_resolution/tests/test_rtg_citation_resolution_contract.py::test_resolve_rejects_catalog_projection_for_different_graph_without_reading",
+        "components/rtg/citation_resolution/tests/test_rtg_citation_resolution_contract.py::test_resolve_rejects_non_finite_rows_and_provenance"
+      ],
+      "model_source": "model/bibliotek/components/component.rtg.citation_resolution.sysml",
+      "requirements": [
+        "contract.rtg.citation_resolution.result_semantics",
+        "contract.rtg.citation_resolution.dependency_integrity",
+        "contract.rtg.citation_resolution.resolve.failures"
+      ],
+      "status": "resolved",
+      "subject": {
+        "role": "operation",
+        "type": "ResolveCitation"
+      },
+      "verification": "ResolveCitationContractVerification"
+    },
+    {
+      "evidence_id": "components/rtg/citation_resolution/tests/test_rtg_citation_resolution_contract.py#RtgCitationResolverBoundaryVerification",
+      "evidence_nodes": [
+        "components/rtg/citation_resolution/tests/test_rtg_citation_resolution_contract.py::test_open_retains_dependencies_without_reading",
+        "components/rtg/citation_resolution/tests/test_rtg_citation_resolution_contract.py::test_resolve_returns_exact_graph_local_row_and_preserves_inputs",
+        "components/rtg/citation_resolution/tests/test_rtg_citation_resolution_contract.py::test_resolve_returns_not_found_with_projection_provenance",
+        "components/rtg/citation_resolution/tests/test_rtg_citation_resolution_contract.py::test_resolve_returns_unsupported_without_reading",
+        "components/rtg/citation_resolution/tests/test_rtg_citation_resolution_contract.py::test_resolve_rejects_malformed_graph_qualified_identity",
+        "components/rtg/citation_resolution/tests/test_rtg_citation_resolution_contract.py::test_resolve_preserves_multiple_rows_for_one_anchor",
+        "components/rtg/citation_resolution/tests/test_rtg_citation_resolution_contract.py::test_resolve_rejects_rows_without_declared_anchor_identity",
+        "components/rtg/citation_resolution/tests/test_rtg_citation_resolution_contract.py::test_resolver_surface_does_not_expose_adjacent_operations"
+      ],
+      "model_source": "model/bibliotek/components/component.rtg.citation_resolution.sysml",
+      "requirements": [
+        "invariant.rtg.citation_resolution.graph_qualified_identity",
+        "invariant.rtg.citation_resolution.bounded_projection",
+        "invariant.rtg.citation_resolution.exact_anchor_match",
+        "invariant.rtg.citation_resolution.read_only",
+        "invariant.rtg.citation_resolution.provenance_preserved",
+        "contract.rtg.citation_resolution.intentional_boundary"
+      ],
+      "status": "resolved",
+      "subject": {
+        "role": "resolver",
+        "type": "RtgCitationResolver"
+      },
+      "verification": "RtgCitationResolverBoundaryVerification"
+    },
+    {
       "evidence_id": "components/rtg/constraints/tests/test_rtg_constraints_contract.py#CreateEmptyRtgConstraintsContractVerification",
       "evidence_nodes": [
         "components/rtg/constraints/tests/test_rtg_constraints_contract.py::test_constraints_store_payloads_without_executing_them"
