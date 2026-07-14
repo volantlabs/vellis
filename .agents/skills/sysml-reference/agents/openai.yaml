@@ -1,0 +1,4 @@
+interface:
+  display_name: "SysML Reference"
+  short_description: "Ground SysML and KerML decisions in specifications"
+  default_prompt: "Use $sysml-reference to answer this modeling question from the pinned SysML and KerML specifications. Begin with the ranked reference finder, read a bounded page set, and report the section/page basis plus normative, informative, convention, and inference distinctions."

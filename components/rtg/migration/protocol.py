@@ -121,8 +121,13 @@ class RtgMigrationStatusTransitionInvalid(RtgMigrationError):
     """A migration status transition is invalid."""
 
 
-class RtgMigrationDeleteRejected(RtgMigrationError):
+class RtgMigrationDeleteNotAllowed(RtgMigrationError):
     """A migration record cannot be deleted in its current status."""
+
+
+# Compatibility aliases for the pre-model Python vocabulary. They are one logical failure.
+RtgMigrationDeleteInvalid = RtgMigrationDeleteNotAllowed
+RtgMigrationDeleteRejected = RtgMigrationDeleteNotAllowed
 
 
 class RtgMigrationEvidenceInvalid(RtgMigrationError):

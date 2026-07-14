@@ -10,7 +10,12 @@ from components.rtg.change_validation.protocol import (
     RtgValidationReport,
 )
 from components.rtg.constraints.protocol import RtgConstraintSnapshot
-from components.rtg.graph.protocol import JsonObject, RtgGraphSnapshot, RtgObject
+from components.rtg.graph.protocol import (
+    JsonObject,
+    RtgGraphSnapshot,
+    RtgObject,
+    RtgTypeCountList,
+)
 from components.rtg.migration.protocol import (
     RtgMigrationRecord,
     RtgMigrationRecordList,
@@ -101,19 +106,44 @@ class RtgControllerSchemaPack:
 
 
 @dataclass(frozen=True, slots=True)
+class RtgControllerSchemaCounts:
+    anchor: int
+    data_object: int
+    link: int
+    total: int
+
+
+@dataclass(frozen=True, slots=True)
+class RtgControllerCandidateCounts:
+    schema: int
+    constraints: int
+    graph: int
+    total: int
+
+
+@dataclass(frozen=True, slots=True)
+class RtgControllerMigrationCounts:
+    draft: int
+    ready: int
+    failed: int
+    applied: int
+    abandoned: int
+    total: int
+
+
+@dataclass(frozen=True, slots=True)
 class RtgControllerSystemState:
     state_classification: str
-    live_schema_summary: JsonObject
-    live_object_counts: JsonObject
-    non_live_candidate_counts: JsonObject
-    migration_counts_by_status: JsonObject
-    persisted_snapshots: tuple[JsonObject, ...]
+    live_schema_counts: RtgControllerSchemaCounts
+    live_object_counts: RtgTypeCountList
+    non_live_candidate_counts: RtgControllerCandidateCounts
+    migration_counts_by_status: RtgControllerMigrationCounts
+    persisted_snapshot_paths: tuple[str, ...]
     ledger_record_count: int
     migration_counts_scope: str = "current_migration_store"
     migration_history_hint: str | None = None
     last_ledger_position: int | None = None
     last_transaction_id: UUID | None = None
-    last_transaction_timestamp: str | None = None
     recommended_workflows: tuple[str, ...] = ()
     recommended_next_steps: tuple[str, ...] = ()
 
@@ -132,8 +162,23 @@ class RtgControllerLiveGraphValidationResult:
 class RtgControllerReplayVerificationResult:
     status: str
     ledger_records_seen: int
+    ledger_records_scanned: int
+    request_records_seen: int
+    eligible_mutating_requests: int
     mutating_requests_replayed: int
+    administrative_records_skipped: int
+    terminal_records_skipped: int
+    failed_or_rejected_transactions_skipped: int
     replay_window: JsonObject
+    start_summary: JsonObject
+    replayed_summary: JsonObject
+    live_summary: JsonObject
+    replay_delta: JsonObject
+    live_count_diffs: JsonObject
+    replayed_state_digest: str
+    live_state_digest: str
+    state_equivalent_to_live: bool
+    ledger_cursor_equivalent_to_live: bool
     pre_summary: JsonObject
     post_summary: JsonObject
     count_diffs: JsonObject
@@ -141,8 +186,27 @@ class RtgControllerReplayVerificationResult:
 
 
 @dataclass(frozen=True, slots=True)
+class RtgControllerMigrationHistoryEvent:
+    event_type: str
+    migration_id: str
+    description: str | None
+    transaction_id: UUID
+    ledger_position: int
+    status: str
+    recorded_at: str
+    summary: str
+    operation_name: str
+    staged: bool
+    finding_count: int
+    finding_codes: tuple[str, ...] = ()
+    mutation_state: str | None = None
+    validation_report: RtgValidationReport | None = None
+    error: JsonObject | None = None
+
+
+@dataclass(frozen=True, slots=True)
 class RtgControllerMigrationHistory:
-    events: tuple[JsonObject, ...]
+    events: tuple[RtgControllerMigrationHistoryEvent, ...]
 
 
 @dataclass(frozen=True, slots=True)
@@ -171,6 +235,7 @@ class RtgControllerOperationResult:
     status: str
     transaction_id: UUID
     ledger_position: int | None = None
+    generated_ids: dict[str, UUID] = field(default_factory=dict)
     applied_changes: RtgControllerAppliedChanges = field(
         default_factory=RtgControllerAppliedChanges
     )

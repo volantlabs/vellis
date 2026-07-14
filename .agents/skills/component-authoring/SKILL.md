@@ -1,165 +1,167 @@
 ---
 name: component-authoring
-description: Design, create, review, revise, extract, split, merge, or validate lightweight component specifications for human-designed and agent-implemented systems. Use when Codex needs to reason about component boundaries or define black-box software components, public contracts, required dependencies, owned state, invariants, verification evidence, lifecycle status, known relationships between components, or agent change rules before implementation or after code changes.
+description: Design, create, review, revise, split, merge, or validate reusable software components and application compositions as textual SysML v2 black-box models. Use when Codex needs to define public actions and values, collaborator roles, abstract owned state, action effects, invariants, lifecycle, verification objectives, component boundaries, or system composition.
 ---
 
 # Component Authoring
 
-Use this skill to design component boundaries and produce component specs that let humans reason about system structure while agents implement validated slices inside clear boundaries.
+Author the durable component and application design in textual SysML v2 under `model/`. Treat
+generated Markdown as a view, never as an independent contract.
 
-A component spec is a durable black-box contract. It is not an implementation plan, task list, scratchpad, or exhaustive source-file inventory. It captures the system meaning of a component: why it exists, what it owns, what it exposes, what it may depend on, what it must never do, and how its behavior can be verified from outside the boundary.
+## Goal
 
-Optimize first for human-readable component specs and agent-safe implementation boundaries. Prefer stable names, explicit ownership, clear dependencies, and known relationships because they preserve the option to project specs into a knowledge graph, SysML, or another MBSE-style model later. Do not add ontology terms, graph structure, or relationships solely for future modeling.
+Model enough contract-significant structure and behavior that a human or agent can:
 
-## Resources
+- understand what the component owns and exposes;
+- invoke and compose its public contracts;
+- reason about abstract state changes and invariant preservation;
+- substitute another conforming realization;
+- derive black-box verification scenarios.
 
-- Read `references/component-spec-template.md` when drafting or rewriting a component spec.
-- Read `references/boundary-quality.md` when reviewing a boundary, deciding whether to split or merge components, or resolving ambiguous ownership.
-- Read `references/minimal-example.md` when an example would clarify expected detail level.
+Leave private helpers, algorithms, implementation data structures, performance strategy, and
+language-specific type hierarchies to realizations.
 
-## Core Principle
+## Conformance Hierarchy
 
-Define the smallest coherent system responsibility that can hide implementation details behind explicit contracts.
+Treat every chosen abstraction boundary as an engineered black box. A component realization
+conforms when its public structure, behavior, abstract state effects, failures, invariants, and
+verification obligations match the model, regardless of implementation language or internal
+design. A composed subsystem or application is another modeled black box: its internal roles must
+conform to their component contracts, and its own external actions, behavior, state, invariants,
+and use cases must conform at the higher boundary.
 
-Favor reusable, self-contained behavior with narrow scope, low coupling, and explicit invariant ownership. A component spec should define what behavior is provided and what contracts are required without assuming whether the implementation is wired in-process, dependency-injected, message-driven, or deployed as a distributed runtime service. Include runtime topology, transport, queue, broker, or dependency-injection details only when they are externally meaningful parts of the component contract.
+Model downward into algorithms, deployment, hardware, or implementation structure only when that
+layer is itself an intentional engineering subject or affects an observable contract. Do not make
+implementation fidelity the default completeness criterion.
 
-A component spec is also language-neutral: it describes externally observable behavior and contracts, not the constructs, test frameworks, or tool commands of any one implementation language. Express verification as boundary behavior and evidence; concrete commands and language mechanics belong to the implementation layer.
+## Required Resources
 
-Prefer elegant designs: one clear representation for each operation, one owner for each invariant, one public contract shape that current consumers can understand and test. Do not add abstractions, lifecycle states, adapters, or extension seams only to preserve theoretical future flexibility.
-
-The spec should let a human say:
-
-- I know what this component means.
-- I know what it owns.
-- I know what it exposes.
-- I know what it may depend on.
-- I know what it must never do.
-- I know how to verify delivered behavior.
-- I do not need to know how every helper inside it is factored.
-
-## Human And Agent Swim Lanes
-
-Keep humans focused on leverage points:
-
-- choosing system boundaries
-- naming durable concepts
-- approving ownership
-- defining public contracts
-- controlling cross-component dependencies
-- identifying invariants and non-responsibilities
-- deciding verification evidence
-- accepting validated slices
-
-Give agents freedom inside the component boundary:
-
-- implement private internals
-- add local helper modules
-- refactor internal structure
-- add tests and validation around public contracts
-- improve implementation quality without changing ownership, dependencies, contracts, invariants, or externally observable behavior
-
-Require explicit human approval before changing accepted component contracts, owned state, lifecycle status, cross-component dependencies, or invariants. Treat `accepted` as a repository governance status defined by the active project instructions; if the repository has not defined who may accept specs, list acceptance authority as an open question.
-
-## Acceptance Readiness
-
-Before a human owner marks a component spec `accepted`, check that:
-
-- Public contracts are concrete enough for an independent implementation.
-- Required and forbidden dependencies are explicit.
-- Owned state and non-responsibilities are clear.
-- Invariants are externally meaningful and testable.
-- Verification requirements are specific enough to prove boundary behavior.
-- The boundary is modular, reusable, low-coupling, and no broader than its invariant ownership requires.
-- The public surface is simple enough to implement, test, and explain without speculative extension mechanisms.
-- Open questions do not leave current public behavior ambiguous.
+- Use the `sysml-reference` skill before making or reviewing a SysML/KerML syntax or semantics
+  decision. Cite the relevant specification section and page for consequential choices.
+- Read `references/component-modeling-pattern.md` before authoring or materially revising a model.
+- Read `references/behavior-detail.md` when deciding how much behavior to formalize.
+- Read `references/model-organization.md` when creating or changing a model library, package
+  boundary, shared vocabulary, application/library dependency, or runtime realization.
+- Read `references/application-composition.md` for application, controller, adapter, or use-case work.
+- Read `references/boundary-quality.md` when reviewing ownership or considering a split or merge.
+- Read `references/examples.md` when a representative storage, query, or controller pattern helps.
 
 ## Workflow
 
-1. Identify the candidate component as a system responsibility, not merely a class, package, service, or directory.
-2. Name it with a stable dotted ID such as `component.billing.invoice_preview`.
-3. Define purpose in product/system language.
-4. Define responsibilities and non-responsibilities in bounded active language.
-5. Define provided contracts with behavior, not only type signatures or transport details.
-6. Define required contracts, separating allowed dependencies from forbidden dependencies and avoiding concrete wiring assumptions unless required by the public contract.
-7. Define owned state, or explicitly state that the component is stateless/read-only.
-8. Define externally meaningful invariants.
-9. Define verification checks and evidence that prove behavior at the component boundary.
-10. Define agent change rules that preserve the human-owned design boundary.
-11. Put uncertainty under `Open questions`; do not hide unresolved ownership or boundary decisions in confident prose.
+Before following the component workflow, search the pinned SysML/KerML reference corpus for every
+language construct whose syntax or semantics affects the design. Record the specification, section,
+and page basis, and distinguish it from repository modeling conventions.
 
-## Existing-Code Extraction
+1. Locate or create the owning model package and confirm its library, application, view, or
+   realization layer.
+2. Establish the smallest coherent boundary around one responsibility and its invariants.
+3. Give public elements stable SysML short names for durable model identity. Model an external
+   encoding as the logical name itself or as an explicit realization codec.
+4. Define boundary-crossing values and identity-bearing items. Separate request and stored forms
+   when identity is optional only on creation.
+5. Define every public and construction action with exact typed inputs, outputs, defaults,
+   multiplicity, principal failures, and observable result semantics.
+6. Model invocation-scoped collaborators as typed action inputs and retained collaborators as
+   multiplicited referential part roles.
+7. Model abstract canonical, derived, and externally referenced state with native feature kinds.
+8. Relate every action to the state or collaborator it reads, creates, writes, or deletes; state
+   explicit no-effect behavior for reads, previews, validation, and rejected mutations.
+9. Put every normative obligation in a requirement `require constraint`; use textual constraints
+   when a complete Boolean expression would obscure or weaken the intended rule.
+10. Assert which component or action usage satisfies each accepted requirement. Keep satisfaction
+   separate from evidence that verifies the assertion.
+11. Model lifecycle only when it changes permitted operations or observable results. Use an
+    enum-valued status and transition obligations for request-driven record lifecycles; use an
+    exhibited state only when activation/event semantics are intentionally modeled.
+12. Add verification cases whose subjects are compatible with the requirements they verify. Use
+   separate action, component, and composition cases when their subjects differ.
+13. For applications, bind retained collaborator roles to actual part occurrences and model
+    actor-visible use cases and application-owned invariants.
+14. Use a `view def` for a reusable projection. Introduce a viewpoint only when stakeholders and
+    concerns are explicitly modeled.
+15. Run a conformant SysML parser/linker/semantic validator as well as repository profile checks,
+    validate downstream products against their packaged dependencies, then regenerate
+    parser-backed projections and review the complete boundary. Grammar matching and regular
+    expressions alone do not establish language conformance.
+16. Ask whether a conforming implementation in a different suitable language could be built from
+    the model and pass black-box conformance at this boundary. Repair the model if correct callers,
+    state effects, results, failures, or composition behavior would still require guessing.
+17. Before retiring a predecessor specification, disposition every durable fact: put contractual
+    structure and behavior in the model, retain rationale/tutorial/operations/open questions in a
+    clearly non-normative document, record implementation disagreement as realization drift, and
+    identify any superseded statement by the model decision that replaced it. File deletion alone
+    is never evidence that migration is complete.
 
-When inferring a spec from code:
+## Fidelity Rule
 
-1. Inspect the likely component root.
-2. Identify public entry points.
-3. Identify outbound dependencies.
-4. Identify state reads and writes.
-5. Identify tests that exercise public behavior.
-6. Separate observed implementation facts from intended component contract.
-7. Draft uncertain ownership, contract, dependency, state, or invariant decisions under `Open questions`.
-8. Do not overfit the spec to private helper structure.
+Use three levels:
 
-Use this distinction whenever code and intended design may differ:
+1. Structural contract for every component: types, actions, failures, collaborators, multiplicities, roles.
+2. State semantics for every stateful component: state ownership, access, effects, failure atomicity,
+   invariant preservation.
+3. Detailed behavior only where consumers must predict it: declarative matching, transition tables,
+   observable ordering, or rollback orchestration.
 
-```text
-Observed current implementation:
-  What the code currently appears to do.
+Model a rule only when it affects legal invocation, output meaning, abstract state, failure effects,
+invariant preservation, substitutability, or composition.
 
-Intended component contract:
-  What the component should mean and guarantee.
-```
+Compression is allowed only after those facts are preserved. Fewer lines are not evidence of a
+better model. A compact requirement may replace several prose bullets only when it has the same
+observable meaning and does not permit additional incompatible implementations.
 
-## Output Modes
+## Contract Evolution
 
-For a new component, output:
+Treat an accepted model as the design authority. Change public names, types, multiplicities,
+defaults, failures, state ownership, ordering promises, invariants, or collaborator topology only
+as an intentional reviewed contract change. Construction actions are public contracts when callers
+depend on them. Implementation evidence may reveal a design question; it does not silently redefine
+the model.
 
-1. The complete component spec.
-2. Assumptions.
-3. Open questions requiring human judgment.
+When the task is specifically to audit model/realization drift, use `model-hygiene-review` before
+authoring changes. Inspect predecessor contracts and chronology: an accepted model can contain a
+migration omission or incorrect language transcription, while implementation behavior can be
+intentional, incidental, or stale. Classify the authority question before revising either side.
 
-For an existing-code extraction, output:
+## Hard Stop Rule
 
-1. Candidate component spec.
-2. Observed implementation facts.
-3. Intended-contract assumptions.
-4. Open questions.
-5. Risks where code and desired boundary appear misaligned.
+Stop adding detail when contract-significant behavior is sufficient for composition, substitution,
+design reasoning, and black-box verification. Do not pursue direct code generation or eliminate
+intentional implementation freedom.
 
-For a review, output:
+The stop rule cannot justify omitting inputs, outputs, fields, defaults, failures, state categories,
+invariants, or observable behavior that the design intentionally promises.
 
-1. Boundary assessment.
-2. Missing or weak sections.
-3. Suggested edits.
-4. Questions requiring human judgment.
-5. Optional revised spec.
+## Governance
 
-For an iteration, output:
+- Humans approve accepted boundaries, public contracts, state ownership, dependencies, and invariants.
+- If model, implementation, and tests disagree, surface the design decision; do not silently choose code.
+- Keep runtime and language choices outside the logical component unless they are observable contract terms.
+- Put genuinely shared public semantics in an owning library package; do not use an application,
+  realization, or global grab bag as the accidental owner of reusable types.
+- Use binding only for actual equality or identity, including binding a retained referential role to
+  the application part occurrence it denotes. Never bind action occurrences as a call relationship.
+- Use action inputs for invocation-scoped collaborators and typed dependencies for state access or
+  allowed dependency topology. Model an invocation as a nested action performed by the provider,
+  with bindings or flows for contract-significant inputs and outputs.
+- Let native constructs carry their native meaning: performed actions are provided capabilities,
+  interfaces connect ports, exhibited states are activated behavior, and allocations map logical
+  elements to realizations. Add metadata only for semantics the language construct does not express.
+- Use `default =` for an overridable default value and `=` only for an actual binding. Navigate
+  nested features with dot notation and reserve `::` for qualification/redefinition references.
+  Quote a required public name when it is a reserved word; do not silently rename the contract.
 
-1. Revised component spec.
-2. Concise changelog of spec changes.
-3. New or remaining open questions.
+## Outputs
 
-For implementation handoff, output:
+For authoring or revision, produce:
 
-1. The accepted or draft component spec being implemented.
-2. The allowed implementation roots and required verification.
-3. Any contract, dependency, state, invariant, or runtime assumptions that need human approval before implementation.
-4. A concise implementation boundary summary. Do not produce a detailed task plan unless the user asks for one.
+1. Updated SysML source.
+2. Updated generated human view.
+3. A concise list of contract decisions or conformance questions, if any.
+4. Structured implementation-neutral conformance objectives derived from verification cases.
+5. Verification results.
 
-## Authoring Rules
+For review, report material boundary, contract, state, invariant, composition, and verification gaps.
+Keep implementation inspection focused on evidence needed to assess the public design.
 
-- Keep the spec concise and black-box oriented.
-- Prefer concrete contracts and invariants over vague prose.
-- Write non-responsibilities as containment rules that prevent drift.
-- Keep component scope tied to invariant ownership.
-- Prefer low-coupling public contracts over convenience access to adjacent component internals.
-- Prefer one canonical representation for each operation and result.
-- Do not turn the spec into an implementation plan.
-- Do not document every private helper.
-- Do not create specs for every class or source file.
-- Do not invent ownership unsupported by code or human direction.
-- Do not expand a component boundary to make implementation easier.
-- Do not make a component responsible for adjacent behavior merely because current code reaches there.
-- Do not introduce optional abstraction layers, lifecycle states, or extension seams without a current consumer, invariant, or verification need.
-- Update the spec when public contracts, owned state, dependencies, invariants, verification requirements, lifecycle status, or known component relationships change.
+When predecessor material is being retired, also report the non-normative destination of useful
+context and the explicit disposition of unresolved model/implementation differences.

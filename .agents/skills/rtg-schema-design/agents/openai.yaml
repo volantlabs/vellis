@@ -1,0 +1,4 @@
+interface:
+  display_name: "RTG Schema Design"
+  short_description: "Design and evolve precise RTG schemas safely"
+  default_prompt: "Use $rtg-schema-design to design or evolve this RTG schema from user needs."

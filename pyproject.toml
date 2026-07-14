@@ -27,9 +27,11 @@ classifiers = [
 ]
 dependencies = [
     "fastmcp>=3.4.4,<4",
+    "google-re2==1.1.20251105",
 ]
 
 [project.scripts]
+vellis = "apps.rtg_knowledge_graph.main:main"
 vellis-rtg-knowledge-graph = "apps.rtg_knowledge_graph.main:main"
 
 [project.urls]
@@ -60,7 +62,9 @@ exclude = [
 [dependency-groups]
 dev = [
     "basedpyright>=1.39.9",
+    "jupyter-client>=8.6,<9",
     "mcp>=1.28.1,<2",
+    "pypdf>=6.14.2",
     "pytest>=8.0",
     "pyyaml>=6.0.3",
     "ruff>=0.15.21",

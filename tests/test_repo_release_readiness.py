@@ -50,17 +50,31 @@ def test_project_has_vellis_import_identity() -> None:
     assert vellis.__version__ == "0.1.0"
 
 
+def test_ci_smokes_native_windows_mcp_onboarding() -> None:
+    workflow = Path(".github/workflows/check.yml").read_text(encoding="utf-8")
+
+    for term in (
+        "windows-mcp-smoke:",
+        "runs-on: windows-latest",
+        "uv sync --locked",
+        "vellis-rtg-knowledge-graph mcp-config",
+        "test_rtg_knowledge_graph_app.py",
+    ):
+        assert term in workflow
+
+
 def test_justfile_exposes_turnkey_rtg_launch_recipes() -> None:
     justfile = Path("justfile").read_text(encoding="utf-8")
 
     for recipe in (
         "skills-sync:",
         "rtg:",
+        "rtg-mcp-config",
         "rtg-mcp-info:",
         "rtg-mcp:",
         "rtg-mcp-http-info",
         "rtg-mcp-http",
         'host="127.0.0.1" port="8765" path="/mcp":',
-        'rtg-eval-info storage_root="/tmp/vellis-beta-001":',
+        'rtg-eval-info storage_root=".data/vellis-beta-001":',
     ):
         assert recipe in justfile

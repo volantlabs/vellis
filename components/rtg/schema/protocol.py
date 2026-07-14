@@ -16,6 +16,11 @@ class RtgSchemaField:
     value_kinds: tuple[str, ...]
     properties: dict[str, RtgSchemaField] = field(default_factory=dict)
     items: RtgSchemaField | None = None
+    allowed_values: tuple[JsonScalar, ...] = ()
+    format: str | None = None
+    minimum: int | float | None = None
+    maximum: int | float | None = None
+    pattern: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -124,15 +129,23 @@ class RtgSchemaUuidConflict(RtgSchemaError):
     """A schema definition UUID conflicts with another definition."""
 
 
-class RtgSchemaKindInvalid(RtgSchemaError):
+class RtgSchemaDefinitionKindInvalid(RtgSchemaError):
     """A schema definition kind is invalid."""
 
 
-class RtgSchemaTypeInvalid(RtgSchemaError):
+class RtgSchemaTypeKeyInvalid(RtgSchemaError):
     """A schema type key is invalid."""
 
 
-class RtgSchemaLiveConflict(RtgSchemaError):
+class RtgSchemaDefinitionInvalid(RtgSchemaError):
+    """A schema definition is structurally invalid."""
+
+
+class RtgSchemaDirectionInvalid(RtgSchemaError):
+    """A link-participation query direction is invalid."""
+
+
+class RtgSchemaLiveTypeConflict(RtgSchemaError):
     """A live schema definition conflicts with another live type key."""
 
 
@@ -142,6 +155,13 @@ class RtgSchemaPayloadInvalid(RtgSchemaError):
 
 class RtgSchemaSystemValueInvalid(RtgSchemaError):
     """A schema definition system value is invalid."""
+
+
+# Compatibility aliases for the initial Python realization vocabulary. The logical contract uses
+# the precise names above; aliases are not separate failure outcomes.
+RtgSchemaKindInvalid = RtgSchemaDefinitionKindInvalid
+RtgSchemaTypeInvalid = RtgSchemaTypeKeyInvalid
+RtgSchemaLiveConflict = RtgSchemaLiveTypeConflict
 
 
 class RtgSchema(Protocol):
@@ -195,7 +215,7 @@ class RtgSchema(Protocol):
     def list_link_participation(
         self,
         type_key: str,
-        direction: str = "both",
+        direction: str = "either",
         live: bool | None = True,
     ) -> RtgSchemaLinkParticipationList:
         """List link schemas that mention a type key."""

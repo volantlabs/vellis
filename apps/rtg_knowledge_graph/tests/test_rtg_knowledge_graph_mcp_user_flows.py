@@ -79,6 +79,106 @@ PROJECT_TITLES_BY_REF = {
 }
 
 
+MODEL_EVIDENCE = {
+    "RtgGetUsageGuideContractVerification": (
+        "test_individual_rtg_mcp_suite_manages_multi_domain_life_graph",
+        "test_individual_rtg_mcp_suite_recovers_from_realistic_agent_mistakes",
+    ),
+    "RtgStageSchemaMigrationContractVerification": (
+        "test_individual_rtg_mcp_suite_recovers_from_realistic_agent_mistakes",
+    ),
+    "RtgGetSystemStateContractVerification": (
+        "test_individual_rtg_mcp_suite_recovers_from_realistic_agent_mistakes",
+    ),
+    "RtgValidateLiveAnchorRecordsContractVerification": (
+        "test_individual_rtg_mcp_suite_manages_multi_domain_life_graph",
+        "test_individual_rtg_mcp_suite_recovers_from_realistic_agent_mistakes",
+    ),
+    "RtgApplyLiveAnchorRecordsContractVerification": (
+        "test_individual_rtg_mcp_suite_recovers_from_realistic_agent_mistakes",
+    ),
+    "RtgValidateLiveGraphChangesContractVerification": (
+        "test_individual_rtg_mcp_suite_recovers_from_realistic_agent_mistakes",
+    ),
+    "RtgApplyLiveGraphChangesContractVerification": (
+        "test_individual_rtg_mcp_suite_recovers_from_realistic_agent_mistakes",
+    ),
+    "RtgStageKnowledgeChangesContractVerification": (
+        "test_individual_rtg_mcp_suite_recovers_from_realistic_agent_mistakes",
+    ),
+    "RtgApplyMigrationCutoverContractVerification": (
+        "test_individual_rtg_mcp_suite_recovers_from_realistic_agent_mistakes",
+    ),
+    "RtgAbandonMigrationContractVerification": (
+        "test_individual_rtg_mcp_suite_manages_multi_domain_life_graph",
+        "test_individual_rtg_mcp_suite_recovers_from_realistic_agent_mistakes",
+        "test_individual_rtg_mcp_suite_replays_ledger_after_server_restart",
+    ),
+    "RtgExecuteQueryContractVerification": (
+        "test_individual_rtg_mcp_suite_manages_multi_domain_life_graph",
+    ),
+    "RtgResolveAnchorByFactContractVerification": (
+        "test_individual_rtg_mcp_suite_manages_multi_domain_life_graph",
+        "test_individual_rtg_mcp_suite_recovers_from_realistic_agent_mistakes",
+    ),
+    "RtgGetObjectContractVerification": (
+        "test_individual_rtg_mcp_suite_recovers_from_realistic_agent_mistakes",
+    ),
+    "RtgListMigrationsContractVerification": (
+        "test_individual_rtg_mcp_suite_recovers_from_realistic_agent_mistakes",
+    ),
+    "RtgGetMigrationContractVerification": (
+        "test_individual_rtg_mcp_suite_manages_multi_domain_life_graph",
+        "test_individual_rtg_mcp_suite_recovers_from_realistic_agent_mistakes",
+    ),
+    "RtgValidateGraphContractVerification": (
+        "test_individual_rtg_mcp_suite_manages_multi_domain_life_graph",
+        "test_individual_rtg_mcp_suite_recovers_from_realistic_agent_mistakes",
+        "test_individual_rtg_mcp_suite_replays_ledger_after_server_restart",
+    ),
+    "RtgDiscoverAnchorTypesContractVerification": (
+        "test_individual_rtg_mcp_suite_manages_multi_domain_life_graph",
+        "test_individual_rtg_mcp_suite_replays_ledger_after_server_restart",
+    ),
+    "RtgGetSchemaPackContractVerification": (
+        "test_individual_rtg_mcp_suite_manages_multi_domain_life_graph",
+    ),
+    "RtgExportSystemSnapshotContractVerification": (
+        "test_individual_rtg_mcp_suite_manages_multi_domain_life_graph",
+    ),
+    "RtgPersistSystemSnapshotContractVerification": (
+        "test_individual_rtg_mcp_suite_manages_multi_domain_life_graph",
+    ),
+    "RtgListPersistedSnapshotsContractVerification": (
+        "test_individual_rtg_mcp_suite_manages_multi_domain_life_graph",
+    ),
+    "RtgLoadPersistedSnapshotContractVerification": (
+        "test_individual_rtg_mcp_suite_manages_multi_domain_life_graph",
+    ),
+    "RtgReplayLedgerContractVerification": (
+        "test_individual_rtg_mcp_suite_manages_multi_domain_life_graph",
+        "test_individual_rtg_mcp_suite_replays_ledger_after_server_restart",
+    ),
+    "RtgVerifyReplayFromLedgerContractVerification": (
+        "test_individual_rtg_mcp_suite_manages_multi_domain_life_graph",
+    ),
+    "RtgListMigrationHistoryContractVerification": (
+        "test_individual_rtg_mcp_suite_recovers_from_realistic_agent_mistakes",
+    ),
+    "RtgFlushLedgerFailuresContractVerification": (
+        "test_individual_rtg_mcp_suite_manages_multi_domain_life_graph",
+    ),
+    "RtgRestoreFromSnapshotContractVerification": (
+        "test_individual_rtg_mcp_suite_manages_multi_domain_life_graph",
+    ),
+    "VellisFacadeBoundaryVerification": (
+        "test_individual_rtg_mcp_suite_manages_multi_domain_life_graph",
+        "test_individual_rtg_mcp_suite_recovers_from_realistic_agent_mistakes",
+        "test_individual_rtg_mcp_suite_replays_ledger_after_server_restart",
+    ),
+}
+
+
 def test_individual_rtg_mcp_suite_manages_multi_domain_life_graph(tmp_path: Path) -> None:
     async def run_flow(session: ClientSession, storage_root: Path) -> None:
         assert EXPECTED_TOOLS <= await _tool_names(session)
@@ -566,6 +666,8 @@ def _server_params(
             str(storage_root),
             "--sql-database-path",
             str(sql_database_path),
+            "--empty",
+            "--manual-recovery",
         ],
         cwd=cwd,
     )

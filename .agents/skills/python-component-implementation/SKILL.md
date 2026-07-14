@@ -1,90 +1,80 @@
 ---
 name: python-component-implementation
-description: Implement, review, or revise Vellis component code in Python from component specs. Use when creating Python component directories, protocols, component classes, reference implementations, or boundary tests for docs/components specs.
+description: Implement, review, or revise Python realizations of components from accepted textual SysML v2 contracts and generated views. Use when creating or aligning Python protocols, component classes, reference implementations, implementation bindings, or black-box contract tests.
 ---
 
 # Python Component Implementation
 
-Use this skill after reading the relevant component spec. Preserve the spec's provided contracts, required contracts, owned state, invariants, non-responsibilities, and change rules.
+Use the accepted SysML/KPAR model and its generated component view as the contract. Python is one
+realization of that language-neutral design.
 
-This skill is the Python realization of language-neutral component specs. The spec under `docs/components/` is the source of truth; this skill governs only how that contract is expressed in Python. Keep Python-specific choices — protocols, dataclasses, test frameworks, packaging — inside the implementation, and do not push them back into the spec.
+Judge the realization at modeled boundaries. Matching private structure, algorithms, helper
+decomposition, or another implementation's incidental behavior is neither required nor preferred.
+The same accepted model may be realized in another language when it preserves the modeled
+structure, behavior, state effects, failures, invariants, composition contracts, and verification
+obligations.
 
 ## Workflow
 
-1. Read the component spec under `docs/components/`.
-2. Confirm the implementation root from `code.roots`.
-3. Create or update one Python directory for the component.
-4. Put public boundary definitions in `protocol.py`.
-5. Put concrete component class code in `implementation.py` or tightly scoped implementation modules.
-6. Put a runnable reference composition in `reference.py`.
-7. Put boundary tests under the component's `tests/` directory.
-8. Run the narrowest relevant tests and report verification evidence.
+1. Locate the component by stable ID in the repository's canonical model package.
+2. Resolve the accepted library package version and read its public values, actions, retained
+   collaborator roles, state, required constraints, asserted satisfiers, failures, and verification
+   cases. Treat top-level documentation as explanation, not as an unmodeled obligation.
+3. Locate the matching concrete realization and confirm its code root and symbol from
+   `@ImplementationBinding`; do not expect language bindings on the reusable logical component.
+4. Implement or revise the consumer-facing Python protocol.
+5. Encapsulate canonical state and invariant enforcement inside the component root.
+6. Supply action-scoped collaborators and wire retained referential roles only through modeled
+   public boundaries; do not reach through another component's internals.
+7. Consume structured implementation-neutral conformance objectives when available; add or update
+   black-box tests derived from their subject-compatible verification cases and evidence groups.
+8. When implementation work forces an observable choice the model does not settle, stop treating
+   it as a private coding decision: propose the language-neutral contract clarification or record
+   realization drift. Incidental helper, library, and representation choices remain private.
+9. Run the narrowest component tests, `just model-check`, and relevant repository checks.
 
-## Directory Shape
+## Realization Rules
 
-Use this default structure:
+- Preserve model action signatures, defaults, results, principal failures, state effects, and invariants.
+- Python exception base classes and inheritance are realization structure unless independently modeled.
+- Private helpers, data structures, algorithms, indexes, and performance choices remain implementation-owned.
+- Derived indexes must remain consistent with modeled canonical state but need not be modeled as code structure.
+- Constructor injection, service lookup, messaging, or another runtime mechanism may realize the
+  same modeled collaborator roles; the mechanism does not redefine the logical contract.
+- Keep application composition and runtime adapters outside the reusable component implementation
+  unless the accepted model assigns that behavior to the component.
+- Do not change accepted contracts, ownership, dependencies, lifecycle, or invariants for implementation convenience.
+
+## Drift Handling
+
+If code or tests disagree with the model:
+
+1. Use `model-hygiene-review` when the disagreement may reflect migration loss, a predecessor
+   contract, an intentional codec, or a later implementation decision.
+2. Preserve the accepted model unless evidence establishes a correction to already approved meaning
+   or the human owner approves a contract change.
+3. Report the model element, implementation symbol, difference, expected behavior, and verification
+   needed using the repository's drift or decision workflow.
+4. Do not expand the model to mirror incidental Python behavior.
+
+## Python Shape
+
+Use the repository's existing component root and conventions. When none exist, a suitable default is:
 
 ```text
 components/<domain>/<name>/
-  __init__.py
   protocol.py
   implementation.py
   reference.py
   tests/
-    test_<domain>_<name>_contract.py
 ```
 
-Map component IDs to implementation directories by removing the `component.` prefix and replacing dots with path separators. For example, `component.storage.json_file` maps to `components/storage/json_file/`.
+`protocol.py` contains only boundary-crossing protocols, values, and concrete public failures.
+Implementation modules own state and behavior. Reference compositions demonstrate the boundary but
+never become the semantic source of truth.
 
-Add private helper modules only when they clarify implementation. Keep helpers inside the component root.
+## Verification
 
-## Protocol File
-
-`protocol.py` defines the consumer-facing Python boundary:
-
-- `typing.Protocol` interfaces for component classes.
-- Public dataclasses or typed structures used by the protocol.
-- Public exception types or error result types.
-- Type aliases that are part of the component contract.
-
-Do not put private helper structure, filesystem details, adapter wiring, or test-only behavior in `protocol.py`.
-
-## Implementation
-
-Implement components as Python classes. The class should encapsulate:
-
-- owned state
-- path, input, and dependency validation
-- invariant enforcement
-- public operations named by the component contract
-- error mapping promised by the component spec
-
-Keep component-owned state and invariant logic inside the component root. Do not move state ownership into reference applications, global modules, or shared utilities unless the component spec is updated and the human owner approves.
-
-Use standard-library features first unless the spec or existing project conventions justify an external dependency.
-
-## Reference Implementation
-
-`reference.py` should be runnable on its own and useful as a test target. It may expose a small factory such as `create_reference_component()`.
-
-Use in-memory dependencies by default for required contracts and related abstractions. If the component's own public contract requires durable local state, such as filesystem-backed storage, use temporary local state rather than weakening the contract.
-
-The reference composition should demonstrate the component boundary. It should not become the source of truth for behavior; the component spec remains normative.
-
-## Tests
-
-Prefer tests that exercise the public protocol and boundary behavior:
-
-- contract tests for each provided operation
-- invariant tests
-- dependency or forbidden-import checks when relevant
-- side-effect tests for owned state and non-responsibilities
-- reference tests that can run against `reference.py`
-
-Avoid tests that only lock down private helper behavior unless those helpers are the only practical way to prove a boundary property.
-
-## Spec Sync
-
-If implementation work reveals unclear or mismatched public behavior, update the component spec or record an open question before encoding the behavior only in code.
-
-Do not change accepted contracts, owned state, dependencies, invariants, runtime assumptions, or lifecycle status without explicit human approval.
+Prefer protocol-level contract tests, invariant/property checks, failure no-effect checks,
+dependency checks, and reference-composition tests. A coherent test suite may cover several model
+requirements; do not require one Python test function per invariant.

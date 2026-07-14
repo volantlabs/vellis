@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import dataclasses
 import json
 from concurrent.futures import ThreadPoolExecutor, TimeoutError
 from pathlib import Path
@@ -31,6 +32,7 @@ from components.rtg.controller import (
     RtgControllerApplyFailed,
     RtgControllerCutoverOptions,
     RtgControllerDiscoveryFailed,
+    RtgControllerObjectNotFound,
     RtgControllerPreconditionFailed,
     RtgControllerReplayFailed,
     RtgControllerReplayOptions,
@@ -38,8 +40,12 @@ from components.rtg.controller import (
     RtgControllerSnapshotFailed,
     RtgControllerValidationFailed,
 )
-from components.rtg.graph import InMemoryRtgGraph
-from components.rtg.migration import InMemoryRtgMigration, RtgMigrationRecord
+from components.rtg.graph import InMemoryRtgGraph, RtgAnchor
+from components.rtg.migration import (
+    InMemoryRtgMigration,
+    RtgMigrationRecord,
+    RtgMigrationSnapshot,
+)
 from components.rtg.query import RtgQueryAnchorBucket, RtgQuerySpec, SimpleRtgQueryEngine
 from components.rtg.schema import (
     InMemoryRtgSchema,
@@ -99,7 +105,13 @@ class FailingDataPutGraph:
 
 
 class PostCutoverRejectingValidator(DeterministicRtgChangeValidator):
+    def __init__(self) -> None:
+        self.rejected = False
+
     def validate_graph_state(self, *args: object, **kwargs: object) -> RtgValidationReport:
+        if self.rejected:
+            return super().validate_graph_state(*args, **kwargs)  # type: ignore[arg-type]
+        self.rejected = True
         return RtgValidationReport(
             accepted=False,
             findings=(
@@ -273,6 +285,303 @@ def build_controller_with_graph_and_validator(
     )
 
 
+MODEL_EVIDENCE = {
+    "ApplyLiveGraphChangesContractVerification": (
+        "test_replay_can_resume_from_a_structurally_valid_skip_mode_snapshot",
+        "test_controller_writes_wait_while_replay_owns_system_state",
+        "test_live_graph_lane_resolves_local_refs_validates_applies_and_ledgers",
+        "test_live_graph_lane_rejects_invalid_batch_without_mutating",
+        "test_controller_cutover_flips_schema_live_status_and_prunes",
+        "test_cutover_rejects_schema_candidate_that_invalidates_live_graph_data",
+        "test_controller_maps_cutover_precondition_failures",
+        "test_live_graph_lane_rejects_non_live_candidate_creation",
+        "test_knowledge_staging_accepts_non_live_graph_candidate_when_migration_scoped",
+        "test_ledger_failures_are_queued_and_flushed",
+        "test_ledger_failure_degrades_result_and_flush_loads_json_queue",
+        "test_replay_accepts_persisted_start_snapshot_path",
+        "test_verify_replay_from_ledger_uses_scratch_state_and_preserves_current_state",
+        "test_replay_verification_restores_invalid_current_instances_exactly",
+        "test_replay_reconstructs_cutover_from_ledgered_request_after_pruning",
+        "test_replay_decodes_ledgered_schema_fields_with_null_items",
+        "test_failed_strict_cutover_status_is_replayable",
+        "test_replay_equivalence_detects_equal_counts_with_different_fact_values",
+        "test_rejected_staging_is_projected_from_existing_ledger_error",
+        "test_migration_history_is_reconstructed_from_ledger",
+        "test_restore_request_response_are_ledgered_and_replayed",
+        "test_normal_apply_failure_rolls_back_touched_graph_records",
+        "test_cutover_post_state_failure_restores_pre_cutover_state",
+    ),
+    "StageKnowledgeChangesContractVerification": (
+        "test_controller_cutover_flips_schema_live_status_and_prunes",
+        "test_cutover_rejects_schema_candidate_that_invalidates_live_graph_data",
+        "test_controller_maps_cutover_precondition_failures",
+        "test_knowledge_staging_rejects_unscoped_schema_candidate",
+        "test_knowledge_staging_rejects_direct_live_schema_write",
+        "test_knowledge_staging_accepts_non_live_graph_candidate_when_migration_scoped",
+        "test_strict_knowledge_staging_rejects_invalid_cutover_projection",
+        "test_replay_reconstructs_cutover_from_ledgered_request_after_pruning",
+        "test_replay_decodes_ledgered_schema_fields_with_null_items",
+        "test_failed_strict_cutover_status_is_replayable",
+        "test_rejected_staging_is_projected_from_existing_ledger_error",
+        "test_unprojectable_staging_is_rejected_and_has_a_terminal_ledger_outcome",
+        "test_migration_history_is_reconstructed_from_ledger",
+        "test_cutover_post_state_failure_restores_pre_cutover_state",
+    ),
+    "ValidateLiveGraphChangesContractVerification": (
+        "test_replay_can_resume_from_a_structurally_valid_skip_mode_snapshot",
+        "test_live_graph_lane_resolves_local_refs_validates_applies_and_ledgers",
+        "test_validate_live_graph_changes_resolves_without_mutation_or_ledger",
+        "test_validate_live_graph_changes_reports_findings_without_mutation",
+        "test_cutover_rejects_schema_candidate_that_invalidates_live_graph_data",
+        "test_replay_verification_restores_invalid_current_instances_exactly",
+        "test_failed_strict_cutover_status_is_replayable",
+    ),
+    "ApplyMigrationCutoverContractVerification": (
+        "test_controller_cutover_flips_schema_live_status_and_prunes",
+        "test_cutover_rejects_schema_candidate_that_invalidates_live_graph_data",
+        "test_controller_rejects_unsupported_cutover_options",
+        "test_controller_maps_cutover_precondition_failures",
+        "test_knowledge_staging_accepts_non_live_graph_candidate_when_migration_scoped",
+        "test_replay_reconstructs_cutover_from_ledgered_request_after_pruning",
+        "test_replay_decodes_ledgered_schema_fields_with_null_items",
+        "test_failed_strict_cutover_status_is_replayable",
+        "test_migration_history_is_reconstructed_from_ledger",
+        "test_cutover_post_state_failure_restores_pre_cutover_state",
+    ),
+    "AbandonMigrationContractVerification": (
+        "test_migration_history_is_reconstructed_from_ledger",
+    ),
+    "ExecuteControllerQueryContractVerification": (
+        "test_live_graph_lane_resolves_local_refs_validates_applies_and_ledgers",
+        "test_validate_live_graph_changes_resolves_without_mutation_or_ledger",
+        "test_live_graph_lane_rejects_invalid_batch_without_mutating",
+        "test_knowledge_staging_accepts_non_live_graph_candidate_when_migration_scoped",
+        "test_replay_accepts_persisted_start_snapshot_path",
+        "test_restore_request_response_are_ledgered_and_replayed",
+        "test_normal_apply_failure_rolls_back_touched_graph_records",
+    ),
+    "GetSystemStateContractVerification": (
+        "test_get_object_maps_invalid_and_missing_graph_ids_to_controller_failure",
+        "test_system_state_uses_typed_compact_counts_and_snapshot_paths",
+        "test_cutover_rejects_schema_candidate_that_invalidates_live_graph_data",
+        "test_strict_knowledge_staging_rejects_invalid_cutover_projection",
+        "test_rejected_staging_is_projected_from_existing_ledger_error",
+        "test_cutover_post_state_failure_restores_pre_cutover_state",
+    ),
+    "ExportSystemSnapshotContractVerification": (
+        "test_controller_reads_wait_while_restore_replaces_component_handles",
+        "test_restore_validates_combined_candidate_before_any_visible_replacement",
+        "test_replay_can_resume_from_a_structurally_valid_skip_mode_snapshot",
+        "test_failed_recorded_restore_preserves_components_but_may_advance_audit_pointer",
+        "test_controller_writes_wait_while_replay_owns_system_state",
+        "test_live_graph_lane_resolves_local_refs_validates_applies_and_ledgers",
+        "test_validate_live_graph_changes_resolves_without_mutation_or_ledger",
+        "test_validate_live_graph_changes_reports_findings_without_mutation",
+        "test_controller_rejects_unsupported_discovery_and_restore_options",
+        "test_replay_rejects_ambiguous_start_snapshot_options",
+        "test_verify_replay_from_ledger_uses_scratch_state_and_preserves_current_state",
+        "test_replay_verification_restores_invalid_current_instances_exactly",
+        "test_replay_reconstructs_cutover_from_ledgered_request_after_pruning",
+        "test_replay_decodes_ledgered_schema_fields_with_null_items",
+        "test_failed_strict_cutover_status_is_replayable",
+        "test_replay_equivalence_detects_equal_counts_with_different_fact_values",
+        "test_restore_request_response_are_ledgered_and_replayed",
+        "test_controller_exports_and_persists_snapshot",
+    ),
+    "RestoreFromSnapshotContractVerification": (
+        "test_controller_reads_wait_while_restore_replaces_component_handles",
+        "test_restore_validates_combined_candidate_before_any_visible_replacement",
+        "test_replay_can_resume_from_a_structurally_valid_skip_mode_snapshot",
+        "test_failed_recorded_restore_preserves_components_but_may_advance_audit_pointer",
+        "test_controller_rejects_unsupported_discovery_and_restore_options",
+        "test_replay_verification_restores_invalid_current_instances_exactly",
+        "test_restore_request_response_are_ledgered_and_replayed",
+    ),
+    "ReplayLedgerContractVerification": (
+        "test_replay_can_resume_from_a_structurally_valid_skip_mode_snapshot",
+        "test_controller_writes_wait_while_replay_owns_system_state",
+        "test_live_graph_lane_resolves_local_refs_validates_applies_and_ledgers",
+        "test_replay_rejects_non_empty_state_without_explicit_snapshot",
+        "test_replay_accepts_persisted_start_snapshot_path",
+        "test_replay_rejects_ambiguous_start_snapshot_options",
+        "test_verify_replay_from_ledger_uses_scratch_state_and_preserves_current_state",
+        "test_replay_verification_restores_invalid_current_instances_exactly",
+        "test_replay_reconstructs_cutover_from_ledgered_request_after_pruning",
+        "test_replay_decodes_ledgered_schema_fields_with_null_items",
+        "test_failed_strict_cutover_status_is_replayable",
+        "test_replay_equivalence_detects_equal_counts_with_different_fact_values",
+        "test_restore_request_response_are_ledgered_and_replayed",
+    ),
+    "VerifyReplayFromLedgerContractVerification": (
+        "test_verify_replay_from_ledger_uses_scratch_state_and_preserves_current_state",
+        "test_replay_verification_restores_invalid_current_instances_exactly",
+        "test_replay_equivalence_detects_equal_counts_with_different_fact_values",
+    ),
+    "ListMigrationHistoryContractVerification": (
+        "test_rejected_staging_is_projected_from_existing_ledger_error",
+        "test_unprojectable_staging_is_rejected_and_has_a_terminal_ledger_outcome",
+        "test_migration_history_is_reconstructed_from_ledger",
+    ),
+    "FlushLedgerFailuresContractVerification": (
+        "test_ledger_failures_are_queued_and_flushed",
+        "test_ledger_failure_degrades_result_and_flush_loads_json_queue",
+    ),
+    "ControllerGetObjectContractVerification": (
+        "test_get_object_maps_invalid_and_missing_graph_ids_to_controller_failure",
+        "test_system_state_uses_typed_compact_counts_and_snapshot_paths",
+        "test_validate_live_graph_changes_reports_findings_without_mutation",
+        "test_cutover_rejects_schema_candidate_that_invalidates_live_graph_data",
+        "test_strict_knowledge_staging_rejects_invalid_cutover_projection",
+        "test_replay_reconstructs_cutover_from_ledgered_request_after_pruning",
+        "test_replay_decodes_ledgered_schema_fields_with_null_items",
+        "test_failed_strict_cutover_status_is_replayable",
+        "test_rejected_staging_is_projected_from_existing_ledger_error",
+        "test_migration_history_is_reconstructed_from_ledger",
+        "test_cutover_post_state_failure_restores_pre_cutover_state",
+    ),
+    "ControllerListMigrationsContractVerification": (
+        "test_strict_knowledge_staging_rejects_invalid_cutover_projection",
+        "test_replay_reconstructs_cutover_from_ledgered_request_after_pruning",
+        "test_rejected_staging_is_projected_from_existing_ledger_error",
+    ),
+    "ControllerGetMigrationContractVerification": (
+        "test_get_object_maps_invalid_and_missing_graph_ids_to_controller_failure",
+        "test_system_state_uses_typed_compact_counts_and_snapshot_paths",
+        "test_validate_live_graph_changes_reports_findings_without_mutation",
+        "test_controller_cutover_flips_schema_live_status_and_prunes",
+        "test_cutover_rejects_schema_candidate_that_invalidates_live_graph_data",
+        "test_strict_knowledge_staging_rejects_invalid_cutover_projection",
+        "test_replay_reconstructs_cutover_from_ledgered_request_after_pruning",
+        "test_replay_decodes_ledgered_schema_fields_with_null_items",
+        "test_failed_strict_cutover_status_is_replayable",
+        "test_rejected_staging_is_projected_from_existing_ledger_error",
+        "test_migration_history_is_reconstructed_from_ledger",
+        "test_cutover_post_state_failure_restores_pre_cutover_state",
+    ),
+    "ValidateGraphContractVerification": (
+        "test_controller_reads_wait_while_restore_replaces_component_handles",
+        "test_restore_validates_combined_candidate_before_any_visible_replacement",
+        "test_replay_can_resume_from_a_structurally_valid_skip_mode_snapshot",
+        "test_live_graph_lane_resolves_local_refs_validates_applies_and_ledgers",
+        "test_validate_live_graph_changes_resolves_without_mutation_or_ledger",
+        "test_validate_live_graph_changes_reports_findings_without_mutation",
+        "test_cutover_rejects_schema_candidate_that_invalidates_live_graph_data",
+        "test_replay_verification_restores_invalid_current_instances_exactly",
+        "test_failed_strict_cutover_status_is_replayable",
+    ),
+    "DiscoverAnchorTypesContractVerification": (
+        "test_controller_cutover_flips_schema_live_status_and_prunes",
+        "test_cutover_rejects_schema_candidate_that_invalidates_live_graph_data",
+        "test_controller_rejects_unsupported_discovery_and_restore_options",
+        "test_replay_reconstructs_cutover_from_ledgered_request_after_pruning",
+        "test_cutover_post_state_failure_restores_pre_cutover_state",
+    ),
+    "GetControllerSchemaPackContractVerification": (
+        "test_controller_cutover_flips_schema_live_status_and_prunes",
+        "test_cutover_rejects_schema_candidate_that_invalidates_live_graph_data",
+        "test_strict_knowledge_staging_rejects_invalid_cutover_projection",
+        "test_replay_reconstructs_cutover_from_ledgered_request_after_pruning",
+        "test_replay_decodes_ledgered_schema_fields_with_null_items",
+        "test_failed_strict_cutover_status_is_replayable",
+        "test_rejected_staging_is_projected_from_existing_ledger_error",
+        "test_migration_history_is_reconstructed_from_ledger",
+        "test_cutover_post_state_failure_restores_pre_cutover_state",
+    ),
+    "PersistSystemSnapshotContractVerification": (
+        "test_system_state_uses_typed_compact_counts_and_snapshot_paths",
+        "test_replay_accepts_persisted_start_snapshot_path",
+        "test_verify_replay_from_ledger_uses_scratch_state_and_preserves_current_state",
+        "test_controller_exports_and_persists_snapshot",
+    ),
+    "ListPersistedSnapshotsContractVerification": (
+        "test_replay_accepts_persisted_start_snapshot_path",
+    ),
+    "LoadPersistedSnapshotContractVerification": (
+        "test_system_state_uses_typed_compact_counts_and_snapshot_paths",
+        "test_replay_accepts_persisted_start_snapshot_path",
+        "test_replay_reconstructs_cutover_from_ledgered_request_after_pruning",
+        "test_replay_decodes_ledgered_schema_fields_with_null_items",
+        "test_failed_strict_cutover_status_is_replayable",
+        "test_controller_exports_and_persists_snapshot",
+    ),
+    "OpenRtgControllerContractVerification": (
+        "test_controller_writes_wait_while_replay_owns_system_state",
+        "test_validate_live_graph_changes_resolves_without_mutation_or_ledger",
+        "test_live_graph_lane_rejects_invalid_batch_without_mutating",
+        "test_cutover_rejects_schema_candidate_that_invalidates_live_graph_data",
+        "test_ledger_failures_are_queued_and_flushed",
+        "test_ledger_failure_degrades_result_and_flush_loads_json_queue",
+        "test_replay_accepts_persisted_start_snapshot_path",
+        "test_verify_replay_from_ledger_uses_scratch_state_and_preserves_current_state",
+        "test_replay_verification_restores_invalid_current_instances_exactly",
+        "test_replay_reconstructs_cutover_from_ledgered_request_after_pruning",
+        "test_replay_decodes_ledgered_schema_fields_with_null_items",
+        "test_failed_strict_cutover_status_is_replayable",
+        "test_replay_equivalence_detects_equal_counts_with_different_fact_values",
+        "test_rejected_staging_is_projected_from_existing_ledger_error",
+        "test_migration_history_is_reconstructed_from_ledger",
+        "test_restore_request_response_are_ledgered_and_replayed",
+        "test_normal_apply_failure_rolls_back_touched_graph_records",
+        "test_cutover_post_state_failure_restores_pre_cutover_state",
+    ),
+    "RtgControllerBoundaryVerification": (
+        "test_get_object_maps_invalid_and_missing_graph_ids_to_controller_failure",
+        "test_controller_reads_wait_while_restore_replaces_component_handles",
+        "test_restore_validates_combined_candidate_before_any_visible_replacement",
+        "test_replay_can_resume_from_a_structurally_valid_skip_mode_snapshot",
+        "test_failed_recorded_restore_preserves_components_but_may_advance_audit_pointer",
+        "test_system_state_uses_typed_compact_counts_and_snapshot_paths",
+        "test_controller_writes_wait_while_replay_owns_system_state",
+        "test_live_graph_lane_resolves_local_refs_validates_applies_and_ledgers",
+        "test_validate_live_graph_changes_resolves_without_mutation_or_ledger",
+        "test_validate_live_graph_changes_reports_findings_without_mutation",
+        "test_live_graph_lane_rejects_invalid_batch_without_mutating",
+        "test_controller_cutover_flips_schema_live_status_and_prunes",
+        "test_cutover_rejects_schema_candidate_that_invalidates_live_graph_data",
+        "test_concrete_controller_has_no_generic_change_batch_bypass",
+        "test_controller_rejects_unsupported_cutover_options",
+        "test_controller_maps_cutover_precondition_failures",
+        "test_controller_rejects_unsupported_discovery_and_restore_options",
+        "test_live_graph_lane_rejects_non_live_candidate_creation",
+        "test_knowledge_staging_rejects_unscoped_schema_candidate",
+        "test_knowledge_staging_rejects_direct_live_schema_write",
+        "test_knowledge_staging_accepts_non_live_graph_candidate_when_migration_scoped",
+        "test_strict_knowledge_staging_rejects_invalid_cutover_projection",
+        "test_ledger_failures_are_queued_and_flushed",
+        "test_ledger_failure_degrades_result_and_flush_loads_json_queue",
+        "test_replay_rejects_non_empty_state_without_explicit_snapshot",
+        "test_replay_accepts_persisted_start_snapshot_path",
+        "test_replay_rejects_ambiguous_start_snapshot_options",
+        "test_verify_replay_from_ledger_uses_scratch_state_and_preserves_current_state",
+        "test_replay_verification_restores_invalid_current_instances_exactly",
+        "test_replay_reconstructs_cutover_from_ledgered_request_after_pruning",
+        "test_replay_decodes_ledgered_schema_fields_with_null_items",
+        "test_failed_strict_cutover_status_is_replayable",
+        "test_replay_equivalence_detects_equal_counts_with_different_fact_values",
+        "test_rejected_staging_is_projected_from_existing_ledger_error",
+        "test_unprojectable_staging_is_rejected_and_has_a_terminal_ledger_outcome",
+        "test_migration_history_is_reconstructed_from_ledger",
+        "test_restore_request_response_are_ledgered_and_replayed",
+        "test_normal_apply_failure_rolls_back_touched_graph_records",
+        "test_cutover_post_state_failure_restores_pre_cutover_state",
+        "test_controller_exports_and_persists_snapshot",
+    ),
+}
+
+
+def test_get_object_maps_invalid_and_missing_graph_ids_to_controller_failure(
+    tmp_path: Path,
+) -> None:
+    controller = build_controller(tmp_path)
+
+    for object_uuid in ("not-a-uuid", "11111111-1111-1111-1111-111111111111"):
+        with pytest.raises(RtgControllerObjectNotFound) as raised:
+            controller.get_object(object_uuid)
+
+        assert raised.value.diagnostic["code"] == "controller.object.not_found"
+        assert raised.value.diagnostic["mutation_state"] == "not_mutated"
+
+
 def test_controller_reads_wait_while_restore_replaces_component_handles(
     tmp_path: Path,
 ) -> None:
@@ -303,6 +612,83 @@ def test_controller_reads_wait_while_restore_replaces_component_handles(
         assert restore_future.result(timeout=2).status == "restore_applied"
         assert read_future.result(timeout=2).accepted is True
         assert validate_graph_started.is_set()
+
+
+def test_restore_validates_combined_candidate_before_any_visible_replacement(
+    tmp_path: Path,
+) -> None:
+    controller = build_controller(tmp_path)
+    before = controller.export_system_snapshot()
+    invalid_graph = InMemoryRtgGraph.empty()
+    invalid_graph.put_anchor(RtgAnchor(uuid=uuid4(), type="Person"))
+    invalid_snapshot = dataclasses.replace(before, graph=invalid_graph.export_snapshot())
+
+    with pytest.raises(RtgControllerSnapshotFailed) as error:
+        controller.restore_from_snapshot(
+            invalid_snapshot, RtgControllerRestoreOptions(ledger_mode="skip")
+        )
+
+    assert "violates controller invariants" in str(error.value)
+    assert controller.export_system_snapshot() == before
+
+
+def test_replay_can_resume_from_a_structurally_valid_skip_mode_snapshot(
+    tmp_path: Path,
+) -> None:
+    source = build_controller(tmp_path / "source")
+    source.apply_live_graph_changes(
+        RtgGraphChangeSet(
+            anchor_writes=(RtgGraphAnchorWrite(RtgChangeReference(local_ref="person"), "Person"),)
+        ),
+        validation_mode="skip",
+    )
+    skip_mode_snapshot = source.export_system_snapshot()
+    assert source.validate_graph().accepted is False
+    with pytest.raises(RtgControllerSnapshotFailed):
+        source.restore_from_snapshot(
+            skip_mode_snapshot, RtgControllerRestoreOptions(ledger_mode="skip")
+        )
+
+    replay = build_controller(tmp_path / "replay")
+    result = replay.replay_ledger(RtgControllerReplayOptions(start_snapshot=skip_mode_snapshot))
+
+    assert result.status == "replay_applied"
+    assert replay.export_system_snapshot().graph == skip_mode_snapshot.graph
+
+
+def test_failed_recorded_restore_preserves_components_but_may_advance_audit_pointer(
+    tmp_path: Path,
+) -> None:
+    controller = build_controller(tmp_path)
+    before = controller.export_system_snapshot()
+    duplicate = RtgMigrationRecord(migration_id="duplicate", description="Duplicate")
+    invalid_snapshot = dataclasses.replace(
+        before, migration=RtgMigrationSnapshot((duplicate, duplicate))
+    )
+
+    with pytest.raises(RtgControllerSnapshotFailed):
+        controller.restore_from_snapshot(invalid_snapshot)
+
+    after = controller.export_system_snapshot()
+    assert after.graph == before.graph
+    assert after.schema == before.schema
+    assert after.constraints == before.constraints
+    assert after.migration == before.migration
+    assert after.last_ledger_position is not None
+    assert after.last_ledger_position != before.last_ledger_position
+
+
+def test_system_state_uses_typed_compact_counts_and_snapshot_paths(tmp_path: Path) -> None:
+    controller = build_controller(tmp_path)
+    state = controller.get_system_state()
+
+    assert state.live_schema_counts.total == 2
+    assert state.live_schema_counts.anchor == 1
+    assert state.live_object_counts.counts == ()
+    assert state.non_live_candidate_counts.total == 0
+    assert state.migration_counts_by_status.total == 0
+    assert state.persisted_snapshot_paths == ()
+    assert not hasattr(state, "last_transaction_timestamp")
 
 
 def test_controller_writes_wait_while_replay_owns_system_state(tmp_path: Path) -> None:
@@ -378,13 +764,19 @@ def test_live_graph_lane_resolves_local_refs_validates_applies_and_ledgers(
     assert result.status == "applied"
     assert result.ledger_position is not None
     assert result.applied_changes.graph_writes == 2
+    assert set(result.generated_ids) == {"person", "profile"}
+    assert result.generated_ids["person"] == query_result.bindings[0].anchors["person"]
     assert len(query_result.bindings) == 1
     replay_controller = build_controller(tmp_path)
     ledger_records_seen = replay_controller.replay_ledger(
         RtgControllerReplayOptions(start_snapshot=baseline)
     ).details["ledger_records_seen"]
+    replayed_query = replay_controller.execute_query(
+        RtgQuerySpec(anchor_buckets=(RtgQueryAnchorBucket("person", ("Person",)),))
+    )
     assert isinstance(ledger_records_seen, int)
     assert ledger_records_seen >= 2
+    assert replayed_query.bindings[0].anchors["person"] == result.generated_ids["person"]
 
 
 def test_validate_live_graph_changes_resolves_without_mutation_or_ledger(
@@ -1092,11 +1484,68 @@ def test_verify_replay_from_ledger_uses_scratch_state_and_preserves_current_stat
         == verified.replay_window["start_ledger_position"]
     )
     assert verified.validation_report.accepted is True
+    assert verified.state_equivalent_to_live is True
+    assert verified.replayed_state_digest == verified.live_state_digest
+    assert verified.start_summary == verified.pre_summary
+    assert verified.replayed_summary == verified.post_summary
+    assert verified.replay_delta == verified.count_diffs
+    assert verified.ledger_records_scanned == verified.ledger_records_seen
+    assert verified.request_records_seen == 1
+    assert verified.eligible_mutating_requests == 1
+    assert verified.administrative_records_skipped == 1
+    assert verified.terminal_records_skipped == 1
+    assert verified.ledger_records_scanned == (
+        verified.eligible_mutating_requests
+        + verified.failed_or_rejected_transactions_skipped
+        + verified.administrative_records_skipped
+        + verified.terminal_records_skipped
+    )
     graph_diffs = json_object(verified.count_diffs["graph_counts"])
     anchor_diffs = json_object(graph_diffs["anchor"])
     assert anchor_diffs["Person"] == 1
     assert controller.export_system_snapshot() == current
     assert baseline.schema.definitions
+
+
+def test_replay_verification_restores_invalid_current_instances_exactly(tmp_path: Path) -> None:
+    ledger_path = tmp_path / "ledger.sqlite"
+    controller = build_controller_with_sql(tmp_path, SqliteStorage.open(ledger_path))
+    baseline = controller.export_system_snapshot()
+    first = controller.apply_live_graph_changes(
+        RtgGraphChangeSet(
+            anchor_writes=(RtgGraphAnchorWrite(RtgChangeReference(local_ref="ada"), "Person"),),
+            data_object_writes=(
+                RtgGraphDataObjectWrite(
+                    ref=RtgChangeReference(local_ref="ada-profile"),
+                    type="Profile",
+                    properties={"name": "Ada"},
+                    anchor_refs=(RtgChangeReference(local_ref="ada"),),
+                ),
+            ),
+        )
+    )
+    controller.apply_live_graph_changes(
+        RtgGraphChangeSet(
+            delete_data_objects=(
+                RtgChangeReference(resource_id=first.generated_ids["ada-profile"]),
+            )
+        ),
+        validation_mode="skip",
+    )
+    current = controller.export_system_snapshot()
+    assert controller.validate_graph().accepted is False
+
+    verified = controller.verify_replay_from_ledger(
+        RtgControllerReplayOptions(
+            start_snapshot=baseline,
+            through_ledger_position=first.ledger_position,
+        )
+    )
+
+    assert verified.state_equivalent_to_live is False
+    assert verified.validation_report.accepted is True
+    assert controller.export_system_snapshot() == current
+    assert controller.validate_graph().accepted is False
 
 
 def test_replay_reconstructs_cutover_from_ledgered_request_after_pruning(
@@ -1294,6 +1743,155 @@ def test_failed_strict_cutover_status_is_replayable(tmp_path: Path) -> None:
     assert replay_controller.validate_graph().accepted is True
 
 
+def test_replay_equivalence_detects_equal_counts_with_different_fact_values(
+    tmp_path: Path,
+) -> None:
+    controller = build_controller_with_sql(tmp_path, SqliteStorage.open(tmp_path / "ledger.sqlite"))
+    baseline = controller.export_system_snapshot()
+    first = controller.apply_live_graph_changes(
+        RtgGraphChangeSet(
+            anchor_writes=(RtgGraphAnchorWrite(RtgChangeReference(local_ref="person"), "Person"),),
+            data_object_writes=(
+                RtgGraphDataObjectWrite(
+                    RtgChangeReference(local_ref="profile"),
+                    "Profile",
+                    {"name": "Ada"},
+                    anchor_refs=(RtgChangeReference(local_ref="person"),),
+                ),
+            ),
+        )
+    )
+    profile_id = first.generated_ids["profile"]
+    controller.apply_live_graph_changes(
+        RtgGraphChangeSet(
+            data_object_writes=(
+                RtgGraphDataObjectWrite(
+                    RtgChangeReference(resource_id=profile_id),
+                    "Profile",
+                    {"name": "Grace"},
+                    anchor_refs=(RtgChangeReference(resource_id=first.generated_ids["person"]),),
+                ),
+            )
+        )
+    )
+    verified = controller.verify_replay_from_ledger(
+        RtgControllerReplayOptions(
+            start_snapshot=baseline, through_ledger_position=first.ledger_position
+        )
+    )
+    assert verified.live_count_diffs["graph_counts"] == {
+        "anchor": {"Person": 0},
+        "data_object": {"Profile": 0},
+        "link": {},
+    }
+    assert verified.state_equivalent_to_live is False
+    assert verified.replayed_state_digest != verified.live_state_digest
+
+
+def test_rejected_staging_is_projected_from_existing_ledger_error(
+    tmp_path: Path,
+) -> None:
+    ledger_path = tmp_path / "ledger.sqlite"
+    controller = build_controller_with_sql(tmp_path, SqliteStorage.open(ledger_path))
+    controller.apply_live_graph_changes(
+        RtgGraphChangeSet(
+            anchor_writes=(RtgGraphAnchorWrite(RtgChangeReference(local_ref="ada"), "Person"),),
+            data_object_writes=(
+                RtgGraphDataObjectWrite(
+                    ref=RtgChangeReference(local_ref="ada-profile"),
+                    type="Profile",
+                    properties={"name": "Ada"},
+                    anchor_refs=(RtgChangeReference(local_ref="ada"),),
+                ),
+            ),
+        )
+    )
+    old_profile = controller.get_schema_pack(
+        ("Person",)
+    ).schema_pack.associated_data_object_schemas[0]
+    replacement = RtgSchemaDefinition(
+        uuid=uuid4(),
+        kind="data_object",
+        type_key="Profile",
+        description="Profile requiring a missing sponsor.",
+        payload=RtgDataObjectSchemaPayload(
+            properties={"sponsor": RtgSchemaField(True, ("string",))}
+        ),
+        system={"live": False},
+    )
+    with pytest.raises(RtgControllerValidationFailed):
+        controller.stage_knowledge_changes(
+            RtgChangeBatch(
+                schema_changes=RtgSchemaChangeSet(
+                    definition_writes=(
+                        RtgSchemaDefinitionWrite(
+                            RtgChangeReference(resource_id=concrete_uuid(replacement.uuid)),
+                            replacement,
+                        ),
+                    )
+                ),
+                migration_changes=RtgMigrationChangeSet(
+                    migration_writes=(
+                        RtgMigrationRecordWrite(
+                            RtgChangeReference(resource_id="rejected-profile-v2"),
+                            RtgMigrationRecord(
+                                migration_id="rejected-profile-v2",
+                                description="Reject incompatible required sponsor.",
+                                status="ready",
+                                schema_make_live=(concrete_uuid(replacement.uuid),),
+                                schema_make_non_live=(concrete_uuid(old_profile.uuid),),
+                            ),
+                        ),
+                    )
+                ),
+            )
+        )
+    assert controller.list_migrations().migrations == ()
+    event = controller.list_migration_history().events[-1]
+    assert event.event_type == "staging_rejected"
+    assert event.migration_id == "rejected-profile-v2"
+    assert event.staged is False
+    assert event.mutation_state == "not_mutated"
+    assert event.finding_count > 0
+    assert event.validation_report is not None
+    assert event.validation_report.accepted is False
+
+
+def test_unprojectable_staging_is_rejected_and_has_a_terminal_ledger_outcome(
+    tmp_path: Path,
+) -> None:
+    controller = build_controller(tmp_path)
+    missing = uuid4()
+
+    with pytest.raises(RtgControllerValidationFailed) as raised:
+        controller.stage_knowledge_changes(
+            RtgChangeBatch(
+                graph_changes=RtgGraphChangeSet(
+                    delete_anchors=(RtgChangeReference(resource_id=missing),)
+                ),
+                migration_changes=RtgMigrationChangeSet(
+                    migration_writes=(
+                        RtgMigrationRecordWrite(
+                            RtgChangeReference(resource_id="unprojectable-staging"),
+                            RtgMigrationRecord(
+                                migration_id="unprojectable-staging",
+                                description="Must be rejected with a terminal outcome.",
+                                status="ready",
+                            ),
+                        ),
+                    )
+                ),
+            )
+        )
+
+    assert raised.value.validation_report is not None
+    assert raised.value.validation_report.findings[0].code == "change_projection.failed"
+    event = controller.list_migration_history().events[-1]
+    assert event.event_type == "staging_rejected"
+    assert event.migration_id == "unprojectable-staging"
+    assert event.finding_codes == ("change_projection.failed",)
+
+
 def test_migration_history_is_reconstructed_from_ledger(
     tmp_path: Path,
 ) -> None:
@@ -1358,11 +1956,18 @@ def test_migration_history_is_reconstructed_from_ledger(
     reloaded = build_controller_with_sql(tmp_path, SqliteStorage.open(ledger_path))
 
     history = reloaded.list_migration_history()
-    event_types = [event["event_type"] for event in history.events]
+    event_types = [event.event_type for event in history.events]
 
     assert event_types == ["staged", "cutover_failed", "abandoned"]
-    assert {str(event["migration_id"]) for event in history.events} == {"profile-schema-v2"}
-    assert all(event["ledger_position"] is not None for event in history.events)
+    assert {event.migration_id for event in history.events} == {"profile-schema-v2"}
+    assert all(event.ledger_position > 0 for event in history.events)
+    staged, cutover_failed, abandoned = history.events
+    assert staged.finding_count == 0
+    assert abandoned.finding_count == 0
+    assert cutover_failed.finding_count > 0
+    assert cutover_failed.finding_codes
+    assert cutover_failed.validation_report is not None
+    assert cutover_failed.validation_report.accepted is False
 
 
 def test_restore_request_response_are_ledgered_and_replayed(tmp_path: Path) -> None:

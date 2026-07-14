@@ -11,7 +11,7 @@ Describe the incorrect behavior.
 
 ## Expected behavior
 
-What the component contract or documentation says should happen.
+What the SysML component/application contract or its generated reference says should happen.
 
 ## Reproduction
 
@@ -25,5 +25,11 @@ Exact commands or code to reproduce, including the component or app involved
 ## Environment
 
 - OS:
+- Architecture (for example x64 or ARM64):
 - `uv --version`:
+- MCP client and version, if applicable:
 - Commit or branch:
+
+For setup or MCP launch failures, also include the exact onboarding command, the complete
+`uv sync` error if dependency installation failed, and the MCP client's server-process log. Remove
+personal data and secrets, but keep executable and argument shapes intact.

@@ -147,7 +147,25 @@ class RtgGraphObjectNotFound(RtgGraphError):
     """The requested RTG object does not exist."""
 
 
-class RtgGraph(Protocol):
+class RtgGraphReadView(Protocol):
+    def get_object(self, object_uuid: UuidInput) -> RtgObject:
+        """Get an anchor, data object, or link by UUID."""
+        ...
+
+    def list_by_type(self, object_type: str) -> RtgObjectList:
+        """List RTG objects by type across the global type namespace."""
+        ...
+
+    def list_anchor_data(self, anchor_uuid: UuidInput) -> RtgDataObjectList:
+        """List data objects indexed to an anchor."""
+        ...
+
+    def list_incident_links(self, object_uuid: UuidInput, direction: str = "both") -> RtgLinkList:
+        """List incident links for an anchor or data object."""
+        ...
+
+
+class RtgGraph(RtgGraphReadView, Protocol):
     @classmethod
     def empty(cls) -> RtgGraph:
         """Create an empty in-memory RTG graph."""
@@ -212,24 +230,8 @@ class RtgGraph(Protocol):
         """Preview a data dissociation without mutating graph state."""
         ...
 
-    def get_object(self, object_uuid: UuidInput) -> RtgObject:
-        """Get an anchor, data object, or link by UUID."""
-        ...
-
-    def list_by_type(self, object_type: str) -> RtgObjectList:
-        """List RTG objects by type across the global type namespace."""
-        ...
-
-    def list_anchor_data(self, anchor_uuid: UuidInput) -> RtgDataObjectList:
-        """List data objects indexed to an anchor."""
-        ...
-
     def list_data_anchors(self, data_uuid: UuidInput) -> RtgAnchorList:
         """List anchors indexed to a data object."""
-        ...
-
-    def list_incident_links(self, object_uuid: UuidInput, direction: str = "both") -> RtgLinkList:
-        """List incident links for an anchor or data object."""
         ...
 
     def count_by_type(self, kind: str | None = None, live: bool | None = None) -> RtgTypeCountList:

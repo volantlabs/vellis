@@ -1,0 +1,1121 @@
+{
+  "bootstrap_migration_id": "575a31e3-ea5d-5808-9b96-3515c4fd0a83",
+  "bootstrap_migration_key": "migration.vellis.everyday_life.v1",
+  "graph_objects": [],
+  "knowledge_changes": {
+    "migration_changes": {
+      "migration_writes": [
+        {
+          "migration": {
+            "description": "Install the modeled Vellis Everyday Life ontology.",
+            "migration_id": "575a31e3-ea5d-5808-9b96-3515c4fd0a83",
+            "schema_make_live": [
+              "13e1fba4-7ad1-5d29-b3dd-84b4a8c6b421",
+              "c1aa90b0-07ab-5d5b-b0a8-4fb660b61127",
+              "e6c85b1d-f947-56b7-aa9e-e546d1673ee9",
+              "46a947bf-2080-575f-882b-a96c4ae0d3cb",
+              "fe252f6e-287b-5193-b111-069234d733ad",
+              "2f2c434e-5743-507e-85b0-5189f72b841f",
+              "c58d39f8-dd1c-5ff9-9ea7-6cca694640ba",
+              "0d76f3b3-a2a5-5085-8fd9-c13c11f09c53",
+              "d733a4ab-ff34-5f27-a24a-b66b1b5d6c3c",
+              "41201a3f-f960-5f9f-9d2a-689e197b769f",
+              "5bec5645-bc29-5c84-8039-70f897a07b7c",
+              "150d262e-dc49-52ef-b8be-c478d460674c",
+              "c707ab80-658d-5d97-9df5-6ae7d8f578c1",
+              "dd389759-aeeb-54f6-b572-9a8afa9ec442",
+              "4407ab29-893e-5f3e-beea-a3e95d773296",
+              "c74f16e6-07b1-5837-8702-e8df86a90849",
+              "b0448826-6355-59bf-90c7-bd4cffeab0f7",
+              "f457bb5e-c2c0-5fae-82f3-e3f5ab99cfab",
+              "7b7b7d4a-fd2f-592f-8d9b-7df759f80fa4",
+              "31750272-2c79-549b-b64d-bd728b976062",
+              "7839ce6d-f5bb-5827-be76-5d4db08acb1c",
+              "997a7d71-d2ab-5d33-a406-23a3e052080a",
+              "a78005e2-dc7b-5883-9396-444bd2b5f84b",
+              "5a242c08-9773-5695-8c24-a159790012c0",
+              "faf4f4a6-e673-5b04-9178-cc35385ffc31",
+              "a3242254-d568-5ed6-9d85-f4a86592046f",
+              "bb40ab4f-8ea5-59b2-bd46-a3b78dce671c",
+              "cdf57464-9a0a-5dc9-8ec9-d2590605dd6c",
+              "1b05678b-146c-5f2c-b444-7258cc08fe7f",
+              "edc66a76-cdf8-5627-b25c-cf38d881e075",
+              "e4d1a763-651e-54e7-93c8-7e5c296d4ce8",
+              "efef7bad-465e-58b0-8694-1d4b9126df7c",
+              "6ee00f5c-8eb6-5aa8-aa03-3c46fe33a87b"
+            ],
+            "status": "ready"
+          },
+          "ref": {
+            "resource_id": "575a31e3-ea5d-5808-9b96-3515c4fd0a83"
+          }
+        }
+      ]
+    },
+    "schema_changes": {
+      "definition_writes": [
+        {
+          "definition": {
+            "description": "A person known to the individual or shared graph.",
+            "kind": "anchor",
+            "payload": {
+              "required_data_types": [
+                "PersonFacts"
+              ]
+            },
+            "system": {
+              "live": false
+            },
+            "type_key": "Person",
+            "uuid": "13e1fba4-7ad1-5d29-b3dd-84b4a8c6b421"
+          },
+          "ref": {
+            "resource_id": "13e1fba4-7ad1-5d29-b3dd-84b4a8c6b421"
+          }
+        },
+        {
+          "definition": {
+            "description": "Typed facts for Person anchors.",
+            "kind": "data_object",
+            "payload": {
+              "properties": {
+                "name": {
+                  "required": true,
+                  "value_kinds": [
+                    "string"
+                  ]
+                },
+                "notes": {
+                  "required": false,
+                  "value_kinds": [
+                    "string"
+                  ]
+                },
+                "preferred_contact": {
+                  "required": false,
+                  "value_kinds": [
+                    "string"
+                  ]
+                },
+                "relationship": {
+                  "required": false,
+                  "value_kinds": [
+                    "string"
+                  ]
+                }
+              }
+            },
+            "system": {
+              "live": false
+            },
+            "type_key": "PersonFacts",
+            "uuid": "c1aa90b0-07ab-5d5b-b0a8-4fb660b61127"
+          },
+          "ref": {
+            "resource_id": "c1aa90b0-07ab-5d5b-b0a8-4fb660b61127"
+          }
+        },
+        {
+          "definition": {
+            "description": "A household, family, team, organization, or community.",
+            "kind": "anchor",
+            "payload": {
+              "required_data_types": [
+                "GroupFacts"
+              ]
+            },
+            "system": {
+              "live": false
+            },
+            "type_key": "Group",
+            "uuid": "e6c85b1d-f947-56b7-aa9e-e546d1673ee9"
+          },
+          "ref": {
+            "resource_id": "e6c85b1d-f947-56b7-aa9e-e546d1673ee9"
+          }
+        },
+        {
+          "definition": {
+            "description": "Typed facts for Group anchors.",
+            "kind": "data_object",
+            "payload": {
+              "properties": {
+                "description": {
+                  "required": false,
+                  "value_kinds": [
+                    "string"
+                  ]
+                },
+                "kind": {
+                  "required": false,
+                  "value_kinds": [
+                    "string"
+                  ]
+                },
+                "name": {
+                  "required": true,
+                  "value_kinds": [
+                    "string"
+                  ]
+                }
+              }
+            },
+            "system": {
+              "live": false
+            },
+            "type_key": "GroupFacts",
+            "uuid": "46a947bf-2080-575f-882b-a96c4ae0d3cb"
+          },
+          "ref": {
+            "resource_id": "46a947bf-2080-575f-882b-a96c4ae0d3cb"
+          }
+        },
+        {
+          "definition": {
+            "description": "An ongoing sphere of personal, household, family, or work responsibility.",
+            "kind": "anchor",
+            "payload": {
+              "required_data_types": [
+                "AreaFacts"
+              ]
+            },
+            "system": {
+              "live": false
+            },
+            "type_key": "Area",
+            "uuid": "fe252f6e-287b-5193-b111-069234d733ad"
+          },
+          "ref": {
+            "resource_id": "fe252f6e-287b-5193-b111-069234d733ad"
+          }
+        },
+        {
+          "definition": {
+            "description": "Typed facts for Area anchors.",
+            "kind": "data_object",
+            "payload": {
+              "properties": {
+                "active": {
+                  "required": false,
+                  "value_kinds": [
+                    "boolean"
+                  ]
+                },
+                "domain": {
+                  "required": false,
+                  "value_kinds": [
+                    "string"
+                  ]
+                },
+                "focus": {
+                  "required": false,
+                  "value_kinds": [
+                    "string"
+                  ]
+                },
+                "title": {
+                  "required": true,
+                  "value_kinds": [
+                    "string"
+                  ]
+                }
+              }
+            },
+            "system": {
+              "live": false
+            },
+            "type_key": "AreaFacts",
+            "uuid": "2f2c434e-5743-507e-85b0-5189f72b841f"
+          },
+          "ref": {
+            "resource_id": "2f2c434e-5743-507e-85b0-5189f72b841f"
+          }
+        },
+        {
+          "definition": {
+            "description": "A desired outcome that work or routines may support.",
+            "kind": "anchor",
+            "payload": {
+              "required_data_types": [
+                "GoalFacts"
+              ]
+            },
+            "system": {
+              "live": false
+            },
+            "type_key": "Goal",
+            "uuid": "c58d39f8-dd1c-5ff9-9ea7-6cca694640ba"
+          },
+          "ref": {
+            "resource_id": "c58d39f8-dd1c-5ff9-9ea7-6cca694640ba"
+          }
+        },
+        {
+          "definition": {
+            "description": "Typed facts for Goal anchors.",
+            "kind": "data_object",
+            "payload": {
+              "properties": {
+                "desired_outcome": {
+                  "required": false,
+                  "value_kinds": [
+                    "string"
+                  ]
+                },
+                "domain": {
+                  "required": false,
+                  "value_kinds": [
+                    "string"
+                  ]
+                },
+                "priority": {
+                  "required": false,
+                  "value_kinds": [
+                    "string"
+                  ]
+                },
+                "status": {
+                  "required": false,
+                  "value_kinds": [
+                    "string"
+                  ]
+                },
+                "target_date": {
+                  "required": false,
+                  "value_kinds": [
+                    "string"
+                  ]
+                },
+                "title": {
+                  "required": true,
+                  "value_kinds": [
+                    "string"
+                  ]
+                }
+              }
+            },
+            "system": {
+              "live": false
+            },
+            "type_key": "GoalFacts",
+            "uuid": "0d76f3b3-a2a5-5085-8fd9-c13c11f09c53"
+          },
+          "ref": {
+            "resource_id": "0d76f3b3-a2a5-5085-8fd9-c13c11f09c53"
+          }
+        },
+        {
+          "definition": {
+            "description": "A finite coordinated effort intended to produce an outcome.",
+            "kind": "anchor",
+            "payload": {
+              "required_data_types": [
+                "ProjectFacts"
+              ]
+            },
+            "system": {
+              "live": false
+            },
+            "type_key": "Project",
+            "uuid": "d733a4ab-ff34-5f27-a24a-b66b1b5d6c3c"
+          },
+          "ref": {
+            "resource_id": "d733a4ab-ff34-5f27-a24a-b66b1b5d6c3c"
+          }
+        },
+        {
+          "definition": {
+            "description": "Typed facts for Project anchors.",
+            "kind": "data_object",
+            "payload": {
+              "properties": {
+                "desired_outcome": {
+                  "required": false,
+                  "value_kinds": [
+                    "string"
+                  ]
+                },
+                "domain": {
+                  "required": false,
+                  "value_kinds": [
+                    "string"
+                  ]
+                },
+                "next_review": {
+                  "required": false,
+                  "value_kinds": [
+                    "string"
+                  ]
+                },
+                "priority": {
+                  "required": false,
+                  "value_kinds": [
+                    "string"
+                  ]
+                },
+                "status": {
+                  "required": false,
+                  "value_kinds": [
+                    "string"
+                  ]
+                },
+                "title": {
+                  "required": true,
+                  "value_kinds": [
+                    "string"
+                  ]
+                }
+              }
+            },
+            "system": {
+              "live": false
+            },
+            "type_key": "ProjectFacts",
+            "uuid": "41201a3f-f960-5f9f-9d2a-689e197b769f"
+          },
+          "ref": {
+            "resource_id": "41201a3f-f960-5f9f-9d2a-689e197b769f"
+          }
+        },
+        {
+          "definition": {
+            "description": "An actionable unit of work.",
+            "kind": "anchor",
+            "payload": {
+              "required_data_types": [
+                "TaskFacts"
+              ]
+            },
+            "system": {
+              "live": false
+            },
+            "type_key": "Task",
+            "uuid": "5bec5645-bc29-5c84-8039-70f897a07b7c"
+          },
+          "ref": {
+            "resource_id": "5bec5645-bc29-5c84-8039-70f897a07b7c"
+          }
+        },
+        {
+          "definition": {
+            "description": "Typed facts for Task anchors.",
+            "kind": "data_object",
+            "payload": {
+              "properties": {
+                "context": {
+                  "required": false,
+                  "value_kinds": [
+                    "string"
+                  ]
+                },
+                "domain": {
+                  "required": false,
+                  "value_kinds": [
+                    "string"
+                  ]
+                },
+                "due": {
+                  "required": false,
+                  "value_kinds": [
+                    "string"
+                  ]
+                },
+                "priority": {
+                  "required": false,
+                  "value_kinds": [
+                    "string"
+                  ]
+                },
+                "status": {
+                  "required": false,
+                  "value_kinds": [
+                    "string"
+                  ]
+                },
+                "title": {
+                  "required": true,
+                  "value_kinds": [
+                    "string"
+                  ]
+                }
+              }
+            },
+            "system": {
+              "live": false
+            },
+            "type_key": "TaskFacts",
+            "uuid": "150d262e-dc49-52ef-b8be-c478d460674c"
+          },
+          "ref": {
+            "resource_id": "150d262e-dc49-52ef-b8be-c478d460674c"
+          }
+        },
+        {
+          "definition": {
+            "description": "A time-bound occurrence, appointment, or meeting.",
+            "kind": "anchor",
+            "payload": {
+              "required_data_types": [
+                "EventFacts"
+              ]
+            },
+            "system": {
+              "live": false
+            },
+            "type_key": "Event",
+            "uuid": "c707ab80-658d-5d97-9df5-6ae7d8f578c1"
+          },
+          "ref": {
+            "resource_id": "c707ab80-658d-5d97-9df5-6ae7d8f578c1"
+          }
+        },
+        {
+          "definition": {
+            "description": "Typed facts for Event anchors.",
+            "kind": "data_object",
+            "payload": {
+              "properties": {
+                "domain": {
+                  "required": false,
+                  "value_kinds": [
+                    "string"
+                  ]
+                },
+                "end": {
+                  "required": false,
+                  "value_kinds": [
+                    "string"
+                  ]
+                },
+                "start": {
+                  "required": false,
+                  "value_kinds": [
+                    "string"
+                  ]
+                },
+                "status": {
+                  "required": false,
+                  "value_kinds": [
+                    "string"
+                  ]
+                },
+                "summary": {
+                  "required": false,
+                  "value_kinds": [
+                    "string"
+                  ]
+                },
+                "title": {
+                  "required": true,
+                  "value_kinds": [
+                    "string"
+                  ]
+                }
+              }
+            },
+            "system": {
+              "live": false
+            },
+            "type_key": "EventFacts",
+            "uuid": "dd389759-aeeb-54f6-b572-9a8afa9ec442"
+          },
+          "ref": {
+            "resource_id": "dd389759-aeeb-54f6-b572-9a8afa9ec442"
+          }
+        },
+        {
+          "definition": {
+            "description": "A recurring practice or responsibility.",
+            "kind": "anchor",
+            "payload": {
+              "required_data_types": [
+                "RoutineFacts"
+              ]
+            },
+            "system": {
+              "live": false
+            },
+            "type_key": "Routine",
+            "uuid": "4407ab29-893e-5f3e-beea-a3e95d773296"
+          },
+          "ref": {
+            "resource_id": "4407ab29-893e-5f3e-beea-a3e95d773296"
+          }
+        },
+        {
+          "definition": {
+            "description": "Typed facts for Routine anchors.",
+            "kind": "data_object",
+            "payload": {
+              "properties": {
+                "active": {
+                  "required": false,
+                  "value_kinds": [
+                    "boolean"
+                  ]
+                },
+                "cadence": {
+                  "required": false,
+                  "value_kinds": [
+                    "string"
+                  ]
+                },
+                "context": {
+                  "required": false,
+                  "value_kinds": [
+                    "string"
+                  ]
+                },
+                "domain": {
+                  "required": false,
+                  "value_kinds": [
+                    "string"
+                  ]
+                },
+                "next_due": {
+                  "required": false,
+                  "value_kinds": [
+                    "string"
+                  ]
+                },
+                "title": {
+                  "required": true,
+                  "value_kinds": [
+                    "string"
+                  ]
+                }
+              }
+            },
+            "system": {
+              "live": false
+            },
+            "type_key": "RoutineFacts",
+            "uuid": "c74f16e6-07b1-5837-8702-e8df86a90849"
+          },
+          "ref": {
+            "resource_id": "c74f16e6-07b1-5837-8702-e8df86a90849"
+          }
+        },
+        {
+          "definition": {
+            "description": "A choice or conclusion worth retaining with rationale.",
+            "kind": "anchor",
+            "payload": {
+              "required_data_types": [
+                "DecisionFacts"
+              ]
+            },
+            "system": {
+              "live": false
+            },
+            "type_key": "Decision",
+            "uuid": "b0448826-6355-59bf-90c7-bd4cffeab0f7"
+          },
+          "ref": {
+            "resource_id": "b0448826-6355-59bf-90c7-bd4cffeab0f7"
+          }
+        },
+        {
+          "definition": {
+            "description": "Typed facts for Decision anchors.",
+            "kind": "data_object",
+            "payload": {
+              "properties": {
+                "decided_on": {
+                  "required": false,
+                  "value_kinds": [
+                    "string"
+                  ]
+                },
+                "domain": {
+                  "required": false,
+                  "value_kinds": [
+                    "string"
+                  ]
+                },
+                "rationale": {
+                  "required": false,
+                  "value_kinds": [
+                    "string"
+                  ]
+                },
+                "status": {
+                  "required": false,
+                  "value_kinds": [
+                    "string"
+                  ]
+                },
+                "title": {
+                  "required": true,
+                  "value_kinds": [
+                    "string"
+                  ]
+                }
+              }
+            },
+            "system": {
+              "live": false
+            },
+            "type_key": "DecisionFacts",
+            "uuid": "f457bb5e-c2c0-5fae-82f3-e3f5ab99cfab"
+          },
+          "ref": {
+            "resource_id": "f457bb5e-c2c0-5fae-82f3-e3f5ab99cfab"
+          }
+        },
+        {
+          "definition": {
+            "description": "A captured observation, idea, or piece of context.",
+            "kind": "anchor",
+            "payload": {
+              "required_data_types": [
+                "NoteFacts"
+              ]
+            },
+            "system": {
+              "live": false
+            },
+            "type_key": "Note",
+            "uuid": "7b7b7d4a-fd2f-592f-8d9b-7df759f80fa4"
+          },
+          "ref": {
+            "resource_id": "7b7b7d4a-fd2f-592f-8d9b-7df759f80fa4"
+          }
+        },
+        {
+          "definition": {
+            "description": "Typed facts for Note anchors.",
+            "kind": "data_object",
+            "payload": {
+              "properties": {
+                "captured_at": {
+                  "required": false,
+                  "value_kinds": [
+                    "string"
+                  ]
+                },
+                "domain": {
+                  "required": false,
+                  "value_kinds": [
+                    "string"
+                  ]
+                },
+                "summary": {
+                  "required": false,
+                  "value_kinds": [
+                    "string"
+                  ]
+                },
+                "title": {
+                  "required": true,
+                  "value_kinds": [
+                    "string"
+                  ]
+                },
+                "topic": {
+                  "required": false,
+                  "value_kinds": [
+                    "string"
+                  ]
+                }
+              }
+            },
+            "system": {
+              "live": false
+            },
+            "type_key": "NoteFacts",
+            "uuid": "31750272-2c79-549b-b64d-bd728b976062"
+          },
+          "ref": {
+            "resource_id": "31750272-2c79-549b-b64d-bd728b976062"
+          }
+        },
+        {
+          "definition": {
+            "description": "A document, URL, artifact, or other useful resource.",
+            "kind": "anchor",
+            "payload": {
+              "required_data_types": [
+                "ResourceFacts"
+              ]
+            },
+            "system": {
+              "live": false
+            },
+            "type_key": "Resource",
+            "uuid": "7839ce6d-f5bb-5827-be76-5d4db08acb1c"
+          },
+          "ref": {
+            "resource_id": "7839ce6d-f5bb-5827-be76-5d4db08acb1c"
+          }
+        },
+        {
+          "definition": {
+            "description": "Typed facts for Resource anchors.",
+            "kind": "data_object",
+            "payload": {
+              "properties": {
+                "domain": {
+                  "required": false,
+                  "value_kinds": [
+                    "string"
+                  ]
+                },
+                "kind": {
+                  "required": false,
+                  "value_kinds": [
+                    "string"
+                  ]
+                },
+                "locator": {
+                  "required": false,
+                  "value_kinds": [
+                    "string"
+                  ]
+                },
+                "summary": {
+                  "required": false,
+                  "value_kinds": [
+                    "string"
+                  ]
+                },
+                "title": {
+                  "required": true,
+                  "value_kinds": [
+                    "string"
+                  ]
+                }
+              }
+            },
+            "system": {
+              "live": false
+            },
+            "type_key": "ResourceFacts",
+            "uuid": "997a7d71-d2ab-5d33-a406-23a3e052080a"
+          },
+          "ref": {
+            "resource_id": "997a7d71-d2ab-5d33-a406-23a3e052080a"
+          }
+        },
+        {
+          "definition": {
+            "description": "A physical or named place relevant to the graph.",
+            "kind": "anchor",
+            "payload": {
+              "required_data_types": [
+                "PlaceFacts"
+              ]
+            },
+            "system": {
+              "live": false
+            },
+            "type_key": "Place",
+            "uuid": "a78005e2-dc7b-5883-9396-444bd2b5f84b"
+          },
+          "ref": {
+            "resource_id": "a78005e2-dc7b-5883-9396-444bd2b5f84b"
+          }
+        },
+        {
+          "definition": {
+            "description": "Typed facts for Place anchors.",
+            "kind": "data_object",
+            "payload": {
+              "properties": {
+                "address": {
+                  "required": false,
+                  "value_kinds": [
+                    "string"
+                  ]
+                },
+                "kind": {
+                  "required": false,
+                  "value_kinds": [
+                    "string"
+                  ]
+                },
+                "name": {
+                  "required": true,
+                  "value_kinds": [
+                    "string"
+                  ]
+                },
+                "notes": {
+                  "required": false,
+                  "value_kinds": [
+                    "string"
+                  ]
+                }
+              }
+            },
+            "system": {
+              "live": false
+            },
+            "type_key": "PlaceFacts",
+            "uuid": "5a242c08-9773-5695-8c24-a159790012c0"
+          },
+          "ref": {
+            "resource_id": "5a242c08-9773-5695-8c24-a159790012c0"
+          }
+        },
+        {
+          "definition": {
+            "description": "An item belongs to an ongoing area.",
+            "kind": "link",
+            "payload": {
+              "allowed_source_types": [
+                "Goal",
+                "Project",
+                "Task",
+                "Event",
+                "Routine",
+                "Decision",
+                "Note",
+                "Resource"
+              ],
+              "allowed_target_types": [
+                "Area"
+              ]
+            },
+            "system": {
+              "live": false
+            },
+            "type_key": "belongs_to",
+            "uuid": "faf4f4a6-e673-5b04-9178-cc35385ffc31"
+          },
+          "ref": {
+            "resource_id": "faf4f4a6-e673-5b04-9178-cc35385ffc31"
+          }
+        },
+        {
+          "definition": {
+            "description": "An item supports a goal or project.",
+            "kind": "link",
+            "payload": {
+              "allowed_source_types": [
+                "Project",
+                "Task",
+                "Event",
+                "Routine",
+                "Decision",
+                "Note",
+                "Resource"
+              ],
+              "allowed_target_types": [
+                "Goal",
+                "Project"
+              ]
+            },
+            "system": {
+              "live": false
+            },
+            "type_key": "supports",
+            "uuid": "a3242254-d568-5ed6-9d85-f4a86592046f"
+          },
+          "ref": {
+            "resource_id": "a3242254-d568-5ed6-9d85-f4a86592046f"
+          }
+        },
+        {
+          "definition": {
+            "description": "A person or group is responsible for an area or work item.",
+            "kind": "link",
+            "payload": {
+              "allowed_source_types": [
+                "Person",
+                "Group"
+              ],
+              "allowed_target_types": [
+                "Area",
+                "Goal",
+                "Project",
+                "Task",
+                "Event",
+                "Routine"
+              ]
+            },
+            "system": {
+              "live": false
+            },
+            "type_key": "responsible_for",
+            "uuid": "bb40ab4f-8ea5-59b2-bd46-a3b78dce671c"
+          },
+          "ref": {
+            "resource_id": "bb40ab4f-8ea5-59b2-bd46-a3b78dce671c"
+          }
+        },
+        {
+          "definition": {
+            "description": "A person is a member of a group.",
+            "kind": "link",
+            "payload": {
+              "allowed_source_types": [
+                "Person"
+              ],
+              "allowed_target_types": [
+                "Group"
+              ]
+            },
+            "system": {
+              "live": false
+            },
+            "type_key": "member_of",
+            "uuid": "cdf57464-9a0a-5dc9-8ec9-d2590605dd6c"
+          },
+          "ref": {
+            "resource_id": "cdf57464-9a0a-5dc9-8ec9-d2590605dd6c"
+          }
+        },
+        {
+          "definition": {
+            "description": "An outcome, activity, or decision involves a person or group.",
+            "kind": "link",
+            "payload": {
+              "allowed_source_types": [
+                "Goal",
+                "Project",
+                "Task",
+                "Event",
+                "Routine",
+                "Decision"
+              ],
+              "allowed_target_types": [
+                "Person",
+                "Group"
+              ]
+            },
+            "system": {
+              "live": false
+            },
+            "type_key": "involves",
+            "uuid": "1b05678b-146c-5f2c-b444-7258cc08fe7f"
+          },
+          "ref": {
+            "resource_id": "1b05678b-146c-5f2c-b444-7258cc08fe7f"
+          }
+        },
+        {
+          "definition": {
+            "description": "An activity or group is associated with a place.",
+            "kind": "link",
+            "payload": {
+              "allowed_source_types": [
+                "Task",
+                "Event",
+                "Routine",
+                "Group"
+              ],
+              "allowed_target_types": [
+                "Place"
+              ]
+            },
+            "system": {
+              "live": false
+            },
+            "type_key": "located_at",
+            "uuid": "edc66a76-cdf8-5627-b25c-cf38d881e075"
+          },
+          "ref": {
+            "resource_id": "edc66a76-cdf8-5627-b25c-cf38d881e075"
+          }
+        },
+        {
+          "definition": {
+            "description": "A note or resource documents another starter-schema anchor.",
+            "kind": "link",
+            "payload": {
+              "allowed_source_types": [
+                "Note",
+                "Resource"
+              ],
+              "allowed_target_types": [
+                "Person",
+                "Group",
+                "Area",
+                "Goal",
+                "Project",
+                "Task",
+                "Event",
+                "Routine",
+                "Decision",
+                "Note",
+                "Resource",
+                "Place"
+              ]
+            },
+            "system": {
+              "live": false
+            },
+            "type_key": "documents",
+            "uuid": "e4d1a763-651e-54e7-93c8-7e5c296d4ce8"
+          },
+          "ref": {
+            "resource_id": "e4d1a763-651e-54e7-93c8-7e5c296d4ce8"
+          }
+        },
+        {
+          "definition": {
+            "description": "A note mentions another starter-schema anchor.",
+            "kind": "link",
+            "payload": {
+              "allowed_source_types": [
+                "Note"
+              ],
+              "allowed_target_types": [
+                "Person",
+                "Group",
+                "Area",
+                "Goal",
+                "Project",
+                "Task",
+                "Event",
+                "Routine",
+                "Decision",
+                "Note",
+                "Resource",
+                "Place"
+              ]
+            },
+            "system": {
+              "live": false
+            },
+            "type_key": "mentions",
+            "uuid": "efef7bad-465e-58b0-8694-1d4b9126df7c"
+          },
+          "ref": {
+            "resource_id": "efef7bad-465e-58b0-8694-1d4b9126df7c"
+          }
+        },
+        {
+          "definition": {
+            "description": "An outcome or work item depends on another outcome or work item.",
+            "kind": "link",
+            "payload": {
+              "allowed_source_types": [
+                "Goal",
+                "Project",
+                "Task"
+              ],
+              "allowed_target_types": [
+                "Goal",
+                "Project",
+                "Task"
+              ]
+            },
+            "system": {
+              "live": false
+            },
+            "type_key": "depends_on",
+            "uuid": "6ee00f5c-8eb6-5aa8-aa03-3c46fe33a87b"
+          },
+          "ref": {
+            "resource_id": "6ee00f5c-8eb6-5aa8-aa03-3c46fe33a87b"
+          }
+        }
+      ]
+    }
+  },
+  "ontology_id": "ontology.vellis.everyday_life",
+  "schema_definition_count": 33,
+  "version": "1"
+}

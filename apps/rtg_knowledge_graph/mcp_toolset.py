@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import copy
+import json
 from collections.abc import Callable
-from typing import Any
+from importlib.resources import files
+from typing import Any, cast
 from uuid import uuid4
 
 from apps.rtg_knowledge_graph.mcp_codec import (
@@ -20,6 +22,11 @@ from apps.rtg_knowledge_graph.mcp_codec import (
     decode_validation_options,
     encode_json,
 )
+from apps.rtg_knowledge_graph.starter_schema import (
+    StarterSchemaStatus,
+    load_starter_schema_bundle,
+    starter_schema_status,
+)
 from components.rtg.change_validation import RtgValidationError
 from components.rtg.constraints import RtgConstraintError
 from components.rtg.controller import (
@@ -33,225 +40,165 @@ from components.rtg.migration import RtgMigrationError
 from components.rtg.query import RtgQueryError
 from components.rtg.schema import RtgSchemaError
 
-TOOL_NAMES: tuple[str, ...] = (
-    "rtg_get_system_state",
-    "rtg_get_usage_guide",
-    "rtg_stage_schema_migration",
-    "rtg_validate_live_anchor_records",
-    "rtg_apply_live_anchor_records",
-    "rtg_validate_live_graph_changes",
-    "rtg_apply_live_graph_changes",
-    "rtg_stage_knowledge_changes",
-    "rtg_apply_migration_cutover",
-    "rtg_abandon_migration",
-    "rtg_execute_query",
-    "rtg_resolve_anchor_by_fact",
-    "rtg_get_object",
-    "rtg_list_migrations",
-    "rtg_get_migration",
-    "rtg_validate_graph",
-    "rtg_discover_anchor_types",
-    "rtg_get_schema_pack",
-    "rtg_export_system_snapshot",
-    "rtg_persist_system_snapshot",
-    "rtg_list_persisted_snapshots",
-    "rtg_load_persisted_snapshot",
-    "rtg_replay_ledger",
-    "rtg_verify_replay_from_ledger",
-    "rtg_list_migration_history",
-    "rtg_flush_ledger_failures",
-    "rtg_restore_from_snapshot",
-)
 
-TOOL_DESCRIPTIONS: dict[str, str] = {
-    "rtg_get_system_state": (
-        "Read controller state for MCP-only agents. Returns state_classification "
-        "(empty|schema_only|populated|has_staged_work|needs_replay), live schema summary, "
-        "live/non-live counts, current migration-store status counts, persisted snapshot paths, "
-        "ledger count, last ledger/transaction pointers, migration history hints, and "
-        "recommended_workflows plus recommended_next_steps. Use workflow_patterns or "
-        "request_patterns when entering cold."
-    ),
-    "rtg_get_usage_guide": (
-        "Return MCP-accessible usage guidance and copy-pastable JSON examples. topic values: "
-        "mcp_bootstrap_checklist, operator_card, workflow_patterns, request_patterns, "
-        "schema_staging_minimal, tool_call_shapes, live_write, lookup_examples, "
-        "query_examples, recovery_and_replay, migration_history, migration_abandonment. "
-        "Examples are generic RTG operation examples with complete top-level tool argument "
-        "envelopes; domain-specific schemas should be derived from the user's task."
-    ),
-    "rtg_stage_schema_migration": (
-        "Ergonomic schema staging for agents. Inputs: migration_id, description, "
-        "schema_definitions[{kind:anchor|data_object|link,type_key,description,payload}], "
-        "optional retire_live_schema[{kind,type_key}], validation_mode. Generates candidate "
-        "UUIDs, sets system.live=false, fills schema_make_live/schema_make_non_live, submits "
-        "the canonical rtg_stage_knowledge_changes payload, and returns that payload. Use after "
-        "schema_bootstrap or schema_evolution workflow planning; next call is usually "
-        "rtg_apply_migration_cutover."
-    ),
-    "rtg_validate_live_anchor_records": (
-        "Validate ergonomic live anchor records without mutating or ledgering. Inputs: "
-        "anchor_records[{ref,type,display_name?,system?,facts:[{ref?,type,properties,system?}]}], "
-        "optional link_writes, optional validation_options{tracks,finding_limit}. Compiles to "
-        "canonical graph_changes and returns submitted_graph_changes plus validation result."
-    ),
-    "rtg_apply_live_anchor_records": (
-        "Apply ergonomic live anchor records after schema exists. Inputs: "
-        "anchor_records[{ref,type,display_name?,system?,facts:[{ref?,type,properties,system?}]}], "
-        "optional link_writes, validation_mode(strict|skip). Compiles to canonical graph_changes "
-        "and returns submitted_graph_changes plus the underlying operation result."
-    ),
-    "rtg_apply_live_graph_changes": (
-        "Apply normal live graph CRUD only. Use this after the live schema exists. "
-        "graph_changes keys: anchor_writes[{ref:{local_ref|resource_id}, type, "
-        "display_name?, system?}], data_object_writes[{ref, type, properties, "
-        "anchor_refs:[ref], system?}], link_writes[{ref, type, source_ref, target_ref, "
-        "system?}], associate_data[{anchor_ref,data_ref}], dissociate_data, delete_anchors, "
-        "delete_data_objects, delete_links, set_live[{object_ref,live}]. Link writes require "
-        "existing or same-request endpoint anchors and a live link schema allowing their types. "
-        "local_ref is request-local only; use resource_id values returned by earlier calls for "
-        "existing objects. Strict invalid writes return validation_report findings. Rejects "
-        "schema, constraint, migration, and non-live candidate work."
-    ),
-    "rtg_validate_live_graph_changes": (
-        "Validate normal live graph CRUD without mutating or ledgering it. Inputs: "
-        "graph_changes with the same shape as rtg_apply_live_graph_changes and optional "
-        "validation_options{tracks,finding_limit}. Do not pass validation_options.mode; mutation "
-        "tools use validation_mode. Resolves local_ref values exactly like a real write, returns "
-        "generated_ids, resolved_graph_changes, and validation_report, and leaves graph state and "
-        "the controller ledger unchanged. Use before risky imports, safe_update, or "
-        "validation_error_recovery probes."
-    ),
-    "rtg_stage_knowledge_changes": (
-        "Advanced normalized-batch staging for migration-scoped knowledge-engineering changes. "
-        "For ordinary schema bootstrap/evolution, prefer rtg_stage_schema_migration because it "
-        "generates candidate UUIDs and migration membership. knowledge_changes is a change batch "
-        "with schema_changes, constraint_changes, migration_changes, and optional non-live "
-        "graph_changes. Schema writes use schema_changes.definition_writes[{ref, "
-        "definition:{uuid?, kind: anchor|data_object|link, type_key, description, payload, "
-        "system:{live:false}}}], where anchor payload uses "
-        "required_data_types/optional_data_types, data_object payload uses "
-        "properties:{field:{required,value_kinds,properties?,items?}}, and link payload uses "
-        "allowed_source_types/allowed_target_types. Constraint writes use "
-        "constraint_changes.constraint_writes[{ref,constraint:{uuid?, kind: "
-        "query_pattern|cardinality, target_type_keys, display_name, description, payload, "
-        "system:{live:false}}}], where query_pattern payload uses query_spec+expectation and "
-        "cardinality payload uses query_spec+counted_binding+minimum/maximum. Migration writes use "
-        "migration_changes.migration_writes[{ref, "
-        "migration:{migration_id, description, status:ready, schema_make_live?, "
-        "schema_make_non_live?, graph_make_live?, constraint_make_live?}}]. New candidates "
-        "must be referenced by a migration record in the same request. For non-live "
-        "graph_changes, graph_make_live must include every candidate anchor, data object, and "
-        "link UUID. Strict staging validates the projected migration cutover; use "
-        "validation_mode:skip only for controlled recovery or intentionally invalid cutover tests."
-    ),
-    "rtg_apply_migration_cutover": (
-        "Apply an explicit migration cutover. The migration record decides which staged schema, "
-        "constraint, or graph candidates become live and which records retire. Use after "
-        "rtg_stage_knowledge_changes returns ok:true. cutover_options keys: validation_mode "
-        "(strict|skip, default strict), prune_retired (default true), failure_restore "
-        "(only restore_pre_cutover_snapshot in v1). Strict cutover returns validation_report "
-        "findings, restores or preserves the previous live state on blocking failures, and marks "
-        "the migration failed so replay can reproduce that status."
-    ),
-    "rtg_abandon_migration": (
-        "Abandon draft/ready/failed staged work and prune safe non-live make-live candidates. "
-        "Never deletes live records or make-non-live targets. Use when exploratory schema, "
-        "constraint, or non-live graph candidates should not proceed."
-    ),
-    "rtg_execute_query": (
-        "Execute a read-only RTG query. query_spec keys: anchor_buckets[{name, "
-        "anchor_type_keys}], link_requirements[{name, source_bucket, target_bucket, "
-        "link_type_keys}], data_requirements[{name, anchor_bucket, data_type_key, "
-        "required?, predicates:[{path:[property,...], operator, value?, values?, "
-        "case_sensitive?, regex_flags?}]}], return_spec:{anchor_buckets?, link_requirements?, "
-        "data_requirements?, properties:[[data_requirement_name,[property,...]]]}. Operators: "
-        "exists, equals, not_equals, lt, lte, gt, gte, contains, in, substring, regex. "
-        "query_options keys: live_filter(all|live|non_live), live_status_overlay, "
-        "order_by[{data_requirement,path,direction:ascending|descending}]. order_by may "
-        "only reference paths listed in return_spec.properties. Optional response_options "
-        "supports format:full or properties_only."
-    ),
-    "rtg_resolve_anchor_by_fact": (
-        "Resolve live anchor UUIDs through the canonical query contract. Inputs: anchor_type, "
-        "data_type, property_path, value, optional case_sensitive. Compiles to rtg_execute_query "
-        "and returns match_count, matches[{resource_id, properties}], submitted_query, and "
-        "guidance for zero or multiple matches."
-    ),
-    "rtg_get_object": "Read one RTG graph object by UUID.",
-    "rtg_list_migrations": "List RTG migration records, optionally filtered by status.",
-    "rtg_get_migration": "Read one RTG migration record by ID.",
-    "rtg_validate_graph": (
-        "Validate current or migration-projected RTG state without mutation. Use "
-        "rtg_validate_graph({}) as the first MCP smoke check. Pass migration_ids to validate "
-        "a staged cutover projection. validation_options keys: tracks (all or list), "
-        "finding_limit (positive integer)."
-    ),
-    "rtg_discover_anchor_types": (
-        "Return live anchor type keys and descriptions for discovery. discovery_options keys: "
-        "include_non_live, limit (positive integer). Use before guessing anchor_type_keys."
-    ),
-    "rtg_get_schema_pack": (
-        "Return schema details and optional live counts for anchor types. Provide "
-        "anchor_type_keys. schema_pack_options keys: live (true, false, or null), "
-        "include_live_counts. Use this before writing data_object_writes or query "
-        "data_requirements so required data types and property names are known."
-    ),
-    "rtg_export_system_snapshot": (
-        "Export a coordinated JSON-safe RTG system snapshot for graph, schema, constraints, "
-        "migration state, and ledger position. Pass summary:true for compact counts and "
-        "ledger pointers instead of the full graph payload."
-    ),
-    "rtg_persist_system_snapshot": (
-        "Persist a coordinated system snapshot through JSON File Storage at relative_path. "
-        "Pass return_snapshot:false to omit the full snapshot payload and return compact "
-        "summary metadata."
-    ),
-    "rtg_list_persisted_snapshots": (
-        "List persisted system snapshots visible through JSON File Storage. Does not expose "
-        "arbitrary filesystem access."
-    ),
-    "rtg_load_persisted_snapshot": (
-        "Load one persisted system snapshot by relative JSON File Storage path. Use the returned "
-        "snapshot with rtg_restore_from_snapshot or rtg_replay_ledger start_snapshot. Pass "
-        "return_snapshot:false to return only relative_path and compact summary."
-    ),
-    "rtg_replay_ledger": (
-        "Replay mutating controller ledger requests into an empty or snapshot-seeded controller. "
-        "replay_options keys: start_snapshot, start_snapshot_path, after_ledger_position, "
-        "through_ledger_position. Use after restart or restore tests to verify recovery from "
-        "persisted ledger state."
-    ),
-    "rtg_verify_replay_from_ledger": (
-        "Replay mutating controller ledger requests into isolated scratch state and restore the "
-        "current state before returning. Accepts the same replay_options as rtg_replay_ledger, "
-        "including start_snapshot_path. Returns pre/post summaries, count diffs, replay counts, "
-        "and validation result without appending ledger entries."
-    ),
-    "rtg_list_migration_history": (
-        "Return ledger-backed migration audit events, including staged, cutover_applied, "
-        "cutover_failed, and abandoned events. Applied migrations may be absent from the live "
-        "migration store but remain visible here."
-    ),
-    "rtg_flush_ledger_failures": "Flush queued controller ledger failures to SQL storage.",
-    "rtg_restore_from_snapshot": (
-        "Restore RTG state from a supplied system snapshot. restore_options keys: "
-        "ledger_mode(record|skip). Use with rtg_export_system_snapshot or a persisted "
-        "snapshot payload."
-    ),
+def _load_model_tool_metadata() -> tuple[
+    tuple[str, ...], dict[str, str], dict[str, dict[str, Any]]
+]:
+    resource = files("apps.rtg_knowledge_graph.resources").joinpath("model_app_manifest.json")
+    manifest = json.loads(resource.read_text(encoding="utf-8"))
+    tools = manifest.get("tools")
+    if not isinstance(tools, list):
+        raise RuntimeError("model application manifest has no tool list")
+
+    names: list[str] = []
+    descriptions: dict[str, str] = {}
+    capabilities: dict[str, dict[str, Any]] = {}
+    for tool in tools:
+        if not isinstance(tool, dict):
+            raise RuntimeError("model application manifest contains an invalid tool entry")
+        name = tool.get("name")
+        description = tool.get("description")
+        if (
+            not isinstance(name, str)
+            or not name
+            or not isinstance(description, str)
+            or not description
+        ):
+            raise RuntimeError("model application manifest contains incomplete tool metadata")
+        if name in descriptions:
+            raise RuntimeError(f"model application manifest repeats tool {name}")
+        names.append(name)
+        descriptions[name] = description
+        annotations = tool.get("annotations")
+        lane = tool.get("lane")
+        audience = tool.get("audience")
+        ledgers = tool.get("ledgers")
+        recommended_predecessors = tool.get("recommended_predecessors")
+        dry_run_tool = tool.get("dry_run_tool")
+        if (
+            not isinstance(annotations, dict)
+            or not isinstance(lane, str)
+            or not isinstance(audience, str)
+            or not isinstance(ledgers, bool)
+            or not isinstance(recommended_predecessors, list)
+            or not all(isinstance(item, str) for item in recommended_predecessors)
+            or (dry_run_tool is not None and not isinstance(dry_run_tool, str))
+        ):
+            raise RuntimeError(f"model application manifest lacks capabilities for {name}")
+        capabilities[name] = {
+            "annotations": annotations,
+            "lane": lane,
+            "audience": audience,
+            "ledgers": ledgers,
+            "recommended_predecessors": recommended_predecessors,
+            "dry_run_tool": dry_run_tool,
+        }
+    if len(names) != 27:
+        raise RuntimeError(f"model application manifest declares {len(names)} tools, expected 27")
+    return tuple(names), descriptions, capabilities
+
+
+TOOL_NAMES, TOOL_DESCRIPTIONS, _MODELED_TOOL_CAPABILITIES = _load_model_tool_metadata()
+
+_LANES = {
+    "state_and_discovery",
+    "live_graph",
+    "query",
+    "knowledge_engineering",
+    "migration",
+    "recovery_and_audit",
+}
+def _tool_capabilities() -> dict[str, dict[str, Any]]:
+    capabilities: dict[str, dict[str, Any]] = {}
+    for name in TOOL_NAMES:
+        modeled = _MODELED_TOOL_CAPABILITIES[name]
+        annotations = modeled["annotations"]
+        read_only = annotations["readOnlyHint"] is True
+        capabilities[name] = {
+            "name": name,
+            "lane": modeled["lane"],
+            "mutates": not read_only,
+            "ledgers": modeled["ledgers"],
+            "dry_run_tool": modeled["dry_run_tool"],
+            "recommended_predecessors": modeled["recommended_predecessors"],
+            "audience": modeled["audience"],
+            "annotations": annotations,
+        }
+    if set(capabilities) != set(TOOL_NAMES):
+        raise RuntimeError("capability metadata does not match registered RTG tools")
+    unknown_predecessors = {
+        predecessor
+        for capability in capabilities.values()
+        for predecessor in capability["recommended_predecessors"]
+        if predecessor not in capabilities
+    }
+    if unknown_predecessors:
+        raise RuntimeError(
+            f"capability metadata names unknown predecessors: {sorted(unknown_predecessors)}"
+        )
+    unknown_dry_run_tools = {
+        capability["dry_run_tool"]
+        for capability in capabilities.values()
+        if capability["dry_run_tool"] is not None
+        and capability["dry_run_tool"] not in capabilities
+    }
+    if unknown_dry_run_tools:
+        raise RuntimeError(
+            f"capability metadata names unknown dry-run tools: {sorted(unknown_dry_run_tools)}"
+        )
+    return capabilities
+
+
+TOOL_CAPABILITIES = _tool_capabilities()
+TOOL_ANNOTATIONS = {
+    name: capability["annotations"] for name, capability in TOOL_CAPABILITIES.items()
 }
 
 
-def mcp_tool_metadata() -> list[dict[str, str]]:
-    return [{"name": name, "description": TOOL_DESCRIPTIONS[name]} for name in TOOL_NAMES]
+def mcp_tool_metadata() -> list[dict[str, Any]]:
+    return [
+        {
+            "name": name,
+            "description": TOOL_DESCRIPTIONS[name],
+            "annotations": TOOL_ANNOTATIONS[name],
+        }
+        for name in TOOL_NAMES
+    ]
 
 
 class RtgMcpToolset:
-    def __init__(self, controller: InProcessRtgController) -> None:
+    def __init__(
+        self,
+        controller: InProcessRtgController,
+        starter_schema: StarterSchemaStatus | None = None,
+    ) -> None:
         self._controller = controller
+        self._starter_schema = starter_schema
 
     def rtg_get_system_state(self) -> dict[str, Any]:
-        return self._response(self._controller.get_system_state)
+        response = self._response(self._controller.get_system_state)
+        result = response.get("result")
+        if response.get("ok") is True and isinstance(result, dict) and self._starter_schema:
+            current_starter_schema = starter_schema_status(
+                self._controller,
+                recovery=self._starter_schema.recovery,
+            )
+            result["starter_schema"] = current_starter_schema.to_json_value()
+            if (
+                current_starter_schema.status == "installed"
+                and result.get("state_classification") == "schema_only"
+            ):
+                workflows = result.get("recommended_workflows")
+                if isinstance(workflows, list) and "everyday_memory_onboarding" not in workflows:
+                    workflows.append("everyday_memory_onboarding")
+                next_steps = result.get("recommended_next_steps")
+                if isinstance(next_steps, list):
+                    next_steps.insert(
+                        0,
+                        "The Everyday Life ontology is installed; ask what the user wants Vellis "
+                        "to remember before proposing initial records.",
+                    )
+        return response
 
     def rtg_get_usage_guide(self, topic: str) -> dict[str, Any]:
         return self._response(lambda: _usage_guide(topic))
@@ -263,6 +210,7 @@ class RtgMcpToolset:
         schema_definitions: list[dict[str, Any]],
         retire_live_schema: list[dict[str, Any]] | None = None,
         validation_mode: str = "strict",
+        response_options: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         return self._response(
             lambda: self._stage_schema_migration(
@@ -271,6 +219,7 @@ class RtgMcpToolset:
                 schema_definitions,
                 retire_live_schema or [],
                 validation_mode,
+                response_options,
             )
         )
 
@@ -305,12 +254,14 @@ class RtgMcpToolset:
         anchor_records: list[dict[str, Any]],
         link_writes: list[dict[str, Any]] | None = None,
         validation_mode: str = "strict",
+        response_options: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         return self._response(
             lambda: self._apply_live_anchor_records(
                 anchor_records,
                 link_writes or [],
                 validation_mode,
+                response_options,
             )
         )
 
@@ -440,9 +391,18 @@ class RtgMcpToolset:
 
     def rtg_export_system_snapshot(self, summary: bool = False) -> dict[str, Any]:
         if not summary:
-            return self._response(self._controller.export_system_snapshot)
+            return self._response(
+                lambda: {
+                    "kind": "full",
+                    **cast(
+                        dict[str, Any],
+                        encode_json(self._controller.export_system_snapshot()),
+                    ),
+                }
+            )
         return self._response(
             lambda: {
+                "kind": "summary",
                 "status": "snapshot_exported",
                 "summary": _snapshot_summary(self._controller.export_system_snapshot()),
             }
@@ -516,12 +476,15 @@ class RtgMcpToolset:
         schema_definitions: list[dict[str, Any]],
         retire_live_schema: list[dict[str, Any]],
         validation_mode: str,
+        response_options: dict[str, Any] | None,
     ) -> dict[str, Any]:
+        response_format = _mutation_response_format(response_options)
         if not schema_definitions:
             raise RtgMcpInputInvalid("schema_definitions must contain at least one definition")
         definition_writes: list[dict[str, Any]] = []
         generated_ids: dict[str, str] = {}
         schema_make_live: list[str] = []
+        seen_schema_keys: set[str] = set()
         for index, source_definition in enumerate(schema_definitions):
             if not isinstance(source_definition, dict):
                 raise RtgMcpInputInvalid(f"schema_definitions[{index}] must be an object")
@@ -532,6 +495,12 @@ class RtgMcpToolset:
                 "type_key",
                 f"schema_definitions[{index}].type_key",
             )
+            schema_key = f"{kind}:{type_key}"
+            if schema_key in seen_schema_keys:
+                raise RtgMcpInputInvalid(
+                    "schema_definitions must contain unique kind and type_key pairs"
+                )
+            seen_schema_keys.add(schema_key)
             candidate_uuid = str(uuid4())
             definition["uuid"] = candidate_uuid
             system = definition.get("system")
@@ -540,7 +509,7 @@ class RtgMcpToolset:
             if not isinstance(system, dict):
                 raise RtgMcpInputInvalid(f"schema_definitions[{index}].system must be an object")
             definition["system"] = {**system, "live": False}
-            generated_ids[f"{kind}:{type_key}"] = candidate_uuid
+            generated_ids[schema_key] = candidate_uuid
             schema_make_live.append(candidate_uuid)
             definition_writes.append(
                 {
@@ -571,11 +540,14 @@ class RtgMcpToolset:
             decode_change_batch(knowledge_changes),
             validation_mode=validation_mode,
         )
-        return {
+        result = {
+            "format": response_format,
             "generated_schema_ids": generated_ids,
-            "submitted_knowledge_changes": knowledge_changes,
             "operation": operation,
         }
+        if response_format == "full":
+            result["submitted_knowledge_changes"] = knowledge_changes
+        return result
 
     def _resolve_live_schema_retirements(
         self,
@@ -629,16 +601,23 @@ class RtgMcpToolset:
         anchor_records: list[dict[str, Any]],
         link_writes: list[dict[str, Any]],
         validation_mode: str,
+        response_options: dict[str, Any] | None,
     ) -> dict[str, Any]:
+        response_format = _mutation_response_format(response_options)
         compiled = _compile_live_anchor_records(anchor_records, link_writes)
         operation = self._controller.apply_live_graph_changes(
             decode_graph_changes(compiled["submitted_graph_changes"]),
             validation_mode=validation_mode,
         )
-        return {
-            **compiled,
+        result = {
+            "format": response_format,
+            "generated_ids": operation.generated_ids,
+            "generated_refs": compiled["generated_refs"],
             "operation": operation,
         }
+        if response_format == "full":
+            result["submitted_graph_changes"] = compiled["submitted_graph_changes"]
+        return result
 
     def _resolve_anchor_by_fact(
         self,
@@ -849,10 +828,28 @@ def _shape_query_response(
 ) -> object:
     options = _response_options(response_options)
     if options["format"] == "full":
-        return result
+        encoded_full = encode_json(result)
+        if isinstance(encoded_full, dict):
+            return {"kind": "full", **encoded_full}
+        return encoded_full
     encoded = encode_json(result)
     if not isinstance(encoded, dict):
         return encoded
+    aggregations = encoded.get("aggregations", [])
+    if isinstance(aggregations, list) and aggregations:
+        response = {
+            "kind": "properties_only",
+            "status": "query_executed",
+            "format": "properties_only",
+            "row_count": len(aggregations),
+            "rows": aggregations,
+            "total_row_count": encoded.get("total_row_count", len(aggregations)),
+            "returned_row_count": encoded.get("returned_row_count", len(aggregations)),
+            "diagnostics": encoded.get("diagnostics", []),
+        }
+        if "next_offset" in encoded:
+            response["next_offset"] = encoded["next_offset"]
+        return response
     returns = encoded.get("returns", [])
     rows = []
     if isinstance(returns, list):
@@ -899,13 +896,19 @@ def _shape_query_response(
                 ),
             }
         )
-    return {
+    response = {
+        "kind": "properties_only",
         "status": "query_executed",
         "format": "properties_only",
         "row_count": len(rows),
         "rows": rows,
+        "total_row_count": encoded.get("total_row_count", len(rows)),
+        "returned_row_count": encoded.get("returned_row_count", len(rows)),
         "diagnostics": diagnostics,
     }
+    if "next_offset" in encoded:
+        response["next_offset"] = encoded["next_offset"]
+    return response
 
 
 def _anchor_fact_lookup_query(
@@ -1034,6 +1037,44 @@ def _response_options(value: dict[str, Any] | None) -> dict[str, str]:
     return {"format": str(format_value)}
 
 
+def _mutation_response_format(value: dict[str, Any] | None) -> str:
+    if value is None:
+        return "compact"
+    if not isinstance(value, dict):
+        raise RtgMcpInputInvalid("response_options must be an object")
+    unknown = sorted(set(value) - {"format"})
+    if unknown:
+        raise RtgMcpInputInvalid(
+            f"response_options has unsupported field(s): {unknown}; accepted field: 'format'",
+            diagnostic=rtg_diagnostic(
+                code="mcp.input.unsupported_field",
+                category="input_shape",
+                path=f"response_options.{unknown[0]}",
+                problem="Mutation response_options contains unsupported fields.",
+                remedy="Use response_options.format with compact or full.",
+                accepted_fields=("format",),
+                minimal_example={"response_options": {"format": "compact"}},
+                guide_topics=("tool_call_shapes",),
+            ),
+        )
+    response_format = value.get("format", "compact")
+    if response_format not in {"compact", "full"}:
+        raise RtgMcpInputInvalid(
+            "response_options.format must be compact or full",
+            diagnostic=rtg_diagnostic(
+                code="mcp.input.unsupported_value",
+                category="input_shape",
+                path="response_options.format",
+                problem="Unsupported mutation response format.",
+                remedy="Use compact (default) or full.",
+                accepted_fields=("compact", "full"),
+                minimal_example={"response_options": {"format": "compact"}},
+                guide_topics=("tool_call_shapes",),
+            ),
+        )
+    return str(response_format)
+
+
 def _shape_loaded_snapshot_result(
     document: object,
     *,
@@ -1156,6 +1197,7 @@ def _required_text(data: dict[str, Any], key: str, label: str) -> str:
 
 def _usage_guide(topic: str) -> dict[str, Any]:
     guides: dict[str, Callable[[], dict[str, Any]]] = {
+        "capabilities": _capabilities_guide,
         "mcp_bootstrap_checklist": _mcp_bootstrap_checklist_guide,
         "operator_card": _operator_card_guide,
         "workflow_patterns": _workflow_patterns_guide,
@@ -1168,11 +1210,99 @@ def _usage_guide(topic: str) -> dict[str, Any]:
         "recovery_and_replay": _recovery_and_replay_guide,
         "migration_history": _migration_history_guide,
         "migration_abandonment": _migration_abandonment_guide,
+        "everyday_life_schema": _everyday_life_schema_guide,
+        "schema_design": _schema_design_guide,
     }
     try:
         return guides[topic]()
     except KeyError as error:
         raise RtgMcpInputInvalid("topic must be one of: " + ", ".join(sorted(guides))) from error
+
+
+def _capabilities_guide() -> dict[str, Any]:
+    return {
+        "topic": "capabilities",
+        "tools": [
+            {key: value for key, value in TOOL_CAPABILITIES[name].items() if key != "annotations"}
+            for name in TOOL_NAMES
+        ],
+        "lanes": sorted(_LANES),
+        "audiences": ["everyday", "advanced", "operator"],
+    }
+
+
+def _everyday_life_schema_guide() -> dict[str, Any]:
+    bundle = load_starter_schema_bundle()
+    writes = bundle["knowledge_changes"]["schema_changes"]["definition_writes"]
+    definitions = [item["definition"] for item in writes]
+    return {
+        "topic": "everyday_life_schema",
+        "ontology_id": bundle["ontology_id"],
+        "ontology_version": bundle["version"],
+        "purpose": (
+            "Map ordinary personal, household, family, and work requests onto the modeled "
+            "starter schema without inventing facts."
+        ),
+        "anchors": [
+            {
+                "type_key": definition["type_key"],
+                "required_facts_type": definition["payload"]["required_data_types"][0],
+            }
+            for definition in definitions
+            if definition["kind"] == "anchor"
+        ],
+        "links": [
+            {
+                "type_key": definition["type_key"],
+                "source_types": definition["payload"]["allowed_source_types"],
+                "target_types": definition["payload"]["allowed_target_types"],
+            }
+            for definition in definitions
+            if definition["kind"] == "link"
+        ],
+        "examples": [
+            "A person, family member, colleague, or contact maps to Person.",
+            "An ongoing responsibility such as Home or Health maps to Area.",
+            "An outcome maps to Goal; bounded work maps to Project; a next action maps to Task.",
+            "A dated commitment maps to Event; recurring upkeep maps to Routine.",
+            "A choice and rationale maps to Decision; captured context maps to Note.",
+            "A useful document or URL maps to Resource; a meaningful location maps to Place.",
+        ],
+        "working_rules": [
+            "Inspect existing records before creating duplicates.",
+            "Only name or title is required; do not invent status, dates, priority, or people.",
+            "Show the user a large proposed initial write before applying it.",
+            "Use schema_design before proposing a schema extension.",
+        ],
+    }
+
+
+def _schema_design_guide() -> dict[str, Any]:
+    return {
+        "topic": "schema_design",
+        "purpose": "Extend an RTG schema while preserving meaning and live data.",
+        "principles": [
+            "Use an anchor for an independently identifiable thing that links can address.",
+            "Use an associated data object for typed descriptive facts about an anchor.",
+            "Use a link for a meaningful relationship users will navigate or query.",
+            "Require only fields that every valid partial record can truthfully provide.",
+            "Prefer stable singular PascalCase type keys and clear snake_case property keys.",
+            "Add a property when it remains one fact of the same concept; add a data type when "
+            "a coherent fact group has its own validation; add an anchor when identity matters.",
+            "Avoid generic JSON blobs, catch-all links, and premature domain specialization.",
+            "Use allowed_values, date/date_time/uri format, numeric bounds, or RE2 pattern only "
+            "when the semantic restriction is stable; refinements recurse into object and list "
+            "fields and are validated against existing data during projected cutover.",
+        ],
+        "workflow": [
+            "Inspect the live schema and representative data before proposing changes.",
+            "Explain the new semantics, affected records, and migration to the human.",
+            "Obtain human approval before consequential schema evolution.",
+            "Stage the migration in strict mode and inspect validation evidence.",
+            "Cut over only after validation; preserve existing live data and identities.",
+            "Validate the graph and verify representative queries after cutover.",
+        ],
+    }
 
 
 def _mcp_bootstrap_checklist_guide() -> dict[str, Any]:
@@ -1193,17 +1323,25 @@ def _mcp_bootstrap_checklist_guide() -> dict[str, Any]:
             },
             {
                 "tool": "rtg_get_usage_guide",
+                "arguments": {"topic": "everyday_life_schema"},
+                "when": (
+                    "Use when starter_schema.status is installed. Map the user's request to "
+                    "existing types before considering schema evolution."
+                ),
+            },
+            {
+                "tool": "rtg_get_usage_guide",
                 "arguments": {"topic": "schema_staging_minimal"},
                 "when": (
-                    "Use for schema payload shape. Translate the user's domain model into "
-                    "schema_definitions; do not treat examples as the application schema."
+                    "Use only when state is intentionally empty or after human-approved schema "
+                    "evolution. Never overlay an unrecognized custom schema."
                 ),
             },
             {
                 "tool": "rtg_stage_schema_migration",
                 "argument_source": (
                     "Build migration_id, description, and schema_definitions from the user's "
-                    "domain prompt. schema_staging_minimal shows only the JSON shape."
+                    "approved design. schema_staging_minimal shows only the JSON shape."
                 ),
             },
             {
@@ -1245,7 +1383,11 @@ def _mcp_bootstrap_checklist_guide() -> dict[str, Any]:
             {
                 "tool": "rtg_verify_replay_from_ledger",
                 "arguments": {"replay_options": {"start_snapshot_path": "snapshots/run.json"}},
-                "why": "Report replay_window, records seen, count diffs, and validation.",
+                "why": (
+                    "Prove or disprove exact domain-state equivalence with digests; report "
+                    "ledger-cursor equivalence separately and use replay accounting to explain "
+                    "the replay window."
+                ),
             },
             {
                 "tool": "rtg_list_migration_history",
@@ -1255,8 +1397,8 @@ def _mcp_bootstrap_checklist_guide() -> dict[str, Any]:
         "notes": [
             (
                 "rtg_get_system_state.migration_counts_by_status reports the current migration "
-                "store. Applied and abandoned migrations may be pruned from current state while "
-                "remaining visible through rtg_list_migration_history."
+                "store. Successful, abandoned, rejected, and failed proposals may be absent from "
+                "current state while remaining visible through rtg_list_migration_history."
             ),
             (
                 "Dry-run validation evidence can be reported in the final brief without writing "
@@ -1271,9 +1413,7 @@ def _mcp_bootstrap_checklist_guide() -> dict[str, Any]:
                 '{"local_ref": "request-local-name"} inside one request or '
                 '{"resource_id": "<uuid>"} for objects returned by earlier calls.'
             ),
-            (
-                "Dry-run tools use validation_options; mutation tools use validation_mode."
-            ),
+            ("Dry-run tools use validation_options; mutation tools use validation_mode."),
             "Examples teach RTG payload shapes; build the actual schema from the user task.",
         ],
     }
@@ -1637,9 +1777,7 @@ def _tool_call_shapes_guide() -> dict[str, Any]:
                 '{"local_ref": "request-local-name"} inside one request or '
                 '{"resource_id": "<uuid>"} for objects returned by earlier calls.'
             ),
-            (
-                "Dry-run tools use validation_options. Mutation tools use validation_mode."
-            ),
+            ("Dry-run tools use validation_options. Mutation tools use validation_mode."),
         ],
         "rtg_stage_schema_migration": {
             "tool": "rtg_stage_schema_migration",
@@ -1654,7 +1792,11 @@ def _tool_call_shapes_guide() -> dict[str, Any]:
                         "payload": {
                             "properties": {
                                 "title": {"required": True, "value_kinds": ["string"]},
-                                "status": {"required": True, "value_kinds": ["string"]},
+                                "status": {
+                                    "required": True,
+                                    "value_kinds": ["string"],
+                                    "allowed_values": ["active", "waiting"],
+                                },
                             }
                         },
                     },
@@ -1675,6 +1817,7 @@ def _tool_call_shapes_guide() -> dict[str, Any]:
                     },
                 ],
                 "validation_mode": "strict",
+                "response_options": {"format": "compact"},
             },
         },
         "rtg_validate_live_anchor_records": {
@@ -1733,7 +1876,12 @@ def _tool_call_shapes_guide() -> dict[str, Any]:
                     }
                 ],
                 "validation_mode": "strict",
+                "response_options": {"format": "compact"},
             },
+            "result_guidance": (
+                "Use generated_ids for every submitted local_ref and generated_refs.facts to "
+                "correlate facade-created fact refs. Request format full only for debugging."
+            ),
         },
         "rtg_validate_live_graph_changes": {
             "tool": "rtg_validate_live_graph_changes",
@@ -1960,16 +2108,24 @@ def _query_examples_guide() -> dict[str, Any]:
                 "Expected counts should come from the user's task or evaluator, not from "
                 "generic usage examples."
             ),
+            "server_side": (
+                "For scalable reconciliation, list group_by property paths in return_spec "
+                "properties and add aggregations with function count and a binding name. Counts "
+                "use distinct bound UUIDs; pagination applies after aggregation."
+            ),
         },
+        "polymorphic_guidance": (
+            "Use one anchor bucket with multiple anchor_type_keys, optional data requirements "
+            "for each fact schema, a common link requirement, and properties-only output before "
+            "introducing union-specific syntax."
+        ),
         "relationship_query_guidance": {
             "belongs_to": "Bind source and target anchor buckets, then require a belongs_to link.",
             "supports": (
                 "Bind supporting objects and supported objects, then require a supports link. "
                 "Use optional data requirements when multiple supporter anchor types may appear."
             ),
-            "owns": (
-                "Bind owner and owned object buckets, then require an owns link."
-            ),
+            "owns": ("Bind owner and owned object buckets, then require an owns link."),
             "related_to": "Bind two item buckets, then require a related_to link.",
         },
         "ordered_active_items": {
@@ -2054,9 +2210,7 @@ def _query_examples_guide() -> dict[str, Any]:
             "tool": "rtg_execute_query",
             "arguments": {
                 "query_spec": {
-                    "anchor_buckets": [
-                        {"name": "collection", "anchor_type_keys": ["Collection"]}
-                    ],
+                    "anchor_buckets": [{"name": "collection", "anchor_type_keys": ["Collection"]}],
                     "data_requirements": [
                         {
                             "name": "facts",
@@ -2219,6 +2373,12 @@ def _recovery_and_replay_guide() -> dict[str, Any]:
                 "run may replay zero mutating requests."
             ),
             (
+                "Replay verification directly reports state_equivalent_to_live, separate "
+                "ledger_cursor_equivalent_to_live, exact domain-state digests, live_count_diffs, "
+                "and accounting for scanned, eligible, replayed, administrative, and rejected "
+                "records. Counts alone are not equivalence evidence."
+            ),
+            (
                 "Dry-run validation evidence can be reported in the final brief without writing "
                 "a live graph evidence record. Only create durable graph evidence when it is "
                 "explicitly desired."
@@ -2280,8 +2440,10 @@ def _migration_history_guide() -> dict[str, Any]:
         "notes": [
             "Use this for durable migration audit after applied migrations are pruned from "
             "the live migration store.",
-            "Expected event_type values include staged, cutover_applied, cutover_failed, and "
-            "abandoned.",
+            "Expected event_type values include staged, staging_rejected, staging_failed, "
+            "cutover_applied, cutover_failed, and abandoned.",
+            "Rejected staging events are derived from existing request/error ledger pairs; they "
+            "do not create migration-store records or replayable mutations.",
         ],
         "arguments": {},
     }

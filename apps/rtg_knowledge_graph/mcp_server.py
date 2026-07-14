@@ -14,6 +14,7 @@ from apps.rtg_knowledge_graph.mcp_launch import (
     mcp_launch_metadata,
 )
 from apps.rtg_knowledge_graph.mcp_toolset import (
+    TOOL_ANNOTATIONS,
     TOOL_DESCRIPTIONS,
     RtgMcpToolset,
     mcp_tool_metadata,
@@ -25,37 +26,28 @@ def build_mcp_server(toolset: RtgMcpToolset) -> FastMCP:
     server = FastMCP(
         MCP_SERVER_NAME,
         instructions=(
-            "Use RTG tools through the controller lanes: live graph work, "
-            "knowledge-engineering staging, and migration cutover. Start with "
-            "rtg_validate_graph({}) as a smoke check, use rtg_get_schema_pack or "
-            "rtg_discover_anchor_types before inventing type keys, and prefer "
-            "rtg_execute_query for graph questions instead of scanning objects manually. "
-            "Use rtg_get_usage_guide(topic='mcp_bootstrap_checklist') for the MCP-only "
-            "happy path, workflow_patterns for state-driven sequences, and request_patterns "
-            "to map ordinary user requests to RTG workflows. For an empty app, stage ordinary "
-            "schema with "
-            "rtg_stage_schema_migration, then cut over with rtg_apply_migration_cutover; "
-            "rtg_stage_knowledge_changes is the advanced normalized-batch surface. Use "
-            "rtg_resolve_anchor_by_fact or "
-            "rtg_get_usage_guide(topic='lookup_examples') before writing links to existing "
-            "objects, and rtg_validate_live_graph_changes for no-mutation probes. "
-            "Tool results are JSON objects with ok plus result on success, including "
-            "transaction_id and optional ledger_position for mutating results. Expected "
-            "failures return error details; use error.diagnostic.remedy and guide_topics "
-            "when present. Validation failures also include transaction_id and "
-            "validation_report when the controller assigned them."
+            "Read system state first. Use installed schema when present and discover schema "
+            "before writing. Dry-run risky changes, use the correct mutation lane, and fetch "
+            "usage-guide topics for detailed request shapes."
         ),
     )
 
-    @server.tool(name="rtg_get_system_state", description=TOOL_DESCRIPTIONS["rtg_get_system_state"])
+    def _tool(*, name: str, description: str):
+        return server.tool(
+            name=name,
+            description=description,
+            annotations=TOOL_ANNOTATIONS[name],
+        )
+
+    @_tool(name="rtg_get_system_state", description=TOOL_DESCRIPTIONS["rtg_get_system_state"])
     def rtg_get_system_state() -> dict[str, Any]:
         return _as_tool_result(toolset.rtg_get_system_state())
 
-    @server.tool(name="rtg_get_usage_guide", description=TOOL_DESCRIPTIONS["rtg_get_usage_guide"])
+    @_tool(name="rtg_get_usage_guide", description=TOOL_DESCRIPTIONS["rtg_get_usage_guide"])
     def rtg_get_usage_guide(topic: str) -> dict[str, Any]:
         return _as_tool_result(toolset.rtg_get_usage_guide(topic))
 
-    @server.tool(
+    @_tool(
         name="rtg_stage_schema_migration",
         description=TOOL_DESCRIPTIONS["rtg_stage_schema_migration"],
     )
@@ -65,6 +57,7 @@ def build_mcp_server(toolset: RtgMcpToolset) -> FastMCP:
         schema_definitions: list[dict[str, Any]],
         retire_live_schema: list[dict[str, Any]] | None = None,
         validation_mode: str = "strict",
+        response_options: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         return _as_tool_result(
             toolset.rtg_stage_schema_migration(
@@ -73,10 +66,11 @@ def build_mcp_server(toolset: RtgMcpToolset) -> FastMCP:
                 schema_definitions,
                 retire_live_schema,
                 validation_mode,
+                _optional_json_object(response_options),
             )
         )
 
-    @server.tool(
+    @_tool(
         name="rtg_validate_live_anchor_records",
         description=TOOL_DESCRIPTIONS["rtg_validate_live_anchor_records"],
     )
@@ -93,7 +87,7 @@ def build_mcp_server(toolset: RtgMcpToolset) -> FastMCP:
             )
         )
 
-    @server.tool(
+    @_tool(
         name="rtg_apply_live_anchor_records",
         description=TOOL_DESCRIPTIONS["rtg_apply_live_anchor_records"],
     )
@@ -101,16 +95,18 @@ def build_mcp_server(toolset: RtgMcpToolset) -> FastMCP:
         anchor_records: list[dict[str, Any]],
         link_writes: list[dict[str, Any]] | None = None,
         validation_mode: str = "strict",
+        response_options: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         return _as_tool_result(
             toolset.rtg_apply_live_anchor_records(
                 anchor_records,
                 link_writes,
                 validation_mode,
+                _optional_json_object(response_options),
             )
         )
 
-    @server.tool(
+    @_tool(
         name="rtg_apply_live_graph_changes",
         description=TOOL_DESCRIPTIONS["rtg_apply_live_graph_changes"],
     )
@@ -125,7 +121,7 @@ def build_mcp_server(toolset: RtgMcpToolset) -> FastMCP:
             )
         )
 
-    @server.tool(
+    @_tool(
         name="rtg_validate_live_graph_changes",
         description=TOOL_DESCRIPTIONS["rtg_validate_live_graph_changes"],
     )
@@ -140,7 +136,7 @@ def build_mcp_server(toolset: RtgMcpToolset) -> FastMCP:
             )
         )
 
-    @server.tool(
+    @_tool(
         name="rtg_stage_knowledge_changes",
         description=TOOL_DESCRIPTIONS["rtg_stage_knowledge_changes"],
     )
@@ -155,7 +151,7 @@ def build_mcp_server(toolset: RtgMcpToolset) -> FastMCP:
             )
         )
 
-    @server.tool(
+    @_tool(
         name="rtg_apply_migration_cutover",
         description=TOOL_DESCRIPTIONS["rtg_apply_migration_cutover"],
     )
@@ -170,16 +166,14 @@ def build_mcp_server(toolset: RtgMcpToolset) -> FastMCP:
             )
         )
 
-    @server.tool(
-        name="rtg_abandon_migration", description=TOOL_DESCRIPTIONS["rtg_abandon_migration"]
-    )
+    @_tool(name="rtg_abandon_migration", description=TOOL_DESCRIPTIONS["rtg_abandon_migration"])
     def rtg_abandon_migration(
         migration_id: str,
         reason: str | None = None,
     ) -> dict[str, Any]:
         return _as_tool_result(toolset.rtg_abandon_migration(migration_id, reason))
 
-    @server.tool(name="rtg_execute_query", description=TOOL_DESCRIPTIONS["rtg_execute_query"])
+    @_tool(name="rtg_execute_query", description=TOOL_DESCRIPTIONS["rtg_execute_query"])
     def rtg_execute_query(
         query_spec: dict[str, Any],
         query_options: dict[str, Any] | None = None,
@@ -193,7 +187,7 @@ def build_mcp_server(toolset: RtgMcpToolset) -> FastMCP:
             )
         )
 
-    @server.tool(
+    @_tool(
         name="rtg_resolve_anchor_by_fact",
         description=TOOL_DESCRIPTIONS["rtg_resolve_anchor_by_fact"],
     )
@@ -214,22 +208,22 @@ def build_mcp_server(toolset: RtgMcpToolset) -> FastMCP:
             )
         )
 
-    @server.tool(name="rtg_get_object", description=TOOL_DESCRIPTIONS["rtg_get_object"])
+    @_tool(name="rtg_get_object", description=TOOL_DESCRIPTIONS["rtg_get_object"])
     def rtg_get_object(object_uuid: str) -> dict[str, Any]:
         return _as_tool_result(toolset.rtg_get_object(object_uuid))
 
-    @server.tool(
+    @_tool(
         name="rtg_list_migrations",
         description=TOOL_DESCRIPTIONS["rtg_list_migrations"],
     )
     def rtg_list_migrations(status: str | None = None) -> dict[str, Any]:
         return _as_tool_result(toolset.rtg_list_migrations(status=status))
 
-    @server.tool(name="rtg_get_migration", description=TOOL_DESCRIPTIONS["rtg_get_migration"])
+    @_tool(name="rtg_get_migration", description=TOOL_DESCRIPTIONS["rtg_get_migration"])
     def rtg_get_migration(migration_id: str) -> dict[str, Any]:
         return _as_tool_result(toolset.rtg_get_migration(migration_id))
 
-    @server.tool(
+    @_tool(
         name="rtg_validate_graph",
         description=TOOL_DESCRIPTIONS["rtg_validate_graph"],
     )
@@ -244,7 +238,7 @@ def build_mcp_server(toolset: RtgMcpToolset) -> FastMCP:
             )
         )
 
-    @server.tool(
+    @_tool(
         name="rtg_discover_anchor_types",
         description=TOOL_DESCRIPTIONS["rtg_discover_anchor_types"],
     )
@@ -257,7 +251,7 @@ def build_mcp_server(toolset: RtgMcpToolset) -> FastMCP:
             )
         )
 
-    @server.tool(
+    @_tool(
         name="rtg_get_schema_pack",
         description=TOOL_DESCRIPTIONS["rtg_get_schema_pack"],
     )
@@ -272,14 +266,14 @@ def build_mcp_server(toolset: RtgMcpToolset) -> FastMCP:
             )
         )
 
-    @server.tool(
+    @_tool(
         name="rtg_export_system_snapshot",
         description=TOOL_DESCRIPTIONS["rtg_export_system_snapshot"],
     )
     def rtg_export_system_snapshot(summary: bool = False) -> dict[str, Any]:
         return _as_tool_result(toolset.rtg_export_system_snapshot(summary=summary))
 
-    @server.tool(
+    @_tool(
         name="rtg_persist_system_snapshot",
         description=TOOL_DESCRIPTIONS["rtg_persist_system_snapshot"],
     )
@@ -291,14 +285,14 @@ def build_mcp_server(toolset: RtgMcpToolset) -> FastMCP:
             toolset.rtg_persist_system_snapshot(relative_path, return_snapshot=return_snapshot)
         )
 
-    @server.tool(
+    @_tool(
         name="rtg_list_persisted_snapshots",
         description=TOOL_DESCRIPTIONS["rtg_list_persisted_snapshots"],
     )
     def rtg_list_persisted_snapshots() -> dict[str, Any]:
         return _as_tool_result(toolset.rtg_list_persisted_snapshots())
 
-    @server.tool(
+    @_tool(
         name="rtg_load_persisted_snapshot",
         description=TOOL_DESCRIPTIONS["rtg_load_persisted_snapshot"],
     )
@@ -313,14 +307,14 @@ def build_mcp_server(toolset: RtgMcpToolset) -> FastMCP:
             )
         )
 
-    @server.tool(
+    @_tool(
         name="rtg_replay_ledger",
         description=TOOL_DESCRIPTIONS["rtg_replay_ledger"],
     )
     def rtg_replay_ledger(replay_options: dict[str, Any] | None = None) -> dict[str, Any]:
         return _as_tool_result(toolset.rtg_replay_ledger(_optional_json_object(replay_options)))
 
-    @server.tool(
+    @_tool(
         name="rtg_verify_replay_from_ledger",
         description=TOOL_DESCRIPTIONS["rtg_verify_replay_from_ledger"],
     )
@@ -331,21 +325,21 @@ def build_mcp_server(toolset: RtgMcpToolset) -> FastMCP:
             toolset.rtg_verify_replay_from_ledger(_optional_json_object(replay_options))
         )
 
-    @server.tool(
+    @_tool(
         name="rtg_list_migration_history",
         description=TOOL_DESCRIPTIONS["rtg_list_migration_history"],
     )
     def rtg_list_migration_history() -> dict[str, Any]:
         return _as_tool_result(toolset.rtg_list_migration_history())
 
-    @server.tool(
+    @_tool(
         name="rtg_flush_ledger_failures",
         description=TOOL_DESCRIPTIONS["rtg_flush_ledger_failures"],
     )
     def rtg_flush_ledger_failures() -> dict[str, Any]:
         return _as_tool_result(toolset.rtg_flush_ledger_failures())
 
-    @server.tool(
+    @_tool(
         name="rtg_restore_from_snapshot",
         description=TOOL_DESCRIPTIONS["rtg_restore_from_snapshot"],
     )
@@ -375,6 +369,7 @@ def mcp_dry_run_status(
     path: str = DEFAULT_LOCALHOST_PATH,
 ) -> dict[str, Any]:
     composition = build_app(config)
+    starter_schema = composition.prepare()
     status = composition.runner.run()
     launch_metadata = mcp_launch_metadata(
         config,
@@ -389,6 +384,7 @@ def mcp_dry_run_status(
             "server_name": MCP_SERVER_NAME,
             "transport": transport,
             **launch_metadata,
+            "starter_schema": starter_schema.to_json_value(),
             "tools": mcp_tool_metadata(),
         },
     }
@@ -403,8 +399,9 @@ def run_mcp_server(
     path: str = DEFAULT_LOCALHOST_PATH,
 ) -> None:
     composition = build_app(config)
+    starter_schema = composition.prepare()
     composition.runner.run()
-    server = build_mcp_server(RtgMcpToolset(composition.controller))
+    server = build_mcp_server(RtgMcpToolset(composition.controller, starter_schema))
     if transport == "stdio":
         server.run(transport=transport)
         return

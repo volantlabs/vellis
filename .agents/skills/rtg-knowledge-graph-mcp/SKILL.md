@@ -11,7 +11,7 @@ Use the RTG MCP server as a controller-facing graph memory, not as a loose JSON 
 
 1. Validate the connection with `rtg_validate_graph({})`.
 2. Read `rtg_get_system_state({})` to classify the app as empty, schema-only, populated, staged, or needing replay.
-3. If examples are needed, call `rtg_get_usage_guide` with `workflow_patterns`, `request_patterns`, `mcp_bootstrap_checklist`, `operator_card`, `schema_staging_minimal`, `tool_call_shapes`, `live_write`, `lookup_examples`, `query_examples`, `recovery_and_replay`, `migration_history`, or `migration_abandonment`.
+3. If examples are needed, call `rtg_get_usage_guide` with `everyday_life_schema`, `schema_design`, `capabilities`, `workflow_patterns`, `request_patterns`, `mcp_bootstrap_checklist`, `operator_card`, `schema_staging_minimal`, `tool_call_shapes`, `live_write`, `lookup_examples`, `query_examples`, `recovery_and_replay`, `migration_history`, or `migration_abandonment`.
 4. Discover available anchor types with `rtg_discover_anchor_types`, then read details with `rtg_get_schema_pack`.
 5. Stage initial schema or schema evolution with `rtg_stage_schema_migration` unless you need the advanced normalized-batch surface.
 6. Make staged schema live with `rtg_apply_migration_cutover`.
@@ -22,7 +22,9 @@ Use the RTG MCP server as a controller-facing graph memory, not as a loose JSON 
 ## First Calls
 
 If the RTG MCP tools are not already connected, use the repo-generated MCP metadata before writing
-custom scripts. `mcp.client_config` launches the stdio server from absolute paths. For a Vellis app
+custom scripts. Prefer the focused `mcp-config` CLI output, which is the complete client block and
+launches the stdio server from absolute paths. The larger diagnostic metadata exposes the same
+block as `mcp.client_config`. For a Vellis app
 that is already running locally, use `mcp.transports.localhost_http.client_config` and connect to
 `http://127.0.0.1:8765/mcp` by default. The localhost HTTP transport is unauthenticated and should
 remain bound to `127.0.0.1`.
@@ -34,15 +36,15 @@ remain bound to `127.0.0.1`.
 5. Call `rtg_get_usage_guide` with `topic: "mcp_bootstrap_checklist"` when you need the full repo-blind workflow through MCP.
 6. Call `rtg_discover_anchor_types` or `rtg_get_schema_pack` before inventing type keys or property names.
 
-If the graph has no live schema, create schema with `rtg_stage_schema_migration`, then make it live with `rtg_apply_migration_cutover`.
+If the graph has no live schema, create schema with `rtg_stage_schema_migration`, then make it live with `rtg_apply_migration_cutover`. When repository skills are available, use `$rtg-schema-design` before authoring or evolving a consequential schema.
 
 ## Mutation Lanes
 
 - Use `rtg_apply_live_graph_changes` for normal live graph CRUD after schema exists.
 - Use `rtg_validate_live_graph_changes` before risky imports or recovery probes; it returns generated IDs and validation findings without mutation or ledger writes.
-- Use `rtg_validate_live_anchor_records` and `rtg_apply_live_anchor_records` when the payload is mostly anchors with associated required facts. These MCP facade tools compile to canonical `graph_changes` and return the submitted low-level payload for audit.
+- Use `rtg_validate_live_anchor_records` and `rtg_apply_live_anchor_records` when the payload is mostly anchors with associated required facts. Both compile to canonical `graph_changes`. Validation returns the submitted low-level payload for audit; successful apply defaults to a compact result with durable generated IDs and fact-position correlation.
 - Use `rtg_resolve_anchor_by_fact` for common exact anchor lookups before link writes. It compiles to `rtg_execute_query` and returns the submitted query, matches, count, and guidance.
-- Use `rtg_stage_schema_migration` for ordinary schema bootstrap or schema evolution. It accepts type-key-oriented schema definitions, generates candidate UUIDs, fills migration membership, and returns the submitted low-level payload.
+- Use `rtg_stage_schema_migration` for ordinary schema bootstrap or schema evolution. It accepts type-key-oriented schema definitions, generates candidate UUIDs, and fills migration membership. Keep every `(kind, type_key)` pair unique within the request. Compact responses are the default and correlate durable candidate UUIDs through `generated_schema_ids["kind:type_key"]`; request `response_options.format: "full"` only when the submitted low-level payload is needed for debugging.
 - Use `rtg_stage_knowledge_changes` only for advanced schema, constraint, migration, and non-live candidate graph changes; staged candidates must be referenced by a migration record in the same request.
 - Use `rtg_apply_migration_cutover` to make staged candidates live and retire replaced records.
 - Use `rtg_abandon_migration` to retire accidental draft, ready, or failed staged work after recording the decision in the ledger.
@@ -105,6 +107,11 @@ For repeated anchor plus facts ingestion, prefer the compact anchor-record facad
 ```
 
 Use `rtg_validate_live_anchor_records` with the same `anchor_records` payload for no-mutation validation.
+
+Successful anchor-record applies default to `response_options: {"format":"compact"}`. Read
+durable identities from `result.generated_ids`; `result.generated_refs.facts` maps automatically
+named fact refs back to anchor/fact positions. Use `format:"full"` only when inspecting the compiled
+`submitted_graph_changes` is necessary.
 
 After the Item schema example below has been cut over, this minimal live write should succeed:
 
@@ -184,8 +191,17 @@ Stage schema definitions as non-live candidates only when you need the advanced 
               "properties": {
                 "title": {"required": true, "value_kinds": ["string"]},
                 "category": {"required": true, "value_kinds": ["string"]},
-                "status": {"required": true, "value_kinds": ["string"]},
-                "priority": {"required": false, "value_kinds": ["integer", "number"]}
+                "status": {
+                  "required": true,
+                  "value_kinds": ["string"],
+                  "allowed_values": ["active", "waiting", "done"]
+                },
+                "priority": {
+                  "required": false,
+                  "value_kinds": ["integer"],
+                  "minimum": 0,
+                  "maximum": 5
+                }
               }
             },
             "system": {"live": false}
@@ -215,6 +231,11 @@ Stage schema definitions as non-live candidates only when you need the advanced 
 ```
 
 If the same migration stages non-live graph candidates, include all of their candidate UUIDs in `graph_make_live`. This includes anchors, associated data objects, and links.
+
+Use field refinements only for stable semantics: `allowed_values` for a closed scalar set,
+`format` values `date`, `date_time`, or `uri` for strings, inclusive `minimum`/`maximum` for numbers,
+and RE2 `pattern` for strings. Refinements also apply recursively inside object properties and list
+items; strict projected-cutover validation checks existing data against them.
 
 Then call:
 
@@ -258,7 +279,10 @@ A `query_pattern` constraint uses a normal RTG `query_spec` plus `expectation`:
 }
 ```
 
-A `cardinality` constraint uses a `query_spec`, `counted_binding`, and optional `minimum` or `maximum`. Use it when the rule is about count bounds rather than just whether a pattern exists.
+A `cardinality` constraint uses a `query_spec`, `counted_binding`, and optional `minimum` or
+`maximum`. An optional `group_by_bindings` list applies the bound independently to each unique tuple
+of those query bindings; omit it for one global count. Use cardinality when the rule is about count
+bounds rather than just whether a pattern exists.
 
 ## Queries
 
@@ -323,7 +347,14 @@ For relationship questions, bind both endpoints and require a typed link:
 
 Supported predicate operators are `exists`, `equals`, `not_equals`, `lt`, `lte`, `gt`, `gte`, `contains`, `in`, `substring`, and `regex`.
 
-When using `response_options.format: "properties_only"`, read compact rows from `result.rows[].properties` and count rows with `result.row_count`. Use the full response when you need bindings or UUIDs.
+When using `response_options.format: "properties_only"`, read non-aggregate compact rows from `result.rows[].properties`; aggregate compact rows retain `row_index`, `group_by`, and caller-named aggregation fields directly. Query responses identify themselves with `result.kind` (`full` or `properties_only`). Count returned rows with `result.row_count`, and use the full response when you need bindings or UUIDs. Give every anchor, link, and data requirement a name that is unique across the whole query.
+
+For larger results, use `query_options.limit` and `offset`; deterministic ordering occurs before
+slicing. `distinct_rows:true` deduplicates exact returned projections before pagination and must not
+be combined with aggregation. For counts,
+use `return_spec.group_by` paths that also appear in `return_spec.properties`, plus `aggregations`
+with `function:"count"`; counts are distinct binding UUIDs. A link requirement may set
+`required:false` when a source row must survive without a matching link.
 
 ## Recovery
 
@@ -335,8 +366,8 @@ When using `response_options.format: "properties_only"`, read compact rows from 
 - Candidate not migration-scoped: add every staged candidate UUID to `schema_make_live`, `constraint_make_live`, or `graph_make_live` as appropriate.
 - Failed cutover: inspect the failed migration status metadata, validate with `migration_ids`, repair staged candidates or live data, and retry or call `rtg_abandon_migration`.
 - Intentional failed-cutover test: stage the invalid candidate with `validation_mode: "skip"`, then call cutover in strict mode and verify the live state is preserved.
-- Restart or persistence check: persist a compact snapshot, list and load it with `return_snapshot:false`, then call `rtg_verify_replay_from_ledger` with `start_snapshot_path` for a non-mutating check. After a real restart, call `rtg_replay_ledger` from empty state or with `start_snapshot_path` and finish with `rtg_validate_graph`. Replay results include `replay_window`; when a start snapshot is supplied, replay starts after that snapshot's ledger position.
-- Migration audit: `rtg_get_system_state.migration_counts_by_status` describes the current migration store. Applied and abandoned migrations may be pruned from current state; use `rtg_list_migration_history` for ledger-backed staged, applied, failed, and abandoned events.
+- Restart or persistence check: persist a compact snapshot, list and load it with `return_snapshot:false`, then call `rtg_verify_replay_from_ledger` with `start_snapshot_path` for a non-mutating check. Exact recovery evidence is `state_equivalent_to_live` plus matching domain digests; ledger cursor equality is reported separately. Accounting distinguishes scanned, eligible, replayed, administrative, terminal, and failed/rejected records.
+- Migration audit: `rtg_get_system_state.migration_counts_by_status` describes only the current migration store. Use `rtg_list_migration_history` for ledger-backed staged, applied, failed, abandoned, `staging_rejected`, and `staging_failed` events. Rejected staging is audit projection, not staged or replayable state.
 
 ## Domain Graph Pattern
 

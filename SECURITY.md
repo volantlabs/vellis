@@ -18,4 +18,12 @@ Useful reports include:
 
 ## Beta Caveat
 
-The RTG Knowledge Graph reference app currently uses in-memory RTG stores for live graph, schema, constraint, and migration state. Treat beta eval storage roots and snapshots as local test artifacts, not production records.
+Vellis is intended for a person's own local graph or a graph shared deliberately on a private
+machine. Ordinary stdio mode opens no network service; advanced HTTP mode is unauthenticated and
+must remain bound to `127.0.0.1`.
+
+Graph state is reconstructed from the durable local controller ledger and stored unencrypted under
+the ignored `.data/rtg_knowledge_graph/` directory by default. The AI agent or model connected to
+Vellis can receive graph contents when it invokes tools. Back up local state as appropriate and do
+not use it for information you are unwilling to provide to that client or model. Vellis does not
+yet provide encryption, authentication, user accounts, or multi-user authorization.

@@ -2,12 +2,13 @@ from __future__ import annotations
 
 import sys
 from pathlib import Path
+from shutil import which
 from typing import Any
 
 from apps.rtg_knowledge_graph.config import RtgKnowledgeGraphConfig
 
 MCP_SERVER_NAME = "rtg_knowledge_graph"
-MCP_STATE_MODE = "fresh_single_session"
+MCP_STATE_MODE = "durable_local_auto_replay"
 DEFAULT_LOCALHOST_HOST = "127.0.0.1"
 DEFAULT_LOCALHOST_PORT = 8765
 DEFAULT_LOCALHOST_PATH = "/mcp"
@@ -15,19 +16,19 @@ RECOMMENDED_EVAL_PROMPT_ID = "individual_life_graph"
 EVAL_PROMPTS = {
     "individual_life_graph": {
         "title": "RTG Individual Life Graph Beta Prompt",
-        "path": "docs/evals/rtg-individual-life-graph-beta-prompt.md",
+        "path": "docs/guides/vellis/evals/rtg-individual-life-graph-beta-prompt.md",
         "description": ("Initial single-user personal and professional life-graph beta scenario."),
     },
     "component_repo_affordance": {
         "title": "RTG Agent Affordance Eval Prompt",
-        "path": "docs/evals/rtg-agent-affordance-eval-prompt.md",
+        "path": "docs/guides/vellis/evals/rtg-agent-affordance-eval-prompt.md",
         "description": "Software-component repository modeling scenario.",
     },
 }
 GUIDES = {
     "known_good_walkthrough": {
         "title": "RTG Beta Known-Good Walkthrough",
-        "path": "docs/evals/rtg-beta-known-good-walkthrough.md",
+        "path": "docs/guides/vellis/evals/rtg-beta-known-good-walkthrough.md",
         "description": "Expected shape of a successful first life-graph beta run.",
     }
 }
@@ -39,7 +40,7 @@ FIRST_CALL = {
         "result.accepted": True,
         "result.findings": [],
     },
-    "purpose": "Confirm the MCP client is connected to a fresh, valid RTG controller.",
+    "purpose": "Confirm the MCP client is connected to a valid recovered RTG controller.",
 }
 
 
@@ -83,6 +84,7 @@ def mcp_launch_metadata(
     storage_root = _absolute(config.storage_root)
     sql_database_path = _absolute(config.sql_database_path)
     if repo_root is not None:
+        uv_command = _uv_command()
         launch_args = [
             "--directory",
             str(repo_root),
@@ -98,8 +100,9 @@ def mcp_launch_metadata(
             "--sql-database-path",
             str(sql_database_path),
         ]
+        _append_startup_mode_args(launch_args, config)
         launch = {
-            "command": "uv",
+            "command": uv_command,
             "args": launch_args,
             "cwd": str(repo_root),
         }
@@ -116,6 +119,7 @@ def mcp_launch_metadata(
             "--sql-database-path",
             str(sql_database_path),
         ]
+        _append_startup_mode_args(launch_args, config)
         launch = {
             "command": sys.executable,
             "args": launch_args,
@@ -130,6 +134,7 @@ def mcp_launch_metadata(
         host=localhost_host,
         port=localhost_port,
         path=localhost_path,
+        config=config,
     )
     localhost_url = _localhost_url(localhost_host, localhost_port, localhost_path)
     transports = {
@@ -165,7 +170,7 @@ def mcp_launch_metadata(
     selected_transport = "localhost_http" if preferred_transport == "http" else "stdio"
     return {
         "launch_mode": launch_mode,
-        "state_mode": MCP_STATE_MODE,
+        "state_mode": _state_mode(config),
         "eval_prompt_path": _optional_path_text(eval_prompt_path()),
         "recommended_eval_prompt": RECOMMENDED_EVAL_PROMPT_ID,
         "eval_prompts": {
@@ -200,36 +205,14 @@ def _localhost_launch(
     host: str,
     port: int,
     path: str,
+    config: RtgKnowledgeGraphConfig,
 ) -> dict[str, Any]:
     if repo_root is not None:
-        return {
-            "command": "uv",
-            "args": [
-                "--directory",
-                str(repo_root),
-                "run",
-                "python",
-                "-m",
-                "apps.rtg_knowledge_graph",
-                "serve-mcp",
-                "--transport",
-                "http",
-                "--host",
-                host,
-                "--port",
-                str(port),
-                "--path",
-                path,
-                "--storage-root",
-                str(storage_root),
-                "--sql-database-path",
-                str(sql_database_path),
-            ],
-            "cwd": str(repo_root),
-        }
-    return {
-        "command": sys.executable,
-        "args": [
+        args = [
+            "--directory",
+            str(repo_root),
+            "run",
+            "python",
             "-m",
             "apps.rtg_knowledge_graph",
             "serve-mcp",
@@ -245,7 +228,34 @@ def _localhost_launch(
             str(storage_root),
             "--sql-database-path",
             str(sql_database_path),
-        ],
+        ]
+        _append_startup_mode_args(args, config)
+        return {
+            "command": _uv_command(),
+            "args": args,
+            "cwd": str(repo_root),
+        }
+    args = [
+        "-m",
+        "apps.rtg_knowledge_graph",
+        "serve-mcp",
+        "--transport",
+        "http",
+        "--host",
+        host,
+        "--port",
+        str(port),
+        "--path",
+        path,
+        "--storage-root",
+        str(storage_root),
+        "--sql-database-path",
+        str(sql_database_path),
+    ]
+    _append_startup_mode_args(args, config)
+    return {
+        "command": sys.executable,
+        "args": args,
     }
 
 
@@ -258,13 +268,29 @@ def _absolute(path: Path) -> Path:
     return path.expanduser().resolve(strict=False)
 
 
+def _uv_command() -> str:
+    """Return a GUI-safe uv command for generated MCP client configuration."""
+    return which("uv") or "uv"
+
+
+def _append_startup_mode_args(args: list[str], config: RtgKnowledgeGraphConfig) -> None:
+    if not config.install_starter_schema:
+        args.append("--empty")
+    if not config.automatic_recovery:
+        args.append("--manual-recovery")
+
+
+def _state_mode(config: RtgKnowledgeGraphConfig) -> str:
+    if not config.automatic_recovery:
+        return "manual_recovery"
+    return MCP_STATE_MODE
+
+
 def _find_repository_root(start: Path) -> Path | None:
     for candidate in (start, *start.parents):
-        if (
-            (candidate / "pyproject.toml").is_file()
-            and (candidate / "apps" / "rtg_knowledge_graph").is_dir()
-            and (candidate / "docs" / "evals").is_dir()
-        ):
+        if (candidate / "pyproject.toml").is_file() and (
+            candidate / "apps" / "rtg_knowledge_graph"
+        ).is_dir():
             return candidate
     return None
 

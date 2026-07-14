@@ -33,8 +33,42 @@ jobs:
       - name: Install dependencies
         run: uv sync --dev
 
+      - name: Set up pinned model references and validator
+        run: just model-setup
+
       - name: Run checks
         run: just check
 
       - name: Validate package build
         run: just build
+
+  windows-mcp-smoke:
+    runs-on: windows-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+
+      - name: Set up Python
+        shell: pwsh
+        run: uv python install (Get-Content .python-version)
+
+      - name: Install locked dependencies
+        run: uv sync --locked
+
+      - name: Verify native Windows MCP onboarding
+        shell: pwsh
+        run: |
+          uv run vellis-rtg-knowledge-graph mcp-config --storage-root .data/vellis-beta-ci | Out-File -Encoding utf8 mcp-config.json
+          $config = Get-Content mcp-config.json -Raw | ConvertFrom-Json
+          if (-not $config.mcpServers.rtg_knowledge_graph.command) {
+            throw "Generated MCP configuration has no launch command."
+          }
+          $codexCommand = uv run vellis-rtg-knowledge-graph mcp-config --client codex --storage-root .data/vellis-beta-ci
+          if (-not $codexCommand.StartsWith("codex mcp add rtg_knowledge_graph -- ")) {
+            throw "Generated Codex registration command is invalid."
+          }
+          uv run pytest apps/rtg_knowledge_graph/tests/test_rtg_knowledge_graph_app.py -q

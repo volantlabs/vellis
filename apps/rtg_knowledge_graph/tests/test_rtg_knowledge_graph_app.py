@@ -1,11 +1,15 @@
 from __future__ import annotations
 
 import json
+import os
+import shlex
+import shutil
 import subprocess
 from pathlib import Path
 
 import pytest
 
+from apps.rtg_knowledge_graph import main as app_main
 from apps.rtg_knowledge_graph import mcp_launch
 from apps.rtg_knowledge_graph.composition import build_app
 from apps.rtg_knowledge_graph.config import (
@@ -15,6 +19,26 @@ from apps.rtg_knowledge_graph.config import (
     STORAGE_ROOT_ENV_VAR,
     RtgKnowledgeGraphConfig,
 )
+
+MODEL_EVIDENCE = {
+    "VellisCompositionVerification": (
+        "test_config_uses_default_storage_root_relative_to_cwd",
+        "test_config_uses_env_storage_root",
+        "test_composed_app_runs_and_writes_manifest",
+        "test_persisted_manifest_preserves_configured_startup_modes",
+        "test_cli_runs_full_app",
+        "test_cli_reports_mcp_dry_run_metadata",
+        "test_cli_prints_focused_stdio_client_config_without_initializing_app",
+        "test_cli_prints_focused_http_client_config",
+        "test_cli_prints_exact_codex_stdio_registration_command",
+        "test_cli_prints_exact_codex_http_registration_command",
+        "test_cli_help_explains_both_first_run_client_paths",
+        "test_cli_treats_mcp_keyboard_interrupt_as_clean_shutdown",
+        "test_powershell_quoting_preserves_paths_and_embedded_quotes",
+        "test_cli_reports_custom_http_mcp_dry_run_metadata",
+        "test_mcp_launch_metadata_has_installed_package_fallback",
+    ),
+}
 
 
 def test_config_uses_default_storage_root_relative_to_cwd(tmp_path: Path) -> None:
@@ -38,7 +62,10 @@ def test_config_uses_env_storage_root(tmp_path: Path) -> None:
     assert config.sql_database_path == tmp_path / "configured.sqlite"
 
 
-def test_composed_app_runs_and_writes_manifest(tmp_path: Path) -> None:
+def test_composed_app_runs_and_writes_manifest(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(mcp_launch, "_uv_command", lambda: "uv")
     config = RtgKnowledgeGraphConfig(
         storage_root=tmp_path / "storage",
         sql_database_path=tmp_path / "controller.sqlite",
@@ -74,16 +101,18 @@ def test_composed_app_runs_and_writes_manifest(tmp_path: Path) -> None:
             "server_name": "rtg_knowledge_graph",
             "transport": "stdio",
             "launch_mode": "repository_checkout",
-            "state_mode": "fresh_single_session",
+            "state_mode": "durable_local_auto_replay",
             "eval_prompt_path": str(
-                Path("docs/evals/rtg-individual-life-graph-beta-prompt.md").resolve()
+                Path("docs/guides/vellis/evals/rtg-individual-life-graph-beta-prompt.md").resolve()
             ),
             "recommended_eval_prompt": "individual_life_graph",
             "eval_prompts": {
                 "individual_life_graph": {
                     "title": "RTG Individual Life Graph Beta Prompt",
                     "path": str(
-                        Path("docs/evals/rtg-individual-life-graph-beta-prompt.md").resolve()
+                        Path(
+                            "docs/guides/vellis/evals/rtg-individual-life-graph-beta-prompt.md"
+                        ).resolve()
                     ),
                     "description": (
                         "Initial single-user personal and professional life-graph beta scenario."
@@ -93,7 +122,11 @@ def test_composed_app_runs_and_writes_manifest(tmp_path: Path) -> None:
                 },
                 "component_repo_affordance": {
                     "title": "RTG Agent Affordance Eval Prompt",
-                    "path": str(Path("docs/evals/rtg-agent-affordance-eval-prompt.md").resolve()),
+                    "path": str(
+                        Path(
+                            "docs/guides/vellis/evals/rtg-agent-affordance-eval-prompt.md"
+                        ).resolve()
+                    ),
                     "description": "Software-component repository modeling scenario.",
                     "available": True,
                     "recommended": False,
@@ -102,7 +135,11 @@ def test_composed_app_runs_and_writes_manifest(tmp_path: Path) -> None:
             "guides": {
                 "known_good_walkthrough": {
                     "title": "RTG Beta Known-Good Walkthrough",
-                    "path": str(Path("docs/evals/rtg-beta-known-good-walkthrough.md").resolve()),
+                    "path": str(
+                        Path(
+                            "docs/guides/vellis/evals/rtg-beta-known-good-walkthrough.md"
+                        ).resolve()
+                    ),
                     "description": "Expected shape of a successful first life-graph beta run.",
                     "available": True,
                 },
@@ -115,7 +152,9 @@ def test_composed_app_runs_and_writes_manifest(tmp_path: Path) -> None:
                     "result.accepted": True,
                     "result.findings": [],
                 },
-                "purpose": "Confirm the MCP client is connected to a fresh, valid RTG controller.",
+                "purpose": (
+                    "Confirm the MCP client is connected to a valid recovered RTG controller."
+                ),
             },
             "transports": {
                 "stdio": {
@@ -251,6 +290,26 @@ def test_composed_app_runs_and_writes_manifest(tmp_path: Path) -> None:
     ]
 
 
+def test_persisted_manifest_preserves_configured_startup_modes(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(mcp_launch, "_uv_command", lambda: "uv")
+    config = RtgKnowledgeGraphConfig(
+        storage_root=tmp_path / "storage",
+        sql_database_path=tmp_path / "controller.sqlite",
+        install_starter_schema=False,
+        automatic_recovery=False,
+    )
+
+    status = build_app(config).runner.run()
+    manifest = json.loads((config.storage_root / status.manifest_path).read_text(encoding="utf-8"))
+    interface = manifest["interfaces"][0]
+
+    assert interface["state_mode"] == "manual_recovery"
+    assert "--empty" in interface["launch"]["args"]
+    assert "--manual-recovery" in interface["launch"]["args"]
+
+
 def test_cli_runs_full_app(tmp_path: Path) -> None:
     storage_root = tmp_path / "cli-storage"
 
@@ -311,9 +370,10 @@ def test_cli_reports_mcp_dry_run_metadata(tmp_path: Path) -> None:
 
     assert status["mcp"]["transport"] == "stdio"
     assert status["mcp"]["launch_mode"] == "repository_checkout"
-    assert status["mcp"]["state_mode"] == "fresh_single_session"
-    assert status["mcp"]["eval_prompt_path"].endswith(
-        "docs/evals/rtg-individual-life-graph-beta-prompt.md"
+    assert status["mcp"]["state_mode"] == "durable_local_auto_replay"
+    assert (
+        Path(status["mcp"]["eval_prompt_path"])
+        == Path("docs/guides/vellis/evals/rtg-individual-life-graph-beta-prompt.md").resolve()
     )
     assert status["mcp"]["recommended_eval_prompt"] == "individual_life_graph"
     assert set(status["mcp"]["eval_prompts"]) == {
@@ -324,8 +384,9 @@ def test_cli_reports_mcp_dry_run_metadata(tmp_path: Path) -> None:
     assert status["mcp"]["eval_prompts"]["individual_life_graph"]["available"] is True
     assert status["mcp"]["eval_prompts"]["component_repo_affordance"]["recommended"] is False
     assert status["mcp"]["guides"]["known_good_walkthrough"]["available"] is True
-    assert status["mcp"]["guides"]["known_good_walkthrough"]["path"].endswith(
-        "docs/evals/rtg-beta-known-good-walkthrough.md"
+    assert (
+        Path(status["mcp"]["guides"]["known_good_walkthrough"]["path"])
+        == Path("docs/guides/vellis/evals/rtg-beta-known-good-walkthrough.md").resolve()
     )
     assert set(status["mcp"]["guides"]) == {"known_good_walkthrough"}
     assert status["mcp"]["first_call"] == {
@@ -336,7 +397,7 @@ def test_cli_reports_mcp_dry_run_metadata(tmp_path: Path) -> None:
             "result.accepted": True,
             "result.findings": [],
         },
-        "purpose": "Confirm the MCP client is connected to a fresh, valid RTG controller.",
+        "purpose": "Confirm the MCP client is connected to a valid recovered RTG controller.",
     }
     assert len(tool_names) == 27
     assert "rtg_apply_live_graph_changes" in tool_names
@@ -345,7 +406,7 @@ def test_cli_reports_mcp_dry_run_metadata(tmp_path: Path) -> None:
     assert "rtg_validate_live_anchor_records" in tool_names
     assert "rtg_resolve_anchor_by_fact" in tool_names
     assert "rtg_get_agent_affordance_eval_prompt" not in tool_names
-    assert launch["command"] == "uv"
+    assert launch["command"] == (shutil.which("uv") or "uv")
     assert launch["args"][:2] == ["--directory", str(Path(".").resolve())]
     assert "--storage-root" in launch["args"]
     assert "--sql-database-path" in launch["args"]
@@ -360,6 +421,161 @@ def test_cli_reports_mcp_dry_run_metadata(tmp_path: Path) -> None:
     assert "http" in localhost_http["launch"]["args"]
     assert (storage_root / "system" / "app_manifest.json").exists()
     assert sql_database_path.exists()
+
+
+def test_cli_prints_focused_stdio_client_config_without_initializing_app(tmp_path: Path) -> None:
+    storage_root = tmp_path / "mcp-storage"
+
+    result = subprocess.run(
+        [
+            "uv",
+            "run",
+            "python",
+            "-m",
+            "apps.rtg_knowledge_graph",
+            "mcp-config",
+            "--storage-root",
+            str(storage_root),
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+    client_config = json.loads(result.stdout)
+    launch = client_config["mcpServers"]["rtg_knowledge_graph"]
+
+    assert launch["command"] == (shutil.which("uv") or "uv")
+    assert launch["args"][:2] == ["--directory", str(Path(".").resolve())]
+    assert str(storage_root.resolve()) in launch["args"]
+    assert not storage_root.exists()
+
+
+def test_cli_prints_focused_http_client_config(tmp_path: Path) -> None:
+    result = subprocess.run(
+        [
+            "uv",
+            "run",
+            "python",
+            "-m",
+            "apps.rtg_knowledge_graph",
+            "mcp-config",
+            "--transport",
+            "http",
+            "--host",
+            "127.0.0.1",
+            "--port",
+            "9876",
+            "--path",
+            "/custom-mcp",
+            "--storage-root",
+            str(tmp_path / "mcp-storage"),
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+    assert json.loads(result.stdout) == {
+        "mcpServers": {
+            "rtg_knowledge_graph": {
+                "transport": "http",
+                "url": "http://127.0.0.1:9876/custom-mcp",
+            }
+        }
+    }
+
+
+def test_cli_prints_exact_codex_stdio_registration_command(tmp_path: Path) -> None:
+    storage_root = tmp_path / "mcp storage"
+
+    result = subprocess.run(
+        [
+            "uv",
+            "run",
+            "vellis-rtg-knowledge-graph",
+            "mcp-config",
+            "--client",
+            "codex",
+            "--storage-root",
+            str(storage_root),
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+    if os.name == "nt":
+        assert result.stdout.startswith("codex mcp add rtg_knowledge_graph -- ")
+        assert app_main._powershell_quote(shutil.which("uv") or "uv") in result.stdout
+        assert app_main._powershell_quote(str(storage_root.resolve())) in result.stdout
+    else:
+        command = shlex.split(result.stdout)
+        assert command[:5] == ["codex", "mcp", "add", "rtg_knowledge_graph", "--"]
+        assert command[5] == (shutil.which("uv") or "uv")
+        assert "--directory" in command
+        assert str(storage_root.resolve()) in command
+    assert not storage_root.exists()
+
+
+def test_cli_prints_exact_codex_http_registration_command(tmp_path: Path) -> None:
+    result = subprocess.run(
+        [
+            "uv",
+            "run",
+            "vellis-rtg-knowledge-graph",
+            "mcp-config",
+            "--client",
+            "codex",
+            "--transport",
+            "http",
+            "--port",
+            "9876",
+            "--storage-root",
+            str(tmp_path / "mcp-storage"),
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+    assert shlex.split(result.stdout) == [
+        "codex",
+        "mcp",
+        "add",
+        "rtg_knowledge_graph",
+        "--url",
+        "http://127.0.0.1:9876/mcp",
+    ]
+
+
+def test_cli_help_explains_both_first_run_client_paths() -> None:
+    result = subprocess.run(
+        ["uv", "run", "vellis-rtg-knowledge-graph", "--help"],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+    assert "vellis setup" in result.stdout
+    assert "--client {auto,codex,claude-code,claude-desktop,generic-json}" in result.stdout
+    assert "MCP client owns the configured stdio process" in result.stdout
+
+
+def test_cli_treats_mcp_keyboard_interrupt_as_clean_shutdown(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def interrupt(*_args: object, **_kwargs: object) -> None:
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr(app_main, "run_mcp_server", interrupt)
+
+    assert app_main.main(["serve-mcp", "--transport", "http"]) == 0
+
+
+def test_powershell_quoting_preserves_paths_and_embedded_quotes() -> None:
+    assert app_main._powershell_quote(r"C:\Program Files\uv.exe") == (r"'C:\Program Files\uv.exe'")
+    assert app_main._powershell_quote("person's-path") == "'person''s-path'"
 
 
 def test_cli_reports_custom_http_mcp_dry_run_metadata(tmp_path: Path) -> None:

@@ -1,0 +1,1291 @@
+{
+  "app_name": "rtg_knowledge_graph",
+  "component_dependencies": [
+    {
+      "id": "component.storage.json_file",
+      "role": "document_storage"
+    },
+    {
+      "id": "component.storage.sql",
+      "role": "controller_ledger_storage"
+    },
+    {
+      "id": "component.rtg.controller",
+      "role": "rtg_system_controller"
+    },
+    {
+      "id": "component.rtg.graph",
+      "role": "graph_store"
+    },
+    {
+      "id": "component.rtg.schema",
+      "role": "schema_registry"
+    },
+    {
+      "id": "component.rtg.constraints",
+      "role": "constraint_registry"
+    },
+    {
+      "id": "component.rtg.migration",
+      "role": "migration_store"
+    },
+    {
+      "id": "component.rtg.change_validation",
+      "role": "change_validator"
+    },
+    {
+      "id": "component.rtg.query",
+      "role": "query_engine"
+    }
+  ],
+  "schema_version": 1,
+  "tools": [
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false,
+        "readOnlyHint": true
+      },
+      "audience": "everyday",
+      "description": "Inspect RTG state and workflow guidance; Lane: state_and_discovery; call this before schema-dependent work.",
+      "dry_run_tool": null,
+      "failure_envelope": {
+        "error": {
+          "message": "<message>",
+          "type": "<failure type>"
+        },
+        "ok": false,
+        "optional": [
+          "error.diagnostic",
+          "transaction_id",
+          "validation_report"
+        ]
+      },
+      "lane": "state_and_discovery",
+      "ledgers": false,
+      "name": "rtg_get_system_state",
+      "operation_id": "operation.vellis.rtg_get_system_state",
+      "parameters": [],
+      "recommended_predecessors": [],
+      "success_envelope": {
+        "ok": true,
+        "result": "<encoded action result>"
+      },
+      "transports": [
+        "stdio",
+        "http"
+      ]
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false,
+        "readOnlyHint": true
+      },
+      "audience": "everyday",
+      "description": "Read detailed RTG request shapes and workflows; Lane: state_and_discovery; use topic capabilities for the tool map.",
+      "dry_run_tool": null,
+      "failure_envelope": {
+        "error": {
+          "message": "<message>",
+          "type": "<failure type>"
+        },
+        "ok": false,
+        "optional": [
+          "error.diagnostic",
+          "transaction_id",
+          "validation_report"
+        ]
+      },
+      "lane": "state_and_discovery",
+      "ledgers": false,
+      "name": "rtg_get_usage_guide",
+      "operation_id": "operation.vellis.rtg_get_usage_guide",
+      "parameters": [
+        {
+          "name": "topic",
+          "required": true
+        }
+      ],
+      "recommended_predecessors": [],
+      "success_envelope": {
+        "ok": true,
+        "result": "<encoded action result>"
+      },
+      "transports": [
+        "stdio",
+        "http"
+      ]
+    },
+    {
+      "annotations": {
+        "destructiveHint": true,
+        "idempotentHint": false,
+        "openWorldHint": false,
+        "readOnlyHint": false
+      },
+      "audience": "advanced",
+      "description": "Stage an ergonomic schema migration; Lane: knowledge_engineering; inspect current schema and obtain approval first.",
+      "dry_run_tool": null,
+      "failure_envelope": {
+        "error": {
+          "message": "<message>",
+          "type": "<failure type>"
+        },
+        "ok": false,
+        "optional": [
+          "error.diagnostic",
+          "transaction_id",
+          "validation_report"
+        ]
+      },
+      "lane": "knowledge_engineering",
+      "ledgers": true,
+      "name": "rtg_stage_schema_migration",
+      "operation_id": "operation.vellis.rtg_stage_schema_migration",
+      "parameters": [
+        {
+          "name": "migration_id",
+          "required": true
+        },
+        {
+          "name": "description",
+          "required": true
+        },
+        {
+          "name": "schema_definitions",
+          "required": true
+        },
+        {
+          "name": "retire_live_schema",
+          "required": false
+        },
+        {
+          "default": "strict",
+          "name": "validation_mode",
+          "required": false
+        },
+        {
+          "name": "response_options",
+          "required": false
+        }
+      ],
+      "recommended_predecessors": [
+        "rtg_get_system_state",
+        "rtg_get_schema_pack"
+      ],
+      "success_envelope": {
+        "ok": true,
+        "result": "<encoded action result>"
+      },
+      "transports": [
+        "stdio",
+        "http"
+      ]
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false,
+        "readOnlyHint": true
+      },
+      "audience": "everyday",
+      "description": "Dry-run ergonomic anchor records without mutation or ledgering; Lane: live_graph.",
+      "dry_run_tool": null,
+      "failure_envelope": {
+        "error": {
+          "message": "<message>",
+          "type": "<failure type>"
+        },
+        "ok": false,
+        "optional": [
+          "error.diagnostic",
+          "transaction_id",
+          "validation_report"
+        ]
+      },
+      "lane": "live_graph",
+      "ledgers": false,
+      "name": "rtg_validate_live_anchor_records",
+      "operation_id": "operation.vellis.rtg_validate_live_anchor_records",
+      "parameters": [
+        {
+          "name": "anchor_records",
+          "required": true
+        },
+        {
+          "name": "link_writes",
+          "required": false
+        },
+        {
+          "name": "validation_options",
+          "required": false
+        }
+      ],
+      "recommended_predecessors": [],
+      "success_envelope": {
+        "ok": true,
+        "result": "<encoded action result>"
+      },
+      "transports": [
+        "stdio",
+        "http"
+      ]
+    },
+    {
+      "annotations": {
+        "destructiveHint": true,
+        "idempotentHint": false,
+        "openWorldHint": false,
+        "readOnlyHint": false
+      },
+      "audience": "everyday",
+      "description": "Apply ergonomic anchor records to live state; Lane: live_graph; discover schema first.",
+      "dry_run_tool": "rtg_validate_live_anchor_records",
+      "failure_envelope": {
+        "error": {
+          "message": "<message>",
+          "type": "<failure type>"
+        },
+        "ok": false,
+        "optional": [
+          "error.diagnostic",
+          "transaction_id",
+          "validation_report"
+        ]
+      },
+      "lane": "live_graph",
+      "ledgers": true,
+      "name": "rtg_apply_live_anchor_records",
+      "operation_id": "operation.vellis.rtg_apply_live_anchor_records",
+      "parameters": [
+        {
+          "name": "anchor_records",
+          "required": true
+        },
+        {
+          "name": "link_writes",
+          "required": false
+        },
+        {
+          "default": "strict",
+          "name": "validation_mode",
+          "required": false
+        },
+        {
+          "name": "response_options",
+          "required": false
+        }
+      ],
+      "recommended_predecessors": [
+        "rtg_validate_live_anchor_records"
+      ],
+      "success_envelope": {
+        "ok": true,
+        "result": "<encoded action result>"
+      },
+      "transports": [
+        "stdio",
+        "http"
+      ]
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false,
+        "readOnlyHint": true
+      },
+      "audience": "everyday",
+      "description": "Dry-run normalized live graph changes without mutation or ledgering; Lane: live_graph.",
+      "dry_run_tool": null,
+      "failure_envelope": {
+        "error": {
+          "message": "<message>",
+          "type": "<failure type>"
+        },
+        "ok": false,
+        "optional": [
+          "error.diagnostic",
+          "transaction_id",
+          "validation_report"
+        ]
+      },
+      "lane": "live_graph",
+      "ledgers": false,
+      "name": "rtg_validate_live_graph_changes",
+      "operation_id": "operation.vellis.rtg_validate_live_graph_changes",
+      "parameters": [
+        {
+          "name": "graph_changes",
+          "required": true
+        },
+        {
+          "name": "validation_options",
+          "required": false
+        }
+      ],
+      "recommended_predecessors": [],
+      "success_envelope": {
+        "ok": true,
+        "result": "<encoded action result>"
+      },
+      "transports": [
+        "stdio",
+        "http"
+      ]
+    },
+    {
+      "annotations": {
+        "destructiveHint": true,
+        "idempotentHint": false,
+        "openWorldHint": false,
+        "readOnlyHint": false
+      },
+      "audience": "everyday",
+      "description": "Apply normalized live graph changes; Lane: live_graph; use the validation predecessor for risky writes.",
+      "dry_run_tool": "rtg_validate_live_graph_changes",
+      "failure_envelope": {
+        "error": {
+          "message": "<message>",
+          "type": "<failure type>"
+        },
+        "ok": false,
+        "optional": [
+          "error.diagnostic",
+          "transaction_id",
+          "validation_report"
+        ]
+      },
+      "lane": "live_graph",
+      "ledgers": true,
+      "name": "rtg_apply_live_graph_changes",
+      "operation_id": "operation.vellis.rtg_apply_live_graph_changes",
+      "parameters": [
+        {
+          "name": "graph_changes",
+          "required": true
+        },
+        {
+          "default": "strict",
+          "name": "validation_mode",
+          "required": false
+        }
+      ],
+      "recommended_predecessors": [
+        "rtg_validate_live_graph_changes"
+      ],
+      "success_envelope": {
+        "ok": true,
+        "result": "<encoded action result>"
+      },
+      "transports": [
+        "stdio",
+        "http"
+      ]
+    },
+    {
+      "annotations": {
+        "destructiveHint": true,
+        "idempotentHint": false,
+        "openWorldHint": false,
+        "readOnlyHint": false
+      },
+      "audience": "advanced",
+      "description": "Stage an advanced normalized knowledge batch; Lane: knowledge_engineering; prefer ergonomic staging for ordinary schema work.",
+      "dry_run_tool": null,
+      "failure_envelope": {
+        "error": {
+          "message": "<message>",
+          "type": "<failure type>"
+        },
+        "ok": false,
+        "optional": [
+          "error.diagnostic",
+          "transaction_id",
+          "validation_report"
+        ]
+      },
+      "lane": "knowledge_engineering",
+      "ledgers": true,
+      "name": "rtg_stage_knowledge_changes",
+      "operation_id": "operation.vellis.rtg_stage_knowledge_changes",
+      "parameters": [
+        {
+          "name": "knowledge_changes",
+          "required": true
+        },
+        {
+          "default": "strict",
+          "name": "validation_mode",
+          "required": false
+        }
+      ],
+      "recommended_predecessors": [
+        "rtg_get_system_state",
+        "rtg_validate_graph"
+      ],
+      "success_envelope": {
+        "ok": true,
+        "result": "<encoded action result>"
+      },
+      "transports": [
+        "stdio",
+        "http"
+      ]
+    },
+    {
+      "annotations": {
+        "destructiveHint": true,
+        "idempotentHint": false,
+        "openWorldHint": false,
+        "readOnlyHint": false
+      },
+      "audience": "advanced",
+      "description": "Apply a staged migration atomically; Lane: migration; validate the projected state first.",
+      "dry_run_tool": null,
+      "failure_envelope": {
+        "error": {
+          "message": "<message>",
+          "type": "<failure type>"
+        },
+        "ok": false,
+        "optional": [
+          "error.diagnostic",
+          "transaction_id",
+          "validation_report"
+        ]
+      },
+      "lane": "migration",
+      "ledgers": true,
+      "name": "rtg_apply_migration_cutover",
+      "operation_id": "operation.vellis.rtg_apply_migration_cutover",
+      "parameters": [
+        {
+          "name": "migration_id",
+          "required": true
+        },
+        {
+          "name": "cutover_options",
+          "required": false
+        }
+      ],
+      "recommended_predecessors": [
+        "rtg_get_migration",
+        "rtg_validate_graph"
+      ],
+      "success_envelope": {
+        "ok": true,
+        "result": "<encoded action result>"
+      },
+      "transports": [
+        "stdio",
+        "http"
+      ]
+    },
+    {
+      "annotations": {
+        "destructiveHint": true,
+        "idempotentHint": false,
+        "openWorldHint": false,
+        "readOnlyHint": false
+      },
+      "audience": "advanced",
+      "description": "Abandon staged migration work and prune safe non-live candidates; Lane: migration.",
+      "dry_run_tool": null,
+      "failure_envelope": {
+        "error": {
+          "message": "<message>",
+          "type": "<failure type>"
+        },
+        "ok": false,
+        "optional": [
+          "error.diagnostic",
+          "transaction_id",
+          "validation_report"
+        ]
+      },
+      "lane": "migration",
+      "ledgers": true,
+      "name": "rtg_abandon_migration",
+      "operation_id": "operation.vellis.rtg_abandon_migration",
+      "parameters": [
+        {
+          "name": "migration_id",
+          "required": true
+        },
+        {
+          "name": "reason",
+          "required": false
+        }
+      ],
+      "recommended_predecessors": [
+        "rtg_get_migration"
+      ],
+      "success_envelope": {
+        "ok": true,
+        "result": "<encoded action result>"
+      },
+      "transports": [
+        "stdio",
+        "http"
+      ]
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false,
+        "readOnlyHint": true
+      },
+      "audience": "everyday",
+      "description": "Execute a read-only RTG query; Lane: query; detailed grammar and examples are in usage guides.",
+      "dry_run_tool": null,
+      "failure_envelope": {
+        "error": {
+          "message": "<message>",
+          "type": "<failure type>"
+        },
+        "ok": false,
+        "optional": [
+          "error.diagnostic",
+          "transaction_id",
+          "validation_report"
+        ]
+      },
+      "lane": "query",
+      "ledgers": false,
+      "name": "rtg_execute_query",
+      "operation_id": "operation.vellis.rtg_execute_query",
+      "parameters": [
+        {
+          "name": "query_spec",
+          "required": true
+        },
+        {
+          "name": "query_options",
+          "required": false
+        },
+        {
+          "name": "response_options",
+          "required": false
+        }
+      ],
+      "recommended_predecessors": [],
+      "success_envelope": {
+        "ok": true,
+        "result": "<encoded action result>"
+      },
+      "transports": [
+        "stdio",
+        "http"
+      ]
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false,
+        "readOnlyHint": true
+      },
+      "audience": "everyday",
+      "description": "Resolve zero, one, or multiple live anchors by typed fact; Lane: query; never guess among multiple matches.",
+      "dry_run_tool": null,
+      "failure_envelope": {
+        "error": {
+          "message": "<message>",
+          "type": "<failure type>"
+        },
+        "ok": false,
+        "optional": [
+          "error.diagnostic",
+          "transaction_id",
+          "validation_report"
+        ]
+      },
+      "lane": "query",
+      "ledgers": false,
+      "name": "rtg_resolve_anchor_by_fact",
+      "operation_id": "operation.vellis.rtg_resolve_anchor_by_fact",
+      "parameters": [
+        {
+          "name": "anchor_type",
+          "required": true
+        },
+        {
+          "name": "data_type",
+          "required": true
+        },
+        {
+          "name": "property_path",
+          "required": true
+        },
+        {
+          "name": "value",
+          "required": true
+        },
+        {
+          "default": false,
+          "name": "case_sensitive",
+          "required": false
+        }
+      ],
+      "recommended_predecessors": [],
+      "success_envelope": {
+        "ok": true,
+        "result": "<encoded action result>"
+      },
+      "transports": [
+        "stdio",
+        "http"
+      ]
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false,
+        "readOnlyHint": true
+      },
+      "audience": "everyday",
+      "description": "Read one RTG graph object by UUID; Lane: state_and_discovery.",
+      "dry_run_tool": null,
+      "failure_envelope": {
+        "error": {
+          "message": "<message>",
+          "type": "<failure type>"
+        },
+        "ok": false,
+        "optional": [
+          "error.diagnostic",
+          "transaction_id",
+          "validation_report"
+        ]
+      },
+      "lane": "state_and_discovery",
+      "ledgers": false,
+      "name": "rtg_get_object",
+      "operation_id": "operation.vellis.rtg_get_object",
+      "parameters": [
+        {
+          "name": "object_uuid",
+          "required": true
+        }
+      ],
+      "recommended_predecessors": [],
+      "success_envelope": {
+        "ok": true,
+        "result": "<encoded action result>"
+      },
+      "transports": [
+        "stdio",
+        "http"
+      ]
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false,
+        "readOnlyHint": true
+      },
+      "audience": "everyday",
+      "description": "List current migration-store records; Lane: migration; use history for pruned or rejected work.",
+      "dry_run_tool": null,
+      "failure_envelope": {
+        "error": {
+          "message": "<message>",
+          "type": "<failure type>"
+        },
+        "ok": false,
+        "optional": [
+          "error.diagnostic",
+          "transaction_id",
+          "validation_report"
+        ]
+      },
+      "lane": "migration",
+      "ledgers": false,
+      "name": "rtg_list_migrations",
+      "operation_id": "operation.vellis.rtg_list_migrations",
+      "parameters": [
+        {
+          "name": "status",
+          "required": false
+        }
+      ],
+      "recommended_predecessors": [],
+      "success_envelope": {
+        "ok": true,
+        "result": "<encoded action result>"
+      },
+      "transports": [
+        "stdio",
+        "http"
+      ]
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false,
+        "readOnlyHint": true
+      },
+      "audience": "everyday",
+      "description": "Read one current migration-store record by ID; Lane: migration.",
+      "dry_run_tool": null,
+      "failure_envelope": {
+        "error": {
+          "message": "<message>",
+          "type": "<failure type>"
+        },
+        "ok": false,
+        "optional": [
+          "error.diagnostic",
+          "transaction_id",
+          "validation_report"
+        ]
+      },
+      "lane": "migration",
+      "ledgers": false,
+      "name": "rtg_get_migration",
+      "operation_id": "operation.vellis.rtg_get_migration",
+      "parameters": [
+        {
+          "name": "migration_id",
+          "required": true
+        }
+      ],
+      "recommended_predecessors": [],
+      "success_envelope": {
+        "ok": true,
+        "result": "<encoded action result>"
+      },
+      "transports": [
+        "stdio",
+        "http"
+      ]
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false,
+        "readOnlyHint": true
+      },
+      "audience": "everyday",
+      "description": "Validate current or migration-projected RTG state without mutation; Lane: live_graph.",
+      "dry_run_tool": null,
+      "failure_envelope": {
+        "error": {
+          "message": "<message>",
+          "type": "<failure type>"
+        },
+        "ok": false,
+        "optional": [
+          "error.diagnostic",
+          "transaction_id",
+          "validation_report"
+        ]
+      },
+      "lane": "live_graph",
+      "ledgers": false,
+      "name": "rtg_validate_graph",
+      "operation_id": "operation.vellis.rtg_validate_graph",
+      "parameters": [
+        {
+          "name": "migration_ids",
+          "required": false
+        },
+        {
+          "name": "validation_options",
+          "required": false
+        }
+      ],
+      "recommended_predecessors": [],
+      "success_envelope": {
+        "ok": true,
+        "result": "<encoded action result>"
+      },
+      "transports": [
+        "stdio",
+        "http"
+      ]
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false,
+        "readOnlyHint": true
+      },
+      "audience": "everyday",
+      "description": "Discover anchor types and live counts; Lane: state_and_discovery; use before guessing type keys.",
+      "dry_run_tool": null,
+      "failure_envelope": {
+        "error": {
+          "message": "<message>",
+          "type": "<failure type>"
+        },
+        "ok": false,
+        "optional": [
+          "error.diagnostic",
+          "transaction_id",
+          "validation_report"
+        ]
+      },
+      "lane": "state_and_discovery",
+      "ledgers": false,
+      "name": "rtg_discover_anchor_types",
+      "operation_id": "operation.vellis.rtg_discover_anchor_types",
+      "parameters": [
+        {
+          "name": "discovery_options",
+          "required": false
+        }
+      ],
+      "recommended_predecessors": [],
+      "success_envelope": {
+        "ok": true,
+        "result": "<encoded action result>"
+      },
+      "transports": [
+        "stdio",
+        "http"
+      ]
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false,
+        "readOnlyHint": true
+      },
+      "audience": "everyday",
+      "description": "Read schema details for selected anchor types; Lane: state_and_discovery; use before writes.",
+      "dry_run_tool": null,
+      "failure_envelope": {
+        "error": {
+          "message": "<message>",
+          "type": "<failure type>"
+        },
+        "ok": false,
+        "optional": [
+          "error.diagnostic",
+          "transaction_id",
+          "validation_report"
+        ]
+      },
+      "lane": "state_and_discovery",
+      "ledgers": false,
+      "name": "rtg_get_schema_pack",
+      "operation_id": "operation.vellis.rtg_get_schema_pack",
+      "parameters": [
+        {
+          "name": "anchor_type_keys",
+          "required": true
+        },
+        {
+          "name": "schema_pack_options",
+          "required": false
+        }
+      ],
+      "recommended_predecessors": [],
+      "success_envelope": {
+        "ok": true,
+        "result": "<encoded action result>"
+      },
+      "transports": [
+        "stdio",
+        "http"
+      ]
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false,
+        "readOnlyHint": true
+      },
+      "audience": "everyday",
+      "description": "Export current coordinated RTG state or a compact summary; Lane: recovery_and_audit.",
+      "dry_run_tool": null,
+      "failure_envelope": {
+        "error": {
+          "message": "<message>",
+          "type": "<failure type>"
+        },
+        "ok": false,
+        "optional": [
+          "error.diagnostic",
+          "transaction_id",
+          "validation_report"
+        ]
+      },
+      "lane": "recovery_and_audit",
+      "ledgers": false,
+      "name": "rtg_export_system_snapshot",
+      "operation_id": "operation.vellis.rtg_export_system_snapshot",
+      "parameters": [
+        {
+          "default": false,
+          "name": "summary",
+          "required": false
+        }
+      ],
+      "recommended_predecessors": [],
+      "success_envelope": {
+        "ok": true,
+        "result": "<encoded action result>"
+      },
+      "transports": [
+        "stdio",
+        "http"
+      ]
+    },
+    {
+      "annotations": {
+        "destructiveHint": true,
+        "idempotentHint": false,
+        "openWorldHint": false,
+        "readOnlyHint": false
+      },
+      "audience": "everyday",
+      "description": "Persist a coordinated RTG snapshot; Lane: recovery_and_audit; this records an administrative ledger event.",
+      "dry_run_tool": null,
+      "failure_envelope": {
+        "error": {
+          "message": "<message>",
+          "type": "<failure type>"
+        },
+        "ok": false,
+        "optional": [
+          "error.diagnostic",
+          "transaction_id",
+          "validation_report"
+        ]
+      },
+      "lane": "recovery_and_audit",
+      "ledgers": true,
+      "name": "rtg_persist_system_snapshot",
+      "operation_id": "operation.vellis.rtg_persist_system_snapshot",
+      "parameters": [
+        {
+          "name": "relative_path",
+          "required": true
+        },
+        {
+          "default": true,
+          "name": "return_snapshot",
+          "required": false
+        }
+      ],
+      "recommended_predecessors": [],
+      "success_envelope": {
+        "ok": true,
+        "result": "<encoded action result>"
+      },
+      "transports": [
+        "stdio",
+        "http"
+      ]
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false,
+        "readOnlyHint": true
+      },
+      "audience": "everyday",
+      "description": "List RTG snapshots visible through configured storage; Lane: recovery_and_audit.",
+      "dry_run_tool": null,
+      "failure_envelope": {
+        "error": {
+          "message": "<message>",
+          "type": "<failure type>"
+        },
+        "ok": false,
+        "optional": [
+          "error.diagnostic",
+          "transaction_id",
+          "validation_report"
+        ]
+      },
+      "lane": "recovery_and_audit",
+      "ledgers": false,
+      "name": "rtg_list_persisted_snapshots",
+      "operation_id": "operation.vellis.rtg_list_persisted_snapshots",
+      "parameters": [],
+      "recommended_predecessors": [],
+      "success_envelope": {
+        "ok": true,
+        "result": "<encoded action result>"
+      },
+      "transports": [
+        "stdio",
+        "http"
+      ]
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false,
+        "readOnlyHint": true
+      },
+      "audience": "everyday",
+      "description": "Load one persisted RTG snapshot without restoring it; Lane: recovery_and_audit.",
+      "dry_run_tool": null,
+      "failure_envelope": {
+        "error": {
+          "message": "<message>",
+          "type": "<failure type>"
+        },
+        "ok": false,
+        "optional": [
+          "error.diagnostic",
+          "transaction_id",
+          "validation_report"
+        ]
+      },
+      "lane": "recovery_and_audit",
+      "ledgers": false,
+      "name": "rtg_load_persisted_snapshot",
+      "operation_id": "operation.vellis.rtg_load_persisted_snapshot",
+      "parameters": [
+        {
+          "name": "relative_path",
+          "required": true
+        },
+        {
+          "default": true,
+          "name": "return_snapshot",
+          "required": false
+        }
+      ],
+      "recommended_predecessors": [],
+      "success_envelope": {
+        "ok": true,
+        "result": "<encoded action result>"
+      },
+      "transports": [
+        "stdio",
+        "http"
+      ]
+    },
+    {
+      "annotations": {
+        "destructiveHint": true,
+        "idempotentHint": false,
+        "openWorldHint": false,
+        "readOnlyHint": false
+      },
+      "audience": "operator",
+      "description": "Replay eligible mutations into empty or snapshot-seeded state; Lane: recovery_and_audit; operator use.",
+      "dry_run_tool": null,
+      "failure_envelope": {
+        "error": {
+          "message": "<message>",
+          "type": "<failure type>"
+        },
+        "ok": false,
+        "optional": [
+          "error.diagnostic",
+          "transaction_id",
+          "validation_report"
+        ]
+      },
+      "lane": "recovery_and_audit",
+      "ledgers": false,
+      "name": "rtg_replay_ledger",
+      "operation_id": "operation.vellis.rtg_replay_ledger",
+      "parameters": [
+        {
+          "name": "replay_options",
+          "required": false
+        }
+      ],
+      "recommended_predecessors": [
+        "rtg_get_system_state"
+      ],
+      "success_envelope": {
+        "ok": true,
+        "result": "<encoded action result>"
+      },
+      "transports": [
+        "stdio",
+        "http"
+      ]
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false,
+        "readOnlyHint": true
+      },
+      "audience": "everyday",
+      "description": "Verify replay in isolated scratch state and restore live state exactly; Lane: recovery_and_audit.",
+      "dry_run_tool": null,
+      "failure_envelope": {
+        "error": {
+          "message": "<message>",
+          "type": "<failure type>"
+        },
+        "ok": false,
+        "optional": [
+          "error.diagnostic",
+          "transaction_id",
+          "validation_report"
+        ]
+      },
+      "lane": "recovery_and_audit",
+      "ledgers": false,
+      "name": "rtg_verify_replay_from_ledger",
+      "operation_id": "operation.vellis.rtg_verify_replay_from_ledger",
+      "parameters": [
+        {
+          "name": "replay_options",
+          "required": false
+        }
+      ],
+      "recommended_predecessors": [],
+      "success_envelope": {
+        "ok": true,
+        "result": "<encoded action result>"
+      },
+      "transports": [
+        "stdio",
+        "http"
+      ]
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false,
+        "readOnlyHint": true
+      },
+      "audience": "everyday",
+      "description": "Read ledger-projected migration events, including rejected proposals; Lane: migration.",
+      "dry_run_tool": null,
+      "failure_envelope": {
+        "error": {
+          "message": "<message>",
+          "type": "<failure type>"
+        },
+        "ok": false,
+        "optional": [
+          "error.diagnostic",
+          "transaction_id",
+          "validation_report"
+        ]
+      },
+      "lane": "migration",
+      "ledgers": false,
+      "name": "rtg_list_migration_history",
+      "operation_id": "operation.vellis.rtg_list_migration_history",
+      "parameters": [],
+      "recommended_predecessors": [],
+      "success_envelope": {
+        "ok": true,
+        "result": "<encoded action result>"
+      },
+      "transports": [
+        "stdio",
+        "http"
+      ]
+    },
+    {
+      "annotations": {
+        "destructiveHint": true,
+        "idempotentHint": false,
+        "openWorldHint": false,
+        "readOnlyHint": false
+      },
+      "audience": "operator",
+      "description": "Retry queued controller ledger writes; Lane: recovery_and_audit; operator use.",
+      "dry_run_tool": null,
+      "failure_envelope": {
+        "error": {
+          "message": "<message>",
+          "type": "<failure type>"
+        },
+        "ok": false,
+        "optional": [
+          "error.diagnostic",
+          "transaction_id",
+          "validation_report"
+        ]
+      },
+      "lane": "recovery_and_audit",
+      "ledgers": false,
+      "name": "rtg_flush_ledger_failures",
+      "operation_id": "operation.vellis.rtg_flush_ledger_failures",
+      "parameters": [],
+      "recommended_predecessors": [
+        "rtg_get_system_state"
+      ],
+      "success_envelope": {
+        "ok": true,
+        "result": "<encoded action result>"
+      },
+      "transports": [
+        "stdio",
+        "http"
+      ]
+    },
+    {
+      "annotations": {
+        "destructiveHint": true,
+        "idempotentHint": false,
+        "openWorldHint": false,
+        "readOnlyHint": false
+      },
+      "audience": "operator",
+      "description": "Restore coordinated RTG state from a supplied snapshot; Lane: recovery_and_audit; operator use.",
+      "dry_run_tool": null,
+      "failure_envelope": {
+        "error": {
+          "message": "<message>",
+          "type": "<failure type>"
+        },
+        "ok": false,
+        "optional": [
+          "error.diagnostic",
+          "transaction_id",
+          "validation_report"
+        ]
+      },
+      "lane": "recovery_and_audit",
+      "ledgers": true,
+      "name": "rtg_restore_from_snapshot",
+      "operation_id": "operation.vellis.rtg_restore_from_snapshot",
+      "parameters": [
+        {
+          "name": "snapshot",
+          "required": true
+        },
+        {
+          "name": "restore_options",
+          "required": false
+        }
+      ],
+      "recommended_predecessors": [
+        "rtg_load_persisted_snapshot"
+      ],
+      "success_envelope": {
+        "ok": true,
+        "result": "<encoded action result>"
+      },
+      "transports": [
+        "stdio",
+        "http"
+      ]
+    }
+  ]
+}

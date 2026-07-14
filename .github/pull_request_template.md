@@ -2,9 +2,9 @@
 
 Describe the change and why.
 
-## Component specs
+## Model contracts
 
-- [ ] No public component behavior changed, or the affected specs under `docs/components/` are updated in this PR.
+- [ ] No public component or application behavior changed, or the affected SysML contracts and generated references are updated in this PR.
 
 ## Verification
 

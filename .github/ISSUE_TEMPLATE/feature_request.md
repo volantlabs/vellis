@@ -11,8 +11,8 @@ What need or gap this addresses.
 
 ## Proposal
 
-What you'd like to see. If it changes a component's public behavior, note which
-spec under `docs/components/` is affected.
+What you'd like to see. If it changes a component's public behavior, identify the affected SysML
+component or application contract.
 
 ## Alternatives considered
 

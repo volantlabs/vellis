@@ -1,0 +1,13 @@
+{
+  "baseline": {
+    "sysml": "2.0",
+    "kerml": "1.0"
+  },
+  "policy": "Native SysML plus typed metadata from SoftwareComponentModeling only",
+  "forbidden_patterns": [
+    "#component\\b",
+    "\\bcomponent\\s+def\\b",
+    "@semantic\\b"
+  ],
+  "formal_language_gate": "The pinned conformant parser is mandatory for every model check."
+}
