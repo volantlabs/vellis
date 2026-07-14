@@ -337,7 +337,7 @@ def _check_protocol_action_coverage() -> list[Finding]:
     for path in sorted(COMPONENT_MODEL_ROOT.glob("component.*.sysml")):
         text = path.read_text(encoding="utf-8")
         component_id = _component_id(text)
-        if not component_id or component_id == "component.rtg.discovery":
+        if not component_id:
             continue
         actions = set(re.findall(rf"\baction def\s+{OPTIONAL_IDENTIFICATION}(\w+)", text))
         missing = sorted(
@@ -418,7 +418,7 @@ def _check_protocol_action_signatures() -> list[Finding]:
     for path in sorted(COMPONENT_MODEL_ROOT.glob("component.*.sysml")):
         text = path.read_text(encoding="utf-8")
         component_id = _component_id(text)
-        if not component_id or component_id == "component.rtg.discovery":
+        if not component_id:
             continue
         action_blocks = {
             match.group(1): _extract_braced_block(text, match.start())
@@ -1627,7 +1627,7 @@ def _consumer_reference_paths(pattern: str) -> list[str]:
             continue
         try:
             text = path.read_text(encoding="utf-8")
-        except (OSError, UnicodeDecodeError):
+        except OSError, UnicodeDecodeError:
             continue
         if expression.search(text):
             matches.append(normalized)

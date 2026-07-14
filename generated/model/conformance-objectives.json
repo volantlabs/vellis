@@ -1374,13 +1374,15 @@
       "verification": "VerifyReplayFromLedgerContractVerification"
     },
     {
-      "evidence_id": "pending#CreateEmptyRtgDiscoveryContractVerification",
-      "evidence_nodes": [],
+      "evidence_id": "components/rtg/discovery/tests/test_rtg_discovery_contract.py#CreateEmptyRtgDiscoveryContractVerification",
+      "evidence_nodes": [
+        "components/rtg/discovery/tests/test_rtg_discovery_contract.py::test_empty_discovery_has_no_views"
+      ],
       "model_source": "model/bibliotek/components/component.rtg.discovery.sysml",
       "requirements": [
         "contract.rtg.discovery.create_empty_rtg_discovery.failures"
       ],
-      "status": "pending",
+      "status": "resolved",
       "subject": {
         "role": "operation",
         "type": "CreateEmptyRtgDiscovery"
@@ -1388,13 +1390,17 @@
       "verification": "CreateEmptyRtgDiscoveryContractVerification"
     },
     {
-      "evidence_id": "pending#ListDiscoveryViewsContractVerification",
-      "evidence_nodes": [],
+      "evidence_id": "components/rtg/discovery/tests/test_rtg_discovery_contract.py#ListDiscoveryViewsContractVerification",
+      "evidence_nodes": [
+        "components/rtg/discovery/tests/test_rtg_discovery_contract.py::test_empty_discovery_has_no_views",
+        "components/rtg/discovery/tests/test_rtg_discovery_contract.py::test_discovery_stores_lists_and_replaces_views",
+        "components/rtg/discovery/tests/test_rtg_discovery_contract.py::test_discovery_lists_views_deterministically_and_returns_copies"
+      ],
       "model_source": "model/bibliotek/components/component.rtg.discovery.sysml",
       "requirements": [
         "contract.rtg.discovery.list_discovery_views.failures"
       ],
-      "status": "pending",
+      "status": "resolved",
       "subject": {
         "role": "operation",
         "type": "ListDiscoveryViews"
@@ -1402,15 +1408,20 @@
       "verification": "ListDiscoveryViewsContractVerification"
     },
     {
-      "evidence_id": "pending#PutDiscoveryViewContractVerification",
-      "evidence_nodes": [],
+      "evidence_id": "components/rtg/discovery/tests/test_rtg_discovery_contract.py#PutDiscoveryViewContractVerification",
+      "evidence_nodes": [
+        "components/rtg/discovery/tests/test_rtg_discovery_contract.py::test_discovery_stores_lists_and_replaces_views",
+        "components/rtg/discovery/tests/test_rtg_discovery_contract.py::test_discovery_lists_views_deterministically_and_returns_copies",
+        "components/rtg/discovery/tests/test_rtg_discovery_contract.py::test_put_view_validates_curated_view_shape",
+        "components/rtg/discovery/tests/test_rtg_discovery_contract.py::test_put_view_rejects_non_finite_metadata_without_replacing"
+      ],
       "model_source": "model/bibliotek/components/component.rtg.discovery.sysml",
       "requirements": [
         "contract.rtg.discovery.view_validity",
         "contract.rtg.discovery.replacement",
         "contract.rtg.discovery.put_discovery_view.failures"
       ],
-      "status": "pending",
+      "status": "resolved",
       "subject": {
         "role": "operation",
         "type": "PutDiscoveryView"
@@ -1418,8 +1429,17 @@
       "verification": "PutDiscoveryViewContractVerification"
     },
     {
-      "evidence_id": "pending#RtgDiscoveryBoundaryVerification",
-      "evidence_nodes": [],
+      "evidence_id": "components/rtg/discovery/tests/test_rtg_discovery_contract.py#RtgDiscoveryBoundaryVerification",
+      "evidence_nodes": [
+        "components/rtg/discovery/tests/test_rtg_discovery_contract.py::test_empty_discovery_has_no_views",
+        "components/rtg/discovery/tests/test_rtg_discovery_contract.py::test_discovery_stores_lists_and_replaces_views",
+        "components/rtg/discovery/tests/test_rtg_discovery_contract.py::test_discovery_lists_views_deterministically_and_returns_copies",
+        "components/rtg/discovery/tests/test_rtg_discovery_contract.py::test_selects_anchor_types_by_view_coordinates",
+        "components/rtg/discovery/tests/test_rtg_discovery_contract.py::test_select_rejects_missing_view_and_invalid_coordinates",
+        "components/rtg/discovery/tests/test_rtg_discovery_contract.py::test_put_view_validates_curated_view_shape",
+        "components/rtg/discovery/tests/test_rtg_discovery_contract.py::test_put_view_rejects_non_finite_metadata_without_replacing",
+        "components/rtg/discovery/tests/test_rtg_discovery_contract.py::test_discovery_surface_does_not_expose_adjacent_component_operations"
+      ],
       "model_source": "model/bibliotek/components/component.rtg.discovery.sysml",
       "requirements": [
         "contract.rtg.discovery.deterministic_reads",
@@ -1428,7 +1448,7 @@
         "invariant.rtg.discovery.no_graph_dependency",
         "invariant.rtg.discovery.knowledge_engineer_curated"
       ],
-      "status": "pending",
+      "status": "resolved",
       "subject": {
         "role": "discovery",
         "type": "RtgDiscovery"
@@ -1436,14 +1456,17 @@
       "verification": "RtgDiscoveryBoundaryVerification"
     },
     {
-      "evidence_id": "pending#SelectDiscoveryAnchorTypesContractVerification",
-      "evidence_nodes": [],
+      "evidence_id": "components/rtg/discovery/tests/test_rtg_discovery_contract.py#SelectDiscoveryAnchorTypesContractVerification",
+      "evidence_nodes": [
+        "components/rtg/discovery/tests/test_rtg_discovery_contract.py::test_selects_anchor_types_by_view_coordinates",
+        "components/rtg/discovery/tests/test_rtg_discovery_contract.py::test_select_rejects_missing_view_and_invalid_coordinates"
+      ],
       "model_source": "model/bibliotek/components/component.rtg.discovery.sysml",
       "requirements": [
         "contract.rtg.discovery.selection",
         "contract.rtg.discovery.select_discovery_anchor_types.failures"
       ],
-      "status": "pending",
+      "status": "resolved",
       "subject": {
         "role": "operation",
         "type": "SelectDiscoveryAnchorTypes"

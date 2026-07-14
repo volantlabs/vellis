@@ -67,7 +67,7 @@ Initial facts:
 - It owns invariant `live_type_unique`.
 - It has an open question count of zero.
 - Component `component.rtg.discovery` is draft.
-- It is deferred and declares planned implementation root `components/rtg/discovery`.
+- It is implemented at `components/rtg/discovery` but remains outside the current Vellis application composition.
 - It has open question `Should aliases or search terms be part of curated discovery views?`
 
 Required tasks:

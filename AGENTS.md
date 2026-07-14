@@ -25,7 +25,8 @@ tree. Remove this section only after that consolidation is complete.
 During harmonization:
 
 - SysML under `model/` is the sole design authority on this line. Migrate useful predecessor
-  contracts into SysML; do not restore `docs/components/` as a second normative specification set.
+  contracts into SysML; do not restore the former Markdown component-specification tree as a
+  second normative specification set.
 - Before changing component contracts, RTG kernel behavior, application composition, onboarding,
   repo-twin behavior, schema domains, monographs, federation, routing, or related skills, inspect
   the corresponding predecessor work and record whether it is superseded, migrated, or intentionally

@@ -315,8 +315,8 @@ Use the live schema from Prompt 1. Ingest these facts with `rtg_apply_live_graph
 `global_uuid_uniqueness`, and has test evidence at
 `components/rtg/graph/tests/test_rtg_graph_contract.py`; `component.rtg.schema` is accepted,
 has implementation root `components/rtg/schema`, owns invariant `live_type_unique`, and has no
-open questions; `component.rtg.discovery` is draft and deferred, declares planned implementation
-root `components/rtg/discovery`, and has open question `Should aliases or search terms be part
+open questions; `component.rtg.discovery` is draft, is implemented at
+`components/rtg/discovery` but remains outside the current Vellis application composition, and has open question `Should aliases or search terms be part
 of curated discovery views?`.
 
 Then use `rtg_execute_query` to answer: which accepted components have invariants without test

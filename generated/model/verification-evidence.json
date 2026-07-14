@@ -1027,6 +1027,54 @@
         "components/rtg/controller/tests/test_rtg_controller_contract.py::test_replay_equivalence_detects_equal_counts_with_different_fact_values"
       ]
     },
+    "components/rtg/discovery/tests/test_rtg_discovery_contract.py#CreateEmptyRtgDiscoveryContractVerification": {
+      "model_source": "model/bibliotek/components/component.rtg.discovery.sysml",
+      "status": "resolved",
+      "test_nodes": [
+        "components/rtg/discovery/tests/test_rtg_discovery_contract.py::test_empty_discovery_has_no_views"
+      ]
+    },
+    "components/rtg/discovery/tests/test_rtg_discovery_contract.py#ListDiscoveryViewsContractVerification": {
+      "model_source": "model/bibliotek/components/component.rtg.discovery.sysml",
+      "status": "resolved",
+      "test_nodes": [
+        "components/rtg/discovery/tests/test_rtg_discovery_contract.py::test_empty_discovery_has_no_views",
+        "components/rtg/discovery/tests/test_rtg_discovery_contract.py::test_discovery_stores_lists_and_replaces_views",
+        "components/rtg/discovery/tests/test_rtg_discovery_contract.py::test_discovery_lists_views_deterministically_and_returns_copies"
+      ]
+    },
+    "components/rtg/discovery/tests/test_rtg_discovery_contract.py#PutDiscoveryViewContractVerification": {
+      "model_source": "model/bibliotek/components/component.rtg.discovery.sysml",
+      "status": "resolved",
+      "test_nodes": [
+        "components/rtg/discovery/tests/test_rtg_discovery_contract.py::test_discovery_stores_lists_and_replaces_views",
+        "components/rtg/discovery/tests/test_rtg_discovery_contract.py::test_discovery_lists_views_deterministically_and_returns_copies",
+        "components/rtg/discovery/tests/test_rtg_discovery_contract.py::test_put_view_validates_curated_view_shape",
+        "components/rtg/discovery/tests/test_rtg_discovery_contract.py::test_put_view_rejects_non_finite_metadata_without_replacing"
+      ]
+    },
+    "components/rtg/discovery/tests/test_rtg_discovery_contract.py#RtgDiscoveryBoundaryVerification": {
+      "model_source": "model/bibliotek/components/component.rtg.discovery.sysml",
+      "status": "resolved",
+      "test_nodes": [
+        "components/rtg/discovery/tests/test_rtg_discovery_contract.py::test_empty_discovery_has_no_views",
+        "components/rtg/discovery/tests/test_rtg_discovery_contract.py::test_discovery_stores_lists_and_replaces_views",
+        "components/rtg/discovery/tests/test_rtg_discovery_contract.py::test_discovery_lists_views_deterministically_and_returns_copies",
+        "components/rtg/discovery/tests/test_rtg_discovery_contract.py::test_selects_anchor_types_by_view_coordinates",
+        "components/rtg/discovery/tests/test_rtg_discovery_contract.py::test_select_rejects_missing_view_and_invalid_coordinates",
+        "components/rtg/discovery/tests/test_rtg_discovery_contract.py::test_put_view_validates_curated_view_shape",
+        "components/rtg/discovery/tests/test_rtg_discovery_contract.py::test_put_view_rejects_non_finite_metadata_without_replacing",
+        "components/rtg/discovery/tests/test_rtg_discovery_contract.py::test_discovery_surface_does_not_expose_adjacent_component_operations"
+      ]
+    },
+    "components/rtg/discovery/tests/test_rtg_discovery_contract.py#SelectDiscoveryAnchorTypesContractVerification": {
+      "model_source": "model/bibliotek/components/component.rtg.discovery.sysml",
+      "status": "resolved",
+      "test_nodes": [
+        "components/rtg/discovery/tests/test_rtg_discovery_contract.py::test_selects_anchor_types_by_view_coordinates",
+        "components/rtg/discovery/tests/test_rtg_discovery_contract.py::test_select_rejects_missing_view_and_invalid_coordinates"
+      ]
+    },
     "components/rtg/graph/tests/test_rtg_graph_contract.py#AssociateDataContractVerification": {
       "model_source": "model/bibliotek/components/component.rtg.graph.sysml",
       "status": "resolved",
@@ -1721,31 +1769,6 @@
         "components/storage/sql/tests/test_storage_sql_contract.py::test_failed_execute_rolls_back_and_handle_remains_usable_from_worker_thread",
         "components/storage/sql/tests/test_storage_sql_contract.py::test_database_path_must_not_be_directory"
       ]
-    },
-    "pending#CreateEmptyRtgDiscoveryContractVerification": {
-      "model_source": "model/bibliotek/components/component.rtg.discovery.sysml",
-      "status": "pending",
-      "test_nodes": []
-    },
-    "pending#ListDiscoveryViewsContractVerification": {
-      "model_source": "model/bibliotek/components/component.rtg.discovery.sysml",
-      "status": "pending",
-      "test_nodes": []
-    },
-    "pending#PutDiscoveryViewContractVerification": {
-      "model_source": "model/bibliotek/components/component.rtg.discovery.sysml",
-      "status": "pending",
-      "test_nodes": []
-    },
-    "pending#RtgDiscoveryBoundaryVerification": {
-      "model_source": "model/bibliotek/components/component.rtg.discovery.sysml",
-      "status": "pending",
-      "test_nodes": []
-    },
-    "pending#SelectDiscoveryAnchorTypesContractVerification": {
-      "model_source": "model/bibliotek/components/component.rtg.discovery.sysml",
-      "status": "pending",
-      "test_nodes": []
     }
   }
 }

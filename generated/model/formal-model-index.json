@@ -39,7 +39,7 @@
         "ItemDefinition": 16,
         "LibraryPackage": 1,
         "PartDefinition": 15,
-        "PartUsage": 12,
+        "PartUsage": 13,
         "RequirementUsage": 348,
         "VerificationCaseDefinition": 122
       },
@@ -4999,20 +4999,20 @@
     },
     "BibliotekLocalPythonRealization": {
       "element_counts": {
-        "Dependency": 25,
-        "Documentation": 6,
-        "EnumerationUsage": 6,
-        "Feature": 4,
-        "FeatureReferenceExpression": 3,
-        "ItemUsage": 3,
-        "LiteralString": 24,
-        "MetadataUsage": 11,
+        "Dependency": 28,
+        "Documentation": 7,
+        "EnumerationUsage": 7,
+        "Feature": 5,
+        "FeatureReferenceExpression": 4,
+        "ItemUsage": 4,
+        "LiteralString": 42,
+        "MetadataUsage": 18,
         "Multiplicity": 7,
         "Package": 1,
-        "PartDefinition": 3,
+        "PartDefinition": 4,
         "PartUsage": 4,
-        "PerformActionUsage": 12,
-        "ReferenceUsage": 30
+        "PerformActionUsage": 15,
+        "ReferenceUsage": 49
       },
       "named_elements": [
         {
@@ -5026,6 +5026,10 @@
         {
           "kind": "PartDefinition",
           "name": "InMemoryAppShell"
+        },
+        {
+          "kind": "PartDefinition",
+          "name": "InMemoryRtgDiscovery"
         }
       ],
       "source": "model/bibliotek/realizations/BibliotekLocalPython.sysml"
@@ -7061,14 +7065,15 @@
     "BibliotekRtgDiscovery": {
       "element_counts": {
         "ActionDefinition": 4,
+        "ActionUsage": 2,
         "AttributeDefinition": 7,
         "AttributeUsage": 33,
         "ConstraintUsage": 12,
         "Dependency": 3,
         "Documentation": 26,
         "EnumerationUsage": 5,
-        "Feature": 3,
-        "FeatureReferenceExpression": 1,
+        "Feature": 21,
+        "FeatureReferenceExpression": 13,
         "ItemDefinition": 1,
         "ItemUsage": 2,
         "LibraryPackage": 1,
@@ -7076,15 +7081,16 @@
         "LiteralInteger": 16,
         "LiteralString": 12,
         "MetadataUsage": 10,
-        "Multiplicity": 20,
+        "Multiplicity": 21,
         "MultiplicityRange": 14,
         "NullExpression": 2,
         "OperatorExpression": 1,
         "PartDefinition": 1,
-        "PartUsage": 1,
+        "PartUsage": 3,
         "PerformActionUsage": 3,
-        "ReferenceUsage": 61,
+        "ReferenceUsage": 78,
         "RequirementUsage": 29,
+        "SatisfyRequirementUsage": 12,
         "VerificationCaseDefinition": 5
       },
       "named_elements": [
@@ -12133,7 +12139,7 @@
     }
   },
   "schema_version": 1,
-  "source_digest": "26e672b9542e1803ddfe75d1ca68eb7c83515270bdb53c106c5d80639b210307",
+  "source_digest": "22b445f29f8305f06194e6f89f1e955585973da4595d8926a734ca09cc284690",
   "validator": {
     "implementation_version": "0.50.0",
     "provider": "Systems-Modeling/SysML-v2-Pilot-Implementation",

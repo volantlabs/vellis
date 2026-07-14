@@ -128,6 +128,7 @@ Current Python implementations include:
 - [`components/rtg/constraints`](components/rtg/constraints/): in-memory RTG constraint registry implementation and boundary tests.
 - [`components/rtg/migration`](components/rtg/migration/): in-memory RTG migration-record store implementation and boundary tests.
 - [`components/rtg/query`](components/rtg/query/): stateless RTG query engine implementation and boundary tests.
+- [`components/rtg/discovery`](components/rtg/discovery/): in-memory curated discovery-view registry implementation and boundary tests.
 - [`components/rtg/change_validation`](components/rtg/change_validation/): deterministic no-mutation RTG change validator implementation and boundary tests.
 - [`components/rtg/controller`](components/rtg/controller/): in-process RTG controller implementation with validation, snapshots, cutover, and SQL-backed ledger behavior.
 

@@ -143,6 +143,24 @@ library package BibliotekRtgDiscovery {
             doc /* Construction has no external side effect. */
         }
     }
+
+    part contractContext {
+        part discovery : RtgDiscovery;
+        satisfy viewValidity by discovery.putView;
+        satisfy replacementEffect by discovery.putView;
+        satisfy selectionEffect by discovery.selectAnchorTypes;
+        satisfy deterministicReads by discovery;
+        satisfy intentionalBoundary by discovery;
+        satisfy viewsNotSchema by discovery;
+        satisfy noGraphDependency by discovery;
+        satisfy knowledgeEngineerCurated by discovery;
+        satisfy putDiscoveryViewFailureSemantics by discovery.putView;
+        satisfy listDiscoveryViewsFailureSemantics by discovery.listViews;
+        satisfy selectDiscoveryAnchorTypesFailureSemantics by discovery.selectAnchorTypes;
+        action createEmptySubject : CreateEmptyRtgDiscovery;
+        satisfy createEmptyRtgDiscoveryFailureSemantics by createEmptySubject;
+    }
+
     verification def PutDiscoveryViewContractVerification {
         subject operation : PutDiscoveryView;
         objective {
@@ -151,8 +169,8 @@ library package BibliotekRtgDiscovery {
             verify putDiscoveryViewFailureSemantics;
         }
         @EvidenceBinding {
-            evidenceId = "pending#PutDiscoveryViewContractVerification";
-            implementationScope = "unimplemented-draft";
+            evidenceId = "components/rtg/discovery/tests/test_rtg_discovery_contract.py#PutDiscoveryViewContractVerification";
+            implementationScope = "InMemoryRtgDiscovery";
         }
     }
 
@@ -163,27 +181,27 @@ library package BibliotekRtgDiscovery {
             verify selectDiscoveryAnchorTypesFailureSemantics;
         }
         @EvidenceBinding {
-            evidenceId = "pending#SelectDiscoveryAnchorTypesContractVerification";
-            implementationScope = "unimplemented-draft";
+            evidenceId = "components/rtg/discovery/tests/test_rtg_discovery_contract.py#SelectDiscoveryAnchorTypesContractVerification";
+            implementationScope = "InMemoryRtgDiscovery";
         }
     }
 
     verification def ListDiscoveryViewsContractVerification {
         subject operation : ListDiscoveryViews;
         objective { verify listDiscoveryViewsFailureSemantics; }
-        @EvidenceBinding { evidenceId = "pending#ListDiscoveryViewsContractVerification"; implementationScope = "unimplemented-draft"; }
+        @EvidenceBinding { evidenceId = "components/rtg/discovery/tests/test_rtg_discovery_contract.py#ListDiscoveryViewsContractVerification"; implementationScope = "InMemoryRtgDiscovery"; }
     }
 
     verification def CreateEmptyRtgDiscoveryContractVerification {
         subject operation : CreateEmptyRtgDiscovery;
         objective { verify createEmptyRtgDiscoveryFailureSemantics; }
-        @EvidenceBinding { evidenceId = "pending#CreateEmptyRtgDiscoveryContractVerification"; implementationScope = "unimplemented-draft"; }
+        @EvidenceBinding { evidenceId = "components/rtg/discovery/tests/test_rtg_discovery_contract.py#CreateEmptyRtgDiscoveryContractVerification"; implementationScope = "InMemoryRtgDiscovery"; }
     }
 
 
     verification def RtgDiscoveryBoundaryVerification {
         subject discovery : RtgDiscovery;
         objective { verify deterministicReads; verify intentionalBoundary; verify viewsNotSchema; verify noGraphDependency; verify knowledgeEngineerCurated; }
-        @EvidenceBinding { evidenceId = "pending#RtgDiscoveryBoundaryVerification"; implementationScope = "unimplemented-draft"; }
+        @EvidenceBinding { evidenceId = "components/rtg/discovery/tests/test_rtg_discovery_contract.py#RtgDiscoveryBoundaryVerification"; implementationScope = "InMemoryRtgDiscovery"; }
     }
 }
