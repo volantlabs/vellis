@@ -1367,6 +1367,73 @@
         "components/rtg/graph/tests/test_rtg_graph_contract.py::test_no_forbidden_dependency_imports"
       ]
     },
+    "components/rtg/graph_registry/tests/test_rtg_graph_registry_contract.py#CompileFederatedIntentContractVerification": {
+      "model_source": "model/bibliotek/components/component.rtg.graph_registry.sysml",
+      "status": "resolved",
+      "test_nodes": [
+        "components/rtg/graph_registry/tests/test_rtg_graph_registry_contract.py::test_compile_federated_intent_plans_read_steps_across_matching_graphs",
+        "components/rtg/graph_registry/tests/test_rtg_graph_registry_contract.py::test_compile_federated_intent_preserves_explicit_graph_set",
+        "components/rtg/graph_registry/tests/test_rtg_graph_registry_contract.py::test_compile_federated_intent_does_not_auto_execute_writes",
+        "components/rtg/graph_registry/tests/test_rtg_graph_registry_contract.py::test_compile_federated_intent_rejects_unknown_target_without_partial_plan"
+      ]
+    },
+    "components/rtg/graph_registry/tests/test_rtg_graph_registry_contract.py#CompileIntentContractVerification": {
+      "model_source": "model/bibliotek/components/component.rtg.graph_registry.sysml",
+      "status": "resolved",
+      "test_nodes": [
+        "components/rtg/graph_registry/tests/test_rtg_graph_registry_contract.py::test_compile_intent_auto_selects_unambiguous_read_route",
+        "components/rtg/graph_registry/tests/test_rtg_graph_registry_contract.py::test_compile_intent_requires_confirmation_for_ambiguous_or_write_routes",
+        "components/rtg/graph_registry/tests/test_rtg_graph_registry_contract.py::test_compile_intent_rejects_unknown_explicit_target",
+        "components/rtg/graph_registry/tests/test_rtg_graph_registry_contract.py::test_compile_intent_rejects_malformed_intent_without_mutation"
+      ]
+    },
+    "components/rtg/graph_registry/tests/test_rtg_graph_registry_contract.py#CreateEmptyRtgGraphRegistryContractVerification": {
+      "model_source": "model/bibliotek/components/component.rtg.graph_registry.sysml",
+      "status": "resolved",
+      "test_nodes": [
+        "components/rtg/graph_registry/tests/test_rtg_graph_registry_contract.py::test_empty_registry_has_no_graphs"
+      ]
+    },
+    "components/rtg/graph_registry/tests/test_rtg_graph_registry_contract.py#GetGraphContractVerification": {
+      "model_source": "model/bibliotek/components/component.rtg.graph_registry.sysml",
+      "status": "resolved",
+      "test_nodes": [
+        "components/rtg/graph_registry/tests/test_rtg_graph_registry_contract.py::test_registry_stores_lists_replaces_and_returns_copies",
+        "components/rtg/graph_registry/tests/test_rtg_graph_registry_contract.py::test_get_graph_reports_missing_graphs"
+      ]
+    },
+    "components/rtg/graph_registry/tests/test_rtg_graph_registry_contract.py#ListGraphsContractVerification": {
+      "model_source": "model/bibliotek/components/component.rtg.graph_registry.sysml",
+      "status": "resolved",
+      "test_nodes": [
+        "components/rtg/graph_registry/tests/test_rtg_graph_registry_contract.py::test_empty_registry_has_no_graphs",
+        "components/rtg/graph_registry/tests/test_rtg_graph_registry_contract.py::test_registry_stores_lists_replaces_and_returns_copies",
+        "components/rtg/graph_registry/tests/test_rtg_graph_registry_contract.py::test_registry_lists_graphs_deterministically"
+      ]
+    },
+    "components/rtg/graph_registry/tests/test_rtg_graph_registry_contract.py#PutGraphContractVerification": {
+      "model_source": "model/bibliotek/components/component.rtg.graph_registry.sysml",
+      "status": "resolved",
+      "test_nodes": [
+        "components/rtg/graph_registry/tests/test_rtg_graph_registry_contract.py::test_registry_stores_lists_replaces_and_returns_copies",
+        "components/rtg/graph_registry/tests/test_rtg_graph_registry_contract.py::test_registry_validates_descriptor_shape",
+        "components/rtg/graph_registry/tests/test_rtg_graph_registry_contract.py::test_registry_rejects_non_finite_metadata_without_replacing"
+      ]
+    },
+    "components/rtg/graph_registry/tests/test_rtg_graph_registry_contract.py#RtgGraphRegistryBoundaryVerification": {
+      "model_source": "model/bibliotek/components/component.rtg.graph_registry.sysml",
+      "status": "resolved",
+      "test_nodes": [
+        "components/rtg/graph_registry/tests/test_rtg_graph_registry_contract.py::test_empty_registry_has_no_graphs",
+        "components/rtg/graph_registry/tests/test_rtg_graph_registry_contract.py::test_registry_stores_lists_replaces_and_returns_copies",
+        "components/rtg/graph_registry/tests/test_rtg_graph_registry_contract.py::test_registry_lists_graphs_deterministically",
+        "components/rtg/graph_registry/tests/test_rtg_graph_registry_contract.py::test_compile_intent_auto_selects_unambiguous_read_route",
+        "components/rtg/graph_registry/tests/test_rtg_graph_registry_contract.py::test_compile_intent_requires_confirmation_for_ambiguous_or_write_routes",
+        "components/rtg/graph_registry/tests/test_rtg_graph_registry_contract.py::test_compile_federated_intent_plans_read_steps_across_matching_graphs",
+        "components/rtg/graph_registry/tests/test_rtg_graph_registry_contract.py::test_compile_federated_intent_does_not_auto_execute_writes",
+        "components/rtg/graph_registry/tests/test_rtg_graph_registry_contract.py::test_registry_surface_does_not_expose_adjacent_component_operations"
+      ]
+    },
     "components/rtg/migration/tests/test_rtg_migration_contract.py#AddMigrationEvidenceContractVerification": {
       "model_source": "model/bibliotek/components/component.rtg.migration.sysml",
       "status": "resolved",

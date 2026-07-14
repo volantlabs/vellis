@@ -11,6 +11,7 @@
     "BibliotekRtgDiagnostics": "model/bibliotek/shared-values/RtgDiagnostics.sysml",
     "BibliotekRtgDiscovery": "model/bibliotek/components/component.rtg.discovery.sysml",
     "BibliotekRtgGraph": "model/bibliotek/components/component.rtg.graph.sysml",
+    "BibliotekRtgGraphRegistry": "model/bibliotek/components/component.rtg.graph_registry.sysml",
     "BibliotekRtgMigration": "model/bibliotek/components/component.rtg.migration.sysml",
     "BibliotekRtgQuery": "model/bibliotek/components/component.rtg.query.sysml",
     "BibliotekRtgSchema": "model/bibliotek/components/component.rtg.schema.sysml",
@@ -30,18 +31,18 @@
   "packages": {
     "Bibliotek": {
       "element_counts": {
-        "ActionDefinition": 109,
-        "AttributeDefinition": 239,
+        "ActionDefinition": 115,
+        "AttributeDefinition": 249,
         "CalculationDefinition": 6,
         "ConstraintDefinition": 1,
-        "Documentation": 9,
-        "EnumerationDefinition": 35,
-        "ItemDefinition": 16,
+        "Documentation": 10,
+        "EnumerationDefinition": 37,
+        "ItemDefinition": 17,
         "LibraryPackage": 1,
-        "PartDefinition": 15,
-        "PartUsage": 13,
-        "RequirementUsage": 348,
-        "VerificationCaseDefinition": 122
+        "PartDefinition": 16,
+        "PartUsage": 14,
+        "RequirementUsage": 365,
+        "VerificationCaseDefinition": 129
       },
       "named_elements": [
         {
@@ -82,6 +83,14 @@
         },
         {
           "kind": "ActionDefinition",
+          "name": "CompileFederatedIntent"
+        },
+        {
+          "kind": "ActionDefinition",
+          "name": "CompileIntent"
+        },
+        {
+          "kind": "ActionDefinition",
           "name": "ControllerGetMigration"
         },
         {
@@ -107,6 +116,10 @@
         {
           "kind": "ActionDefinition",
           "name": "CreateEmptyRtgGraph"
+        },
+        {
+          "kind": "ActionDefinition",
+          "name": "CreateEmptyRtgGraphRegistry"
         },
         {
           "kind": "ActionDefinition",
@@ -206,6 +219,10 @@
         },
         {
           "kind": "ActionDefinition",
+          "name": "GetGraph"
+        },
+        {
+          "kind": "ActionDefinition",
           "name": "GetGraphObject"
         },
         {
@@ -287,6 +304,10 @@
         {
           "kind": "ActionDefinition",
           "name": "ListGraphObjectsByType"
+        },
+        {
+          "kind": "ActionDefinition",
+          "name": "ListGraphs"
         },
         {
           "kind": "ActionDefinition",
@@ -387,6 +408,10 @@
         {
           "kind": "ActionDefinition",
           "name": "PutDiscoveryView"
+        },
+        {
+          "kind": "ActionDefinition",
+          "name": "PutGraph"
         },
         {
           "kind": "ActionDefinition",
@@ -938,6 +963,22 @@
         },
         {
           "kind": "AttributeDefinition",
+          "name": "RtgGraphFederatedIntent"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "RtgGraphFederatedPlan"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "RtgGraphFederatedPlanStep"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "RtgGraphIntent"
+        },
+        {
+          "kind": "AttributeDefinition",
           "name": "RtgGraphJsonValueInvalid"
         },
         {
@@ -950,7 +991,19 @@
         },
         {
           "kind": "AttributeDefinition",
+          "name": "RtgGraphList"
+        },
+        {
+          "kind": "AttributeDefinition",
           "name": "RtgGraphLiveStatusChange"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "RtgGraphMcpEndpoint"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "RtgGraphNotFound"
         },
         {
           "kind": "AttributeDefinition",
@@ -959,6 +1012,18 @@
         {
           "kind": "AttributeDefinition",
           "name": "RtgGraphReferenceInvalid"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "RtgGraphRegistryInvalid"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "RtgGraphRouteCandidate"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "RtgGraphRouteRecord"
         },
         {
           "kind": "AttributeDefinition",
@@ -1530,6 +1595,14 @@
         },
         {
           "kind": "EnumerationDefinition",
+          "name": "RtgGraphMcpTransport"
+        },
+        {
+          "kind": "EnumerationDefinition",
+          "name": "RtgGraphOperation"
+        },
+        {
+          "kind": "EnumerationDefinition",
           "name": "RtgLinkDirection"
         },
         {
@@ -1650,6 +1723,10 @@
         },
         {
           "kind": "ItemDefinition",
+          "name": "RtgGraphDescriptor"
+        },
+        {
+          "kind": "ItemDefinition",
           "name": "RtgLink"
         },
         {
@@ -1716,6 +1793,11 @@
         {
           "kind": "PartDefinition",
           "name": "RtgGraphReadView"
+        },
+        {
+          "kind": "PartDefinition",
+          "name": "RtgGraphRegistry",
+          "short_name": "component.rtg.graph_registry"
         },
         {
           "kind": "PartDefinition",
@@ -1893,6 +1975,16 @@
         },
         {
           "kind": "RequirementUsage",
+          "name": "compileFederatedIntentFailureSemantics",
+          "short_name": "contract.rtg.graph_registry.compile_federated_intent.failures"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "compileIntentFailureSemantics",
+          "short_name": "contract.rtg.graph_registry.compile_intent.failures"
+        },
+        {
+          "kind": "RequirementUsage",
           "name": "completedHistoryExternal",
           "short_name": "invariant.rtg.migration.completed_history_is_external"
         },
@@ -1963,6 +2055,11 @@
         },
         {
           "kind": "RequirementUsage",
+          "name": "createEmptyRtgGraphRegistryFailureSemantics",
+          "short_name": "contract.rtg.graph_registry.create_empty.failures"
+        },
+        {
+          "kind": "RequirementUsage",
           "name": "createEmptyRtgMigrationFailureSemantics",
           "short_name": "contract.rtg.migration.create_empty_rtg_migration.failures"
         },
@@ -1970,6 +2067,11 @@
           "kind": "RequirementUsage",
           "name": "createEmptyRtgSchemaFailureSemantics",
           "short_name": "contract.rtg.schema.create_empty_rtg_schema.failures"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "crossGraphIdentityIsExplicit",
+          "short_name": "invariant.rtg.graph_registry.cross_graph_identity_is_explicit"
         },
         {
           "kind": "RequirementUsage",
@@ -2088,8 +2190,18 @@
         },
         {
           "kind": "RequirementUsage",
+          "name": "descriptorValidity",
+          "short_name": "contract.rtg.graph_registry.descriptor_validity"
+        },
+        {
+          "kind": "RequirementUsage",
           "name": "deterministicListOrdering",
           "short_name": "invariant.rtg.schema.deterministic_list_ordering"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "deterministicListing",
+          "short_name": "invariant.rtg.graph_registry.deterministic_listing"
         },
         {
           "kind": "RequirementUsage",
@@ -2228,6 +2340,11 @@
         },
         {
           "kind": "RequirementUsage",
+          "name": "federatedPlanning",
+          "short_name": "contract.rtg.graph_registry.federated_planning"
+        },
+        {
+          "kind": "RequirementUsage",
           "name": "fieldSemantics",
           "short_name": "contract.rtg.schema.field_semantics"
         },
@@ -2270,6 +2387,11 @@
           "kind": "RequirementUsage",
           "name": "getEffect",
           "short_name": "contract.app.catalog.get_effect"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "getGraphFailureSemantics",
+          "short_name": "contract.rtg.graph_registry.get_graph.failures"
         },
         {
           "kind": "RequirementUsage",
@@ -2424,6 +2546,11 @@
         {
           "kind": "RequirementUsage",
           "name": "intentionalBoundary",
+          "short_name": "contract.rtg.graph_registry.intentional_boundary"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "intentionalBoundary",
           "short_name": "contract.rtg.controller.intentional_boundary"
         },
         {
@@ -2555,6 +2682,11 @@
           "kind": "RequirementUsage",
           "name": "listGraphObjectsByTypeFailureSemantics",
           "short_name": "contract.rtg.graph.list_graph_objects_by_type.failures"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "listGraphsFailureSemantics",
+          "short_name": "contract.rtg.graph_registry.list_graphs.failures"
         },
         {
           "kind": "RequirementUsage",
@@ -2720,6 +2852,11 @@
           "kind": "RequirementUsage",
           "name": "noImplicitRootChange",
           "short_name": "invariant.storage.json_file.no_implicit_root_change"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "noImplicitWriteTarget",
+          "short_name": "invariant.rtg.graph_registry.no_implicit_write_target"
         },
         {
           "kind": "RequirementUsage",
@@ -2978,6 +3115,16 @@
         },
         {
           "kind": "RequirementUsage",
+          "name": "putEffect",
+          "short_name": "contract.rtg.graph_registry.put_effect"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "putGraphFailureSemantics",
+          "short_name": "contract.rtg.graph_registry.put_graph.failures"
+        },
+        {
+          "kind": "RequirementUsage",
           "name": "putLinkFailureSemantics",
           "short_name": "contract.rtg.graph.put_link.failures"
         },
@@ -3015,6 +3162,11 @@
           "kind": "RequirementUsage",
           "name": "readEffect",
           "short_name": "contract.storage.json_file.read_effect"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "readEffects",
+          "short_name": "contract.rtg.graph_registry.read_effects"
         },
         {
           "kind": "RequirementUsage",
@@ -3125,6 +3277,16 @@
           "kind": "RequirementUsage",
           "name": "rootContainment",
           "short_name": "invariant.storage.json_file.root_containment"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "routeCompilation",
+          "short_name": "contract.rtg.graph_registry.route_compilation"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "routeRecordsAreAdvisory",
+          "short_name": "invariant.rtg.graph_registry.route_records_are_advisory"
         },
         {
           "kind": "RequirementUsage",
@@ -3353,6 +3515,11 @@
         },
         {
           "kind": "RequirementUsage",
+          "name": "uniqueGraphIds",
+          "short_name": "invariant.rtg.graph_registry.unique_graph_ids"
+        },
+        {
+          "kind": "RequirementUsage",
           "name": "uniqueIdentity",
           "short_name": "invariant.app.catalog.unique_identity"
         },
@@ -3531,6 +3698,14 @@
         },
         {
           "kind": "VerificationCaseDefinition",
+          "name": "CompileFederatedIntentContractVerification"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
+          "name": "CompileIntentContractVerification"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
           "name": "ControllerGetMigrationContractVerification"
         },
         {
@@ -3556,6 +3731,10 @@
         {
           "kind": "VerificationCaseDefinition",
           "name": "CreateEmptyRtgGraphContractVerification"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
+          "name": "CreateEmptyRtgGraphRegistryContractVerification"
         },
         {
           "kind": "VerificationCaseDefinition",
@@ -3655,6 +3834,10 @@
         },
         {
           "kind": "VerificationCaseDefinition",
+          "name": "GetGraphContractVerification"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
           "name": "GetGraphObjectContractVerification"
         },
         {
@@ -3740,6 +3923,10 @@
         {
           "kind": "VerificationCaseDefinition",
           "name": "ListGraphObjectsByTypeContractVerification"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
+          "name": "ListGraphsContractVerification"
         },
         {
           "kind": "VerificationCaseDefinition",
@@ -3843,6 +4030,10 @@
         },
         {
           "kind": "VerificationCaseDefinition",
+          "name": "PutGraphContractVerification"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
           "name": "PutLinkContractVerification"
         },
         {
@@ -3896,6 +4087,10 @@
         {
           "kind": "VerificationCaseDefinition",
           "name": "RtgGraphBoundaryVerification"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
+          "name": "RtgGraphRegistryBoundaryVerification"
         },
         {
           "kind": "VerificationCaseDefinition",
@@ -4999,20 +5194,20 @@
     },
     "BibliotekLocalPythonRealization": {
       "element_counts": {
-        "Dependency": 28,
-        "Documentation": 7,
-        "EnumerationUsage": 7,
-        "Feature": 5,
-        "FeatureReferenceExpression": 4,
-        "ItemUsage": 4,
-        "LiteralString": 42,
-        "MetadataUsage": 18,
+        "Dependency": 33,
+        "Documentation": 8,
+        "EnumerationUsage": 8,
+        "Feature": 6,
+        "FeatureReferenceExpression": 5,
+        "ItemUsage": 5,
+        "LiteralString": 66,
+        "MetadataUsage": 27,
         "Multiplicity": 7,
         "Package": 1,
-        "PartDefinition": 4,
+        "PartDefinition": 5,
         "PartUsage": 4,
-        "PerformActionUsage": 15,
-        "ReferenceUsage": 49
+        "PerformActionUsage": 20,
+        "ReferenceUsage": 74
       },
       "named_elements": [
         {
@@ -5030,6 +5225,10 @@
         {
           "kind": "PartDefinition",
           "name": "InMemoryRtgDiscovery"
+        },
+        {
+          "kind": "PartDefinition",
+          "name": "InMemoryRtgGraphRegistry"
         }
       ],
       "source": "model/bibliotek/realizations/BibliotekLocalPython.sysml"
@@ -8161,6 +8360,332 @@
         }
       ],
       "source": "model/bibliotek/components/component.rtg.graph.sysml"
+    },
+    "BibliotekRtgGraphRegistry": {
+      "element_counts": {
+        "ActionDefinition": 6,
+        "ActionUsage": 2,
+        "AttributeDefinition": 10,
+        "AttributeUsage": 46,
+        "ConstraintUsage": 17,
+        "Dependency": 5,
+        "Documentation": 33,
+        "EnumerationDefinition": 2,
+        "EnumerationUsage": 10,
+        "Feature": 31,
+        "FeatureReferenceExpression": 18,
+        "ItemDefinition": 1,
+        "ItemUsage": 2,
+        "LibraryPackage": 1,
+        "LiteralInfinity": 18,
+        "LiteralInteger": 30,
+        "LiteralString": 17,
+        "MetadataUsage": 14,
+        "Multiplicity": 34,
+        "MultiplicityRange": 25,
+        "NullExpression": 2,
+        "OperatorExpression": 3,
+        "PartDefinition": 1,
+        "PartUsage": 3,
+        "PerformActionUsage": 5,
+        "ReferenceUsage": 108,
+        "RequirementUsage": 41,
+        "SatisfyRequirementUsage": 17,
+        "VerificationCaseDefinition": 7
+      },
+      "named_elements": [
+        {
+          "kind": "ActionDefinition",
+          "name": "CompileFederatedIntent"
+        },
+        {
+          "kind": "ActionDefinition",
+          "name": "CompileIntent"
+        },
+        {
+          "kind": "ActionDefinition",
+          "name": "CreateEmptyRtgGraphRegistry"
+        },
+        {
+          "kind": "ActionDefinition",
+          "name": "GetGraph"
+        },
+        {
+          "kind": "ActionDefinition",
+          "name": "ListGraphs"
+        },
+        {
+          "kind": "ActionDefinition",
+          "name": "PutGraph"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "RtgGraphFederatedIntent"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "RtgGraphFederatedPlan"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "RtgGraphFederatedPlanStep"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "RtgGraphIntent"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "RtgGraphList"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "RtgGraphMcpEndpoint"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "RtgGraphNotFound"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "RtgGraphRegistryInvalid"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "RtgGraphRouteCandidate"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "RtgGraphRouteRecord"
+        },
+        {
+          "kind": "EnumerationDefinition",
+          "name": "RtgGraphMcpTransport"
+        },
+        {
+          "kind": "EnumerationDefinition",
+          "name": "RtgGraphOperation"
+        },
+        {
+          "kind": "ItemDefinition",
+          "name": "RtgGraphDescriptor"
+        },
+        {
+          "kind": "PartDefinition",
+          "name": "RtgGraphRegistry",
+          "short_name": "component.rtg.graph_registry"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "compileFederatedIntentFailureSemantics",
+          "short_name": "contract.rtg.graph_registry.compile_federated_intent.failures"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "compileFederatedIntentFailureSemantics"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "compileIntentFailureSemantics",
+          "short_name": "contract.rtg.graph_registry.compile_intent.failures"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "compileIntentFailureSemantics"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "createEmptyRtgGraphRegistryFailureSemantics",
+          "short_name": "contract.rtg.graph_registry.create_empty.failures"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "createEmptyRtgGraphRegistryFailureSemantics"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "crossGraphIdentityIsExplicit",
+          "short_name": "invariant.rtg.graph_registry.cross_graph_identity_is_explicit"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "crossGraphIdentityIsExplicit"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "descriptorValidity",
+          "short_name": "contract.rtg.graph_registry.descriptor_validity"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "descriptorValidity"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "deterministicListing",
+          "short_name": "invariant.rtg.graph_registry.deterministic_listing"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "deterministicListing"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "federatedPlanning",
+          "short_name": "contract.rtg.graph_registry.federated_planning"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "federatedPlanning"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "getGraphFailureSemantics",
+          "short_name": "contract.rtg.graph_registry.get_graph.failures"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "getGraphFailureSemantics"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "intentionalBoundary",
+          "short_name": "contract.rtg.graph_registry.intentional_boundary"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "intentionalBoundary"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "listGraphsFailureSemantics",
+          "short_name": "contract.rtg.graph_registry.list_graphs.failures"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "listGraphsFailureSemantics"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "noImplicitWriteTarget",
+          "short_name": "invariant.rtg.graph_registry.no_implicit_write_target"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "noImplicitWriteTarget"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "obj"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "obj"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "obj"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "obj"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "obj"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "obj"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "obj"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "putEffect",
+          "short_name": "contract.rtg.graph_registry.put_effect"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "putEffect"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "putGraphFailureSemantics",
+          "short_name": "contract.rtg.graph_registry.put_graph.failures"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "putGraphFailureSemantics"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "readEffects",
+          "short_name": "contract.rtg.graph_registry.read_effects"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "readEffects"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "routeCompilation",
+          "short_name": "contract.rtg.graph_registry.route_compilation"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "routeCompilation"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "routeRecordsAreAdvisory",
+          "short_name": "invariant.rtg.graph_registry.route_records_are_advisory"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "routeRecordsAreAdvisory"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "uniqueGraphIds",
+          "short_name": "invariant.rtg.graph_registry.unique_graph_ids"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "uniqueGraphIds"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
+          "name": "CompileFederatedIntentContractVerification"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
+          "name": "CompileIntentContractVerification"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
+          "name": "CreateEmptyRtgGraphRegistryContractVerification"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
+          "name": "GetGraphContractVerification"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
+          "name": "ListGraphsContractVerification"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
+          "name": "PutGraphContractVerification"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
+          "name": "RtgGraphRegistryBoundaryVerification"
+        }
+      ],
+      "source": "model/bibliotek/components/component.rtg.graph_registry.sysml"
     },
     "BibliotekRtgMigration": {
       "element_counts": {
@@ -12139,7 +12664,7 @@
     }
   },
   "schema_version": 1,
-  "source_digest": "22b445f29f8305f06194e6f89f1e955585973da4595d8926a734ca09cc284690",
+  "source_digest": "3d8451e32bb1a6b1fe26dfddb03d384875062ee9a35290aca93c1e50e17ca931",
   "validator": {
     "implementation_version": "0.50.0",
     "provider": "Systems-Modeling/SysML-v2-Pilot-Implementation",

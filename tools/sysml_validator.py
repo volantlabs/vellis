@@ -60,6 +60,7 @@ MODEL_ORDER = (
     "bibliotek/components/component.rtg.constraints.sysml",
     "bibliotek/components/component.rtg.change_validation.sysml",
     "bibliotek/components/component.rtg.discovery.sysml",
+    "bibliotek/components/component.rtg.graph_registry.sysml",
     "bibliotek/components/component.rtg.controller.sysml",
     "bibliotek/realizations/BibliotekLocalPython.sysml",
     "bibliotek/Bibliotek.sysml",
