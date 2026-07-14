@@ -3623,6 +3623,31 @@
       "verification": "PersonalLauncherCompositionVerification"
     },
     {
+      "evidence_id": "apps/rtg_federation/tests/test_rtg_federation_app.py#RtgFederationCompositionVerification",
+      "evidence_nodes": [
+        "apps/rtg_federation/tests/test_rtg_federation_app.py::test_federation_toolset_lists_routes_and_returns_graph_mcp_info",
+        "apps/rtg_federation/tests/test_rtg_federation_app.py::test_federation_toolset_returns_structured_federated_answer",
+        "apps/rtg_federation/tests/test_rtg_federation_app.py::test_federation_toolset_traverses_one_active_bridge_without_joining",
+        "apps/rtg_federation/tests/test_rtg_federation_app.py::test_federation_toolset_returns_evidence_bounded_semantic_answer",
+        "apps/rtg_federation/tests/test_rtg_federation_app.py::test_federation_mcp_dry_run_reports_control_plane_metadata"
+      ],
+      "model_source": "model/vellis/RtgFederation.sysml",
+      "requirements": [
+        "invariant.vellis.rtg_federation.graph_local_reads",
+        "invariant.vellis.rtg_federation.explicit_write_targets",
+        "invariant.vellis.rtg_federation.qualified_identity",
+        "invariant.vellis.rtg_federation.semantic_opt_in",
+        "invariant.vellis.rtg_federation.adapters_outside_components",
+        "invariant.vellis.rtg_federation.read_compatible_snapshots"
+      ],
+      "status": "resolved",
+      "subject": {
+        "role": "application",
+        "type": "RtgFederationApplication"
+      },
+      "verification": "RtgFederationCompositionVerification"
+    },
+    {
       "evidence_id": "apps/rtg_knowledge_graph/tests/test_rtg_knowledge_graph_app.py#VellisCompositionVerification",
       "evidence_nodes": [
         "apps/rtg_knowledge_graph/tests/test_rtg_knowledge_graph_app.py::test_config_uses_default_storage_root_relative_to_cwd",

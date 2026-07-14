@@ -1,0 +1,87 @@
+id: experience_studio
+slug: experience-studio
+title: Experience Studio
+status: alpha
+summary: Governed planning graph for graph-backed public games, visual explorations, and interactive experiences.
+prompt_path: docs/guides/vellis/evals/rtg-experience-studio-alpha-prompt.md
+walkthrough_path: docs/guides/vellis/evals/rtg-experience-studio-alpha-walkthrough.md
+recommended_first_call:
+  tool: rtg_get_system_state
+  arguments: {}
+domain_tags:
+  - experience-design
+  - graph-backed-experiences
+  - games
+  - interactive
+  - public-data
+  - publication
+  - publish
+  - evidence
+  - alpha
+runtime_compatibility:
+  status: blocked
+  requirements:
+    - experience-studio schema, seed, and query fixtures
+    - link kinds
+  blockers:
+    - The referenced prototype fixtures and required link-kind schema metadata are not yet present in the harmonized tree.
+schema_summary:
+  anchors:
+    - Experience
+    - Audience
+    - ExperienceQuestion
+    - Scene
+    - Interaction
+    - SourceCandidate
+    - SourceAssessment
+    - Claim
+    - GraphModel
+    - PrototypeBuild
+    - PublicationCriterion
+    - PublicationCheck
+    - Decision
+  fact_types:
+    - ExperienceFacts
+    - AudienceFacts
+    - ExperienceQuestionFacts
+    - SceneFacts
+    - InteractionFacts
+    - SourceCandidateFacts
+    - SourceAssessmentFacts
+    - ClaimFacts
+    - GraphModelFacts
+    - PrototypeBuildFacts
+    - PublicationCriterionFacts
+    - PublicationCheckFacts
+    - DecisionFacts
+  links:
+    - targets_audience
+    - answers_question
+    - contains_scene
+    - offers_interaction
+    - follows
+    - considers_source
+    - assessment_for
+    - assesses_source
+    - presents_claim
+    - proposes_model
+    - has_build
+    - implements_model
+    - check_for
+    - checks_criterion
+    - governs
+    - evidenced_by
+run_instructions:
+  - Connect a fresh RTG graph and call rtg_validate_graph, then rtg_get_system_state.
+  - Inspect the alpha schema, Ocean Signal Atlas seed, and query fixtures before mutation.
+  - Stage schema through rtg_stage_schema_migration and cut over only after strict validation.
+  - Ingest the Ocean Signal Atlas planning seed through rtg_apply_live_anchor_records.
+  - Run portfolio, source-readiness, and publication-check queries.
+  - Preserve a snapshot and verify ledger replay before calling the run complete.
+guardrails:
+  - Keep operator commitments in Personal Ops; store only product-owned planning facts here.
+  - Keep source-grounded runtime facts in their owning domain graph, not in Experience Studio.
+  - Model relationships carrying outcome, confidence, or review time as event anchors.
+  - Treat commercial-use and publication findings as reviewable evidence, not legal certification.
+  - Use graph-qualified identity for cross-graph references; never store raw foreign UUIDs.
+  - Do not auto-install opaque schema payloads; inspect all alpha fixtures before applying them.

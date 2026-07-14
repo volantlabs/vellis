@@ -1,0 +1,51 @@
+id: governance_core
+slug: governance-core
+title: Governance Core
+status: beta
+summary: Kernel-adjacent governance vocabulary for principles, decisions, conventions, policies, and their provenance.
+prompt_path: docs/guides/vellis/evals/rtg-governance-core-beta-prompt.md
+walkthrough_path: docs/guides/vellis/evals/rtg-governance-core-known-good-walkthrough.md
+recommended_first_call:
+  tool: rtg_get_system_state
+  arguments: {}
+domain_tags:
+  - governance
+  - provenance
+  - policy
+  - beta
+runtime_compatibility:
+  status: blocked
+  requirements:
+    - schema time shapes
+    - link kinds
+    - identity criteria
+    - event immutability and protected-provenance validation
+  blockers:
+    - The harmonized kernel does not yet expose the required schema metadata or policy validation behaviors.
+schema_summary:
+  anchors:
+    - Actor
+    - Principle
+    - Decision
+    - Convention
+    - Policy
+  fact_types:
+    - ActorFacts
+    - PrincipleFacts
+    - DecisionFacts
+    - ConventionFacts
+    - PolicyFacts
+  links:
+    - authored_by
+    - supersedes
+run_instructions:
+  - Connect the RTG MCP server and call rtg_validate_graph, then rtg_get_system_state.
+  - Recreate the schema from the prompt through a strict staged migration and cutover.
+  - Write a small governed decision set and preserve authorship provenance.
+  - Validate the live graph, then preserve snapshot or replay evidence.
+  - Compare results with the known-good walkthrough.
+guardrails:
+  - Do not use a hidden prebuilt schema payload.
+  - Treat governance artifacts as versioned graph records, not mutable prose blobs.
+  - Preserve provenance links; direct provenance-link deletion must be rejected.
+  - Do not bypass validation-before-mutation.

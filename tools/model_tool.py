@@ -3175,6 +3175,12 @@ def _render_operation_summary() -> str:
     launcher_realization_text = (
         MODEL_ROOT / "vellis" / "realizations" / "PersonalLauncherPython.sysml"
     ).read_text(encoding="utf-8")
+    federation_text = (MODEL_ROOT / "vellis" / "RtgFederation.sysml").read_text(
+        encoding="utf-8"
+    )
+    federation_realization_text = (
+        MODEL_ROOT / "vellis" / "realizations" / "RtgFederationPython.sysml"
+    ).read_text(encoding="utf-8")
     starter = _starter_schema_data()
     starter_definitions = [
         item["definition"]
@@ -3291,6 +3297,28 @@ def _render_operation_summary() -> str:
             launcher_text,
         )
     )
+    federation_role_types = {
+        "RtgGraphRegistry": "component.rtg.graph_registry",
+        "RtgRoutePack": "component.rtg.route_pack",
+        "RtgGraphBridge": "component.rtg.graph_bridge",
+        "RtgCitationProjectionCatalog": "application projection adapter",
+        "RtgCitationProjectionReader": "application projection adapter",
+        "FederationCitationResolver": "component.rtg.citation_resolution",
+        "RtgBridgeTraverser": "component.rtg.bridge_traversal",
+        "RtgFederatedSynthesizer": "component.rtg.federated_synthesis",
+        "RtgFederationSemanticPipeline": "optional evidence-bounded semantic pipeline",
+    }
+    federation_role_rows = [
+        "| RTG Federation role | Logical type | Provider |",
+        "|---|---|---|",
+    ]
+    federation_role_rows.extend(
+        f"| `{role}` | `{type_name}` | `{federation_role_types[type_name]}` |"
+        for role, type_name in re.findall(
+            r"(?m)^\s*part\s+(\w+)(?:\[[^]]+\])?\s*:\s*(\w+)\s*;",
+            _definition_block(federation_text, "part def", "RtgFederationApplication"),
+        )
+    )
     local_realization_text = (
         MODEL_ROOT / "vellis" / "realizations" / "VellisLocalPython.sysml"
     ).read_text(encoding="utf-8")
@@ -3333,6 +3361,31 @@ def _render_operation_summary() -> str:
         launcher_python_rows.append(
             f"| `{role}` | `{logical_type}` | `{realization}` | `{symbol}` |"
         )
+    federation_realization_definitions: dict[str, tuple[str, str]] = {}
+    for definition in re.finditer(
+        r"\bpart def\s+(\w+)\s*:>\s*([\w, ]+)\s*\{", federation_realization_text
+    ):
+        block = _extract_braced_block(federation_realization_text, definition.start())
+        symbol = re.search(r'\bsymbol\s*=\s*"([^"]+)"', block)
+        if symbol:
+            federation_realization_definitions[definition.group(1)] = (
+                definition.group(2).strip(),
+                symbol.group(1),
+            )
+    federation_python_rows = [
+        "| RTG Federation role | Logical type | Python realization | Implementation symbol |",
+        "|---|---|---|---|",
+    ]
+    for role, realization in re.findall(
+        r"\bpart\s+:>>\s+(\w+)(?:\[[^]]+\])?\s*:\s*(\w+)\s*;",
+        federation_realization_text,
+    ):
+        logical_type, symbol = federation_realization_definitions.get(
+            realization, ("Bibliotek component realization", "See Bibliotek Python realization")
+        )
+        federation_python_rows.append(
+            f"| `{role}` | `{logical_type}` | `{realization}` | `{symbol}` |"
+        )
     use_case_text = "\n".join(
         path.read_text(encoding="utf-8")
         for path in sorted((MODEL_ROOT / "vellis" / "use-cases").glob("*.sysml"))
@@ -3360,6 +3413,7 @@ def _render_operation_summary() -> str:
     contract_texts = [
         (MODEL_ROOT / "vellis" / "Vellis.sysml").read_text(encoding="utf-8"),
         launcher_text,
+        federation_text,
         operation_text,
         realization_text,
     ]
@@ -3406,6 +3460,10 @@ def _render_operation_summary() -> str:
             "",
             *launcher_role_rows,
             "",
+            "## RTG Federation composition",
+            "",
+            *federation_role_rows,
+            "",
             "## Everyday Life starter ontology",
             "",
             f"Ontology `{starter['ontology_id']}` version `{starter['version']}` is generated as "
@@ -3426,6 +3484,10 @@ def _render_operation_summary() -> str:
             "## Personal Launcher Python realization",
             "",
             *launcher_python_rows,
+            "",
+            "## RTG Federation Python realization",
+            "",
+            *federation_python_rows,
             "",
             "## Requirements and satisfaction",
             "",

@@ -160,10 +160,18 @@ Current applications are:
 - [`apps/personal_launcher`](apps/personal_launcher/): a local web and macOS launcher that composes
   the application catalog, launcher, and shell. Run `just launcher-dev` for the web UI or
   `just launcher-app` to install `Vellis Launcher.app`.
-- [Vellis application model reference](generated/reference/vellis/index.md): RTG and Personal
-  Launcher compositions, actor-visible use cases, verification, and realization mappings.
+- [`apps/rtg_federation`](apps/rtg_federation/): the read-oriented federation control plane for
+  routing across registered graph monographs, executing descriptor-declared graph-local reads,
+  preserving graph-qualified citations, and traversing one confirmed bridge at a time. Start with
+  `just rtg-graphs`, `just rtg-federation-preflight`, and `just rtg-federation-mcp-info`.
+- [Vellis application model reference](generated/reference/vellis/index.md): RTG Knowledge Graph,
+  Personal Launcher, and RTG Federation compositions, verification, and realization mappings.
 
 The RTG Knowledge Graph MCP server uses standalone FastMCP v3 from the `fastmcp` package.
+
+The repo-bundled [schema-domain catalog](docs/schema-domains/README.md) provides recreatable prompts
+and known-good walkthroughs without opaque install payloads. Registered graph roots and federation
+operating rules live in the [RTG monograph registry](docs/rtg-monographs/README.md).
 
 Manual evaluation prompts include:
 

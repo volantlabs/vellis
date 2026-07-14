@@ -1,0 +1,72 @@
+id: time_room_history
+slug: time-room-history
+title: Time Room History
+status: alpha
+summary: Source-grounded historical claims compiled into deterministic offline runtime packs for kid-safe historical-figure experiences.
+prompt_path: docs/guides/vellis/evals/rtg-time-room-history-alpha-prompt.md
+walkthrough_path: docs/guides/vellis/evals/rtg-time-room-history-alpha-walkthrough.md
+recommended_first_call:
+  tool: rtg_get_system_state
+  arguments: {}
+domain_tags:
+  - history
+  - historical-figures
+  - education
+  - sources
+  - compiled-runtime
+  - time-room
+  - alpha
+runtime_compatibility:
+  status: blocked
+  requirements:
+    - Time Room History schema, seed, and query fixtures
+  blockers:
+    - The referenced prototype fixtures are not yet present in the harmonized tree.
+schema_summary:
+  anchors:
+    - HistoricalFigure
+    - HistoricalSource
+    - HistoricalEntity
+    - HistoricalClaim
+    - ReconstructionScene
+    - LearningPrompt
+    - Misconception
+    - RuntimePack
+  fact_types:
+    - HistoricalFigureFacts
+    - HistoricalSourceFacts
+    - HistoricalEntityFacts
+    - HistoricalClaimFacts
+    - ReconstructionSceneFacts
+    - LearningPromptFacts
+    - MisconceptionFacts
+    - RuntimePackFacts
+  links:
+    - claim_about_figure
+    - claim_supported_by
+    - claim_mentions
+    - scene_about_figure
+    - scene_grounded_by
+    - prompt_about_figure
+    - prompt_grounded_by
+    - misconception_about_figure
+    - misconception_corrected_by
+    - pack_for_figure
+    - pack_includes_claim
+    - pack_includes_scene
+    - pack_includes_prompt
+    - pack_includes_misconception
+run_instructions:
+  - Connect a fresh explicit Time Room History graph and call rtg_validate_graph, then rtg_get_system_state.
+  - Inspect the schema, Ada seed, and query fixtures before mutation.
+  - Stage schema through rtg_stage_schema_migration and cut over only after strict validation.
+  - Dry-run and ingest the Ada records through the anchor-record facade.
+  - Run the bounded inventory queries, persist the alpha snapshot, and verify replay.
+  - Compile the runtime pack from the validated snapshot rather than copying the authoring fixture into the app.
+guardrails:
+  - Historical claims require at least one authoritative source link before compilation.
+  - Reconstruction scenes and learning prompts require grounding claims.
+  - Preserve qualified certainty for debated historical interpretations.
+  - Keep source locators and compact paraphrases in the graph; do not copy restricted archival bodies.
+  - Keep runtime offline and deterministic; Vellis and language models are optional during play.
+  - Use graph-qualified identity for every compiled graph reference.

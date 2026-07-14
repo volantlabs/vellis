@@ -33,6 +33,8 @@
     "VellisOperations": "model/vellis/VellisOperations.sysml",
     "VellisPersonalLauncher": "model/vellis/PersonalLauncher.sysml",
     "VellisPersonalLauncherPythonRealization": "model/vellis/realizations/PersonalLauncherPython.sysml",
+    "VellisRtgFederation": "model/vellis/RtgFederation.sysml",
+    "VellisRtgFederationPythonRealization": "model/vellis/realizations/RtgFederationPython.sysml",
     "VellisUseCases": "model/vellis/use-cases/VellisUseCases.sysml",
     "VellisViews": "model/vellis/views/VellisViews.sysml"
   },
@@ -13866,7 +13868,7 @@
         "ConstraintUsage": 6,
         "Documentation": 89,
         "EnumerationDefinition": 3,
-        "EnumerationUsage": 96,
+        "EnumerationUsage": 97,
         "Feature": 242,
         "FeatureChainExpression": 77,
         "FeatureReferenceExpression": 66,
@@ -14050,7 +14052,7 @@
         "Dependency": 101,
         "Documentation": 121,
         "EnumerationDefinition": 8,
-        "EnumerationUsage": 62,
+        "EnumerationUsage": 63,
         "Feature": 196,
         "FeatureChainExpression": 95,
         "FeatureReferenceExpression": 49,
@@ -15022,6 +15024,158 @@
       ],
       "source": "model/vellis/realizations/PersonalLauncherPython.sysml"
     },
+    "VellisRtgFederation": {
+      "element_counts": {
+        "BindingConnectorAsUsage": 5,
+        "ConstraintUsage": 6,
+        "Dependency": 21,
+        "Documentation": 25,
+        "EnumerationUsage": 5,
+        "Feature": 8,
+        "FeatureReferenceExpression": 7,
+        "ItemUsage": 3,
+        "LiteralInteger": 2,
+        "LiteralString": 3,
+        "MetadataUsage": 9,
+        "Multiplicity": 25,
+        "MultiplicityRange": 6,
+        "Package": 1,
+        "PartDefinition": 3,
+        "PartUsage": 18,
+        "PerformActionUsage": 29,
+        "ReferenceUsage": 42,
+        "RequirementUsage": 13,
+        "SatisfyRequirementUsage": 6,
+        "VerificationCaseDefinition": 1
+      },
+      "named_elements": [
+        {
+          "kind": "PartDefinition",
+          "name": "FederationCitationResolver"
+        },
+        {
+          "kind": "PartDefinition",
+          "name": "RtgFederationApplication",
+          "short_name": "application.vellis.rtg_federation"
+        },
+        {
+          "kind": "PartDefinition",
+          "name": "RtgFederationSemanticPipeline"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "adaptersOutsideComponents",
+          "short_name": "invariant.vellis.rtg_federation.adapters_outside_components"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "adaptersOutsideComponents"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "explicitWriteTargets",
+          "short_name": "invariant.vellis.rtg_federation.explicit_write_targets"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "explicitWriteTargets"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "graphLocalReads",
+          "short_name": "invariant.vellis.rtg_federation.graph_local_reads"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "graphLocalReads"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "obj"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "qualifiedIdentity",
+          "short_name": "invariant.vellis.rtg_federation.qualified_identity"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "qualifiedIdentity"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "readCompatibleSnapshots",
+          "short_name": "invariant.vellis.rtg_federation.read_compatible_snapshots"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "readCompatibleSnapshots"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "semanticOptIn",
+          "short_name": "invariant.vellis.rtg_federation.semantic_opt_in"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "semanticOptIn"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
+          "name": "RtgFederationCompositionVerification"
+        }
+      ],
+      "source": "model/vellis/RtgFederation.sysml"
+    },
+    "VellisRtgFederationPythonRealization": {
+      "element_counts": {
+        "AllocationUsage": 10,
+        "BindingConnectorAsUsage": 5,
+        "Dependency": 21,
+        "Documentation": 13,
+        "EnumerationUsage": 8,
+        "Feature": 6,
+        "FeatureReferenceExpression": 5,
+        "ItemUsage": 3,
+        "LiteralInteger": 2,
+        "LiteralString": 15,
+        "MetadataUsage": 60,
+        "Multiplicity": 34,
+        "MultiplicityRange": 2,
+        "Package": 1,
+        "PartDefinition": 6,
+        "PartUsage": 29,
+        "PerformActionUsage": 26,
+        "ReferenceUsage": 42
+      },
+      "named_elements": [
+        {
+          "kind": "PartDefinition",
+          "name": "PythonFederationCitationProjectionCatalog"
+        },
+        {
+          "kind": "PartDefinition",
+          "name": "PythonFederationCitationProjectionReader"
+        },
+        {
+          "kind": "PartDefinition",
+          "name": "PythonFederationCitationResolver"
+        },
+        {
+          "kind": "PartDefinition",
+          "name": "PythonFederationSemanticDraftGenerator"
+        },
+        {
+          "kind": "PartDefinition",
+          "name": "PythonRtgFederationSemanticPipeline"
+        },
+        {
+          "kind": "PartDefinition",
+          "name": "RtgFederationPython"
+        }
+      ],
+      "source": "model/vellis/realizations/RtgFederationPython.sysml"
+    },
     "VellisUseCases": {
       "element_counts": {
         "ActionUsage": 18,
@@ -15246,7 +15400,7 @@
     }
   },
   "schema_version": 1,
-  "source_digest": "8d708d098aa208de3f14dcc12f658d1366cd6573afe20c820f68b3cd121c661f",
+  "source_digest": "7341af683ae7e5711f06073f2def8eb0908d98a9c943781f7c72c802ef0e7ec7",
   "validator": {
     "implementation_version": "0.50.0",
     "provider": "Systems-Modeling/SysML-v2-Pilot-Implementation",

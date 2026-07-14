@@ -1,0 +1,156 @@
+{
+  "version": 1,
+  "description": "End-to-end read workload cases for the local RTG federation control plane.",
+  "cases": [
+    {
+      "case_id": "three_graph_execution_and_citations",
+      "category": "multi_graph_execution",
+      "mode": "federated_answer",
+      "intent": {
+        "text": "Compare component evidence, personal attention, and Gothic sources."
+      },
+      "expected": {
+        "status": "complete",
+        "planned_graph_ids": ["personal_ops", "gothic_archive", "repo_twin"],
+        "executed_graph_ids": ["personal_ops", "gothic_archive", "repo_twin"],
+        "max_limitation_count": 0,
+        "min_citation_count": 3,
+        "resolved_citation_graph_ids": ["personal_ops", "gothic_archive", "repo_twin"],
+        "section_required_fields": {
+          "personal_ops": ["attention_item_count", "evidence_gap_count"],
+          "gothic_archive": ["verification_gap_count"],
+          "repo_twin": ["missing_evidence_count"]
+        },
+        "join_execution": "not_performed",
+        "write_execution": "not_performed"
+      }
+    },
+    {
+      "case_id": "temporal_personal_and_repo_read",
+      "category": "temporal_multi_graph_execution",
+      "mode": "federated_answer",
+      "intent": {
+        "text": "Compare personal attention this week with repo component evidence."
+      },
+      "expected": {
+        "status": "complete",
+        "planned_graph_ids": ["personal_ops", "repo_twin"],
+        "executed_graph_ids": ["personal_ops", "repo_twin"],
+        "max_limitation_count": 0,
+        "min_citation_count": 2,
+        "resolved_citation_graph_ids": ["personal_ops", "repo_twin"],
+        "section_answers": {
+          "personal_ops": {"attention_scope": "this_week"}
+        },
+        "section_required_fields": {
+          "repo_twin": ["component_count", "missing_evidence_count"]
+        },
+        "join_execution": "not_performed",
+        "write_execution": "not_performed"
+      }
+    },
+    {
+      "case_id": "experience_publication_readiness",
+      "category": "answer_contract",
+      "mode": "federated_answer",
+      "intent": {
+        "text": "Show Experience Studio publication readiness."
+      },
+      "expected": {
+        "status": "complete",
+        "planned_graph_ids": ["experience_studio"],
+        "executed_graph_ids": ["experience_studio"],
+        "max_limitation_count": 0,
+        "min_citation_count": 1,
+        "resolved_citation_graph_ids": ["experience_studio"],
+        "section_answers": {
+          "experience_studio": {
+            "publication_status": "review_required",
+            "open_check_count": 2
+          }
+        },
+        "section_required_fields": {
+          "experience_studio": ["checks", "open_checks", "assurance_scope"]
+        },
+        "join_execution": "not_performed",
+        "write_execution": "not_performed"
+      }
+    },
+    {
+      "case_id": "grounded_cross_graph_comparison",
+      "category": "semantic_claim_grounding",
+      "mode": "evidence_bounded_synthesis",
+      "intent": {
+        "text": "Compare personal attention this week with repo component evidence."
+      },
+      "draft": {
+        "claims": [
+          {
+            "text": "Personal attention and repository evidence expose distinct review queues.",
+            "kind": "comparison",
+            "citation_graph_ids": ["personal_ops", "repo_twin"],
+            "uncertainty": null
+          }
+        ],
+        "limitations": []
+      },
+      "expected": {
+        "status": "complete",
+        "deterministic_status": "complete",
+        "model_execution": "performed",
+        "min_claim_count": 1,
+        "claim_kinds": ["comparison"],
+        "claim_citation_graph_ids": ["personal_ops", "repo_twin"],
+        "entailment_status": "not_verified",
+        "join_execution": "not_performed",
+        "write_execution": "not_performed"
+      }
+    },
+    {
+      "case_id": "grounded_inference_with_uncertainty",
+      "category": "semantic_claim_grounding",
+      "mode": "evidence_bounded_synthesis",
+      "intent": {
+        "text": "Show Experience Studio publication readiness."
+      },
+      "draft": {
+        "claims": [
+          {
+            "text": "Publication likely remains gated while open checks remain.",
+            "kind": "inference",
+            "citation_graph_ids": ["experience_studio"],
+            "uncertainty": "The evidence records readiness state, not the final publisher decision."
+          }
+        ],
+        "limitations": []
+      },
+      "expected": {
+        "status": "complete",
+        "deterministic_status": "complete",
+        "model_execution": "performed",
+        "min_claim_count": 1,
+        "claim_kinds": ["inference"],
+        "claim_citation_graph_ids": ["experience_studio"],
+        "entailment_status": "not_verified",
+        "join_execution": "not_performed",
+        "write_execution": "not_performed"
+      }
+    },
+    {
+      "case_id": "confirmed_repo_personal_bridge",
+      "category": "bridge_traversal",
+      "mode": "bridge_traversal",
+      "bridge_selector": {
+        "source_graph_id": "repo_twin",
+        "target_graph_id": "personal_ops",
+        "bridge_type": "related_context"
+      },
+      "expected": {
+        "status": "resolved",
+        "source_resolution_status": "resolved",
+        "target_resolution_status": "resolved",
+        "join_execution": "not_performed"
+      }
+    }
+  ]
+}

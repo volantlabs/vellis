@@ -648,6 +648,7 @@ def test_mcp_launch_metadata_has_installed_package_fallback(
     assert metadata["eval_prompt_path"] is None
     assert all(not prompt["available"] for prompt in metadata["eval_prompts"].values())
     assert all(not guide["available"] for guide in metadata["guides"].values())
+    assert all(not domain["available"] for domain in metadata["schema_domains"].values())
     assert launch["command"]
     assert launch["args"][:3] == ["-m", "apps.rtg_knowledge_graph", "serve-mcp"]
     assert "cwd" not in launch

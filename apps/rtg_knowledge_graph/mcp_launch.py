@@ -6,6 +6,7 @@ from shutil import which
 from typing import Any
 
 from apps.rtg_knowledge_graph.config import RtgKnowledgeGraphConfig
+from apps.rtg_knowledge_graph.schema_domains import SCHEMA_DOMAINS
 
 MCP_SERVER_NAME = "rtg_knowledge_graph"
 MCP_STATE_MODE = "durable_local_auto_replay"
@@ -72,6 +73,23 @@ def guide_paths() -> dict[str, Path | None]:
     }
 
 
+def schema_domain_paths() -> dict[str, dict[str, Path | None]]:
+    repo_root = repository_root()
+    path_keys = ("catalog_path", "prompt_path", "walkthrough_path")
+    if repo_root is None:
+        return {
+            domain_id: {path_key: None for path_key in path_keys}
+            for domain_id in SCHEMA_DOMAINS
+        }
+    return {
+        domain_id: {
+            path_key: _existing_prompt_path(repo_root, str(domain[path_key]))
+            for path_key in path_keys
+        }
+        for domain_id, domain in SCHEMA_DOMAINS.items()
+    }
+
+
 def mcp_launch_metadata(
     config: RtgKnowledgeGraphConfig,
     *,
@@ -127,6 +145,7 @@ def mcp_launch_metadata(
         launch_mode = "installed_package"
     prompt_paths = eval_prompt_paths()
     paths_by_guide = guide_paths()
+    paths_by_domain = schema_domain_paths()
     localhost_launch = _localhost_launch(
         repo_root=repo_root,
         storage_root=storage_root,
@@ -189,6 +208,22 @@ def mcp_launch_metadata(
                 "available": paths_by_guide[guide_id] is not None,
             }
             for guide_id, guide in GUIDES.items()
+        },
+        "schema_domains": {
+            domain_id: {
+                **domain,
+                "catalog_path": _optional_path_text(paths_by_domain[domain_id]["catalog_path"]),
+                "prompt_path": _optional_path_text(paths_by_domain[domain_id]["prompt_path"]),
+                "walkthrough_path": _optional_path_text(
+                    paths_by_domain[domain_id]["walkthrough_path"]
+                ),
+                "available": all(paths_by_domain[domain_id].values()),
+                "runtime_ready": (
+                    all(paths_by_domain[domain_id].values())
+                    and domain["runtime_status"] == "ready"
+                ),
+            }
+            for domain_id, domain in SCHEMA_DOMAINS.items()
         },
         "first_call": FIRST_CALL,
         "transports": transports,

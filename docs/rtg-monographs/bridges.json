@@ -1,0 +1,59 @@
+{
+  "bridges": [
+    {
+      "bridge_type": "related_context",
+      "source": {
+        "graph_id": "repo_twin",
+        "local_uuid": "a6e3edde-92b3-5b62-9565-da4e60d02b23"
+      },
+      "target": {
+        "graph_id": "personal_ops",
+        "local_uuid": "ac387d54-0e47-4a80-ab99-a943ca03852e"
+      },
+      "confidence": 0.9,
+      "asserted_at": "2026-07-10T00:00:00Z",
+      "asserted_by": "agent.codex",
+      "provenance": [
+        {
+          "graph_id": "repo_twin",
+          "local_uuid": "a6e3edde-92b3-5b62-9565-da4e60d02b23"
+        },
+        {
+          "graph_id": "personal_ops",
+          "local_uuid": "ac387d54-0e47-4a80-ab99-a943ca03852e"
+        }
+      ],
+      "metadata": {
+        "label": "Bridge traversal evidence supports the life-graph hardening decision",
+        "note": "Both graph-qualified endpoints resolve through descriptor-declared citation projections."
+      }
+    }
+  ],
+  "candidates": [
+    {
+      "bridge_type": "related_context",
+      "source": {
+        "graph_id": "repo_twin",
+        "local_uuid": "44444444-4444-4444-8444-444444444444"
+      },
+      "target": {
+        "graph_id": "gothic_archive",
+        "local_uuid": "55555555-5555-4555-8555-555555555555"
+      },
+      "confidence": 0.48,
+      "proposed_at": "2026-07-09T00:00:00Z",
+      "proposed_by": "agent.codex",
+      "evidence": [
+        {
+          "graph_id": "repo_twin",
+          "local_uuid": "66666666-6666-4666-8666-666666666666"
+        }
+      ],
+      "rationale": "Repo prototype evidence may correspond to Gothic archive docent context, pending review.",
+      "metadata": {
+        "label": "Candidate link between repo prototype evidence and Gothic docent context",
+        "note": "Candidate-only planning fixture; not traversal permission until promoted."
+      }
+    }
+  ]
+}

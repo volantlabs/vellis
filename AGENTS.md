@@ -22,6 +22,12 @@ launcher, shell, repo-twin, schema-domain, monograph, federation, routing, and r
 work from `codex/personal-launcher-app` is still being deliberately reconciled with the SysML-owned
 tree. Remove this section only after that consolidation is complete.
 
+Current checkpoint: the federation control plane, route packs, declared reads, citation resolution,
+bridge traversal, SysML application authority, and read-only predecessor-snapshot projection have
+been reconciled. The schema-domain catalog now distinguishes available instructions from runtime
+readiness. Temporal schema shapes, identity criteria, link kinds, their validation policies, and the
+prototype fixture-backed domains remain deferred to the RTG kernel harmonization checkpoint.
+
 During harmonization:
 
 - SysML under `model/` is the sole design authority on this line. Migrate useful predecessor

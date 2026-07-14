@@ -1,0 +1,432 @@
+{
+  "version": 1,
+  "description": "Deterministic routing and planning regression cases for the local RTG federation control plane.",
+  "cases": [
+    {
+      "case_id": "repo_component_evidence_read",
+      "category": "single_graph_read",
+      "mode": "route",
+      "intent": {"operation": "read", "text": "Which component specs lack evidence?"},
+      "expected": {
+        "selected_graph_id": "repo_twin",
+        "requires_confirmation": false,
+        "candidate_graph_ids": ["repo_twin", "personal_ops"],
+        "reason": "read intent matched one high-confidence graph"
+      }
+    },
+    {
+      "case_id": "personal_attention_this_week_read",
+      "category": "temporal_read",
+      "mode": "route",
+      "intent": {"operation": "read", "text": "What needs attention this week?"},
+      "expected": {
+        "selected_graph_id": "personal_ops",
+        "requires_confirmation": false,
+        "candidate_graph_ids": ["personal_ops"],
+        "reason": "read intent matched one high-confidence graph"
+      }
+    },
+    {
+      "case_id": "personal_attention_today_read",
+      "category": "temporal_read",
+      "mode": "route",
+      "intent": {"operation": "read", "text": "What needs attention today?"},
+      "expected": {
+        "selected_graph_id": "personal_ops",
+        "requires_confirmation": false,
+        "candidate_graph_ids": ["personal_ops"],
+        "reason": "read intent matched one high-confidence graph"
+      }
+    },
+    {
+      "case_id": "gothic_source_read",
+      "category": "single_graph_read",
+      "mode": "route",
+      "intent": {"operation": "read", "text": "Show Gothic archive sources and reading trails."},
+      "expected": {
+        "selected_graph_id": "gothic_archive",
+        "requires_confirmation": false,
+        "candidate_graph_ids": ["gothic_archive"],
+        "reason": "read intent matched one high-confidence graph"
+      }
+    },
+    {
+      "case_id": "experience_publication_readiness",
+      "category": "single_graph_read",
+      "mode": "route",
+      "intent": {"operation": "read", "text": "Show Experience Studio publication readiness."},
+      "expected": {
+        "selected_graph_id": "experience_studio",
+        "requires_confirmation": false,
+        "candidate_graph_ids": ["experience_studio"],
+        "reason": "read intent matched one high-confidence graph"
+      }
+    },
+    {
+      "case_id": "application_portfolio_comparison",
+      "category": "single_graph_read",
+      "mode": "route",
+      "intent": {"operation": "read", "text": "Which applications are similar to Nocturne?"},
+      "expected": {
+        "selected_graph_id": "application_portfolio",
+        "requires_confirmation": false,
+        "candidate_graph_ids": ["application_portfolio"],
+        "reason": "read intent matched one high-confidence graph"
+      }
+    },
+    {
+      "case_id": "explicit_read_target",
+      "category": "explicit_target",
+      "mode": "route",
+      "intent": {
+        "operation": "read",
+        "text": "Show the relevant records.",
+        "target_graph_id": "gothic_archive"
+      },
+      "expected": {
+        "selected_graph_id": "gothic_archive",
+        "requires_confirmation": false,
+        "candidate_graph_ids": ["gothic_archive"],
+        "reason": "explicit target_graph_id selected the graph"
+      }
+    },
+    {
+      "case_id": "shared_evidence_is_ambiguous",
+      "category": "ambiguous_read",
+      "mode": "route",
+      "intent": {"operation": "read", "text": "Find evidence."},
+      "expected": {
+        "selected_graph_id": null,
+        "requires_confirmation": true,
+        "candidate_graph_ids": ["personal_ops", "repo_twin"],
+        "reason": "multiple graphs tied for the strongest match"
+      }
+    },
+    {
+      "case_id": "unmatched_read_requires_confirmation",
+      "category": "negative_read",
+      "mode": "route",
+      "intent": {"operation": "read", "text": "What is the weather?"},
+      "expected": {
+        "selected_graph_id": null,
+        "requires_confirmation": true,
+        "candidate_graph_ids": [],
+        "reason": "no candidate graph matched the intent"
+      }
+    },
+    {
+      "case_id": "low_confidence_domain_hint_requires_confirmation",
+      "category": "low_confidence_read",
+      "mode": "route",
+      "intent": {
+        "operation": "read",
+        "text": "Show the relevant records.",
+        "domain_hints": ["commitments"]
+      },
+      "expected": {
+        "selected_graph_id": null,
+        "requires_confirmation": true,
+        "candidate_graph_ids": ["personal_ops"],
+        "reason": "best graph match was below the read auto-selection threshold"
+      }
+    },
+    {
+      "case_id": "inferred_write_target_is_blocked",
+      "category": "write_safety",
+      "mode": "route",
+      "intent": {"operation": "write", "text": "Record a personal commitment."},
+      "expected": {
+        "selected_graph_id": null,
+        "requires_confirmation": true,
+        "candidate_graph_ids": ["personal_ops"],
+        "reason": "write intents require an explicit target_graph_id"
+      }
+    },
+    {
+      "case_id": "explicit_write_target_is_selected",
+      "category": "write_safety",
+      "mode": "route",
+      "intent": {
+        "operation": "write",
+        "text": "Record a personal commitment.",
+        "target_graph_id": "personal_ops"
+      },
+      "expected": {
+        "selected_graph_id": "personal_ops",
+        "requires_confirmation": false,
+        "candidate_graph_ids": ["personal_ops"],
+        "reason": "explicit target_graph_id selected the graph"
+      }
+    },
+    {
+      "case_id": "repo_and_personal_federated_plan",
+      "category": "multi_graph_read",
+      "mode": "federated_plan",
+      "intent": {"operation": "read", "text": "Compare component evidence with personal decisions."},
+      "expected": {
+        "step_graph_ids": ["personal_ops", "repo_twin"],
+        "requires_confirmation": false,
+        "executable": true,
+        "reason": "read plan includes all matching graph candidates"
+      }
+    },
+    {
+      "case_id": "three_graph_federated_plan",
+      "category": "multi_graph_read",
+      "mode": "federated_plan",
+      "intent": {
+        "operation": "read",
+        "text": "Compare repository component evidence gaps, personal commitments needing attention this week, and Gothic archive sources."
+      },
+      "expected": {
+        "step_graph_ids": ["gothic_archive", "personal_ops", "repo_twin"],
+        "requires_confirmation": false,
+        "executable": true,
+        "reason": "read plan includes all matching graph candidates"
+      }
+    },
+    {
+      "case_id": "three_graph_route_pack_preview",
+      "category": "route_pack",
+      "mode": "route_pack_preview",
+      "intent": {
+        "operation": "read",
+        "text": "Compare component evidence, personal attention, and Gothic sources."
+      },
+      "expected": {
+        "status": "ready",
+        "selected_skill_name": "rtg-federation-control-plane",
+        "handoff_skill_names": ["rtg-knowledge-graph-mcp"],
+        "graph_ids": ["personal_ops", "gothic_archive", "repo_twin"],
+        "hazard_codes": [],
+        "preflight_status": "passed",
+        "selected_graph_id": "personal_ops",
+        "single_graph_requires_confirmation": false,
+        "federated_plan_requires_confirmation": false,
+        "verification_commands": [
+          "just rtg-federation-preflight",
+          "just rtg-federation-eval",
+          "just rtg-federation-workload-eval",
+          "just graph-query evidence <component-id>",
+          "just graph-query blast-radius <component-id>",
+          "just graph-verify"
+        ]
+      }
+    },
+    {
+      "case_id": "ambiguous_evidence_route_pack_preview",
+      "category": "route_pack",
+      "mode": "route_pack_preview",
+      "intent": {"operation": "read", "text": "Find evidence."},
+      "expected": {
+        "status": "needs_attention",
+        "selected_skill_name": "rtg-federation-control-plane",
+        "handoff_skill_names": ["rtg-knowledge-graph-mcp"],
+        "graph_ids": ["personal_ops", "repo_twin"],
+        "hazard_codes": ["single_graph_route_requires_confirmation"],
+        "preflight_status": "passed",
+        "selected_graph_id": null,
+        "single_graph_requires_confirmation": true,
+        "federated_plan_requires_confirmation": false,
+        "verification_commands": [
+          "just rtg-federation-preflight",
+          "just rtg-federation-eval",
+          "just rtg-federation-workload-eval",
+          "just graph-query evidence <component-id>",
+          "just graph-query blast-radius <component-id>",
+          "just graph-verify"
+        ]
+      }
+    },
+    {
+      "case_id": "write_without_target_route_pack_preview",
+      "category": "write_safety",
+      "mode": "route_pack_preview",
+      "intent": {"operation": "write", "text": "Record evidence for a decision."},
+      "expected": {
+        "status": "needs_attention",
+        "selected_skill_name": "rtg-federation-control-plane",
+        "handoff_skill_names": ["rtg-knowledge-graph-mcp"],
+        "graph_ids": ["personal_ops", "repo_twin"],
+        "hazard_codes": [
+          "write_target_required",
+          "single_graph_route_requires_confirmation",
+          "federated_plan_requires_confirmation"
+        ],
+        "preflight_status": "passed",
+        "selected_graph_id": null,
+        "single_graph_requires_confirmation": true,
+        "federated_plan_requires_confirmation": true,
+        "verification_commands": [
+          "just rtg-federation-preflight",
+          "just rtg-federation-eval",
+          "just rtg-federation-workload-eval",
+          "just graph-query evidence <component-id>",
+          "just graph-query blast-radius <component-id>",
+          "just graph-verify"
+        ]
+      }
+    },
+    {
+      "case_id": "three_graph_route_pack_gate_invokes",
+      "category": "route_pack_gate",
+      "mode": "route_pack_gate",
+      "intent": {
+        "operation": "read",
+        "text": "Compare component evidence, personal attention, and Gothic sources."
+      },
+      "expected": {
+        "decision": "invoke",
+        "route_pack_status": "ready",
+        "selected_skill_name": "rtg-federation-control-plane",
+        "selected_graph_id": "personal_ops",
+        "graph_context_ids": ["personal_ops", "gothic_archive", "repo_twin"],
+        "blocking_hazard_codes": [],
+        "clarification_hazard_codes": [],
+        "preflight_status": "passed",
+        "allowed_federation_tools": [
+          "vellis_list_graphs",
+          "vellis_federated_capabilities",
+          "vellis_federated_preflight",
+          "vellis_intent_compile",
+          "vellis_route_pack_preview",
+          "vellis_route_pack_gate",
+          "vellis_federated_plan",
+          "vellis_federated_answer",
+          "vellis_federated_semantic_answer",
+          "vellis_resolve_citation",
+          "vellis_traverse_bridge",
+          "vellis_graph_mcp_info",
+          "vellis_route_query"
+        ],
+        "allowed_graph_local_tools": [
+          "rtg_validate_graph",
+          "rtg_get_system_state",
+          "rtg_get_schema_pack",
+          "rtg_execute_query",
+          "rtg_validate_live_graph_changes",
+          "rtg_apply_live_graph_changes"
+        ],
+        "required_verification_commands": [
+          "just rtg-federation-preflight",
+          "just rtg-federation-eval",
+          "just rtg-federation-workload-eval",
+          "just graph-query evidence <component-id>",
+          "just graph-query blast-radius <component-id>",
+          "just graph-verify"
+        ]
+      }
+    },
+    {
+      "case_id": "ambiguous_evidence_route_pack_gate_clarifies",
+      "category": "route_pack_gate",
+      "mode": "route_pack_gate",
+      "intent": {"operation": "read", "text": "Find evidence."},
+      "expected": {
+        "decision": "clarify",
+        "route_pack_status": "needs_attention",
+        "selected_skill_name": "rtg-federation-control-plane",
+        "selected_graph_id": null,
+        "graph_context_ids": ["personal_ops", "repo_twin"],
+        "blocking_hazard_codes": [],
+        "clarification_hazard_codes": ["single_graph_route_requires_confirmation"],
+        "preflight_status": "passed",
+        "allowed_federation_tools": [
+          "vellis_list_graphs",
+          "vellis_federated_capabilities",
+          "vellis_federated_preflight",
+          "vellis_intent_compile",
+          "vellis_route_pack_preview",
+          "vellis_route_pack_gate",
+          "vellis_federated_plan",
+          "vellis_federated_answer",
+          "vellis_federated_semantic_answer",
+          "vellis_resolve_citation",
+          "vellis_traverse_bridge",
+          "vellis_graph_mcp_info",
+          "vellis_route_query"
+        ],
+        "allowed_graph_local_tools": [],
+        "required_verification_commands": [
+          "just rtg-federation-preflight",
+          "just rtg-federation-eval",
+          "just rtg-federation-workload-eval",
+          "just graph-query evidence <component-id>",
+          "just graph-query blast-radius <component-id>",
+          "just graph-verify"
+        ]
+      }
+    },
+    {
+      "case_id": "write_without_target_route_pack_gate_blocks",
+      "category": "write_safety",
+      "mode": "route_pack_gate",
+      "intent": {"operation": "write", "text": "Record evidence for a decision."},
+      "expected": {
+        "decision": "blocked",
+        "route_pack_status": "needs_attention",
+        "selected_skill_name": "rtg-federation-control-plane",
+        "selected_graph_id": null,
+        "graph_context_ids": ["personal_ops", "repo_twin"],
+        "blocking_hazard_codes": ["write_target_required"],
+        "clarification_hazard_codes": [
+          "single_graph_route_requires_confirmation",
+          "federated_plan_requires_confirmation"
+        ],
+        "preflight_status": "passed",
+        "allowed_federation_tools": [
+          "vellis_list_graphs",
+          "vellis_federated_capabilities",
+          "vellis_federated_preflight",
+          "vellis_intent_compile",
+          "vellis_route_pack_preview",
+          "vellis_route_pack_gate",
+          "vellis_federated_plan",
+          "vellis_federated_answer",
+          "vellis_federated_semantic_answer",
+          "vellis_resolve_citation",
+          "vellis_traverse_bridge",
+          "vellis_graph_mcp_info",
+          "vellis_route_query"
+        ],
+        "allowed_graph_local_tools": [],
+        "required_verification_commands": [
+          "just rtg-federation-preflight",
+          "just rtg-federation-eval",
+          "just rtg-federation-workload-eval",
+          "just graph-query evidence <component-id>",
+          "just graph-query blast-radius <component-id>",
+          "just graph-verify"
+        ]
+      }
+    },
+    {
+      "case_id": "explicit_federated_write_is_not_executable",
+      "category": "write_safety",
+      "mode": "federated_plan",
+      "intent": {
+        "operation": "write",
+        "text": "Record a personal commitment.",
+        "target_graph_ids": ["personal_ops"]
+      },
+      "expected": {
+        "step_graph_ids": ["personal_ops"],
+        "requires_confirmation": true,
+        "executable": false,
+        "reason": "federated write and admin plans require graph-local execution flow"
+      }
+    },
+    {
+      "case_id": "unmatched_federated_read_is_not_executable",
+      "category": "negative_read",
+      "mode": "federated_plan",
+      "intent": {"operation": "read", "text": "Compare weather and traffic."},
+      "expected": {
+        "step_graph_ids": [],
+        "requires_confirmation": true,
+        "executable": false,
+        "reason": "no candidate graph matched the federated intent"
+      }
+    }
+  ]
+}

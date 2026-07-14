@@ -1,0 +1,348 @@
+{
+  "graphs": [
+    {
+      "graph_id": "repo_twin",
+      "title": "Repo Digital Twin",
+      "storage_root": ".data/repo-twin",
+      "sql_database_path": ".data/repo-twin/controller.sqlite",
+      "authority": "derived_from_repo",
+      "write_policy": "sync_only",
+      "domains": [
+        "components",
+        "specs",
+        "tests",
+        "evidence",
+        "repo-structure"
+      ],
+      "tags": [
+        "repo",
+        "engineering",
+        "derived",
+        "evidence"
+      ],
+      "mcp_endpoint": {
+        "transport": "http",
+        "host": "127.0.0.1",
+        "port": 8765,
+        "path": "/mcp",
+        "server_name": "vellis_repo_twin"
+      },
+      "metadata": {
+        "disposable": true,
+        "snapshot_path": "snapshots/current.json",
+        "description": "Deterministic graph derived from repository files; refresh with just graph-verify.",
+        "federated_read_capabilities": [
+          {
+            "query_name": "repo_components_evidence_status",
+            "implementation": "apps.rtg_federation.queries.repo_components_evidence_status:CANNED_QUERY",
+            "description": "Summarize component evidence status from the repo twin.",
+            "terms": [
+              "component",
+              "components",
+              "spec",
+              "specs",
+              "evidence",
+              "repo"
+            ],
+            "domains": [
+              "components",
+              "specs",
+              "evidence"
+            ],
+            "tags": [
+              "repo",
+              "engineering"
+            ]
+          }
+        ],
+        "citation_projection": {
+          "query_name": "repo_components_evidence_status",
+          "anchor_bucket": "component"
+        },
+        "route_pack_read": {
+          "query_name": "repo_components_evidence_status",
+          "command": "just graph-query untested",
+          "verification_commands": [
+            "just graph-check"
+          ],
+          "stale_recovery_command": "just graph-verify",
+          "required_docs": []
+        }
+      }
+    },
+    {
+      "graph_id": "personal_ops",
+      "title": "Personal Operating Graph",
+      "storage_root": ".data/rtg_knowledge_graph/json_file",
+      "sql_database_path": ".data/rtg_knowledge_graph/controller.sqlite",
+      "authority": "user_authored",
+      "write_policy": "explicit_target_required",
+      "domains": [
+        "commitments",
+        "decisions",
+        "routines",
+        "attention",
+        "evidence"
+      ],
+      "tags": [
+        "personal",
+        "operating",
+        "memory",
+        "beta",
+        "this week",
+        "today"
+      ],
+      "mcp_endpoint": {
+        "transport": "http",
+        "host": "127.0.0.1",
+        "port": 8766,
+        "path": "/mcp",
+        "server_name": "vellis_personal_ops"
+      },
+      "metadata": {
+        "schema_domain": "personal_operating_graph",
+        "snapshot_path": "snapshots/personal-operating-graph-v1.json",
+        "description": "Experiment root for the personal operating graph schema domain.",
+        "federated_read_capabilities": [
+          {
+            "query_name": "personal_attention_overview",
+            "implementation": "apps.rtg_federation.queries.personal_attention_overview:CANNED_QUERY",
+            "description": "Summarize personal operating graph items that need attention.",
+            "terms": [
+              "attention",
+              "today",
+              "this week",
+              "commitments",
+              "routines",
+              "decisions",
+              "evidence gaps"
+            ],
+            "domains": [
+              "commitments",
+              "decisions",
+              "routines",
+              "attention",
+              "evidence"
+            ],
+            "tags": [
+              "personal",
+              "operating",
+              "memory",
+              "this week",
+              "today"
+            ]
+          }
+        ],
+        "citation_projection": {
+          "query_name": "personal_attention_overview",
+          "anchor_bucket": "item"
+        }
+      }
+    },
+    {
+      "graph_id": "experience_studio",
+      "title": "Experience Studio",
+      "storage_root": ".data/monographs/experience-studio",
+      "sql_database_path": ".data/monographs/experience-studio/controller.sqlite",
+      "authority": "team_authored_product_planning",
+      "write_policy": "explicit_target_required",
+      "domains": [
+        "experience-design",
+        "graph-backed-experiences",
+        "product-planning",
+        "games",
+        "interactive-experiences",
+        "public-data",
+        "publication-readiness"
+      ],
+      "tags": [
+        "experience",
+        "experiences",
+        "graph-backed",
+        "studio",
+        "planning",
+        "games",
+        "interactive",
+        "public-data",
+        "publication",
+        "publish",
+        "ocean-signal-atlas",
+        "alpha"
+      ],
+      "mcp_endpoint": {
+        "transport": "http",
+        "host": "127.0.0.1",
+        "port": 8768,
+        "path": "/mcp",
+        "server_name": "vellis_experience_studio"
+      },
+      "metadata": {
+        "schema_domain": "experience_studio",
+        "snapshot_path": "snapshots/experience-studio-alpha.json",
+        "description": "Governed planning root for graph-backed public games and interactive experiences.",
+        "federated_read_capabilities": [
+          {
+            "query_name": "experience_publication_readiness",
+            "implementation": "apps.rtg_federation.queries.experience_publication_readiness:CANNED_QUERY",
+            "description": "Summarize ordered Experience Studio publication checks and unresolved review gates.",
+            "terms": [
+              "experience studio",
+              "publication readiness",
+              "publication checks",
+              "publication gates",
+              "publish",
+              "ocean signal atlas"
+            ],
+            "domains": [
+              "experience-design",
+              "publication-readiness"
+            ],
+            "tags": [
+              "experience",
+              "studio",
+              "publication",
+              "publish",
+              "ocean-signal-atlas"
+            ]
+          }
+        ],
+        "citation_projection": {
+          "query_name": "experience_publication_readiness",
+          "anchor_bucket": "check"
+        }
+      }
+    },
+    {
+      "graph_id": "gothic_archive",
+      "title": "Gothic Ambient Archive",
+      "storage_root": ".data/monographs/gothic-ambient-archive",
+      "sql_database_path": ".data/monographs/gothic-ambient-archive/controller.sqlite",
+      "authority": "source_grounded_archive",
+      "write_policy": "explicit_target_required",
+      "domains": [
+        "literature",
+        "public-domain",
+        "gothic",
+        "docent",
+        "source-evidence"
+      ],
+      "tags": [
+        "archive",
+        "ambient",
+        "literature",
+        "alpha"
+      ],
+      "mcp_endpoint": {
+        "transport": "http",
+        "host": "127.0.0.1",
+        "port": 8767,
+        "path": "/mcp",
+        "server_name": "vellis_gothic_archive"
+      },
+      "metadata": {
+        "schema_domain": "gothic_ambient_archive",
+        "snapshot_path": "snapshots/gothic-ambient-archive-alpha.json",
+        "description": "Experiment root for public-domain Gothic literature and docent navigation.",
+        "federated_read_capabilities": [
+          {
+            "query_name": "gothic_source_index",
+            "implementation": "apps.rtg_federation.queries.gothic_source_index:CANNED_QUERY",
+            "description": "Index Gothic archive works, sources, passages, reading trails, and verification gaps.",
+            "terms": [
+              "gothic",
+              "archive",
+              "works",
+              "sources",
+              "passages",
+              "reading trails",
+              "verification gaps"
+            ],
+            "domains": [
+              "literature",
+              "sources",
+              "passages",
+              "motifs",
+              "reading_trails"
+            ],
+            "tags": [
+              "gothic",
+              "public-domain",
+              "docent",
+              "ambient"
+            ]
+          }
+        ],
+        "citation_projection": {
+          "query_name": "gothic_source_index",
+          "anchor_bucket": "archive_item"
+        }
+      }
+    },
+    {
+      "graph_id": "application_portfolio",
+      "title": "Application Portfolio",
+      "storage_root": ".data/monographs/application-portfolio",
+      "sql_database_path": ".data/monographs/application-portfolio/controller.sqlite",
+      "authority": "team_authored_product_planning",
+      "write_policy": "explicit_target_required",
+      "domains": [
+        "applications",
+        "application-portfolio",
+        "application-comparison",
+        "experience-patterns",
+        "component-adoption"
+      ],
+      "tags": [
+        "applications",
+        "portfolio",
+        "comparison",
+        "similar",
+        "meta"
+      ],
+      "mcp_endpoint": {
+        "transport": "http",
+        "host": "127.0.0.1",
+        "port": 8769,
+        "path": "/mcp",
+        "server_name": "vellis_application_portfolio"
+      },
+      "metadata": {
+        "snapshot_path": "snapshots/application-portfolio-v2.json",
+        "description": "Governed portfolio graph for evidence-backed application comparisons, experience patterns, dependency evaluations, component adoption, audiences, maturity, and explicit coverage gaps."
+      }
+    },
+    {
+      "graph_id": "time_room_history",
+      "title": "Time Room History",
+      "storage_root": ".data/monographs/time-room-history",
+      "sql_database_path": ".data/monographs/time-room-history/controller.sqlite",
+      "authority": "source_grounded_history",
+      "write_policy": "explicit_target_required",
+      "domains": [
+        "history",
+        "historical-figures",
+        "education",
+        "claims",
+        "runtime-packs"
+      ],
+      "tags": [
+        "time-room",
+        "ada-lovelace",
+        "compiled-runtime",
+        "alpha"
+      ],
+      "mcp_endpoint": {
+        "transport": "http",
+        "host": "127.0.0.1",
+        "port": 8770,
+        "path": "/mcp",
+        "server_name": "vellis_time_room_history"
+      },
+      "metadata": {
+        "schema_domain": "time_room_history",
+        "snapshot_path": "snapshots/time-room-history-alpha.json",
+        "description": "Source-grounded historical claims and governed offline runtime-pack projections for Time Room."
+      }
+    }
+  ]
+}

@@ -25,6 +25,20 @@ Generated from textual SysML v2 by `just model-render` as a non-normative readin
 | `launcher` | `AppLauncher` | `component.app.launcher` |
 | `shell` | `AppShell` | `component.app.shell` |
 
+## RTG Federation composition
+
+| RTG Federation role | Logical type | Provider |
+|---|---|---|
+| `registry` | `RtgGraphRegistry` | `component.rtg.graph_registry` |
+| `routePack` | `RtgRoutePack` | `component.rtg.route_pack` |
+| `bridgeStore` | `RtgGraphBridge` | `component.rtg.graph_bridge` |
+| `projectionCatalog` | `RtgCitationProjectionCatalog` | `application projection adapter` |
+| `projectionReader` | `RtgCitationProjectionReader` | `application projection adapter` |
+| `citationResolver` | `FederationCitationResolver` | `component.rtg.citation_resolution` |
+| `bridgeTraverser` | `RtgBridgeTraverser` | `component.rtg.bridge_traversal` |
+| `federatedSynthesizer` | `RtgFederatedSynthesizer` | `component.rtg.federated_synthesis` |
+| `semanticPipeline` | `RtgFederationSemanticPipeline` | `optional evidence-bounded semantic pipeline` |
+
 ## Everyday Life starter ontology
 
 Ontology `ontology.vellis.everyday_life` version `1` is generated as schema-only bootstrap material. It contains no people, tasks, or other graph facts.
@@ -94,6 +108,22 @@ Ontology `ontology.vellis.everyday_life` version `1` is generated as schema-only
 | `launcher` | `Bibliotek component realization` | `InMemoryAppLauncher` | `See Bibliotek Python realization` |
 | `shell` | `Bibliotek component realization` | `InMemoryAppShell` | `See Bibliotek Python realization` |
 
+## RTG Federation Python realization
+
+| RTG Federation role | Logical type | Python realization | Implementation symbol |
+|---|---|---|---|
+| `generator` | `RtgSemanticDraftGenerator` | `PythonFederationSemanticDraftGenerator` | `apps.rtg_federation.semantic_openai.OpenAiResponsesSemanticDraftGenerator` |
+| `synthesizer` | `Bibliotek component realization` | `EvidenceBoundedRtgSynthesizer` | `See Bibliotek Python realization` |
+| `registry` | `Bibliotek component realization` | `InMemoryRtgGraphRegistry` | `See Bibliotek Python realization` |
+| `routePack` | `Bibliotek component realization` | `DeterministicRtgRoutePack` | `See Bibliotek Python realization` |
+| `bridgeStore` | `Bibliotek component realization` | `InMemoryRtgGraphBridge` | `See Bibliotek Python realization` |
+| `projectionCatalog` | `RtgCitationProjectionCatalog` | `PythonFederationCitationProjectionCatalog` | `apps.rtg_federation.registry_io._RegistryCitationProjectionCatalog` |
+| `projectionReader` | `RtgCitationProjectionReader` | `PythonFederationCitationProjectionReader` | `apps.rtg_federation.registry_io._RegistryCitationProjectionReader` |
+| `citationResolver` | `FederationCitationResolver` | `PythonFederationCitationResolver` | `components.rtg.citation_resolution.DeterministicRtgCitationResolver` |
+| `bridgeTraverser` | `Bibliotek component realization` | `DeterministicRtgBridgeTraverser` | `See Bibliotek Python realization` |
+| `federatedSynthesizer` | `Bibliotek component realization` | `DeterministicRtgFederatedSynthesizer` | `See Bibliotek Python realization` |
+| `semanticPipeline` | `Bibliotek component realization` | `PythonRtgFederationSemanticPipeline` | `See Bibliotek Python realization` |
+
 ## Requirements and satisfaction
 
 | Stable ID | Subject | Satisfier | Required constraint |
@@ -105,9 +135,15 @@ Ontology `ontology.vellis.everyday_life` version `1` is generated as schema-only
 | `invariant.vellis.personal_launcher.truthful_activity` | `PersonalLauncherApplication` | `application` | Managed runtime surfaces produce launcher-owned sessions; handed-off or already completed surfaces produce bounded recent activity without false runtime ownership. |
 | `invariant.vellis.personal_launcher.current_defaults` | `PersonalLauncherApplication` | `application` | Built-in repository-local catalog entries name only surfaces available in the current Vellis distribution; optional applications enter through explicit catalog records when installed. |
 | `invariant.vellis.personal_launcher.transport_outside_components` | `PersonalLauncherApplication` | `application` | HTTP serving, browser opening, and desktop-wrapper installation remain application adapters and do not enter reusable component contracts. |
+| `invariant.vellis.rtg_federation.graph_local_reads` | `RtgFederationApplication` | `application` | Every executable graph read is descriptor-declared and runs against one owning graph at a time; the federation application performs no arbitrary cross-graph join and proxies no monograph write. |
+| `invariant.vellis.rtg_federation.explicit_write_targets` | `RtgFederationApplication` | `application` | Route compilation never authorizes a write from confidence alone. Any write-oriented route requires one explicitly named graph and hands execution to that graph's governed application boundary. |
+| `invariant.vellis.rtg_federation.qualified_identity` | `RtgFederationApplication` | `application` | Federated citations and bridge endpoints retain graph-qualified identity. Citation resolution is bounded by the owning descriptor, and confirmed bridge traversal keeps source and target projections separate. |
+| `invariant.vellis.rtg_federation.semantic_opt_in` | `RtgFederationApplication` | `application` | Deterministic synthesis is always available without a model. The optional semantic pipeline receives only the deterministic evidence envelope, receives no graph tools, stores no response, and cannot claim verified entailment. |
+| `invariant.vellis.rtg_federation.adapters_outside_components` | `RtgFederationApplication` | `application` | Registry JSON loading, snapshot access, canned-query dispatch, CLI encoding, and MCP transport remain application adapters and do not redefine reusable Bibliotek contracts. |
+| `invariant.vellis.rtg_federation.read_compatible_snapshots` | `RtgFederationApplication` | `application` | A predecessor snapshot may be projected in memory for bounded reads only when every unsupported schema field or legacy value kind is recognized and reported. The projection never rewrites the stored snapshot and never authorizes a graph write or claims schema-domain runtime readiness. |
 | `contract.vellis.facade.failures` | `VellisApplicationFacade` | `facade` | Input decoding rejects unknown fields, wrong JSON kinds, invalid enum literals, missing required values, and contradictory option shapes as VellisRequestInvalid before controller invocation. Modeled Bibliotek failures propagate without changing their concrete type, message, diagnostic, transaction identity, or validation evidence. |
 | `contract.vellis.facade.implementation_freedom` | `VellisApplicationFacade` | `facade` | The facade may choose any implementation language or helper decomposition but must preserve the modeled request compilation, controller invocation, response shaping, defaults, ordering, and no-effect guarantees. |
-| `contract.vellis.facade.usage_guides` | `RtgGetUsageGuide` | `facade.rtgGetUsageGuide` | The fifteen guide topics cover: the installed Everyday Life schema; safe RTG schema design and evolution; compact machine-readable tool capabilities; MCP bootstrap sequence; concise operator rules; state-driven workflows; ordinary-request-to-workflow mapping; minimal schema staging; exact top-level tool shapes; live writes; identity lookup before links; query construction; snapshot/restore/replay recovery; durable migration history; and safe abandonment. Generic examples do not silently replace or specialize an application's modeled schema. |
+| `contract.vellis.facade.usage_guides` | `RtgGetUsageGuide` | `facade.rtgGetUsageGuide` | The sixteen guide topics cover: the installed Everyday Life schema; safe RTG schema design and evolution; the repo-bundled schema-domain catalog; compact machine-readable tool capabilities; MCP bootstrap sequence; concise operator rules; state-driven workflows; ordinary-request-to-workflow mapping; minimal schema staging; exact top-level tool shapes; live writes; identity lookup before links; query construction; snapshot/restore/replay recovery; durable migration history; and safe abandonment. Catalog entries are instructions recreated through governed operations, never opaque install payloads. |
 | `contract.vellis.facade.schema_migration_compilation` | `RtgStageSchemaMigration` | `facade.rtgStageSchemaMigration` | Each unique kind-and-typeKey request becomes one newly identified non-live schema write and one schema_make_live member; duplicate request keys are rejected before controller invocation. generatedSchemaIds maps kind:type_key to that UUID. Each retirement selector must resolve to exactly one live definition and becomes schema_make_non_live. One ready migration with the supplied ID and description owns the membership. Compact response is default and full response adds the exact submitted batch; shaping has no mutation effect. |
 | `contract.vellis.facade.anchor_record_compilation` | `VellisApplicationFacade` | `facade` | Each anchor record becomes one canonical anchor write. Each nested fact becomes one data-object write associated to that anchor; an omitted fact reference receives a unique request-local reference reported in generatedRefs. Link writes pass through unchanged. Validation and apply use identical compilation. Apply returns every resolved local-reference UUID; compact is default and full additionally returns the exact submitted graph changes. |
 | `contract.vellis.facade.query_semantics` | `VellisApplicationFacade` | `facade` | Full query responses preserve the canonical query result. properties_only retains final row order, pagination metadata, and diagnostics while omitting bindings and unrequested records; non-aggregate rows contain row_index plus selected properties, while aggregate rows preserve row_index, group_by, and caller-named aggregation values. Anchor resolution compiles one live-only equality query and returns every deterministic match without guessing uniqueness. |
@@ -153,6 +189,7 @@ Ontology `ontology.vellis.everyday_life` version `1` is generated as schema-only
 |---|---|---|---|
 | `VellisCompositionVerification` | `VellisApplication` | `bibliotekOnlyThroughContracts`, `discoveryDraftUnbound`, `transportOutsideController` | `apps/rtg_knowledge_graph/tests/test_rtg_knowledge_graph_app.py#VellisCompositionVerification` |
 | `PersonalLauncherCompositionVerification` | `PersonalLauncherApplication` | `publicContractsOnly`, `truthfulActivity`, `currentDefaults`, `transportOutsideComponents` | `apps/personal_launcher/tests/test_personal_launcher_app.py#PersonalLauncherCompositionVerification` |
+| `RtgFederationCompositionVerification` | `RtgFederationApplication` | `graphLocalReads`, `explicitWriteTargets`, `qualifiedIdentity`, `semanticOptIn`, `adaptersOutsideComponents`, `readCompatibleSnapshots` | `apps/rtg_federation/tests/test_rtg_federation_app.py#RtgFederationCompositionVerification` |
 | `RtgGetUsageGuideContractVerification` | `RtgGetUsageGuide` | `usageGuideSemantics`, `rtgGetUsageGuideFailureSemantics` | `apps/rtg_knowledge_graph/tests/test_rtg_knowledge_graph_mcp_user_flows.py#RtgGetUsageGuideContractVerification` |
 | `RtgStageSchemaMigrationContractVerification` | `RtgStageSchemaMigration` | `schemaMigrationCompilation`, `rtgStageSchemaMigrationFailureSemantics` | `apps/rtg_knowledge_graph/tests/test_rtg_knowledge_graph_mcp_user_flows.py#RtgStageSchemaMigrationContractVerification` |
 | `RtgGetSystemStateContractVerification` | `RtgGetSystemState` | `rtgGetSystemStateFailureSemantics` | `apps/rtg_knowledge_graph/tests/test_rtg_knowledge_graph_mcp_user_flows.py#RtgGetSystemStateContractVerification` |

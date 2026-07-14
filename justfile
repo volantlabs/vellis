@@ -34,6 +34,81 @@ graph-report storage_root=".data/repo-twin" format="markdown":
 graph-query name *args:
     @uv run python -m tools.repo_twin query {{name}} {{args}}
 
+rtg-graphs registry="docs/rtg-monographs/registry.json":
+    @uv run python -m tools.rtg_graph_registry --registry {{registry}} list
+
+rtg-route query operation="read" registry="docs/rtg-monographs/registry.json":
+    @uv run python -m tools.rtg_graph_registry --registry {{registry}} route --operation {{operation}} "{{query}}"
+
+rtg-route-pack-preview query operation="read" registry="docs/rtg-monographs/registry.json":
+    @uv run python -m tools.rtg_graph_registry --registry {{registry}} route-pack-preview --operation {{operation}} "{{query}}"
+
+rtg-route-pack-gate query operation="read" registry="docs/rtg-monographs/registry.json":
+    @uv run python -m tools.rtg_graph_registry --registry {{registry}} route-pack-gate --operation {{operation}} "{{query}}"
+
+rtg-federated-plan query operation="read" registry="docs/rtg-monographs/registry.json":
+    @uv run python -m tools.rtg_graph_registry --registry {{registry}} federated-plan --operation {{operation}} "{{query}}"
+
+rtg-federated-capabilities registry="docs/rtg-monographs/registry.json":
+    @uv run python -m tools.rtg_graph_registry --registry {{registry}} federated-capabilities
+
+rtg-federated-capabilities-check registry="docs/rtg-monographs/registry.json":
+    @uv run python -m tools.rtg_graph_registry --registry {{registry}} federated-capabilities --check
+
+rtg-federation-preflight registry="docs/rtg-monographs/registry.json":
+    @uv run python -m tools.rtg_graph_registry --registry {{registry}} federated-preflight --check
+
+rtg-federated-capability-template query_name:
+    @uv run python -m tools.rtg_graph_registry federated-capability-template {{query_name}}
+
+rtg-federated-answer query operation="read" registry="docs/rtg-monographs/registry.json":
+    @uv run python -m tools.rtg_graph_registry --registry {{registry}} federated-answer --operation {{operation}} "{{query}}"
+
+rtg-citation-resolve graph_id local_uuid registry="docs/rtg-monographs/registry.json":
+    @uv run python -m tools.rtg_graph_registry --registry {{registry}} resolve-citation {{graph_id}} {{local_uuid}}
+
+rtg-bridge-traverse bridge_id registry="docs/rtg-monographs/registry.json" bridges="docs/rtg-monographs/bridges.json":
+    @uv run python -m tools.rtg_graph_registry --registry {{registry}} bridge-traverse --bridges {{bridges}} {{bridge_id}}
+
+rtg-route-query query canned_query="repo_components_evidence_status" registry="docs/rtg-monographs/registry.json":
+    @uv run python -m tools.rtg_graph_registry --registry {{registry}} route-query --canned-query {{canned_query}} "{{query}}"
+
+rtg-bridge-candidates status="candidate_only" registry="docs/rtg-monographs/registry.json":
+    @uv run python -m tools.rtg_graph_registry --registry {{registry}} bridge-candidates list --status {{status}}
+
+rtg-bridge-candidate candidate_id registry="docs/rtg-monographs/registry.json":
+    @uv run python -m tools.rtg_graph_registry --registry {{registry}} bridge-candidates inspect {{candidate_id}}
+
+rtg-bridge-candidate-promote candidate_id asserted_at asserted_by registry="docs/rtg-monographs/registry.json":
+    @uv run python -m tools.rtg_graph_registry --registry {{registry}} bridge-candidates promote {{candidate_id}} --asserted-at {{asserted_at}} --asserted-by {{asserted_by}}
+
+rtg-bridge-candidate-reject candidate_id rejected_at rejected_by reason registry="docs/rtg-monographs/registry.json":
+    @uv run python -m tools.rtg_graph_registry --registry {{registry}} bridge-candidates reject {{candidate_id}} --rejected-at {{rejected_at}} --rejected-by {{rejected_by}} --reason "{{reason}}"
+
+rtg-monograph-mcp-info graph_id registry="docs/rtg-monographs/registry.json":
+    @uv run python -m tools.rtg_graph_registry --registry {{registry}} mcp-info {{graph_id}}
+
+rtg-monograph-init graph_id registry="docs/rtg-monographs/registry.json":
+    @uv run python -m tools.rtg_graph_registry --registry {{registry}} init {{graph_id}}
+
+rtg-monograph-mcp graph_id registry="docs/rtg-monographs/registry.json":
+    @uv run python -m tools.rtg_graph_registry --registry {{registry}} serve-http {{graph_id}}
+
+rtg-federation-mcp-info registry="docs/rtg-monographs/registry.json" host="127.0.0.1" port="8775" path="/mcp":
+    @uv run python -m apps.rtg_federation serve-mcp --transport http --host {{host}} --port {{port}} --path {{path}} --registry {{registry}} --dry-run --json
+
+rtg-federation-mcp registry="docs/rtg-monographs/registry.json" host="127.0.0.1" port="8775" path="/mcp":
+    @uv run python -m apps.rtg_federation serve-mcp --transport http --host {{host}} --port {{port}} --path {{path}} --registry {{registry}}
+
+rtg-federation-mcp-semantic model registry="docs/rtg-monographs/registry.json" host="127.0.0.1" port="8775" path="/mcp":
+    @uv run python -m apps.rtg_federation serve-mcp --transport http --host {{host}} --port {{port}} --path {{path}} --registry {{registry}} --semantic-model {{model}}
+
+rtg-federation-eval cases="docs/guides/vellis/evals/rtg-federation-routing-cases.json" registry="docs/rtg-monographs/registry.json":
+    @uv run python -m tools.rtg_federation_eval --registry {{registry}} --cases {{cases}}
+
+rtg-federation-workload-eval cases="docs/guides/vellis/evals/rtg-federation-workload-cases.json" registry="docs/rtg-monographs/registry.json" bridges="docs/rtg-monographs/bridges.json":
+    @uv run python -m tools.rtg_federation_workload_eval --registry {{registry}} --bridges {{bridges}} --cases {{cases}}
+
 graph-evidence kind *command:
     @uv run python -m tools.repo_twin evidence {{kind}} -- {{command}}
 

@@ -1,0 +1,64 @@
+id: agent_memory_spine
+slug: agent-memory-spine
+title: Agent Memory Spine
+status: beta
+summary: Reference agent-memory vocabulary for actors, traces, facts, assessments, decisions, skills, taxonomy, media, and domains.
+prompt_path: docs/guides/vellis/evals/rtg-agent-memory-spine-beta-prompt.md
+walkthrough_path: docs/guides/vellis/evals/rtg-agent-memory-spine-known-good-walkthrough.md
+recommended_first_call:
+  tool: rtg_get_system_state
+  arguments: {}
+domain_tags:
+  - agent
+  - memory
+  - provenance
+  - taxonomy
+  - beta
+runtime_compatibility:
+  status: blocked
+  requirements:
+    - schema time shapes
+    - link kinds
+    - identity criteria
+    - merge-candidate, event-immutability, and protected-provenance validation
+  blockers:
+    - The harmonized kernel does not yet expose the required schema metadata or policy validation behaviors.
+schema_summary:
+  anchors:
+    - Actor
+    - Session
+    - Trace
+    - Fact
+    - Assessment
+    - Decision
+    - Skill
+    - Taxonomy
+    - Media
+    - Domain
+  fact_types:
+    - ActorFacts
+    - SessionFacts
+    - TraceFacts
+    - FactBody
+    - AssessmentFacts
+    - DecisionFacts
+    - SkillFacts
+    - TaxonomyFacts
+    - MediaFacts
+    - DomainFacts
+  links:
+    - ClassifiedAs
+    - derived_from
+    - supersedes
+    - belongs_to_domain
+run_instructions:
+  - Connect the RTG MCP server and call rtg_validate_graph, then rtg_get_system_state.
+  - Recreate the schema from the prompt through a strict staged migration and cutover.
+  - Run the append-only Assessment, Actor merge-candidate, and protected provenance-link probes.
+  - Validate the live graph, then preserve snapshot or replay evidence.
+  - Compare results with the known-good walkthrough.
+guardrails:
+  - Do not use a hidden prebuilt schema payload.
+  - Append new Assessment records instead of editing existing assessments.
+  - Resolve Actor identity candidates before force-creating another actor.
+  - Preserve provenance links; direct provenance-link deletion must be rejected.

@@ -1,0 +1,51 @@
+id: individual_life_graph
+slug: individual-life-graph
+title: Individual Life Graph
+status: beta
+summary: Initial personal and professional planning graph for one operator.
+prompt_path: docs/guides/vellis/evals/rtg-individual-life-graph-beta-prompt.md
+walkthrough_path: docs/guides/vellis/evals/rtg-beta-known-good-walkthrough.md
+recommended_first_call:
+  tool: rtg_get_system_state
+  arguments: {}
+domain_tags:
+  - personal
+  - professional
+  - planning
+  - beta
+runtime_compatibility:
+  status: ready
+  requirements: []
+  blockers: []
+schema_summary:
+  anchors:
+    - Person
+    - Area
+    - Project
+    - Task
+    - Event
+    - Note
+    - Resource
+  fact_types:
+    - PersonFacts
+    - AreaFacts
+    - ProjectFacts
+    - TaskFacts
+    - EventFacts
+    - NoteFacts
+    - ResourceFacts
+  links:
+    - belongs_to
+    - supports
+    - owns
+    - mentions
+    - depends_on
+run_instructions:
+  - Connect the RTG MCP server and call rtg_validate_graph, then rtg_get_system_state.
+  - If the graph is empty, use the prompt to recreate the schema through staged migration.
+  - Ingest the supplied seed facts through live graph writes.
+  - Compare query, recovery, snapshot, and replay evidence with the walkthrough.
+guardrails:
+  - Do not use a hidden prebuilt schema payload.
+  - Do not bypass validation-before-mutation.
+  - Report placeholder date assumptions.

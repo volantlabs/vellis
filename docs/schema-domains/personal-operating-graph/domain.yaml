@@ -1,0 +1,60 @@
+id: personal_operating_graph
+slug: personal-operating-graph
+title: Personal Operating Graph
+status: beta
+summary: Governed personal operating graph for commitments, decisions, reviews, evidence, routines, and attention planning.
+prompt_path: docs/guides/vellis/evals/rtg-personal-operating-graph-beta-prompt.md
+walkthrough_path: docs/guides/vellis/evals/rtg-personal-operating-graph-known-good-walkthrough.md
+recommended_first_call:
+  tool: rtg_get_system_state
+  arguments: {}
+domain_tags:
+  - personal
+  - operating
+  - evidence
+  - attention
+  - beta
+runtime_compatibility:
+  status: ready
+  requirements: []
+  blockers: []
+schema_summary:
+  anchors:
+    - Person
+    - Area
+    - Goal
+    - Commitment
+    - Decision
+    - Review
+    - Evidence
+    - RelationshipContext
+    - Routine
+  fact_types:
+    - PersonFacts
+    - AreaFacts
+    - GoalFacts
+    - CommitmentFacts
+    - DecisionFacts
+    - ReviewFacts
+    - EvidenceFacts
+    - RelationshipContextFacts
+    - RoutineFacts
+  links:
+    - belongs_to
+    - supports
+    - owns
+    - justifies
+    - reviewed_in
+    - involves
+    - informs
+run_instructions:
+  - Connect the RTG MCP server and call rtg_validate_graph, then rtg_get_system_state.
+  - If the graph is empty, bootstrap the schema from the prompt.
+  - If a compatible individual life graph already exists, stage a schema evolution instead of deleting live data.
+  - Ingest commitments, decisions, evidence, routines, reviews, and relationship context through live graph writes.
+  - Compare query, recovery, failed-evolution, snapshot, and replay evidence with the walkthrough.
+guardrails:
+  - Use useful links rather than exhaustive links.
+  - Keep evidence and trust gaps visible.
+  - Do not auto-install an opaque schema payload.
+  - Preserve snapshot or replay evidence before calling the run complete.

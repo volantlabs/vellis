@@ -1,0 +1,6 @@
+interface:
+  display_name: "RTG Federation Control Plane"
+  short_description: "Route across RTG graph monographs"
+  default_prompt: "Use $rtg-federation-control-plane when graph work must escalate for an unknown target, multiple monographs, policy or freshness hazards, citations, bridges, or federation MCP tools."
+policy:
+  allow_implicit_invocation: true

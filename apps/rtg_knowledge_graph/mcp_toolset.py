@@ -22,6 +22,7 @@ from apps.rtg_knowledge_graph.mcp_codec import (
     decode_validation_options,
     encode_json,
 )
+from apps.rtg_knowledge_graph.schema_domains import SCHEMA_DOMAINS
 from apps.rtg_knowledge_graph.starter_schema import (
     StarterSchemaStatus,
     load_starter_schema_bundle,
@@ -1202,6 +1203,7 @@ def _usage_guide(topic: str) -> dict[str, Any]:
         "operator_card": _operator_card_guide,
         "workflow_patterns": _workflow_patterns_guide,
         "request_patterns": _request_patterns_guide,
+        "schema_domains": _schema_domains_guide,
         "schema_staging_minimal": _schema_staging_minimal_guide,
         "tool_call_shapes": _tool_call_shapes_guide,
         "live_write": _live_write_guide,
@@ -1301,6 +1303,47 @@ def _schema_design_guide() -> dict[str, Any]:
             "Stage the migration in strict mode and inspect validation evidence.",
             "Cut over only after validation; preserve existing live data and identities.",
             "Validate the graph and verify representative queries after cutover.",
+        ],
+    }
+
+
+def _schema_domains_guide() -> dict[str, Any]:
+    return {
+        "topic": "schema_domains",
+        "purpose": (
+            "Browse repo-bundled schema-domain instructions and distinguish catalog availability "
+            "from compatibility with the current RTG kernel."
+        ),
+        "domains": [
+            {
+                "domain_id": domain_id,
+                "title": domain["title"],
+                "status": domain["status"],
+                "summary": domain["summary"],
+                "catalog_path": domain["catalog_path"],
+                "prompt_path": domain["prompt_path"],
+                "walkthrough_path": domain["walkthrough_path"],
+                "domain_tags": domain["domain_tags"],
+                "recommended_first_call": domain["recommended_first_call"],
+                "runtime_status": domain["runtime_status"],
+                "runtime_requirements": domain["runtime_requirements"],
+                "runtime_blockers": domain["runtime_blockers"],
+            }
+            for domain_id, domain in SCHEMA_DOMAINS.items()
+        ],
+        "workflow": [
+            "Call rtg_validate_graph({}) and rtg_get_system_state({}) first.",
+            "Choose a domain by domain_id and confirm runtime_status is ready.",
+            "Read its catalog and prompt from the checkout.",
+            "Recreate schema through staged migration and governed cutover.",
+            "Ingest only user-provided or source-grounded facts through live writes.",
+            "Compare the result with the known-good walkthrough, then preserve snapshot evidence.",
+        ],
+        "guardrails": [
+            "Do not auto-install opaque schema payloads from the catalog.",
+            "Do not attempt a blocked domain until every runtime blocker is resolved.",
+            "Do not bypass staged migrations, strict validation, snapshots, or replay evidence.",
+            "The catalog is instructional; the governed live graph is authoritative after cutover.",
         ],
     }
 

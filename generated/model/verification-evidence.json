@@ -13,6 +13,17 @@
         "apps/personal_launcher/tests/test_personal_launcher_app.py::test_desktop_installer_writes_mac_app_bundle"
       ]
     },
+    "apps/rtg_federation/tests/test_rtg_federation_app.py#RtgFederationCompositionVerification": {
+      "model_source": "model/vellis/RtgFederation.sysml",
+      "status": "resolved",
+      "test_nodes": [
+        "apps/rtg_federation/tests/test_rtg_federation_app.py::test_federation_toolset_lists_routes_and_returns_graph_mcp_info",
+        "apps/rtg_federation/tests/test_rtg_federation_app.py::test_federation_toolset_returns_structured_federated_answer",
+        "apps/rtg_federation/tests/test_rtg_federation_app.py::test_federation_toolset_traverses_one_active_bridge_without_joining",
+        "apps/rtg_federation/tests/test_rtg_federation_app.py::test_federation_toolset_returns_evidence_bounded_semantic_answer",
+        "apps/rtg_federation/tests/test_rtg_federation_app.py::test_federation_mcp_dry_run_reports_control_plane_metadata"
+      ]
+    },
     "apps/rtg_knowledge_graph/tests/test_rtg_knowledge_graph_app.py#VellisCompositionVerification": {
       "model_source": "model/vellis/Vellis.sysml",
       "status": "resolved",

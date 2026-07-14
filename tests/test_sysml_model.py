@@ -62,7 +62,7 @@ def test_formal_validator_is_pinned_and_covers_every_authored_model() -> None:
         ]
         == "required"
     )
-    assert len(sysml_validator._model_files("all")) == 35
+    assert len(sysml_validator._model_files("all")) == 37
     assert all(path.exists() for path in sysml_validator._model_files("all"))
     assert model_layout.SOFTWARE_COMPONENT_PATTERN_PATH not in sysml_validator._model_files("all")
 
@@ -155,7 +155,7 @@ def test_generated_conformance_objectives_resolve_model_requirements_and_evidenc
 def test_official_parser_index_covers_authored_packages_and_public_definitions() -> None:
     index = json.loads(model_layout.GENERATED_FORMAL_INDEX.read_text(encoding="utf-8"))
 
-    assert len(index["authored_packages"]) == 35
+    assert len(index["authored_packages"]) == 37
     assert index["authored_packages"]["VellisPersonalLauncher"] == (
         "model/vellis/PersonalLauncher.sysml"
     )
@@ -699,7 +699,7 @@ def test_model_handoff_names_complete_products_and_application_sources(
     ):
         assert source in application_output
     assert "apps/rtg_knowledge_graph/resources/everyday_life_schema.json" in application_output
-    assert "Verification: 33 structured objective(s)" in application_output
+    assert "Verification: 34 structured objective(s)" in application_output
 
 
 def test_model_packages_exclude_fixture_configuration_and_migration(

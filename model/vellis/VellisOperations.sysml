@@ -13,7 +13,7 @@ package VellisOperations {
 
     enum def VellisUsageGuideTopic {
         enum mcpBootstrapChecklist; enum operatorCard; enum workflowPatterns;
-        enum requestPatterns; enum schemaStagingMinimal; enum toolCallShapes;
+        enum requestPatterns; enum schemaDomains; enum schemaStagingMinimal; enum toolCallShapes;
         enum liveWrite; enum lookupExamples; enum queryExamples;
         enum recoveryAndReplay; enum migrationHistory; enum migrationAbandonment;
         enum everydayLifeSchema; enum schemaDesign; enum capabilities;
@@ -193,7 +193,7 @@ package VellisOperations {
     requirement <'contract.vellis.facade.usage_guides'> usageGuideSemantics {
         subject operation : RtgGetUsageGuide;
         require constraint {
-            doc /* The fifteen guide topics cover: the installed Everyday Life schema; safe RTG schema design and evolution; compact machine-readable tool capabilities; MCP bootstrap sequence; concise operator rules; state-driven workflows; ordinary-request-to-workflow mapping; minimal schema staging; exact top-level tool shapes; live writes; identity lookup before links; query construction; snapshot/restore/replay recovery; durable migration history; and safe abandonment. Generic examples do not silently replace or specialize an application's modeled schema. */
+            doc /* The sixteen guide topics cover: the installed Everyday Life schema; safe RTG schema design and evolution; the repo-bundled schema-domain catalog; compact machine-readable tool capabilities; MCP bootstrap sequence; concise operator rules; state-driven workflows; ordinary-request-to-workflow mapping; minimal schema staging; exact top-level tool shapes; live writes; identity lookup before links; query construction; snapshot/restore/replay recovery; durable migration history; and safe abandonment. Catalog entries are instructions recreated through governed operations, never opaque install payloads. */
         }
     }
 

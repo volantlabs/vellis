@@ -33,6 +33,7 @@ dependencies = [
 [project.scripts]
 vellis = "apps.rtg_knowledge_graph.main:main"
 vellis-rtg-knowledge-graph = "apps.rtg_knowledge_graph.main:main"
+vellis-rtg-federation = "apps.rtg_federation.main:main"
 vellis-personal-launcher = "apps.personal_launcher.main:main"
 
 [project.urls]
