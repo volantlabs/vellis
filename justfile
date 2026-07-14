@@ -115,4 +115,12 @@ run-rtg-knowledge-graph-mcp *args:
 run-rtg-knowledge-graph-mcp-info *args:
     @uv run python -m apps.rtg_knowledge_graph serve-mcp --dry-run --json {{args}}
 
+# Launch the Personal Launcher local web UI.
+launcher-dev host="127.0.0.1" port="18777":
+    @uv run python -m apps.personal_launcher --host {{host}} --port {{port}} --open-browser
+
+# Install or refresh the macOS desktop application wrapper.
+launcher-app destination="":
+    @if [ -n "{{destination}}" ]; then uv run python -m apps.personal_launcher install-desktop-app --desktop-app-path "{{destination}}"; else uv run python -m apps.personal_launcher install-desktop-app; fi
+
 check: lint typecheck skills-check model-check test

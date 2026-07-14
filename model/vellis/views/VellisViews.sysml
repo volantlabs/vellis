@@ -4,6 +4,8 @@ package VellisViews {
     private import VellisUseCases::*;
     private import VellisLocalPythonRealization::*;
     private import VellisMcpPythonRealization::*;
+    private import VellisPersonalLauncher::*;
+    private import VellisPersonalLauncherPythonRealization::*;
 
     view def VellisCompositionView {
         doc /* Vellis roles, equality bindings, and logical-to-realization allocations. */
@@ -32,6 +34,8 @@ package VellisViews {
         expose Vellis::**;
         expose VellisLocalPythonRealization::**;
         expose VellisMcpPythonRealization::**;
+        expose VellisPersonalLauncher::**;
+        expose VellisPersonalLauncherPythonRealization::**;
         render asTreeDiagram;
     }
 
@@ -42,6 +46,7 @@ package VellisViews {
 
     view vellisRequirementVerification : VellisRequirementVerificationView {
         expose Vellis::**;
+        expose VellisPersonalLauncher::**;
         render asElementTable;
     }
 }

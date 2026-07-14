@@ -108,6 +108,9 @@ Current generated component views include:
 - [Bibliotek model reference](generated/reference/bibliotek/index.md): library packages, components,
   shared values, and retained dependency topology.
 
+- [`component.app.catalog`](generated/reference/bibliotek/components/component.app.catalog.md): declarative local application descriptors and launch surfaces.
+- [`component.app.launcher`](generated/reference/bibliotek/components/component.app.launcher.md): local lifecycle control for catalog-declared application surfaces.
+- [`component.app.shell`](generated/reference/bibliotek/components/component.app.shell.md): renderer-neutral application selection, activity, and command state.
 - [`component.storage.json_file`](generated/reference/bibliotek/components/component.storage.json_file.md): local filesystem-backed JSON document storage.
 - [`component.storage.sql`](generated/reference/bibliotek/components/component.storage.sql.md): SQLite-backed generic SQL execution surface for durable relational storage consumers.
 - [`component.rtg.graph`](generated/reference/bibliotek/components/component.rtg.graph.md): schema-neutral in-memory reified type graph for anchors, data objects, links, and direct UUID indexes.
@@ -123,6 +126,9 @@ Current generated component views include:
 
 Current Python implementations include:
 
+- [`components/app/catalog`](components/app/catalog/): in-memory application catalog implementation and boundary tests.
+- [`components/app/launcher`](components/app/launcher/): in-memory application launcher and runtime-adapter boundary tests.
+- [`components/app/shell`](components/app/shell/): in-memory renderer-neutral shell implementation and boundary tests.
 - [`components/storage/json_file`](components/storage/json_file/): JSON File Storage protocol, implementation, reference composition, and boundary tests.
 - [`components/storage/sql`](components/storage/sql/): SQLite-backed SQL Storage protocol, implementation, reference composition, and boundary tests.
 - [`components/rtg/graph`](components/rtg/graph/): in-memory RTG protocol, implementation, reference composition, and boundary tests.
@@ -136,13 +142,16 @@ Current Python implementations include:
 - [`components/rtg/change_validation`](components/rtg/change_validation/): deterministic no-mutation RTG change validator implementation and boundary tests.
 - [`components/rtg/controller`](components/rtg/controller/): in-process RTG controller implementation with validation, snapshots, cutover, and SQL-backed ledger behavior.
 
-The first application is:
+Current applications are:
 
 - [`apps/rtg_knowledge_graph`](apps/rtg_knowledge_graph/): the Vellis RTG Knowledge Graph app. It
   wires JSON File Storage, SQL Storage, and the in-process RTG controller, then exposes the modeled
   Vellis façade through local MCP transports for human/agent knowledge-system workflows.
-- [Vellis application model reference](generated/reference/vellis/index.md): composition, actor-visible
-  use cases, façade requirements, verification, and MCP realization mappings.
+- [`apps/personal_launcher`](apps/personal_launcher/): a local web and macOS launcher that composes
+  the application catalog, launcher, and shell. Run `just launcher-dev` for the web UI or
+  `just launcher-app` to install `Vellis Launcher.app`.
+- [Vellis application model reference](generated/reference/vellis/index.md): RTG and Personal
+  Launcher compositions, actor-visible use cases, verification, and realization mappings.
 
 The RTG Knowledge Graph MCP server uses standalone FastMCP v3 from the `fastmcp` package.
 
@@ -277,11 +286,14 @@ Useful recipes:
 - `just rtg-mcp-http-info`: print localhost HTTP MCP URL config for another local agent
 - `just rtg-mcp-http`: launch the unauthenticated localhost HTTP MCP server
 - `just rtg-eval-info`: print detailed beta eval MCP metadata with `.data/vellis-beta-001` storage
+- `just launcher-dev`: launch the Personal Launcher local web UI
+- `just launcher-app`: install or refresh `Vellis Launcher.app` on macOS
 - `just run-rtg-knowledge-graph`: launch the RTG Knowledge Graph app
 - `just run-rtg-knowledge-graph-mcp`: launch the RTG Knowledge Graph MCP server
 - `just run-rtg-knowledge-graph-mcp-info`: print RTG MCP dry-run metadata and client config
 - `vellis`: short console script for setup, doctor, and the RTG Knowledge Graph app
 - `vellis-rtg-knowledge-graph`: preserved compatibility console script
+- `vellis-personal-launcher`: installed console script for the Personal Launcher
 - `just check`: run lint, type checking, skill validation, model checks, and tests
 
 Launch the first application with the default local `.data/` storage:
@@ -351,4 +363,5 @@ Repo-local agent skills live in [`.agents/skills/`](.agents/skills/). This is th
 
 ## Status
 
-This repository is beta-stage. The SysML component-model system, Python project infrastructure, initial component implementations, and local RTG Knowledge Graph eval path are in place.
+This repository is beta-stage. The SysML component-model system, Python project infrastructure,
+initial component implementations, RTG Knowledge Graph, and Personal Launcher are in place.

@@ -3161,6 +3161,10 @@ def _render_component_summary() -> str:
 
 def _render_operation_summary() -> str:
     operation_text = (MODEL_ROOT / "vellis" / "VellisOperations.sysml").read_text(encoding="utf-8")
+    launcher_text = (MODEL_ROOT / "vellis" / "PersonalLauncher.sysml").read_text(encoding="utf-8")
+    launcher_realization_text = (
+        MODEL_ROOT / "vellis" / "realizations" / "PersonalLauncherPython.sysml"
+    ).read_text(encoding="utf-8")
     starter = _starter_schema_data()
     starter_definitions = [
         item["definition"]
@@ -3260,6 +3264,23 @@ def _render_operation_summary() -> str:
     role_rows.extend(
         f"| `{role}` | `{component_id}` |" for role, component_id in _vellis_roles().items()
     )
+    launcher_role_types = {
+        "AppCatalog": "component.app.catalog",
+        "AppLauncher": "component.app.launcher",
+        "AppShell": "component.app.shell",
+        "RuntimeAdapter": "external runtime capability",
+    }
+    launcher_role_rows = [
+        "| Personal Launcher role | Logical type | Provider |",
+        "|---|---|---|",
+    ]
+    launcher_role_rows.extend(
+        f"| `{role}` | `{type_name}` | `{launcher_role_types[type_name]}` |"
+        for role, type_name in re.findall(
+            r"(?m)^\s*part\s+(\w+)\s*:\s*(AppCatalog|AppLauncher|AppShell|RuntimeAdapter)\s*;",
+            launcher_text,
+        )
+    )
     local_realization_text = (
         MODEL_ROOT / "vellis" / "realizations" / "VellisLocalPython.sysml"
     ).read_text(encoding="utf-8")
@@ -3278,6 +3299,30 @@ def _render_operation_summary() -> str:
     ):
         logical_type, symbol = realization_definitions.get(realization, ("unmapped", "unmapped"))
         python_role_rows.append(f"| `{role}` | `{logical_type}` | `{realization}` | `{symbol}` |")
+    launcher_realization_definitions: dict[str, tuple[str, str]] = {}
+    for definition in re.finditer(
+        r"\bpart def\s+(\w+)\s*:>\s*(\w+)\s*\{", launcher_realization_text
+    ):
+        block = _extract_braced_block(launcher_realization_text, definition.start())
+        symbol = re.search(r'\bsymbol\s*=\s*"([^"]+)"', block)
+        if symbol:
+            launcher_realization_definitions[definition.group(1)] = (
+                definition.group(2),
+                symbol.group(1),
+            )
+    launcher_python_rows = [
+        "| Personal Launcher role | Logical type | Python realization | Implementation symbol |",
+        "|---|---|---|---|",
+    ]
+    for role, realization in re.findall(
+        r"\bpart\s+:>>\s+(\w+)\s*:\s*(\w+)\s*;", launcher_realization_text
+    ):
+        logical_type, symbol = launcher_realization_definitions.get(
+            realization, ("Bibliotek component realization", "See Bibliotek Python realization")
+        )
+        launcher_python_rows.append(
+            f"| `{role}` | `{logical_type}` | `{realization}` | `{symbol}` |"
+        )
     use_case_text = "\n".join(
         path.read_text(encoding="utf-8")
         for path in sorted((MODEL_ROOT / "vellis" / "use-cases").glob("*.sysml"))
@@ -3304,6 +3349,7 @@ def _render_operation_summary() -> str:
 
     contract_texts = [
         (MODEL_ROOT / "vellis" / "Vellis.sysml").read_text(encoding="utf-8"),
+        launcher_text,
         operation_text,
         realization_text,
     ]
@@ -3346,6 +3392,10 @@ def _render_operation_summary() -> str:
             "",
             *role_rows,
             "",
+            "## Personal Launcher composition",
+            "",
+            *launcher_role_rows,
+            "",
             "## Everyday Life starter ontology",
             "",
             f"Ontology `{starter['ontology_id']}` version `{starter['version']}` is generated as "
@@ -3362,6 +3412,10 @@ def _render_operation_summary() -> str:
             "## Python realization",
             "",
             *python_role_rows,
+            "",
+            "## Personal Launcher Python realization",
+            "",
+            *launcher_python_rows,
             "",
             "## Requirements and satisfaction",
             "",

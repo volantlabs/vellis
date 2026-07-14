@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" role="img" aria-label="Vellis Launcher">
+  <rect width="96" height="96" rx="18" fill="#1f2933"/>
+  <path d="M24 24h48v10H36v14h30v10H36v14h36v10H24z" fill="#f8fafc"/>
+  <path d="M52 18l26 30-26 30V60l10-12-10-12z" fill="#14b8a6"/>
+</svg>

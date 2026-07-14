@@ -3217,6 +3217,30 @@
       "verification": "EverydayLifeOntologyVerification"
     },
     {
+      "evidence_id": "apps/personal_launcher/tests/test_personal_launcher_app.py#PersonalLauncherCompositionVerification",
+      "evidence_nodes": [
+        "apps/personal_launcher/tests/test_personal_launcher_app.py::test_load_or_create_catalog_merges_missing_builtin_apps_without_overwriting",
+        "apps/personal_launcher/tests/test_personal_launcher_app.py::test_service_records_url_handoff_without_active_session",
+        "apps/personal_launcher/tests/test_personal_launcher_app.py::test_missing_file_surface_fails_without_recording_activity",
+        "apps/personal_launcher/tests/test_personal_launcher_app.py::test_command_surface_records_process_session",
+        "apps/personal_launcher/tests/test_personal_launcher_app.py::test_completed_command_becomes_handoff_instead_of_running_session",
+        "apps/personal_launcher/tests/test_personal_launcher_app.py::test_desktop_installer_writes_mac_app_bundle"
+      ],
+      "model_source": "model/vellis/PersonalLauncher.sysml",
+      "requirements": [
+        "invariant.vellis.personal_launcher.public_contracts_only",
+        "invariant.vellis.personal_launcher.truthful_activity",
+        "invariant.vellis.personal_launcher.current_defaults",
+        "invariant.vellis.personal_launcher.transport_outside_components"
+      ],
+      "status": "resolved",
+      "subject": {
+        "role": "application",
+        "type": "PersonalLauncherApplication"
+      },
+      "verification": "PersonalLauncherCompositionVerification"
+    },
+    {
       "evidence_id": "apps/rtg_knowledge_graph/tests/test_rtg_knowledge_graph_app.py#VellisCompositionVerification",
       "evidence_nodes": [
         "apps/rtg_knowledge_graph/tests/test_rtg_knowledge_graph_app.py::test_config_uses_default_storage_root_relative_to_cwd",

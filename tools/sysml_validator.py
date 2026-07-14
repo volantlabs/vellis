@@ -69,9 +69,11 @@ MODEL_ORDER = (
     "vellis/EverydayLifeOntology.sysml",
     "vellis/VellisOperations.sysml",
     "vellis/Vellis.sysml",
+    "vellis/PersonalLauncher.sysml",
     "vellis/use-cases/VellisUseCases.sysml",
     "vellis/realizations/VellisLocalPython.sysml",
     "vellis/realizations/VellisMcpPython.sysml",
+    "vellis/realizations/PersonalLauncherPython.sysml",
     "vellis/views/VellisViews.sysml",
 )
 

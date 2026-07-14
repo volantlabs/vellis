@@ -1,6 +1,18 @@
 {
   "description": "Generated concrete test-node index for modeled verification evidence groups.",
   "groups": {
+    "apps/personal_launcher/tests/test_personal_launcher_app.py#PersonalLauncherCompositionVerification": {
+      "model_source": "model/vellis/PersonalLauncher.sysml",
+      "status": "resolved",
+      "test_nodes": [
+        "apps/personal_launcher/tests/test_personal_launcher_app.py::test_load_or_create_catalog_merges_missing_builtin_apps_without_overwriting",
+        "apps/personal_launcher/tests/test_personal_launcher_app.py::test_service_records_url_handoff_without_active_session",
+        "apps/personal_launcher/tests/test_personal_launcher_app.py::test_missing_file_surface_fails_without_recording_activity",
+        "apps/personal_launcher/tests/test_personal_launcher_app.py::test_command_surface_records_process_session",
+        "apps/personal_launcher/tests/test_personal_launcher_app.py::test_completed_command_becomes_handoff_instead_of_running_session",
+        "apps/personal_launcher/tests/test_personal_launcher_app.py::test_desktop_installer_writes_mac_app_bundle"
+      ]
+    },
     "apps/rtg_knowledge_graph/tests/test_rtg_knowledge_graph_app.py#VellisCompositionVerification": {
       "model_source": "model/vellis/Vellis.sysml",
       "status": "resolved",

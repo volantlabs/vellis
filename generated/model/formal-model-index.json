@@ -26,6 +26,8 @@
     "VellisLocalPythonRealization": "model/vellis/realizations/VellisLocalPython.sysml",
     "VellisMcpPythonRealization": "model/vellis/realizations/VellisMcpPython.sysml",
     "VellisOperations": "model/vellis/VellisOperations.sysml",
+    "VellisPersonalLauncher": "model/vellis/PersonalLauncher.sysml",
+    "VellisPersonalLauncherPythonRealization": "model/vellis/realizations/PersonalLauncherPython.sysml",
     "VellisUseCases": "model/vellis/use-cases/VellisUseCases.sysml",
     "VellisViews": "model/vellis/views/VellisViews.sysml"
   },
@@ -13239,6 +13241,112 @@
       ],
       "source": "model/vellis/VellisOperations.sysml"
     },
+    "VellisPersonalLauncher": {
+      "element_counts": {
+        "BindingConnectorAsUsage": 4,
+        "ConstraintUsage": 4,
+        "Dependency": 25,
+        "Documentation": 15,
+        "EnumerationUsage": 5,
+        "Feature": 6,
+        "FeatureReferenceExpression": 5,
+        "ItemUsage": 3,
+        "LiteralString": 3,
+        "MetadataUsage": 5,
+        "Multiplicity": 21,
+        "Package": 1,
+        "PartDefinition": 1,
+        "PartUsage": 10,
+        "PerformActionUsage": 17,
+        "ReferenceUsage": 32,
+        "RequirementUsage": 9,
+        "SatisfyRequirementUsage": 4,
+        "VerificationCaseDefinition": 1
+      },
+      "named_elements": [
+        {
+          "kind": "PartDefinition",
+          "name": "PersonalLauncherApplication",
+          "short_name": "application.vellis.personal_launcher"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "currentDefaults",
+          "short_name": "invariant.vellis.personal_launcher.current_defaults"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "currentDefaults"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "obj"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "publicContractsOnly",
+          "short_name": "invariant.vellis.personal_launcher.public_contracts_only"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "publicContractsOnly"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "transportOutsideComponents",
+          "short_name": "invariant.vellis.personal_launcher.transport_outside_components"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "transportOutsideComponents"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "truthfulActivity",
+          "short_name": "invariant.vellis.personal_launcher.truthful_activity"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "truthfulActivity"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
+          "name": "PersonalLauncherCompositionVerification"
+        }
+      ],
+      "source": "model/vellis/PersonalLauncher.sysml"
+    },
+    "VellisPersonalLauncherPythonRealization": {
+      "element_counts": {
+        "AllocationUsage": 5,
+        "BindingConnectorAsUsage": 4,
+        "Dependency": 25,
+        "Documentation": 6,
+        "EnumerationUsage": 5,
+        "Feature": 3,
+        "FeatureReferenceExpression": 2,
+        "ItemUsage": 3,
+        "LiteralString": 6,
+        "MetadataUsage": 14,
+        "Multiplicity": 18,
+        "Package": 1,
+        "PartDefinition": 2,
+        "PartUsage": 14,
+        "PerformActionUsage": 17,
+        "ReferenceUsage": 20
+      },
+      "named_elements": [
+        {
+          "kind": "PartDefinition",
+          "name": "PersonalLauncherPython"
+        },
+        {
+          "kind": "PartDefinition",
+          "name": "PythonDesktopRuntimeAdapter"
+        }
+      ],
+      "source": "model/vellis/realizations/PersonalLauncherPython.sysml"
+    },
     "VellisUseCases": {
       "element_counts": {
         "ActionUsage": 18,
@@ -13463,7 +13571,7 @@
     }
   },
   "schema_version": 1,
-  "source_digest": "00b959b47d608507da3b3ebf2b8e6a2c8845f3e17b332298b1cb431ae49bba7b",
+  "source_digest": "f310720bec87ebf3d0964752bf74b0edd2a970c2dd2d5442cd97fc88a5a63364",
   "validator": {
     "implementation_version": "0.50.0",
     "provider": "Systems-Modeling/SysML-v2-Pilot-Implementation",

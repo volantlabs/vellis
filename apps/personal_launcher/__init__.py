@@ -1,0 +1,1 @@
+"""Personal launcher reference app."""

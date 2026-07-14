@@ -304,6 +304,8 @@ Default recipes:
 - `just model-package`: build independently packageable KPAR products.
 - `just model-handoff TARGET=<stable-id>`: inspect the model slice and verification objectives for an implementation handoff.
 - `just model-audit [stable-id]`: write an ignored advisory model/implementation evidence bundle without changing either side.
+- `just launcher-dev`: launch the Personal Launcher local web UI.
+- `just launcher-app`: install or refresh the macOS Personal Launcher wrapper.
 - `just check`: run lint, type checking, skill validation, model checks, and tests.
 
 Run Python commands through `uv run` unless there is a specific reason to use another interpreter.

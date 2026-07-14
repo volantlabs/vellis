@@ -33,6 +33,7 @@ dependencies = [
 [project.scripts]
 vellis = "apps.rtg_knowledge_graph.main:main"
 vellis-rtg-knowledge-graph = "apps.rtg_knowledge_graph.main:main"
+vellis-personal-launcher = "apps.personal_launcher.main:main"
 
 [project.urls]
 Repository = "https://github.com/volantlabs/vellis"
@@ -57,6 +58,9 @@ exclude = [
 [tool.setuptools.package-data]
 "apps.rtg_knowledge_graph" = [
     "resources/*.json",
+]
+"apps.personal_launcher" = [
+    "static/*",
 ]
 
 [dependency-groups]

@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Vellis Launcher</title>
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <section class="workspace" aria-label="Apps">
+        <header class="topbar">
+          <div class="brand">
+            <img src="/static/vellis-launcher.svg" alt="" />
+            <div class="brandCopy">
+              <h1>Vellis Launcher</h1>
+              <p id="statusLine" aria-live="polite">Ready</p>
+            </div>
+          </div>
+          <div class="searchBox">
+            <label class="visuallyHidden" for="searchInput">Search apps</label>
+            <input id="searchInput" type="search" autocomplete="off" placeholder="Search apps" />
+          </div>
+        </header>
+        <div class="libraryHeader">
+          <h2>Apps</h2>
+          <span id="resultCount" class="resultCount">0 apps</span>
+        </div>
+        <nav id="tagRail" class="tagRail" aria-label="Filter apps by tag"></nav>
+        <section id="appGrid" class="appGrid" aria-label="App list"></section>
+      </section>
+      <aside class="sessionsPanel" aria-label="Activity">
+        <div class="panelHeader">
+          <div class="panelTitle">
+            <h2>Activity</h2>
+            <span id="sessionCount" class="sessionCount">0</span>
+          </div>
+          <button
+            id="refreshButton"
+            class="iconButton"
+            type="button"
+            aria-label="Refresh activity"
+            title="Refresh activity"
+          >
+            ↻
+          </button>
+        </div>
+        <section class="activitySection" aria-labelledby="managedSessionsLabel">
+          <h3 id="managedSessionsLabel">Managed sessions</h3>
+          <div id="activeApp" class="activeApp" aria-label="Active managed session"></div>
+          <div id="sessionList" class="sessionList" aria-label="Managed session list"></div>
+        </section>
+        <section class="activitySection recentSection" aria-labelledby="recentLaunchesLabel">
+          <h3 id="recentLaunchesLabel">Recent launches</h3>
+          <div id="recentList" class="recentList" aria-label="Recent launch list"></div>
+        </section>
+      </aside>
+    </main>
+    <script src="/static/app.js"></script>
+  </body>
+</html>

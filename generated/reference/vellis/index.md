@@ -16,6 +16,15 @@ Generated from textual SysML v2 by `just model-render` as a non-normative readin
 | `changeValidator` | `component.rtg.change_validation` |
 | `controller` | `component.rtg.controller` |
 
+## Personal Launcher composition
+
+| Personal Launcher role | Logical type | Provider |
+|---|---|---|
+| `catalog` | `AppCatalog` | `component.app.catalog` |
+| `runtimeAdapter` | `RuntimeAdapter` | `external runtime capability` |
+| `launcher` | `AppLauncher` | `component.app.launcher` |
+| `shell` | `AppShell` | `component.app.shell` |
+
 ## Everyday Life starter ontology
 
 Ontology `ontology.vellis.everyday_life` version `1` is generated as schema-only bootstrap material. It contains no people, tasks, or other graph facts.
@@ -76,6 +85,15 @@ Ontology `ontology.vellis.everyday_life` version `1` is generated as schema-only
 | `facade` | `VellisApplicationFacade` | `PythonVellisFacade` | `apps.rtg_knowledge_graph.mcp_toolset.RtgMcpToolset` |
 | `starterOntologyInstaller` | `EverydayLifeOntologyInstaller` | `PythonEverydayLifeOntologyInstaller` | `apps.rtg_knowledge_graph.starter_schema.install_everyday_life_ontology` |
 
+## Personal Launcher Python realization
+
+| Personal Launcher role | Logical type | Python realization | Implementation symbol |
+|---|---|---|---|
+| `catalog` | `Bibliotek component realization` | `InMemoryAppCatalog` | `See Bibliotek Python realization` |
+| `runtimeAdapter` | `RuntimeAdapter` | `PythonDesktopRuntimeAdapter` | `apps.personal_launcher.runtime.DesktopRuntimeAdapter` |
+| `launcher` | `Bibliotek component realization` | `InMemoryAppLauncher` | `See Bibliotek Python realization` |
+| `shell` | `Bibliotek component realization` | `InMemoryAppShell` | `See Bibliotek Python realization` |
+
 ## Requirements and satisfaction
 
 | Stable ID | Subject | Satisfier | Required constraint |
@@ -83,6 +101,10 @@ Ontology `ontology.vellis.everyday_life` version `1` is generated as schema-only
 | `invariant.vellis.bibliotek_public_contracts_only` | `VellisApplication` | `application` | Vellis consumes Bibliotek roles only through modeled public contracts. |
 | `invariant.vellis.discovery_draft_unbound` | `VellisApplication` | `application` | The draft curated discovery component is not part of the current application. |
 | `invariant.vellis.transport_outside_controller` | `VellisApplication` | `application` | MCP transport and app shaping remain outside the RTG controller. |
+| `invariant.vellis.personal_launcher.public_contracts_only` | `PersonalLauncherApplication` | `application` | The launcher composes catalog, launcher, shell, and runtime roles only through their modeled public contracts. |
+| `invariant.vellis.personal_launcher.truthful_activity` | `PersonalLauncherApplication` | `application` | Managed runtime surfaces produce launcher-owned sessions; handed-off or already completed surfaces produce bounded recent activity without false runtime ownership. |
+| `invariant.vellis.personal_launcher.current_defaults` | `PersonalLauncherApplication` | `application` | Built-in repository-local catalog entries name only surfaces available in the current Vellis distribution; optional applications enter through explicit catalog records when installed. |
+| `invariant.vellis.personal_launcher.transport_outside_components` | `PersonalLauncherApplication` | `application` | HTTP serving, browser opening, and desktop-wrapper installation remain application adapters and do not enter reusable component contracts. |
 | `contract.vellis.facade.failures` | `VellisApplicationFacade` | `facade` | Input decoding rejects unknown fields, wrong JSON kinds, invalid enum literals, missing required values, and contradictory option shapes as VellisRequestInvalid before controller invocation. Modeled Bibliotek failures propagate without changing their concrete type, message, diagnostic, transaction identity, or validation evidence. |
 | `contract.vellis.facade.implementation_freedom` | `VellisApplicationFacade` | `facade` | The facade may choose any implementation language or helper decomposition but must preserve the modeled request compilation, controller invocation, response shaping, defaults, ordering, and no-effect guarantees. |
 | `contract.vellis.facade.usage_guides` | `RtgGetUsageGuide` | `facade.rtgGetUsageGuide` | The fifteen guide topics cover: the installed Everyday Life schema; safe RTG schema design and evolution; compact machine-readable tool capabilities; MCP bootstrap sequence; concise operator rules; state-driven workflows; ordinary-request-to-workflow mapping; minimal schema staging; exact top-level tool shapes; live writes; identity lookup before links; query construction; snapshot/restore/replay recovery; durable migration history; and safe abandonment. Generic examples do not silently replace or specialize an application's modeled schema. |
@@ -130,6 +152,7 @@ Ontology `ontology.vellis.everyday_life` version `1` is generated as schema-only
 | Verification | Subject | Objectives | Evidence |
 |---|---|---|---|
 | `VellisCompositionVerification` | `VellisApplication` | `bibliotekOnlyThroughContracts`, `discoveryDraftUnbound`, `transportOutsideController` | `apps/rtg_knowledge_graph/tests/test_rtg_knowledge_graph_app.py#VellisCompositionVerification` |
+| `PersonalLauncherCompositionVerification` | `PersonalLauncherApplication` | `publicContractsOnly`, `truthfulActivity`, `currentDefaults`, `transportOutsideComponents` | `apps/personal_launcher/tests/test_personal_launcher_app.py#PersonalLauncherCompositionVerification` |
 | `RtgGetUsageGuideContractVerification` | `RtgGetUsageGuide` | `usageGuideSemantics`, `rtgGetUsageGuideFailureSemantics` | `apps/rtg_knowledge_graph/tests/test_rtg_knowledge_graph_mcp_user_flows.py#RtgGetUsageGuideContractVerification` |
 | `RtgStageSchemaMigrationContractVerification` | `RtgStageSchemaMigration` | `schemaMigrationCompilation`, `rtgStageSchemaMigrationFailureSemantics` | `apps/rtg_knowledge_graph/tests/test_rtg_knowledge_graph_mcp_user_flows.py#RtgStageSchemaMigrationContractVerification` |
 | `RtgGetSystemStateContractVerification` | `RtgGetSystemState` | `rtgGetSystemStateFailureSemantics` | `apps/rtg_knowledge_graph/tests/test_rtg_knowledge_graph_mcp_user_flows.py#RtgGetSystemStateContractVerification` |
