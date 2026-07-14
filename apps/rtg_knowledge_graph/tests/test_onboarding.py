@@ -98,7 +98,7 @@ def test_json_commands_require_explicit_ambiguous_client_without_prompting(
     monkeypatch: pytest.MonkeyPatch,
     command: str,
 ) -> None:
-    monkeypatch.setattr(onboarding, "detected_clients", lambda: ("codex", "claude-code"))
+    monkeypatch.setattr(onboarding, "detected_clients", lambda **_kwargs: ("codex", "claude-code"))
     arguments = [command, "--data-dir", str(tmp_path / command), "--json"]
     if command == "setup":
         arguments.append("--yes")
@@ -113,7 +113,7 @@ def test_json_commands_require_explicit_ambiguous_client_without_prompting(
 
 
 def test_client_selection_uses_injected_streams(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(onboarding, "detected_clients", lambda: ("codex", "claude-code"))
+    monkeypatch.setattr(onboarding, "detected_clients", lambda **_kwargs: ("codex", "claude-code"))
     input_stream = TtyStringIO("2\n")
     output_stream = StringIO()
 
@@ -134,7 +134,7 @@ def test_client_selection_uses_injected_streams(monkeypatch: pytest.MonkeyPatch)
 
 
 def test_client_selection_reports_eof_cleanly(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(onboarding, "detected_clients", lambda: ("codex", "claude-code"))
+    monkeypatch.setattr(onboarding, "detected_clients", lambda **_kwargs: ("codex", "claude-code"))
 
     with pytest.raises(onboarding.VellisStartupFailed, match="interactive input ended"):
         select_client(
@@ -159,6 +159,46 @@ def test_setup_remains_interactive_with_injected_streams(tmp_path: Path) -> None
     assert result.client == "generic-json"
     assert result.registration.startswith("written:")
     assert output_stream.getvalue().endswith("Continue? [y/N] ")
+
+
+def test_auto_client_selection_uses_supplied_environment(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    paths: list[str | None] = []
+
+    def fake_which(executable: str, *, path: str | None = None) -> str | None:
+        paths.append(path)
+        return f"/fake/{executable}" if path == "/fake-bin" else None
+
+    monkeypatch.setattr(onboarding.shutil, "which", fake_which)
+    env = {"HOME": str(tmp_path), "PATH": "/fake-bin"}
+
+    assert onboarding.detected_clients(env=env) == ("codex", "claude-code")
+    assert paths == ["/fake-bin", "/fake-bin"]
+
+
+def test_generic_setup_prints_a_plain_configuration_path(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    data_dir = tmp_path / "data"
+
+    assert (
+        main(
+            [
+                "setup",
+                "--client",
+                "generic-json",
+                "--data-dir",
+                str(data_dir),
+                "--yes",
+            ]
+        )
+        == 0
+    )
+    output = capsys.readouterr().out
+    expected = data_dir / "setup" / "mcp-config.json"
+    assert f"configuration at {expected}" in output
+    assert "configuration at written:" not in output
 
 
 def test_setup_preserves_legacy_flat_storage_root_as_the_data_location(

@@ -73,13 +73,18 @@ def config_for_data_dir(
     )
 
 
-def detected_clients(*, home: Path | None = None) -> tuple[str, ...]:
+def detected_clients(
+    *,
+    home: Path | None = None,
+    env: Mapping[str, str] | None = None,
+) -> tuple[str, ...]:
+    path = None if env is None else env.get("PATH", "")
     detected: list[str] = []
-    if shutil.which("codex"):
+    if shutil.which("codex", path=path):
         detected.append("codex")
-    if shutil.which("claude"):
+    if shutil.which("claude", path=path):
         detected.append("claude-code")
-    if _claude_desktop_config_path(home=home).parent.exists():
+    if _claude_desktop_config_path(home=home, env=env).parent.exists():
         detected.append("claude-desktop")
     return tuple(detected)
 
@@ -90,10 +95,11 @@ def select_client(
     interactive: bool = True,
     input_stream: Any = None,
     output_stream: Any = None,
+    env: Mapping[str, str] | None = None,
 ) -> str:
     if requested != "auto":
         return requested
-    choices = detected_clients()
+    choices = detected_clients(home=_home(env), env=env)
     if len(choices) == 1:
         return choices[0]
     if not choices:
@@ -133,6 +139,7 @@ def setup_vellis(
         interactive=interactive,
         input_stream=input_stream,
         output_stream=output_stream,
+        env=env,
     )
     if not yes and not interactive:
         raise VellisStartupFailed("non-interactive setup requires --yes")
@@ -156,11 +163,15 @@ def setup_vellis(
         stream = input_stream or sys.stdin
         if not stream.isatty():
             raise VellisStartupFailed("setup confirmation requires a terminal or --yes")
-        answer = _prompt(
-            "Continue? [y/N] ",
-            input_stream=stream,
-            output_stream=output,
-        ).strip().lower()
+        answer = (
+            _prompt(
+                "Continue? [y/N] ",
+                input_stream=stream,
+                output_stream=output,
+            )
+            .strip()
+            .lower()
+        )
         if answer not in {"y", "yes"}:
             raise VellisStartupFailed("setup cancelled")
 
@@ -274,6 +285,7 @@ def doctor_report(
         interactive=interactive,
         input_stream=input_stream,
         output_stream=output_stream,
+        env=env,
     )
     metadata = mcp_launch_metadata(config)
     server = _single_server(metadata["client_config"])

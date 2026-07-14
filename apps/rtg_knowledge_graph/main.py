@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import argparse
-import io
 import json
 import os
 import shlex
@@ -185,14 +184,15 @@ def _run_command(args: argparse.Namespace, config: RtgKnowledgeGraphConfig) -> i
             client=args.client,
             yes=args.yes,
             interactive=not args.json,
-            output_stream=io.StringIO() if args.json else None,
+            output_stream=sys.stderr if args.json else None,
         )
         if args.json:
             print(json.dumps(result.to_json_value(), sort_keys=True))
         else:
             if result.client == "generic-json":
+                registration_path = result.registration.removeprefix("written:")
                 print(
-                    f"\nAdd the complete MCP configuration at {result.registration} to your client."
+                    f"\nAdd the complete MCP configuration at {registration_path} to your client."
                 )
             print("\nVellis is ready. Restart or reload your MCP client, then say:\n")
             print(f'  "{result.first_prompt}"')

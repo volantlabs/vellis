@@ -27,6 +27,19 @@ Then tell the agent:
 One graph can be personal or can represent shared household or family responsibilities; Vellis
 does not create accounts, profiles, or workspaces.
 
+## Start Vellis again
+
+After the initial setup, open or reload the configured AI client. The client starts the local
+Vellis process when it needs the tools, and Vellis recovers the durable graph automatically. You
+do not need to return to the repository, rerun setup, or keep a separate server terminal open.
+
+If the client does not show the Vellis tools, fully restart or reload it. Then run the
+non-destructive check from the repository if the problem remains:
+
+```sh
+uv run vellis doctor
+```
+
 ## What is installed
 
 The schema can represent people and groups; ongoing areas of responsibility; goals, projects,

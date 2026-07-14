@@ -63,8 +63,10 @@ selected client, then say:
 > details and show me what you propose before making a large initial write.
 
 That is the complete ordinary setup path—no MCP JSON editing, raw tool calls, schema construction,
-or snapshots are required. State is stored unencrypted under `.data/rtg_knowledge_graph/`, ignored
-by Git, and recovered automatically across MCP process restarts. See the
+or snapshots are required. After the first setup, opening or reloading the configured client starts
+Vellis automatically; do not launch a second server in a terminal. State is stored unencrypted
+under `.data/rtg_knowledge_graph/`, ignored by Git, and recovered automatically across MCP process
+restarts. See the
 [plain-language getting-started guide](docs/guides/vellis/getting-started.md) for backups, reset,
 troubleshooting with `uv run vellis doctor`, shared-family use, and advanced local HTTP mode.
 

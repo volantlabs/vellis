@@ -87,7 +87,8 @@ Setup recovers the ledger, installs the starter schema only for a genuinely empt
 the result, and registers the stdio MCP server user-wide with Codex, Claude Code, Claude Desktop,
 or a generic JSON client. The generated launch uses absolute paths and the client owns the server
 process. The same `uv run vellis setup` path works on native Windows without Bash or `just`. Use
-`uv run vellis doctor` for a non-destructive check.
+`uv run vellis doctor` for a non-destructive check. After setup, opening or reloading that client
+is the normal startup path; do not run a second stdio server in a terminal.
 
 The `setup --json` and `doctor --json` forms are non-interactive interfaces for scripts and agents.
 They emit exactly one JSON document on stdout and never prompt. Pass `--yes` to authorize setup and
