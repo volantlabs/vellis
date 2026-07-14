@@ -293,6 +293,12 @@ Default recipes:
 - `just format`: format Python code with Ruff.
 - `just skills-check`: validate repo-local skill metadata.
 - `just skills-sync`: expose `.agents/skills` source-of-truth skills in Claude Code's `.claude/skills` project-skill layout.
+- `just graph-sync`: synchronize the ignored local repo twin from the parser-backed SysML inventory and repository files.
+- `just graph-check`: check the synchronized twin for authority, implementation, test, and evidence drift.
+- `just graph-report`: render model-to-realization traceability from the local twin.
+- `just graph-query`: run canned component, orphan, evidence, and blast-radius queries.
+- `just graph-evidence`: run a verification command and record graph-linked evidence.
+- `just graph-verify`: synchronize and check the local twin.
 - `just model-setup`: fetch and checksum-verify the pinned official validator, formal libraries, and Java runtime.
 - `just model-check`: run official SysML validation plus profile, architecture, implementation-binding, and generated-artifact checks.
 - `just model-check-formal`: run the pinned official SysML validator directly.
@@ -306,9 +312,35 @@ Default recipes:
 - `just model-audit [stable-id]`: write an ignored advisory model/implementation evidence bundle without changing either side.
 - `just launcher-dev`: launch the Personal Launcher local web UI.
 - `just launcher-app`: install or refresh the macOS Personal Launcher wrapper.
-- `just check`: run lint, type checking, skill validation, model checks, and tests.
+- `just check`: run lint, type checking, skill validation, model checks, evidence-wrapped tests, and repo-twin verification.
 
 Run Python commands through `uv run` unless there is a specific reason to use another interpreter.
+
+## Repo Digital Twin
+
+The local repo twin is a deterministic, disposable RTG projection stored under
+`.data/repo-twin`. Textual SysML remains authoritative: the twin reads the current
+parser-backed inventory in `generated/model/formal-model-index.json`, authored component models,
+Python realization roots, tests, and applications. It must never recreate the retired Markdown
+component-contract tree or
+become a second contract authority.
+
+For repo-structure questions, run `just graph-report` or `just graph-query <name>` before
+re-reading the full source tree. Canned queries are `components`, `orphans`, `unimplemented`,
+`untested`, `evidence <component-id>`, and `blast-radius <component-id>`.
+
+The importer fails closed when the formal inventory is missing or stale and preserves an existing
+twin rather than pruning from partial authority. Run `just model-render` to refresh the inventory,
+then `just graph-verify`. Never edit `.data/repo-twin` by hand. If the twin itself is corrupt,
+preserve any needed local snapshot or ledger first; it can then be rebuilt because the repository
+is authoritative. Evidence records are the only non-derivable data and are refreshed by
+`test-evidence` during `just check`.
+
+Treat `changed_contract` and `missing_evidence` as warnings requiring review and a fresh wrapped
+test run when the change is intentional. Fix error findings such as `orphan_spec`,
+`orphan_code_root`, `duplicate_component_id`, and `parse_error` at their repository source. The
+experiment log, standing anomalies, and review trigger live in
+`docs/experiments/repo-digital-twin-review-notes.md`.
 
 ## Runtime Neutrality
 

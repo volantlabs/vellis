@@ -7,7 +7,7 @@ setup:
     @uv sync --dev
 
 test:
-    @if find apps components tests -path '*/test_*.py' -print -quit 2>/dev/null | grep -q .; then uv run pytest; else echo "No tests found."; fi
+    @if find apps components tests tools -path '*/test_*.py' -print -quit 2>/dev/null | grep -q .; then uv run pytest; else echo "No tests found."; fi
 
 lint:
     @uv run ruff check .
@@ -21,6 +21,29 @@ skills-check:
 
 skills-sync:
     @uv run python tools/sync_agent_skills.py
+
+graph-sync storage_root=".data/repo-twin":
+    @uv run python -m tools.repo_twin sync --storage-root {{storage_root}}
+
+graph-check storage_root=".data/repo-twin":
+    @uv run python -m tools.repo_twin check --storage-root {{storage_root}}
+
+graph-report storage_root=".data/repo-twin" format="markdown":
+    @uv run python -m tools.repo_twin report --storage-root {{storage_root}} --format {{format}}
+
+graph-query name *args:
+    @uv run python -m tools.repo_twin query {{name}} {{args}}
+
+graph-evidence kind *command:
+    @uv run python -m tools.repo_twin evidence {{kind}} -- {{command}}
+
+# Run tests through the evidence wrapper so ordinary checks refresh model/realization evidence.
+test-evidence:
+    @uv run python -m tools.repo_twin evidence test_run -- just test
+
+graph-verify storage_root=".data/repo-twin":
+    @uv run python -m tools.repo_twin sync --storage-root {{storage_root}}
+    @uv run python -m tools.repo_twin check --storage-root {{storage_root}}
 
 typecheck:
     @uv run basedpyright
@@ -123,4 +146,4 @@ launcher-dev host="127.0.0.1" port="18777":
 launcher-app destination="":
     @if [ -n "{{destination}}" ]; then uv run python -m apps.personal_launcher install-desktop-app --desktop-app-path "{{destination}}"; else uv run python -m apps.personal_launcher install-desktop-app; fi
 
-check: lint typecheck skills-check model-check test
+check: lint typecheck skills-check model-check test-evidence graph-verify

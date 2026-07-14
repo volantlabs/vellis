@@ -142,11 +142,20 @@ library package BibliotekRtgEvidenceBoundedSynthesis {
         subject operation : SynthesizeEvidenceBoundedClaims;
         require constraint { doc /* Malformed request, source status, intent, source citation, generator result, claim, or limitation raises RtgEvidenceBoundedSynthesisInvalid, returns no partial record, and leaves caller inputs unchanged. */ }
     }
+    requirement <'contract.rtg.evidence_bounded_synthesis.generate.failures'> generateSemanticDraftFailureSemantics {
+        subject operation : GenerateSemanticDraft;
+        require constraint { doc /* The logical generator capability defines no component-owned failure outcome; a provider-specific failure returns no partial draft and remains the supplied provider's error rather than fabricated evidence-bounded output. */ }
+    }
+    requirement <'contract.rtg.evidence_bounded_synthesis.open.failures'> openRtgEvidenceBoundedSynthesizerFailureSemantics {
+        subject operation : OpenRtgEvidenceBoundedSynthesizer;
+        require constraint { doc /* A missing generator capability creates no synthesizer and construction performs no generation, graph access, provider selection, network call, or external side effect. */ }
+    }
 
     part contractContext {
         part synthesizer : RtgEvidenceBoundedSynthesizer;
         part generator : RtgSemanticDraftGenerator;
         satisfy generatorCapability by generator.generate;
+        satisfy generateSemanticDraftFailureSemantics by generator.generate;
         satisfy synthesisStatus by synthesizer.synthesize;
         satisfy sourceEnvelope by synthesizer.synthesize;
         satisfy failClosedDraft by synthesizer.synthesize;
@@ -158,11 +167,13 @@ library package BibliotekRtgEvidenceBoundedSynthesis {
         satisfy readOnly by synthesizer;
         satisfy intentionalBoundary by synthesizer;
         satisfy synthesizeFailureSemantics by synthesizer.synthesize;
+        action openSubject : OpenRtgEvidenceBoundedSynthesizer;
+        satisfy openRtgEvidenceBoundedSynthesizerFailureSemantics by openSubject;
     }
 
     verification def SemanticDraftGeneratorContractVerification {
         subject operation : GenerateSemanticDraft;
-        objective { verify generatorCapability; }
+        objective { verify generatorCapability; verify generateSemanticDraftFailureSemantics; }
         @EvidenceBinding { evidenceId = "components/rtg/evidence_bounded_synthesis/tests/test_rtg_evidence_bounded_synthesis_contract.py#SemanticDraftGeneratorContractVerification"; implementationScope = "ReferenceSemanticDraftGenerator"; }
     }
     verification def SynthesizeEvidenceBoundedClaimsContractVerification {
@@ -177,7 +188,7 @@ library package BibliotekRtgEvidenceBoundedSynthesis {
     }
     verification def OpenRtgEvidenceBoundedSynthesizerContractVerification {
         subject operation : OpenRtgEvidenceBoundedSynthesizer;
-        objective { verify intentionalBoundary; }
+        objective { verify openRtgEvidenceBoundedSynthesizerFailureSemantics; }
         @EvidenceBinding { evidenceId = "components/rtg/evidence_bounded_synthesis/tests/test_rtg_evidence_bounded_synthesis_contract.py#OpenRtgEvidenceBoundedSynthesizerContractVerification"; implementationScope = "EvidenceBoundedRtgSynthesizer.open"; }
     }
 }

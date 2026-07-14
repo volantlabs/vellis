@@ -58,6 +58,8 @@ Generated from textual SysML v2 by `just model-render` as a non-normative readin
 | `invariant.rtg.evidence_bounded_synthesis.read_only` | `RtgEvidenceBoundedSynthesizer` | `synthesizer` | Synthesis deep-isolates generator input and mutates no request, source record, citation, read, bridge, candidate, generator-owned value, graph, or external artifact. |
 | `contract.rtg.evidence_bounded_synthesis.intentional_boundary` | `RtgEvidenceBoundedSynthesizer` | `synthesizer` | The component executes no graph query or MCP tool, resolves no citation, traverses or promotes no bridge, restores no snapshot, joins or merges no identities, selects no provider, proves no factual correctness, and writes no claim or fact. |
 | `contract.rtg.evidence_bounded_synthesis.synthesize.failures` | `SynthesizeEvidenceBoundedClaims` | `synthesizer.synthesize` | Malformed request, source status, intent, source citation, generator result, claim, or limitation raises RtgEvidenceBoundedSynthesisInvalid, returns no partial record, and leaves caller inputs unchanged. |
+| `contract.rtg.evidence_bounded_synthesis.generate.failures` | `GenerateSemanticDraft` | `generator.generate` | The logical generator capability defines no component-owned failure outcome; a provider-specific failure returns no partial draft and remains the supplied provider's error rather than fabricated evidence-bounded output. |
+| `contract.rtg.evidence_bounded_synthesis.open.failures` | `OpenRtgEvidenceBoundedSynthesizer` | `openSubject` | A missing generator capability creates no synthesizer and construction performs no generation, graph access, provider selection, network call, or external side effect. |
 
 ## Public values and items
 
@@ -83,9 +85,9 @@ Generated from textual SysML v2 by `just model-render` as a non-normative readin
 
 | Verification | Subject | Objectives | Evidence |
 |---|---|---|---|
-| `SemanticDraftGeneratorContractVerification` | `GenerateSemanticDraft` | `generatorCapability` | `components/rtg/evidence_bounded_synthesis/tests/test_rtg_evidence_bounded_synthesis_contract.py#SemanticDraftGeneratorContractVerification` |
+| `SemanticDraftGeneratorContractVerification` | `GenerateSemanticDraft` | `generatorCapability`, `generateSemanticDraftFailureSemantics` | `components/rtg/evidence_bounded_synthesis/tests/test_rtg_evidence_bounded_synthesis_contract.py#SemanticDraftGeneratorContractVerification` |
 | `SynthesizeEvidenceBoundedClaimsContractVerification` | `SynthesizeEvidenceBoundedClaims` | `synthesisStatus`, `sourceEnvelope`, `failClosedDraft`, `noEvidenceShortCircuit`, `synthesizeFailureSemantics` | `components/rtg/evidence_bounded_synthesis/tests/test_rtg_evidence_bounded_synthesis_contract.py#SynthesizeEvidenceBoundedClaimsContractVerification` |
 | `RtgEvidenceBoundedSynthesizerBoundaryVerification` | `RtgEvidenceBoundedSynthesizer` | `sourceBoundClaims`, `crossGraphComparison`, `inferenceDisclosure`, `noEntailmentClaim`, `readOnly`, `intentionalBoundary` | `components/rtg/evidence_bounded_synthesis/tests/test_rtg_evidence_bounded_synthesis_contract.py#RtgEvidenceBoundedSynthesizerBoundaryVerification` |
-| `OpenRtgEvidenceBoundedSynthesizerContractVerification` | `OpenRtgEvidenceBoundedSynthesizer` | `intentionalBoundary` | `components/rtg/evidence_bounded_synthesis/tests/test_rtg_evidence_bounded_synthesis_contract.py#OpenRtgEvidenceBoundedSynthesizerContractVerification` |
+| `OpenRtgEvidenceBoundedSynthesizerContractVerification` | `OpenRtgEvidenceBoundedSynthesizer` | `openRtgEvidenceBoundedSynthesizerFailureSemantics` | `components/rtg/evidence_bounded_synthesis/tests/test_rtg_evidence_bounded_synthesis_contract.py#OpenRtgEvidenceBoundedSynthesizerContractVerification` |
 
 Equivalent private algorithms, helpers, storage layouts, and implementation-language inheritance remain implementation choices.

@@ -1657,7 +1657,7 @@
       ],
       "model_source": "model/bibliotek/components/component.rtg.evidence_bounded_synthesis.sysml",
       "requirements": [
-        "contract.rtg.evidence_bounded_synthesis.intentional_boundary"
+        "contract.rtg.evidence_bounded_synthesis.open.failures"
       ],
       "status": "resolved",
       "subject": {
@@ -1699,7 +1699,8 @@
       ],
       "model_source": "model/bibliotek/components/component.rtg.evidence_bounded_synthesis.sysml",
       "requirements": [
-        "contract.rtg.evidence_bounded_synthesis.generator_capability"
+        "contract.rtg.evidence_bounded_synthesis.generator_capability",
+        "contract.rtg.evidence_bounded_synthesis.generate.failures"
       ],
       "status": "resolved",
       "subject": {

@@ -287,6 +287,12 @@ Useful recipes:
 - `just model-audit [stable-id]`: collect an advisory model/implementation drift evidence bundle
 - `just skills-check`: validate repo-local skill metadata
 - `just skills-sync`: expose source-of-truth repo skills in Claude Code's project-skill layout
+- `just graph-sync`: derive the local repo twin from the parser-backed SysML inventory and repository files
+- `just graph-check`: report stale twin data, authority/realization drift, missing tests, and stale evidence
+- `just graph-report`: render component-to-model-to-code traceability from the local twin
+- `just graph-query <name>`: run a canned component, orphan, evidence, or blast-radius query
+- `just graph-evidence <kind> <command...>`: run a command and attach its result to the local twin
+- `just graph-verify`: synchronize and check the ignored local repo twin
 - `just rtg`: launch the RTG Knowledge Graph app with default local `.data/` storage
 - `uv run vellis setup`: install/recover the starter schema and configure a local MCP client
 - `uv run vellis doctor`: non-destructively inspect local state and client registration
@@ -304,7 +310,7 @@ Useful recipes:
 - `vellis`: short console script for setup, doctor, and the RTG Knowledge Graph app
 - `vellis-rtg-knowledge-graph`: preserved compatibility console script
 - `vellis-personal-launcher`: installed console script for the Personal Launcher
-- `just check`: run lint, type checking, skill validation, model checks, and tests
+- `just check`: run lint, type checking, skill validation, model checks, evidence-wrapped tests, and repo-twin verification
 
 Launch the first application with the default local `.data/` storage:
 

@@ -49,7 +49,7 @@
         "LibraryPackage": 1,
         "PartDefinition": 26,
         "PartUsage": 20,
-        "RequirementUsage": 448,
+        "RequirementUsage": 450,
         "VerificationCaseDefinition": 159
       },
       "named_elements": [
@@ -2859,6 +2859,11 @@
         },
         {
           "kind": "RequirementUsage",
+          "name": "generateSemanticDraftFailureSemantics",
+          "short_name": "contract.rtg.evidence_bounded_synthesis.generate.failures"
+        },
+        {
+          "kind": "RequirementUsage",
           "name": "generatorCapability",
           "short_name": "contract.rtg.evidence_bounded_synthesis.generator_capability"
         },
@@ -3591,6 +3596,11 @@
           "kind": "RequirementUsage",
           "name": "openRtgControllerFailureSemantics",
           "short_name": "contract.rtg.controller.open_rtg_controller.failures"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "openRtgEvidenceBoundedSynthesizerFailureSemantics",
+          "short_name": "contract.rtg.evidence_bounded_synthesis.open.failures"
         },
         {
           "kind": "RequirementUsage",
@@ -8863,16 +8873,17 @@
     "BibliotekRtgEvidenceBoundedSynthesis": {
       "element_counts": {
         "ActionDefinition": 3,
+        "ActionUsage": 2,
         "AttributeDefinition": 7,
         "AttributeUsage": 35,
         "BindingConnectorAsUsage": 1,
-        "ConstraintUsage": 12,
+        "ConstraintUsage": 14,
         "Dependency": 1,
-        "Documentation": 33,
+        "Documentation": 35,
         "EnumerationDefinition": 3,
         "EnumerationUsage": 16,
-        "Feature": 21,
-        "FeatureReferenceExpression": 14,
+        "Feature": 24,
+        "FeatureReferenceExpression": 16,
         "LibraryPackage": 1,
         "LiteralInfinity": 9,
         "LiteralInteger": 14,
@@ -8884,9 +8895,9 @@
         "PartDefinition": 2,
         "PartUsage": 5,
         "PerformActionUsage": 2,
-        "ReferenceUsage": 75,
-        "RequirementUsage": 29,
-        "SatisfyRequirementUsage": 12,
+        "ReferenceUsage": 80,
+        "RequirementUsage": 32,
+        "SatisfyRequirementUsage": 14,
         "VerificationCaseDefinition": 4
       },
       "named_elements": [
@@ -8971,6 +8982,15 @@
         },
         {
           "kind": "RequirementUsage",
+          "name": "generateSemanticDraftFailureSemantics",
+          "short_name": "contract.rtg.evidence_bounded_synthesis.generate.failures"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "generateSemanticDraftFailureSemantics"
+        },
+        {
+          "kind": "RequirementUsage",
           "name": "generatorCapability",
           "short_name": "contract.rtg.evidence_bounded_synthesis.generator_capability"
         },
@@ -8991,10 +9011,6 @@
           "kind": "RequirementUsage",
           "name": "intentionalBoundary",
           "short_name": "contract.rtg.evidence_bounded_synthesis.intentional_boundary"
-        },
-        {
-          "kind": "RequirementUsage",
-          "name": "intentionalBoundary"
         },
         {
           "kind": "RequirementUsage",
@@ -9033,6 +9049,15 @@
         {
           "kind": "RequirementUsage",
           "name": "obj"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "openRtgEvidenceBoundedSynthesizerFailureSemantics",
+          "short_name": "contract.rtg.evidence_bounded_synthesis.open.failures"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "openRtgEvidenceBoundedSynthesizerFailureSemantics"
         },
         {
           "kind": "RequirementUsage",
@@ -15221,7 +15246,7 @@
     }
   },
   "schema_version": 1,
-  "source_digest": "351f79332d9be806cb9fa29b7a012a1cce171af65b267068cdbd0b7eef3935f4",
+  "source_digest": "8d708d098aa208de3f14dcc12f658d1366cd6573afe20c820f68b3cd121c661f",
   "validator": {
     "implementation_version": "0.50.0",
     "provider": "Systems-Modeling/SysML-v2-Pilot-Implementation",

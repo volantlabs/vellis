@@ -91,6 +91,7 @@ testpaths = [
     "apps",
     "components",
     "tests",
+    "tools",
 ]
 python_files = [
     "test_*.py",
