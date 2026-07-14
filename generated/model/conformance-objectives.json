@@ -334,6 +334,133 @@
       "verification": "SupportsRuntimeSurfaceContractVerification"
     },
     {
+      "evidence_id": "components/app/shell/tests/test_app_shell_contract.py#AppShellBoundaryVerification",
+      "evidence_nodes": [
+        "components/app/shell/tests/test_app_shell_contract.py::test_open_shell_does_not_launch_or_attach_apps",
+        "components/app/shell/tests/test_app_shell_contract.py::test_open_app_launches_through_launcher_and_sets_active_app",
+        "components/app/shell/tests/test_app_shell_contract.py::test_handoff_launch_is_recent_history_without_active_session",
+        "components/app/shell/tests/test_app_shell_contract.py::test_open_app_can_attach_through_launcher",
+        "components/app/shell/tests/test_app_shell_contract.py::test_switch_app_uses_existing_session_without_launching",
+        "components/app/shell/tests/test_app_shell_contract.py::test_close_app_clears_active_state_without_stopping_by_default",
+        "components/app/shell/tests/test_app_shell_contract.py::test_close_app_can_stop_launcher_owned_session",
+        "components/app/shell/tests/test_app_shell_contract.py::test_close_app_rejects_stopping_external_session",
+        "components/app/shell/tests/test_app_shell_contract.py::test_home_view_filters_apps_and_remains_renderer_neutral",
+        "components/app/shell/tests/test_app_shell_contract.py::test_missing_session_errors_preserve_launcher_meaning",
+        "components/app/shell/tests/test_app_shell_contract.py::test_restored_active_session_is_used_when_present",
+        "components/app/shell/tests/test_app_shell_contract.py::test_reference_component_is_usable",
+        "components/app/shell/tests/test_app_shell_contract.py::test_no_forbidden_dependency_imports"
+      ],
+      "model_source": "model/bibliotek/components/component.app.shell.sysml",
+      "requirements": [
+        "invariant.app.shell.active_public_state",
+        "invariant.app.shell.handoff_history_only",
+        "invariant.app.shell.runtime_delegated",
+        "invariant.app.shell.no_app_data",
+        "invariant.app.shell.renderer_neutral",
+        "contract.app.shell.intentional_boundary"
+      ],
+      "status": "resolved",
+      "subject": {
+        "role": "shell",
+        "type": "AppShell"
+      },
+      "verification": "AppShellBoundaryVerification"
+    },
+    {
+      "evidence_id": "components/app/shell/tests/test_app_shell_contract.py#CloseAppContractVerification",
+      "evidence_nodes": [
+        "components/app/shell/tests/test_app_shell_contract.py::test_close_app_clears_active_state_without_stopping_by_default",
+        "components/app/shell/tests/test_app_shell_contract.py::test_close_app_can_stop_launcher_owned_session",
+        "components/app/shell/tests/test_app_shell_contract.py::test_close_app_rejects_stopping_external_session",
+        "components/app/shell/tests/test_app_shell_contract.py::test_missing_session_errors_preserve_launcher_meaning"
+      ],
+      "model_source": "model/bibliotek/components/component.app.shell.sysml",
+      "requirements": [
+        "contract.app.shell.close_effect",
+        "contract.app.shell.close_app.failures"
+      ],
+      "status": "resolved",
+      "subject": {
+        "role": "operation",
+        "type": "CloseApp"
+      },
+      "verification": "CloseAppContractVerification"
+    },
+    {
+      "evidence_id": "components/app/shell/tests/test_app_shell_contract.py#GetHomeContractVerification",
+      "evidence_nodes": [
+        "components/app/shell/tests/test_app_shell_contract.py::test_open_shell_does_not_launch_or_attach_apps",
+        "components/app/shell/tests/test_app_shell_contract.py::test_home_view_filters_apps_and_remains_renderer_neutral",
+        "components/app/shell/tests/test_app_shell_contract.py::test_restored_active_session_is_used_when_present"
+      ],
+      "model_source": "model/bibliotek/components/component.app.shell.sysml",
+      "requirements": [
+        "contract.app.shell.home_effect",
+        "contract.app.shell.get_home.failures"
+      ],
+      "status": "resolved",
+      "subject": {
+        "role": "operation",
+        "type": "GetHome"
+      },
+      "verification": "GetHomeContractVerification"
+    },
+    {
+      "evidence_id": "components/app/shell/tests/test_app_shell_contract.py#OpenAppContractVerification",
+      "evidence_nodes": [
+        "components/app/shell/tests/test_app_shell_contract.py::test_open_app_launches_through_launcher_and_sets_active_app",
+        "components/app/shell/tests/test_app_shell_contract.py::test_handoff_launch_is_recent_history_without_active_session",
+        "components/app/shell/tests/test_app_shell_contract.py::test_open_app_can_attach_through_launcher"
+      ],
+      "model_source": "model/bibliotek/components/component.app.shell.sysml",
+      "requirements": [
+        "contract.app.shell.open_effect",
+        "contract.app.shell.open_app.failures"
+      ],
+      "status": "resolved",
+      "subject": {
+        "role": "operation",
+        "type": "OpenApp"
+      },
+      "verification": "OpenAppContractVerification"
+    },
+    {
+      "evidence_id": "components/app/shell/tests/test_app_shell_contract.py#OpenAppShellContractVerification",
+      "evidence_nodes": [
+        "components/app/shell/tests/test_app_shell_contract.py::test_open_shell_does_not_launch_or_attach_apps",
+        "components/app/shell/tests/test_app_shell_contract.py::test_restored_active_session_is_used_when_present"
+      ],
+      "model_source": "model/bibliotek/components/component.app.shell.sysml",
+      "requirements": [
+        "contract.app.shell.open_shell_effect",
+        "contract.app.shell.open.failures"
+      ],
+      "status": "resolved",
+      "subject": {
+        "role": "operation",
+        "type": "OpenAppShell"
+      },
+      "verification": "OpenAppShellContractVerification"
+    },
+    {
+      "evidence_id": "components/app/shell/tests/test_app_shell_contract.py#SwitchAppContractVerification",
+      "evidence_nodes": [
+        "components/app/shell/tests/test_app_shell_contract.py::test_switch_app_uses_existing_session_without_launching",
+        "components/app/shell/tests/test_app_shell_contract.py::test_missing_session_errors_preserve_launcher_meaning"
+      ],
+      "model_source": "model/bibliotek/components/component.app.shell.sysml",
+      "requirements": [
+        "contract.app.shell.switch_effect",
+        "contract.app.shell.switch_app.failures"
+      ],
+      "status": "resolved",
+      "subject": {
+        "role": "operation",
+        "type": "SwitchApp"
+      },
+      "verification": "SwitchAppContractVerification"
+    },
+    {
       "evidence_id": "components/rtg/change_validation/tests/test_rtg_change_validation_contract.py#RtgChangeValidationBoundaryVerification",
       "evidence_nodes": [
         "components/rtg/change_validation/tests/test_rtg_change_validation_contract.py::test_semantic_field_refinements_validate_values_recursively",

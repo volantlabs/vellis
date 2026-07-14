@@ -3,6 +3,7 @@ library package Bibliotek {
     public import BibliotekSoftwareValues::*;
     public import BibliotekAppCatalog::*;
     public import BibliotekAppLauncher::*;
+    public import BibliotekAppShell::*;
     public import BibliotekStorageJsonFile::*;
     public import BibliotekStorageSql::*;
     public import BibliotekRtgDiagnostics::*;

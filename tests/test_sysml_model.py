@@ -16,8 +16,8 @@ def test_repository_model_profile_and_generated_artifacts_are_current() -> None:
     assert model_tool.check_generated() == []
 
 
-def test_bibliotek_model_has_all_twelve_component_identities() -> None:
-    assert len(model_tool._component_model_statuses()) == 12
+def test_bibliotek_model_has_all_thirteen_component_identities() -> None:
+    assert len(model_tool._component_model_statuses()) == 13
     assert model_tool._component_model_statuses()["component.rtg.discovery"] == "draft"
 
 
@@ -52,7 +52,7 @@ def test_formal_validator_is_pinned_and_covers_every_authored_model() -> None:
         ]
         == "required"
     )
-    assert len(sysml_validator._model_files("all")) == 25
+    assert len(sysml_validator._model_files("all")) == 26
     assert all(path.exists() for path in sysml_validator._model_files("all"))
     assert model_layout.SOFTWARE_COMPONENT_PATTERN_PATH not in sysml_validator._model_files("all")
 
@@ -145,7 +145,7 @@ def test_generated_conformance_objectives_resolve_model_requirements_and_evidenc
 def test_official_parser_index_covers_authored_packages_and_public_definitions() -> None:
     index = json.loads(model_layout.GENERATED_FORMAL_INDEX.read_text(encoding="utf-8"))
 
-    assert len(index["authored_packages"]) == 25
+    assert len(index["authored_packages"]) == 26
     assert "SoftwareComponentPattern" not in index["authored_packages"]
     assert set(index["packages"]) == set(index["authored_packages"])
     assert model_tool._check_formal_model_index() == []
@@ -588,7 +588,7 @@ def test_public_definitions_and_component_contracts_are_complete() -> None:
 def test_generated_component_views_cover_actions_state_and_invariants() -> None:
     pages = model_tool._component_pages()
 
-    assert len(pages) == 12
+    assert len(pages) == 13
     for content in pages.values():
         assert "## Provided actions" in content
         assert "## Construction actions" in content

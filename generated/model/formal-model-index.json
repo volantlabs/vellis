@@ -3,6 +3,7 @@
     "Bibliotek": "model/bibliotek/Bibliotek.sysml",
     "BibliotekAppCatalog": "model/bibliotek/components/component.app.catalog.sysml",
     "BibliotekAppLauncher": "model/bibliotek/components/component.app.launcher.sysml",
+    "BibliotekAppShell": "model/bibliotek/components/component.app.shell.sysml",
     "BibliotekLocalPythonRealization": "model/bibliotek/realizations/BibliotekLocalPython.sysml",
     "BibliotekRtgChangeValidation": "model/bibliotek/components/component.rtg.change_validation.sysml",
     "BibliotekRtgConstraints": "model/bibliotek/components/component.rtg.constraints.sysml",
@@ -29,18 +30,18 @@
   "packages": {
     "Bibliotek": {
       "element_counts": {
-        "ActionDefinition": 104,
-        "AttributeDefinition": 228,
+        "ActionDefinition": 109,
+        "AttributeDefinition": 239,
         "CalculationDefinition": 6,
         "ConstraintDefinition": 1,
-        "Documentation": 8,
+        "Documentation": 9,
         "EnumerationDefinition": 35,
-        "ItemDefinition": 15,
+        "ItemDefinition": 16,
         "LibraryPackage": 1,
-        "PartDefinition": 14,
-        "PartUsage": 11,
-        "RequirementUsage": 332,
-        "VerificationCaseDefinition": 116
+        "PartDefinition": 15,
+        "PartUsage": 12,
+        "RequirementUsage": 348,
+        "VerificationCaseDefinition": 122
       },
       "named_elements": [
         {
@@ -74,6 +75,10 @@
         {
           "kind": "ActionDefinition",
           "name": "BuildMigrationCutoverPlan"
+        },
+        {
+          "kind": "ActionDefinition",
+          "name": "CloseApp"
         },
         {
           "kind": "ActionDefinition",
@@ -205,6 +210,10 @@
         },
         {
           "kind": "ActionDefinition",
+          "name": "GetHome"
+        },
+        {
+          "kind": "ActionDefinition",
           "name": "GetMigration"
         },
         {
@@ -317,11 +326,19 @@
         },
         {
           "kind": "ActionDefinition",
+          "name": "OpenApp"
+        },
+        {
+          "kind": "ActionDefinition",
           "name": "OpenAppCatalog"
         },
         {
           "kind": "ActionDefinition",
           "name": "OpenAppLauncher"
+        },
+        {
+          "kind": "ActionDefinition",
+          "name": "OpenAppShell"
         },
         {
           "kind": "ActionDefinition",
@@ -437,6 +454,10 @@
         },
         {
           "kind": "ActionDefinition",
+          "name": "SwitchApp"
+        },
+        {
+          "kind": "ActionDefinition",
           "name": "ValidateGraph"
         },
         {
@@ -477,6 +498,10 @@
         },
         {
           "kind": "AttributeDefinition",
+          "name": "AppCloseRejected"
+        },
+        {
+          "kind": "AttributeDefinition",
           "name": "AppDescriptorInvalid"
         },
         {
@@ -501,7 +526,27 @@
         },
         {
           "kind": "AttributeDefinition",
+          "name": "AppOpenRequest"
+        },
+        {
+          "kind": "AttributeDefinition",
           "name": "AppSessionList"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "AppShellCommandResult"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "AppShellConfigurationInvalid"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "AppShellReadFailed"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "AppShellView"
         },
         {
           "kind": "AttributeDefinition",
@@ -522,6 +567,10 @@
         {
           "kind": "AttributeDefinition",
           "name": "CatalogQuery"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "CloseRequest"
         },
         {
           "kind": "AttributeDefinition",
@@ -1273,6 +1322,22 @@
         },
         {
           "kind": "AttributeDefinition",
+          "name": "ShellActiveApp"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "ShellOptions"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "ShellQuery"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "ShellSurfaceSelection"
+        },
+        {
+          "kind": "AttributeDefinition",
           "name": "SqlExecutionFailed"
         },
         {
@@ -1553,6 +1618,10 @@
         },
         {
           "kind": "ItemDefinition",
+          "name": "AppShellState"
+        },
+        {
+          "kind": "ItemDefinition",
           "name": "JsonStorageRoot"
         },
         {
@@ -1608,6 +1677,11 @@
           "kind": "PartDefinition",
           "name": "AppLauncher",
           "short_name": "component.app.launcher"
+        },
+        {
+          "kind": "PartDefinition",
+          "name": "AppShell",
+          "short_name": "component.app.shell"
         },
         {
           "kind": "PartDefinition",
@@ -1681,6 +1755,11 @@
           "kind": "RequirementUsage",
           "name": "abandonmentNeverDeletesLive",
           "short_name": "invariant.rtg.controller.abandonment_never_deletes_live_records"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "activePublicState",
+          "short_name": "invariant.app.shell.active_public_state"
         },
         {
           "kind": "RequirementUsage",
@@ -1796,6 +1875,16 @@
           "kind": "RequirementUsage",
           "name": "cascadeEffectsFromPreview",
           "short_name": "invariant.rtg.change_validation.cascade_effects_from_graph_preview"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "closeAppFailureSemantics",
+          "short_name": "contract.app.shell.close_app.failures"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "closeEffect",
+          "short_name": "contract.app.shell.close_effect"
         },
         {
           "kind": "RequirementUsage",
@@ -2189,6 +2278,11 @@
         },
         {
           "kind": "RequirementUsage",
+          "name": "getHomeFailureSemantics",
+          "short_name": "contract.app.shell.get_home.failures"
+        },
+        {
+          "kind": "RequirementUsage",
           "name": "getMigrationFailureSemantics",
           "short_name": "contract.rtg.migration.get_migration.failures"
         },
@@ -2219,8 +2313,18 @@
         },
         {
           "kind": "RequirementUsage",
+          "name": "handoffHistoryOnly",
+          "short_name": "invariant.app.shell.handoff_history_only"
+        },
+        {
+          "kind": "RequirementUsage",
           "name": "handoffNotSession",
           "short_name": "invariant.app.launcher.handoff_not_session"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "homeEffect",
+          "short_name": "contract.app.shell.home_effect"
         },
         {
           "kind": "RequirementUsage",
@@ -2266,6 +2370,11 @@
           "kind": "RequirementUsage",
           "name": "intentionalBoundary",
           "short_name": "contract.app.launcher.intentional_boundary"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "intentionalBoundary",
+          "short_name": "contract.app.shell.intentional_boundary"
         },
         {
           "kind": "RequirementUsage",
@@ -2574,6 +2683,11 @@
         },
         {
           "kind": "RequirementUsage",
+          "name": "noAppData",
+          "short_name": "invariant.app.shell.no_app_data"
+        },
+        {
+          "kind": "RequirementUsage",
           "name": "noAssociationObjects",
           "short_name": "invariant.rtg.graph.no_association_objects"
         },
@@ -2679,8 +2793,18 @@
         },
         {
           "kind": "RequirementUsage",
+          "name": "openAppFailureSemantics",
+          "short_name": "contract.app.shell.open_app.failures"
+        },
+        {
+          "kind": "RequirementUsage",
           "name": "openAppLauncherFailureSemantics",
           "short_name": "contract.app.launcher.open.failures"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "openAppShellFailureSemantics",
+          "short_name": "contract.app.shell.open.failures"
         },
         {
           "kind": "RequirementUsage",
@@ -2694,6 +2818,11 @@
         },
         {
           "kind": "RequirementUsage",
+          "name": "openEffect",
+          "short_name": "contract.app.shell.open_effect"
+        },
+        {
+          "kind": "RequirementUsage",
           "name": "openJsonFileStorageFailureSemantics",
           "short_name": "contract.storage.json_file.open_json_file_storage.failures"
         },
@@ -2701,6 +2830,11 @@
           "kind": "RequirementUsage",
           "name": "openRtgControllerFailureSemantics",
           "short_name": "contract.rtg.controller.open_rtg_controller.failures"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "openShellEffect",
+          "short_name": "contract.app.shell.open_shell_effect"
         },
         {
           "kind": "RequirementUsage",
@@ -2929,6 +3063,11 @@
         },
         {
           "kind": "RequirementUsage",
+          "name": "rendererNeutral",
+          "short_name": "invariant.app.shell.renderer_neutral"
+        },
+        {
+          "kind": "RequirementUsage",
           "name": "replacementEffect",
           "short_name": "contract.rtg.discovery.replacement"
         },
@@ -2986,6 +3125,11 @@
           "kind": "RequirementUsage",
           "name": "rootContainment",
           "short_name": "invariant.storage.json_file.root_containment"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "runtimeDelegated",
+          "short_name": "invariant.app.shell.runtime_delegated"
         },
         {
           "kind": "RequirementUsage",
@@ -3131,6 +3275,16 @@
           "kind": "RequirementUsage",
           "name": "supportsRuntimeSurfaceFailureSemantics",
           "short_name": "contract.app.launcher.supports_runtime_surface.failures"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "switchAppFailureSemantics",
+          "short_name": "contract.app.shell.switch_app.failures"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "switchEffect",
+          "short_name": "contract.app.shell.switch_effect"
         },
         {
           "kind": "RequirementUsage",
@@ -3345,6 +3499,10 @@
         },
         {
           "kind": "VerificationCaseDefinition",
+          "name": "AppShellBoundaryVerification"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
           "name": "ApplyLiveGraphChangesContractVerification"
         },
         {
@@ -3366,6 +3524,10 @@
         {
           "kind": "VerificationCaseDefinition",
           "name": "BuildMigrationCutoverPlanContractVerification"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
+          "name": "CloseAppContractVerification"
         },
         {
           "kind": "VerificationCaseDefinition",
@@ -3497,6 +3659,10 @@
         },
         {
           "kind": "VerificationCaseDefinition",
+          "name": "GetHomeContractVerification"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
           "name": "GetMigrationContractVerification"
         },
         {
@@ -3617,7 +3783,15 @@
         },
         {
           "kind": "VerificationCaseDefinition",
+          "name": "OpenAppContractVerification"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
           "name": "OpenAppLauncherContractVerification"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
+          "name": "OpenAppShellContractVerification"
         },
         {
           "kind": "VerificationCaseDefinition",
@@ -3766,6 +3940,10 @@
         {
           "kind": "VerificationCaseDefinition",
           "name": "SupportsRuntimeSurfaceContractVerification"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
+          "name": "SwitchAppContractVerification"
         },
         {
           "kind": "VerificationCaseDefinition",
@@ -4519,22 +4697,322 @@
       ],
       "source": "model/bibliotek/components/component.app.launcher.sysml"
     },
+    "BibliotekAppShell": {
+      "element_counts": {
+        "ActionDefinition": 5,
+        "ActionUsage": 3,
+        "AttributeDefinition": 11,
+        "AttributeUsage": 43,
+        "ConstraintUsage": 16,
+        "Dependency": 25,
+        "Documentation": 37,
+        "EnumerationUsage": 5,
+        "Feature": 29,
+        "FeatureReferenceExpression": 17,
+        "ItemDefinition": 1,
+        "ItemUsage": 13,
+        "LibraryPackage": 1,
+        "LiteralBoolean": 1,
+        "LiteralInfinity": 12,
+        "LiteralInteger": 36,
+        "LiteralString": 17,
+        "MetadataUsage": 14,
+        "Multiplicity": 21,
+        "MultiplicityRange": 25,
+        "OperatorExpression": 3,
+        "PartDefinition": 1,
+        "PartUsage": 7,
+        "PerformActionUsage": 12,
+        "ReferenceUsage": 100,
+        "RequirementUsage": 38,
+        "SatisfyRequirementUsage": 16,
+        "VerificationCaseDefinition": 6
+      },
+      "named_elements": [
+        {
+          "kind": "ActionDefinition",
+          "name": "CloseApp"
+        },
+        {
+          "kind": "ActionDefinition",
+          "name": "GetHome"
+        },
+        {
+          "kind": "ActionDefinition",
+          "name": "OpenApp"
+        },
+        {
+          "kind": "ActionDefinition",
+          "name": "OpenAppShell"
+        },
+        {
+          "kind": "ActionDefinition",
+          "name": "SwitchApp"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "AppCloseRejected"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "AppOpenRequest"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "AppShellCommandResult"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "AppShellConfigurationInvalid"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "AppShellReadFailed"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "AppShellView"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "CloseRequest"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "ShellActiveApp"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "ShellOptions"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "ShellQuery"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "ShellSurfaceSelection"
+        },
+        {
+          "kind": "ItemDefinition",
+          "name": "AppShellState"
+        },
+        {
+          "kind": "PartDefinition",
+          "name": "AppShell",
+          "short_name": "component.app.shell"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "activePublicState",
+          "short_name": "invariant.app.shell.active_public_state"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "activePublicState"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "closeAppFailureSemantics",
+          "short_name": "contract.app.shell.close_app.failures"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "closeAppFailureSemantics"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "closeEffect",
+          "short_name": "contract.app.shell.close_effect"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "closeEffect"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "getHomeFailureSemantics",
+          "short_name": "contract.app.shell.get_home.failures"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "getHomeFailureSemantics"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "handoffHistoryOnly",
+          "short_name": "invariant.app.shell.handoff_history_only"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "handoffHistoryOnly"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "homeEffect",
+          "short_name": "contract.app.shell.home_effect"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "homeEffect"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "intentionalBoundary",
+          "short_name": "contract.app.shell.intentional_boundary"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "intentionalBoundary"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "noAppData",
+          "short_name": "invariant.app.shell.no_app_data"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "noAppData"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "obj"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "obj"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "obj"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "obj"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "obj"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "obj"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "openAppFailureSemantics",
+          "short_name": "contract.app.shell.open_app.failures"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "openAppFailureSemantics"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "openAppShellFailureSemantics",
+          "short_name": "contract.app.shell.open.failures"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "openAppShellFailureSemantics"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "openEffect",
+          "short_name": "contract.app.shell.open_effect"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "openEffect"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "openShellEffect",
+          "short_name": "contract.app.shell.open_shell_effect"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "openShellEffect"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "rendererNeutral",
+          "short_name": "invariant.app.shell.renderer_neutral"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "rendererNeutral"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "runtimeDelegated",
+          "short_name": "invariant.app.shell.runtime_delegated"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "runtimeDelegated"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "switchAppFailureSemantics",
+          "short_name": "contract.app.shell.switch_app.failures"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "switchAppFailureSemantics"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "switchEffect",
+          "short_name": "contract.app.shell.switch_effect"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "switchEffect"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
+          "name": "AppShellBoundaryVerification"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
+          "name": "CloseAppContractVerification"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
+          "name": "GetHomeContractVerification"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
+          "name": "OpenAppContractVerification"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
+          "name": "OpenAppShellContractVerification"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
+          "name": "SwitchAppContractVerification"
+        }
+      ],
+      "source": "model/bibliotek/components/component.app.shell.sysml"
+    },
     "BibliotekLocalPythonRealization": {
       "element_counts": {
-        "Dependency": 14,
-        "Documentation": 5,
-        "EnumerationUsage": 5,
-        "Feature": 3,
-        "FeatureReferenceExpression": 2,
-        "ItemUsage": 2,
-        "LiteralString": 18,
-        "MetadataUsage": 8,
+        "Dependency": 25,
+        "Documentation": 6,
+        "EnumerationUsage": 6,
+        "Feature": 4,
+        "FeatureReferenceExpression": 3,
+        "ItemUsage": 3,
+        "LiteralString": 24,
+        "MetadataUsage": 11,
         "Multiplicity": 7,
         "Package": 1,
-        "PartDefinition": 2,
-        "PartUsage": 2,
-        "PerformActionUsage": 8,
-        "ReferenceUsage": 23
+        "PartDefinition": 3,
+        "PartUsage": 4,
+        "PerformActionUsage": 12,
+        "ReferenceUsage": 30
       },
       "named_elements": [
         {
@@ -4544,6 +5022,10 @@
         {
           "kind": "PartDefinition",
           "name": "InMemoryAppLauncher"
+        },
+        {
+          "kind": "PartDefinition",
+          "name": "InMemoryAppShell"
         }
       ],
       "source": "model/bibliotek/realizations/BibliotekLocalPython.sysml"
@@ -11651,7 +12133,7 @@
     }
   },
   "schema_version": 1,
-  "source_digest": "2581669ac88627e19c874df37a9377fd73df79188618a36ac21c1c70b94d6a8d",
+  "source_digest": "26e672b9542e1803ddfe75d1ca68eb7c83515270bdb53c106c5d80639b210307",
   "validator": {
     "implementation_version": "0.50.0",
     "provider": "Systems-Modeling/SysML-v2-Pilot-Implementation",

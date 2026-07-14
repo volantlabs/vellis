@@ -301,6 +301,7 @@ def _model_action_for_method(component_id: str, method: str, actions: set[str]) 
         ("component.app.launcher", "attach"): "AttachRuntimeSurface",
         ("component.app.launcher", "stop"): "StopRuntimeSurface",
         ("component.app.launcher", "probe"): "ProbeRuntimeSurface",
+        ("component.app.shell", "open"): "OpenAppShell",
     }
     alias = aliases.get((component_id, method))
     if alias:
@@ -2544,9 +2545,9 @@ def check(scope: str = "all", *, require_external: bool = False) -> list[Finding
         if re.search(r"\bimport\s+Vellis", bibliotek_text):
             findings.append(Finding(MODEL_ROOT / "bibliotek", "Bibliotek must not import Vellis"))
         models = _component_model_statuses()
-        if len(models) != 12:
+        if len(models) != 13:
             findings.append(
-                Finding(COMPONENT_MODEL_ROOT, f"expected 12 components, found {len(models)}")
+                Finding(COMPONENT_MODEL_ROOT, f"expected 13 components, found {len(models)}")
             )
         findings.extend(_check_forbidden_component_imports())
         findings.extend(_check_protocol_action_coverage())
