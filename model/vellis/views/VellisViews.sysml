@@ -4,11 +4,18 @@ package VellisViews {
     private import VellisUseCases::*;
     private import VellisLocalPythonRealization::*;
     private import VellisMcpPythonRealization::*;
+    private import VellisRuntimePythonRealization::*;
 
     view def VellisCompositionView {
-        doc /* Vellis roles, equality bindings, and logical-to-realization allocations. */
+        doc /* Vellis roles, runtime ports and interfaces, message/send/accept behavior, equality bindings, and logical-to-realization allocations. */
         filter @SysML::PartDefinition;
         filter @SysML::PartUsage;
+        filter @SysML::PortDefinition;
+        filter @SysML::PortUsage;
+        filter @SysML::InterfaceDefinition;
+        filter @SysML::InterfaceUsage;
+        filter @SysML::FlowUsage;
+        filter @SysML::ActionUsage;
         filter @SysML::BindingConnectorAsUsage;
         filter @SysML::AllocationUsage;
     }
@@ -32,6 +39,7 @@ package VellisViews {
         expose Vellis::**;
         expose VellisLocalPythonRealization::**;
         expose VellisMcpPythonRealization::**;
+        expose VellisRuntimePythonRealization::**;
         render asTreeDiagram;
     }
 

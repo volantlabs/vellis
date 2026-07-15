@@ -17,8 +17,6 @@ deleting or rewriting the question; do not answer it only in implementation code
   records, or should normalization remain private?
 - Should a reusable support/diagnostic component enrich query and validation results with live model
   context beyond the generic guidance already owned by those contracts?
-- If a future asynchronous runtime owns reusable audit behavior, what real second consumer and stable
-  ledger/replay contract would justify extracting the controller's current audit authority?
 
 ## Discovery evolution
 

@@ -62,10 +62,10 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         help="Local directory root for JSON File Storage.",
     )
     parser.add_argument(
-        "--sql-database-path",
+        "--runtime-database-path",
         type=Path,
         default=None,
-        help="SQLite database path for the controller ledger.",
+        help="SQLite database path for the component runtime ledger.",
     )
     parser.add_argument(
         "--json",
@@ -100,7 +100,7 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "--manual-recovery",
         action="store_true",
-        help="Developer/evaluation mode: do not replay durable state automatically.",
+        help="Developer/evaluation mode: do not reconstruct durable state automatically.",
     )
     parser.add_argument(
         "--transport",
@@ -135,9 +135,11 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
 def main(argv: Sequence[str] | None = None) -> int:
     args = parse_args(argv)
     if args.data_dir is not None and (
-        args.storage_root is not None or args.sql_database_path is not None
+        args.storage_root is not None or args.runtime_database_path is not None
     ):
-        raise SystemExit("--data-dir cannot be combined with --storage-root/--sql-database-path")
+        raise SystemExit(
+            "--data-dir cannot be combined with --storage-root/--runtime-database-path"
+        )
     if args.data_dir is not None:
         config = config_for_data_dir(
             args.data_dir,
@@ -147,7 +149,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     elif args.storage_root is not None:
         config = RtgKnowledgeGraphConfig(
             storage_root=args.storage_root,
-            sql_database_path=args.sql_database_path or args.storage_root / "controller.sqlite",
+            runtime_database_path=(
+                args.runtime_database_path or args.storage_root / "runtime.sqlite"
+            ),
             install_starter_schema=not args.empty,
             automatic_recovery=not args.manual_recovery,
         )
@@ -156,14 +160,14 @@ def main(argv: Sequence[str] | None = None) -> int:
         config = (
             RtgKnowledgeGraphConfig(
                 storage_root=env_config.storage_root,
-                sql_database_path=args.sql_database_path,
+                runtime_database_path=args.runtime_database_path,
                 install_starter_schema=not args.empty,
                 automatic_recovery=not args.manual_recovery,
             )
-            if args.sql_database_path is not None
+            if args.runtime_database_path is not None
             else RtgKnowledgeGraphConfig(
                 storage_root=env_config.storage_root,
-                sql_database_path=env_config.sql_database_path,
+                runtime_database_path=env_config.runtime_database_path,
                 install_starter_schema=not args.empty,
                 automatic_recovery=not args.manual_recovery,
             )
@@ -263,9 +267,9 @@ def _run_command(args: argparse.Namespace, config: RtgKnowledgeGraphConfig) -> i
             print(json.dumps(client_config, indent=2, sort_keys=True))
         return 0
 
-    composition = build_app(config)
-    composition.prepare()
-    status = composition.runner.run()
+    with build_app(config) as composition:
+        composition.prepare()
+        status = composition.runner.run()
 
     if args.json:
         print(json.dumps(status.to_json_value(), sort_keys=True))

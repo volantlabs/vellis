@@ -149,6 +149,10 @@ class RtgMigration(Protocol):
         """Export a migration snapshot."""
         ...
 
+    def replace_snapshot(self, snapshot: RtgMigrationSnapshot) -> None:
+        """Atomically replace all migration state from a validated snapshot."""
+        ...
+
     def put_migration(self, migration: RtgMigrationRecord) -> RtgMigrationRecord:
         """Create or fully replace a migration record."""
         ...

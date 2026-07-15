@@ -46,6 +46,9 @@ MODEL_EVIDENCE = {
         "test_dissociation_and_data_delete_previews_match_mutations_without_mutating",
         "test_snapshot_round_trip_and_missing_live_default",
     ),
+    "ReplaceGraphSnapshotContractVerification": (
+        "test_replace_snapshot_is_atomic_and_idempotent",
+    ),
     "PutAnchorContractVerification": (
         "test_anchor_data_link_round_trip_and_indexes",
         "test_writes_generate_missing_uuids_and_preserve_supplied_uuids",
@@ -635,6 +638,29 @@ def test_snapshot_round_trip_and_missing_live_default() -> None:
     assert exported.data_objects[0]["system"] == {"live": True}
     assert exported.links[0]["system"] == {"live": True}
     assert InMemoryRtgGraph.import_snapshot(exported).export_snapshot() == exported
+
+
+def test_replace_snapshot_is_atomic_and_idempotent() -> None:
+    source = InMemoryRtgGraph.empty()
+    source.put_anchor(RtgAnchor(UUID(int=701), "Person", "Source"))
+    target = InMemoryRtgGraph.empty()
+    target.put_anchor(RtgAnchor(UUID(int=702), "Place", "Prior"))
+
+    replacement = source.export_snapshot()
+    target.replace_snapshot(replacement)
+    target.replace_snapshot(replacement)
+
+    assert target.export_snapshot() == replacement
+    before_rejection = target.export_snapshot()
+    malformed = RtgGraphSnapshot(
+        anchors=replacement.anchors,
+        data_objects=replacement.data_objects,
+        links=replacement.links,
+        anchor_data_index={str(UUID(int=999)): (str(UUID(int=998)),)},
+    )
+    with pytest.raises(RtgGraphReferenceInvalid):
+        target.replace_snapshot(malformed)
+    assert target.export_snapshot() == before_rejection
 
 
 def test_type_counts_can_filter_by_kind_and_live_status() -> None:

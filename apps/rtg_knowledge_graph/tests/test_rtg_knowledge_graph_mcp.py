@@ -6,6 +6,7 @@ import re
 import socket
 import subprocess
 import time
+from collections.abc import Sequence
 from pathlib import Path
 from typing import Any, cast
 from uuid import UUID, uuid4
@@ -15,6 +16,9 @@ from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 from mcp.client.streamable_http import streamable_http_client
 
+from apps.rtg_knowledge_graph.composition import build_app
+from apps.rtg_knowledge_graph.config import RtgKnowledgeGraphConfig
+from apps.rtg_knowledge_graph.gateway_registration import model_mcp_gateway_registrations
 from apps.rtg_knowledge_graph.mcp_codec import (
     RtgMcpInputInvalid,
     decode_change_batch,
@@ -25,7 +29,7 @@ from apps.rtg_knowledge_graph.mcp_codec import (
     decode_query_diagnostic_options,
     decode_query_options,
     decode_query_spec,
-    decode_restore_options,
+    decode_replay_options,
     decode_schema_changes,
     decode_schema_definition,
     decode_schema_field,
@@ -33,7 +37,15 @@ from apps.rtg_knowledge_graph.mcp_codec import (
     decode_validation_options,
     encode_json,
 )
+from apps.rtg_knowledge_graph.mcp_server import build_mcp_server
 from apps.rtg_knowledge_graph.mcp_toolset import TOOL_NAMES, RtgMcpToolset, mcp_tool_metadata
+from components.interface.mcp_gateway import (
+    McpGateway,
+    McpGatewayInvocation,
+    McpGatewayOutcome,
+    McpGatewayToolRegistration,
+    RuntimeMcpGateway,
+)
 from components.rtg.change_validation import (
     DeterministicRtgChangeValidator,
     RtgChangeBatch,
@@ -53,8 +65,18 @@ from components.rtg.schema import (
     RtgSchemaDefinition,
     RtgSchemaField,
 )
+from components.runtime.component_adapter import (
+    ActionBinding,
+    ExplicitComponentAdapter,
+    RuntimeActionBindingDescriptor,
+    RuntimeActionIdempotency,
+)
+from components.runtime.message_runtime import (
+    RuntimeExternalBoundaryMode,
+    RuntimeReplayMode,
+    SqliteMessageRuntime,
+)
 from components.storage.json_file import LocalJsonFileStorage
-from components.storage.sql import SqliteStorage
 
 
 def build_schema() -> InMemoryRtgSchema:
@@ -91,7 +113,6 @@ def build_toolset(tmp_path: Path) -> RtgMcpToolset:
         DeterministicRtgChangeValidator(),
         SimpleRtgQueryEngine(),
         LocalJsonFileStorage.open(tmp_path / "json"),
-        SqliteStorage.open(tmp_path / "controller.sqlite"),
     )
     return RtgMcpToolset(controller)
 
@@ -105,7 +126,6 @@ def build_empty_toolset(tmp_path: Path) -> RtgMcpToolset:
         DeterministicRtgChangeValidator(),
         SimpleRtgQueryEngine(),
         LocalJsonFileStorage.open(tmp_path / "json"),
-        SqliteStorage.open(tmp_path / "controller.sqlite"),
     )
     return RtgMcpToolset(controller)
 
@@ -125,12 +145,13 @@ MODEL_EVIDENCE = {
         "test_mcp_codec_rejects_malformed_query_return_properties",
         "test_mcp_codec_rejects_non_string_query_terms",
         "test_mcp_codec_rejects_non_string_option_terms",
+        "test_mcp_codec_rejects_controller_ledger_replay_options",
         "test_mcp_codec_rejects_mutation_aliases_that_would_be_ignored",
         "test_mcp_toolset_rejects_wrong_mutation_fields_instead_of_noop",
         "test_mcp_codec_accepts_schema_field_null_items_from_json_round_trip",
         "test_rtg_mcp_skill_item_schema_live_write_and_query_path_runs",
         "test_mcp_toolset_live_graph_query_get_object_and_validation_error",
-        "test_mcp_toolset_validates_live_graph_changes_without_mutation_or_ledger",
+        "test_mcp_toolset_validates_live_graph_changes_without_mutation",
         "test_mcp_toolset_validates_and_applies_live_anchor_records",
         "test_compact_mutation_response_is_materially_smaller_than_full",
         "test_properties_only_preserves_aggregation_rows_and_pagination_metadata",
@@ -139,7 +160,7 @@ MODEL_EVIDENCE = {
         "test_mcp_toolset_resolves_anchor_by_fact_through_query_facade",
         "test_mcp_toolset_resolve_anchor_by_fact_reports_ambiguous_matches",
         "test_mcp_toolset_stages_cuts_over_and_reads_schema_migration",
-        "test_mcp_toolset_snapshot_ledger_restore_tools",
+        "test_mcp_toolset_snapshot_restore_and_runtime_only_tools",
         "test_mcp_toolset_system_state_guides_schema_staging_and_abandonment",
         "test_schema_migration_rejects_duplicate_definition_correlation_keys_before_mutation",
         "test_mcp_toolset_system_state_workflows_for_schema_and_populated_states",
@@ -148,12 +169,15 @@ MODEL_EVIDENCE = {
         "test_mcp_exposes_modeled_everyday_life_and_schema_design_guidance",
         "test_mcp_toolset_stage_schema_migration_can_replace_live_schema",
         "test_mcp_toolset_persisted_snapshot_readback",
-        "test_mcp_toolset_replay_path_and_migration_history",
+        "test_mcp_toolset_runtime_reconstruction_health_and_migration_history",
         "test_mcp_toolset_keeps_error_shape_for_unexpected_exceptions",
         "test_mcp_toolset_rejects_unsupported_controller_options",
         "test_mcp_toolset_errors_include_ref_and_uuid_diagnostics",
         "test_diagnostic_json_normalization_preserves_nested_sequences",
         "test_mcp_tool_metadata_is_concise_complete_and_annotated",
+        "test_runtime_gateway_server_projects_generated_vellis_tool_shapes",
+        "test_runtime_gateway_server_accepts_mcp_gateway_protocol_substitute",
+        "test_runtime_gateway_server_exposes_only_a_generic_registered_tool",
         "test_mcp_server_stdio_protocol_lists_tools_from_non_repo_cwd",
         "test_mcp_server_http_protocol_lists_tools_from_non_repo_cwd",
     ),
@@ -379,7 +403,6 @@ def test_mcp_codec_rejects_non_string_option_terms() -> None:
         lambda: decode_cutover_options({"validation_mode": 1}),
         lambda: decode_cutover_options({"failure_restore": 1}),
         lambda: decode_validation_options({"tracks": [1]}),
-        lambda: decode_restore_options({"ledger_mode": 1}),
         lambda: decode_migration_changes(
             {
                 "status_changes": [
@@ -395,6 +418,51 @@ def test_mcp_codec_rejects_non_string_option_terms() -> None:
     for decode in malformed_payloads:
         with pytest.raises(RtgMcpInputInvalid):
             decode()
+
+
+@pytest.mark.parametrize(
+    ("key", "value"),
+    (
+        ("start_snapshot", {}),
+        ("start_snapshot_path", "snapshots/legacy.json"),
+        ("after_ledger_position", 1),
+        ("through_ledger_position", 2),
+    ),
+)
+def test_mcp_codec_rejects_controller_ledger_replay_options(key: str, value: object) -> None:
+    with pytest.raises(RtgMcpInputInvalid) as error:
+        decode_replay_options({key: value})
+
+    assert key in str(error.value)
+
+
+def test_mcp_codec_decodes_runtime_external_boundary_dispositions() -> None:
+    decoded = decode_replay_options(
+        {
+            "through_runtime_position": 42,
+            "external_boundaries": [
+                {
+                    "boundary_id": "vellis.storage.json.primary",
+                    "mode": "unavailable",
+                    "limitation": "not attached to the isolated branch",
+                }
+            ],
+        }
+    )
+
+    assert decoded.through_position == 42
+    assert len(decoded.external_boundaries) == 1
+    assert decoded.external_boundaries[0].boundary_id == "vellis.storage.json.primary"
+    assert decoded.external_boundaries[0].mode is RuntimeExternalBoundaryMode.UNAVAILABLE
+
+    with pytest.raises(RtgMcpInputInvalid, match="must be one of"):
+        decode_replay_options(
+            {
+                "external_boundaries": [
+                    {"boundary_id": "vellis.storage.json.primary", "mode": "repeat_live"}
+                ]
+            }
+        )
 
 
 def test_mcp_codec_rejects_mutation_aliases_that_would_be_ignored() -> None:
@@ -534,7 +602,7 @@ def test_mcp_toolset_live_graph_query_get_object_and_validation_error(
     assert missing["error"]["type"] == "RtgControllerObjectNotFound"
 
 
-def test_mcp_toolset_validates_live_graph_changes_without_mutation_or_ledger(
+def test_mcp_toolset_validates_live_graph_changes_without_mutation(
     tmp_path: Path,
 ) -> None:
     toolset = build_toolset(tmp_path)
@@ -566,7 +634,7 @@ def test_mcp_toolset_validates_live_graph_changes_without_mutation_or_ledger(
         preview["result"]["resolved_graph_changes"]["anchor_writes"][0]["ref"]["resource_id"]
         == preview["result"]["generated_ids"]["person"]
     )
-    assert state_after_preview["result"]["ledger_record_count"] == 0
+    assert state_after_preview["result"]["live_object_counts"]["counts"] == []
     assert query_after_preview["result"]["bindings"] == []
 
 
@@ -742,7 +810,6 @@ def test_invalid_mutation_response_format_fails_before_controller_invocation(
     state = toolset.rtg_get_system_state()["result"]
     assert rejected["ok"] is False
     assert rejected["error"]["diagnostic"]["path"] == "response_options.format"
-    assert state["ledger_record_count"] == 0
     assert state["live_object_counts"]["counts"] == []
 
 
@@ -939,7 +1006,7 @@ def test_mcp_toolset_stages_cuts_over_and_reads_schema_migration(
     assert missing["error"]["type"] == "RtgMigrationNotFound"
 
 
-def test_mcp_toolset_snapshot_ledger_restore_tools(
+def test_mcp_toolset_snapshot_restore_and_runtime_only_tools(
     tmp_path: Path,
 ) -> None:
     toolset = build_toolset(tmp_path)
@@ -948,12 +1015,13 @@ def test_mcp_toolset_snapshot_ledger_restore_tools(
     compact_snapshot = toolset.rtg_export_system_snapshot(summary=True)
     persisted = toolset.rtg_persist_system_snapshot("system/snapshot.json", return_snapshot=False)
     validation = toolset.rtg_validate_graph()
-    replay = toolset.rtg_replay_ledger()
-    replay_verification = toolset.rtg_verify_replay_from_ledger(
-        {"start_snapshot_path": "system/snapshot.json"}
-    )
-    flush = toolset.rtg_flush_ledger_failures()
     restored = toolset.rtg_restore_from_snapshot(snapshot["result"])
+    runtime_only = (
+        toolset.rtg_replay_ledger(),
+        toolset.rtg_verify_replay_from_ledger(),
+        toolset.rtg_list_migration_history(),
+        toolset.rtg_flush_ledger_failures(),
+    )
 
     assert snapshot["ok"] is True
     assert snapshot["result"]["kind"] == "full"
@@ -964,11 +1032,13 @@ def test_mcp_toolset_snapshot_ledger_restore_tools(
     assert "snapshot" not in persisted["result"]
     assert persisted["result"]["summary"]["schema_type_counts"]["anchor"] >= 1
     assert validation["result"]["accepted"] is True
-    assert replay["ok"] is False
-    assert replay_verification["result"]["status"] == "replay_verified"
-    assert replay_verification["result"]["replay_window"]["start_source"] == "start_snapshot_path"
-    assert flush["result"]["status"] == "ledger_failures_flushed"
     assert restored["result"]["status"] == "restore_applied"
+    assert all(response["ok"] is False for response in runtime_only)
+    assert all(response["error"]["type"] == "RtgMcpInputInvalid" for response in runtime_only)
+    assert all(
+        "runtime-native Vellis application" in response["error"]["message"]
+        for response in runtime_only
+    )
     assert "rtg_apply_live_graph_changes" in TOOL_NAMES
     assert "rtg_get_agent_affordance_eval_prompt" not in TOOL_NAMES
 
@@ -1021,9 +1091,11 @@ def test_mcp_toolset_system_state_guides_schema_staging_and_abandonment(
     ]
     assert abandoned["result"]["status"] == "migration_abandoned"
     assert abandoned["result"]["details"]["pruned_candidates"]["schema"]
-    assert final_state["result"]["state_classification"] == "needs_replay"
-    assert final_state["result"]["recommended_workflows"] == ["replay_recovery"]
-    assert "empty state is intentional" in " ".join(final_state["result"]["recommended_next_steps"])
+    assert final_state["result"]["state_classification"] == "empty"
+    assert final_state["result"]["recommended_workflows"] == [
+        "connection_state_check",
+        "schema_bootstrap",
+    ]
 
 
 def test_schema_migration_rejects_duplicate_definition_correlation_keys_before_mutation(
@@ -1047,7 +1119,7 @@ def test_schema_migration_rejects_duplicate_definition_correlation_keys_before_m
     assert rejected["ok"] is False
     assert rejected["error"]["type"] == "RtgMcpInputInvalid"
     assert "unique kind and type_key pairs" in rejected["error"]["message"]
-    assert state["ledger_record_count"] == 0
+    assert state["live_object_counts"]["counts"] == []
     assert state["live_schema_counts"]["total"] == 0
     assert state["migration_counts_by_status"]["total"] == 0
 
@@ -1080,7 +1152,7 @@ def test_mcp_toolset_system_state_workflows_for_schema_and_populated_states(
     assert populated["result"]["recommended_workflows"] == [
         "query_answer",
         "safe_update",
-        "snapshot_replay_check",
+        "snapshot_recovery",
     ]
 
 
@@ -1142,16 +1214,21 @@ def test_mcp_usage_guides_are_packaged_and_do_not_return_fake_snapshot_payloads(
         for step in checklist["result"]["steps"]
         if step.get("tool") == "rtg_verify_replay_from_ledger"
     )
-    assert "domain-state equivalence" in replay_check["why"]
-    assert "ledger-cursor equivalence separately" in replay_check["why"]
+    assert "runtime" in replay_check["why"].lower()
+    assert "isolated" in replay_check["why"].lower()
     assert any("rejected" in note and "failed" in note for note in checklist["result"]["notes"])
     assert missing_beta_schema["ok"] is False
     assert "schema_staging_minimal" in missing_beta_schema["error"]["message"]
     assert "life_graph_schema_v1" not in missing_beta_schema["error"]["message"]
     assert recovery["ok"] is True
-    assert "<loaded snapshot>" not in json.dumps(recovery)
-    assert recovery["result"]["replay_from_empty"]["arguments"] == {"replay_options": {}}
-    assert recovery["result"]["steps"][-1]["tool"] == "rtg_verify_replay_from_ledger"
+    encoded_recovery = json.dumps(recovery)
+    assert "<loaded snapshot>" not in encoded_recovery
+    assert "start_snapshot_path" not in encoded_recovery
+    assert "after_ledger_position" not in encoded_recovery
+    assert "full coordinated snapshot" in encoded_recovery
+    assert "fresh current data root" in encoded_recovery
+    assert "never imported" in encoded_recovery
+    assert "isolated" in encoded_recovery.lower()
     assert (
         recovery["result"]["controlled_failed_migration_example"]["stage"]["tool"]
         == "rtg_stage_schema_migration"
@@ -1167,10 +1244,10 @@ def test_mcp_usage_guides_are_packaged_and_do_not_return_fake_snapshot_payloads(
         "link_writing",
         "validation_error_recovery",
         "schema_evolution",
-        "snapshot_replay_check",
+        "snapshot_recovery_check",
         "staged_work_review",
         "cutover_or_abandon",
-        "replay_recovery",
+        "runtime_reconstruction",
     } <= workflow_ids
     request_workflows = {
         workflow
@@ -1228,7 +1305,6 @@ def test_mcp_generic_usage_guides_do_not_leak_beta_domain_terms(tmp_path: Path) 
     )
 
     for term in (
-        "Vellis",
         "Person",
         "Area",
         "Project",
@@ -1325,41 +1401,52 @@ def test_mcp_toolset_persisted_snapshot_readback(tmp_path: Path) -> None:
     assert "snapshot" not in compact_loaded["result"]
 
 
-def test_mcp_toolset_replay_path_and_migration_history(tmp_path: Path) -> None:
-    toolset = build_toolset(tmp_path)
-    guide = toolset.rtg_get_usage_guide("schema_staging_minimal")
-    staged = toolset.rtg_stage_schema_migration(
-        migration_id="minimal-item-schema",
-        description="Introduce minimal item schema.",
-        schema_definitions=cast(
-            list[dict[str, Any]],
-            guide["result"]["arguments"]["schema_definitions"],
-        ),
+def test_mcp_toolset_runtime_reconstruction_health_and_migration_history(
+    tmp_path: Path,
+) -> None:
+    config = RtgKnowledgeGraphConfig(
+        storage_root=tmp_path / "runtime-json",
+        runtime_database_path=tmp_path / "runtime.sqlite",
+        install_starter_schema=False,
+        automatic_recovery=True,
     )
-    cutover = toolset.rtg_apply_migration_cutover("minimal-item-schema")
-    persisted = toolset.rtg_persist_system_snapshot(
-        "snapshots/after-cutover.json",
-        return_snapshot=False,
-    )
-    verified = toolset.rtg_verify_replay_from_ledger(
-        {"start_snapshot_path": "snapshots/after-cutover.json"}
-    )
-    history = toolset.rtg_list_migration_history()
-    state = toolset.rtg_get_system_state()
+    with build_app(config) as composition:
+        toolset = composition.build_facade(composition.prepare())
+        guide = toolset.rtg_get_usage_guide("schema_staging_minimal")
+        staged = toolset.rtg_stage_schema_migration(
+            migration_id="minimal-item-schema",
+            description="Introduce minimal item schema.",
+            schema_definitions=cast(
+                list[dict[str, Any]],
+                guide["result"]["arguments"]["schema_definitions"],
+            ),
+        )
+        cutover = toolset.rtg_apply_migration_cutover("minimal-item-schema")
+        startup_verification = toolset.rtg_verify_replay_from_ledger()
+        isolated_verification = toolset.rtg_verify_replay_from_ledger(
+            {"through_runtime_position": composition.runtime.current_position}
+        )
+        history = toolset.rtg_list_migration_history()
+        flush = toolset.rtg_flush_ledger_failures()
+        state = toolset.rtg_get_system_state()
 
-    assert staged["ok"] is True
-    assert cutover["ok"] is True
-    assert persisted["ok"] is True
-    assert verified["result"]["status"] == "replay_verified"
-    assert verified["result"]["replay_window"]["start_source"] == "start_snapshot_path"
-    assert state["result"]["migration_counts_scope"] == "current_migration_store"
-    assert "ledger-backed migration events" in state["result"]["migration_history_hint"]
-    assert [event["event_type"] for event in history["result"]["events"]] == [
-        "staged",
-        "cutover_applied",
-    ]
-    assert all(event["finding_count"] == 0 for event in history["result"]["events"])
-    assert all(event["finding_codes"] == [] for event in history["result"]["events"])
+        assert staged["ok"] is True
+        assert cutover["ok"] is True
+        assert startup_verification["result"]["status"] == "reconstruction_verified"
+        assert startup_verification["result"]["verified"] is True
+        assert startup_verification["result"]["details"]["scope"] == "latest startup reconstruction"
+        assert isolated_verification["result"]["status"] == "isolated_reconstruction_required"
+        assert isolated_verification["result"]["verified"] is False
+        assert history["result"]["source"] == "runtime_ledger"
+        assert [event["event_type"] for event in history["result"]["events"]] == [
+            "knowledge_staged",
+            "cutover_requested",
+        ]
+        assert all(event["disposition"] == "committed" for event in history["result"]["events"])
+        assert flush["result"]["status"] == "runtime_healthy"
+        assert flush["result"]["details"]["queued_degraded_records"] == 0
+        assert state["result"]["migration_counts_scope"] == "current_migration_store"
+        assert state["result"]["runtime"]["health"] == "ready"
 
 
 def test_mcp_toolset_keeps_error_shape_for_unexpected_exceptions(
@@ -1381,7 +1468,6 @@ def test_mcp_toolset_keeps_error_shape_for_unexpected_exceptions(
 
 def test_mcp_toolset_rejects_unsupported_controller_options(tmp_path: Path) -> None:
     toolset = build_toolset(tmp_path)
-    snapshot = toolset.rtg_export_system_snapshot()["result"]
 
     missing_cutover = toolset.rtg_apply_migration_cutover("missing")
     bad_cutover = toolset.rtg_apply_migration_cutover(
@@ -1389,7 +1475,6 @@ def test_mcp_toolset_rejects_unsupported_controller_options(tmp_path: Path) -> N
         {"validation_mode": "relaxed"},
     )
     bad_discovery = toolset.rtg_discover_anchor_types({"limit": 0})
-    bad_restore = toolset.rtg_restore_from_snapshot(snapshot, {"ledger_mode": "silent"})
     bad_validation_options = toolset.rtg_validate_live_graph_changes(
         {},
         {"mode": "strict"},
@@ -1412,8 +1497,6 @@ def test_mcp_toolset_rejects_unsupported_controller_options(tmp_path: Path) -> N
     assert "validation_mode" in bad_cutover["error"]["message"]
     assert bad_discovery["ok"] is False
     assert bad_discovery["error"]["type"] == "RtgControllerDiscoveryFailed"
-    assert bad_restore["ok"] is False
-    assert bad_restore["error"]["type"] == "RtgControllerSnapshotFailed"
     assert bad_validation_options["ok"] is False
     assert (
         "dry-run tools do not accept validation_options.mode"
@@ -1538,6 +1621,168 @@ def test_mcp_tool_metadata_is_concise_complete_and_annotated() -> None:
         "idempotentHint": False,
         "openWorldHint": False,
     }
+
+
+def test_runtime_gateway_server_projects_generated_vellis_tool_shapes(tmp_path: Path) -> None:
+    config = RtgKnowledgeGraphConfig(
+        storage_root=tmp_path / "runtime-gateway-json",
+        runtime_database_path=tmp_path / "runtime-gateway.sqlite",
+        install_starter_schema=False,
+        automatic_recovery=True,
+    )
+    registrations = model_mcp_gateway_registrations()
+    with build_app(config) as composition:
+        gateway = composition.build_mcp_gateway(composition.prepare())
+        tools = asyncio.run(build_mcp_server(gateway).list_tools())
+
+    assert [tool.name for tool in tools] == [item.tool_name for item in registrations]
+    assert len(tools) == len(registrations) == 27
+    for tool, registration in zip(tools, registrations, strict=True):
+        assert tool.description == registration.description
+        assert tool.parameters == registration.parameter_schema
+        assert tool.annotations is not None
+        assert tool.annotations.model_dump(mode="json", by_alias=True, exclude_none=True) == (
+            registration.annotations
+        )
+
+
+def test_runtime_gateway_server_accepts_mcp_gateway_protocol_substitute() -> None:
+    registration = McpGatewayToolRegistration(
+        tool_name="echo_registered",
+        description="Echo one registered payload through a protocol substitute.",
+        parameter_schema={
+            "type": "object",
+            "properties": {"value": {"type": "string"}},
+            "required": ["value"],
+            "additionalProperties": False,
+        },
+        annotations={"readOnlyHint": True},
+        target_instance_key="test.echo.primary",
+        component_contract_id="component.test.echo",
+        action_id="component.test.echo.invoke",
+        schema_version=1,
+        codec_id="codec.test.echo.request.json",
+        codec_version=1,
+    )
+
+    class FakeMcpGateway:
+        def __init__(self) -> None:
+            self._registrations = (registration,)
+            self.invocations: list[McpGatewayInvocation] = []
+
+        @property
+        def registrations(self) -> tuple[McpGatewayToolRegistration, ...]:
+            return self._registrations
+
+        def register_tools(
+            self, registrations: tuple[McpGatewayToolRegistration, ...]
+        ) -> None:
+            self._registrations = registrations
+
+        async def invoke_tool(self, invocation: McpGatewayInvocation) -> McpGatewayOutcome:
+            self.invocations.append(invocation)
+            return McpGatewayOutcome(
+                tool_name=invocation.tool_name,
+                result={"echo": invocation.arguments},
+                message_id=uuid4(),
+                trace_id=uuid4(),
+            )
+
+    fake_gateway: McpGateway = FakeMcpGateway()
+    assert not isinstance(fake_gateway, RuntimeMcpGateway)
+    server = build_mcp_server(fake_gateway)
+
+    async def exercise_server() -> tuple[Sequence[Any], Any]:
+        return await server.list_tools(), await server.call_tool(
+            "echo_registered", {"value": "hello"}
+        )
+
+    tools, result = asyncio.run(exercise_server())
+    assert [tool.name for tool in tools] == ["echo_registered"]
+    assert result.structured_content == {"echo": {"value": "hello"}}
+    assert fake_gateway.invocations == [
+        McpGatewayInvocation(tool_name="echo_registered", arguments={"value": "hello"})
+    ]
+
+
+def test_runtime_gateway_server_exposes_only_a_generic_registered_tool(tmp_path: Path) -> None:
+    class Counter:
+        value = 0
+
+        def increment(self, amount: int) -> int:
+            self.value += amount
+            return self.value
+
+    counter = Counter()
+    runtime = SqliteMessageRuntime.open(
+        tmp_path / "generic-gateway.sqlite", runtime_key="test.generic_gateway"
+    )
+    runtime.register_adapter(
+        instance_key="test.counter.primary",
+        component_contract_id="component.test.counter",
+        adapter=ExplicitComponentAdapter(
+            (
+                ActionBinding(
+                    descriptor=RuntimeActionBindingDescriptor(
+                        component_contract_id="component.test.counter",
+                        action_id="component.test.counter.increment",
+                        binding_id="binding.test.counter.v1",
+                        binding_version=1,
+                        schema_version=1,
+                        request_codec_id="codec.test.counter.request.json",
+                        result_codec_id="codec.test.counter.result.json",
+                        failure_codec_id="codec.test.counter.failure.json",
+                        idempotency=RuntimeActionIdempotency.NON_IDEMPOTENT,
+                        replay_mode=RuntimeReplayMode.CANONICAL_EFFECT,
+                    ),
+                    invoke=counter.increment,
+                    decode_request=lambda payload: ((cast(int, payload["amount"]),), {}),
+                    encode_result=encode_json,
+                    build_replay_effect=lambda args, _kwargs, _result: {
+                        "amount": cast(int, args[0])
+                    },
+                    apply_replay_effect=lambda payload: counter.increment(
+                        cast(int, payload["amount"])
+                    ),
+                ),
+            )
+        ),
+    )
+    gateway = RuntimeMcpGateway(runtime, source_instance_key="test.counter.primary")
+    registration = McpGatewayToolRegistration(
+        tool_name="increment_counter",
+        description="Increment one generic counter.",
+        parameter_schema={
+            "type": "object",
+            "properties": {"amount": {"type": "integer"}},
+            "required": ["amount"],
+            "additionalProperties": False,
+        },
+        annotations={"readOnlyHint": False},
+        target_instance_key="test.counter.primary",
+        component_contract_id="component.test.counter",
+        action_id="component.test.counter.increment",
+        schema_version=1,
+        codec_id="codec.test.counter.request.json",
+        codec_version=1,
+    )
+    gateway.register_tools((registration,))
+    try:
+        server = build_mcp_server(gateway)
+
+        async def exercise_server() -> tuple[Sequence[Any], Any]:
+            return await server.list_tools(), await server.call_tool(
+                "increment_counter", {"amount": 4}
+            )
+
+        tools, result = asyncio.run(exercise_server())
+        assert [tool.name for tool in tools] == ["increment_counter"]
+        assert tools[0].parameters == registration.parameter_schema
+        assert tools[0].description == registration.description
+        assert result.structured_content == {"value": 4}
+        assert counter.value == 4
+    finally:
+        runtime.close()
 
 
 def test_mcp_server_stdio_protocol_lists_tools_from_non_repo_cwd(tmp_path: Path) -> None:

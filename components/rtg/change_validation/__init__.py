@@ -26,6 +26,10 @@ from components.rtg.change_validation.protocol import (
     RtgValidationOptions,
     RtgValidationReport,
 )
+from components.rtg.change_validation.runtime_binding import (
+    create_rtg_change_validator_adapter,
+    create_rtg_change_validator_proxy,
+)
 
 __all__ = [
     "DeterministicRtgChangeValidator",
@@ -52,4 +56,6 @@ __all__ = [
     "RtgValidationInputInvalid",
     "RtgValidationOptions",
     "RtgValidationReport",
+    "create_rtg_change_validator_adapter",
+    "create_rtg_change_validator_proxy",
 ]

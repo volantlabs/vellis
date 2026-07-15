@@ -116,7 +116,7 @@ def test_local_vellis_data_readme_is_tracked_and_runtime_state_is_ignored() -> N
     )
     assert trackable.returncode == 1
     ignored = subprocess.run(
-        ["git", "check-ignore", "-q", ".data/rtg_knowledge_graph/controller.sqlite"],
+        ["git", "check-ignore", "-q", ".data/rtg_knowledge_graph/runtime.sqlite"],
         cwd=ROOT,
         check=False,
     )

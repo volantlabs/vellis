@@ -42,7 +42,7 @@ By default, state is stored unencrypted in:
 ```text
 .data/rtg_knowledge_graph/
   json_file/
-  controller.sqlite
+  runtime.sqlite
 ```
 
 The directory is ignored by Git, so normal pulls leave it untouched. `git clean -x` deletes ignored
@@ -51,9 +51,9 @@ files and can remove it. To back up Vellis while it is stopped, copy the entire
 delete that directory; rerunning setup creates a new empty graph with the starter schema. There is
 no automatic destructive cleanup command.
 
-Vellis automatically replays its durable ledger when its MCP process restarts and fails closed if
-that history cannot be reconstructed safely. The explicit snapshot, replay, and verification tools
-remain available for controlled recovery and audits.
+Vellis automatically reconstructs managed component state from its runtime ledger when its MCP
+process restarts and fails closed if confirmed history cannot be reconstructed safely. Explicit
+snapshot and runtime-history operations remain available for controlled recovery and audits.
 
 ## Troubleshooting
 
@@ -76,32 +76,15 @@ interactive.
 The ordinary connection uses local stdio: the client starts Vellis directly and no network server
 is opened. Localhost HTTP is an explicit advanced mode and must remain bound to `127.0.0.1`.
 
-## Reusing data from the private beta
+## Moving data from an earlier Vellis version
 
-The few testers who configured Vellis before the standard setup command do not need a data
-migration. Their MCP registration normally contains the authoritative `--storage-root` and
-`--sql-database-path` values. Stop the old Vellis process, copy those exact paths from the existing
-client configuration, and run setup against them:
+Do not point the current runtime at an earlier controller database or copy its ledger. Use the old
+version to validate and export a full coordinated snapshot, start the current version with a new
+empty data directory, and restore that snapshot through Vellis. The destination runtime records the
+restore as the beginning of its own chronology. Keep the source untouched until destination
+validation and restart reconstruction agree.
 
-```sh
-uv run vellis setup \
-  --storage-root /absolute/path/from/the/old-registration \
-  --sql-database-path /absolute/path/from/the/old-registration/controller.sqlite
-```
-
-If the registration names another SQLite path, use that exact path instead. Setup replays the old
-ledger, preserves its schema as custom, and updates the client registration without overlaying the
-Everyday Life ontology. Then run `uv run vellis doctor` with the same `--storage-root` and
-`--sql-database-path` arguments, restart the client, and have the agent call
-`rtg_get_system_state` and `rtg_validate_graph`. Confirm the expected ledger, schema, and object
-counts before changing or deleting any old files.
-
-Do not pass an old flat storage root to `--data-dir`: `--data-dir` denotes the newer parent layout
-whose JSON documents live in a `json_file/` child. Reusing the old `--storage-root` is the safest
-option. If a tester wants to relocate data afterward, keep the original untouched, stop Vellis,
-copy the SQLite database (and any SQLite sidecar files) to the new `controller.sqlite` location,
-copy the old JSON-storage contents except that database into the new `json_file/` directory, then
-validate the copied instance before retiring the original.
+Agents should follow the complete [snapshot-transfer procedure](snapshot-transfer.md).
 
 ## Beta data boundaries
 

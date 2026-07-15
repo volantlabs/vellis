@@ -1234,6 +1234,7 @@ source = { editable = "." }
 dependencies = [
     { name = "fastmcp" },
     { name = "google-re2" },
+    { name = "jsonschema" },
 ]
 
 [package.dev-dependencies]
@@ -1251,6 +1252,7 @@ dev = [
 requires-dist = [
     { name = "fastmcp", specifier = ">=3.4.4,<4" },
     { name = "google-re2", specifier = "==1.1.20251105" },
+    { name = "jsonschema", specifier = ">=4.20,<5" },
 ]
 
 [package.metadata.requires-dev]

@@ -90,6 +90,7 @@ library package BibliotekRtgSchema {
     attribute def RtgSchemaLiveTypeConflict { attribute 'message' : String; }
 
     action def ExportSchemaSnapshot { out 'snapshot' : RtgSchemaSnapshot; doc /* Export every full definition with normalized live metadata without mutation or filtering. */ @FailureContract { errorIds = (); } }
+    action def ReplaceSchemaSnapshot { in 'snapshot' : RtgSchemaSnapshot; doc /* Validate the complete candidate, then atomically replace all definitions and rebuild derived indexes. */ @FailureContract { errorIds = ("RtgSchemaSnapshotInvalid", "RtgSchemaUuidInvalid", "RtgSchemaUuidConflict", "RtgSchemaDefinitionKindInvalid", "RtgSchemaTypeKeyInvalid", "RtgSchemaDefinitionInvalid", "RtgSchemaPayloadInvalid", "RtgSchemaSystemValueInvalid", "RtgSchemaLiveTypeConflict"); } }
     action def PutSchemaDefinition { in definition : RtgSchemaDefinition; out stored : RtgSchemaDefinition; doc /* Generate or preserve identity, validate definition structure and the selected payload, and atomically create or fully replace one definition. */ @FailureContract { errorIds = ("RtgSchemaUuidInvalid", "RtgSchemaDefinitionKindInvalid", "RtgSchemaTypeKeyInvalid", "RtgSchemaDefinitionInvalid", "RtgSchemaPayloadInvalid", "RtgSchemaSystemValueInvalid", "RtgSchemaLiveTypeConflict"); } }
     action def GetSchemaDefinition { in definitionUuid : Uuid; out definition : RtgSchemaDefinition; doc /* Return one definition by UUID. */ @FailureContract { errorIds = ("RtgSchemaDefinitionNotFound"); } }
     action def ListSchemaDefinitions { in kind[0..1] : RtgSchemaDefinitionKind; in live[0..1] : Boolean; out result : RtgSchemaDefinitionList; doc /* List definitions with optional kind and live filters in deterministic order. */ @FailureContract { errorIds = ("RtgSchemaDefinitionKindInvalid"); } }
@@ -105,11 +106,12 @@ library package BibliotekRtgSchema {
         @SpecificationStatus { lifecycleStatus = SpecLifecycle::accepted; owner = "humans"; }
         item definitions[0..*] : RtgSchemaDefinition { doc /* Canonical component-owned schema-definition occurrences. */ }
         derived attribute navigationIndexes : JsonObject { doc /* Ephemeral navigation indexes derived from canonical schema definitions. */ }
-        perform action exportSnapshot[0..*] : ExportSchemaSnapshot; perform action putDefinition[0..*] : PutSchemaDefinition; perform action getDefinition[0..*] : GetSchemaDefinition;
+        perform action exportSnapshot[0..*] : ExportSchemaSnapshot; perform action replaceSnapshot[0..*] : ReplaceSchemaSnapshot; perform action putDefinition[0..*] : PutSchemaDefinition; perform action getDefinition[0..*] : GetSchemaDefinition;
         perform action listDefinitions[0..*] : ListSchemaDefinitions; perform action listDefinitionsByTypeKey[0..*] : ListDefinitionsByTypeKey;
         perform action listAnchorDataTypeKeys[0..*] : ListAnchorDataTypeKeys; perform action listLinkParticipation[0..*] : ListLinkParticipation;
         perform action listAnchorTypeSummaries[0..*] : ListAnchorTypeSummaries; perform action getSchemaPack[0..*] : GetSchemaPack; perform action deleteDefinition[0..*] : DeleteSchemaDefinition;
         dependency snapshotState from exportSnapshot to definitions { @StateAccess { kind = StateAccessKind::read; } doc /* read all canonical definitions. */ }
+        dependency replaceSnapshotState from replaceSnapshot to definitions { @StateAccess { kind = StateAccessKind::write; } doc /* validate before visibility, atomically replace every definition, and rebuild indexes. */ }
         dependency putState from putDefinition to definitions { @StateAccess { kind = StateAccessKind::write; } doc /* atomically create/replace definition and rebuild affected indexes. */ }
         dependency getState from getDefinition to definitions { @StateAccess { kind = StateAccessKind::read; } doc /* read one canonical definition. */ }
         dependency listState from listDefinitions to navigationIndexes { @StateAccess { kind = StateAccessKind::read; } doc /* read kind/live indexes. */ }
@@ -176,7 +178,14 @@ library package BibliotekRtgSchema {
     requirement <'contract.rtg.schema.snapshot_effect'> schemaSnapshotEffect {
         subject schema : RtgSchema;
         require constraint {
-            doc /* Snapshot round-trip preserves full records and normalized live state; import validates the whole candidate before visibility. */
+            doc /* Snapshot round-trip preserves full records and normalized live state; import and in-place replacement validate the whole candidate before visibility. Rejected replacement preserves prior state, and replacing with the current snapshot is idempotent. */
+        }
+    }
+
+    requirement <'contract.rtg.schema.snapshot_replacement'> schemaSnapshotReplacementEffect {
+        subject operation : ReplaceSchemaSnapshot;
+        require constraint {
+            doc /* Whole-candidate validation precedes visibility; success atomically replaces all definitions and indexes, failure preserves the prior registry, and replacing with an identical snapshot is idempotent. */
         }
     }
 
@@ -255,6 +264,11 @@ library package BibliotekRtgSchema {
         require constraint {
             doc /* Export has no declared domain failure. */
         }
+    }
+
+    requirement <'contract.rtg.schema.replace_schema_snapshot.failures'> replaceSchemaSnapshotFailureSemantics {
+        subject operation : ReplaceSchemaSnapshot;
+        require constraint { doc /* Rejected replacement leaves definitions and indexes unchanged. */ }
     }
 
     requirement <'contract.rtg.schema.put_schema_definition.failures'> putSchemaDefinitionFailureSemantics {
@@ -343,6 +357,7 @@ library package BibliotekRtgSchema {
         satisfy canonicalOrdering by schema;
         satisfy intentionalBoundary by schema;
         satisfy schemaSnapshotEffect by schema;
+        satisfy schemaSnapshotReplacementEffect by schema.replaceSnapshot;
         satisfy uuidUnique by schema;
         satisfy liveTypeUnique by schema;
         satisfy liveStatusBoolean by schema;
@@ -356,6 +371,7 @@ library package BibliotekRtgSchema {
         satisfy schemaDeleteEffect by schema.deleteDefinition;
 
         satisfy exportSchemaSnapshotFailureSemantics by schema.exportSnapshot;
+        satisfy replaceSchemaSnapshotFailureSemantics by schema.replaceSnapshot;
         satisfy putSchemaDefinitionFailureSemantics by schema.putDefinition;
         satisfy getSchemaDefinitionFailureSemantics by schema.getDefinition;
         satisfy listSchemaDefinitionsFailureSemantics by schema.listDefinitions;
@@ -400,6 +416,12 @@ library package BibliotekRtgSchema {
         subject operation : ExportSchemaSnapshot;
         objective { verify exportSchemaSnapshotFailureSemantics; }
         @EvidenceBinding { evidenceId = "components/rtg/schema/tests/test_rtg_schema_contract.py#ExportSchemaSnapshotContractVerification"; implementationScope = "InMemoryRtgSchema"; }
+    }
+
+    verification def ReplaceSchemaSnapshotContractVerification {
+        subject operation : ReplaceSchemaSnapshot;
+        objective { verify schemaSnapshotReplacementEffect; verify replaceSchemaSnapshotFailureSemantics; }
+        @EvidenceBinding { evidenceId = "components/rtg/schema/tests/test_rtg_schema_contract.py#ReplaceSchemaSnapshotContractVerification"; implementationScope = "InMemoryRtgSchema"; }
     }
 
     verification def GetSchemaDefinitionContractVerification {

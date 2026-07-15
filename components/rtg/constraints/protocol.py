@@ -4,6 +4,8 @@ from dataclasses import dataclass, field
 from typing import Protocol
 from uuid import UUID
 
+from components.rtg.query.protocol import RtgQuerySpec
+
 type JsonScalar = str | int | float | bool | None
 type JsonValue = JsonScalar | list[JsonValue] | dict[str, JsonValue]
 type JsonObject = dict[str, JsonValue]
@@ -12,13 +14,13 @@ type UuidInput = UUID | str
 
 @dataclass(frozen=True, slots=True)
 class RtgConstraintQueryPatternPayload:
-    query_spec: object
+    query_spec: RtgQuerySpec
     expectation: str
 
 
 @dataclass(frozen=True, slots=True)
 class RtgConstraintCardinalityPayload:
-    query_spec: object
+    query_spec: RtgQuerySpec
     counted_binding: str
     group_by_bindings: tuple[str, ...] = ()
     minimum: int | None = None
@@ -107,6 +109,10 @@ class RtgConstraints(Protocol):
 
     def export_snapshot(self) -> RtgConstraintSnapshot:
         """Export a constraint snapshot."""
+        ...
+
+    def replace_snapshot(self, snapshot: RtgConstraintSnapshot) -> None:
+        """Atomically replace all constraint state from a validated snapshot."""
         ...
 
     def put_constraint(self, constraint: RtgConstraintDefinition) -> RtgConstraintDefinition:

@@ -10,6 +10,7 @@ package VellisOperations {
     private import BibliotekRtgChangeValidation::*;
     private import BibliotekRtgController::*;
     private import BibliotekRtgDiagnostics::*;
+    private import BibliotekRuntimeMessageRuntime::*;
 
     enum def VellisUsageGuideTopic {
         enum mcpBootstrapChecklist; enum operatorCard; enum workflowPatterns;
@@ -29,6 +30,12 @@ package VellisOperations {
         enum snapshot_exported;
     }
     enum def VellisStarterSchemaState { enum installed; enum custom; enum empty; }
+    enum def VellisReconstructionVerificationStatus {
+        enum reconstruction_verified;
+        enum isolated_reconstruction_required;
+    }
+    enum def VellisRuntimeHistorySource { enum runtime_ledger; }
+    enum def VellisRestoreLedgerMode { enum record; }
 
     attribute def JsonObjectList { attribute values[0..*] : JsonObject; doc /* Encodes directly as a JSON array, not an object containing values. */ }
     attribute def StringList { attribute values[0..*] : String; doc /* Encodes directly as a JSON array, not an object containing values. */ }
@@ -42,8 +49,20 @@ package VellisOperations {
         attribute linkTypeKeys[0..*] : String;
         attribute recovery : String;
     }
+    attribute def VellisRuntimeState {
+        attribute runtimeId : Uuid;
+        attribute runtimeKey : String;
+        attribute health : String;
+        attribute currentPosition : Integer;
+        attribute messageCount : Integer;
+        attribute lastTraceId[0..1] : Uuid;
+        attribute lastTracePosition[0..1] : Integer;
+        attribute lastTraceDisposition[0..1] : RuntimeTraceDisposition;
+        doc /* Read-only application projection of runtime identity, health, chronology, and the most recent terminal trace. */
+    }
     attribute def VellisSystemState :> RtgControllerSystemState {
         attribute starterSchema : VellisStarterSchemaSummary;
+        attribute runtime : VellisRuntimeState;
     }
     attribute def VellisSchemaDefinitionRequest { attribute kind : RtgSchemaDefinitionKind; attribute typeKey : String; attribute description : String; attribute payload : RtgSchemaPayload; doc /* Description and typeKey are non-empty; payload family must match kind. */ }
     attribute def VellisSchemaDefinitionRequestList { attribute definitions[1..*] : VellisSchemaDefinitionRequest; doc /* Encodes directly as the schema_definitions JSON array. Each kind-and-typeKey pair is unique within one request so generated-schema identity correlation is lossless. */ }
@@ -78,13 +97,46 @@ package VellisOperations {
         doc /* Full coordinated system snapshot. */
     }
     attribute def VellisSnapshotSummaryExport :> VellisSnapshotExport { :>> kind = VellisSnapshotExportKind::summary; attribute status : VellisSnapshotSummaryStatus; attribute summary : JsonObject; }
-    attribute def VellisPersistedSnapshotResult { attribute status : RtgControllerOperationStatus; attribute transactionId : Uuid; attribute ledgerPosition[0..1] : Integer; attribute appliedChanges : RtgControllerAppliedChanges; attribute validationReport[0..1] : RtgValidationReport; attribute 'snapshot'[0..1] : RtgSystemSnapshot; attribute details : JsonObject; attribute relativePath : JsonRelativePath; attribute summary : JsonObject; doc /* Mirrors the controller result, adds relativePath and summary, and omits snapshot when return_snapshot is false. */ }
+    attribute def VellisPersistedSnapshotResult { attribute status : RtgControllerOperationStatus; attribute generatedIds : JsonObject; attribute appliedChanges : RtgControllerAppliedChanges; attribute validationReport[0..1] : RtgValidationReport; attribute 'snapshot'[0..1] : RtgSystemSnapshot; attribute details : JsonObject; attribute relativePath : JsonRelativePath; attribute summary : JsonObject; doc /* Mirrors the domain controller result, adds relativePath and summary, and omits snapshot when return_snapshot is false; runtime trace identity and position remain envelope/history metadata rather than domain fields. */ }
     attribute def VellisLoadedSnapshotResult { attribute relativePath : JsonRelativePath; attribute 'snapshot'[0..1] : RtgSystemSnapshot; attribute summary : JsonObject; doc /* snapshot is omitted when return_snapshot is false. */ }
+    attribute def VellisReplayVerificationResult {
+        attribute status : VellisReconstructionVerificationStatus;
+        attribute verified : Boolean;
+        attribute throughRuntimePosition[0..1] : Integer;
+        attribute requestedThroughRuntimePosition[0..1] : Integer;
+        attribute report[0..1] : RuntimeReconstructionReport;
+        attribute details : JsonObject;
+        doc /* Reports whether the requested cursor has verified reconstruction evidence; arbitrary historical verification requires an isolated data-root copy. */
+    }
+    attribute def VellisMigrationHistoryEvent {
+        attribute eventType : String;
+        attribute runtimePosition : Integer;
+        attribute traceId[0..1] : Uuid;
+        attribute disposition[0..1] : RuntimeTraceDisposition;
+        attribute migrationId[0..1] : String;
+        attribute arguments : JsonObject;
+        doc /* One migration-related controller request projected from its complete runtime trace. */
+    }
+    attribute def VellisMigrationHistory {
+        attribute events[0..*] ordered : VellisMigrationHistoryEvent;
+        attribute source : VellisRuntimeHistorySource = VellisRuntimeHistorySource::runtime_ledger;
+        attribute throughRuntimePosition : Integer;
+        doc /* Runtime-position-ordered migration trace projection; the controller owns no separate history store. */
+    }
+    attribute def VellisDeprecatedLedgerFlushResult {
+        attribute status : String;
+        attribute details : JsonObject;
+        doc /* Deprecated compatibility response reporting runtime fail-stop health and zero queued degraded records; it performs no flush and changes no state. */
+    }
+    attribute def VellisRestoreOptions {
+        attribute ledgerMode : VellisRestoreLedgerMode default = VellisRestoreLedgerMode::record;
+        doc /* Optional compatibility shape. Snapshot restoration is always recorded as authoritative runtime traffic; record is the only valid value. */
+    }
     attribute def VellisRequestInvalid { attribute 'message' : String; attribute diagnostic[0..1] : RtgDiagnostic; }
 
     action def <'operation.vellis.rtg_get_system_state'> RtgGetSystemState {
         out result : VellisSystemState[1];
-        doc /* Return state classification, counts, ledger pointers, and recommended next steps. */
+        doc /* Return RTG domain classification and counts, starter-schema posture, runtime identity and health, current runtime position, and recommended next steps. */
         @FailureContract { errorIds = ("VellisRequestInvalid", "RtgControllerDiscoveryFailed"); }
     }
     action def <'operation.vellis.rtg_get_usage_guide'> RtgGetUsageGuide {
@@ -104,7 +156,7 @@ package VellisOperations {
     action def <'operation.vellis.rtg_validate_live_anchor_records'> RtgValidateLiveAnchorRecords {
         in anchor_records : VellisAnchorRecordList[1]; in link_writes : RtgGraphLinkWriteList[0..1];
         in validation_options : RtgControllerValidationOptions[0..1]; out result : VellisAnchorValidationResult[1];
-        doc /* Compile each anchor and nested fact into canonical writes, generate deterministic request-local fact references where omitted, pass through canonical link writes, and return compiled changes plus validation without mutation or ledger writes. */
+        doc /* Compile each anchor and nested fact into canonical writes, generate deterministic request-local fact references where omitted, pass through canonical link writes, and return compiled changes plus validation without component mutation; the runtime still records the request and outcome. */
         @FailureContract { errorIds = ("VellisRequestInvalid", "RtgControllerPreconditionFailed", "RtgValidationInputInvalid"); }
     }
     action def <'operation.vellis.rtg_apply_live_anchor_records'> RtgApplyLiveAnchorRecords {
@@ -116,7 +168,7 @@ package VellisOperations {
     action def <'operation.vellis.rtg_validate_live_graph_changes'> RtgValidateLiveGraphChanges {
         in graph_changes : RtgGraphChangeSet[1]; in validation_options : RtgControllerValidationOptions[0..1];
         out result : RtgControllerLiveGraphValidationResult[1];
-        doc /* Validate normal live graph CRUD without mutation or ledger writes. */
+        doc /* Validate normal live graph CRUD without component mutation; the runtime still records the request and outcome. */
         @FailureContract { errorIds = ("VellisRequestInvalid", "RtgControllerPreconditionFailed", "RtgValidationInputInvalid"); }
     }
     action def <'operation.vellis.rtg_apply_live_graph_changes'> RtgApplyLiveGraphChanges {
@@ -135,7 +187,7 @@ package VellisOperations {
         in migration_id : String[1]; in cutover_options : RtgControllerCutoverOptions[0..1];
         out result : RtgControllerOperationResult[1];
         doc /* Apply the selected migration cutover with validation and failure restoration. */
-        @FailureContract { errorIds = ("VellisRequestInvalid", "RtgControllerValidationFailed", "RtgControllerPreconditionFailed", "RtgControllerApplyFailed"); }
+        @FailureContract { errorIds = ("VellisRequestInvalid", "RtgControllerValidationFailed", "RtgControllerPreconditionFailed", "RtgControllerApplyFailed", "RtgControllerRecoveryIndeterminate"); }
     }
     action def <'operation.vellis.rtg_abandon_migration'> RtgAbandonMigration {
         in migration_id : String[1]; in reason : String[0..1]; out result : RtgControllerOperationResult[1];
@@ -165,35 +217,35 @@ package VellisOperations {
     }
     action def <'operation.vellis.rtg_discover_anchor_types'> RtgDiscoverAnchorTypes { in discovery_options : RtgControllerDiscoveryOptions[0..1]; out result : RtgAnchorTypeDiscoveryResult[1]; doc /* Return schema type keys, descriptions, and live counts; exclude non-live types by default and honor a positive optional limit. */ @FailureContract { errorIds = ("VellisRequestInvalid", "RtgControllerDiscoveryFailed"); } }
     action def <'operation.vellis.rtg_get_schema_pack'> RtgGetSchemaPack { in anchor_type_keys : StringList[1]; in schema_pack_options : RtgControllerSchemaPackOptions[0..1]; out result : RtgControllerSchemaPack[1]; doc /* Return selected anchor schemas, associated-data schemas, participating link schemas, and requested live counts. */ @FailureContract { errorIds = ("VellisRequestInvalid", "RtgControllerDiscoveryFailed"); } }
-    action def <'operation.vellis.rtg_export_system_snapshot'> RtgExportSystemSnapshot { in summary : Boolean[0..1] default = false; out result : VellisSnapshotExport[1]; doc /* Return the full coordinated snapshot when summary is false; otherwise return snapshot_exported plus compact component counts and ledger pointers. */ @FailureContract { errorIds = ("RtgControllerSnapshotFailed"); } }
-    action def <'operation.vellis.rtg_persist_system_snapshot'> RtgPersistSystemSnapshot { in relative_path : JsonRelativePath[1]; in return_snapshot : Boolean[0..1] default = true; out result : VellisPersistedSnapshotResult[1]; doc /* Persist a coordinated snapshot, add relative path and compact summary to the controller result, and omit the full snapshot only when requested. */ @FailureContract { errorIds = ("VellisRequestInvalid", "RtgControllerSnapshotFailed", "RtgControllerApplyFailed"); } }
+    action def <'operation.vellis.rtg_export_system_snapshot'> RtgExportSystemSnapshot { in summary : Boolean[0..1] default = false; out result : VellisSnapshotExport[1]; doc /* Return the full coordinated snapshot when summary is false; otherwise return snapshot_exported plus compact component counts. Runtime chronology remains outside the snapshot payload. */ @FailureContract { errorIds = ("RtgControllerSnapshotFailed"); } }
+    action def <'operation.vellis.rtg_persist_system_snapshot'> RtgPersistSystemSnapshot { in relative_path : JsonRelativePath[1]; in return_snapshot : Boolean[0..1] default = true; out result : VellisPersistedSnapshotResult[1]; doc /* Persist a coordinated snapshot, add relative path and compact summary to the domain controller result, and omit the full snapshot only when requested. */ @FailureContract { errorIds = ("VellisRequestInvalid", "RtgControllerSnapshotFailed"); } }
     action def <'operation.vellis.rtg_list_persisted_snapshots'> RtgListPersistedSnapshots { out result : RtgPersistedSnapshotList[1]; doc /* List only persisted snapshot-like documents visible through the configured JSON storage root. */ @FailureContract { errorIds = ("RtgControllerSnapshotFailed"); } }
     action def <'operation.vellis.rtg_load_persisted_snapshot'> RtgLoadPersistedSnapshot { in relative_path : JsonRelativePath[1]; in return_snapshot : Boolean[0..1] default = true; out result : VellisLoadedSnapshotResult[1]; doc /* Load and validate one persisted snapshot, always return path and compact summary, and omit the full snapshot only when requested; do not apply it. */ @FailureContract { errorIds = ("VellisRequestInvalid", "RtgControllerSnapshotFailed"); } }
-    action def <'operation.vellis.rtg_replay_ledger'> RtgReplayLedger { in replay_options : RtgControllerReplayOptions[0..1]; out result : RtgControllerOperationResult[1]; doc /* Reconstruct state from an empty or explicit snapshot seed using the selected ascending ledger window. */ @FailureContract { errorIds = ("VellisRequestInvalid", "RtgControllerReplayFailed"); } }
-    action def <'operation.vellis.rtg_verify_replay_from_ledger'> RtgVerifyReplayFromLedger { in replay_options : RtgControllerReplayOptions[0..1]; out result : RtgControllerReplayVerificationResult[1]; doc /* Replay into isolated state and return summaries, count differences, replay window, and validation without replacing current state. */ @FailureContract { errorIds = ("VellisRequestInvalid", "RtgControllerReplayFailed"); } }
-    action def <'operation.vellis.rtg_list_migration_history'> RtgListMigrationHistory { out result : RtgControllerMigrationHistory[1]; doc /* Return ledger-backed staged, staging-rejected, staging-failed, cutover-applied, cutover-failed, and abandoned events in ledger order. */ @FailureContract { errorIds = ("RtgControllerReplayFailed"); } }
-    action def <'operation.vellis.rtg_flush_ledger_failures'> RtgFlushLedgerFailures { out result : RtgControllerOperationResult[1]; doc /* Retry queued audit records in original order and report remaining degraded-audit state. */ @FailureContract { errorIds = ("RtgControllerApplyFailed"); } }
-    action def <'operation.vellis.rtg_restore_from_snapshot'> RtgRestoreFromSnapshot { in 'snapshot' : RtgSystemSnapshot[1]; in restore_options : RtgControllerRestoreOptions[0..1]; out result : RtgControllerOperationResult[1]; doc /* Validate and atomically restore coordinated state; record the operation by default and reserve skip for internal recovery. */ @FailureContract { errorIds = ("VellisRequestInvalid", "RtgControllerSnapshotFailed"); } }
+    action def <'operation.vellis.rtg_replay_ledger'> RtgReplayLedger { in replay_options : RuntimeReconstructionRequest[0..1]; out result : RuntimeReconstructionReport[1]; doc /* Reconstruct managed component state through an optional runtime cursor, preparing targets by explicit reset or compatible checkpoints and applying committed canonical effects only. */ @FailureContract { errorIds = ("VellisRequestInvalid", "RuntimeReplayIncompatible", "RuntimeLedgerUnavailable", "RuntimeFailStopped"); } }
+    action def <'operation.vellis.rtg_verify_replay_from_ledger'> RtgVerifyReplayFromLedger { in replay_options : RuntimeReconstructionRequest[0..1]; out result : VellisReplayVerificationResult[1]; doc /* Return available reconstruction verification for the requested runtime cursor without replacing current state; historical verification that lacks exact startup evidence requires an isolated data-root copy. */ @FailureContract { errorIds = ("VellisRequestInvalid", "RuntimeReplayIncompatible", "RuntimeLedgerUnavailable", "RuntimeFailStopped"); } }
+    action def <'operation.vellis.rtg_list_migration_history'> RtgListMigrationHistory { out result : VellisMigrationHistory[1]; doc /* Query runtime facts and causal traces for migration staging, cutover, and abandonment requests and return them in terminal runtime-position order. */ @FailureContract { errorIds = ("RuntimeLedgerUnavailable", "RuntimeFailStopped"); } }
+    action def <'operation.vellis.rtg_flush_ledger_failures'> RtgFlushLedgerFailures { out result : VellisDeprecatedLedgerFlushResult[1]; doc /* Deprecated health-only compatibility operation: report runtime health and zero queued degraded records without retrying, flushing, or mutating anything. */ @FailureContract { errorIds = ("RuntimeLedgerUnavailable"); } }
+    action def <'operation.vellis.rtg_restore_from_snapshot'> RtgRestoreFromSnapshot { in 'snapshot' : RtgSystemSnapshot[1]; in restore_options : VellisRestoreOptions[0..1]; out result : RtgControllerOperationResult[1]; doc /* Validate and atomically restore coordinated RTG state. The restore request is always recorded as authoritative runtime traffic; optional restore_options can only affirm record mode. */ @FailureContract { errorIds = ("VellisRequestInvalid", "RtgControllerSnapshotFailed", "RtgControllerRecoveryIndeterminate"); } }
 
 
     requirement <'contract.vellis.facade.failures'> facadeFailureSemantics {
         subject facade : VellisApplicationFacade;
         require constraint {
-            doc /* Input decoding rejects unknown fields, wrong JSON kinds, invalid enum literals, missing required values, and contradictory option shapes as VellisRequestInvalid before controller invocation. Modeled Bibliotek failures propagate without changing their concrete type, message, diagnostic, transaction identity, or validation evidence. */
+            doc /* Input decoding rejects unknown fields, wrong JSON kinds, invalid enum literals, missing required values, and contradictory option shapes as VellisRequestInvalid before controller or runtime invocation. Modeled Bibliotek failures propagate without changing their concrete type, message, diagnostic, or validation evidence. */
         }
     }
 
     requirement <'contract.vellis.facade.implementation_freedom'> facadeFreedom {
         subject facade : VellisApplicationFacade;
         require constraint {
-            doc /* The facade may choose any implementation language or helper decomposition but must preserve the modeled request compilation, controller invocation, response shaping, defaults, ordering, and no-effect guarantees. */
+            doc /* The facade may choose any implementation language or helper decomposition but must preserve the modeled request compilation, controller and runtime invocation, response shaping, defaults, ordering, and no-effect guarantees. */
         }
     }
 
     requirement <'contract.vellis.facade.usage_guides'> usageGuideSemantics {
         subject operation : RtgGetUsageGuide;
         require constraint {
-            doc /* The fifteen guide topics cover: the installed Everyday Life schema; safe RTG schema design and evolution; compact machine-readable tool capabilities; MCP bootstrap sequence; concise operator rules; state-driven workflows; ordinary-request-to-workflow mapping; minimal schema staging; exact top-level tool shapes; live writes; identity lookup before links; query construction; snapshot/restore/replay recovery; durable migration history; and safe abandonment. Generic examples do not silently replace or specialize an application's modeled schema. */
+            doc /* The fifteen guide topics cover: the installed Everyday Life schema; safe RTG schema design and evolution; compact machine-readable tool capabilities; MCP bootstrap sequence; concise operator rules; state-driven workflows; ordinary-request-to-workflow mapping; minimal schema staging; exact top-level tool shapes; live writes; identity lookup before links; query construction; snapshot transfer and runtime reconstruction; runtime trace history; and safe abandonment. Generic examples do not silently replace or specialize an application's modeled schema. */
         }
     }
 
@@ -221,14 +273,20 @@ package VellisOperations {
     requirement <'contract.vellis.facade.snapshot_semantics'> snapshotFacadeSemantics {
         subject facade : VellisApplicationFacade;
         require constraint {
-            doc /* Full export returns the canonical snapshot; summary export returns snapshot_exported and compact counts/pointers. Persist and load always add compact summary and relative path, and return_snapshot=false removes only the full snapshot payload. No response shaping changes stored or current state. */
+            doc /* Full export returns the canonical coordinated RTG snapshot; summary export returns snapshot_exported and compact component counts. Persist and load always add compact summary and relative path, and return_snapshot=false removes only the full snapshot payload. Snapshot payloads contain no controller-ledger cursor or transaction identity, and response shaping changes no stored or current state. */
         }
     }
 
     requirement <'contract.vellis.facade.controller_forwarding'> controllerForwardingSemantics {
         subject facade : VellisApplicationFacade;
         require constraint {
-            doc /* Actions not identified as compilation or shaping workflows decode their modeled inputs, invoke exactly the satisfied controller capability once, and encode the modeled result without adding state, filtering, retries, ordering, or lifecycle policy. */
+            doc /* Controller-owned actions not identified as compilation or shaping workflows decode their modeled inputs, invoke exactly the satisfied controller capability once, and encode the modeled result without adding state, filtering, retries, ordering, or lifecycle policy. Runtime history, reconstruction, and health projections never route through the controller. */
+        }
+    }
+    requirement <'contract.vellis.facade.runtime_projection'> runtimeProjectionSemantics {
+        subject facade : VellisApplicationFacade;
+        require constraint {
+            doc /* System state augments the controller's domain summary with runtime identity, health, message count, cursor, and latest terminal trace. Replay delegates to runtime reconstruction with explicit cursor/reset/checkpoint semantics. Verification reports exact available evidence without in-place historical rewind. Migration history is a deterministic projection of runtime facts and causal traces. The deprecated flush operation reports health and zero queued degraded records without mutation. */
         }
     }
     part def <'application.vellis.facade'> VellisApplicationFacade {
@@ -256,16 +314,26 @@ package VellisOperations {
             perform rtgPersistSystemSnapshot.invokeController;
             perform rtgListPersistedSnapshots.invokeController;
             perform rtgLoadPersistedSnapshot.invokeController;
-            perform rtgReplayLedger.invokeController;
-            perform rtgVerifyReplayFromLedger.invokeController;
-            perform rtgListMigrationHistory.invokeController;
-            perform rtgFlushLedgerFailures.invokeController;
             perform rtgRestoreFromSnapshot.invokeController;
+        }
+        ref part runtime[1] : MessageRuntime {
+            perform rtgReplayLedger.invokeRuntime;
+            perform rtgListMigrationHistory.queryRuntimeHistory;
         }
         perform action rtgGetSystemState[0..*] : RtgGetSystemState {
             action invokeController : GetSystemState {
-                out result redefines GetSystemState::result = rtgGetSystemState.result;
+                out result redefines GetSystemState::result;
             }
+            action shapeSystemState {
+                in attribute domainState = invokeController.result;
+                in attribute runtimeId = runtime.runtimeId;
+                in attribute runtimeKey = runtime.runtimeKey;
+                in attribute runtimeHealth = runtime.health;
+                in attribute runtimePosition = runtime.currentPosition;
+                out attribute result = rtgGetSystemState.result;
+                doc /* Add starter-schema posture and the trusted runtime status projection to the controller's domain state. */
+            }
+            first invokeController then shapeSystemState;
         }
         perform action rtgGetUsageGuide[0..*] : RtgGetUsageGuide { doc /* select one modeled guide topic and return static application guidance. */ }
         perform action rtgStageSchemaMigration[0..*] : RtgStageSchemaMigration {
@@ -491,34 +559,65 @@ package VellisOperations {
             first invokeController then shapeResult;
         }
         perform action rtgReplayLedger[0..*] : RtgReplayLedger {
-            action invokeController : ReplayLedger {
-                in replayOptions redefines ReplayLedger::replayOptions = rtgReplayLedger.replay_options;
-                out result redefines ReplayLedger::result = rtgReplayLedger.result;
+            action normalizeReconstructionRequest {
+                in attribute options = rtgReplayLedger.replay_options;
+                out attribute request : RuntimeReconstructionRequest;
+                doc /* Omitted options become the default request with no cursor, no checkpoints, and resetTargets=false. */
             }
+            action invokeRuntime : ReconstructRuntimeState {
+                in request redefines ReconstructRuntimeState::request = normalizeReconstructionRequest.request;
+                out report redefines ReconstructRuntimeState::report = rtgReplayLedger.result;
+            }
+            first normalizeReconstructionRequest then invokeRuntime;
         }
         perform action rtgVerifyReplayFromLedger[0..*] : RtgVerifyReplayFromLedger {
-            action invokeController : VerifyReplayFromLedger {
-                in replayOptions redefines VerifyReplayFromLedger::replayOptions = rtgVerifyReplayFromLedger.replay_options;
-                out result redefines VerifyReplayFromLedger::result = rtgVerifyReplayFromLedger.result;
+            action inspectReconstructionEvidence {
+                in attribute request = rtgVerifyReplayFromLedger.replay_options;
+                in attribute runtimeId = runtime.runtimeId;
+                in attribute currentPosition = runtime.currentPosition;
+                out attribute result = rtgVerifyReplayFromLedger.result;
+                doc /* Compare the requested cursor with verified startup reconstruction evidence; require an isolated copy for any other historical cursor. */
             }
         }
         perform action rtgListMigrationHistory[0..*] : RtgListMigrationHistory {
-            action invokeController : ListMigrationHistory {
-                out result redefines ListMigrationHistory::result = rtgListMigrationHistory.result;
+            action buildRuntimeHistoryQuery {
+                out attribute query : RuntimeHistoryQuery;
+                doc /* Select controller request facts and traces for migration staging, cutover, and abandonment. */
             }
+            action queryRuntimeHistory : QueryRuntimeHistory {
+                in query redefines QueryRuntimeHistory::query = buildRuntimeHistoryQuery.query;
+                out page redefines QueryRuntimeHistory::page;
+            }
+            action shapeMigrationHistory {
+                in attribute historyPage = queryRuntimeHistory.page;
+                out attribute result = rtgListMigrationHistory.result;
+                doc /* Resolve complete causal traces, retain migration identifiers and arguments, and order events by terminal runtime position. */
+            }
+            first buildRuntimeHistoryQuery then queryRuntimeHistory;
+            first queryRuntimeHistory then shapeMigrationHistory;
         }
         perform action rtgFlushLedgerFailures[0..*] : RtgFlushLedgerFailures {
-            action invokeController : FlushLedgerFailures {
-                out result redefines FlushLedgerFailures::result = rtgFlushLedgerFailures.result;
+            action shapeDeprecatedStatus {
+                in attribute runtimeHealth = runtime.health;
+                out attribute result = rtgFlushLedgerFailures.result;
+                doc /* Report current runtime health, queued_degraded_records=0, deprecation, and the replacement runtime recovery surface. */
             }
         }
         perform action rtgRestoreFromSnapshot[0..*] : RtgRestoreFromSnapshot {
+            action validateRestoreOptions {
+                in attribute options = rtgRestoreFromSnapshot.restore_options;
+                doc /* Accept omitted options or ledgerMode=record only. */
+            }
             action invokeController : RestoreFromSnapshot {
                 in 'snapshot' redefines RestoreFromSnapshot::'snapshot' = rtgRestoreFromSnapshot.'snapshot';
-                in restoreOptions redefines RestoreFromSnapshot::restoreOptions = rtgRestoreFromSnapshot.restore_options;
                 out result redefines RestoreFromSnapshot::result = rtgRestoreFromSnapshot.result;
             }
+            first validateRestoreOptions then invokeController;
         }
+
+        dependency stateRuntimeMetadata from rtgGetSystemState to runtime { doc /* Read runtime identity, health, current position, message count, and latest terminal trace without changing history. */ }
+        dependency verifyRuntimeEvidence from rtgVerifyReplayFromLedger to runtime { doc /* Read trusted reconstruction evidence without changing live component state or canonical history. */ }
+        dependency flushRuntimeHealth from rtgFlushLedgerFailures to runtime { doc /* Read fail-stop health only; no queued controller-ledger records exist. */ }
 
 
 
@@ -573,7 +672,7 @@ package VellisOperations {
     requirement <'contract.vellis.facade.rtg_validate_live_anchor_records.failures'> rtgValidateLiveAnchorRecordsFailureSemantics {
         subject operation : RtgValidateLiveAnchorRecords;
         require constraint {
-            doc /* Compilation or validation failure has no component or ledger effect. */
+            doc /* Compilation or validation failure has no domain-component effect; the runtime may retain the rejected or faulted trace. */
         }
     }
 
@@ -587,7 +686,7 @@ package VellisOperations {
     requirement <'contract.vellis.facade.rtg_validate_live_graph_changes.failures'> rtgValidateLiveGraphChangesFailureSemantics {
         subject operation : RtgValidateLiveGraphChanges;
         require constraint {
-            doc /* The dry-run never mutates component or ledger state. */
+            doc /* The dry-run never mutates domain-component state; runtime traffic recording remains authoritative. */
         }
     }
 
@@ -608,7 +707,7 @@ package VellisOperations {
     requirement <'contract.vellis.facade.rtg_apply_migration_cutover.failures'> rtgApplyMigrationCutoverFailureSemantics {
         subject operation : RtgApplyMigrationCutover;
         require constraint {
-            doc /* The facade does not weaken cutover restoration or ledger semantics. */
+            doc /* The facade does not weaken cutover restoration, rollback, or runtime trace-disposition semantics. If restoration cannot be confirmed, RtgControllerRecoveryIndeterminate propagates and the runtime records an indeterminate trace before gating further traffic. */
         }
     }
 
@@ -622,7 +721,7 @@ package VellisOperations {
     requirement <'contract.vellis.facade.rtg_execute_query.failures'> rtgExecuteQueryFailureSemantics {
         subject operation : RtgExecuteQuery;
         require constraint {
-            doc /* Query and shaping failures have no state or ledger effect. */
+            doc /* Query and shaping failures have no domain-component effect; the runtime records the resulting fault trace. */
         }
     }
 
@@ -636,21 +735,21 @@ package VellisOperations {
     requirement <'contract.vellis.facade.rtg_get_object.failures'> rtgGetObjectFailureSemantics {
         subject operation : RtgGetObject;
         require constraint {
-            doc /* Failure has no state or ledger effect. */
+            doc /* Failure has no domain-component effect; the runtime records the resulting fault trace. */
         }
     }
 
     requirement <'contract.vellis.facade.rtg_list_migrations.failures'> rtgListMigrationsFailureSemantics {
         subject operation : RtgListMigrations;
         require constraint {
-            doc /* Failure has no state or ledger effect. */
+            doc /* Failure has no domain-component effect; the runtime records the resulting fault trace. */
         }
     }
 
     requirement <'contract.vellis.facade.rtg_get_migration.failures'> rtgGetMigrationFailureSemantics {
         subject operation : RtgGetMigration;
         require constraint {
-            doc /* Failure has no state or ledger effect. */
+            doc /* Failure has no domain-component effect; the runtime records the resulting fault trace. */
         }
     }
 
@@ -678,7 +777,7 @@ package VellisOperations {
     requirement <'contract.vellis.facade.rtg_export_system_snapshot.failures'> rtgExportSystemSnapshotFailureSemantics {
         subject operation : RtgExportSystemSnapshot;
         require constraint {
-            doc /* Export has no state or ledger effect. */
+            doc /* Export has no domain-component effect; normal runtime request and response facts remain recorded. */
         }
     }
 
@@ -713,7 +812,7 @@ package VellisOperations {
     requirement <'contract.vellis.facade.rtg_verify_replay_from_ledger.failures'> rtgVerifyReplayFromLedgerFailureSemantics {
         subject operation : RtgVerifyReplayFromLedger;
         require constraint {
-            doc /* Verification leaves current state and source ledger unchanged. */
+            doc /* Verification leaves current component state and canonical runtime history unchanged. */
         }
     }
 
@@ -727,14 +826,14 @@ package VellisOperations {
     requirement <'contract.vellis.facade.rtg_flush_ledger_failures.failures'> rtgFlushLedgerFailuresFailureSemantics {
         subject operation : RtgFlushLedgerFailures;
         require constraint {
-            doc /* Unflushed records remain queued and legible. */
+            doc /* The deprecated operation never mutates runtime or component state and always reports zero queued degraded controller-ledger records. */
         }
     }
 
     requirement <'contract.vellis.facade.rtg_restore_from_snapshot.failures'> rtgRestoreFromSnapshotFailureSemantics {
         subject operation : RtgRestoreFromSnapshot;
         require constraint {
-            doc /* Failure exposes no partially restored state. */
+            doc /* Ordinary failure restores the prior coordinated state. If restoration cannot be confirmed, RtgControllerRecoveryIndeterminate explicitly reports the uncertainty and the runtime records an indeterminate trace before gating further traffic. */
         }
     }
 
@@ -746,6 +845,7 @@ package VellisOperations {
         satisfy queryFacadeSemantics by facade;
         satisfy snapshotFacadeSemantics by facade;
         satisfy controllerForwardingSemantics by facade;
+        satisfy runtimeProjectionSemantics by facade;
         satisfy usageGuideSemantics by facade.rtgGetUsageGuide;
         satisfy schemaMigrationCompilation by facade.rtgStageSchemaMigration;
 
@@ -957,7 +1057,7 @@ package VellisOperations {
 
     verification def VellisFacadeBoundaryVerification {
         subject facade : VellisApplicationFacade;
-        objective { verify facadeFailureSemantics; verify facadeFreedom; verify anchorRecordCompilation; verify queryFacadeSemantics; verify snapshotFacadeSemantics; verify controllerForwardingSemantics; }
+        objective { verify facadeFailureSemantics; verify facadeFreedom; verify anchorRecordCompilation; verify queryFacadeSemantics; verify snapshotFacadeSemantics; verify controllerForwardingSemantics; verify runtimeProjectionSemantics; }
         @EvidenceBinding { evidenceId = "apps/rtg_knowledge_graph/tests/test_rtg_knowledge_graph_mcp_user_flows.py#VellisFacadeBoundaryVerification"; implementationScope = "VellisApplicationFacade"; }
     }
 }

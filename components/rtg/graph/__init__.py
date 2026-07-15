@@ -35,6 +35,11 @@ from components.rtg.graph.protocol import (
     RtgTypeCountList,
     UuidInput,
 )
+from components.rtg.graph.runtime_binding import (
+    RtgGraphMessageProxy,
+    create_rtg_graph_adapter,
+    create_rtg_graph_proxy,
+)
 
 __all__ = [
     "InMemoryRtgGraph",
@@ -69,5 +74,8 @@ __all__ = [
     "RtgGraphTypeKindConflict",
     "RtgGraphUuidConflict",
     "RtgGraphUuidInvalid",
+    "RtgGraphMessageProxy",
     "UuidInput",
+    "create_rtg_graph_adapter",
+    "create_rtg_graph_proxy",
 ]

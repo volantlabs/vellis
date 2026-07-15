@@ -17,6 +17,7 @@ Generated from textual SysML v2 by `just model-render` as a non-normative readin
 | `listDataAnchors` | `ListDataAnchors` | in `dataUuid: Uuid`; out `result: RtgAnchorList` | `RtgGraphUuidInvalid`, `RtgGraphDataObjectNotFound` | Return directly associated anchors without lifecycle filtering. |
 | `listIncidentLinks` | `ListIncidentLinks` | in `objectUuid: Uuid`; in `direction: RtgLinkDirection` = `RtgLinkDirection::both`; out `result: RtgLinkList` | `RtgGraphUuidInvalid`, `RtgGraphObjectNotFound` | Return source, target, or all incident links without lifecycle filtering. |
 | `countByType` | `CountGraphObjectsByType` | in `kind: RtgObjectKind[0..1]`; in `live: Boolean[0..1]`; out `result: RtgTypeCountList` | `RtgGraphTypeInvalid` | Return deterministic counts by type with optional object-kind and live-status filters. |
+| `replaceSnapshot` | `ReplaceGraphSnapshot` | in `snapshot: RtgGraphSnapshot` | `RtgGraphSnapshotInvalid`, `RtgGraphUuidInvalid`, `RtgGraphUuidConflict`, `RtgGraphReferenceInvalid`, `RtgGraphTypeInvalid`, `RtgGraphTypeKindConflict`, `RtgGraphJsonValueInvalid`, `RtgGraphSystemValueInvalid` | Validate the complete candidate, then atomically replace all canonical graph state and rebuild every derived index. |
 | `putAnchor` | `PutAnchor` | in `anchor: RtgAnchor`; out `stored: RtgAnchor` | `RtgGraphUuidInvalid`, `RtgGraphUuidConflict`, `RtgGraphTypeInvalid`, `RtgGraphTypeKindConflict`, `RtgGraphSystemValueInvalid` | Create or fully replace one anchor while preserving its associations and incident links. |
 | `putDataObject` | `PutDataObject` | in `dataObject: RtgDataObject`; in `anchorUuids: Uuid[1..*]`; out `stored: RtgDataObject` | `RtgGraphUuidInvalid`, `RtgGraphUuidConflict`, `RtgGraphAnchorNotFound`, `RtgGraphTypeInvalid`, `RtgGraphTypeKindConflict`, `RtgGraphJsonValueInvalid`, `RtgGraphSystemValueInvalid` | Create or fully replace one data object and replace its complete direct anchor association set. |
 | `putLink` | `PutLink` | in `link: RtgLink`; out `stored: RtgLink` | `RtgGraphUuidInvalid`, `RtgGraphUuidConflict`, `RtgGraphEndpointNotFound`, `RtgGraphTypeInvalid`, `RtgGraphTypeKindConflict`, `RtgGraphSystemValueInvalid` | Create or fully replace one directed typed link between existing non-link endpoints. |
@@ -65,6 +66,7 @@ Generated from textual SysML v2 by `just model-render` as a non-normative readin
 | `deleteDataObject` | `dataObjects` | `delete` | remove data and complete cascade atomically. |
 | `deleteLink` | `links` | `delete` | remove exactly one link and index entries. |
 | `exportSnapshot` | `anchors` | `read` | read all canonical records, associations, and their stable identities without mutation. |
+| `replaceSnapshot` | `anchors` | `write` | validate before visibility, atomically replace all canonical records and associations, and rebuild derived indexes. |
 | `getObject` | `anchors` | `read` | read the one global object namespace across anchors, data objects, and links. |
 | `listByType` | `derivedIndexes` | `read` | read the derived type index and canonical records without mutation. |
 | `listAnchorData` | `anchorDataAssociations` | `read` | read direct anchor-to-data associations without mutation. |
@@ -89,7 +91,8 @@ Generated from textual SysML v2 by `just model-render` as a non-normative readin
 | `contract.rtg.graph.association_effect` | `RtgGraph` | `graph` | Association is a direct identity-free many-to-many relation. Repeated association is idempotent; removing the last anchor grounds deletion of the data object and its incident links. |
 | `contract.rtg.graph.delete_effect` | `RtgGraph` | `graph` | Deletes return the complete cascade with always-present result lists and leave no dangling links or associations; rejected deletes have no effect. |
 | `contract.rtg.graph.preview_effect` | `RtgGraph` | `graph` | Each preview returns exactly the cascade the paired mutation would produce from the same state and changes no canonical or derived state. |
-| `contract.rtg.graph.snapshot_effect` | `RtgGraph` | `graph` | Export preserves UUIDs, types, endpoints, properties, system metadata, and direct associations without filtering. Import validates the whole candidate and rebuilds derived indexes. |
+| `contract.rtg.graph.snapshot_effect` | `RtgGraph` | `graph` | Export preserves UUIDs, types, endpoints, properties, system metadata, and direct associations without filtering. Import and in-place replacement validate the whole candidate before visibility, rebuild derived indexes, and expose either the complete replacement or the unchanged prior state. Replacing with the current snapshot is idempotent. |
+| `contract.rtg.graph.snapshot_replacement` | `ReplaceGraphSnapshot` | `graph.replaceSnapshot` | Whole-candidate validation precedes visibility; success atomically replaces all records, associations, and indexes, failure preserves the prior graph, and replacing with an identical snapshot is idempotent. |
 | `contract.rtg.graph.canonical_ordering` | `RtgGraph` | `graph` | Object lists, snapshot record collections, and each delete-result collection use ascending textual UUID order. Snapshot association entries use ascending anchor UUID and their data UUIDs use ascending textual order. Type counts use ascending type key then object kind. |
 | `contract.rtg.graph.intentional_boundary` | `RtgGraph` | `graph` | Graph owns schema-neutral records, direct associations, and indexes only. It performs no schema/delta validation, authorization, migration-candidate policy, hidden live filtering, query/inference/reasoning, persistence, replay/audit, backup/replication, or distributed coordination; arbitrary system metadata is preserved without assigned meaning beyond system.live. |
 | `invariant.rtg.graph.global_uuid_uniqueness` | `RtgGraph` | `graph` | UUIDs are globally unique across graph object kinds. |
@@ -116,6 +119,7 @@ Generated from textual SysML v2 by `just model-render` as a non-normative readin
 | `invariant.rtg.graph.mutation_atomicity` | `RtgGraph` | `graph` | Each mutation preserves every graph invariant or has no effect. |
 | `invariant.rtg.graph.preview_matches_delete` | `RtgGraph` | `graph` | Preview cascades match their corresponding mutations. |
 | `contract.rtg.graph.export_graph_snapshot.failures` | `ExportGraphSnapshot` | `graph.exportSnapshot` | Export has no declared domain failure. |
+| `contract.rtg.graph.replace_graph_snapshot.failures` | `ReplaceGraphSnapshot` | `graph.replaceSnapshot` | Rejected replacement leaves every graph record, association, and derived index unchanged. |
 | `contract.rtg.graph.put_anchor.failures` | `PutAnchor` | `graph.putAnchor` | Rejected writes have no effect. |
 | `contract.rtg.graph.put_data_object.failures` | `PutDataObject` | `graph.putDataObject` | Rejected writes change neither records nor indexes. |
 | `contract.rtg.graph.put_link.failures` | `PutLink` | `graph.putLink` | Rejected writes change neither links nor incident indexes. |
@@ -181,6 +185,7 @@ Generated from textual SysML v2 by `just model-render` as a non-normative readin
 | Verification | Subject | Objectives | Evidence |
 |---|---|---|---|
 | `ExportGraphSnapshotContractVerification` | `ExportGraphSnapshot` | `exportGraphSnapshotFailureSemantics` | `components/rtg/graph/tests/test_rtg_graph_contract.py#ExportGraphSnapshotContractVerification` |
+| `ReplaceGraphSnapshotContractVerification` | `ReplaceGraphSnapshot` | `snapshotReplacementEffect`, `replaceGraphSnapshotFailureSemantics` | `components/rtg/graph/tests/test_rtg_graph_contract.py#ReplaceGraphSnapshotContractVerification` |
 | `PutAnchorContractVerification` | `PutAnchor` | `putAnchorFailureSemantics` | `components/rtg/graph/tests/test_rtg_graph_contract.py#PutAnchorContractVerification` |
 | `PutDataObjectContractVerification` | `PutDataObject` | `putDataObjectFailureSemantics` | `components/rtg/graph/tests/test_rtg_graph_contract.py#PutDataObjectContractVerification` |
 | `PutLinkContractVerification` | `PutLink` | `putLinkFailureSemantics` | `components/rtg/graph/tests/test_rtg_graph_contract.py#PutLinkContractVerification` |

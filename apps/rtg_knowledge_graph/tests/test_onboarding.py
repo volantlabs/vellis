@@ -62,7 +62,7 @@ def test_setup_json_is_single_document_and_repeated_setup_is_noop(
     )
     second = json.loads(capsys.readouterr().out)
     assert second["registration"] == "already_configured"
-    assert second["starter_schema"]["recovery"] == "ledger_replayed"
+    assert second["starter_schema"]["recovery"] == "runtime_reconstructed"
 
 
 def test_setup_json_requires_yes_without_prompting(
@@ -161,10 +161,10 @@ def test_setup_remains_interactive_with_injected_streams(tmp_path: Path) -> None
     assert output_stream.getvalue().endswith("Continue? [y/N] ")
 
 
-def test_setup_preserves_legacy_flat_storage_root_as_the_data_location(
+def test_setup_accepts_explicit_storage_and_runtime_paths(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    legacy_root = tmp_path / "vellis-beta-001"
+    data_root = tmp_path / "vellis-data"
     assert (
         main(
             [
@@ -172,9 +172,9 @@ def test_setup_preserves_legacy_flat_storage_root_as_the_data_location(
                 "--client",
                 "generic-json",
                 "--storage-root",
-                str(legacy_root),
-                "--sql-database-path",
-                str(legacy_root / "controller.sqlite"),
+                str(data_root / "json_file"),
+                "--runtime-database-path",
+                str(data_root / "runtime.sqlite"),
                 "--yes",
                 "--json",
             ]
@@ -182,8 +182,8 @@ def test_setup_preserves_legacy_flat_storage_root_as_the_data_location(
         == 0
     )
     result = json.loads(capsys.readouterr().out)
-    assert result["data_dir"] == str(legacy_root)
-    assert (legacy_root / "setup" / "mcp-config.json").is_file()
+    assert result["data_dir"] == str(data_root)
+    assert (data_root / "setup" / "mcp-config.json").is_file()
 
 
 def test_claude_desktop_merge_preserves_other_entries_and_is_idempotent(tmp_path: Path) -> None:
@@ -287,15 +287,15 @@ def test_doctor_is_non_destructive_for_fresh_data_directory(
     assert main(["doctor", "--client", "generic-json", "--data-dir", str(data_dir), "--json"]) == 1
     report = json.loads(capsys.readouterr().out)
     assert report["ok"] is False
-    assert not config_for_data_dir(data_dir).sql_database_path.exists()
+    assert not config_for_data_dir(data_dir).runtime_database_path.exists()
 
 
-def test_setup_fails_closed_for_corrupt_ledger_without_configuring_client(
+def test_setup_fails_closed_for_corrupt_runtime_database_without_configuring_client(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     data_dir = tmp_path / "corrupt"
     data_dir.mkdir()
-    (data_dir / "controller.sqlite").write_bytes(b"not a sqlite database")
+    (data_dir / "runtime.sqlite").write_bytes(b"not a sqlite database")
 
     assert (
         main(

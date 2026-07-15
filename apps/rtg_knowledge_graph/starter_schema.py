@@ -7,7 +7,7 @@ from typing import Any, cast
 from uuid import NAMESPACE_URL, UUID, uuid5
 
 from apps.rtg_knowledge_graph.mcp_codec import decode_change_batch
-from components.rtg.controller import InProcessRtgController
+from components.rtg.controller import RtgController
 
 JsonObject = dict[str, Any]
 
@@ -63,34 +63,15 @@ def load_starter_schema_bundle() -> JsonObject:
 
 
 def prepare_controller(
-    controller: InProcessRtgController,
+    controller: RtgController,
     *,
     install_starter_schema: bool = True,
     automatic_recovery: bool = True,
+    recovery: str = "not_needed",
 ) -> StarterSchemaStatus:
     bundle = load_starter_schema_bundle()
-    recovery = "not_needed"
-    state = controller.get_system_state()
-    if state.state_classification == "needs_replay":
-        if not automatic_recovery:
-            return starter_schema_status(
-                controller,
-                bundle=bundle,
-                recovery="manual_recovery_required",
-            )
-        try:
-            controller.replay_ledger()
-            report = controller.validate_graph()
-            if not report.accepted:
-                raise VellisStartupFailed("replayed durable graph state did not pass validation")
-        except Exception as error:  # noqa: BLE001 - startup must fail closed
-            raise VellisStartupFailed(
-                "Vellis could not reconstruct and validate durable graph state from the "
-                "controller ledger; no replacement empty MCP server was started. Run "
-                "`uv run vellis doctor`. "
-                f"Cause: {error}"
-            ) from error
-        recovery = "ledger_replayed"
+    if not automatic_recovery and recovery == "manual_recovery_required":
+        return starter_schema_status(controller, bundle=bundle, recovery=recovery)
 
     status = starter_schema_status(controller, bundle=bundle, recovery=recovery)
     if _is_recoverable_staged_installation(controller, bundle):
@@ -179,7 +160,7 @@ def prepare_controller(
 
 
 def install_everyday_life_ontology(
-    controller: InProcessRtgController,
+    controller: RtgController,
 ) -> EverydayLifeInstallationResult:
     """Realize the modeled ontology installation action over one controller."""
     bundle = load_starter_schema_bundle()
@@ -204,7 +185,7 @@ def install_everyday_life_ontology(
 
 
 def starter_schema_status(
-    controller: InProcessRtgController,
+    controller: RtgController,
     *,
     bundle: JsonObject | None = None,
     recovery: str = "not_checked",
@@ -212,20 +193,7 @@ def starter_schema_status(
     value = bundle or load_starter_schema_bundle()
     writes = value["knowledge_changes"]["schema_changes"]["definition_writes"]
     expected = {str(item["definition"]["uuid"]): item["definition"] for item in writes}
-    anchor_types = tuple(
-        sorted(
-            str(item["definition"]["type_key"])
-            for item in writes
-            if item["definition"]["kind"] == "anchor"
-        )
-    )
-    link_types = tuple(
-        sorted(
-            str(item["definition"]["type_key"])
-            for item in writes
-            if item["definition"]["kind"] == "link"
-        )
-    )
+    anchor_types, link_types = _bundle_type_keys(value)
     snapshot = controller.export_system_snapshot()
     live_by_id = {
         str(item.get("uuid")): item
@@ -259,8 +227,41 @@ def starter_schema_status(
     )
 
 
+def unreconstructed_starter_schema_status() -> StarterSchemaStatus:
+    """Describe the configured ontology without reading unreconstructed component state."""
+    bundle = load_starter_schema_bundle()
+    anchor_types, link_types = _bundle_type_keys(bundle)
+    return StarterSchemaStatus(
+        ontology_id=str(bundle["ontology_id"]),
+        version=str(bundle["version"]),
+        status="empty",
+        anchor_type_keys=anchor_types,
+        link_type_keys=link_types,
+        recovery="manual_recovery_required",
+    )
+
+
+def _bundle_type_keys(bundle: JsonObject) -> tuple[tuple[str, ...], tuple[str, ...]]:
+    writes = bundle["knowledge_changes"]["schema_changes"]["definition_writes"]
+    anchor_types = tuple(
+        sorted(
+            str(item["definition"]["type_key"])
+            for item in writes
+            if item["definition"]["kind"] == "anchor"
+        )
+    )
+    link_types = tuple(
+        sorted(
+            str(item["definition"]["type_key"])
+            for item in writes
+            if item["definition"]["kind"] == "link"
+        )
+    )
+    return anchor_types, link_types
+
+
 def _starter_schema_integrity_issue(
-    controller: InProcessRtgController,
+    controller: RtgController,
     bundle: JsonObject,
 ) -> str | None:
     writes = bundle["knowledge_changes"]["schema_changes"]["definition_writes"]
@@ -287,7 +288,7 @@ def _starter_schema_integrity_issue(
 
 
 def _is_recoverable_staged_installation(
-    controller: InProcessRtgController,
+    controller: RtgController,
     bundle: JsonObject,
 ) -> bool:
     snapshot = controller.export_system_snapshot()

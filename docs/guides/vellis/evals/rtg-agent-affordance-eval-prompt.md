@@ -1,6 +1,6 @@
 # RTG Agent Affordance Eval Prompt
 
-Evaluation only: launch Vellis with `--empty --manual-recovery` before using this prompt.
+Evaluation only: launch Vellis with a fresh data root and `--empty` before using this prompt.
 
 Use this prompt manually with an agent after the `rtg_knowledge_graph` MCP server is
 already connected. The prompt is external eval material, not an MCP tool or resource.
@@ -10,11 +10,11 @@ already connected. The prompt is external eval material, not an MCP tool or reso
 You are maintaining a long-lived project memory for a human-led engineering system.
 You have access to an RTG MCP server. Use the RTG system affordances intentionally:
 schema definitions, constraint definitions, graph writes, validation, migrations, cutover,
-query, snapshots, and ledger evidence.
+query, snapshots, and runtime trace evidence.
 
 Rules:
 
-- Use the controller-facing MCP tools directly. The write lanes are live graph writes
+- Use the curated Vellis MCP tools directly. The write lanes are live graph writes
   (`rtg_apply_live_graph_changes`, with `rtg_validate_live_graph_changes` for no-mutation probes),
   schema/migration staging (`rtg_stage_schema_migration` or advanced
   `rtg_stage_knowledge_changes`), and migration cutover (`rtg_apply_migration_cutover`).
@@ -24,7 +24,7 @@ Rules:
 - Initial schema and constraints are knowledge-engineering work: stage schema through
   `rtg_stage_schema_migration` when possible, or use `rtg_stage_knowledge_changes` for advanced
   constraint and non-live graph candidates, then make them live with `rtg_apply_migration_cutover`.
-- Use strict controller writes. If a tool returns `ok: false` with `validation_report`, repair
+- Use strict writes. If a tool returns `ok: false` with `validation_report`, repair
   the submitted payload and retry; do not weaken constraints just to pass.
 - Use `rtg_validate_graph` for current-state or migration-projected validation checks. Use
   `rtg_validate_live_graph_changes` before risky live graph imports or recovery probes that should
@@ -33,17 +33,19 @@ Rules:
   records, and migration evidence.
 - Use `rtg_resolve_anchor_by_fact` for exact anchor lookup before link writes when useful. Use
   `rtg_execute_query` for multi-hop questions instead of scanning every object manually.
-- Preserve evidence through migration evidence, controller transaction IDs, persisted snapshots,
-  snapshot readback, or ledger references.
+- Preserve domain evidence through migration evidence, persisted snapshots, and snapshot readback.
+  Use runtime trace IDs, runtime positions, and terminal dispositions for cross-component
+  chronology when the curated runtime projections expose them.
 - Produce a concise human-facing brief at the end.
 
 Tool response shape:
 
 - Success: `{"ok": true, "result": ...}`
 - Expected failure: `{"ok": false, "error": {"type": "...", "message": "..."}, ...}`
-- Validation failures may include `transaction_id` and `validation_report.findings`.
-- Successful mutating results include `result.transaction_id` and may include
-  `result.ledger_position`.
+- Validation failures may include `validation_report.findings`.
+- Mutating results describe domain status, generated IDs, applied changes, and validation evidence;
+  runtime trace identity and chronology belong to runtime status/history projections rather than
+  controller results.
 
 Your mission is to model a small software-component repository as an evolving knowledge graph.
 The human needs this memory to answer design, implementation, test-evidence, and planning
@@ -83,10 +85,10 @@ Required tasks:
    - Which implementation roots are affected by changing the component schema?
    - Which draft components have unresolved open questions?
 5. The human then provides new data:
-   - `component.rtg.controller` has a ledger transaction that records request and response
-     payloads.
-   - Ledger evidence must record transaction ID, ledger position, operation name, and whether
-     replay can use it.
+   - The Vellis runtime has a terminal trace for a `component.rtg.controller` request and its
+     derived component calls.
+   - Runtime trace evidence must record trace ID, runtime position, action name, terminal
+     disposition, and whether a committed canonical effect can reconstruct managed state.
    - This data does not fit the original evidence schema.
 6. Propose a non-live evidence schema replacement and a migration record that makes the
    replacement live and retires the old evidence schema.
@@ -94,11 +96,11 @@ Required tasks:
    `validation_report`, explain the finding, repair the payload, and retry.
 8. Apply migration cutover.
 9. Query the post-cutover model to show:
-   - controller ledger evidence is represented
+   - runtime trace evidence for the controller interaction is represented
    - older test evidence still remains usable
    - accepted components without evidence are still discoverable
-10. Export or persist a system snapshot and identify the controller transaction, ledger position,
-    or ledger evidence that supports the final state.
+10. Export or persist a system snapshot and identify the migration evidence plus runtime
+    trace/position evidence that supports the final state.
 11. Produce a human-facing brief with:
    - what schema exists now
    - what graph facts are live
@@ -120,9 +122,9 @@ Expected artifacts:
 
 Scoring rubric:
 
-- Pass: The agent uses schema, constraints, validation, migration, query, snapshot, and ledger
-  affordances in their intended roles; repairs validation failures without weakening rules; and
-  produces a traceable human brief.
+- Pass: The agent uses schema, constraints, validation, migration, query, snapshot, and runtime
+  trace affordances in their intended roles; repairs validation failures without weakening rules;
+  and produces a traceable human brief.
 - Partial: The agent uses graph and query but treats schema evolution, validation, migration,
   or evidence as prose instead of RTG-managed state.
 - Fail: The agent bypasses migration for schema evolution, stores schema/constraint/migration
@@ -137,5 +139,5 @@ Failure modes to watch for:
 - Replacing validation with narrative reasoning only.
 - Weakening constraints to make bad data pass.
 - Answering impact questions by scanning every object manually instead of using query patterns.
-- Losing the link between human-facing conclusions and transaction, snapshot, test, or
-  migration evidence.
+- Losing the link between human-facing conclusions and runtime trace, snapshot, test, or migration
+  evidence.

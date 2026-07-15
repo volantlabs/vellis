@@ -80,6 +80,11 @@ library package BibliotekRtgGraph {
         doc /* Return the complete unfiltered graph state without mutation. */
         @FailureContract { errorIds = (); }
     }
+    action def ReplaceGraphSnapshot {
+        in 'snapshot' : RtgGraphSnapshot;
+        doc /* Validate the complete candidate, then atomically replace all canonical graph state and rebuild every derived index. */
+        @FailureContract { errorIds = ("RtgGraphSnapshotInvalid", "RtgGraphUuidInvalid", "RtgGraphUuidConflict", "RtgGraphReferenceInvalid", "RtgGraphTypeInvalid", "RtgGraphTypeKindConflict", "RtgGraphJsonValueInvalid", "RtgGraphSystemValueInvalid"); }
+    }
     action def PutAnchor {
         in anchor : RtgAnchor; out stored : RtgAnchor;
         doc /* Create or fully replace one anchor while preserving its associations and incident links. */
@@ -184,6 +189,7 @@ library package BibliotekRtgGraph {
         item links[0..*] : RtgLink { doc /* Canonical component-owned link occurrences. */ }
         attribute anchorDataAssociations : JsonObject { doc /* Canonical identity-free direct associations. */ }
         derived attribute derivedIndexes : JsonObject { doc /* Ephemeral navigation indexes derived from canonical graph state. */ }
+        perform action replaceSnapshot[0..*] : ReplaceGraphSnapshot;
         perform action putAnchor[0..*] : PutAnchor; perform action putDataObject[0..*] : PutDataObject; perform action putLink[0..*] : PutLink;
         perform action associateData[0..*] : AssociateData; perform action dissociateData[0..*] : DissociateData;
         perform action deleteAnchor[0..*] : DeleteAnchor; perform action deleteDataObject[0..*] : DeleteDataObject; perform action deleteLink[0..*] : DeleteLink;
@@ -199,6 +205,7 @@ library package BibliotekRtgGraph {
         dependency deleteDataState from deleteDataObject to dataObjects { @StateAccess { kind = StateAccessKind::delete; } doc /* remove data and complete cascade atomically. */ }
         dependency deleteLinkState from deleteLink to links { @StateAccess { kind = StateAccessKind::delete; } doc /* remove exactly one link and index entries. */ }
         dependency exportSnapshotState from exportSnapshot to anchors { @StateAccess { kind = StateAccessKind::read; } doc /* read all canonical records, associations, and their stable identities without mutation. */ }
+        dependency replaceSnapshotState from replaceSnapshot to anchors { @StateAccess { kind = StateAccessKind::write; } doc /* validate before visibility, atomically replace all canonical records and associations, and rebuild derived indexes. */ }
         dependency getObjectState from getObject to anchors { @StateAccess { kind = StateAccessKind::read; } doc /* read the one global object namespace across anchors, data objects, and links. */ }
         dependency listByTypeState from listByType to derivedIndexes { @StateAccess { kind = StateAccessKind::read; } doc /* read the derived type index and canonical records without mutation. */ }
         dependency listAnchorDataState from listAnchorData to anchorDataAssociations { @StateAccess { kind = StateAccessKind::read; } doc /* read direct anchor-to-data associations without mutation. */ }
@@ -245,7 +252,14 @@ library package BibliotekRtgGraph {
     requirement <'contract.rtg.graph.snapshot_effect'> snapshotEffect {
         subject graph : RtgGraph;
         require constraint {
-            doc /* Export preserves UUIDs, types, endpoints, properties, system metadata, and direct associations without filtering. Import validates the whole candidate and rebuilds derived indexes. */
+            doc /* Export preserves UUIDs, types, endpoints, properties, system metadata, and direct associations without filtering. Import and in-place replacement validate the whole candidate before visibility, rebuild derived indexes, and expose either the complete replacement or the unchanged prior state. Replacing with the current snapshot is idempotent. */
+        }
+    }
+
+    requirement <'contract.rtg.graph.snapshot_replacement'> snapshotReplacementEffect {
+        subject operation : ReplaceGraphSnapshot;
+        require constraint {
+            doc /* Whole-candidate validation precedes visibility; success atomically replaces all records, associations, and indexes, failure preserves the prior graph, and replacing with an identical snapshot is idempotent. */
         }
     }
 
@@ -431,6 +445,13 @@ library package BibliotekRtgGraph {
         }
     }
 
+    requirement <'contract.rtg.graph.replace_graph_snapshot.failures'> replaceGraphSnapshotFailureSemantics {
+        subject operation : ReplaceGraphSnapshot;
+        require constraint {
+            doc /* Rejected replacement leaves every graph record, association, and derived index unchanged. */
+        }
+    }
+
     requirement <'contract.rtg.graph.put_anchor.failures'> putAnchorFailureSemantics {
         subject operation : PutAnchor;
         require constraint {
@@ -571,6 +592,7 @@ library package BibliotekRtgGraph {
         satisfy deleteEffect by graph;
         satisfy previewEffect by graph;
         satisfy snapshotEffect by graph;
+        satisfy snapshotReplacementEffect by graph.replaceSnapshot;
         satisfy canonicalOrdering by graph;
         satisfy intentionalBoundary by graph;
         satisfy globalUuidUniqueness by graph;
@@ -598,6 +620,7 @@ library package BibliotekRtgGraph {
         satisfy previewMatchesDelete by graph;
 
         satisfy exportGraphSnapshotFailureSemantics by graph.exportSnapshot;
+        satisfy replaceGraphSnapshotFailureSemantics by graph.replaceSnapshot;
         satisfy putAnchorFailureSemantics by graph.putAnchor;
         satisfy putDataObjectFailureSemantics by graph.putDataObject;
         satisfy putLinkFailureSemantics by graph.putLink;
@@ -624,6 +647,12 @@ library package BibliotekRtgGraph {
         subject operation : ExportGraphSnapshot;
         objective { verify exportGraphSnapshotFailureSemantics; }
         @EvidenceBinding { evidenceId = "components/rtg/graph/tests/test_rtg_graph_contract.py#ExportGraphSnapshotContractVerification"; implementationScope = "InMemoryRtgGraph"; }
+    }
+
+    verification def ReplaceGraphSnapshotContractVerification {
+        subject operation : ReplaceGraphSnapshot;
+        objective { verify snapshotReplacementEffect; verify replaceGraphSnapshotFailureSemantics; }
+        @EvidenceBinding { evidenceId = "components/rtg/graph/tests/test_rtg_graph_contract.py#ReplaceGraphSnapshotContractVerification"; implementationScope = "InMemoryRtgGraph"; }
     }
 
     verification def PutAnchorContractVerification {

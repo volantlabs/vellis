@@ -2,14 +2,15 @@ package Vellis {
     private import SoftwareComponentModeling::*;
     private import BibliotekSoftwareValues::*;
     private import Bibliotek::*;
+    private import BibliotekRuntimeMessageRuntime::*;
     private import VellisOperations::*;
     private import VellisEverydayLifeOntology::*;
 
     part def <'application.vellis'> VellisApplication {
         @SpecificationStatus { lifecycleStatus = SpecLifecycle::accepted; owner = "humans"; }
 
+        part runtime : MessageRuntime;
         part documentStorage : JsonFileStorage;
-        part ledgerStorage : SqlStorage;
         part graphStore : RtgGraph;
         part schemaRegistry : RtgSchema;
         part constraintRegistry : RtgConstraints;
@@ -27,8 +28,8 @@ package Vellis {
         bind controller.changeValidator = changeValidator;
         bind controller.queryEngine = queryEngine;
         bind controller.jsonStorage = documentStorage;
-        bind controller.sqlStorage = ledgerStorage;
         bind facade.controller = controller;
+        bind facade.runtime = runtime;
     }
 
 
@@ -53,17 +54,25 @@ package Vellis {
         }
     }
 
+    requirement <'invariant.vellis.runtime_history_authority'> runtimeHistoryAuthority {
+        subject application : VellisApplication;
+        require constraint {
+            doc /* The message runtime owns application traffic chronology, trace query, health, and reconstruction; the RTG controller owns no application ledger or generic replay capability. */
+        }
+    }
+
     part contractContext {
         part application : VellisApplication;
         satisfy bibliotekOnlyThroughContracts by application;
         satisfy discoveryDraftUnbound by application;
         satisfy transportOutsideController by application;
+        satisfy runtimeHistoryAuthority by application;
     }
 
 
     verification def VellisCompositionVerification {
         subject application : VellisApplication;
-        objective { verify bibliotekOnlyThroughContracts; verify discoveryDraftUnbound; verify transportOutsideController; }
+        objective { verify bibliotekOnlyThroughContracts; verify discoveryDraftUnbound; verify transportOutsideController; verify runtimeHistoryAuthority; }
         @EvidenceBinding { evidenceId = "apps/rtg_knowledge_graph/tests/test_rtg_knowledge_graph_app.py#VellisCompositionVerification"; implementationScope = "VellisLocalPython"; }
     }
 }

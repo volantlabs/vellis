@@ -73,6 +73,7 @@ library package BibliotekRtgMigration {
     attribute def RtgMigrationEvidenceInvalid { attribute 'message' : String; }
 
     action def ExportMigrationSnapshot { out 'snapshot' : RtgMigrationSnapshot; doc /* Export all records without inspecting referenced component state. */ @FailureContract { errorIds = (); } }
+    action def ReplaceMigrationSnapshot { in 'snapshot' : RtgMigrationSnapshot; doc /* Validate the complete candidate, then atomically replace every migration record and rebuild the status index without applying lifecycle transitions against prior state. */ @FailureContract { errorIds = ("RtgMigrationSnapshotInvalid", "RtgMigrationIdInvalid", "RtgMigrationIdConflict", "RtgMigrationRecordInvalid", "RtgMigrationStatusInvalid", "RtgMigrationEvidenceInvalid"); } }
     action def PutMigration {
         in migration : RtgMigrationRecord;
         out stored : RtgMigrationRecord;
@@ -99,6 +100,7 @@ library package BibliotekRtgMigration {
         item migrationRecords[0..*] : RtgMigrationRecord { doc /* Canonical component-owned migration occurrences. */ }
         derived attribute statusIndex : JsonObject { doc /* Ephemeral status index derived from canonical migration records. */ }
         perform action exportSnapshot[0..*] : ExportMigrationSnapshot;
+        perform action replaceSnapshot[0..*] : ReplaceMigrationSnapshot;
         perform action putMigration[0..*] : PutMigration;
         perform action getMigration[0..*] : GetMigration;
         perform action listMigrations[0..*] : ListMigrations;
@@ -107,6 +109,7 @@ library package BibliotekRtgMigration {
         perform action deleteMigration[0..*] : DeleteMigration;
         perform action buildCutoverPlan[0..*] : BuildMigrationCutoverPlan;
         dependency snapshotState from exportSnapshot to migrationRecords { @StateAccess { kind = StateAccessKind::read; } doc /* return all migration records in migration-ID order. */ }
+        dependency replaceSnapshotState from replaceSnapshot to migrationRecords { @StateAccess { kind = StateAccessKind::write; } doc /* validate before visibility and atomically replace every record and derived status entry. */ }
         dependency putState from putMigration to migrationRecords { @StateAccess { kind = StateAccessKind::write; } doc /* create or lifecycle-safe replace one complete record. */ }
         dependency statusState from setStatus to migrationRecords { @StateAccess { kind = StateAccessKind::write; } doc /* apply one allowed lifecycle transition or same-status metadata update. */ }
         dependency evidenceState from addEvidence to migrationRecords { @StateAccess { kind = StateAccessKind::write; } doc /* append one evidence identity not already present. */ }
@@ -124,6 +127,13 @@ library package BibliotekRtgMigration {
         subject operation : PutMigration;
         require constraint {
             doc /* A new record may begin in any valid status. Replacing an existing ID must preserve status or satisfy MigrationStatusTransitionAllowed for the stored and requested statuses; all other fields are fully replaced. */
+        }
+    }
+
+    requirement <'contract.rtg.migration.snapshot_replacement'> snapshotReplacementEffect {
+        subject operation : ReplaceMigrationSnapshot;
+        require constraint {
+            doc /* Replacement preserves the complete supplied records and ordering after whole-candidate validation, does not apply lifecycle transitions against prior state, exposes either the complete replacement or the unchanged prior state, and is idempotent for an identical snapshot. */
         }
     }
 
@@ -246,6 +256,11 @@ library package BibliotekRtgMigration {
         }
     }
 
+    requirement <'contract.rtg.migration.replace_migration_snapshot.failures'> replaceMigrationSnapshotFailureSemantics {
+        subject operation : ReplaceMigrationSnapshot;
+        require constraint { doc /* Rejected replacement leaves all migration records and the status index unchanged. */ }
+    }
+
     requirement <'contract.rtg.migration.put_migration.failures'> putMigrationFailureSemantics {
         subject operation : PutMigration;
         require constraint {
@@ -312,6 +327,7 @@ library package BibliotekRtgMigration {
     part contractContext {
         part migration : RtgMigration;
         satisfy putMigrationEffect by migration.putMigration;
+        satisfy snapshotReplacementEffect by migration.replaceSnapshot;
         satisfy membershipSemantics by migration.putMigration;
         satisfy statusTransitionTable by migration.setStatus;
         satisfy evidenceEffect by migration.addEvidence;
@@ -330,6 +346,7 @@ library package BibliotekRtgMigration {
         satisfy rollbackForwardChange by migration;
 
         satisfy exportMigrationSnapshotFailureSemantics by migration.exportSnapshot;
+        satisfy replaceMigrationSnapshotFailureSemantics by migration.replaceSnapshot;
         satisfy putMigrationFailureSemantics by migration.putMigration;
         satisfy getMigrationFailureSemantics by migration.getMigration;
         satisfy listMigrationsFailureSemantics by migration.listMigrations;
@@ -412,6 +429,12 @@ library package BibliotekRtgMigration {
         subject operation : ExportMigrationSnapshot;
         objective { verify exportMigrationSnapshotFailureSemantics; }
         @EvidenceBinding { evidenceId = "components/rtg/migration/tests/test_rtg_migration_contract.py#ExportMigrationSnapshotContractVerification"; implementationScope = "InMemoryRtgMigration"; }
+    }
+
+    verification def ReplaceMigrationSnapshotContractVerification {
+        subject operation : ReplaceMigrationSnapshot;
+        objective { verify snapshotReplacementEffect; verify replaceMigrationSnapshotFailureSemantics; }
+        @EvidenceBinding { evidenceId = "components/rtg/migration/tests/test_rtg_migration_contract.py#ReplaceMigrationSnapshotContractVerification"; implementationScope = "InMemoryRtgMigration"; }
     }
 
     verification def GetMigrationContractVerification {

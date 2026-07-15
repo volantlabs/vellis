@@ -131,6 +131,10 @@ class InMemoryRtgGraph:
             },
         )
 
+    def replace_snapshot(self, snapshot: RtgGraphSnapshot) -> None:
+        candidate = type(self).import_snapshot(snapshot)
+        self.__dict__ = candidate.__dict__
+
     def put_anchor(self, anchor: RtgAnchor) -> RtgAnchor:
         normalized = self._normalize_anchor(anchor)
         anchor_uuid = _record_uuid(normalized)

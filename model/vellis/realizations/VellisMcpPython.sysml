@@ -4,8 +4,9 @@ package VellisMcpPythonRealization {
     private import ScalarValues::*;
     private import BibliotekRtgChangeValidation::*;
     private import BibliotekRtgDiagnostics::*;
+    private import BibliotekInterfaceMcpGateway::*;
     private import VellisOperations::*;
-    private import VellisLocalPythonRealization::*;
+    private import VellisRuntimePythonRealization::*;
 
     enum def McpTransportKind {
         enum stdio;
@@ -37,7 +38,7 @@ package VellisMcpPythonRealization {
         attribute destructiveHint : Boolean;
         attribute idempotentHint : Boolean;
         attribute openWorldHint : Boolean;
-        doc /* Vellis MCP realization traceability, optional dry-run predecessor, and standard MCP behavioral hints. The annotated action usage documents a concise transport-facing description; detailed grammar lives in usage guides and shared typed contracts define result and failure encoding. */
+        doc /* Vellis MCP registration traceability, optional dry-run predecessor, and standard MCP behavioral hints. Each annotated transport action is projected dynamically through the generic gateway; detailed grammar lives in usage guides and shared typed contracts define result and failure encoding. */
     }
 
     attribute def VellisMcpError {
@@ -50,7 +51,6 @@ package VellisMcpPythonRealization {
     attribute def VellisMcpFailure {
         attribute ok : Boolean = false;
         attribute error : VellisMcpError;
-        attribute transactionId[0..1] : Uuid;
         attribute validationReport[0..1] : RtgValidationReport;
     }
 
@@ -95,284 +95,127 @@ package VellisMcpPythonRealization {
     part def <'adapter.vellis.mcp'> VellisMcpAdapter {
         @SpecificationStatus { lifecycleStatus = SpecLifecycle::accepted; owner = "humans"; }
         @ImplementationBinding { implementationLanguage = ImplementationLanguage::python; codeRoot = "apps/rtg_knowledge_graph"; symbol = "apps.rtg_knowledge_graph.mcp_server.build_mcp_server"; realization = "FastMCP"; }
-        ref part facade[1] : VellisApplicationFacade {
-            perform getSystemState.invokeFacade;
-            perform getUsageGuide.invokeFacade;
-            perform stageSchemaMigration.invokeFacade;
-            perform validateLiveAnchorRecords.invokeFacade;
-            perform applyLiveAnchorRecords.invokeFacade;
-            perform validateLiveGraphChanges.invokeFacade;
-            perform applyLiveGraphChanges.invokeFacade;
-            perform stageKnowledgeChanges.invokeFacade;
-            perform applyMigrationCutover.invokeFacade;
-            perform abandonMigration.invokeFacade;
-            perform executeQuery.invokeFacade;
-            perform resolveAnchorByFact.invokeFacade;
-            perform getObject.invokeFacade;
-            perform listMigrations.invokeFacade;
-            perform getMigration.invokeFacade;
-            perform validateGraph.invokeFacade;
-            perform discoverAnchorTypes.invokeFacade;
-            perform getSchemaPack.invokeFacade;
-            perform exportSystemSnapshot.invokeFacade;
-            perform persistSystemSnapshot.invokeFacade;
-            perform listPersistedSnapshots.invokeFacade;
-            perform loadPersistedSnapshot.invokeFacade;
-            perform replayLedger.invokeFacade;
-            perform verifyReplay.invokeFacade;
-            perform listMigrationHistory.invokeFacade;
-            perform flushLedgerFailures.invokeFacade;
-            perform restoreFromSnapshot.invokeFacade;
-        }
+        doc /* Project the curated Vellis MCP registrations over a generic gateway without retaining the application facade, controller, or domain implementations. */
+        ref part gateway[1] : McpGateway;
         port endpoint : McpEndpoint;
 
-        perform action getSystemState[0..*] : RtgGetSystemState { @McpToolBinding { toolName = "rtg_get_system_state"; implementationSymbol = "RtgMcpToolset.rtg_get_system_state"; transport = (McpTransportKind::stdio, McpTransportKind::http); lane = McpOperationalLane::state_and_discovery; audience = McpAudienceKind::everyday; ledgers = false; readOnlyHint = true; destructiveHint = false; idempotentHint = true; openWorldHint = false; }
+        perform action getSystemState[0..*] : RtgGetSystemState { @McpToolBinding { toolName = "rtg_get_system_state"; implementationSymbol = "apps.rtg_knowledge_graph.mcp_server._RuntimeGatewayTool.run"; transport = (McpTransportKind::stdio, McpTransportKind::http); lane = McpOperationalLane::state_and_discovery; audience = McpAudienceKind::everyday; ledgers = false; readOnlyHint = true; destructiveHint = false; idempotentHint = true; openWorldHint = false; }
             doc /* Inspect RTG state and workflow guidance; Lane: state_and_discovery; call this before schema-dependent work. */
-            action invokeFacade : RtgGetSystemState {
-                out result redefines RtgGetSystemState::result = getSystemState.result;
-            }
         }
-        perform action getUsageGuide[0..*] : RtgGetUsageGuide { @McpToolBinding { toolName = "rtg_get_usage_guide"; implementationSymbol = "RtgMcpToolset.rtg_get_usage_guide"; transport = (McpTransportKind::stdio, McpTransportKind::http); lane = McpOperationalLane::state_and_discovery; audience = McpAudienceKind::everyday; ledgers = false; readOnlyHint = true; destructiveHint = false; idempotentHint = true; openWorldHint = false; }
+        perform action getUsageGuide[0..*] : RtgGetUsageGuide { @McpToolBinding { toolName = "rtg_get_usage_guide"; implementationSymbol = "apps.rtg_knowledge_graph.mcp_server._RuntimeGatewayTool.run"; transport = (McpTransportKind::stdio, McpTransportKind::http); lane = McpOperationalLane::state_and_discovery; audience = McpAudienceKind::everyday; ledgers = false; readOnlyHint = true; destructiveHint = false; idempotentHint = true; openWorldHint = false; }
             doc /* Read detailed RTG request shapes and workflows; Lane: state_and_discovery; use topic capabilities for the tool map. */
-            action invokeFacade : RtgGetUsageGuide {
-                in topic redefines RtgGetUsageGuide::topic = getUsageGuide.topic;
-                out result redefines RtgGetUsageGuide::result = getUsageGuide.result;
-            }
         }
-        perform action stageSchemaMigration[0..*] : RtgStageSchemaMigration { @McpToolBinding { toolName = "rtg_stage_schema_migration"; implementationSymbol = "RtgMcpToolset.rtg_stage_schema_migration"; transport = (McpTransportKind::stdio, McpTransportKind::http); lane = McpOperationalLane::knowledge_engineering; audience = McpAudienceKind::advanced; ledgers = true; recommendedPredecessors = ("rtg_get_system_state", "rtg_get_schema_pack"); readOnlyHint = false; destructiveHint = true; idempotentHint = false; openWorldHint = false; }
+        perform action stageSchemaMigration[0..*] : RtgStageSchemaMigration { @McpToolBinding { toolName = "rtg_stage_schema_migration"; implementationSymbol = "apps.rtg_knowledge_graph.mcp_server._RuntimeGatewayTool.run"; transport = (McpTransportKind::stdio, McpTransportKind::http); lane = McpOperationalLane::knowledge_engineering; audience = McpAudienceKind::advanced; ledgers = true; recommendedPredecessors = ("rtg_get_system_state", "rtg_get_schema_pack"); readOnlyHint = false; destructiveHint = true; idempotentHint = false; openWorldHint = false; }
             doc /* Stage an ergonomic schema migration; Lane: knowledge_engineering; inspect current schema and obtain approval first. */
-            action invokeFacade : RtgStageSchemaMigration {
-                in migration_id redefines RtgStageSchemaMigration::migration_id = stageSchemaMigration.migration_id;
-                in description redefines RtgStageSchemaMigration::description = stageSchemaMigration.description;
-                in schema_definitions redefines RtgStageSchemaMigration::schema_definitions = stageSchemaMigration.schema_definitions;
-                in retire_live_schema redefines RtgStageSchemaMigration::retire_live_schema = stageSchemaMigration.retire_live_schema;
-                in validation_mode redefines RtgStageSchemaMigration::validation_mode = stageSchemaMigration.validation_mode;
-                in response_options redefines RtgStageSchemaMigration::response_options = stageSchemaMigration.response_options;
-                out result redefines RtgStageSchemaMigration::result = stageSchemaMigration.result;
-            }
         }
-        perform action validateLiveAnchorRecords[0..*] : RtgValidateLiveAnchorRecords { @McpToolBinding { toolName = "rtg_validate_live_anchor_records"; implementationSymbol = "RtgMcpToolset.rtg_validate_live_anchor_records"; transport = (McpTransportKind::stdio, McpTransportKind::http); lane = McpOperationalLane::live_graph; audience = McpAudienceKind::everyday; ledgers = false; readOnlyHint = true; destructiveHint = false; idempotentHint = true; openWorldHint = false; }
+        perform action validateLiveAnchorRecords[0..*] : RtgValidateLiveAnchorRecords { @McpToolBinding { toolName = "rtg_validate_live_anchor_records"; implementationSymbol = "apps.rtg_knowledge_graph.mcp_server._RuntimeGatewayTool.run"; transport = (McpTransportKind::stdio, McpTransportKind::http); lane = McpOperationalLane::live_graph; audience = McpAudienceKind::everyday; ledgers = false; readOnlyHint = true; destructiveHint = false; idempotentHint = true; openWorldHint = false; }
             doc /* Dry-run ergonomic anchor records without mutation or ledgering; Lane: live_graph. */
-            action invokeFacade : RtgValidateLiveAnchorRecords {
-                in anchor_records redefines RtgValidateLiveAnchorRecords::anchor_records = validateLiveAnchorRecords.anchor_records;
-                in link_writes redefines RtgValidateLiveAnchorRecords::link_writes = validateLiveAnchorRecords.link_writes;
-                in validation_options redefines RtgValidateLiveAnchorRecords::validation_options = validateLiveAnchorRecords.validation_options;
-                out result redefines RtgValidateLiveAnchorRecords::result = validateLiveAnchorRecords.result;
-            }
         }
-        perform action applyLiveAnchorRecords[0..*] : RtgApplyLiveAnchorRecords { @McpToolBinding { toolName = "rtg_apply_live_anchor_records"; implementationSymbol = "RtgMcpToolset.rtg_apply_live_anchor_records"; transport = (McpTransportKind::stdio, McpTransportKind::http); lane = McpOperationalLane::live_graph; audience = McpAudienceKind::everyday; ledgers = true; recommendedPredecessors = ("rtg_validate_live_anchor_records"); dryRunTool = "rtg_validate_live_anchor_records"; readOnlyHint = false; destructiveHint = true; idempotentHint = false; openWorldHint = false; }
+        perform action applyLiveAnchorRecords[0..*] : RtgApplyLiveAnchorRecords { @McpToolBinding { toolName = "rtg_apply_live_anchor_records"; implementationSymbol = "apps.rtg_knowledge_graph.mcp_server._RuntimeGatewayTool.run"; transport = (McpTransportKind::stdio, McpTransportKind::http); lane = McpOperationalLane::live_graph; audience = McpAudienceKind::everyday; ledgers = true; recommendedPredecessors = ("rtg_validate_live_anchor_records"); dryRunTool = "rtg_validate_live_anchor_records"; readOnlyHint = false; destructiveHint = true; idempotentHint = false; openWorldHint = false; }
             doc /* Apply ergonomic anchor records to live state; Lane: live_graph; discover schema first. */
-            action invokeFacade : RtgApplyLiveAnchorRecords {
-                in anchor_records redefines RtgApplyLiveAnchorRecords::anchor_records = applyLiveAnchorRecords.anchor_records;
-                in link_writes redefines RtgApplyLiveAnchorRecords::link_writes = applyLiveAnchorRecords.link_writes;
-                in validation_mode redefines RtgApplyLiveAnchorRecords::validation_mode = applyLiveAnchorRecords.validation_mode;
-                in response_options redefines RtgApplyLiveAnchorRecords::response_options = applyLiveAnchorRecords.response_options;
-                out result redefines RtgApplyLiveAnchorRecords::result = applyLiveAnchorRecords.result;
-            }
         }
-        perform action validateLiveGraphChanges[0..*] : RtgValidateLiveGraphChanges { @McpToolBinding { toolName = "rtg_validate_live_graph_changes"; implementationSymbol = "RtgMcpToolset.rtg_validate_live_graph_changes"; transport = (McpTransportKind::stdio, McpTransportKind::http); lane = McpOperationalLane::live_graph; audience = McpAudienceKind::everyday; ledgers = false; readOnlyHint = true; destructiveHint = false; idempotentHint = true; openWorldHint = false; }
+        perform action validateLiveGraphChanges[0..*] : RtgValidateLiveGraphChanges { @McpToolBinding { toolName = "rtg_validate_live_graph_changes"; implementationSymbol = "apps.rtg_knowledge_graph.mcp_server._RuntimeGatewayTool.run"; transport = (McpTransportKind::stdio, McpTransportKind::http); lane = McpOperationalLane::live_graph; audience = McpAudienceKind::everyday; ledgers = false; readOnlyHint = true; destructiveHint = false; idempotentHint = true; openWorldHint = false; }
             doc /* Dry-run normalized live graph changes without mutation or ledgering; Lane: live_graph. */
-            action invokeFacade : RtgValidateLiveGraphChanges {
-                in graph_changes redefines RtgValidateLiveGraphChanges::graph_changes = validateLiveGraphChanges.graph_changes;
-                in validation_options redefines RtgValidateLiveGraphChanges::validation_options = validateLiveGraphChanges.validation_options;
-                out result redefines RtgValidateLiveGraphChanges::result = validateLiveGraphChanges.result;
-            }
         }
-        perform action applyLiveGraphChanges[0..*] : RtgApplyLiveGraphChanges { @McpToolBinding { toolName = "rtg_apply_live_graph_changes"; implementationSymbol = "RtgMcpToolset.rtg_apply_live_graph_changes"; transport = (McpTransportKind::stdio, McpTransportKind::http); lane = McpOperationalLane::live_graph; audience = McpAudienceKind::everyday; ledgers = true; recommendedPredecessors = ("rtg_validate_live_graph_changes"); dryRunTool = "rtg_validate_live_graph_changes"; readOnlyHint = false; destructiveHint = true; idempotentHint = false; openWorldHint = false; }
+        perform action applyLiveGraphChanges[0..*] : RtgApplyLiveGraphChanges { @McpToolBinding { toolName = "rtg_apply_live_graph_changes"; implementationSymbol = "apps.rtg_knowledge_graph.mcp_server._RuntimeGatewayTool.run"; transport = (McpTransportKind::stdio, McpTransportKind::http); lane = McpOperationalLane::live_graph; audience = McpAudienceKind::everyday; ledgers = true; recommendedPredecessors = ("rtg_validate_live_graph_changes"); dryRunTool = "rtg_validate_live_graph_changes"; readOnlyHint = false; destructiveHint = true; idempotentHint = false; openWorldHint = false; }
             doc /* Apply normalized live graph changes; Lane: live_graph; use the validation predecessor for risky writes. */
-            action invokeFacade : RtgApplyLiveGraphChanges {
-                in graph_changes redefines RtgApplyLiveGraphChanges::graph_changes = applyLiveGraphChanges.graph_changes;
-                in validation_mode redefines RtgApplyLiveGraphChanges::validation_mode = applyLiveGraphChanges.validation_mode;
-                out result redefines RtgApplyLiveGraphChanges::result = applyLiveGraphChanges.result;
-            }
         }
-        perform action stageKnowledgeChanges[0..*] : RtgStageKnowledgeChanges { @McpToolBinding { toolName = "rtg_stage_knowledge_changes"; implementationSymbol = "RtgMcpToolset.rtg_stage_knowledge_changes"; transport = (McpTransportKind::stdio, McpTransportKind::http); lane = McpOperationalLane::knowledge_engineering; audience = McpAudienceKind::advanced; ledgers = true; recommendedPredecessors = ("rtg_get_system_state", "rtg_validate_graph"); readOnlyHint = false; destructiveHint = true; idempotentHint = false; openWorldHint = false; }
+        perform action stageKnowledgeChanges[0..*] : RtgStageKnowledgeChanges { @McpToolBinding { toolName = "rtg_stage_knowledge_changes"; implementationSymbol = "apps.rtg_knowledge_graph.mcp_server._RuntimeGatewayTool.run"; transport = (McpTransportKind::stdio, McpTransportKind::http); lane = McpOperationalLane::knowledge_engineering; audience = McpAudienceKind::advanced; ledgers = true; recommendedPredecessors = ("rtg_get_system_state", "rtg_validate_graph"); readOnlyHint = false; destructiveHint = true; idempotentHint = false; openWorldHint = false; }
             doc /* Stage an advanced normalized knowledge batch; Lane: knowledge_engineering; prefer ergonomic staging for ordinary schema work. */
-            action invokeFacade : RtgStageKnowledgeChanges {
-                in knowledge_changes redefines RtgStageKnowledgeChanges::knowledge_changes = stageKnowledgeChanges.knowledge_changes;
-                in validation_mode redefines RtgStageKnowledgeChanges::validation_mode = stageKnowledgeChanges.validation_mode;
-                out result redefines RtgStageKnowledgeChanges::result = stageKnowledgeChanges.result;
-            }
         }
-        perform action applyMigrationCutover[0..*] : RtgApplyMigrationCutover { @McpToolBinding { toolName = "rtg_apply_migration_cutover"; implementationSymbol = "RtgMcpToolset.rtg_apply_migration_cutover"; transport = (McpTransportKind::stdio, McpTransportKind::http); lane = McpOperationalLane::migration; audience = McpAudienceKind::advanced; ledgers = true; recommendedPredecessors = ("rtg_get_migration", "rtg_validate_graph"); readOnlyHint = false; destructiveHint = true; idempotentHint = false; openWorldHint = false; }
+        perform action applyMigrationCutover[0..*] : RtgApplyMigrationCutover { @McpToolBinding { toolName = "rtg_apply_migration_cutover"; implementationSymbol = "apps.rtg_knowledge_graph.mcp_server._RuntimeGatewayTool.run"; transport = (McpTransportKind::stdio, McpTransportKind::http); lane = McpOperationalLane::migration; audience = McpAudienceKind::advanced; ledgers = true; recommendedPredecessors = ("rtg_get_migration", "rtg_validate_graph"); readOnlyHint = false; destructiveHint = true; idempotentHint = false; openWorldHint = false; }
             doc /* Apply a staged migration atomically; Lane: migration; validate the projected state first. */
-            action invokeFacade : RtgApplyMigrationCutover {
-                in migration_id redefines RtgApplyMigrationCutover::migration_id = applyMigrationCutover.migration_id;
-                in cutover_options redefines RtgApplyMigrationCutover::cutover_options = applyMigrationCutover.cutover_options;
-                out result redefines RtgApplyMigrationCutover::result = applyMigrationCutover.result;
-            }
         }
-        perform action abandonMigration[0..*] : RtgAbandonMigration { @McpToolBinding { toolName = "rtg_abandon_migration"; implementationSymbol = "RtgMcpToolset.rtg_abandon_migration"; transport = (McpTransportKind::stdio, McpTransportKind::http); lane = McpOperationalLane::migration; audience = McpAudienceKind::advanced; ledgers = true; recommendedPredecessors = ("rtg_get_migration"); readOnlyHint = false; destructiveHint = true; idempotentHint = false; openWorldHint = false; }
+        perform action abandonMigration[0..*] : RtgAbandonMigration { @McpToolBinding { toolName = "rtg_abandon_migration"; implementationSymbol = "apps.rtg_knowledge_graph.mcp_server._RuntimeGatewayTool.run"; transport = (McpTransportKind::stdio, McpTransportKind::http); lane = McpOperationalLane::migration; audience = McpAudienceKind::advanced; ledgers = true; recommendedPredecessors = ("rtg_get_migration"); readOnlyHint = false; destructiveHint = true; idempotentHint = false; openWorldHint = false; }
             doc /* Abandon staged migration work and prune safe non-live candidates; Lane: migration. */
-            action invokeFacade : RtgAbandonMigration {
-                in migration_id redefines RtgAbandonMigration::migration_id = abandonMigration.migration_id;
-                in reason redefines RtgAbandonMigration::reason = abandonMigration.reason;
-                out result redefines RtgAbandonMigration::result = abandonMigration.result;
-            }
         }
-        perform action executeQuery[0..*] : RtgExecuteQuery { @McpToolBinding { toolName = "rtg_execute_query"; implementationSymbol = "RtgMcpToolset.rtg_execute_query"; transport = (McpTransportKind::stdio, McpTransportKind::http); lane = McpOperationalLane::query; audience = McpAudienceKind::everyday; ledgers = false; readOnlyHint = true; destructiveHint = false; idempotentHint = true; openWorldHint = false; }
+        perform action executeQuery[0..*] : RtgExecuteQuery { @McpToolBinding { toolName = "rtg_execute_query"; implementationSymbol = "apps.rtg_knowledge_graph.mcp_server._RuntimeGatewayTool.run"; transport = (McpTransportKind::stdio, McpTransportKind::http); lane = McpOperationalLane::query; audience = McpAudienceKind::everyday; ledgers = false; readOnlyHint = true; destructiveHint = false; idempotentHint = true; openWorldHint = false; }
             doc /* Execute a read-only RTG query; Lane: query; detailed grammar and examples are in usage guides. */
-            action invokeFacade : RtgExecuteQuery {
-                in query_spec redefines RtgExecuteQuery::query_spec = executeQuery.query_spec;
-                in query_options redefines RtgExecuteQuery::query_options = executeQuery.query_options;
-                in response_options redefines RtgExecuteQuery::response_options = executeQuery.response_options;
-                out result redefines RtgExecuteQuery::result = executeQuery.result;
-            }
         }
-        perform action resolveAnchorByFact[0..*] : RtgResolveAnchorByFact { @McpToolBinding { toolName = "rtg_resolve_anchor_by_fact"; implementationSymbol = "RtgMcpToolset.rtg_resolve_anchor_by_fact"; transport = (McpTransportKind::stdio, McpTransportKind::http); lane = McpOperationalLane::query; audience = McpAudienceKind::everyday; ledgers = false; readOnlyHint = true; destructiveHint = false; idempotentHint = true; openWorldHint = false; }
+        perform action resolveAnchorByFact[0..*] : RtgResolveAnchorByFact { @McpToolBinding { toolName = "rtg_resolve_anchor_by_fact"; implementationSymbol = "apps.rtg_knowledge_graph.mcp_server._RuntimeGatewayTool.run"; transport = (McpTransportKind::stdio, McpTransportKind::http); lane = McpOperationalLane::query; audience = McpAudienceKind::everyday; ledgers = false; readOnlyHint = true; destructiveHint = false; idempotentHint = true; openWorldHint = false; }
             doc /* Resolve zero, one, or multiple live anchors by typed fact; Lane: query; never guess among multiple matches. */
-            action invokeFacade : RtgResolveAnchorByFact {
-                in anchor_type redefines RtgResolveAnchorByFact::anchor_type = resolveAnchorByFact.anchor_type;
-                in data_type redefines RtgResolveAnchorByFact::data_type = resolveAnchorByFact.data_type;
-                in property_path redefines RtgResolveAnchorByFact::property_path = resolveAnchorByFact.property_path;
-                in value redefines RtgResolveAnchorByFact::value = resolveAnchorByFact.value;
-                in case_sensitive redefines RtgResolveAnchorByFact::case_sensitive = resolveAnchorByFact.case_sensitive;
-                out result redefines RtgResolveAnchorByFact::result = resolveAnchorByFact.result;
-            }
         }
-        perform action getObject[0..*] : RtgGetObject { @McpToolBinding { toolName = "rtg_get_object"; implementationSymbol = "RtgMcpToolset.rtg_get_object"; transport = (McpTransportKind::stdio, McpTransportKind::http); lane = McpOperationalLane::state_and_discovery; audience = McpAudienceKind::everyday; ledgers = false; readOnlyHint = true; destructiveHint = false; idempotentHint = true; openWorldHint = false; }
+        perform action getObject[0..*] : RtgGetObject { @McpToolBinding { toolName = "rtg_get_object"; implementationSymbol = "apps.rtg_knowledge_graph.mcp_server._RuntimeGatewayTool.run"; transport = (McpTransportKind::stdio, McpTransportKind::http); lane = McpOperationalLane::state_and_discovery; audience = McpAudienceKind::everyday; ledgers = false; readOnlyHint = true; destructiveHint = false; idempotentHint = true; openWorldHint = false; }
             doc /* Read one RTG graph object by UUID; Lane: state_and_discovery. */
-            action invokeFacade : RtgGetObject {
-                in object_uuid redefines RtgGetObject::object_uuid = getObject.object_uuid;
-                out result redefines RtgGetObject::result = getObject.result;
-            }
         }
-        perform action listMigrations[0..*] : RtgListMigrations { @McpToolBinding { toolName = "rtg_list_migrations"; implementationSymbol = "RtgMcpToolset.rtg_list_migrations"; transport = (McpTransportKind::stdio, McpTransportKind::http); lane = McpOperationalLane::migration; audience = McpAudienceKind::everyday; ledgers = false; readOnlyHint = true; destructiveHint = false; idempotentHint = true; openWorldHint = false; }
+        perform action listMigrations[0..*] : RtgListMigrations { @McpToolBinding { toolName = "rtg_list_migrations"; implementationSymbol = "apps.rtg_knowledge_graph.mcp_server._RuntimeGatewayTool.run"; transport = (McpTransportKind::stdio, McpTransportKind::http); lane = McpOperationalLane::migration; audience = McpAudienceKind::everyday; ledgers = false; readOnlyHint = true; destructiveHint = false; idempotentHint = true; openWorldHint = false; }
             doc /* List current migration-store records; Lane: migration; use history for pruned or rejected work. */
-            action invokeFacade : RtgListMigrations {
-                in status redefines RtgListMigrations::status = listMigrations.status;
-                out result redefines RtgListMigrations::result = listMigrations.result;
-            }
         }
-        perform action getMigration[0..*] : RtgGetMigration { @McpToolBinding { toolName = "rtg_get_migration"; implementationSymbol = "RtgMcpToolset.rtg_get_migration"; transport = (McpTransportKind::stdio, McpTransportKind::http); lane = McpOperationalLane::migration; audience = McpAudienceKind::everyday; ledgers = false; readOnlyHint = true; destructiveHint = false; idempotentHint = true; openWorldHint = false; }
+        perform action getMigration[0..*] : RtgGetMigration { @McpToolBinding { toolName = "rtg_get_migration"; implementationSymbol = "apps.rtg_knowledge_graph.mcp_server._RuntimeGatewayTool.run"; transport = (McpTransportKind::stdio, McpTransportKind::http); lane = McpOperationalLane::migration; audience = McpAudienceKind::everyday; ledgers = false; readOnlyHint = true; destructiveHint = false; idempotentHint = true; openWorldHint = false; }
             doc /* Read one current migration-store record by ID; Lane: migration. */
-            action invokeFacade : RtgGetMigration {
-                in migration_id redefines RtgGetMigration::migration_id = getMigration.migration_id;
-                out result redefines RtgGetMigration::result = getMigration.result;
-            }
         }
-        perform action validateGraph[0..*] : RtgValidateGraph { @McpToolBinding { toolName = "rtg_validate_graph"; implementationSymbol = "RtgMcpToolset.rtg_validate_graph"; transport = (McpTransportKind::stdio, McpTransportKind::http); lane = McpOperationalLane::live_graph; audience = McpAudienceKind::everyday; ledgers = false; readOnlyHint = true; destructiveHint = false; idempotentHint = true; openWorldHint = false; }
+        perform action validateGraph[0..*] : RtgValidateGraph { @McpToolBinding { toolName = "rtg_validate_graph"; implementationSymbol = "apps.rtg_knowledge_graph.mcp_server._RuntimeGatewayTool.run"; transport = (McpTransportKind::stdio, McpTransportKind::http); lane = McpOperationalLane::live_graph; audience = McpAudienceKind::everyday; ledgers = false; readOnlyHint = true; destructiveHint = false; idempotentHint = true; openWorldHint = false; }
             doc /* Validate current or migration-projected RTG state without mutation; Lane: live_graph. */
-            action invokeFacade : RtgValidateGraph {
-                in migration_ids redefines RtgValidateGraph::migration_ids = validateGraph.migration_ids;
-                in validation_options redefines RtgValidateGraph::validation_options = validateGraph.validation_options;
-                out result redefines RtgValidateGraph::result = validateGraph.result;
-            }
         }
-        perform action discoverAnchorTypes[0..*] : RtgDiscoverAnchorTypes { @McpToolBinding { toolName = "rtg_discover_anchor_types"; implementationSymbol = "RtgMcpToolset.rtg_discover_anchor_types"; transport = (McpTransportKind::stdio, McpTransportKind::http); lane = McpOperationalLane::state_and_discovery; audience = McpAudienceKind::everyday; ledgers = false; readOnlyHint = true; destructiveHint = false; idempotentHint = true; openWorldHint = false; }
+        perform action discoverAnchorTypes[0..*] : RtgDiscoverAnchorTypes { @McpToolBinding { toolName = "rtg_discover_anchor_types"; implementationSymbol = "apps.rtg_knowledge_graph.mcp_server._RuntimeGatewayTool.run"; transport = (McpTransportKind::stdio, McpTransportKind::http); lane = McpOperationalLane::state_and_discovery; audience = McpAudienceKind::everyday; ledgers = false; readOnlyHint = true; destructiveHint = false; idempotentHint = true; openWorldHint = false; }
             doc /* Discover anchor types and live counts; Lane: state_and_discovery; use before guessing type keys. */
-            action invokeFacade : RtgDiscoverAnchorTypes {
-                in discovery_options redefines RtgDiscoverAnchorTypes::discovery_options = discoverAnchorTypes.discovery_options;
-                out result redefines RtgDiscoverAnchorTypes::result = discoverAnchorTypes.result;
-            }
         }
-        perform action getSchemaPack[0..*] : RtgGetSchemaPack { @McpToolBinding { toolName = "rtg_get_schema_pack"; implementationSymbol = "RtgMcpToolset.rtg_get_schema_pack"; transport = (McpTransportKind::stdio, McpTransportKind::http); lane = McpOperationalLane::state_and_discovery; audience = McpAudienceKind::everyday; ledgers = false; readOnlyHint = true; destructiveHint = false; idempotentHint = true; openWorldHint = false; }
+        perform action getSchemaPack[0..*] : RtgGetSchemaPack { @McpToolBinding { toolName = "rtg_get_schema_pack"; implementationSymbol = "apps.rtg_knowledge_graph.mcp_server._RuntimeGatewayTool.run"; transport = (McpTransportKind::stdio, McpTransportKind::http); lane = McpOperationalLane::state_and_discovery; audience = McpAudienceKind::everyday; ledgers = false; readOnlyHint = true; destructiveHint = false; idempotentHint = true; openWorldHint = false; }
             doc /* Read schema details for selected anchor types; Lane: state_and_discovery; use before writes. */
-            action invokeFacade : RtgGetSchemaPack {
-                in anchor_type_keys redefines RtgGetSchemaPack::anchor_type_keys = getSchemaPack.anchor_type_keys;
-                in schema_pack_options redefines RtgGetSchemaPack::schema_pack_options = getSchemaPack.schema_pack_options;
-                out result redefines RtgGetSchemaPack::result = getSchemaPack.result;
-            }
         }
-        perform action exportSystemSnapshot[0..*] : RtgExportSystemSnapshot { @McpToolBinding { toolName = "rtg_export_system_snapshot"; implementationSymbol = "RtgMcpToolset.rtg_export_system_snapshot"; transport = (McpTransportKind::stdio, McpTransportKind::http); lane = McpOperationalLane::recovery_and_audit; audience = McpAudienceKind::everyday; ledgers = false; readOnlyHint = true; destructiveHint = false; idempotentHint = true; openWorldHint = false; }
+        perform action exportSystemSnapshot[0..*] : RtgExportSystemSnapshot { @McpToolBinding { toolName = "rtg_export_system_snapshot"; implementationSymbol = "apps.rtg_knowledge_graph.mcp_server._RuntimeGatewayTool.run"; transport = (McpTransportKind::stdio, McpTransportKind::http); lane = McpOperationalLane::recovery_and_audit; audience = McpAudienceKind::everyday; ledgers = false; readOnlyHint = true; destructiveHint = false; idempotentHint = true; openWorldHint = false; }
             doc /* Export current coordinated RTG state or a compact summary; Lane: recovery_and_audit. */
-            action invokeFacade : RtgExportSystemSnapshot {
-                in summary redefines RtgExportSystemSnapshot::summary = exportSystemSnapshot.summary;
-                out result redefines RtgExportSystemSnapshot::result = exportSystemSnapshot.result;
-            }
         }
-        perform action persistSystemSnapshot[0..*] : RtgPersistSystemSnapshot { @McpToolBinding { toolName = "rtg_persist_system_snapshot"; implementationSymbol = "RtgMcpToolset.rtg_persist_system_snapshot"; transport = (McpTransportKind::stdio, McpTransportKind::http); lane = McpOperationalLane::recovery_and_audit; audience = McpAudienceKind::everyday; ledgers = true; readOnlyHint = false; destructiveHint = true; idempotentHint = false; openWorldHint = false; }
-            doc /* Persist a coordinated RTG snapshot; Lane: recovery_and_audit; this records an administrative ledger event. */
-            action invokeFacade : RtgPersistSystemSnapshot {
-                in relative_path redefines RtgPersistSystemSnapshot::relative_path = persistSystemSnapshot.relative_path;
-                in return_snapshot redefines RtgPersistSystemSnapshot::return_snapshot = persistSystemSnapshot.return_snapshot;
-                out result redefines RtgPersistSystemSnapshot::result = persistSystemSnapshot.result;
-            }
+        perform action persistSystemSnapshot[0..*] : RtgPersistSystemSnapshot { @McpToolBinding { toolName = "rtg_persist_system_snapshot"; implementationSymbol = "apps.rtg_knowledge_graph.mcp_server._RuntimeGatewayTool.run"; transport = (McpTransportKind::stdio, McpTransportKind::http); lane = McpOperationalLane::recovery_and_audit; audience = McpAudienceKind::everyday; ledgers = true; readOnlyHint = false; destructiveHint = true; idempotentHint = false; openWorldHint = false; }
+            doc /* Persist a coordinated RTG snapshot; Lane: recovery_and_audit; the runtime records the request, component calls, and terminal trace. */
         }
-        perform action listPersistedSnapshots[0..*] : RtgListPersistedSnapshots { @McpToolBinding { toolName = "rtg_list_persisted_snapshots"; implementationSymbol = "RtgMcpToolset.rtg_list_persisted_snapshots"; transport = (McpTransportKind::stdio, McpTransportKind::http); lane = McpOperationalLane::recovery_and_audit; audience = McpAudienceKind::everyday; ledgers = false; readOnlyHint = true; destructiveHint = false; idempotentHint = true; openWorldHint = false; }
+        perform action listPersistedSnapshots[0..*] : RtgListPersistedSnapshots { @McpToolBinding { toolName = "rtg_list_persisted_snapshots"; implementationSymbol = "apps.rtg_knowledge_graph.mcp_server._RuntimeGatewayTool.run"; transport = (McpTransportKind::stdio, McpTransportKind::http); lane = McpOperationalLane::recovery_and_audit; audience = McpAudienceKind::everyday; ledgers = false; readOnlyHint = true; destructiveHint = false; idempotentHint = true; openWorldHint = false; }
             doc /* List RTG snapshots visible through configured storage; Lane: recovery_and_audit. */
-            action invokeFacade : RtgListPersistedSnapshots {
-                out result redefines RtgListPersistedSnapshots::result = listPersistedSnapshots.result;
-            }
         }
-        perform action loadPersistedSnapshot[0..*] : RtgLoadPersistedSnapshot { @McpToolBinding { toolName = "rtg_load_persisted_snapshot"; implementationSymbol = "RtgMcpToolset.rtg_load_persisted_snapshot"; transport = (McpTransportKind::stdio, McpTransportKind::http); lane = McpOperationalLane::recovery_and_audit; audience = McpAudienceKind::everyday; ledgers = false; readOnlyHint = true; destructiveHint = false; idempotentHint = true; openWorldHint = false; }
+        perform action loadPersistedSnapshot[0..*] : RtgLoadPersistedSnapshot { @McpToolBinding { toolName = "rtg_load_persisted_snapshot"; implementationSymbol = "apps.rtg_knowledge_graph.mcp_server._RuntimeGatewayTool.run"; transport = (McpTransportKind::stdio, McpTransportKind::http); lane = McpOperationalLane::recovery_and_audit; audience = McpAudienceKind::everyday; ledgers = false; readOnlyHint = true; destructiveHint = false; idempotentHint = true; openWorldHint = false; }
             doc /* Load one persisted RTG snapshot without restoring it; Lane: recovery_and_audit. */
-            action invokeFacade : RtgLoadPersistedSnapshot {
-                in relative_path redefines RtgLoadPersistedSnapshot::relative_path = loadPersistedSnapshot.relative_path;
-                in return_snapshot redefines RtgLoadPersistedSnapshot::return_snapshot = loadPersistedSnapshot.return_snapshot;
-                out result redefines RtgLoadPersistedSnapshot::result = loadPersistedSnapshot.result;
-            }
         }
-        perform action replayLedger[0..*] : RtgReplayLedger { @McpToolBinding { toolName = "rtg_replay_ledger"; implementationSymbol = "RtgMcpToolset.rtg_replay_ledger"; transport = (McpTransportKind::stdio, McpTransportKind::http); lane = McpOperationalLane::recovery_and_audit; audience = McpAudienceKind::operator; ledgers = false; recommendedPredecessors = ("rtg_get_system_state"); readOnlyHint = false; destructiveHint = true; idempotentHint = false; openWorldHint = false; }
-            doc /* Replay eligible mutations into empty or snapshot-seeded state; Lane: recovery_and_audit; operator use. */
-            action invokeFacade : RtgReplayLedger {
-                in replay_options redefines RtgReplayLedger::replay_options = replayLedger.replay_options;
-                out result redefines RtgReplayLedger::result = replayLedger.result;
-            }
+        perform action replayLedger[0..*] : RtgReplayLedger { @McpToolBinding { toolName = "rtg_replay_ledger"; implementationSymbol = "apps.rtg_knowledge_graph.mcp_server._RuntimeGatewayTool.run"; transport = (McpTransportKind::stdio, McpTransportKind::http); lane = McpOperationalLane::recovery_and_audit; audience = McpAudienceKind::operator; ledgers = false; recommendedPredecessors = ("rtg_get_system_state"); readOnlyHint = false; destructiveHint = true; idempotentHint = false; openWorldHint = false; }
+            doc /* Reconstruct committed canonical effects through an optional runtime cursor after explicit reset or compatible checkpoints; Lane: recovery_and_audit; operator use. */
         }
-        perform action verifyReplay[0..*] : RtgVerifyReplayFromLedger { @McpToolBinding { toolName = "rtg_verify_replay_from_ledger"; implementationSymbol = "RtgMcpToolset.rtg_verify_replay_from_ledger"; transport = (McpTransportKind::stdio, McpTransportKind::http); lane = McpOperationalLane::recovery_and_audit; audience = McpAudienceKind::everyday; ledgers = false; readOnlyHint = true; destructiveHint = false; idempotentHint = true; openWorldHint = false; }
-            doc /* Verify replay in isolated scratch state and restore live state exactly; Lane: recovery_and_audit. */
-            action invokeFacade : RtgVerifyReplayFromLedger {
-                in replay_options redefines RtgVerifyReplayFromLedger::replay_options = verifyReplay.replay_options;
-                out result redefines RtgVerifyReplayFromLedger::result = verifyReplay.result;
-            }
+        perform action verifyReplay[0..*] : RtgVerifyReplayFromLedger { @McpToolBinding { toolName = "rtg_verify_replay_from_ledger"; implementationSymbol = "apps.rtg_knowledge_graph.mcp_server._RuntimeGatewayTool.run"; transport = (McpTransportKind::stdio, McpTransportKind::http); lane = McpOperationalLane::recovery_and_audit; audience = McpAudienceKind::everyday; ledgers = false; readOnlyHint = true; destructiveHint = false; idempotentHint = true; openWorldHint = false; }
+            doc /* Report exact available reconstruction evidence and direct historical requests to an isolated data-root copy; Lane: recovery_and_audit. */
         }
-        perform action listMigrationHistory[0..*] : RtgListMigrationHistory { @McpToolBinding { toolName = "rtg_list_migration_history"; implementationSymbol = "RtgMcpToolset.rtg_list_migration_history"; transport = (McpTransportKind::stdio, McpTransportKind::http); lane = McpOperationalLane::migration; audience = McpAudienceKind::everyday; ledgers = false; readOnlyHint = true; destructiveHint = false; idempotentHint = true; openWorldHint = false; }
-            doc /* Read ledger-projected migration events, including rejected proposals; Lane: migration. */
-            action invokeFacade : RtgListMigrationHistory {
-                out result redefines RtgListMigrationHistory::result = listMigrationHistory.result;
-            }
+        perform action listMigrationHistory[0..*] : RtgListMigrationHistory { @McpToolBinding { toolName = "rtg_list_migration_history"; implementationSymbol = "apps.rtg_knowledge_graph.mcp_server._RuntimeGatewayTool.run"; transport = (McpTransportKind::stdio, McpTransportKind::http); lane = McpOperationalLane::migration; audience = McpAudienceKind::everyday; ledgers = false; readOnlyHint = true; destructiveHint = false; idempotentHint = true; openWorldHint = false; }
+            doc /* Read migration-related runtime traces in terminal-position order; Lane: migration. */
         }
-        perform action flushLedgerFailures[0..*] : RtgFlushLedgerFailures { @McpToolBinding { toolName = "rtg_flush_ledger_failures"; implementationSymbol = "RtgMcpToolset.rtg_flush_ledger_failures"; transport = (McpTransportKind::stdio, McpTransportKind::http); lane = McpOperationalLane::recovery_and_audit; audience = McpAudienceKind::operator; ledgers = false; recommendedPredecessors = ("rtg_get_system_state"); readOnlyHint = false; destructiveHint = true; idempotentHint = false; openWorldHint = false; }
-            doc /* Retry queued controller ledger writes; Lane: recovery_and_audit; operator use. */
-            action invokeFacade : RtgFlushLedgerFailures {
-                out result redefines RtgFlushLedgerFailures::result = flushLedgerFailures.result;
-            }
+        perform action flushLedgerFailures[0..*] : RtgFlushLedgerFailures { @McpToolBinding { toolName = "rtg_flush_ledger_failures"; implementationSymbol = "apps.rtg_knowledge_graph.mcp_server._RuntimeGatewayTool.run"; transport = (McpTransportKind::stdio, McpTransportKind::http); lane = McpOperationalLane::recovery_and_audit; audience = McpAudienceKind::operator; ledgers = false; recommendedPredecessors = ("rtg_get_system_state"); readOnlyHint = true; destructiveHint = false; idempotentHint = true; openWorldHint = false; }
+            doc /* Deprecated health-only status for callers that still know the old tool name; Lane: recovery_and_audit; operator use. */
         }
-        perform action restoreFromSnapshot[0..*] : RtgRestoreFromSnapshot { @McpToolBinding { toolName = "rtg_restore_from_snapshot"; implementationSymbol = "RtgMcpToolset.rtg_restore_from_snapshot"; transport = (McpTransportKind::stdio, McpTransportKind::http); lane = McpOperationalLane::recovery_and_audit; audience = McpAudienceKind::operator; ledgers = true; recommendedPredecessors = ("rtg_load_persisted_snapshot"); readOnlyHint = false; destructiveHint = true; idempotentHint = false; openWorldHint = false; }
+        perform action restoreFromSnapshot[0..*] : RtgRestoreFromSnapshot { @McpToolBinding { toolName = "rtg_restore_from_snapshot"; implementationSymbol = "apps.rtg_knowledge_graph.mcp_server._RuntimeGatewayTool.run"; transport = (McpTransportKind::stdio, McpTransportKind::http); lane = McpOperationalLane::recovery_and_audit; audience = McpAudienceKind::operator; ledgers = true; recommendedPredecessors = ("rtg_load_persisted_snapshot"); readOnlyHint = false; destructiveHint = true; idempotentHint = false; openWorldHint = false; }
             doc /* Restore coordinated RTG state from a supplied snapshot; Lane: recovery_and_audit; operator use. */
-            action invokeFacade : RtgRestoreFromSnapshot {
-                in 'snapshot' redefines RtgRestoreFromSnapshot::'snapshot' = restoreFromSnapshot.'snapshot';
-                in restore_options redefines RtgRestoreFromSnapshot::restore_options = restoreFromSnapshot.restore_options;
-                out result redefines RtgRestoreFromSnapshot::result = restoreFromSnapshot.result;
-            }
         }
     }
 
     part def VellisMcpPython {
-        part application : VellisLocalPython;
+        part application : VellisRuntimePython;
         part adapter : VellisMcpAdapter;
         part client : McpClient;
         interface clientToAdapter : McpToolExchange
             connect client.endpoint to adapter.endpoint;
-            bind adapter.facade = application.facade;
-        allocate application.facade.rtgGetSystemState to adapter.getSystemState;
-        allocate application.facade.rtgGetUsageGuide to adapter.getUsageGuide;
-        allocate application.facade.rtgStageSchemaMigration to adapter.stageSchemaMigration;
-        allocate application.facade.rtgValidateLiveAnchorRecords to adapter.validateLiveAnchorRecords;
-        allocate application.facade.rtgApplyLiveAnchorRecords to adapter.applyLiveAnchorRecords;
-        allocate application.facade.rtgValidateLiveGraphChanges to adapter.validateLiveGraphChanges;
-        allocate application.facade.rtgApplyLiveGraphChanges to adapter.applyLiveGraphChanges;
-        allocate application.facade.rtgStageKnowledgeChanges to adapter.stageKnowledgeChanges;
-        allocate application.facade.rtgApplyMigrationCutover to adapter.applyMigrationCutover;
-        allocate application.facade.rtgAbandonMigration to adapter.abandonMigration;
-        allocate application.facade.rtgExecuteQuery to adapter.executeQuery;
-        allocate application.facade.rtgResolveAnchorByFact to adapter.resolveAnchorByFact;
-        allocate application.facade.rtgGetObject to adapter.getObject;
-        allocate application.facade.rtgListMigrations to adapter.listMigrations;
-        allocate application.facade.rtgGetMigration to adapter.getMigration;
-        allocate application.facade.rtgValidateGraph to adapter.validateGraph;
-        allocate application.facade.rtgDiscoverAnchorTypes to adapter.discoverAnchorTypes;
-        allocate application.facade.rtgGetSchemaPack to adapter.getSchemaPack;
-        allocate application.facade.rtgExportSystemSnapshot to adapter.exportSystemSnapshot;
-        allocate application.facade.rtgPersistSystemSnapshot to adapter.persistSystemSnapshot;
-        allocate application.facade.rtgListPersistedSnapshots to adapter.listPersistedSnapshots;
-        allocate application.facade.rtgLoadPersistedSnapshot to adapter.loadPersistedSnapshot;
-        allocate application.facade.rtgReplayLedger to adapter.replayLedger;
-        allocate application.facade.rtgVerifyReplayFromLedger to adapter.verifyReplay;
-        allocate application.facade.rtgListMigrationHistory to adapter.listMigrationHistory;
-        allocate application.facade.rtgFlushLedgerFailures to adapter.flushLedgerFailures;
-        allocate application.facade.rtgRestoreFromSnapshot to adapter.restoreFromSnapshot;
+        bind adapter.gateway = application.gateway;
+        allocate adapter.getSystemState to application.gateway.invokeTool;
+        allocate adapter.getUsageGuide to application.gateway.invokeTool;
+        allocate adapter.stageSchemaMigration to application.gateway.invokeTool;
+        allocate adapter.validateLiveAnchorRecords to application.gateway.invokeTool;
+        allocate adapter.applyLiveAnchorRecords to application.gateway.invokeTool;
+        allocate adapter.validateLiveGraphChanges to application.gateway.invokeTool;
+        allocate adapter.applyLiveGraphChanges to application.gateway.invokeTool;
+        allocate adapter.stageKnowledgeChanges to application.gateway.invokeTool;
+        allocate adapter.applyMigrationCutover to application.gateway.invokeTool;
+        allocate adapter.abandonMigration to application.gateway.invokeTool;
+        allocate adapter.executeQuery to application.gateway.invokeTool;
+        allocate adapter.resolveAnchorByFact to application.gateway.invokeTool;
+        allocate adapter.getObject to application.gateway.invokeTool;
+        allocate adapter.listMigrations to application.gateway.invokeTool;
+        allocate adapter.getMigration to application.gateway.invokeTool;
+        allocate adapter.validateGraph to application.gateway.invokeTool;
+        allocate adapter.discoverAnchorTypes to application.gateway.invokeTool;
+        allocate adapter.getSchemaPack to application.gateway.invokeTool;
+        allocate adapter.exportSystemSnapshot to application.gateway.invokeTool;
+        allocate adapter.persistSystemSnapshot to application.gateway.invokeTool;
+        allocate adapter.listPersistedSnapshots to application.gateway.invokeTool;
+        allocate adapter.loadPersistedSnapshot to application.gateway.invokeTool;
+        allocate adapter.replayLedger to application.gateway.invokeTool;
+        allocate adapter.verifyReplay to application.gateway.invokeTool;
+        allocate adapter.listMigrationHistory to application.gateway.invokeTool;
+        allocate adapter.flushLedgerFailures to application.gateway.invokeTool;
+        allocate adapter.restoreFromSnapshot to application.gateway.invokeTool;
     }
 
 
@@ -387,6 +230,13 @@ package VellisMcpPythonRealization {
         subject adapter : VellisMcpAdapter;
         require constraint {
             doc /* Each MCP-bound adapter action documents one concise purpose/lane/safety description and standard read-only, destructive, idempotent, and closed-world hints. Detailed request grammar and examples are available through usage guides. Logical Vellis action documentation remains the semantic contract; generated runtime metadata carries the realization description without a second Python authority. */
+        }
+    }
+
+    requirement <'contract.vellis.mcp.gateway_projection'> mcpGatewayProjection {
+        subject adapter : VellisMcpAdapter;
+        require constraint {
+            doc /* The transport adapter obtains its curated registrations from and dispatches every tool through the retained generic MCP gateway; it retains no Vellis facade, RTG controller, or domain implementation role. */
         }
     }
 
@@ -407,7 +257,7 @@ package VellisMcpPythonRealization {
     requirement <'contract.vellis.mcp.failure_encoding'> mcpFailureEncoding {
         subject adapter : VellisMcpAdapter;
         require constraint {
-            doc /* Every expected or unexpected action failure returns {ok:false,error:{type,message,diagnostic?}} rather than a transport failure. type preserves the concrete failure name. Controller validation failures additionally expose top-level transaction_id and validation_report when present on the source failure. Failure encoding adds no state effect. */
+            doc /* Every expected or unexpected action failure returns {ok:false,error:{type,message,diagnostic?}} rather than a transport failure. type preserves the concrete failure name. Controller validation failures additionally expose top-level validation_report when present on the source failure. Runtime message and trace identity remain runtime envelope/history metadata. Failure encoding adds no domain state effect. */
         }
     }
 
@@ -423,6 +273,7 @@ package VellisMcpPythonRealization {
         attribute outcome : VellisMcpOutcome;
         satisfy mcpOutcomeExclusive by outcome;
         satisfy mcpDescriptionAuthority by adapter;
+        satisfy mcpGatewayProjection by adapter;
         satisfy mcpInputEncoding by adapter;
         satisfy mcpResultEncoding by adapter;
         satisfy mcpFailureEncoding by adapter;
@@ -443,7 +294,7 @@ package VellisMcpPythonRealization {
 
     verification def VellisMcpBoundaryVerification {
         subject adapter : VellisMcpAdapter;
-        objective { verify mcpDescriptionAuthority; verify mcpInputEncoding; verify mcpResultEncoding; verify mcpFailureEncoding; verify mcpTransportEquivalence; }
+        objective { verify mcpDescriptionAuthority; verify mcpGatewayProjection; verify mcpInputEncoding; verify mcpResultEncoding; verify mcpFailureEncoding; verify mcpTransportEquivalence; }
         @EvidenceBinding { evidenceId = "apps/rtg_knowledge_graph/tests/test_rtg_knowledge_graph_mcp.py#VellisMcpBoundaryVerification"; implementationScope = "VellisMcpPython"; }
     }
 }

@@ -2,7 +2,7 @@ package VellisLocalPythonRealization {
     private import SoftwareComponentModeling::*;
     private import BibliotekSoftwareValues::*;
     private import BibliotekStorageJsonFile::*;
-    private import BibliotekStorageSql::*;
+    private import BibliotekRuntimeMessageRuntime::*;
     private import BibliotekRtgGraph::*;
     private import BibliotekRtgSchema::*;
     private import BibliotekRtgConstraints::*;
@@ -16,13 +16,6 @@ package VellisLocalPythonRealization {
 
     part def LocalJsonFileStorage :> JsonFileStorage {
         @ImplementationBinding { implementationLanguage = ImplementationLanguage::python; codeRoot = "components/storage/json_file"; symbol = "components.storage.json_file.LocalJsonFileStorage"; realization = "VellisLocalPython"; }
-    }
-    part def SqliteStorage :> SqlStorage {
-        @ImplementationCodec { logicalType = "SqlParameters"; implementationType = "tuple[SqlScalar, ...] | dict[str, SqlScalar]"; normalization = "The positional tuple and named dictionary alternatives preserve the modeled kind and ordered or uniquely named scalar values losslessly."; }
-        @ImplementationCodec { logicalType = "SqlOperation::parameters"; implementationType = "SqlParameters"; normalization = "An omitted logical parameter record decodes to an empty positional tuple and encodes equivalently."; }
-        @ImplementationCodec { logicalType = "SqlRow::columns"; implementationType = "dict[str, SqlScalar]"; normalization = "Unique modeled column names become dictionary keys while preserving every JSON-compatible scalar value."; }
-        @ImplementationCodec { logicalType = "SysML lowerCamelCase public feature names"; implementationType = "Python snake_case dataclass and argument names"; normalization = "The realization maps names mechanically without changing values, multiplicities, or operation meaning."; }
-        @ImplementationBinding { implementationLanguage = ImplementationLanguage::python; codeRoot = "components/storage/sql"; symbol = "components.storage.sql.SqliteStorage"; realization = "VellisLocalPython"; }
     }
     part def InMemoryRtgGraph :> RtgGraph {
         @ImplementationBinding { implementationLanguage = ImplementationLanguage::python; codeRoot = "components/rtg/graph"; symbol = "components.rtg.graph.InMemoryRtgGraph"; realization = "VellisLocalPython"; }
@@ -64,9 +57,9 @@ package VellisLocalPythonRealization {
     }
 
     part def VellisLocalPython :> VellisApplication {
-        @ImplementationBinding { implementationLanguage = ImplementationLanguage::python; codeRoot = "apps/rtg_knowledge_graph"; symbol = "apps.rtg_knowledge_graph.composition.build_app"; realization = "dependency-injected-in-process"; }
+        doc /* Python realizations of the logical Vellis component occurrences. The concrete runtime, adapters, occurrence registrations, and proxy-only composition are defined by VellisRuntimePython. */
+        part :>> runtime : MessageRuntime;
         part :>> documentStorage : LocalJsonFileStorage;
-        part :>> ledgerStorage : SqliteStorage;
         part :>> graphStore : InMemoryRtgGraph;
         part :>> schemaRegistry : InMemoryRtgSchema;
         part :>> constraintRegistry : InMemoryRtgConstraints;
@@ -83,7 +76,7 @@ package VellisLocalPythonRealization {
     part pythonVellis : VellisLocalPython;
     allocate logicalVellis to pythonVellis {
         allocate logicalVellis.documentStorage to pythonVellis.documentStorage;
-        allocate logicalVellis.ledgerStorage to pythonVellis.ledgerStorage;
+        allocate logicalVellis.runtime to pythonVellis.runtime;
         allocate logicalVellis.graphStore to pythonVellis.graphStore;
         allocate logicalVellis.schemaRegistry to pythonVellis.schemaRegistry;
         allocate logicalVellis.constraintRegistry to pythonVellis.constraintRegistry;

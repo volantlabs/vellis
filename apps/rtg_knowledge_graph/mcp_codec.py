@@ -32,8 +32,6 @@ from components.rtg.constraints import (
 from components.rtg.controller import (
     RtgControllerCutoverOptions,
     RtgControllerDiscoveryOptions,
-    RtgControllerReplayOptions,
-    RtgControllerRestoreOptions,
     RtgControllerSchemaPackOptions,
     RtgControllerValidationOptions,
     RtgSystemSnapshot,
@@ -71,6 +69,11 @@ from components.rtg.schema import (
     RtgSchemaDefinition,
     RtgSchemaField,
     RtgSchemaSnapshot,
+)
+from components.runtime.message_runtime import (
+    RuntimeExternalBoundaryDisposition,
+    RuntimeExternalBoundaryMode,
+    RuntimeReconstructionRequest,
 )
 
 
@@ -1068,47 +1071,85 @@ def decode_schema_pack_options(value: object | None) -> RtgControllerSchemaPackO
     )
 
 
-def decode_replay_options(value: object | None) -> RtgControllerReplayOptions | None:
+def decode_replay_options(value: object | None) -> RuntimeReconstructionRequest:
     if value is None:
-        return None
+        return RuntimeReconstructionRequest()
     data = _object(value, "replay_options")
     _reject_unknown_keys(
         data,
         {
-            "start_snapshot",
-            "start_snapshot_path",
-            "after_ledger_position",
-            "through_ledger_position",
+            "through_runtime_position",
+            "checkpoint_references",
+            "reset_targets",
+            "external_boundaries",
         },
         "replay_options",
-        {
-            "snapshot": "start_snapshot",
-            "snapshot_path": "start_snapshot_path",
-            "after": "after_ledger_position",
-            "through": "through_ledger_position",
-        },
     )
-    snapshot = data.get("start_snapshot")
-    return RtgControllerReplayOptions(
-        start_snapshot=decode_system_snapshot(snapshot) if snapshot is not None else None,
-        start_snapshot_path=_optional_str(data.get("start_snapshot_path")),
-        after_ledger_position=_optional_int(
-            data.get("after_ledger_position"), "replay_options.after_ledger_position"
+    runtime_through = _optional_int(
+        data.get("through_runtime_position"), "replay_options.through_runtime_position"
+    )
+    checkpoints = _json_object(
+        data.get("checkpoint_references", {}), "replay_options.checkpoint_references"
+    )
+    if any(not isinstance(reference, str) for reference in checkpoints.values()):
+        raise RtgMcpInputInvalid("checkpoint_references values must be strings")
+    return RuntimeReconstructionRequest(
+        through_position=runtime_through,
+        checkpoint_references=checkpoints,
+        reset_targets=_optional_bool(
+            data.get("reset_targets"), False, "replay_options.reset_targets"
         ),
-        through_ledger_position=_optional_int(
-            data.get("through_ledger_position"), "replay_options.through_ledger_position"
+        external_boundaries=_decode_external_boundaries(
+            data.get("external_boundaries", ())
         ),
     )
 
 
-def decode_restore_options(value: object | None) -> RtgControllerRestoreOptions | None:
+def _decode_external_boundaries(
+    value: object,
+) -> tuple[RuntimeExternalBoundaryDisposition, ...]:
+    result: list[RuntimeExternalBoundaryDisposition] = []
+    for index, data in enumerate(
+        _checked_objects(
+            value,
+            "replay_options.external_boundaries",
+            {"boundary_id", "mode", "limitation"},
+        )
+    ):
+        boundary_id = _required_str(data, "boundary_id")
+        mode_value = _required_str(data, "mode")
+        if not boundary_id.strip():
+            raise RtgMcpInputInvalid(
+                f"replay_options.external_boundaries[{index}].boundary_id must be non-empty"
+            )
+        try:
+            mode = RuntimeExternalBoundaryMode(mode_value)
+        except ValueError as error:
+            raise RtgMcpInputInvalid(
+                f"replay_options.external_boundaries[{index}].mode must be one of "
+                + ", ".join(item.value for item in RuntimeExternalBoundaryMode)
+            ) from error
+        limitation = _optional_str(data.get("limitation"))
+        if limitation is not None and not limitation.strip():
+            raise RtgMcpInputInvalid(
+                f"replay_options.external_boundaries[{index}].limitation must be non-empty"
+            )
+        result.append(RuntimeExternalBoundaryDisposition(boundary_id, mode, limitation))
+    return tuple(result)
+
+
+def decode_restore_options(value: object | None) -> None:
     if value is None:
         return None
     data = _object(value, "restore_options")
     _reject_unknown_keys(data, {"ledger_mode"}, "restore_options")
-    return RtgControllerRestoreOptions(
-        ledger_mode=_optional_str(data.get("ledger_mode")) or "record"
-    )
+    ledger_mode = _optional_str(data.get("ledger_mode")) or "record"
+    if ledger_mode != "record":
+        raise RtgMcpInputInvalid(
+            "snapshot restoration is always authoritative runtime traffic; ledger_mode must be "
+            "'record' when supplied"
+        )
+    return None
 
 
 def decode_system_snapshot(value: object) -> RtgSystemSnapshot:
@@ -1122,11 +1163,6 @@ def decode_system_snapshot(value: object) -> RtgSystemSnapshot:
         migration=decode_migration_snapshot(
             _required_value(data, "migration", "system_snapshot.migration")
         ),
-        last_ledger_position=_optional_int(
-            data.get("last_ledger_position"), "system_snapshot.last_ledger_position"
-        ),
-        last_transaction_id=_optional_uuid(data.get("last_transaction_id")),
-        last_transaction_timestamp=_optional_str(data.get("last_transaction_timestamp")),
     )
 
 

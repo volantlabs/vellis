@@ -1,30 +1,20 @@
 from __future__ import annotations
 
-import asyncio
-import json
-import socket
-import subprocess
-import sys
-import time
-from io import StringIO
 from pathlib import Path
-from typing import Any, cast
+from typing import Any
 from uuid import UUID
 
 import pytest
-from mcp import ClientSession, StdioServerParameters
-from mcp.client.stdio import stdio_client
-from mcp.client.streamable_http import streamable_http_client
 
 from apps.rtg_knowledge_graph.composition import build_app
 from apps.rtg_knowledge_graph.config import RtgKnowledgeGraphConfig
-from apps.rtg_knowledge_graph.mcp_codec import decode_change_batch, decode_schema_definition
-from apps.rtg_knowledge_graph.mcp_toolset import RtgMcpToolset
-from apps.rtg_knowledge_graph.onboarding import (
-    config_for_data_dir,
-    doctor_report,
-    setup_vellis,
+from apps.rtg_knowledge_graph.mcp_codec import (
+    decode_change_batch,
+    decode_schema_definition,
+    encode_json,
 )
+from apps.rtg_knowledge_graph.mcp_toolset import RtgMcpToolset
+from apps.rtg_knowledge_graph.onboarding import config_for_data_dir
 from apps.rtg_knowledge_graph.starter_schema import (
     VellisStartupFailed,
     install_everyday_life_ontology,
@@ -42,23 +32,24 @@ from components.rtg.schema import (
     RtgAnchorSchemaPayload,
     RtgSchemaDefinition,
 )
+from components.runtime.message_runtime import RuntimeFailStopped, RuntimeHistoryQuery
 from components.storage.json_file.implementation import LocalJsonFileStorage
-from components.storage.sql import SqliteStorage
 
 MODEL_EVIDENCE = {
     "EverydayLifeOntologyVerification": (
         "test_everyday_life_bundle_is_exact_schema_only_and_deterministic",
         "test_modeled_ontology_installer_reports_installation_and_reuse",
-        "test_everyday_life_ontology_install_is_idempotent_and_replayable",
+        "test_everyday_life_ontology_install_is_idempotent_and_runtime_reconstructed",
         "test_custom_schema_is_preserved_and_not_overlaid",
-        "test_replayed_beta_shaped_custom_graph_with_overlapping_keys_starts",
+        "test_snapshot_transfers_beta_shaped_custom_graph_with_overlapping_keys",
         "test_installed_ontology_can_be_extended_without_bootstrap_overwrite",
         "test_starter_identity_collision_fails_without_partial_effects",
         "test_partial_starter_installation_fails_without_partial_effects",
         "test_startup_completes_an_exact_interrupted_starter_staging",
         "test_empty_mode_abandons_an_exact_interrupted_starter_staging",
         "test_manual_recovery_does_not_overlay_durable_history",
-        "test_failed_starter_cutover_removes_staged_state_and_replays_cleanly",
+        "test_manual_recovery_can_be_initiated_through_the_runtime_facade",
+        "test_failed_starter_cutover_removes_staged_state_and_reconstructs_cleanly",
     ),
 }
 
@@ -206,7 +197,9 @@ def test_modeled_ontology_installer_reports_installation_and_reuse(tmp_path: Pat
     assert reused.schema_definition_count == 33
 
 
-def test_everyday_life_ontology_install_is_idempotent_and_replayable(tmp_path: Path) -> None:
+def test_everyday_life_ontology_install_is_idempotent_and_runtime_reconstructed(
+    tmp_path: Path,
+) -> None:
     config = config_for_data_dir(tmp_path / "data")
     first = build_app(config)
     installed = first.prepare()
@@ -226,18 +219,19 @@ def test_everyday_life_ontology_install_is_idempotent_and_replayable(tmp_path: P
     )
     assert created["ok"] is True
     assert first.controller.get_system_state().state_classification == "populated"
+    first.close()
 
-    restarted = build_app(config)
-    replayed = restarted.prepare()
-    assert replayed.status == "installed"
-    assert replayed.recovery == "ledger_replayed"
-    state = restarted.controller.get_system_state()
-    assert state.live_schema_counts.total == 33
-    assert state.state_classification == "populated"
+    with build_app(config) as restarted:
+        reconstructed = restarted.prepare()
+        assert reconstructed.status == "installed"
+        assert reconstructed.recovery == "runtime_reconstructed"
+        state = restarted.controller.get_system_state()
+        assert state.live_schema_counts.total == 33
+        assert state.state_classification == "populated"
 
-    repeated = restarted.prepare()
-    assert repeated.status == "installed"
-    assert restarted.controller.get_system_state().live_schema_counts.total == 33
+        repeated = restarted.prepare()
+        assert repeated.status == "installed"
+        assert restarted.controller.get_system_state().live_schema_counts.total == 33
 
 
 @pytest.mark.parametrize("type_key", ["CustomThing", "Person"])
@@ -267,10 +261,10 @@ def test_custom_schema_is_preserved_and_not_overlaid(tmp_path: Path, type_key: s
     assert controller.export_system_snapshot() == snapshot
 
 
-def test_replayed_beta_shaped_custom_graph_with_overlapping_keys_starts(
+def test_snapshot_transfers_beta_shaped_custom_graph_with_overlapping_keys(
     tmp_path: Path,
 ) -> None:
-    controller = _controller(tmp_path, InMemoryRtgSchema.empty())
+    controller = _controller(tmp_path / "source", InMemoryRtgSchema.empty())
     toolset = RtgMcpToolset(controller)
     anchor_types = ("Person", "Area", "Project", "Task", "Event", "Note", "Resource")
     definitions: list[dict[str, Any]] = []
@@ -335,73 +329,83 @@ def test_replayed_beta_shaped_custom_graph_with_overlapping_keys_starts(
         is True
     )
     before = controller.export_system_snapshot()
-
-    restarted = build_app(
-        RtgKnowledgeGraphConfig(
-            storage_root=tmp_path / "json",
-            sql_database_path=tmp_path / "ledger.sqlite",
-            install_starter_schema=True,
-            automatic_recovery=True,
-        )
-    )
-    status = restarted.prepare()
-    after = restarted.controller.export_system_snapshot()
-    assert status.status == "custom"
-    assert status.recovery == "ledger_replayed"
-    _assert_same_domain_state(after, before)
-    assert len(after.graph.anchors) == 7
-    assert len(after.graph.data_objects) == 7
-    assert len(after.graph.links) == 1
-    assert len(after.schema.definitions) == 15
-
-    legacy_config = RtgKnowledgeGraphConfig(
-        storage_root=tmp_path / "json",
-        sql_database_path=tmp_path / "ledger.sqlite",
-        install_starter_schema=True,
+    encoded = encode_json(before)
+    assert isinstance(encoded, dict)
+    transfer_snapshot = {
+        **encoded,
+        "transaction_id": "legacy-controller-trace",
+        "ledger_position": 4321,
+        "legacy_controller_metadata": {
+            "ledger_schema": "controller-v1",
+            "source_version": "pre-runtime",
+        },
+    }
+    destination_config = RtgKnowledgeGraphConfig(
+        storage_root=tmp_path / "destination" / "json",
+        runtime_database_path=tmp_path / "destination" / "runtime.sqlite",
+        install_starter_schema=False,
         automatic_recovery=True,
     )
-    ledger_count = restarted.controller.get_system_state().ledger_record_count
-    setup = setup_vellis(
-        legacy_config,
-        client="generic-json",
-        yes=True,
-        output_stream=StringIO(),
-    )
-    assert setup.starter_schema.status == "custom"
-    assert setup.starter_schema.recovery == "ledger_replayed"
-    doctor = doctor_report(legacy_config, client="generic-json")
-    assert doctor["ok"] is True
-    replay_check = next(check for check in doctor["checks"] if check["id"] == "replay_feasibility")
-    assert replay_check["detail"] == {
-        "status": "custom",
-        "recovery": "ledger_replayed",
-    }
-    asyncio.run(_assert_custom_graph_mcp_reconnects(legacy_config, tmp_path))
-    final = build_app(legacy_config)
-    assert final.prepare().status == "custom"
-    assert final.controller.get_system_state().ledger_record_count == ledger_count
-    _assert_same_domain_state(final.controller.export_system_snapshot(), before)
 
-    empty_mode = build_app(
-        RtgKnowledgeGraphConfig(
-            storage_root=tmp_path / "json-empty-mode",
-            sql_database_path=tmp_path / "ledger.sqlite",
-            install_starter_schema=False,
-            automatic_recovery=True,
+    with build_app(destination_config) as destination:
+        initial = destination.prepare()
+        assert initial.status == "empty"
+        assert not destination.runtime.query_history_sync(
+            RuntimeHistoryQuery(fact_type="canonical_effect")
+        ).facts
+
+        facade = destination.build_facade(initial)
+        restored = facade.rtg_restore_from_snapshot(transfer_snapshot)
+        assert restored["ok"] is True
+        assert restored["result"]["status"] == "restore_applied"
+
+        after_restore = destination.controller.export_system_snapshot()
+        _assert_same_domain_state(after_restore, before)
+        effects = destination.runtime.query_history_sync(
+            RuntimeHistoryQuery(fact_type="canonical_effect")
+        ).facts
+        assert len(effects) == 5
+        assert {(item.instance_key, item.action_id) for item in effects} == {
+            ("vellis.graph.primary", "component.rtg.graph.replace_snapshot"),
+            ("vellis.schema.primary", "component.rtg.schema.replace_snapshot"),
+            ("vellis.constraints.primary", "component.rtg.constraints.replace_snapshot"),
+            ("vellis.migration.primary", "component.rtg.migration.replace_snapshot"),
+            (
+                "vellis.controller.primary",
+                "component.rtg.controller.restore_from_snapshot",
+            ),
+        }
+        controller_effect = next(
+            item for item in effects if item.instance_key == "vellis.controller.primary"
         )
-    )
-    assert empty_mode.prepare().status == "custom"
-    manual = build_app(
-        RtgKnowledgeGraphConfig(
-            storage_root=tmp_path / "json-manual",
-            sql_database_path=tmp_path / "ledger.sqlite",
-            install_starter_schema=False,
-            automatic_recovery=False,
+        assert controller_effect.runtime_position == max(
+            item.runtime_position for item in effects
         )
-    )
-    manual_status = manual.prepare()
-    assert manual_status.status == "empty"
-    assert manual_status.recovery == "manual_recovery_required"
+        effect = controller_effect.details["effect"]
+        assert isinstance(effect, dict)
+        payload = effect["payload"]
+        assert isinstance(payload, dict)
+        assert payload["supersedes_trace_effects"] is True
+        arguments = payload["arguments"]
+        assert isinstance(arguments, dict)
+        canonical_snapshot = arguments["snapshot"]
+        assert isinstance(canonical_snapshot, dict)
+        assert "transaction_id" not in canonical_snapshot
+        assert "ledger_position" not in canonical_snapshot
+        assert "legacy_controller_metadata" not in canonical_snapshot
+        destination_runtime_id = destination.runtime.runtime_id
+
+    with build_app(destination_config) as restarted:
+        status = restarted.prepare()
+        after_restart = restarted.controller.export_system_snapshot()
+        assert restarted.runtime.runtime_id == destination_runtime_id
+        assert status.status == "custom"
+        assert status.recovery == "runtime_reconstructed"
+        _assert_same_domain_state(after_restart, before)
+        assert len(after_restart.graph.anchors) == 7
+        assert len(after_restart.graph.data_objects) == 7
+        assert len(after_restart.graph.links) == 1
+        assert len(after_restart.schema.definitions) == 15
 
 
 def test_installed_ontology_can_be_extended_without_bootstrap_overwrite(tmp_path: Path) -> None:
@@ -504,22 +508,73 @@ def test_empty_mode_abandons_an_exact_interrupted_starter_staging(tmp_path: Path
 
 def test_manual_recovery_does_not_overlay_durable_history(tmp_path: Path) -> None:
     config = config_for_data_dir(tmp_path / "data")
-    build_app(config).prepare()
-    manual = build_app(
+    with build_app(config) as initial:
+        initial.prepare()
+        assert initial.runtime.query_history_sync(
+            RuntimeHistoryQuery(fact_type="canonical_effect")
+        ).facts
+    with build_app(
         RtgKnowledgeGraphConfig(
             storage_root=config.storage_root,
-            sql_database_path=config.sql_database_path,
+            runtime_database_path=config.runtime_database_path,
             install_starter_schema=False,
             automatic_recovery=False,
         )
-    )
-    status = manual.prepare()
-    assert status.status == "empty"
-    assert status.recovery == "manual_recovery_required"
-    assert manual.controller.get_system_state().state_classification == "needs_replay"
+    ) as manual:
+        status = manual.prepare()
+        assert status.status == "empty"
+        assert status.recovery == "manual_recovery_required"
+        assert manual.runtime.health == "recovery_required"
+        with pytest.raises(RuntimeFailStopped, match="recovery_required"):
+            manual.controller.get_system_state()
 
 
-def test_failed_starter_cutover_removes_staged_state_and_replays_cleanly(
+def test_manual_recovery_can_be_initiated_through_the_runtime_facade(tmp_path: Path) -> None:
+    config = config_for_data_dir(tmp_path / "data")
+    with build_app(config) as initial:
+        initial.prepare()
+        source_snapshot = initial.controller.export_system_snapshot()
+
+    with build_app(
+        RtgKnowledgeGraphConfig(
+            storage_root=config.storage_root,
+            runtime_database_path=config.runtime_database_path,
+            install_starter_schema=False,
+            automatic_recovery=False,
+        )
+    ) as manual:
+        status = manual.prepare()
+        facade = manual.build_facade(status)
+        with pytest.raises(RuntimeFailStopped, match="recovery_required"):
+            manual.controller.restore_from_snapshot(source_snapshot)
+        with pytest.raises(RuntimeFailStopped, match="recovery_required"):
+            facade.rtg_get_usage_guide("schema_design")
+        effects_before = manual.runtime.query_history_sync(
+            RuntimeHistoryQuery(fact_type="canonical_effect", limit=1000)
+        ).facts
+        messages_before = manual.runtime.query_history_sync(
+            RuntimeHistoryQuery(fact_type="message_accepted", limit=1000)
+        ).facts
+
+        replay = facade.rtg_replay_ledger()
+
+        effects_after = manual.runtime.query_history_sync(
+            RuntimeHistoryQuery(fact_type="canonical_effect", limit=1000)
+        ).facts
+        messages_after = manual.runtime.query_history_sync(
+            RuntimeHistoryQuery(fact_type="message_accepted", limit=1000)
+        ).facts
+        assert replay["ok"] is True
+        assert replay["result"]["verified"] is True
+        assert replay["result"]["applied_effects"] > 0
+        assert effects_after == effects_before
+        assert len(messages_after) == len(messages_before) + 1
+        assert manual.controller.export_system_snapshot() == source_snapshot
+        assert facade.rtg_get_usage_guide("schema_design")["ok"] is True
+        manual.controller.restore_from_snapshot(source_snapshot)
+
+
+def test_failed_starter_cutover_removes_staged_state_and_reconstructs_cleanly(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     config = config_for_data_dir(tmp_path / "data")
@@ -532,20 +587,21 @@ def test_failed_starter_cutover_removes_staged_state_and_replays_cleanly(
     monkeypatch.setattr(InProcessRtgController, "apply_migration_cutover", fail_cutover)
     with pytest.raises(VellisStartupFailed, match="installation failed"):
         composition.prepare()
-    _assert_same_domain_state(composition.controller.export_system_snapshot(), before)
+    assert composition.runtime.health == "recovery_required"
+    composition.close()
 
     monkeypatch.undo()
-    restarted = build_app(
+    with build_app(
         RtgKnowledgeGraphConfig(
             storage_root=config.storage_root,
-            sql_database_path=config.sql_database_path,
+            runtime_database_path=config.runtime_database_path,
             install_starter_schema=False,
             automatic_recovery=True,
         )
-    )
-    status = restarted.prepare()
-    assert status.status == "empty"
-    _assert_same_domain_state(restarted.controller.export_system_snapshot(), before)
+    ) as restarted:
+        status = restarted.prepare()
+        assert status.status == "empty"
+        _assert_same_domain_state(restarted.controller.export_system_snapshot(), before)
 
 
 def _controller(tmp_path: Path, schema: InMemoryRtgSchema) -> InProcessRtgController:
@@ -557,121 +613,9 @@ def _controller(tmp_path: Path, schema: InMemoryRtgSchema) -> InProcessRtgContro
         DeterministicRtgChangeValidator(),
         SimpleRtgQueryEngine(),
         LocalJsonFileStorage.open(tmp_path / "json"),
-        SqliteStorage.open(tmp_path / "ledger.sqlite"),
     )
 
 
 def _assert_same_domain_state(left: object, right: object) -> None:
     for feature in ("graph", "schema", "constraints", "migration"):
         assert getattr(left, feature) == getattr(right, feature)
-
-
-async def _assert_custom_graph_mcp_reconnects(
-    config: RtgKnowledgeGraphConfig, working_directory: Path
-) -> None:
-    base_args = [
-        sys.executable,
-        "-m",
-        "apps.rtg_knowledge_graph",
-        "serve-mcp",
-        "--storage-root",
-        str(config.storage_root),
-        "--sql-database-path",
-        str(config.sql_database_path),
-    ]
-    stdio = StdioServerParameters(
-        command=base_args[0],
-        args=[*base_args[1:], "--transport", "stdio"],
-        cwd=working_directory,
-    )
-    async with stdio_client(stdio) as (read, write):
-        async with ClientSession(read, write) as session:
-            await session.initialize()
-            await _assert_custom_graph_session(session)
-
-    port = _free_tcp_port()
-    process = subprocess.Popen(
-        [
-            *base_args,
-            "--transport",
-            "http",
-            "--host",
-            "127.0.0.1",
-            "--port",
-            str(port),
-            "--path",
-            "/mcp",
-        ],
-        cwd=working_directory,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        text=True,
-    )
-    try:
-        _wait_for_tcp_port("127.0.0.1", port, process)
-        async with streamable_http_client(f"http://127.0.0.1:{port}/mcp") as (
-            read,
-            write,
-            _session_id,
-        ):
-            async with ClientSession(read, write) as session:
-                await session.initialize()
-                await _assert_custom_graph_session(session)
-    finally:
-        _terminate_process(process)
-
-
-async def _assert_custom_graph_session(session: ClientSession) -> None:
-    state = _tool_result_payload(await session.call_tool("rtg_get_system_state", {}))
-    validation = _tool_result_payload(await session.call_tool("rtg_validate_graph", {}))
-    query = _tool_result_payload(
-        await session.call_tool(
-            "rtg_execute_query",
-            {"query_spec": {"anchor_buckets": [{"name": "task", "anchor_type_keys": ["Task"]}]}},
-        )
-    )
-    assert state["ok"] is True
-    assert state["result"]["starter_schema"]["status"] == "custom"
-    assert state["result"]["live_schema_counts"]["total"] == 15
-    assert validation["result"]["accepted"] is True
-    assert len(query["result"]["bindings"]) == 1
-
-
-def _free_tcp_port() -> int:
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
-        sock.bind(("127.0.0.1", 0))
-        return int(sock.getsockname()[1])
-
-
-def _wait_for_tcp_port(host: str, port: int, process: subprocess.Popen[str]) -> None:
-    deadline = time.monotonic() + 15
-    while time.monotonic() < deadline:
-        if process.poll() is not None:
-            _stdout, stderr = process.communicate(timeout=1)
-            raise AssertionError(f"MCP HTTP server exited early: {stderr}")
-        try:
-            with socket.create_connection((host, port), timeout=0.2):
-                return
-        except OSError:
-            time.sleep(0.1)
-    _terminate_process(process)
-    raise AssertionError(f"MCP HTTP server did not listen on {host}:{port}")
-
-
-def _terminate_process(process: subprocess.Popen[str]) -> None:
-    if process.poll() is not None:
-        return
-    process.terminate()
-    try:
-        process.wait(timeout=5)
-    except subprocess.TimeoutExpired:
-        process.kill()
-        process.wait(timeout=5)
-
-
-def _tool_result_payload(result: object) -> dict[str, Any]:
-    structured = getattr(result, "structuredContent", None)
-    if isinstance(structured, dict):
-        return cast(dict[str, Any], structured)
-    content = cast(Any, result).content
-    return cast(dict[str, Any], json.loads(content[0].text))

@@ -21,30 +21,31 @@ See the repository `README.md` Development Setup section for install commands.
 
 ## Launch
 
-Use a fresh explicit storage root for each beta eval:
+Use a fresh explicit data root for each beta eval. This runbook deliberately enables manual
+runtime reconstruction so an evaluator can exercise that path without changing normal startup:
 
 ```sh
-uv run vellis-rtg-knowledge-graph mcp-config --storage-root .data/vellis-beta-001 --empty --manual-recovery
+uv run vellis-rtg-knowledge-graph mcp-config --data-dir .data/vellis-runtime-eval-001 --empty --manual-recovery
 ```
 
 This prints only a copy-pastable `mcpServers` block and does not initialize the application. Merge
 the block into the evaluating client's configuration and restart/reload that client. The client
 then launches and owns the stdio server; do not start `just rtg` or `just rtg-mcp` separately.
 
-For troubleshooting or eval bookkeeping, `just rtg-eval-info .data/vellis-beta-001` prints the
+For troubleshooting or eval bookkeeping, `just rtg-eval-info .data/vellis-runtime-eval-001` prints the
 larger diagnostic payload. That command initializes the composition and reports:
 
 - `mcp.client_config`: copy-pastable MCP server config.
 - `mcp.transports.localhost_http.client_config`: URL-based config for agents attaching to a
   running localhost server.
 - `mcp.launch`: cwd-independent launch command using `uv --directory <repo-root>`.
-- `mcp.launch.args`: includes both `--storage-root` and `--sql-database-path`.
+- `mcp.launch.args`: includes both `--storage-root` and `--runtime-database-path`.
 - `mcp.eval_prompt_path`: local path to the recommended eval prompt for the human.
 - `mcp.eval_prompts`: available prompt paths, including the individual life-graph beta prompt and
   the component-repo affordance prompt.
 - `mcp.first_call`: the first MCP call to make after connecting the client.
-- `mcp.state_mode`: `manual_recovery` for this evaluation launch.
-- `mcp.tools`: controller-facing RTG MCP tools.
+- `mcp.state_mode`: `manual_recovery` for this targeted evaluation launch.
+- `mcp.tools`: curated Vellis RTG MCP tools.
 
 Client wiring:
 
@@ -55,7 +56,7 @@ Client wiring:
 - Claude Code: `claude mcp add rtg_knowledge_graph -- <command and args from the generated
   config>`, or place the `mcpServers` block in a project `.mcp.json`.
 - Codex: run the output from
-  `uv run vellis-rtg-knowledge-graph mcp-config --client codex --storage-root .data/vellis-beta-001 --empty --manual-recovery`,
+  `uv run vellis-rtg-knowledge-graph mcp-config --client codex --data-dir .data/vellis-runtime-eval-001 --empty --manual-recovery`,
   then restart or reload Codex. Do not paste the generic JSON block into Codex's TOML config.
 
 The "MCP Interface" section of `apps/rtg_knowledge_graph/README.md` covers wiring in more
@@ -65,7 +66,7 @@ For agents that should attach to an already-running local Vellis app, launch the
 localhost HTTP MCP server instead:
 
 ```sh
-uv run vellis serve-mcp --transport http --host 127.0.0.1 --port 8765 --path /mcp --storage-root .data/vellis-beta-001 --empty --manual-recovery
+uv run vellis serve-mcp --transport http --host 127.0.0.1 --port 8765 --path /mcp --data-dir .data/vellis-runtime-eval-001 --empty --manual-recovery
 ```
 
 Then configure the other same-machine agent with
@@ -76,9 +77,12 @@ authentication and is not intended for network exposure.
 After the MCP client connects, make the `mcp.first_call` tool call before giving the agent a
 long eval prompt. For the default metadata, call `rtg_validate_graph` with `{}`. A fresh server
 should return `ok: true`, `result.accepted: true`, and no findings.
-Then call `rtg_get_system_state` with `{}`. A fresh in-memory server should report `empty`; a
-restarted server with ledger records may report `needs_replay`; an already bootstrapped server may
-report `schema_only` or `populated`.
+Then call `rtg_get_system_state` with `{}`. A fresh data root should report `empty`; an already
+bootstrapped root may report `schema_only` or `populated`. Normal application startup automatically
+reconstructs the latest committed managed state. This targeted eval uses `manual_recovery`, so after
+a restart it must explicitly reconstruct before expecting the prior domain classification.
+Inspect the nested `runtime` status for health, current runtime position, message count, and latest
+terminal trace evidence.
 
 For the primary beta workflow, give the agent
 `docs/guides/vellis/evals/rtg-individual-life-graph-beta-prompt.md` after the first call succeeds. Use
@@ -91,15 +95,21 @@ any prebuilt scenario artifact.
 
 V1 state semantics:
 
-- Live RTG graph, schema, constraint, and migration state is in memory for the running MCP
-  server process.
-- The storage root persists the app manifest, persisted snapshots, queued ledger failures, and
-  the SQL ledger.
-- Restart restore/replay is disabled by `--manual-recovery`. For beta evals, keep the MCP process running for the
-  whole eval or explicitly use snapshot, restore, replay, and replay-verification tools.
+- Live RTG graph, schema, constraint, and migration state is hosted by runtime-managed component
+  occurrences.
+- The runtime database contains the authoritative append-only cross-component chronology,
+  occurrence identities, committed canonical effects, terminal trace dispositions, and
+  reconstruction evidence. There is no separate controller SQL ledger.
+- Ordinary restart recovery automatically reconstructs the latest confirmed state. This runbook's
+  `--empty --manual-recovery` launch is a targeted operator test, not the normal beta launch mode.
 - Persisted snapshots can be listed and loaded through MCP with
   `rtg_list_persisted_snapshots` and `rtg_load_persisted_snapshot`; agents do not need direct
   filesystem access for snapshot readback.
+- Historical reconstruction through an earlier runtime position requires an isolated copy of the
+  complete data root. V1 does not rewind the active runtime in place.
+- Earlier-version data enters a fresh current root only through one full coordinated snapshot
+  exported by the source version. Never copy or import its controller ledger; follow
+  [`snapshot-transfer.md`](../snapshot-transfer.md).
 
 ## Tool Primer
 
@@ -109,8 +119,10 @@ All RTG MCP tools return JSON objects:
 {"ok": true, "result": {}}
 ```
 
-Successful mutating controller results include `result.transaction_id` and, when SQL audit
-recording succeeded, `result.ledger_position`.
+Successful mutating results report domain status, generated IDs, applied changes, and validation
+evidence. Controller results do not own runtime trace IDs or runtime positions. Read
+`rtg_get_system_state.result.runtime` or a curated runtime-history projection when chronology is
+part of the evaluation.
 
 Validation failures return:
 
@@ -118,7 +130,6 @@ Validation failures return:
 {
   "ok": false,
   "error": {"type": "RtgControllerValidationFailed", "message": "..."},
-  "transaction_id": "...",
   "validation_report": {"accepted": false, "findings": []}
 }
 ```
@@ -216,7 +227,8 @@ Live graph writes go through `rtg_apply_live_graph_changes`:
 ```
 
 Invalid live graph writes are the simplest way to exercise bad-write recovery: strict validation
-returns `ok: false`, a controller transaction ID, and a `validation_report` with blocking findings.
+returns `ok: false` and a `validation_report` with blocking findings. The runtime records the
+request and terminal fault trace independently of the controller failure payload.
 
 Queries use anchor buckets plus optional associated data requirements:
 
@@ -264,18 +276,31 @@ Agents should operate the RTG MCP server in this order:
    `rtg_validate_live_anchor_records`; use `rtg_apply_live_anchor_records` for repeated anchor
    plus required-facts ingestion, `rtg_apply_live_graph_changes` for lower-level CRUD and links,
    and answer questions with `rtg_execute_query`.
-10. Preserve recovery evidence with `rtg_persist_system_snapshot`,
-   `rtg_list_persisted_snapshots`, `rtg_load_persisted_snapshot`, `rtg_restore_from_snapshot`,
-   `rtg_replay_ledger`, `rtg_verify_replay_from_ledger`, and `rtg_list_migration_history`.
+10. Preserve domain recovery evidence with `rtg_persist_system_snapshot`,
+    `rtg_list_persisted_snapshots`, `rtg_load_persisted_snapshot`, and
+    `rtg_restore_from_snapshot`. Inspect runtime health/position through `rtg_get_system_state`,
+    and use `rtg_list_migration_history` when migration trace chronology matters.
 
 Dry-run validation tools accept `validation_options.tracks` and `validation_options.finding_limit`;
 mutation tools use `validation_mode`. Use `return_snapshot:false` for compact snapshot
-persistence/load. When verifying recovery, report `state_equivalent_to_live` with the replayed and
-live domain-state digests; report `ledger_cursor_equivalent_to_live` separately, and use the replay
-accounting plus `replay_window` to explain which ledger records were scanned, eligible, replayed,
-administrative, terminal, or failed/rejected.
-`rtg_get_system_state.migration_counts_by_status` is the current migration-store view; use
-`rtg_list_migration_history` for ledger-backed migration audit after cutover or abandonment.
+persistence/load. Ordinary latest recovery is automatic on restart. In this manual-recovery eval,
+an empty runtime host may call the legacy-named `rtg_replay_ledger` operation with current-runtime
+options before resuming domain work. The legacy-named
+`rtg_verify_replay_from_ledger` operation reports the latest startup reconstruction evidence:
+`verified`, `start_position`, `through_position`, applied/skipped/incompatible effects, state
+digests, the combined `verified_digest`, external effects skipped, external-boundary dispositions,
+and limitations. It reports the recorded startup reconstruction rather than performing another
+reconstruction.
+
+Use `rtg_replay_ledger` only in an intentional manual/isolated operator composition with compatible
+empty/reset targets. Historical reconstruction uses `through_runtime_position` and requires a
+complete data-root copy and a selected runtime position; never rewind the active eval root in
+place. A verified historical result remains `branch_pending` until trusted operator code records
+its exact source runtime, cursor, and `verified_digest`; ordinary MCP traffic remains closed until
+then.
+`rtg_get_system_state.migration_counts_by_status` is the current migration-store view;
+`rtg_list_migration_history` is a projection of migration-related runtime traces after cutover or
+abandonment.
 
 Use schema-required fields and link type rules for beta blocking validation first. Add constraints
 when the rule fits one of the documented v1 payloads:
@@ -305,8 +330,8 @@ open questions, work items, and change proposals. Call `rtg_validate_graph` firs
 `rtg_stage_schema_migration` for schema definitions and `rtg_stage_knowledge_changes` only when
 you need advanced constraint candidates tied to a ready migration. Use `rtg_apply_migration_cutover`
 to make them live. Use `rtg_discover_anchor_types`, `rtg_get_schema_pack`, and
-`rtg_validate_graph` to verify the result. Stop after summarizing what schema is live and which
-transaction IDs or ledger positions support it.
+`rtg_validate_graph` to verify the result. Stop after summarizing what schema is live, what domain
+evidence supports it, and what the nested runtime status says about the latest terminal trace.
 
 ### Prompt 2: Ingest And Query Live Graph
 
@@ -326,18 +351,20 @@ any uncertainty.
 
 ### Prompt 3: Evolve Evidence Model
 
-The human adds data that does not fit the current evidence schema: `component.rtg.controller`
-has ledger evidence with transaction ID, ledger position, operation name, and whether replay can
-use it. Propose a non-live replacement evidence schema and a migration record that makes it live
-and retires the old evidence schema. Include every non-live graph candidate ID in
+The human adds data that does not fit the current evidence schema: the Vellis runtime has a
+terminal trace for a `component.rtg.controller` request and its derived component calls. Runtime
+evidence includes trace ID, runtime position, action, terminal disposition, and whether a committed
+canonical effect reconstructs managed state. Propose a non-live replacement evidence schema and a
+migration record that makes it live and retires the old evidence schema. Include every non-live
+graph candidate ID in
 `graph_make_live`, including the evidence anchor, evidence facts object, component anchor, component
 facts object, and links.
 
 Submit one intentionally invalid evidence item first. Whether the invalid item is a live write or a
 strict staged candidate, expect `ok: false` with `validation_report`; repair the payload, retry,
-and apply migration cutover. Query post-cutover state to show ledger evidence is represented, older
-test evidence remains usable, and accepted components without evidence remain discoverable. Export
-or persist a snapshot and produce a concise human brief.
+and apply migration cutover. Query post-cutover state to show runtime trace evidence is represented,
+older test evidence remains usable, and accepted components without evidence remain discoverable.
+Export or persist a snapshot and produce a concise human brief.
 
 ## Single Prompt
 
@@ -348,14 +375,14 @@ sequenced prompts first while the RTG tool surface is still new.
 For the initial individual open-source use case, use
 `docs/guides/vellis/evals/rtg-individual-life-graph-beta-prompt.md`. That prompt asks the agent to model one
 person's personal and professional domains, exercise realistic bad writes and recovery, and
-verify snapshot or ledger evidence. The known-good walkthrough is
+verify snapshot and runtime-trace evidence. The known-good walkthrough is
 `docs/guides/vellis/evals/rtg-beta-known-good-walkthrough.md`.
 
 ## Scoring
 
-- Pass: The agent uses schema, constraints, validation, migration, query, snapshot, and ledger
-  affordances in their intended roles; repairs validation failures without weakening rules; and
-  produces traceable human-facing conclusions.
+- Pass: The agent uses schema, constraints, validation, migration, query, snapshot, and runtime
+  trace affordances in their intended roles; repairs validation failures without weakening rules;
+  and produces traceable human-facing conclusions.
 - Partial: The agent uses graph and query but treats schema evolution, validation, migration, or
   evidence as prose instead of RTG-managed state.
 - Fail: The agent bypasses migrations for schema evolution, stores schema/constraint/migration

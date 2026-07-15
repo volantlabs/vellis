@@ -11,6 +11,7 @@ Generated from textual SysML v2 by `just model-render` as a non-normative readin
 | Feature | Contract | Signature | Principal failures | Meaning |
 |---|---|---|---|---|
 | `exportSnapshot` | `ExportConstraintSnapshot` | out `snapshot: RtgConstraintSnapshot` | None | Export every full constraint record without evaluating it or inspecting other components. |
+| `replaceSnapshot` | `ReplaceConstraintSnapshot` | in `snapshot: RtgConstraintSnapshot` | `RtgConstraintSnapshotInvalid`, `RtgConstraintUuidInvalid`, `RtgConstraintUuidConflict`, `RtgConstraintKindInvalid`, `RtgConstraintDefinitionInvalid`, `RtgConstraintPayloadInvalid`, `RtgConstraintSystemValueInvalid` | Validate the complete candidate, then atomically replace every constraint record and rebuild derived indexes. |
 | `putConstraint` | `PutConstraint` | in `constraint: RtgConstraintDefinition`; out `stored: RtgConstraintDefinition` | `RtgConstraintUuidInvalid`, `RtgConstraintUuidConflict`, `RtgConstraintKindInvalid`, `RtgConstraintDefinitionInvalid`, `RtgConstraintPayloadInvalid`, `RtgConstraintSystemValueInvalid` | Generate or preserve identity, validate kind-specific structure and bounds, and atomically create or fully replace one record. A kind/payload type mismatch is RtgConstraintDefinitionInvalid; malformed contents of the selected payload are RtgConstraintPayloadInvalid. |
 | `getConstraint` | `GetConstraint` | in `constraintUuid: Uuid`; out `constraint: RtgConstraintDefinition` | `RtgConstraintNotFound` | Return one full constraint definition by UUID without executing it. |
 | `listConstraints` | `ListConstraints` | in `kind: RtgConstraintKind[0..1]`; in `live: Boolean[0..1]`; out `result: RtgConstraintDefinitionList` | `RtgConstraintKindInvalid` | List definitions with optional kind/live filters in deterministic order. |
@@ -42,6 +43,7 @@ Generated from textual SysML v2 by `just model-render` as a non-normative readin
 | Action | State / collaborator | Access | Modeled effect |
 |---|---|---|---|
 | `exportSnapshot` | `constraintRecords` | `read` | read all canonical records. |
+| `replaceSnapshot` | `constraintRecords` | `write` | validate before visibility, atomically replace every record, and rebuild indexes. |
 | `putConstraint` | `constraintRecords` | `write` | atomically create/replace one record and rebuild affected indexes. |
 | `getConstraint` | `constraintRecords` | `read` | read one canonical record. |
 | `listConstraints` | `derivedIndexes` | `read` | read kind/live indexes. |
@@ -61,7 +63,8 @@ Generated from textual SysML v2 by `just model-render` as a non-normative readin
 | `contract.rtg.constraints.write_effect` | `PutConstraint` | `registry.putConstraint` | Missing UUID generates identity; supplied identity is preserved. Kind selects a compatible typed payload, target keys are unique and unordered, descriptions remain human-readable, missing live becomes true, and writes do not execute rules. Duplicate target keys are rejected rather than silently repaired. |
 | `contract.rtg.constraints.read_effect` | `RtgConstraints` | `registry` | Reads honor explicit filters, use ascending textual constraint UUID order, derive only from canonical records/indexes, and never inspect or mutate graph/schema state. |
 | `contract.rtg.constraints.delete_effect` | `DeleteConstraint` | `registry.deleteConstraint` | Delete removes exactly one definition and index entries with no cross-component cascade. |
-| `contract.rtg.constraints.snapshot_effect` | `RtgConstraints` | `registry` | Snapshot round-trip preserves full records and normalized live state; import validates the whole candidate before visibility. |
+| `contract.rtg.constraints.snapshot_effect` | `RtgConstraints` | `registry` | Snapshot round-trip preserves full records and normalized live state; import and in-place replacement validate the whole candidate before visibility. Rejected replacement preserves prior state, and replacing with the current snapshot is idempotent. |
+| `contract.rtg.constraints.snapshot_replacement` | `ReplaceConstraintSnapshot` | `registry.replaceSnapshot` | Whole-candidate validation precedes visibility; success atomically replaces all records and indexes, failure preserves the prior registry, and replacing with an identical snapshot is idempotent. |
 | `contract.rtg.constraints.intentional_boundary` | `RtgConstraints` | `registry` | This registry owns declarative definitions only. It does not execute constraints, inspect or mutate graph/schema/migration state, choose migration membership, own durable persistence or workflow, provide general graph query/inference, or attach v1 severity/blocking policy. UUID alone identifies a definition; names and target keys may be shared by multiple definitions. |
 | `invariant.rtg.constraints.uuid_unique` | `RtgConstraints` | `registry` | Constraint UUIDs are unique. |
 | `invariant.rtg.constraints.display_name_not_identity` | `RtgConstraints` | `registry` | Display name is non-unique navigation text, not identity. |
@@ -72,6 +75,7 @@ Generated from textual SysML v2 by `just model-render` as a non-normative readin
 | `invariant.rtg.constraints.pattern_compatibility` | `RtgConstraints` | `registry` | Query-pattern and cardinality payloads use the canonical RtgQuerySpec and name valid bindings structurally; evaluation belongs to validation/query. |
 | `invariant.rtg.constraints.indexes_match_records` | `RtgConstraints` | `registry` | Derived kind, target, and live indexes exactly match canonical records. |
 | `contract.rtg.constraints.export_constraint_snapshot.failures` | `ExportConstraintSnapshot` | `registry.exportSnapshot` | Export is state-neutral and has no declared domain failure. |
+| `contract.rtg.constraints.replace_constraint_snapshot.failures` | `ReplaceConstraintSnapshot` | `registry.replaceSnapshot` | Rejected replacement leaves canonical records and indexes unchanged. |
 | `contract.rtg.constraints.put_constraint.failures` | `PutConstraint` | `registry.putConstraint` | Rejected writes leave canonical records and indexes unchanged. |
 | `contract.rtg.constraints.get_constraint.failures` | `GetConstraint` | `registry.getConstraint` | Read failure has no effect. |
 | `contract.rtg.constraints.list_constraints.failures` | `ListConstraints` | `registry.listConstraints` | Read failure has no effect. |
@@ -115,6 +119,7 @@ Generated from textual SysML v2 by `just model-render` as a non-normative readin
 | `PutConstraintContractVerification` | `PutConstraint` | `constraintWriteEffect`, `putConstraintFailureSemantics` | `components/rtg/constraints/tests/test_rtg_constraints_contract.py#PutConstraintContractVerification` |
 | `DeleteConstraintContractVerification` | `DeleteConstraint` | `constraintDeleteEffect`, `deleteConstraintFailureSemantics` | `components/rtg/constraints/tests/test_rtg_constraints_contract.py#DeleteConstraintContractVerification` |
 | `ExportConstraintSnapshotContractVerification` | `ExportConstraintSnapshot` | `exportConstraintSnapshotFailureSemantics` | `components/rtg/constraints/tests/test_rtg_constraints_contract.py#ExportConstraintSnapshotContractVerification` |
+| `ReplaceConstraintSnapshotContractVerification` | `ReplaceConstraintSnapshot` | `snapshotReplacementEffect`, `replaceConstraintSnapshotFailureSemantics` | `components/rtg/constraints/tests/test_rtg_constraints_contract.py#ReplaceConstraintSnapshotContractVerification` |
 | `GetConstraintContractVerification` | `GetConstraint` | `getConstraintFailureSemantics` | `components/rtg/constraints/tests/test_rtg_constraints_contract.py#GetConstraintContractVerification` |
 | `ListConstraintsContractVerification` | `ListConstraints` | `listConstraintsFailureSemantics` | `components/rtg/constraints/tests/test_rtg_constraints_contract.py#ListConstraintsContractVerification` |
 | `ListConstraintsByTargetContractVerification` | `ListConstraintsByTarget` | `listConstraintsByTargetFailureSemantics` | `components/rtg/constraints/tests/test_rtg_constraints_contract.py#ListConstraintsByTargetContractVerification` |

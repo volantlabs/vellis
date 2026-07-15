@@ -11,6 +11,7 @@ Generated from textual SysML v2 by `just model-render` as a non-normative readin
 | Feature | Contract | Signature | Principal failures | Meaning |
 |---|---|---|---|---|
 | `exportSnapshot` | `ExportMigrationSnapshot` | out `snapshot: RtgMigrationSnapshot` | None | Export all records without inspecting referenced component state. |
+| `replaceSnapshot` | `ReplaceMigrationSnapshot` | in `snapshot: RtgMigrationSnapshot` | `RtgMigrationSnapshotInvalid`, `RtgMigrationIdInvalid`, `RtgMigrationIdConflict`, `RtgMigrationRecordInvalid`, `RtgMigrationStatusInvalid`, `RtgMigrationEvidenceInvalid` | Validate the complete candidate, then atomically replace every migration record and rebuild the status index without applying lifecycle transitions against prior state. |
 | `putMigration` | `PutMigration` | in `migration: RtgMigrationRecord`; out `stored: RtgMigrationRecord` | `RtgMigrationIdInvalid`, `RtgMigrationRecordInvalid`, `RtgMigrationStatusInvalid`, `RtgMigrationStatusTransitionInvalid`, `RtgMigrationEvidenceInvalid` | Generate or preserve migration identity and create or lifecycle-safe fully replace one structurally valid record. |
 | `getMigration` | `GetMigration` | in `migrationId: String`; out `migration: RtgMigrationRecord` | `RtgMigrationNotFound` | Return one migration tracking record by ID. |
 | `listMigrations` | `ListMigrations` | in `status: RtgMigrationStatus[0..1]`; out `result: RtgMigrationRecordList` | `RtgMigrationStatusInvalid` | Return all records or records in one status in deterministic migration-ID order. |
@@ -44,6 +45,7 @@ Generated from textual SysML v2 by `just model-render` as a non-normative readin
 | Action | State / collaborator | Access | Modeled effect |
 |---|---|---|---|
 | `exportSnapshot` | `migrationRecords` | `read` | return all migration records in migration-ID order. |
+| `replaceSnapshot` | `migrationRecords` | `write` | validate before visibility and atomically replace every record and derived status entry. |
 | `putMigration` | `migrationRecords` | `write` | create or lifecycle-safe replace one complete record. |
 | `setStatus` | `migrationRecords` | `write` | apply one allowed lifecycle transition or same-status metadata update. |
 | `addEvidence` | `migrationRecords` | `write` | append one evidence identity not already present. |
@@ -63,6 +65,7 @@ Generated from textual SysML v2 by `just model-render` as a non-normative readin
 | Stable ID | Subject | Satisfier | Required constraint |
 |---|---|---|---|
 | `contract.rtg.migration.put_effect` | `PutMigration` | `migration.putMigration` | A new record may begin in any valid status. Replacing an existing ID must preserve status or satisfy MigrationStatusTransitionAllowed for the stored and requested statuses; all other fields are fully replaced. |
+| `contract.rtg.migration.snapshot_replacement` | `ReplaceMigrationSnapshot` | `migration.replaceSnapshot` | Replacement preserves the complete supplied records and ordering after whole-candidate validation, does not apply lifecycle transitions against prior state, exposes either the complete replacement or the unchanged prior state, and is idempotent for an identical snapshot. |
 | `contract.rtg.migration.membership` | `PutMigration` | `migration.putMigration` | Each make-live and make-non-live collection is a duplicate-free logical set and the two sets are disjoint per resource kind. Each replacement maps a distinct old identity in make-non-live to a distinct new identity in make-live; replacement old and new identities differ. Additions and removals without a replacement remain legal. Stored and returned encodings use ascending UUID order, with replacements ordered by old then new UUID. |
 | `contract.rtg.migration.status_transitions` | `SetMigrationStatus` | `migration.setStatus` | The stored and requested statuses must satisfy MigrationStatusTransitionAllowed. Thus draft changes to ready or abandoned; ready to draft, applied, failed, or abandoned; failed to ready or abandoned; applied and abandoned are terminal. Every accepted transition, including same-status, replaces metadata.status_metadata with the supplied JSON object or an empty object and preserves unrelated metadata. |
 | `contract.rtg.migration.evidence_effect` | `AddMigrationEvidence` | `migration.addEvidence` | Evidence IDs are unique within a migration; success appends one evidence record and preserves membership and status. |
@@ -80,6 +83,7 @@ Generated from textual SysML v2 by `just model-render` as a non-normative readin
 | `invariant.rtg.migration.completed_history_is_external` | `RtgMigration` | `migration` | Durable completed history belongs to controller audit. |
 | `invariant.rtg.migration.rollback_is_forward_change_v1` | `RtgMigration` | `migration` | V1 rollback is represented by a later forward migration, not a special status or reverse executable operation. |
 | `contract.rtg.migration.export_migration_snapshot.failures` | `ExportMigrationSnapshot` | `migration.exportSnapshot` | Export is read-only and has no declared domain failure. |
+| `contract.rtg.migration.replace_migration_snapshot.failures` | `ReplaceMigrationSnapshot` | `migration.replaceSnapshot` | Rejected replacement leaves all migration records and the status index unchanged. |
 | `contract.rtg.migration.put_migration.failures` | `PutMigration` | `migration.putMigration` | Rejected creation or replacement leaves all migration records and indexes unchanged; an existing record may preserve status or follow the lifecycle transition table. |
 | `contract.rtg.migration.get_migration.failures` | `GetMigration` | `migration.getMigration` | Read failure has no effect. |
 | `contract.rtg.migration.list_migrations.failures` | `ListMigrations` | `migration.listMigrations` | Read failure has no effect. |
@@ -127,6 +131,7 @@ Generated from textual SysML v2 by `just model-render` as a non-normative readin
 | `DeleteMigrationContractVerification` | `DeleteMigration` | `deleteEffect`, `deleteMigrationFailureSemantics` | `components/rtg/migration/tests/test_rtg_migration_contract.py#DeleteMigrationContractVerification` |
 | `BuildMigrationCutoverPlanContractVerification` | `BuildMigrationCutoverPlan` | `cutoverPlanEffect`, `buildMigrationCutoverPlanFailureSemantics` | `components/rtg/migration/tests/test_rtg_migration_contract.py#BuildMigrationCutoverPlanContractVerification` |
 | `ExportMigrationSnapshotContractVerification` | `ExportMigrationSnapshot` | `exportMigrationSnapshotFailureSemantics` | `components/rtg/migration/tests/test_rtg_migration_contract.py#ExportMigrationSnapshotContractVerification` |
+| `ReplaceMigrationSnapshotContractVerification` | `ReplaceMigrationSnapshot` | `snapshotReplacementEffect`, `replaceMigrationSnapshotFailureSemantics` | `components/rtg/migration/tests/test_rtg_migration_contract.py#ReplaceMigrationSnapshotContractVerification` |
 | `GetMigrationContractVerification` | `GetMigration` | `getMigrationFailureSemantics` | `components/rtg/migration/tests/test_rtg_migration_contract.py#GetMigrationContractVerification` |
 | `ListMigrationsContractVerification` | `ListMigrations` | `listMigrationsFailureSemantics` | `components/rtg/migration/tests/test_rtg_migration_contract.py#ListMigrationsContractVerification` |
 | `CreateEmptyRtgMigrationContractVerification` | `CreateEmptyRtgMigration` | `createEmptyRtgMigrationFailureSemantics` | `components/rtg/migration/tests/test_rtg_migration_contract.py#CreateEmptyRtgMigrationContractVerification` |

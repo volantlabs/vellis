@@ -51,40 +51,11 @@ class RtgControllerSchemaPackOptions:
 
 
 @dataclass(frozen=True, slots=True)
-class RtgControllerReplayOptions:
-    start_snapshot: RtgSystemSnapshot | None = None
-    start_snapshot_path: str | None = None
-    after_ledger_position: int | None = None
-    through_ledger_position: int | None = None
-
-
-@dataclass(frozen=True, slots=True)
-class RtgControllerRestoreOptions:
-    ledger_mode: str = "record"
-
-
-@dataclass(frozen=True, slots=True)
-class RtgControllerLedgerFailureRecord:
-    transaction_id: UUID
-    ledger_position: int | None
-    operation_name: str
-    record_kind: str
-    payload_json: str
-    failure_message: str
-    retry_count: int
-    first_failed_timestamp: str
-    last_failed_timestamp: str
-
-
-@dataclass(frozen=True, slots=True)
 class RtgSystemSnapshot:
     graph: RtgGraphSnapshot
     schema: RtgSchemaSnapshot
     constraints: RtgConstraintSnapshot
     migration: RtgMigrationSnapshot
-    last_ledger_position: int | None = None
-    last_transaction_id: UUID | None = None
-    last_transaction_timestamp: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -139,11 +110,7 @@ class RtgControllerSystemState:
     non_live_candidate_counts: RtgControllerCandidateCounts
     migration_counts_by_status: RtgControllerMigrationCounts
     persisted_snapshot_paths: tuple[str, ...]
-    ledger_record_count: int
     migration_counts_scope: str = "current_migration_store"
-    migration_history_hint: str | None = None
-    last_ledger_position: int | None = None
-    last_transaction_id: UUID | None = None
     recommended_workflows: tuple[str, ...] = ()
     recommended_next_steps: tuple[str, ...] = ()
 
@@ -156,57 +123,6 @@ class RtgControllerLiveGraphValidationResult:
     generated_ids: dict[str, UUID]
     resolved_graph_changes: RtgGraphChangeSet
     validation_report: RtgValidationReport
-
-
-@dataclass(frozen=True, slots=True)
-class RtgControllerReplayVerificationResult:
-    status: str
-    ledger_records_seen: int
-    ledger_records_scanned: int
-    request_records_seen: int
-    eligible_mutating_requests: int
-    mutating_requests_replayed: int
-    administrative_records_skipped: int
-    terminal_records_skipped: int
-    failed_or_rejected_transactions_skipped: int
-    replay_window: JsonObject
-    start_summary: JsonObject
-    replayed_summary: JsonObject
-    live_summary: JsonObject
-    replay_delta: JsonObject
-    live_count_diffs: JsonObject
-    replayed_state_digest: str
-    live_state_digest: str
-    state_equivalent_to_live: bool
-    ledger_cursor_equivalent_to_live: bool
-    pre_summary: JsonObject
-    post_summary: JsonObject
-    count_diffs: JsonObject
-    validation_report: RtgValidationReport
-
-
-@dataclass(frozen=True, slots=True)
-class RtgControllerMigrationHistoryEvent:
-    event_type: str
-    migration_id: str
-    description: str | None
-    transaction_id: UUID
-    ledger_position: int
-    status: str
-    recorded_at: str
-    summary: str
-    operation_name: str
-    staged: bool
-    finding_count: int
-    finding_codes: tuple[str, ...] = ()
-    mutation_state: str | None = None
-    validation_report: RtgValidationReport | None = None
-    error: JsonObject | None = None
-
-
-@dataclass(frozen=True, slots=True)
-class RtgControllerMigrationHistory:
-    events: tuple[RtgControllerMigrationHistoryEvent, ...]
 
 
 @dataclass(frozen=True, slots=True)
@@ -233,8 +149,6 @@ class RtgControllerAppliedChanges:
 @dataclass(frozen=True, slots=True)
 class RtgControllerOperationResult:
     status: str
-    transaction_id: UUID
-    ledger_position: int | None = None
     generated_ids: dict[str, UUID] = field(default_factory=dict)
     applied_changes: RtgControllerAppliedChanges = field(
         default_factory=RtgControllerAppliedChanges
@@ -263,12 +177,10 @@ class RtgControllerValidationFailed(RtgControllerError):
         self,
         message: str,
         *,
-        transaction_id: UUID | None = None,
         validation_report: RtgValidationReport | None = None,
         diagnostic: JsonObject | None = None,
     ) -> None:
         super().__init__(message, diagnostic=diagnostic)
-        self.transaction_id = transaction_id
         self.validation_report = validation_report
 
 
@@ -292,8 +204,8 @@ class RtgControllerSnapshotFailed(RtgControllerError):
     """A snapshot operation failed."""
 
 
-class RtgControllerReplayFailed(RtgControllerError):
-    """A ledger replay operation failed."""
+class RtgControllerRecoveryIndeterminate(RtgControllerError):
+    """A compensating restore failed, so coordinated state cannot be confirmed."""
 
 
 class RtgController(Protocol):
@@ -307,7 +219,6 @@ class RtgController(Protocol):
         change_validator: object,
         query_engine: object,
         json_storage: object,
-        sql_storage: object,
     ) -> RtgController:
         """Open a controller bound to RTG component implementations."""
         ...
@@ -325,7 +236,7 @@ class RtgController(Protocol):
         graph_changes: RtgGraphChangeSet,
         validation_options: RtgControllerValidationOptions | None = None,
     ) -> RtgControllerLiveGraphValidationResult:
-        """Validate normal live graph CRUD without mutation or ledger writes."""
+        """Validate normal live graph CRUD without mutation."""
         ...
 
     def stage_knowledge_changes(
@@ -341,7 +252,7 @@ class RtgController(Protocol):
         migration_id: str,
         cutover_options: RtgControllerCutoverOptions | None = None,
     ) -> RtgControllerOperationResult:
-        """Apply one migration cutover."""
+        """Apply one migration cutover as a compensating saga."""
         ...
 
     def execute_query(
@@ -388,23 +299,23 @@ class RtgController(Protocol):
         ...
 
     def get_system_state(self) -> RtgControllerSystemState:
-        """Return read-only controller state and recommended next steps."""
+        """Return read-only domain state and recommended next steps."""
         ...
 
     def export_system_snapshot(self) -> RtgSystemSnapshot:
-        """Export a coordinated RTG system snapshot."""
+        """Export a coordinated RTG domain snapshot."""
         ...
 
     def persist_system_snapshot(self, relative_path: str) -> RtgControllerOperationResult:
-        """Persist a coordinated RTG system snapshot."""
+        """Persist a coordinated RTG domain snapshot."""
         ...
 
     def list_persisted_snapshots(self) -> RtgPersistedSnapshotList:
-        """List persisted system snapshots visible through JSON File Storage."""
+        """List persisted domain snapshots visible through JSON File Storage."""
         ...
 
     def load_persisted_snapshot(self, relative_path: str) -> RtgPersistedSnapshotDocument:
-        """Load one persisted system snapshot through JSON File Storage."""
+        """Load one persisted domain snapshot through JSON File Storage."""
         ...
 
     def abandon_migration(
@@ -415,32 +326,9 @@ class RtgController(Protocol):
         """Abandon a staged migration and prune safe non-live candidates."""
         ...
 
-    def replay_ledger(
-        self,
-        replay_options: RtgControllerReplayOptions | None = None,
-    ) -> RtgControllerOperationResult:
-        """Replay successful mutating ledger records."""
-        ...
-
-    def verify_replay_from_ledger(
-        self,
-        replay_options: RtgControllerReplayOptions | None = None,
-    ) -> RtgControllerReplayVerificationResult:
-        """Replay into isolated scratch controller state without mutating current state."""
-        ...
-
-    def list_migration_history(self) -> RtgControllerMigrationHistory:
-        """Return ledger-backed migration events."""
-        ...
-
-    def flush_ledger_failures(self) -> RtgControllerOperationResult:
-        """Flush queued controller ledger failures."""
-        ...
-
     def restore_from_snapshot(
         self,
         snapshot: RtgSystemSnapshot,
-        restore_options: RtgControllerRestoreOptions | None = None,
     ) -> RtgControllerOperationResult:
-        """Restore RTG state from a coordinated system snapshot."""
+        """Atomically restore RTG domain state from a coordinated snapshot."""
         ...

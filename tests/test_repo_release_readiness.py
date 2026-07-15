@@ -75,6 +75,6 @@ def test_justfile_exposes_turnkey_rtg_launch_recipes() -> None:
         "rtg-mcp-http-info",
         "rtg-mcp-http",
         'host="127.0.0.1" port="8765" path="/mcp":',
-        'rtg-eval-info storage_root=".data/vellis-beta-001":',
+        'rtg-eval-info data_root=".data/vellis-runtime-eval-001":',
     ):
         assert recipe in justfile

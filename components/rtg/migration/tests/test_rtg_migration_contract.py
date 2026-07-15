@@ -44,6 +44,9 @@ MODEL_EVIDENCE = {
     "ExportMigrationSnapshotContractVerification": (
         "test_migration_tracks_cutover_membership_and_evidence",
     ),
+    "ReplaceMigrationSnapshotContractVerification": (
+        "test_replace_migration_snapshot_is_atomic_and_idempotent",
+    ),
     "GetMigrationContractVerification": (
         "test_migration_tracks_cutover_membership_and_evidence",
         "test_migration_status_and_delete_rules",
@@ -243,3 +246,23 @@ def test_migration_cutover_sets_must_be_disjoint() -> None:
                 graph_make_non_live=(same,),
             )
         )
+
+
+def test_replace_migration_snapshot_is_atomic_and_idempotent() -> None:
+    source = InMemoryRtgMigration.empty()
+    source.put_migration(RtgMigrationRecord(migration_id="source", description="Source"))
+    target = InMemoryRtgMigration.empty()
+    target.put_migration(RtgMigrationRecord(migration_id="prior", description="Prior"))
+    replacement = source.export_snapshot()
+
+    target.replace_snapshot(replacement)
+    target.replace_snapshot(replacement)
+
+    assert target.export_snapshot() == replacement
+    before_rejection = target.export_snapshot()
+    malformed = RtgMigrationSnapshot(
+        migrations=(replacement.migrations[0], replacement.migrations[0])
+    )
+    with pytest.raises(RtgMigrationIdConflict):
+        target.replace_snapshot(malformed)
+    assert target.export_snapshot() == before_rejection

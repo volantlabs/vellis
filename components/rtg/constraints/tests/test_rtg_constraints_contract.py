@@ -43,6 +43,9 @@ MODEL_EVIDENCE = {
     "ExportConstraintSnapshotContractVerification": (
         "test_constraints_store_payloads_without_executing_them",
     ),
+    "ReplaceConstraintSnapshotContractVerification": (
+        "test_replace_constraint_snapshot_is_atomic_and_idempotent",
+    ),
     "GetConstraintContractVerification": (
         "test_constraints_store_payloads_without_executing_them",
     ),
@@ -293,3 +296,41 @@ def test_constraint_snapshot_rejects_malformed_and_duplicate_identities() -> Non
         )
     with pytest.raises(RtgConstraintSnapshotInvalid):
         InMemoryRtgConstraints.import_snapshot(cast(RtgConstraintSnapshot, object()))
+
+
+def test_replace_constraint_snapshot_is_atomic_and_idempotent() -> None:
+    query_spec = RtgQuerySpec(
+        anchor_buckets=(RtgQueryAnchorBucket("component", ("Component",)),)
+    )
+
+    def record(identity: int, name: str) -> RtgConstraintDefinition:
+        return RtgConstraintDefinition(
+            uuid=UUID(int=identity),
+            kind="cardinality",
+            target_type_keys=("Component",),
+            display_name=name,
+            description="Replacement state.",
+            payload=RtgConstraintCardinalityPayload(
+                query_spec=query_spec,
+                counted_binding="component",
+                minimum=1,
+            ),
+        )
+
+    source = InMemoryRtgConstraints.empty()
+    source.put_constraint(record(721, "Source"))
+    target = InMemoryRtgConstraints.empty()
+    target.put_constraint(record(722, "Prior"))
+    replacement = source.export_snapshot()
+
+    target.replace_snapshot(replacement)
+    target.replace_snapshot(replacement)
+
+    assert target.export_snapshot() == replacement
+    before_rejection = target.export_snapshot()
+    malformed = RtgConstraintSnapshot(
+        constraints=(replacement.constraints[0], replacement.constraints[0])
+    )
+    with pytest.raises(RtgConstraintUuidConflict):
+        target.replace_snapshot(malformed)
+    assert target.export_snapshot() == before_rejection

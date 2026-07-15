@@ -49,6 +49,9 @@ MODEL_EVIDENCE = {
         "test_schema_field_refinements_are_normalized_and_reject_invalid_combinations",
         "test_schema_snapshot_rejects_duplicate_and_coercive_input",
     ),
+    "ReplaceSchemaSnapshotContractVerification": (
+        "test_replace_schema_snapshot_is_atomic_and_idempotent",
+    ),
     "GetSchemaDefinitionContractVerification": (
         "test_schema_stores_definitions_snapshots_and_schema_packs",
         "test_link_participation_distinguishes_query_and_result_directions",
@@ -476,3 +479,39 @@ def test_schema_pack_selection_is_unique_and_ordered() -> None:
     ]
     with pytest.raises(RtgSchemaTypeKeyInvalid):
         schema.get_schema_pack(("Alpha", "Alpha"))
+
+
+def test_replace_schema_snapshot_is_atomic_and_idempotent() -> None:
+    source = InMemoryRtgSchema.empty()
+    source.put_definition(
+        RtgSchemaDefinition(
+            uuid=UUID(int=711),
+            kind="anchor",
+            type_key="Person",
+            description="Person.",
+            payload=RtgAnchorSchemaPayload(),
+        )
+    )
+    target = InMemoryRtgSchema.empty()
+    target.put_definition(
+        RtgSchemaDefinition(
+            uuid=UUID(int=712),
+            kind="anchor",
+            type_key="Place",
+            description="Place.",
+            payload=RtgAnchorSchemaPayload(),
+        )
+    )
+    replacement = source.export_snapshot()
+
+    target.replace_snapshot(replacement)
+    target.replace_snapshot(replacement)
+
+    assert target.export_snapshot() == replacement
+    before_rejection = target.export_snapshot()
+    malformed = RtgSchemaSnapshot(
+        definitions=(replacement.definitions[0], replacement.definitions[0])
+    )
+    with pytest.raises(RtgSchemaUuidConflict):
+        target.replace_snapshot(malformed)
+    assert target.export_snapshot() == before_rejection

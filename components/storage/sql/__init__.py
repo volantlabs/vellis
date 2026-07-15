@@ -18,6 +18,10 @@ from components.storage.sql.protocol import (
     SqlTransactionFailed,
     SqlTransactionResult,
 )
+from components.storage.sql.runtime_binding import (
+    create_sql_storage_adapter,
+    create_sql_storage_proxy,
+)
 
 __all__ = [
     "SqlExecutionFailed",
@@ -36,4 +40,6 @@ __all__ = [
     "SqlStorageUnavailable",
     "SqlTransactionFailed",
     "SqlTransactionResult",
+    "create_sql_storage_adapter",
+    "create_sql_storage_proxy",
 ]

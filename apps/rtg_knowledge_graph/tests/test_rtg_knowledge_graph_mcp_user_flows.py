@@ -112,7 +112,7 @@ MODEL_EVIDENCE = {
     "RtgAbandonMigrationContractVerification": (
         "test_individual_rtg_mcp_suite_manages_multi_domain_life_graph",
         "test_individual_rtg_mcp_suite_recovers_from_realistic_agent_mistakes",
-        "test_individual_rtg_mcp_suite_replays_ledger_after_server_restart",
+        "test_individual_rtg_mcp_suite_reconstructs_automatically_after_server_restart",
     ),
     "RtgExecuteQueryContractVerification": (
         "test_individual_rtg_mcp_suite_manages_multi_domain_life_graph",
@@ -134,11 +134,11 @@ MODEL_EVIDENCE = {
     "RtgValidateGraphContractVerification": (
         "test_individual_rtg_mcp_suite_manages_multi_domain_life_graph",
         "test_individual_rtg_mcp_suite_recovers_from_realistic_agent_mistakes",
-        "test_individual_rtg_mcp_suite_replays_ledger_after_server_restart",
+        "test_individual_rtg_mcp_suite_reconstructs_automatically_after_server_restart",
     ),
     "RtgDiscoverAnchorTypesContractVerification": (
         "test_individual_rtg_mcp_suite_manages_multi_domain_life_graph",
-        "test_individual_rtg_mcp_suite_replays_ledger_after_server_restart",
+        "test_individual_rtg_mcp_suite_reconstructs_automatically_after_server_restart",
     ),
     "RtgGetSchemaPackContractVerification": (
         "test_individual_rtg_mcp_suite_manages_multi_domain_life_graph",
@@ -157,7 +157,6 @@ MODEL_EVIDENCE = {
     ),
     "RtgReplayLedgerContractVerification": (
         "test_individual_rtg_mcp_suite_manages_multi_domain_life_graph",
-        "test_individual_rtg_mcp_suite_replays_ledger_after_server_restart",
     ),
     "RtgVerifyReplayFromLedgerContractVerification": (
         "test_individual_rtg_mcp_suite_manages_multi_domain_life_graph",
@@ -174,7 +173,7 @@ MODEL_EVIDENCE = {
     "VellisFacadeBoundaryVerification": (
         "test_individual_rtg_mcp_suite_manages_multi_domain_life_graph",
         "test_individual_rtg_mcp_suite_recovers_from_realistic_agent_mistakes",
-        "test_individual_rtg_mcp_suite_replays_ledger_after_server_restart",
+        "test_individual_rtg_mcp_suite_reconstructs_automatically_after_server_restart",
     ),
 }
 
@@ -383,11 +382,28 @@ def test_individual_rtg_mcp_suite_manages_multi_domain_life_graph(tmp_path: Path
 
         replay = await _call_tool(session, "rtg_replay_ledger", {})
         assert replay["ok"] is False
-        assert replay["error"]["type"] == "RtgControllerReplayFailed"
+        assert replay["error"]["type"] == "RuntimeReplayTargetNotPrepared"
+
+        runtime_state = await _call_tool(session, "rtg_get_system_state", {})
+        replay_verification = await _call_tool(
+            session,
+            "rtg_verify_replay_from_ledger",
+            {
+                "replay_options": {
+                    "through_runtime_position": runtime_state["result"]["runtime"][
+                        "current_position"
+                    ]
+                }
+            },
+        )
+        assert replay_verification["ok"] is True
+        assert replay_verification["result"]["status"] == "isolated_reconstruction_required"
+        assert replay_verification["result"]["verified"] is False
 
         flush = await _call_tool(session, "rtg_flush_ledger_failures", {})
         assert flush["ok"] is True
-        assert flush["result"]["status"] == "ledger_failures_flushed"
+        assert flush["result"]["status"] == "runtime_healthy"
+        assert flush["result"]["details"]["queued_degraded_records"] == 0
 
     asyncio.run(_run_with_mcp_server(tmp_path, run_flow))
 
@@ -425,8 +441,8 @@ def test_individual_rtg_mcp_suite_recovers_from_realistic_agent_mistakes(
         }
         assert await _task_count(session) == baseline_task_count
         assert (
-            state_after_dry_run["result"]["ledger_record_count"]
-            == state_before_dry_run["result"]["ledger_record_count"]
+            state_after_dry_run["result"]["live_object_counts"]
+            == state_before_dry_run["result"]["live_object_counts"]
         )
 
         missing_facts = await _call_tool(
@@ -600,13 +616,13 @@ def test_individual_rtg_mcp_suite_recovers_from_realistic_agent_mistakes(
     asyncio.run(_run_with_mcp_server(tmp_path, run_flow))
 
 
-def test_individual_rtg_mcp_suite_replays_ledger_after_server_restart(
+def test_individual_rtg_mcp_suite_reconstructs_automatically_after_server_restart(
     tmp_path: Path,
 ) -> None:
     async def run_flow() -> None:
         storage_root = tmp_path / "restart-storage"
-        sql_database_path = tmp_path / "restart-controller.sqlite"
-        params = _server_params(tmp_path, storage_root, sql_database_path)
+        runtime_database_path = tmp_path / "restart-runtime.sqlite"
+        params = _server_params(tmp_path, storage_root, runtime_database_path)
 
         async with _mcp_session(params) as first_session:
             await _bootstrap_individual_schema(first_session)
@@ -614,22 +630,26 @@ def test_individual_rtg_mcp_suite_replays_ledger_after_server_restart(
             assert await _task_count(first_session) == 8
 
         async with _mcp_session(params) as restarted_session:
-            empty_discovery = await _call_tool(
+            discovery = await _call_tool(
                 restarted_session,
                 "rtg_discover_anchor_types",
                 {},
             )
-            assert empty_discovery["ok"] is True
-            assert empty_discovery["result"]["anchor_types"] == []
-
-            replay = await _call_tool(restarted_session, "rtg_replay_ledger", {})
-            assert replay["ok"] is True
-            assert replay["result"]["status"] == "replay_applied"
-            assert replay["result"]["details"]["mutating_requests_replayed"] >= 3
-
+            assert discovery["ok"] is True
+            assert _anchor_type_keys(discovery) == {
+                "Area",
+                "Event",
+                "Note",
+                "Person",
+                "Project",
+                "Resource",
+                "Task",
+            }
             assert await _task_count(restarted_session) == 8
             validation = await _call_tool(restarted_session, "rtg_validate_graph", {})
             assert validation["result"]["accepted"] is True
+            state = await _call_tool(restarted_session, "rtg_get_system_state", {})
+            assert state["result"]["starter_schema"]["recovery"] == "runtime_reconstructed"
 
     asyncio.run(run_flow())
 
@@ -639,15 +659,17 @@ async def _run_with_mcp_server(
     flow: Callable[[ClientSession, Path], Awaitable[None]],
 ) -> None:
     storage_root = tmp_path / "mcp-storage"
-    sql_database_path = tmp_path / "controller.sqlite"
-    async with _mcp_session(_server_params(tmp_path, storage_root, sql_database_path)) as session:
+    runtime_database_path = tmp_path / "runtime.sqlite"
+    async with _mcp_session(
+        _server_params(tmp_path, storage_root, runtime_database_path)
+    ) as session:
         await flow(session, storage_root)
 
 
 def _server_params(
     cwd: Path,
     storage_root: Path,
-    sql_database_path: Path,
+    runtime_database_path: Path,
 ) -> StdioServerParameters:
     repo_root = Path(__file__).resolve().parents[3]
     return StdioServerParameters(
@@ -664,10 +686,9 @@ def _server_params(
             "stdio",
             "--storage-root",
             str(storage_root),
-            "--sql-database-path",
-            str(sql_database_path),
+            "--runtime-database-path",
+            str(runtime_database_path),
             "--empty",
-            "--manual-recovery",
         ],
         cwd=cwd,
     )

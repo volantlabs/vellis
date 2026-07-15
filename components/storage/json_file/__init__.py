@@ -20,6 +20,10 @@ from components.storage.json_file.protocol import (
     StorageRootUnavailable,
     StorageWriteFailed,
 )
+from components.storage.json_file.runtime_binding import (
+    create_json_file_storage_adapter,
+    create_json_file_storage_proxy,
+)
 
 __all__ = [
     "JsonDocument",
@@ -40,4 +44,6 @@ __all__ = [
     "StorageRootInvalid",
     "StorageRootUnavailable",
     "StorageWriteFailed",
+    "create_json_file_storage_adapter",
+    "create_json_file_storage_proxy",
 ]

@@ -9,12 +9,16 @@ server is connected.
 Start from a fresh storage root:
 
 ```sh
-uv run vellis-rtg-knowledge-graph mcp-config --storage-root .data/vellis-beta-001 --empty --manual-recovery
+uv run vellis-rtg-knowledge-graph mcp-config --data-dir .data/vellis-runtime-eval-001 --empty
 ```
+
+This walkthrough does not open an earlier-version root. Transfer earlier data by exporting one
+full coordinated snapshot with the source version and restoring it into a separate empty current
+root; follow [`snapshot-transfer.md`](../snapshot-transfer.md).
 
 Merge the complete generated `mcpServers` block into an MCP client and restart/reload the client;
 the client starts the stdio server. If the agent should attach to an already-running local app
-instead, run `uv run vellis serve-mcp --transport http --storage-root .data/vellis-beta-001 --empty --manual-recovery` and use
+instead, run `uv run vellis serve-mcp --transport http --data-dir .data/vellis-runtime-eval-001 --empty` and use
 `http://127.0.0.1:8765/mcp`.
 
 The first call is:
@@ -31,9 +35,11 @@ Then call:
 {"tool": "rtg_get_system_state", "arguments": {}}
 ```
 
-Expected result: a fresh in-memory server reports `state_classification: "empty"`. A restarted
-server with ledger records but empty in-memory state may report `needs_replay`, and an agent should
-follow `recommended_next_steps`.
+Expected result: a fresh data root reports `state_classification: "empty"`. A restarted server
+automatically reconstructs the latest committed managed state before accepting traffic and should
+report the same `schema_only` or `populated` classification it had before shutdown. The nested
+`runtime` status reports health, current runtime position, and the latest terminal trace when one
+exists.
 
 Agents without repo access can call `rtg_get_usage_guide` with
 `topic: "mcp_bootstrap_checklist"` for the canonical sequence.
@@ -62,7 +68,7 @@ and `next_review`, avoid empty required date-like values, and report those place
 
 Expected evidence:
 
-- staging returns `ok: true` with a controller `transaction_id` and usually a `ledger_position`
+- staging returns `ok: true` with generated IDs and applied-change evidence when applicable
 - migration cutover returns `ok: true`
 - `rtg_discover_anchor_types` returns the seven live anchor types
 - `rtg_get_schema_pack` can describe required facts for selected anchor types
@@ -132,30 +138,35 @@ Expected result:
 - cutover fails with a validation report containing `schema_object.missing_required_property`
 - the previous live `ProjectFacts` schema remains live
 - the migration is marked `failed` with status metadata that describes the validation failure
-- `rtg_list_migration_history` shows the staged and failed cutover events even if current
-  migration counts later return to zero after abandonment/pruning
+- `rtg_list_migration_history` projects the staged and failed cutover runtime traces even if
+  current migration counts later return to zero after abandonment/pruning
 - `rtg_validate_graph({})` still returns accepted current state
 - if the failed candidate is not going to be repaired, `rtg_abandon_migration` records the
   abandonment and prunes safe non-live make-live candidates
 
-## 6. Preserve And Replay Evidence
+## 6. Preserve And Reconstruct Evidence
 
 The agent should call `rtg_persist_system_snapshot` with `return_snapshot:false`, then
 `rtg_list_persisted_snapshots` and `rtg_load_persisted_snapshot` with `return_snapshot:false`. It
-should report the snapshot path, transaction ID, ledger position when present, and compact summary
-counts without dumping the full graph.
+should report the snapshot path and compact summary counts without dumping the full graph. The
+runtime records the façade request, component calls, canonical effects, and terminal trace in its
+authoritative chronology.
 
-For a restart check, start a fresh server process against the same storage root and SQL ledger, call
-`rtg_replay_ledger` from empty state or with `start_snapshot_path`, then verify the expected task
-count and `rtg_validate_graph({})`. Without a restart, call `rtg_verify_replay_from_ledger` to
-exercise replay in scratch state without mutating the live controller.
+For a restart check, stop the server cleanly and start a new process against the same data root and
+runtime database. Latest committed state reconstruction is automatic. Verify the expected task
+count, call `rtg_validate_graph({})`, and use the legacy-named
+`rtg_verify_replay_from_ledger({"replay_options": {}})` compatibility operation to inspect the
+latest startup reconstruction report.
 
-Expected result: replay verification reports `state_equivalent_to_live`, replayed and live
-domain-state digests, `ledger_cursor_equivalent_to_live`, detailed replay accounting, count
-summaries, and a passing validation report. Exact graph recovery requires domain-state equivalence;
-cursor equivalence is separate evidence. If `start_snapshot_path` points at an end-of-run snapshot,
-replaying zero mutating requests after that snapshot can be correct; the accounting and
-`replay_window` should make that ledger position behavior explicit.
+Expected result: reconstruction verification reports `verified: true`, the reconstructed-through
+runtime position, component state digests, applied/skipped effect counts, limitations, and passing
+invariant verification. It must not recontact external adapters or append playback as new business
+traffic.
+
+Historical reconstruction through an earlier runtime position is never an in-place eval step.
+Copy the complete data root, attach that isolated copy to compatible empty occurrences, and request
+reconstruction through the selected position. Keep the active root unchanged. A branch that accepts
+new traffic must first record source-runtime, source-position, and verified-digest provenance.
 
 ## Completion Brief
 
@@ -169,6 +180,6 @@ A good final agent brief should tell the human:
 - which next actions and active projects were found through queries
 - which bad writes were rejected and how they were repaired
 - which schema evolution failed safely
-- which snapshot, transaction ID, ledger position, migration history, and replay verification
-  support recovery
+- which snapshot, runtime trace/position evidence, migration trace history, and reconstruction
+  verification support recovery
 - what modeling choices remain uncertain

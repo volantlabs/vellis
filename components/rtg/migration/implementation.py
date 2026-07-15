@@ -65,6 +65,10 @@ class InMemoryRtgMigration:
     def export_snapshot(self) -> RtgMigrationSnapshot:
         return RtgMigrationSnapshot(migrations=tuple(_copy_record(item) for item in self._sorted()))
 
+    def replace_snapshot(self, snapshot: RtgMigrationSnapshot) -> None:
+        candidate = type(self).import_snapshot(snapshot)
+        self._migrations = candidate._migrations
+
     def put_migration(self, migration: RtgMigrationRecord) -> RtgMigrationRecord:
         if not isinstance(migration, RtgMigrationRecord):
             raise RtgMigrationRecordInvalid("migration must be a migration record")

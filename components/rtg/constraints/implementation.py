@@ -67,6 +67,10 @@ class InMemoryRtgConstraints:
             constraints=tuple(_copy_constraint(item) for item in self._sorted())
         )
 
+    def replace_snapshot(self, snapshot: RtgConstraintSnapshot) -> None:
+        candidate = type(self).import_snapshot(snapshot)
+        self._constraints = candidate._constraints
+
     def put_constraint(self, constraint: RtgConstraintDefinition) -> RtgConstraintDefinition:
         normalized = self._normalize_constraint(constraint)
         uuid_value = _constraint_uuid(normalized)

@@ -28,6 +28,7 @@ classifiers = [
 dependencies = [
     "fastmcp>=3.4.4,<4",
     "google-re2==1.1.20251105",
+    "jsonschema>=4.20,<5",
 ]
 
 [project.scripts]

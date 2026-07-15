@@ -37,6 +37,10 @@ from components.rtg.schema.protocol import (
     RtgSchemaUuidInvalid,
     UuidInput,
 )
+from components.rtg.schema.runtime_binding import (
+    create_rtg_schema_adapter,
+    create_rtg_schema_proxy,
+)
 
 __all__ = [
     "InMemoryRtgSchema",
@@ -74,4 +78,6 @@ __all__ = [
     "RtgSchemaUuidConflict",
     "RtgSchemaUuidInvalid",
     "UuidInput",
+    "create_rtg_schema_adapter",
+    "create_rtg_schema_proxy",
 ]

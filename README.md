@@ -99,12 +99,17 @@ Vellis evolves in this order:
 1. Build a coherent component library.
 2. Ship Vellis as the first turnkey application assembled from those components.
 3. Add tooling and SDK surfaces for building software from component models.
-4. Add runtime support, including distributed-runtime patterns, when component contracts justify it.
+4. Evolve first-party applications onto the accepted local message runtime while preserving a clean
+   future distribution seam.
 
 Current generated component views include:
 
 - [Bibliotek model reference](generated/reference/bibliotek/index.md): library packages, components,
   shared values, and retained dependency topology.
+
+- [`component.runtime.message_runtime`](generated/reference/bibliotek/components/component.runtime.message_runtime.md): accepted local-first routing, durable chronology, trace query, and reconstruction contract.
+- [`component.runtime.component_adapter`](generated/reference/bibliotek/components/component.runtime.component_adapter.md): accepted explicit action-to-message binding and proxy contract.
+- [`component.interface.mcp_gateway`](generated/reference/bibliotek/components/component.interface.mcp_gateway.md): accepted curated generic MCP-to-runtime gateway.
 
 - [`component.storage.json_file`](generated/reference/bibliotek/components/component.storage.json_file.md): local filesystem-backed JSON document storage.
 - [`component.storage.sql`](generated/reference/bibliotek/components/component.storage.sql.md): SQLite-backed generic SQL execution surface for durable relational storage consumers.
@@ -127,13 +132,13 @@ Current Python implementations include:
 - [`components/rtg/migration`](components/rtg/migration/): in-memory RTG migration-record store implementation and boundary tests.
 - [`components/rtg/query`](components/rtg/query/): stateless RTG query engine implementation and boundary tests.
 - [`components/rtg/change_validation`](components/rtg/change_validation/): deterministic no-mutation RTG change validator implementation and boundary tests.
-- [`components/rtg/controller`](components/rtg/controller/): in-process RTG controller implementation with validation, snapshots, cutover, and SQL-backed ledger behavior.
+- [`components/rtg/controller`](components/rtg/controller/): runtime-neutral RTG saga controller with validation, compensation, cutover, and coordinated snapshot behavior.
 
 The first application is:
 
 - [`apps/rtg_knowledge_graph`](apps/rtg_knowledge_graph/): the Vellis RTG Knowledge Graph app. It
-  wires JSON File Storage, SQL Storage, and the in-process RTG controller, then exposes the modeled
-  Vellis façade through local MCP transports for human/agent knowledge-system workflows.
+  composes named component occurrences through the local message runtime, exposes only the curated
+  Vellis façade through MCP, and uses the runtime ledger as its authoritative chronology.
 - [Vellis application model reference](generated/reference/vellis/index.md): composition, actor-visible
   use cases, façade requirements, verification, and MCP realization mappings.
 
@@ -269,7 +274,8 @@ Useful recipes:
 - `just rtg-mcp`: launch the default RTG Knowledge Graph stdio MCP server
 - `just rtg-mcp-http-info`: print localhost HTTP MCP URL config for another local agent
 - `just rtg-mcp-http`: launch the unauthenticated localhost HTTP MCP server
-- `just rtg-eval-info`: print detailed beta eval MCP metadata with `.data/vellis-beta-001` storage
+- `just rtg-eval-info`: print detailed eval MCP metadata with isolated
+  `.data/vellis-runtime-eval-001` storage
 - `just run-rtg-knowledge-graph`: launch the RTG Knowledge Graph app
 - `just run-rtg-knowledge-graph-mcp`: launch the RTG Knowledge Graph MCP server
 - `just run-rtg-knowledge-graph-mcp-info`: print RTG MCP dry-run metadata and client config
@@ -305,16 +311,16 @@ paths, transports, tool metadata, and the smoke-check expectation.
 For modular same-machine use, run the localhost HTTP server:
 
 ```sh
-just rtg-mcp-http .data/vellis-beta-001 127.0.0.1 8765 /mcp
+just rtg-mcp-http .data/rtg_knowledge_graph 127.0.0.1 8765 /mcp
 ```
 
 The URL client config is in `mcp.transports.localhost_http.client_config`; the endpoint is
 `http://127.0.0.1:8765/mcp`.
 
-For a developer beta eval with explicit blank/manual-recovery state:
+For a developer eval with explicit blank/manual-recovery state:
 
 ```sh
-just rtg-eval-info .data/vellis-beta-001
+just rtg-eval-info .data/vellis-runtime-eval-001
 ```
 
 Run ad hoc Python commands through `uv run`:

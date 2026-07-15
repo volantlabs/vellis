@@ -179,6 +179,10 @@ class RtgSchema(Protocol):
         """Export a JSON-compatible schema snapshot."""
         ...
 
+    def replace_snapshot(self, snapshot: RtgSchemaSnapshot) -> None:
+        """Atomically replace all schema state from a validated snapshot."""
+        ...
+
     def put_definition(self, definition: RtgSchemaDefinition) -> RtgSchemaDefinition:
         """Create or fully replace a schema definition."""
         ...

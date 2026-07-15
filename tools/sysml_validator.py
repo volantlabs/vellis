@@ -48,6 +48,9 @@ MODEL_ORDER = (
     "foundation/SoftwareComponentModeling.sysml",
     "bibliotek/shared-values/SoftwareValues.sysml",
     "bibliotek/shared-values/RtgDiagnostics.sysml",
+    "bibliotek/components/component.runtime.message_runtime.sysml",
+    "bibliotek/components/component.runtime.component_adapter.sysml",
+    "bibliotek/components/component.interface.mcp_gateway.sysml",
     "bibliotek/components/component.storage.json_file.sysml",
     "bibliotek/components/component.storage.sql.sysml",
     "bibliotek/components/component.rtg.graph.sysml",
@@ -65,6 +68,7 @@ MODEL_ORDER = (
     "vellis/Vellis.sysml",
     "vellis/use-cases/VellisUseCases.sysml",
     "vellis/realizations/VellisLocalPython.sysml",
+    "vellis/realizations/VellisRuntimePython.sysml",
     "vellis/realizations/VellisMcpPython.sysml",
     "vellis/views/VellisViews.sysml",
 )

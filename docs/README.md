@@ -10,10 +10,15 @@ Documentation is organized by audience and authority:
   profile, model workflow, validation, and packaging rules.
 - [`guides/vellis/getting-started.md`](guides/vellis/getting-started.md) is the human first-run,
   local-data, backup, reset, and troubleshooting guide.
+- [`guides/vellis/snapshot-transfer.md`](guides/vellis/snapshot-transfer.md) is the agent-facing
+  procedure for transferring managed state from an earlier Vellis installation without importing
+  its ledger.
 - [`guides/vellis/evals/`](guides/vellis/evals/) contains developer-only evaluation prompts and
   walkthroughs.
 - [`design/open-design-questions.md`](design/open-design-questions.md) is a non-normative backlog of
   unresolved model-design questions.
+- [`design/component-runtime-architecture.md`](design/component-runtime-architecture.md) records the
+  accepted cross-component runtime rules, current Vellis realization, and future review triggers.
 - [`vision/agentic-mbse-engineering-system.md`](vision/agentic-mbse-engineering-system.md) states the
   durable human-and-agent model-based engineering vision.
 

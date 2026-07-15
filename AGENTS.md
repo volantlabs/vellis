@@ -73,12 +73,18 @@ with compatible subjects. Do not create hollow calculations, constraints, states
 interfaces to hold prose. Use view definitions for reusable projections and viewpoints only for
 explicit stakeholder concerns; generated Markdown is a projection.
 
-A future message runtime should be modeled as separately packageable Bibliotek runtime contracts
-only after delivery, addressing, routing, correlation, ordering, retry, and idempotency semantics
-are intentionally designed for reuse. Vellis may then add a message-runtime realization that maps
-the same logical component capabilities to ports, messages, and flows. Do not rewrite today's
-component actions or collaborator roles merely because their realization changes from direct
-calls to messaging.
+The accepted message runtime is modeled as separately packageable Bibliotek runtime contracts with
+intentional delivery, addressing, routing, correlation, ordering, retry-foundation, idempotency,
+ledger, and reconstruction semantics. First-party application realizations should use generated
+static occurrence and curated-operation manifests while the logical component actions remain
+runtime-neutral. Do not rewrite component actions or collaborator roles merely because a
+realization changes from direct calls to messaging. Vellis is runtime-native: its controller owns
+RTG saga and coordinated snapshot behavior, while runtime traffic history, trace identity, health,
+and reconstruction stay above it. Never reintroduce a controller traffic ledger or dual authority.
+A runtime trace becomes terminal only after every accepted causal descendant is terminal. An
+indeterminate trace leaves the runtime recovery-required across restart; ordinary traffic remains
+closed until verified reconstruction, with only an explicitly binding-authorized non-effectful
+root recovery action admitted while that gate is active.
 
 ## Startup Checks
 
@@ -100,14 +106,16 @@ with ordinary questions about what the human wants remembered. Do not direct a n
 JSON, schema construction, snapshots, or evaluation prompts. Use `uv run vellis doctor` for
 non-destructive troubleshooting.
 
-For one of the private-beta testers with an existing Vellis registration, do not run bare setup or
-assume the new default data path. First inspect the existing `rtg_knowledge_graph` MCP launch and
-extract its exact `--storage-root` and `--sql-database-path`. Show those paths to the human, obtain
-confirmation, and run `vellis setup` with the same arguments so automatic replay adopts the graph
-in place. Run `vellis doctor` with those same arguments, restart the client, and verify system state
-and graph validation before moving or deleting anything. Prefer in-place reuse; if relocation is
-requested, preserve the original until the copied ledger, JSON storage, schema, and object counts
-have been verified. Never substitute `--data-dir` for a legacy flat `--storage-root`.
+When moving data from an earlier Vellis version into the component runtime, do not run current setup
+over the earlier data root and do not import, merge, or replay its controller ledger. Inspect and
+show the source and proposed destination paths, then use the source version to validate and export
+one full coordinated system snapshot. Initialize a separate empty destination and restore the
+snapshot with starter-schema installation disabled (`--empty`) through the current Vellis
+application interface so the destination runtime records that restore as the start of its
+authoritative chronology. Preserve the source data root until
+destination validation and restart reconstruction agree. Follow
+`docs/guides/vellis/snapshot-transfer.md`; never substitute `--data-dir` for a legacy flat
+`--storage-root` while inspecting the source.
 
 ## Model-First Component Workflow
 
@@ -312,7 +320,7 @@ Repo-local agent skills live in `.agents/skills/`. Treat that directory as the s
 
 Claude Code project-skill exposure lives in `.claude/skills/` as relative symlinks back to `.agents/skills/`. Run `just skills-sync` after adding, removing, or renaming a repo-local skill, and keep `just skills-check` passing so the Claude exposure stays aligned.
 
-Use `.agents/skills/rtg-knowledge-graph-mcp/SKILL.md` when operating or evaluating the RTG Knowledge Graph MCP server through tools such as `rtg_validate_graph`, `rtg_apply_live_graph_changes`, `rtg_stage_knowledge_changes`, `rtg_apply_migration_cutover`, `rtg_execute_query`, snapshots, restore, or ledger replay.
+Use `.agents/skills/rtg-knowledge-graph-mcp/SKILL.md` when operating or evaluating the RTG Knowledge Graph MCP server through tools such as `rtg_validate_graph`, `rtg_apply_live_graph_changes`, `rtg_stage_knowledge_changes`, `rtg_apply_migration_cutover`, `rtg_execute_query`, snapshots, restore, or runtime reconstruction.
 
 ## Folder-Level Guidance
 

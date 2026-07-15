@@ -1,6 +1,7 @@
 {
   "authored_packages": {
     "Bibliotek": "model/bibliotek/Bibliotek.sysml",
+    "BibliotekInterfaceMcpGateway": "model/bibliotek/components/component.interface.mcp_gateway.sysml",
     "BibliotekRtgChangeValidation": "model/bibliotek/components/component.rtg.change_validation.sysml",
     "BibliotekRtgConstraints": "model/bibliotek/components/component.rtg.constraints.sysml",
     "BibliotekRtgController": "model/bibliotek/components/component.rtg.controller.sysml",
@@ -10,6 +11,8 @@
     "BibliotekRtgMigration": "model/bibliotek/components/component.rtg.migration.sysml",
     "BibliotekRtgQuery": "model/bibliotek/components/component.rtg.query.sysml",
     "BibliotekRtgSchema": "model/bibliotek/components/component.rtg.schema.sysml",
+    "BibliotekRuntimeComponentAdapter": "model/bibliotek/components/component.runtime.component_adapter.sysml",
+    "BibliotekRuntimeMessageRuntime": "model/bibliotek/components/component.runtime.message_runtime.sysml",
     "BibliotekSoftwareValues": "model/bibliotek/shared-values/SoftwareValues.sysml",
     "BibliotekStorageJsonFile": "model/bibliotek/components/component.storage.json_file.sysml",
     "BibliotekStorageSql": "model/bibliotek/components/component.storage.sql.sysml",
@@ -20,24 +23,27 @@
     "VellisLocalPythonRealization": "model/vellis/realizations/VellisLocalPython.sysml",
     "VellisMcpPythonRealization": "model/vellis/realizations/VellisMcpPython.sysml",
     "VellisOperations": "model/vellis/VellisOperations.sysml",
+    "VellisRuntimePythonRealization": "model/vellis/realizations/VellisRuntimePython.sysml",
     "VellisUseCases": "model/vellis/use-cases/VellisUseCases.sysml",
     "VellisViews": "model/vellis/views/VellisViews.sysml"
   },
   "packages": {
     "Bibliotek": {
       "element_counts": {
-        "ActionDefinition": 89,
-        "AttributeDefinition": 204,
+        "ActionDefinition": 109,
+        "AttributeDefinition": 240,
         "CalculationDefinition": 6,
         "ConstraintDefinition": 1,
         "Documentation": 6,
-        "EnumerationDefinition": 33,
+        "EnumerationDefinition": 35,
+        "InterfaceDefinition": 1,
         "ItemDefinition": 11,
         "LibraryPackage": 1,
-        "PartDefinition": 11,
-        "PartUsage": 9,
-        "RequirementUsage": 296,
-        "VerificationCaseDefinition": 99
+        "PartDefinition": 14,
+        "PartUsage": 12,
+        "PortDefinition": 1,
+        "RequirementUsage": 324,
+        "VerificationCaseDefinition": 122
       },
       "named_elements": [
         {
@@ -47,6 +53,10 @@
         {
           "kind": "ActionDefinition",
           "name": "AddMigrationEvidence"
+        },
+        {
+          "kind": "ActionDefinition",
+          "name": "ApplyCanonicalReplayEffect"
         },
         {
           "kind": "ActionDefinition",
@@ -63,6 +73,10 @@
         {
           "kind": "ActionDefinition",
           "name": "BuildMigrationCutoverPlan"
+        },
+        {
+          "kind": "ActionDefinition",
+          "name": "ConfirmStaticRuntimeTopology"
         },
         {
           "kind": "ActionDefinition",
@@ -130,7 +144,15 @@
         },
         {
           "kind": "ActionDefinition",
+          "name": "DescribeRuntimeBinding"
+        },
+        {
+          "kind": "ActionDefinition",
           "name": "DiscoverAnchorTypes"
+        },
+        {
+          "kind": "ActionDefinition",
+          "name": "DispatchRuntimeMessage"
         },
         {
           "kind": "ActionDefinition",
@@ -174,10 +196,6 @@
         },
         {
           "kind": "ActionDefinition",
-          "name": "FlushLedgerFailures"
-        },
-        {
-          "kind": "ActionDefinition",
           "name": "GetConstraint"
         },
         {
@@ -190,7 +208,15 @@
         },
         {
           "kind": "ActionDefinition",
+          "name": "GetMcpGatewayRegistrations"
+        },
+        {
+          "kind": "ActionDefinition",
           "name": "GetMigration"
+        },
+        {
+          "kind": "ActionDefinition",
+          "name": "GetRuntimeCausalTrace"
         },
         {
           "kind": "ActionDefinition",
@@ -203,6 +229,10 @@
         {
           "kind": "ActionDefinition",
           "name": "GetSystemState"
+        },
+        {
+          "kind": "ActionDefinition",
+          "name": "ImportReplayCheckpoint"
         },
         {
           "kind": "ActionDefinition",
@@ -219,6 +249,10 @@
         {
           "kind": "ActionDefinition",
           "name": "ImportRtgSchemaSnapshot"
+        },
+        {
+          "kind": "ActionDefinition",
+          "name": "InvokeMcpGatewayTool"
         },
         {
           "kind": "ActionDefinition",
@@ -270,10 +304,6 @@
         },
         {
           "kind": "ActionDefinition",
-          "name": "ListMigrationHistory"
-        },
-        {
-          "kind": "ActionDefinition",
           "name": "ListMigrations"
         },
         {
@@ -303,6 +333,10 @@
         {
           "kind": "ActionDefinition",
           "name": "PersistSystemSnapshot"
+        },
+        {
+          "kind": "ActionDefinition",
+          "name": "PrepareStaticRuntimeTopology"
         },
         {
           "kind": "ActionDefinition",
@@ -346,6 +380,10 @@
         },
         {
           "kind": "ActionDefinition",
+          "name": "QueryRuntimeHistory"
+        },
+        {
+          "kind": "ActionDefinition",
           "name": "QuerySql"
         },
         {
@@ -354,7 +392,51 @@
         },
         {
           "kind": "ActionDefinition",
-          "name": "ReplayLedger"
+          "name": "ReconstructRuntimeState"
+        },
+        {
+          "kind": "ActionDefinition",
+          "name": "RecordRuntimeBranchProvenance"
+        },
+        {
+          "kind": "ActionDefinition",
+          "name": "RegisterComponentOccurrence"
+        },
+        {
+          "kind": "ActionDefinition",
+          "name": "RegisterMcpGatewayTools"
+        },
+        {
+          "kind": "ActionDefinition",
+          "name": "ReplaceConstraintSnapshot"
+        },
+        {
+          "kind": "ActionDefinition",
+          "name": "ReplaceGraphSnapshot"
+        },
+        {
+          "kind": "ActionDefinition",
+          "name": "ReplaceMigrationSnapshot"
+        },
+        {
+          "kind": "ActionDefinition",
+          "name": "ReplaceSchemaSnapshot"
+        },
+        {
+          "kind": "ActionDefinition",
+          "name": "ReplayStateDigest"
+        },
+        {
+          "kind": "ActionDefinition",
+          "name": "ReplayStateStatus"
+        },
+        {
+          "kind": "ActionDefinition",
+          "name": "RequestRuntimeMessage"
+        },
+        {
+          "kind": "ActionDefinition",
+          "name": "ResetReplayState"
         },
         {
           "kind": "ActionDefinition",
@@ -363,6 +445,10 @@
         {
           "kind": "ActionDefinition",
           "name": "SelectDiscoveryAnchorTypes"
+        },
+        {
+          "kind": "ActionDefinition",
+          "name": "SendRuntimeMessage"
         },
         {
           "kind": "ActionDefinition",
@@ -390,11 +476,19 @@
         },
         {
           "kind": "ActionDefinition",
-          "name": "VerifyReplayFromLedger"
+          "name": "VerifyReplayState"
         },
         {
           "kind": "ActionDefinition",
           "name": "WriteJsonDocument"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "ComponentOccurrenceDeclaration"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "ComponentOccurrenceRegistration"
         },
         {
           "kind": "AttributeDefinition",
@@ -467,6 +561,30 @@
         {
           "kind": "AttributeDefinition",
           "name": "JsonValueNotSerializable"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "McpGatewayInvocation"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "McpGatewayInvocationInvalid"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "McpGatewayOutcome"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "McpGatewayRegistrationInvalid"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "McpGatewayToolRegistration"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "McpGatewayToolUnknown"
         },
         {
           "kind": "AttributeDefinition",
@@ -594,23 +712,11 @@
         },
         {
           "kind": "AttributeDefinition",
-          "name": "RtgControllerLedgerFailureRecord"
-        },
-        {
-          "kind": "AttributeDefinition",
           "name": "RtgControllerLiveGraphValidationResult"
         },
         {
           "kind": "AttributeDefinition",
           "name": "RtgControllerMigrationCounts"
-        },
-        {
-          "kind": "AttributeDefinition",
-          "name": "RtgControllerMigrationHistory"
-        },
-        {
-          "kind": "AttributeDefinition",
-          "name": "RtgControllerMigrationHistoryEvent"
         },
         {
           "kind": "AttributeDefinition",
@@ -626,19 +732,7 @@
         },
         {
           "kind": "AttributeDefinition",
-          "name": "RtgControllerReplayFailed"
-        },
-        {
-          "kind": "AttributeDefinition",
-          "name": "RtgControllerReplayOptions"
-        },
-        {
-          "kind": "AttributeDefinition",
-          "name": "RtgControllerReplayVerificationResult"
-        },
-        {
-          "kind": "AttributeDefinition",
-          "name": "RtgControllerRestoreOptions"
+          "name": "RtgControllerRecoveryIndeterminate"
         },
         {
           "kind": "AttributeDefinition",
@@ -1114,6 +1208,142 @@
         },
         {
           "kind": "AttributeDefinition",
+          "name": "RuntimeActionBindingDescriptor"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "RuntimeActionUnknown"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "RuntimeAddress"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "RuntimeAddressUnknown"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "RuntimeArgumentDescriptor"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "RuntimeBindingDescription"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "RuntimeBindingInvalid"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "RuntimeCausalTrace"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "RuntimeComponentFault"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "RuntimeCuratedOperationDeclaration"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "RuntimeDispatchResult"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "RuntimeExternalBoundaryDisposition"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "RuntimeFailStopped"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "RuntimeFailureBindingDescriptor"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "RuntimeHistoryPage"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "RuntimeHistoryQuery"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "RuntimeLedgerFact"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "RuntimeLedgerUnavailable"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "RuntimeMessageConflict"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "RuntimeMessageReceipt"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "RuntimePayload"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "RuntimePayloadInvalid"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "RuntimeQueueFull"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "RuntimeReconstructionReport"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "RuntimeReconstructionRequest"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "RuntimeRegistrationInvalid"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "RuntimeReplayIncompatible"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "RuntimeReplayStateStatus"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "RuntimeReplayTargetNotPrepared"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "RuntimeRequestOutcome"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "RuntimeRequestTimedOut"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "RuntimeSchemaUnsupported"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "RuntimeTopologyConfirmation"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "RuntimeTopologyManifest"
+        },
+        {
+          "kind": "AttributeDefinition",
           "name": "SqlExecutionFailed"
         },
         {
@@ -1258,19 +1488,7 @@
         },
         {
           "kind": "EnumerationDefinition",
-          "name": "RtgControllerLedgerMode"
-        },
-        {
-          "kind": "EnumerationDefinition",
-          "name": "RtgControllerLedgerRecordKind"
-        },
-        {
-          "kind": "EnumerationDefinition",
           "name": "RtgControllerMigrationCountScope"
-        },
-        {
-          "kind": "EnumerationDefinition",
-          "name": "RtgControllerMigrationEventType"
         },
         {
           "kind": "EnumerationDefinition",
@@ -1279,10 +1497,6 @@
         {
           "kind": "EnumerationDefinition",
           "name": "RtgControllerOperationStatus"
-        },
-        {
-          "kind": "EnumerationDefinition",
-          "name": "RtgControllerReplayVerificationStatus"
         },
         {
           "kind": "EnumerationDefinition",
@@ -1370,7 +1584,35 @@
         },
         {
           "kind": "EnumerationDefinition",
+          "name": "RuntimeActionIdempotency"
+        },
+        {
+          "kind": "EnumerationDefinition",
+          "name": "RuntimeDeliveryStatus"
+        },
+        {
+          "kind": "EnumerationDefinition",
+          "name": "RuntimeExternalBoundaryMode"
+        },
+        {
+          "kind": "EnumerationDefinition",
+          "name": "RuntimeMessageKind"
+        },
+        {
+          "kind": "EnumerationDefinition",
+          "name": "RuntimeReplayMode"
+        },
+        {
+          "kind": "EnumerationDefinition",
+          "name": "RuntimeTraceDisposition"
+        },
+        {
+          "kind": "EnumerationDefinition",
           "name": "SqlParameterKind"
+        },
+        {
+          "kind": "InterfaceDefinition",
+          "name": "RuntimeMessageExchange"
         },
         {
           "kind": "ItemDefinition",
@@ -1383,10 +1625,6 @@
         {
           "kind": "ItemDefinition",
           "name": "RtgConstraintDefinition"
-        },
-        {
-          "kind": "ItemDefinition",
-          "name": "RtgControllerLedger"
         },
         {
           "kind": "ItemDefinition",
@@ -1414,12 +1652,31 @@
         },
         {
           "kind": "ItemDefinition",
+          "name": "RuntimeMessageEnvelope"
+        },
+        {
+          "kind": "ItemDefinition",
           "name": "SqlDatabase"
+        },
+        {
+          "kind": "PartDefinition",
+          "name": "ComponentRuntimeAdapter",
+          "short_name": "component.runtime.component_adapter"
         },
         {
           "kind": "PartDefinition",
           "name": "JsonFileStorage",
           "short_name": "component.storage.json_file"
+        },
+        {
+          "kind": "PartDefinition",
+          "name": "McpGateway",
+          "short_name": "component.interface.mcp_gateway"
+        },
+        {
+          "kind": "PartDefinition",
+          "name": "MessageRuntime",
+          "short_name": "component.runtime.message_runtime"
         },
         {
           "kind": "PartDefinition",
@@ -1469,6 +1726,10 @@
           "kind": "PartDefinition",
           "name": "SqlStorage",
           "short_name": "component.storage.sql"
+        },
+        {
+          "kind": "PortDefinition",
+          "name": "RuntimeMessagePort"
         },
         {
           "kind": "RequirementUsage",
@@ -1547,6 +1808,16 @@
         },
         {
           "kind": "RequirementUsage",
+          "name": "boundedOccurrenceOrdering",
+          "short_name": "contract.runtime.message_runtime.ordering"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "branchFailureSemantics",
+          "short_name": "contract.runtime.message_runtime.branch.failures"
+        },
+        {
+          "kind": "RequirementUsage",
           "name": "buildMigrationCutoverPlanFailureSemantics",
           "short_name": "contract.rtg.migration.build_migration_cutover_plan.failures"
         },
@@ -1559,6 +1830,11 @@
           "kind": "RequirementUsage",
           "name": "candidatesMaterialized",
           "short_name": "invariant.rtg.migration.candidates_are_materialized_v1"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "canonicalEffectReplay",
+          "short_name": "contract.runtime.message_runtime.replay"
         },
         {
           "kind": "RequirementUsage",
@@ -1579,6 +1855,11 @@
           "kind": "RequirementUsage",
           "name": "cascadeEffectsFromPreview",
           "short_name": "invariant.rtg.change_validation.cascade_effects_from_graph_preview"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "checkpointFailureSemantics",
+          "short_name": "contract.runtime.component_adapter.checkpoint.failures"
         },
         {
           "kind": "RequirementUsage",
@@ -1664,6 +1945,11 @@
           "kind": "RequirementUsage",
           "name": "createEmptyRtgSchemaFailureSemantics",
           "short_name": "contract.rtg.schema.create_empty_rtg_schema.failures"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "curatedSurface",
+          "short_name": "contract.interface.mcp_gateway.curated"
         },
         {
           "kind": "RequirementUsage",
@@ -1772,6 +2058,11 @@
         },
         {
           "kind": "RequirementUsage",
+          "name": "describeFailureSemantics",
+          "short_name": "contract.runtime.component_adapter.describe.failures"
+        },
+        {
+          "kind": "RequirementUsage",
           "name": "deterministicListOrdering",
           "short_name": "invariant.rtg.schema.deterministic_list_ordering"
         },
@@ -1812,6 +2103,16 @@
         },
         {
           "kind": "RequirementUsage",
+          "name": "digestFailureSemantics",
+          "short_name": "contract.runtime.component_adapter.digest.failures"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "directMessageEquivalence",
+          "short_name": "contract.runtime.component_adapter.equivalence"
+        },
+        {
+          "kind": "RequirementUsage",
           "name": "directorySemantics",
           "short_name": "contract.storage.json_file.directory_semantics"
         },
@@ -1832,6 +2133,11 @@
         },
         {
           "kind": "RequirementUsage",
+          "name": "dispatchFailureSemantics",
+          "short_name": "contract.runtime.component_adapter.dispatch.failures"
+        },
+        {
+          "kind": "RequirementUsage",
           "name": "displayNameNotIdentity",
           "short_name": "invariant.rtg.constraints.display_name_not_identity"
         },
@@ -1839,6 +2145,16 @@
           "kind": "RequirementUsage",
           "name": "dissociateDataFailureSemantics",
           "short_name": "contract.rtg.graph.dissociate_data.failures"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "durableBeforeDispatch",
+          "short_name": "contract.runtime.message_runtime.delivery"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "durableIdentity",
+          "short_name": "contract.runtime.message_runtime.identity"
         },
         {
           "kind": "RequirementUsage",
@@ -1872,6 +2188,11 @@
         },
         {
           "kind": "RequirementUsage",
+          "name": "explicitMapping",
+          "short_name": "contract.runtime.component_adapter.explicit_mapping"
+        },
+        {
+          "kind": "RequirementUsage",
           "name": "exportConstraintSnapshotFailureSemantics",
           "short_name": "contract.rtg.constraints.export_constraint_snapshot.failures"
         },
@@ -1902,11 +2223,6 @@
         },
         {
           "kind": "RequirementUsage",
-          "name": "failedCutoverReplayPreservesStatus",
-          "short_name": "invariant.rtg.controller.failed_cutover_replay_preserves_status"
-        },
-        {
-          "kind": "RequirementUsage",
           "name": "fieldSemantics",
           "short_name": "contract.rtg.schema.field_semantics"
         },
@@ -1919,11 +2235,6 @@
           "kind": "RequirementUsage",
           "name": "findingsComprehensive",
           "short_name": "invariant.rtg.change_validation.findings_are_comprehensive"
-        },
-        {
-          "kind": "RequirementUsage",
-          "name": "flushLedgerFailuresFailureSemantics",
-          "short_name": "contract.rtg.controller.flush_ledger_failures.failures"
         },
         {
           "kind": "RequirementUsage",
@@ -1974,6 +2285,11 @@
           "kind": "RequirementUsage",
           "name": "graphTypeIsSchemaTypeKey",
           "short_name": "invariant.rtg.controller.graph_type_is_schema_type_key"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "historyFailureSemantics",
+          "short_name": "contract.runtime.message_runtime.history.failures"
         },
         {
           "kind": "RequirementUsage",
@@ -2062,6 +2378,16 @@
         },
         {
           "kind": "RequirementUsage",
+          "name": "invariantVerificationFailureSemantics",
+          "short_name": "contract.runtime.component_adapter.invariants.failures"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "invokeFailureSemantics",
+          "short_name": "contract.interface.mcp_gateway.invoke.failures"
+        },
+        {
+          "kind": "RequirementUsage",
           "name": "jsonCompatibleRows",
           "short_name": "invariant.storage.sql.json_compatible_rows"
         },
@@ -2084,31 +2410,6 @@
           "kind": "RequirementUsage",
           "name": "knowledgeEngineerCurated",
           "short_name": "invariant.rtg.discovery.knowledge_engineer_curated"
-        },
-        {
-          "kind": "RequirementUsage",
-          "name": "ledgerFailureSemantics",
-          "short_name": "contract.rtg.controller.ledger_failure_semantics"
-        },
-        {
-          "kind": "RequirementUsage",
-          "name": "ledgerOutcomeFlow",
-          "short_name": "contract.rtg.controller.ledger_outcomes"
-        },
-        {
-          "kind": "RequirementUsage",
-          "name": "ledgerPayloadsJsonText",
-          "short_name": "invariant.rtg.controller.ledger_payloads_are_json_text"
-        },
-        {
-          "kind": "RequirementUsage",
-          "name": "ledgerPositionReplayCursor",
-          "short_name": "invariant.rtg.controller.ledger_position_is_replay_cursor"
-        },
-        {
-          "kind": "RequirementUsage",
-          "name": "ledgerRecordsBlackBoxActivity",
-          "short_name": "invariant.rtg.controller.ledger_records_black_box_activity"
         },
         {
           "kind": "RequirementUsage",
@@ -2182,11 +2483,6 @@
         },
         {
           "kind": "RequirementUsage",
-          "name": "listMigrationHistoryFailureSemantics",
-          "short_name": "contract.rtg.controller.list_migration_history.failures"
-        },
-        {
-          "kind": "RequirementUsage",
           "name": "listMigrationsFailureSemantics",
           "short_name": "contract.rtg.migration.list_migrations.failures"
         },
@@ -2257,13 +2553,13 @@
         },
         {
           "kind": "RequirementUsage",
-          "name": "metadataSemantics",
-          "short_name": "contract.storage.json_file.metadata_semantics"
+          "name": "messageDeduplication",
+          "short_name": "contract.runtime.message_runtime.deduplication"
         },
         {
           "kind": "RequirementUsage",
-          "name": "migrationHistorySemantics",
-          "short_name": "contract.rtg.controller.migration_history"
+          "name": "metadataSemantics",
+          "short_name": "contract.storage.json_file.metadata_semantics"
         },
         {
           "kind": "RequirementUsage",
@@ -2577,6 +2873,26 @@
         },
         {
           "kind": "RequirementUsage",
+          "name": "reconstructFailureSemantics",
+          "short_name": "contract.runtime.message_runtime.reconstruct.failures"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "reconstructionStateControl",
+          "short_name": "contract.runtime.component_adapter.reconstruction"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "recoveryAuthorization",
+          "short_name": "contract.runtime.component_adapter.recovery_authorization"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "recoveryIngress",
+          "short_name": "contract.runtime.message_runtime.recovery_ingress"
+        },
+        {
+          "kind": "RequirementUsage",
           "name": "referenceSemantics",
           "short_name": "contract.rtg.change_validation.references"
         },
@@ -2587,28 +2903,53 @@
         },
         {
           "kind": "RequirementUsage",
+          "name": "registerFailureSemantics",
+          "short_name": "contract.runtime.message_runtime.register.failures"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "registerFailureSemantics",
+          "short_name": "contract.interface.mcp_gateway.register.failures"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "registrationReadFailureSemantics",
+          "short_name": "contract.interface.mcp_gateway.registrations.failures"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "replaceConstraintSnapshotFailureSemantics",
+          "short_name": "contract.rtg.constraints.replace_constraint_snapshot.failures"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "replaceGraphSnapshotFailureSemantics",
+          "short_name": "contract.rtg.graph.replace_graph_snapshot.failures"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "replaceMigrationSnapshotFailureSemantics",
+          "short_name": "contract.rtg.migration.replace_migration_snapshot.failures"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "replaceSchemaSnapshotFailureSemantics",
+          "short_name": "contract.rtg.schema.replace_schema_snapshot.failures"
+        },
+        {
+          "kind": "RequirementUsage",
           "name": "replacementEffect",
           "short_name": "contract.rtg.discovery.replacement"
         },
         {
           "kind": "RequirementUsage",
-          "name": "replayFlow",
-          "short_name": "contract.rtg.controller.replay_flow"
+          "name": "replayFailureSemantics",
+          "short_name": "contract.runtime.component_adapter.replay.failures"
         },
         {
           "kind": "RequirementUsage",
-          "name": "replayLedgerFailureSemantics",
-          "short_name": "contract.rtg.controller.replay_ledger.failures"
-        },
-        {
-          "kind": "RequirementUsage",
-          "name": "replaySelection",
-          "short_name": "contract.rtg.controller.replay_selection"
-        },
-        {
-          "kind": "RequirementUsage",
-          "name": "replayVerification",
-          "short_name": "contract.rtg.controller.replay_verification"
+          "name": "replayStateStatusFailureSemantics",
+          "short_name": "contract.runtime.component_adapter.replay_state_status.failures"
         },
         {
           "kind": "RequirementUsage",
@@ -2617,8 +2958,23 @@
         },
         {
           "kind": "RequirementUsage",
-          "name": "resolvedUuidsBeforeLedger",
-          "short_name": "invariant.rtg.controller.resolved_uuids_before_ledger"
+          "name": "requestFailureSemantics",
+          "short_name": "contract.runtime.message_runtime.request.failures"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "resetFailureSemantics",
+          "short_name": "contract.runtime.component_adapter.reset.failures"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "resolvedReplayEffects",
+          "short_name": "contract.runtime.component_adapter.replay"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "resolvedUuidsBeforeMutation",
+          "short_name": "invariant.rtg.controller.resolved_uuids_before_mutation"
         },
         {
           "kind": "RequirementUsage",
@@ -2677,6 +3033,11 @@
         },
         {
           "kind": "RequirementUsage",
+          "name": "schemaSnapshotReplacementEffect",
+          "short_name": "contract.rtg.schema.snapshot_replacement"
+        },
+        {
+          "kind": "RequirementUsage",
           "name": "selectDiscoveryAnchorTypesFailureSemantics",
           "short_name": "contract.rtg.discovery.select_discovery_anchor_types.failures"
         },
@@ -2684,6 +3045,11 @@
           "kind": "RequirementUsage",
           "name": "selectionEffect",
           "short_name": "contract.rtg.discovery.selection"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "sendFailureSemantics",
+          "short_name": "contract.runtime.message_runtime.send.failures"
         },
         {
           "kind": "RequirementUsage",
@@ -2717,8 +3083,18 @@
         },
         {
           "kind": "RequirementUsage",
-          "name": "snapshotRecordsLedgerPosition",
-          "short_name": "invariant.rtg.controller.snapshot_records_ledger_position"
+          "name": "snapshotReplacementEffect",
+          "short_name": "contract.rtg.graph.snapshot_replacement"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "snapshotReplacementEffect",
+          "short_name": "contract.rtg.constraints.snapshot_replacement"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "snapshotReplacementEffect",
+          "short_name": "contract.rtg.migration.snapshot_replacement"
         },
         {
           "kind": "RequirementUsage",
@@ -2744,6 +3120,11 @@
           "kind": "RequirementUsage",
           "name": "stagingFlow",
           "short_name": "contract.rtg.controller.staging_flow"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "staticTopologyAtomicity",
+          "short_name": "contract.runtime.message_runtime.static_topology_atomicity"
         },
         {
           "kind": "RequirementUsage",
@@ -2782,6 +3163,31 @@
         },
         {
           "kind": "RequirementUsage",
+          "name": "terminalCausality",
+          "short_name": "contract.runtime.message_runtime.causality"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "terminalPersistenceFailStop",
+          "short_name": "contract.runtime.message_runtime.fail_stop"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "topologyFailureSemantics",
+          "short_name": "contract.runtime.message_runtime.topology.failures"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "topologyPreparationFailureSemantics",
+          "short_name": "contract.runtime.message_runtime.topology_prepare.failures"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "traceFailureSemantics",
+          "short_name": "contract.runtime.message_runtime.trace.failures"
+        },
+        {
+          "kind": "RequirementUsage",
           "name": "trackIsolation",
           "short_name": "contract.rtg.change_validation.track_isolation"
         },
@@ -2802,13 +3208,8 @@
         },
         {
           "kind": "RequirementUsage",
-          "name": "transactionIdAlwaysAssigned",
-          "short_name": "invariant.rtg.controller.transaction_id_always_assigned"
-        },
-        {
-          "kind": "RequirementUsage",
-          "name": "transactionIdsUuids",
-          "short_name": "invariant.rtg.controller.transaction_ids_are_uuids"
+          "name": "transportOnly",
+          "short_name": "contract.interface.mcp_gateway.transport_only"
         },
         {
           "kind": "RequirementUsage",
@@ -2912,8 +3313,8 @@
         },
         {
           "kind": "RequirementUsage",
-          "name": "verifyReplayFromLedgerFailureSemantics",
-          "short_name": "contract.rtg.controller.verify_replay_from_ledger.failures"
+          "name": "verifiedHistoricalBranching",
+          "short_name": "contract.runtime.message_runtime.branching"
         },
         {
           "kind": "RequirementUsage",
@@ -2960,6 +3361,10 @@
         },
         {
           "kind": "VerificationCaseDefinition",
+          "name": "ApplyCanonicalReplayEffectContractVerification"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
           "name": "ApplyLiveGraphChangesContractVerification"
         },
         {
@@ -2973,6 +3378,14 @@
         {
           "kind": "VerificationCaseDefinition",
           "name": "BuildMigrationCutoverPlanContractVerification"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
+          "name": "ComponentRuntimeAdapterBoundaryVerification"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
+          "name": "ConfirmStaticRuntimeTopologyContractVerification"
         },
         {
           "kind": "VerificationCaseDefinition",
@@ -3040,7 +3453,15 @@
         },
         {
           "kind": "VerificationCaseDefinition",
+          "name": "DescribeRuntimeBindingContractVerification"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
           "name": "DiscoverAnchorTypesContractVerification"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
+          "name": "DispatchRuntimeMessageContractVerification"
         },
         {
           "kind": "VerificationCaseDefinition",
@@ -3084,10 +3505,6 @@
         },
         {
           "kind": "VerificationCaseDefinition",
-          "name": "FlushLedgerFailuresContractVerification"
-        },
-        {
-          "kind": "VerificationCaseDefinition",
           "name": "GetConstraintContractVerification"
         },
         {
@@ -3100,7 +3517,15 @@
         },
         {
           "kind": "VerificationCaseDefinition",
+          "name": "GetMcpGatewayRegistrationsContractVerification"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
           "name": "GetMigrationContractVerification"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
+          "name": "GetRuntimeCausalTraceContractVerification"
         },
         {
           "kind": "VerificationCaseDefinition",
@@ -3113,6 +3538,10 @@
         {
           "kind": "VerificationCaseDefinition",
           "name": "GetSystemStateContractVerification"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
+          "name": "ImportReplayCheckpointContractVerification"
         },
         {
           "kind": "VerificationCaseDefinition",
@@ -3129,6 +3558,10 @@
         {
           "kind": "VerificationCaseDefinition",
           "name": "ImportRtgSchemaSnapshotContractVerification"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
+          "name": "InvokeMcpGatewayToolContractVerification"
         },
         {
           "kind": "VerificationCaseDefinition",
@@ -3184,10 +3617,6 @@
         },
         {
           "kind": "VerificationCaseDefinition",
-          "name": "ListMigrationHistoryContractVerification"
-        },
-        {
-          "kind": "VerificationCaseDefinition",
           "name": "ListMigrationsContractVerification"
         },
         {
@@ -3204,6 +3633,14 @@
         },
         {
           "kind": "VerificationCaseDefinition",
+          "name": "McpGatewayBoundaryVerification"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
+          "name": "MessageRuntimeBoundaryVerification"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
           "name": "OpenJsonFileStorageContractVerification"
         },
         {
@@ -3217,6 +3654,10 @@
         {
           "kind": "VerificationCaseDefinition",
           "name": "PersistSystemSnapshotContractVerification"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
+          "name": "PrepareStaticRuntimeTopologyContractVerification"
         },
         {
           "kind": "VerificationCaseDefinition",
@@ -3260,6 +3701,10 @@
         },
         {
           "kind": "VerificationCaseDefinition",
+          "name": "QueryRuntimeHistoryContractVerification"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
           "name": "QuerySqlContractVerification"
         },
         {
@@ -3268,7 +3713,51 @@
         },
         {
           "kind": "VerificationCaseDefinition",
-          "name": "ReplayLedgerContractVerification"
+          "name": "ReconstructRuntimeStateContractVerification"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
+          "name": "RecordRuntimeBranchProvenanceContractVerification"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
+          "name": "RegisterComponentOccurrenceContractVerification"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
+          "name": "RegisterMcpGatewayToolsContractVerification"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
+          "name": "ReplaceConstraintSnapshotContractVerification"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
+          "name": "ReplaceGraphSnapshotContractVerification"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
+          "name": "ReplaceMigrationSnapshotContractVerification"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
+          "name": "ReplaceSchemaSnapshotContractVerification"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
+          "name": "ReplayStateDigestContractVerification"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
+          "name": "ReplayStateStatusContractVerification"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
+          "name": "RequestRuntimeMessageContractVerification"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
+          "name": "ResetReplayStateContractVerification"
         },
         {
           "kind": "VerificationCaseDefinition",
@@ -3312,6 +3801,10 @@
         },
         {
           "kind": "VerificationCaseDefinition",
+          "name": "SendRuntimeMessageContractVerification"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
           "name": "SetMigrationStatusContractVerification"
         },
         {
@@ -3340,7 +3833,7 @@
         },
         {
           "kind": "VerificationCaseDefinition",
-          "name": "VerifyReplayFromLedgerContractVerification"
+          "name": "VerifyReplayStateContractVerification"
         },
         {
           "kind": "VerificationCaseDefinition",
@@ -3349,6 +3842,165 @@
       ],
       "source": "model/bibliotek/Bibliotek.sysml"
     },
+    "BibliotekInterfaceMcpGateway": {
+      "element_counts": {
+        "ActionDefinition": 3,
+        "AttributeDefinition": 6,
+        "AttributeUsage": 28,
+        "ConjugatedPortDefinition": 1,
+        "ConstraintUsage": 5,
+        "Dependency": 13,
+        "Documentation": 16,
+        "EnumerationUsage": 5,
+        "Feature": 11,
+        "FeatureReferenceExpression": 6,
+        "FlowUsage": 2,
+        "InterfaceUsage": 1,
+        "ItemUsage": 2,
+        "LibraryPackage": 1,
+        "LiteralInfinity": 6,
+        "LiteralInteger": 7,
+        "LiteralString": 10,
+        "MetadataUsage": 9,
+        "Multiplicity": 28,
+        "MultiplicityRange": 8,
+        "NullExpression": 1,
+        "OperatorExpression": 1,
+        "PartDefinition": 1,
+        "PartUsage": 3,
+        "PerformActionUsage": 12,
+        "PortUsage": 4,
+        "ReferenceUsage": 47,
+        "RequirementUsage": 14,
+        "SatisfyRequirementUsage": 5,
+        "VerificationCaseDefinition": 4
+      },
+      "named_elements": [
+        {
+          "kind": "ActionDefinition",
+          "name": "GetMcpGatewayRegistrations"
+        },
+        {
+          "kind": "ActionDefinition",
+          "name": "InvokeMcpGatewayTool"
+        },
+        {
+          "kind": "ActionDefinition",
+          "name": "RegisterMcpGatewayTools"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "McpGatewayInvocation"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "McpGatewayInvocationInvalid"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "McpGatewayOutcome"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "McpGatewayRegistrationInvalid"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "McpGatewayToolRegistration"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "McpGatewayToolUnknown"
+        },
+        {
+          "kind": "ConjugatedPortDefinition",
+          "name": "~RuntimeMessagePort"
+        },
+        {
+          "kind": "PartDefinition",
+          "name": "McpGateway",
+          "short_name": "component.interface.mcp_gateway"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "curatedSurface",
+          "short_name": "contract.interface.mcp_gateway.curated"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "curatedSurface"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "invokeFailureSemantics",
+          "short_name": "contract.interface.mcp_gateway.invoke.failures"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "invokeFailureSemantics"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "obj"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "obj"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "obj"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "obj"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "registerFailureSemantics",
+          "short_name": "contract.interface.mcp_gateway.register.failures"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "registerFailureSemantics"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "registrationReadFailureSemantics",
+          "short_name": "contract.interface.mcp_gateway.registrations.failures"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "registrationReadFailureSemantics"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "transportOnly",
+          "short_name": "contract.interface.mcp_gateway.transport_only"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "transportOnly"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
+          "name": "GetMcpGatewayRegistrationsContractVerification"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
+          "name": "InvokeMcpGatewayToolContractVerification"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
+          "name": "McpGatewayBoundaryVerification"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
+          "name": "RegisterMcpGatewayToolsContractVerification"
+        }
+      ],
+      "source": "model/bibliotek/components/component.interface.mcp_gateway.sysml"
+    },
     "BibliotekRtgChangeValidation": {
       "element_counts": {
         "ActionDefinition": 2,
@@ -3356,7 +4008,7 @@
         "AttributeDefinition": 22,
         "AttributeUsage": 116,
         "ConstraintUsage": 21,
-        "Dependency": 25,
+        "Dependency": 28,
         "Documentation": 50,
         "EnumerationDefinition": 3,
         "EnumerationUsage": 19,
@@ -3372,7 +4024,7 @@
         "MultiplicityRange": 43,
         "PartDefinition": 1,
         "PartUsage": 2,
-        "PerformActionUsage": 34,
+        "PerformActionUsage": 37,
         "ReferenceUsage": 123,
         "RequirementUsage": 45,
         "SatisfyRequirementUsage": 21,
@@ -3711,35 +4363,35 @@
     },
     "BibliotekRtgConstraints": {
       "element_counts": {
-        "ActionDefinition": 8,
+        "ActionDefinition": 9,
         "ActionUsage": 4,
         "AttributeDefinition": 15,
         "AttributeUsage": 31,
-        "ConstraintUsage": 21,
-        "Dependency": 6,
-        "Documentation": 41,
+        "ConstraintUsage": 23,
+        "Dependency": 7,
+        "Documentation": 44,
         "EnumerationDefinition": 2,
         "EnumerationUsage": 9,
-        "Feature": 34,
-        "FeatureReferenceExpression": 22,
+        "Feature": 39,
+        "FeatureReferenceExpression": 24,
         "ItemDefinition": 1,
         "ItemUsage": 4,
         "LibraryPackage": 1,
-        "LiteralInfinity": 11,
-        "LiteralInteger": 25,
-        "LiteralString": 22,
-        "MetadataUsage": 18,
+        "LiteralInfinity": 12,
+        "LiteralInteger": 26,
+        "LiteralString": 24,
+        "MetadataUsage": 20,
         "Multiplicity": 27,
-        "MultiplicityRange": 19,
+        "MultiplicityRange": 20,
         "NullExpression": 2,
-        "OperatorExpression": 3,
+        "OperatorExpression": 4,
         "PartDefinition": 1,
         "PartUsage": 15,
-        "PerformActionUsage": 6,
-        "ReferenceUsage": 129,
-        "RequirementUsage": 51,
-        "SatisfyRequirementUsage": 21,
-        "VerificationCaseDefinition": 9
+        "PerformActionUsage": 7,
+        "ReferenceUsage": 141,
+        "RequirementUsage": 56,
+        "SatisfyRequirementUsage": 23,
+        "VerificationCaseDefinition": 10
       },
       "named_elements": [
         {
@@ -3773,6 +4425,10 @@
         {
           "kind": "ActionDefinition",
           "name": "PutConstraint"
+        },
+        {
+          "kind": "ActionDefinition",
+          "name": "ReplaceConstraintSnapshot"
         },
         {
           "kind": "AttributeDefinition",
@@ -4042,6 +4698,10 @@
         },
         {
           "kind": "RequirementUsage",
+          "name": "obj"
+        },
+        {
+          "kind": "RequirementUsage",
           "name": "patternCompatibility",
           "short_name": "invariant.rtg.constraints.pattern_compatibility"
         },
@@ -4060,12 +4720,30 @@
         },
         {
           "kind": "RequirementUsage",
+          "name": "replaceConstraintSnapshotFailureSemantics",
+          "short_name": "contract.rtg.constraints.replace_constraint_snapshot.failures"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "replaceConstraintSnapshotFailureSemantics"
+        },
+        {
+          "kind": "RequirementUsage",
           "name": "snapshotEffect",
           "short_name": "contract.rtg.constraints.snapshot_effect"
         },
         {
           "kind": "RequirementUsage",
           "name": "snapshotEffect"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "snapshotReplacementEffect",
+          "short_name": "contract.rtg.constraints.snapshot_replacement"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "snapshotReplacementEffect"
         },
         {
           "kind": "RequirementUsage",
@@ -4110,6 +4788,10 @@
         },
         {
           "kind": "VerificationCaseDefinition",
+          "name": "ReplaceConstraintSnapshotContractVerification"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
           "name": "RtgConstraintsBoundaryVerification"
         }
       ],
@@ -4117,40 +4799,38 @@
     },
     "BibliotekRtgController": {
       "element_counts": {
-        "ActionDefinition": 23,
-        "ActionUsage": 36,
-        "AttributeDefinition": 32,
-        "AttributeUsage": 256,
-        "BindingConnectorAsUsage": 8,
-        "ConstraintUsage": 81,
-        "Dependency": 151,
-        "Documentation": 172,
-        "EnumerationDefinition": 12,
-        "EnumerationUsage": 54,
-        "Feature": 202,
-        "FeatureChainExpression": 43,
-        "FeatureReferenceExpression": 104,
-        "ItemDefinition": 1,
-        "ItemUsage": 16,
+        "ActionDefinition": 19,
+        "ActionUsage": 39,
+        "AttributeDefinition": 26,
+        "AttributeUsage": 189,
+        "BindingConnectorAsUsage": 7,
+        "ConstraintUsage": 64,
+        "Dependency": 114,
+        "Documentation": 146,
+        "EnumerationDefinition": 8,
+        "EnumerationUsage": 36,
+        "Feature": 174,
+        "FeatureChainExpression": 39,
+        "FeatureReferenceExpression": 86,
+        "ItemUsage": 14,
         "LibraryPackage": 1,
         "LiteralBoolean": 4,
-        "LiteralInfinity": 32,
-        "LiteralInteger": 122,
-        "LiteralString": 64,
-        "MetadataUsage": 58,
-        "Multiplicity": 195,
-        "MultiplicityRange": 85,
-        "NullExpression": 1,
+        "LiteralInfinity": 25,
+        "LiteralInteger": 74,
+        "LiteralString": 53,
+        "MetadataUsage": 54,
+        "Multiplicity": 147,
+        "MultiplicityRange": 59,
         "OperatorExpression": 11,
         "PartDefinition": 1,
-        "PartUsage": 27,
-        "PerformActionUsage": 80,
-        "ReferenceUsage": 626,
-        "RequirementUsage": 186,
-        "SatisfyRequirementUsage": 81,
-        "SuccessionAsUsage": 21,
-        "TransitionUsage": 11,
-        "VerificationCaseDefinition": 24
+        "PartUsage": 26,
+        "PerformActionUsage": 84,
+        "ReferenceUsage": 525,
+        "RequirementUsage": 148,
+        "SatisfyRequirementUsage": 64,
+        "SuccessionAsUsage": 22,
+        "TransitionUsage": 10,
+        "VerificationCaseDefinition": 20
       },
       "named_elements": [
         {
@@ -4191,19 +4871,11 @@
         },
         {
           "kind": "ActionDefinition",
-          "name": "FlushLedgerFailures"
-        },
-        {
-          "kind": "ActionDefinition",
           "name": "GetControllerSchemaPack"
         },
         {
           "kind": "ActionDefinition",
           "name": "GetSystemState"
-        },
-        {
-          "kind": "ActionDefinition",
-          "name": "ListMigrationHistory"
         },
         {
           "kind": "ActionDefinition",
@@ -4223,10 +4895,6 @@
         },
         {
           "kind": "ActionDefinition",
-          "name": "ReplayLedger"
-        },
-        {
-          "kind": "ActionDefinition",
           "name": "RestoreFromSnapshot"
         },
         {
@@ -4240,10 +4908,6 @@
         {
           "kind": "ActionDefinition",
           "name": "ValidateLiveGraphChanges"
-        },
-        {
-          "kind": "ActionDefinition",
-          "name": "VerifyReplayFromLedger"
         },
         {
           "kind": "AttributeDefinition",
@@ -4283,23 +4947,11 @@
         },
         {
           "kind": "AttributeDefinition",
-          "name": "RtgControllerLedgerFailureRecord"
-        },
-        {
-          "kind": "AttributeDefinition",
           "name": "RtgControllerLiveGraphValidationResult"
         },
         {
           "kind": "AttributeDefinition",
           "name": "RtgControllerMigrationCounts"
-        },
-        {
-          "kind": "AttributeDefinition",
-          "name": "RtgControllerMigrationHistory"
-        },
-        {
-          "kind": "AttributeDefinition",
-          "name": "RtgControllerMigrationHistoryEvent"
         },
         {
           "kind": "AttributeDefinition",
@@ -4315,19 +4967,7 @@
         },
         {
           "kind": "AttributeDefinition",
-          "name": "RtgControllerReplayFailed"
-        },
-        {
-          "kind": "AttributeDefinition",
-          "name": "RtgControllerReplayOptions"
-        },
-        {
-          "kind": "AttributeDefinition",
-          "name": "RtgControllerReplayVerificationResult"
-        },
-        {
-          "kind": "AttributeDefinition",
-          "name": "RtgControllerRestoreOptions"
+          "name": "RtgControllerRecoveryIndeterminate"
         },
         {
           "kind": "AttributeDefinition",
@@ -4379,19 +5019,7 @@
         },
         {
           "kind": "EnumerationDefinition",
-          "name": "RtgControllerLedgerMode"
-        },
-        {
-          "kind": "EnumerationDefinition",
-          "name": "RtgControllerLedgerRecordKind"
-        },
-        {
-          "kind": "EnumerationDefinition",
           "name": "RtgControllerMigrationCountScope"
-        },
-        {
-          "kind": "EnumerationDefinition",
-          "name": "RtgControllerMigrationEventType"
         },
         {
           "kind": "EnumerationDefinition",
@@ -4400,10 +5028,6 @@
         {
           "kind": "EnumerationDefinition",
           "name": "RtgControllerOperationStatus"
-        },
-        {
-          "kind": "EnumerationDefinition",
-          "name": "RtgControllerReplayVerificationStatus"
         },
         {
           "kind": "EnumerationDefinition",
@@ -4420,10 +5044,6 @@
         {
           "kind": "EnumerationDefinition",
           "name": "RtgControllerWorkflow"
-        },
-        {
-          "kind": "ItemDefinition",
-          "name": "RtgControllerLedger"
         },
         {
           "kind": "PartDefinition",
@@ -4621,24 +5241,6 @@
         },
         {
           "kind": "RequirementUsage",
-          "name": "failedCutoverReplayPreservesStatus",
-          "short_name": "invariant.rtg.controller.failed_cutover_replay_preserves_status"
-        },
-        {
-          "kind": "RequirementUsage",
-          "name": "failedCutoverReplayPreservesStatus"
-        },
-        {
-          "kind": "RequirementUsage",
-          "name": "flushLedgerFailuresFailureSemantics",
-          "short_name": "contract.rtg.controller.flush_ledger_failures.failures"
-        },
-        {
-          "kind": "RequirementUsage",
-          "name": "flushLedgerFailuresFailureSemantics"
-        },
-        {
-          "kind": "RequirementUsage",
           "name": "getControllerSchemaPackFailureSemantics",
           "short_name": "contract.rtg.controller.get_controller_schema_pack.failures"
         },
@@ -4681,60 +5283,6 @@
         {
           "kind": "RequirementUsage",
           "name": "knowledgeChangesMigrationScoped"
-        },
-        {
-          "kind": "RequirementUsage",
-          "name": "ledgerFailureSemantics",
-          "short_name": "contract.rtg.controller.ledger_failure_semantics"
-        },
-        {
-          "kind": "RequirementUsage",
-          "name": "ledgerFailureSemantics"
-        },
-        {
-          "kind": "RequirementUsage",
-          "name": "ledgerOutcomeFlow",
-          "short_name": "contract.rtg.controller.ledger_outcomes"
-        },
-        {
-          "kind": "RequirementUsage",
-          "name": "ledgerOutcomeFlow"
-        },
-        {
-          "kind": "RequirementUsage",
-          "name": "ledgerPayloadsJsonText",
-          "short_name": "invariant.rtg.controller.ledger_payloads_are_json_text"
-        },
-        {
-          "kind": "RequirementUsage",
-          "name": "ledgerPayloadsJsonText"
-        },
-        {
-          "kind": "RequirementUsage",
-          "name": "ledgerPositionReplayCursor",
-          "short_name": "invariant.rtg.controller.ledger_position_is_replay_cursor"
-        },
-        {
-          "kind": "RequirementUsage",
-          "name": "ledgerPositionReplayCursor"
-        },
-        {
-          "kind": "RequirementUsage",
-          "name": "ledgerRecordsBlackBoxActivity",
-          "short_name": "invariant.rtg.controller.ledger_records_black_box_activity"
-        },
-        {
-          "kind": "RequirementUsage",
-          "name": "ledgerRecordsBlackBoxActivity"
-        },
-        {
-          "kind": "RequirementUsage",
-          "name": "listMigrationHistoryFailureSemantics",
-          "short_name": "contract.rtg.controller.list_migration_history.failures"
-        },
-        {
-          "kind": "RequirementUsage",
-          "name": "listMigrationHistoryFailureSemantics"
         },
         {
           "kind": "RequirementUsage",
@@ -4792,15 +5340,6 @@
         },
         {
           "kind": "RequirementUsage",
-          "name": "migrationHistorySemantics",
-          "short_name": "contract.rtg.controller.migration_history"
-        },
-        {
-          "kind": "RequirementUsage",
-          "name": "migrationHistorySemantics"
-        },
-        {
-          "kind": "RequirementUsage",
           "name": "noTransportOwnership",
           "short_name": "invariant.rtg.controller.no_transport_ownership"
         },
@@ -4825,22 +5364,6 @@
         {
           "kind": "RequirementUsage",
           "name": "normalizedBatchesInternalPlans"
-        },
-        {
-          "kind": "RequirementUsage",
-          "name": "obj"
-        },
-        {
-          "kind": "RequirementUsage",
-          "name": "obj"
-        },
-        {
-          "kind": "RequirementUsage",
-          "name": "obj"
-        },
-        {
-          "kind": "RequirementUsage",
-          "name": "obj"
         },
         {
           "kind": "RequirementUsage",
@@ -5014,48 +5537,12 @@
         },
         {
           "kind": "RequirementUsage",
-          "name": "replayFlow",
-          "short_name": "contract.rtg.controller.replay_flow"
+          "name": "resolvedUuidsBeforeMutation",
+          "short_name": "invariant.rtg.controller.resolved_uuids_before_mutation"
         },
         {
           "kind": "RequirementUsage",
-          "name": "replayFlow"
-        },
-        {
-          "kind": "RequirementUsage",
-          "name": "replayLedgerFailureSemantics",
-          "short_name": "contract.rtg.controller.replay_ledger.failures"
-        },
-        {
-          "kind": "RequirementUsage",
-          "name": "replayLedgerFailureSemantics"
-        },
-        {
-          "kind": "RequirementUsage",
-          "name": "replaySelection",
-          "short_name": "contract.rtg.controller.replay_selection"
-        },
-        {
-          "kind": "RequirementUsage",
-          "name": "replaySelection"
-        },
-        {
-          "kind": "RequirementUsage",
-          "name": "replayVerification",
-          "short_name": "contract.rtg.controller.replay_verification"
-        },
-        {
-          "kind": "RequirementUsage",
-          "name": "replayVerification"
-        },
-        {
-          "kind": "RequirementUsage",
-          "name": "resolvedUuidsBeforeLedger",
-          "short_name": "invariant.rtg.controller.resolved_uuids_before_ledger"
-        },
-        {
-          "kind": "RequirementUsage",
-          "name": "resolvedUuidsBeforeLedger"
+          "name": "resolvedUuidsBeforeMutation"
         },
         {
           "kind": "RequirementUsage",
@@ -5101,15 +5588,6 @@
         {
           "kind": "RequirementUsage",
           "name": "snapshotJsonSerializable"
-        },
-        {
-          "kind": "RequirementUsage",
-          "name": "snapshotRecordsLedgerPosition",
-          "short_name": "invariant.rtg.controller.snapshot_records_ledger_position"
-        },
-        {
-          "kind": "RequirementUsage",
-          "name": "snapshotRecordsLedgerPosition"
         },
         {
           "kind": "RequirementUsage",
@@ -5176,24 +5654,6 @@
         },
         {
           "kind": "RequirementUsage",
-          "name": "transactionIdAlwaysAssigned",
-          "short_name": "invariant.rtg.controller.transaction_id_always_assigned"
-        },
-        {
-          "kind": "RequirementUsage",
-          "name": "transactionIdAlwaysAssigned"
-        },
-        {
-          "kind": "RequirementUsage",
-          "name": "transactionIdsUuids",
-          "short_name": "invariant.rtg.controller.transaction_ids_are_uuids"
-        },
-        {
-          "kind": "RequirementUsage",
-          "name": "transactionIdsUuids"
-        },
-        {
-          "kind": "RequirementUsage",
           "name": "validateGraphFailureSemantics",
           "short_name": "contract.rtg.controller.validate_graph.failures"
         },
@@ -5236,15 +5696,6 @@
         {
           "kind": "RequirementUsage",
           "name": "validationReportAuthoritative"
-        },
-        {
-          "kind": "RequirementUsage",
-          "name": "verifyReplayFromLedgerFailureSemantics",
-          "short_name": "contract.rtg.controller.verify_replay_from_ledger.failures"
-        },
-        {
-          "kind": "RequirementUsage",
-          "name": "verifyReplayFromLedgerFailureSemantics"
         },
         {
           "kind": "RequirementUsage",
@@ -5293,19 +5744,11 @@
         },
         {
           "kind": "VerificationCaseDefinition",
-          "name": "FlushLedgerFailuresContractVerification"
-        },
-        {
-          "kind": "VerificationCaseDefinition",
           "name": "GetControllerSchemaPackContractVerification"
         },
         {
           "kind": "VerificationCaseDefinition",
           "name": "GetSystemStateContractVerification"
-        },
-        {
-          "kind": "VerificationCaseDefinition",
-          "name": "ListMigrationHistoryContractVerification"
         },
         {
           "kind": "VerificationCaseDefinition",
@@ -5322,10 +5765,6 @@
         {
           "kind": "VerificationCaseDefinition",
           "name": "PersistSystemSnapshotContractVerification"
-        },
-        {
-          "kind": "VerificationCaseDefinition",
-          "name": "ReplayLedgerContractVerification"
         },
         {
           "kind": "VerificationCaseDefinition",
@@ -5346,10 +5785,6 @@
         {
           "kind": "VerificationCaseDefinition",
           "name": "ValidateLiveGraphChangesContractVerification"
-        },
-        {
-          "kind": "VerificationCaseDefinition",
-          "name": "VerifyReplayFromLedgerContractVerification"
         }
       ],
       "source": "model/bibliotek/components/component.rtg.controller.sysml"
@@ -5613,36 +6048,36 @@
     },
     "BibliotekRtgGraph": {
       "element_counts": {
-        "ActionDefinition": 20,
+        "ActionDefinition": 21,
         "ActionUsage": 4,
         "AttributeDefinition": 24,
         "AttributeUsage": 38,
-        "ConstraintUsage": 50,
-        "Dependency": 18,
-        "Documentation": 99,
+        "ConstraintUsage": 52,
+        "Dependency": 19,
+        "Documentation": 102,
         "EnumerationDefinition": 2,
         "EnumerationUsage": 12,
-        "Feature": 87,
-        "FeatureReferenceExpression": 52,
+        "Feature": 92,
+        "FeatureReferenceExpression": 54,
         "ItemDefinition": 4,
         "ItemUsage": 10,
         "LibraryPackage": 1,
         "LiteralBoolean": 1,
-        "LiteralInfinity": 34,
-        "LiteralInteger": 46,
-        "LiteralString": 45,
-        "MetadataUsage": 42,
+        "LiteralInfinity": 35,
+        "LiteralInteger": 47,
+        "LiteralString": 47,
+        "MetadataUsage": 44,
         "Multiplicity": 34,
-        "MultiplicityRange": 41,
+        "MultiplicityRange": 42,
         "NullExpression": 2,
-        "OperatorExpression": 16,
+        "OperatorExpression": 17,
         "PartDefinition": 2,
         "PartUsage": 4,
-        "PerformActionUsage": 18,
-        "ReferenceUsage": 332,
-        "RequirementUsage": 121,
-        "SatisfyRequirementUsage": 50,
-        "VerificationCaseDefinition": 21
+        "PerformActionUsage": 19,
+        "ReferenceUsage": 344,
+        "RequirementUsage": 126,
+        "SatisfyRequirementUsage": 52,
+        "VerificationCaseDefinition": 22
       },
       "named_elements": [
         {
@@ -5724,6 +6159,10 @@
         {
           "kind": "ActionDefinition",
           "name": "PutLink"
+        },
+        {
+          "kind": "ActionDefinition",
+          "name": "ReplaceGraphSnapshot"
         },
         {
           "kind": "AttributeDefinition",
@@ -6210,6 +6649,10 @@
         },
         {
           "kind": "RequirementUsage",
+          "name": "obj"
+        },
+        {
+          "kind": "RequirementUsage",
           "name": "previewDeleteAnchorFailureSemantics",
           "short_name": "contract.rtg.graph.preview_delete_anchor.failures"
         },
@@ -6291,6 +6734,15 @@
         },
         {
           "kind": "RequirementUsage",
+          "name": "replaceGraphSnapshotFailureSemantics",
+          "short_name": "contract.rtg.graph.replace_graph_snapshot.failures"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "replaceGraphSnapshotFailureSemantics"
+        },
+        {
+          "kind": "RequirementUsage",
           "name": "schemaNeutrality",
           "short_name": "invariant.rtg.graph.schema_neutrality"
         },
@@ -6315,6 +6767,15 @@
         {
           "kind": "RequirementUsage",
           "name": "snapshotEffect"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "snapshotReplacementEffect",
+          "short_name": "contract.rtg.graph.snapshot_replacement"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "snapshotReplacementEffect"
         },
         {
           "kind": "RequirementUsage",
@@ -6470,6 +6931,10 @@
         },
         {
           "kind": "VerificationCaseDefinition",
+          "name": "ReplaceGraphSnapshotContractVerification"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
           "name": "RtgGraphBoundaryVerification"
         }
       ],
@@ -6477,36 +6942,36 @@
     },
     "BibliotekRtgMigration": {
       "element_counts": {
-        "ActionDefinition": 10,
+        "ActionDefinition": 11,
         "ActionUsage": 4,
         "AttributeDefinition": 15,
         "AttributeUsage": 43,
         "CalculationDefinition": 1,
-        "ConstraintUsage": 27,
-        "Dependency": 8,
-        "Documentation": 48,
+        "ConstraintUsage": 29,
+        "Dependency": 9,
+        "Documentation": 51,
         "EnumerationDefinition": 1,
         "EnumerationUsage": 11,
-        "Feature": 50,
-        "FeatureReferenceExpression": 29,
+        "Feature": 55,
+        "FeatureReferenceExpression": 31,
         "ItemDefinition": 1,
         "ItemUsage": 4,
         "LibraryPackage": 1,
-        "LiteralInfinity": 30,
-        "LiteralInteger": 36,
-        "LiteralString": 26,
-        "MetadataUsage": 22,
+        "LiteralInfinity": 31,
+        "LiteralInteger": 37,
+        "LiteralString": 28,
+        "MetadataUsage": 24,
         "Multiplicity": 29,
-        "MultiplicityRange": 34,
+        "MultiplicityRange": 35,
         "NullExpression": 2,
-        "OperatorExpression": 6,
+        "OperatorExpression": 7,
         "PartDefinition": 1,
         "PartUsage": 4,
-        "PerformActionUsage": 8,
-        "ReferenceUsage": 175,
-        "RequirementUsage": 65,
-        "SatisfyRequirementUsage": 27,
-        "VerificationCaseDefinition": 11
+        "PerformActionUsage": 9,
+        "ReferenceUsage": 187,
+        "RequirementUsage": 70,
+        "SatisfyRequirementUsage": 29,
+        "VerificationCaseDefinition": 12
       },
       "named_elements": [
         {
@@ -6544,6 +7009,10 @@
         {
           "kind": "ActionDefinition",
           "name": "PutMigration"
+        },
+        {
+          "kind": "ActionDefinition",
+          "name": "ReplaceMigrationSnapshot"
         },
         {
           "kind": "ActionDefinition",
@@ -6843,6 +7312,10 @@
         },
         {
           "kind": "RequirementUsage",
+          "name": "obj"
+        },
+        {
+          "kind": "RequirementUsage",
           "name": "putMigrationEffect",
           "short_name": "contract.rtg.migration.put_effect"
         },
@@ -6870,6 +7343,15 @@
         },
         {
           "kind": "RequirementUsage",
+          "name": "replaceMigrationSnapshotFailureSemantics",
+          "short_name": "contract.rtg.migration.replace_migration_snapshot.failures"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "replaceMigrationSnapshotFailureSemantics"
+        },
+        {
+          "kind": "RequirementUsage",
           "name": "rollbackForwardChange",
           "short_name": "invariant.rtg.migration.rollback_is_forward_change_v1"
         },
@@ -6885,6 +7367,15 @@
         {
           "kind": "RequirementUsage",
           "name": "setMigrationStatusFailureSemantics"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "snapshotReplacementEffect",
+          "short_name": "contract.rtg.migration.snapshot_replacement"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "snapshotReplacementEffect"
         },
         {
           "kind": "RequirementUsage",
@@ -6948,6 +7439,10 @@
         {
           "kind": "VerificationCaseDefinition",
           "name": "PutMigrationContractVerification"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
+          "name": "ReplaceMigrationSnapshotContractVerification"
         },
         {
           "kind": "VerificationCaseDefinition",
@@ -7336,37 +7831,37 @@
     },
     "BibliotekRtgSchema": {
       "element_counts": {
-        "ActionDefinition": 12,
+        "ActionDefinition": 13,
         "ActionUsage": 4,
         "AttributeDefinition": 26,
         "AttributeUsage": 51,
         "CalculationDefinition": 1,
-        "ConstraintUsage": 30,
-        "Dependency": 10,
-        "Documentation": 59,
+        "ConstraintUsage": 32,
+        "Dependency": 11,
+        "Documentation": 62,
         "EnumerationDefinition": 5,
         "EnumerationUsage": 26,
-        "Feature": 52,
-        "FeatureReferenceExpression": 32,
+        "Feature": 57,
+        "FeatureReferenceExpression": 34,
         "ItemDefinition": 1,
         "ItemUsage": 7,
         "LibraryPackage": 1,
         "LiteralBoolean": 4,
-        "LiteralInfinity": 31,
-        "LiteralInteger": 59,
-        "LiteralString": 30,
-        "MetadataUsage": 26,
+        "LiteralInfinity": 32,
+        "LiteralInteger": 60,
+        "LiteralString": 32,
+        "MetadataUsage": 28,
         "Multiplicity": 36,
-        "MultiplicityRange": 46,
+        "MultiplicityRange": 47,
         "NullExpression": 3,
-        "OperatorExpression": 7,
+        "OperatorExpression": 8,
         "PartDefinition": 1,
         "PartUsage": 4,
-        "PerformActionUsage": 10,
-        "ReferenceUsage": 207,
-        "RequirementUsage": 73,
-        "SatisfyRequirementUsage": 30,
-        "VerificationCaseDefinition": 13
+        "PerformActionUsage": 11,
+        "ReferenceUsage": 219,
+        "RequirementUsage": 78,
+        "SatisfyRequirementUsage": 32,
+        "VerificationCaseDefinition": 14
       },
       "named_elements": [
         {
@@ -7416,6 +7911,10 @@
         {
           "kind": "ActionDefinition",
           "name": "PutSchemaDefinition"
+        },
+        {
+          "kind": "ActionDefinition",
+          "name": "ReplaceSchemaSnapshot"
         },
         {
           "kind": "AttributeDefinition",
@@ -7815,6 +8314,10 @@
         },
         {
           "kind": "RequirementUsage",
+          "name": "obj"
+        },
+        {
+          "kind": "RequirementUsage",
           "name": "payloadSemantics",
           "short_name": "contract.rtg.schema.payload_semantics"
         },
@@ -7830,6 +8333,15 @@
         {
           "kind": "RequirementUsage",
           "name": "putSchemaDefinitionFailureSemantics"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "replaceSchemaSnapshotFailureSemantics",
+          "short_name": "contract.rtg.schema.replace_schema_snapshot.failures"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "replaceSchemaSnapshotFailureSemantics"
         },
         {
           "kind": "RequirementUsage",
@@ -7857,6 +8369,15 @@
         {
           "kind": "RequirementUsage",
           "name": "schemaSnapshotEffect"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "schemaSnapshotReplacementEffect",
+          "short_name": "contract.rtg.schema.snapshot_replacement"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "schemaSnapshotReplacementEffect"
         },
         {
           "kind": "RequirementUsage",
@@ -7926,10 +8447,800 @@
         },
         {
           "kind": "VerificationCaseDefinition",
+          "name": "ReplaceSchemaSnapshotContractVerification"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
           "name": "RtgSchemaBoundaryVerification"
         }
       ],
       "source": "model/bibliotek/components/component.rtg.schema.sysml"
+    },
+    "BibliotekRuntimeComponentAdapter": {
+      "element_counts": {
+        "ActionDefinition": 8,
+        "AttributeDefinition": 9,
+        "AttributeUsage": 78,
+        "ConjugatedPortDefinition": 1,
+        "ConstraintUsage": 13,
+        "Dependency": 18,
+        "Documentation": 30,
+        "EnumerationDefinition": 1,
+        "EnumerationUsage": 17,
+        "Feature": 32,
+        "FeatureReferenceExpression": 16,
+        "FlowUsage": 2,
+        "InterfaceUsage": 1,
+        "ItemUsage": 3,
+        "LibraryPackage": 1,
+        "LiteralBoolean": 2,
+        "LiteralInfinity": 14,
+        "LiteralInteger": 30,
+        "LiteralString": 24,
+        "MetadataUsage": 19,
+        "Multiplicity": 53,
+        "MultiplicityRange": 23,
+        "NullExpression": 1,
+        "OperatorExpression": 7,
+        "PartDefinition": 1,
+        "PartUsage": 3,
+        "PerformActionUsage": 17,
+        "PortUsage": 4,
+        "ReferenceUsage": 104,
+        "RequirementUsage": 35,
+        "SatisfyRequirementUsage": 13,
+        "VerificationCaseDefinition": 9
+      },
+      "named_elements": [
+        {
+          "kind": "ActionDefinition",
+          "name": "ApplyCanonicalReplayEffect"
+        },
+        {
+          "kind": "ActionDefinition",
+          "name": "DescribeRuntimeBinding"
+        },
+        {
+          "kind": "ActionDefinition",
+          "name": "DispatchRuntimeMessage"
+        },
+        {
+          "kind": "ActionDefinition",
+          "name": "ImportReplayCheckpoint"
+        },
+        {
+          "kind": "ActionDefinition",
+          "name": "ReplayStateDigest"
+        },
+        {
+          "kind": "ActionDefinition",
+          "name": "ReplayStateStatus"
+        },
+        {
+          "kind": "ActionDefinition",
+          "name": "ResetReplayState"
+        },
+        {
+          "kind": "ActionDefinition",
+          "name": "VerifyReplayState"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "RuntimeActionBindingDescriptor"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "RuntimeArgumentDescriptor"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "RuntimeBindingDescription"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "RuntimeBindingInvalid"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "RuntimeComponentFault"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "RuntimeDispatchResult"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "RuntimeFailureBindingDescriptor"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "RuntimePayloadInvalid"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "RuntimeReplayStateStatus"
+        },
+        {
+          "kind": "ConjugatedPortDefinition",
+          "name": "~RuntimeMessagePort"
+        },
+        {
+          "kind": "EnumerationDefinition",
+          "name": "RuntimeActionIdempotency"
+        },
+        {
+          "kind": "PartDefinition",
+          "name": "ComponentRuntimeAdapter",
+          "short_name": "component.runtime.component_adapter"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "checkpointFailureSemantics",
+          "short_name": "contract.runtime.component_adapter.checkpoint.failures"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "checkpointFailureSemantics"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "describeFailureSemantics",
+          "short_name": "contract.runtime.component_adapter.describe.failures"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "describeFailureSemantics"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "digestFailureSemantics",
+          "short_name": "contract.runtime.component_adapter.digest.failures"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "digestFailureSemantics"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "directMessageEquivalence",
+          "short_name": "contract.runtime.component_adapter.equivalence"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "directMessageEquivalence"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "dispatchFailureSemantics",
+          "short_name": "contract.runtime.component_adapter.dispatch.failures"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "dispatchFailureSemantics"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "explicitMapping",
+          "short_name": "contract.runtime.component_adapter.explicit_mapping"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "explicitMapping"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "invariantVerificationFailureSemantics",
+          "short_name": "contract.runtime.component_adapter.invariants.failures"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "invariantVerificationFailureSemantics"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "obj"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "obj"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "obj"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "obj"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "obj"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "obj"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "obj"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "obj"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "obj"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "reconstructionStateControl",
+          "short_name": "contract.runtime.component_adapter.reconstruction"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "reconstructionStateControl"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "recoveryAuthorization",
+          "short_name": "contract.runtime.component_adapter.recovery_authorization"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "recoveryAuthorization"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "replayFailureSemantics",
+          "short_name": "contract.runtime.component_adapter.replay.failures"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "replayFailureSemantics"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "replayStateStatusFailureSemantics",
+          "short_name": "contract.runtime.component_adapter.replay_state_status.failures"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "replayStateStatusFailureSemantics"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "resetFailureSemantics",
+          "short_name": "contract.runtime.component_adapter.reset.failures"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "resetFailureSemantics"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "resolvedReplayEffects",
+          "short_name": "contract.runtime.component_adapter.replay"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "resolvedReplayEffects"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
+          "name": "ApplyCanonicalReplayEffectContractVerification"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
+          "name": "ComponentRuntimeAdapterBoundaryVerification"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
+          "name": "DescribeRuntimeBindingContractVerification"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
+          "name": "DispatchRuntimeMessageContractVerification"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
+          "name": "ImportReplayCheckpointContractVerification"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
+          "name": "ReplayStateDigestContractVerification"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
+          "name": "ReplayStateStatusContractVerification"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
+          "name": "ResetReplayStateContractVerification"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
+          "name": "VerifyReplayStateContractVerification"
+        }
+      ],
+      "source": "model/bibliotek/components/component.runtime.component_adapter.sysml"
+    },
+    "BibliotekRuntimeMessageRuntime": {
+      "element_counts": {
+        "ActionDefinition": 9,
+        "AttributeDefinition": 27,
+        "AttributeUsage": 134,
+        "ConjugatedPortDefinition": 1,
+        "ConstraintUsage": 19,
+        "Dependency": 10,
+        "Documentation": 41,
+        "EnumerationDefinition": 5,
+        "EnumerationUsage": 27,
+        "Feature": 40,
+        "FeatureReferenceExpression": 21,
+        "FlowEnd": 4,
+        "FlowUsage": 2,
+        "InterfaceDefinition": 1,
+        "ItemDefinition": 1,
+        "ItemUsage": 4,
+        "LibraryPackage": 1,
+        "LiteralBoolean": 1,
+        "LiteralInfinity": 20,
+        "LiteralInteger": 101,
+        "LiteralString": 22,
+        "MetadataUsage": 20,
+        "Multiplicity": 94,
+        "MultiplicityRange": 60,
+        "OperatorExpression": 9,
+        "PartDefinition": 1,
+        "PartUsage": 2,
+        "PerformActionUsage": 9,
+        "PortDefinition": 1,
+        "PortUsage": 3,
+        "ReferenceUsage": 147,
+        "RequirementUsage": 48,
+        "SatisfyRequirementUsage": 19,
+        "VerificationCaseDefinition": 10
+      },
+      "named_elements": [
+        {
+          "kind": "ActionDefinition",
+          "name": "ConfirmStaticRuntimeTopology"
+        },
+        {
+          "kind": "ActionDefinition",
+          "name": "GetRuntimeCausalTrace"
+        },
+        {
+          "kind": "ActionDefinition",
+          "name": "PrepareStaticRuntimeTopology"
+        },
+        {
+          "kind": "ActionDefinition",
+          "name": "QueryRuntimeHistory"
+        },
+        {
+          "kind": "ActionDefinition",
+          "name": "ReconstructRuntimeState"
+        },
+        {
+          "kind": "ActionDefinition",
+          "name": "RecordRuntimeBranchProvenance"
+        },
+        {
+          "kind": "ActionDefinition",
+          "name": "RegisterComponentOccurrence"
+        },
+        {
+          "kind": "ActionDefinition",
+          "name": "RequestRuntimeMessage"
+        },
+        {
+          "kind": "ActionDefinition",
+          "name": "SendRuntimeMessage"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "ComponentOccurrenceDeclaration"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "ComponentOccurrenceRegistration"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "RuntimeActionUnknown"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "RuntimeAddress"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "RuntimeAddressUnknown"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "RuntimeCausalTrace"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "RuntimeCuratedOperationDeclaration"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "RuntimeExternalBoundaryDisposition"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "RuntimeFailStopped"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "RuntimeHistoryPage"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "RuntimeHistoryQuery"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "RuntimeLedgerFact"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "RuntimeLedgerUnavailable"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "RuntimeMessageConflict"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "RuntimeMessageReceipt"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "RuntimePayload"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "RuntimeQueueFull"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "RuntimeReconstructionReport"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "RuntimeReconstructionRequest"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "RuntimeRegistrationInvalid"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "RuntimeReplayIncompatible"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "RuntimeReplayTargetNotPrepared"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "RuntimeRequestOutcome"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "RuntimeRequestTimedOut"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "RuntimeSchemaUnsupported"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "RuntimeTopologyConfirmation"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "RuntimeTopologyManifest"
+        },
+        {
+          "kind": "ConjugatedPortDefinition",
+          "name": "~RuntimeMessagePort"
+        },
+        {
+          "kind": "EnumerationDefinition",
+          "name": "RuntimeDeliveryStatus"
+        },
+        {
+          "kind": "EnumerationDefinition",
+          "name": "RuntimeExternalBoundaryMode"
+        },
+        {
+          "kind": "EnumerationDefinition",
+          "name": "RuntimeMessageKind"
+        },
+        {
+          "kind": "EnumerationDefinition",
+          "name": "RuntimeReplayMode"
+        },
+        {
+          "kind": "EnumerationDefinition",
+          "name": "RuntimeTraceDisposition"
+        },
+        {
+          "kind": "InterfaceDefinition",
+          "name": "RuntimeMessageExchange"
+        },
+        {
+          "kind": "ItemDefinition",
+          "name": "RuntimeMessageEnvelope"
+        },
+        {
+          "kind": "PartDefinition",
+          "name": "MessageRuntime",
+          "short_name": "component.runtime.message_runtime"
+        },
+        {
+          "kind": "PortDefinition",
+          "name": "RuntimeMessagePort"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "boundedOccurrenceOrdering",
+          "short_name": "contract.runtime.message_runtime.ordering"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "boundedOccurrenceOrdering"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "branchFailureSemantics",
+          "short_name": "contract.runtime.message_runtime.branch.failures"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "branchFailureSemantics"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "canonicalEffectReplay",
+          "short_name": "contract.runtime.message_runtime.replay"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "canonicalEffectReplay"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "durableBeforeDispatch",
+          "short_name": "contract.runtime.message_runtime.delivery"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "durableBeforeDispatch"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "durableIdentity",
+          "short_name": "contract.runtime.message_runtime.identity"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "durableIdentity"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "historyFailureSemantics",
+          "short_name": "contract.runtime.message_runtime.history.failures"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "historyFailureSemantics"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "messageDeduplication",
+          "short_name": "contract.runtime.message_runtime.deduplication"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "messageDeduplication"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "obj"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "obj"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "obj"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "obj"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "obj"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "obj"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "obj"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "obj"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "obj"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "obj"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "reconstructFailureSemantics",
+          "short_name": "contract.runtime.message_runtime.reconstruct.failures"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "reconstructFailureSemantics"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "recoveryIngress",
+          "short_name": "contract.runtime.message_runtime.recovery_ingress"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "recoveryIngress"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "registerFailureSemantics",
+          "short_name": "contract.runtime.message_runtime.register.failures"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "registerFailureSemantics"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "requestFailureSemantics",
+          "short_name": "contract.runtime.message_runtime.request.failures"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "requestFailureSemantics"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "sendFailureSemantics",
+          "short_name": "contract.runtime.message_runtime.send.failures"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "sendFailureSemantics"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "staticTopologyAtomicity",
+          "short_name": "contract.runtime.message_runtime.static_topology_atomicity"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "staticTopologyAtomicity"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "terminalCausality",
+          "short_name": "contract.runtime.message_runtime.causality"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "terminalCausality"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "terminalPersistenceFailStop",
+          "short_name": "contract.runtime.message_runtime.fail_stop"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "terminalPersistenceFailStop"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "topologyFailureSemantics",
+          "short_name": "contract.runtime.message_runtime.topology.failures"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "topologyFailureSemantics"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "topologyPreparationFailureSemantics",
+          "short_name": "contract.runtime.message_runtime.topology_prepare.failures"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "topologyPreparationFailureSemantics"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "traceFailureSemantics",
+          "short_name": "contract.runtime.message_runtime.trace.failures"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "traceFailureSemantics"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "verifiedHistoricalBranching",
+          "short_name": "contract.runtime.message_runtime.branching"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "verifiedHistoricalBranching"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
+          "name": "ConfirmStaticRuntimeTopologyContractVerification"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
+          "name": "GetRuntimeCausalTraceContractVerification"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
+          "name": "MessageRuntimeBoundaryVerification"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
+          "name": "PrepareStaticRuntimeTopologyContractVerification"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
+          "name": "QueryRuntimeHistoryContractVerification"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
+          "name": "ReconstructRuntimeStateContractVerification"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
+          "name": "RecordRuntimeBranchProvenanceContractVerification"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
+          "name": "RegisterComponentOccurrenceContractVerification"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
+          "name": "RequestRuntimeMessageContractVerification"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
+          "name": "SendRuntimeMessageContractVerification"
+        }
+      ],
+      "source": "model/bibliotek/components/component.runtime.message_runtime.sysml"
     },
     "BibliotekSoftwareValues": {
       "element_counts": {
@@ -8762,15 +10073,15 @@
     },
     "Vellis": {
       "element_counts": {
-        "AttributeUsage": 5,
+        "AttributeUsage": 11,
         "BindingConnectorAsUsage": 9,
-        "ConstraintUsage": 3,
-        "Dependency": 151,
-        "Documentation": 15,
+        "ConstraintUsage": 4,
+        "Dependency": 127,
+        "Documentation": 16,
         "EnumerationUsage": 5,
-        "Feature": 5,
-        "FeatureReferenceExpression": 4,
-        "ItemUsage": 9,
+        "Feature": 6,
+        "FeatureReferenceExpression": 5,
+        "ItemUsage": 7,
         "LiteralString": 3,
         "MetadataUsage": 12,
         "Multiplicity": 34,
@@ -8778,10 +10089,11 @@
         "Package": 1,
         "PartDefinition": 1,
         "PartUsage": 22,
-        "PerformActionUsage": 135,
-        "ReferenceUsage": 38,
-        "RequirementUsage": 7,
-        "SatisfyRequirementUsage": 3,
+        "PerformActionUsage": 146,
+        "PortUsage": 1,
+        "ReferenceUsage": 42,
+        "RequirementUsage": 9,
+        "SatisfyRequirementUsage": 4,
         "VerificationCaseDefinition": 1
       },
       "named_elements": [
@@ -8811,6 +10123,15 @@
         {
           "kind": "RequirementUsage",
           "name": "obj"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "runtimeHistoryAuthority",
+          "short_name": "invariant.vellis.runtime_history_authority"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "runtimeHistoryAuthority"
         },
         {
           "kind": "RequirementUsage",
@@ -9089,26 +10410,27 @@
     },
     "VellisLocalPythonRealization": {
       "element_counts": {
-        "ActionUsage": 39,
+        "ActionUsage": 44,
         "AllocationUsage": 39,
-        "AttributeUsage": 5,
+        "AttributeUsage": 11,
         "BindingConnectorAsUsage": 9,
-        "Dependency": 151,
-        "Documentation": 43,
-        "EnumerationUsage": 16,
-        "Feature": 14,
-        "FeatureReferenceExpression": 13,
-        "ItemUsage": 9,
-        "LiteralString": 66,
-        "MetadataUsage": 60,
+        "Dependency": 127,
+        "Documentation": 44,
+        "EnumerationUsage": 14,
+        "Feature": 12,
+        "FeatureReferenceExpression": 11,
+        "ItemUsage": 7,
+        "LiteralString": 48,
+        "MetadataUsage": 54,
         "Multiplicity": 97,
         "MultiplicityRange": 28,
         "Package": 1,
-        "PartDefinition": 13,
+        "PartDefinition": 12,
         "PartUsage": 34,
-        "PerformActionUsage": 103,
-        "ReferenceUsage": 237,
-        "SuccessionAsUsage": 13
+        "PerformActionUsage": 109,
+        "PortUsage": 1,
+        "ReferenceUsage": 217,
+        "SuccessionAsUsage": 18
       },
       "named_elements": [
         {
@@ -9157,10 +10479,6 @@
         },
         {
           "kind": "PartDefinition",
-          "name": "SqliteStorage"
-        },
-        {
-          "kind": "PartDefinition",
           "name": "VellisLocalPython"
         }
       ],
@@ -9168,45 +10486,45 @@
     },
     "VellisMcpPythonRealization": {
       "element_counts": {
-        "ActionUsage": 66,
+        "ActionUsage": 4,
         "AllocationUsage": 27,
         "AttributeDefinition": 4,
-        "AttributeUsage": 210,
-        "BindingConnectorAsUsage": 10,
+        "AttributeUsage": 48,
+        "BindingConnectorAsUsage": 20,
         "ConjugatedPortDefinition": 1,
         "ConstraintDefinition": 1,
-        "ConstraintUsage": 6,
-        "Documentation": 89,
+        "ConstraintUsage": 7,
+        "Dependency": 3,
+        "Documentation": 74,
         "EnumerationDefinition": 3,
-        "EnumerationUsage": 96,
-        "Feature": 242,
-        "FeatureChainExpression": 77,
-        "FeatureReferenceExpression": 66,
+        "EnumerationUsage": 74,
+        "Feature": 167,
+        "FeatureChainExpression": 1,
+        "FeatureReferenceExpression": 63,
         "FlowEnd": 4,
         "FlowUsage": 2,
         "InterfaceDefinition": 1,
-        "InterfaceUsage": 1,
+        "InterfaceUsage": 12,
         "ItemDefinition": 2,
-        "ItemUsage": 38,
-        "LiteralBoolean": 141,
+        "ItemUsage": 37,
+        "LiteralBoolean": 137,
         "LiteralInfinity": 31,
-        "LiteralInteger": 44,
+        "LiteralInteger": 42,
         "LiteralString": 70,
         "MetadataDefinition": 1,
-        "MetadataUsage": 62,
+        "MetadataUsage": 65,
         "Multiplicity": 95,
-        "MultiplicityRange": 142,
+        "MultiplicityRange": 39,
         "OperatorExpression": 31,
         "Package": 1,
         "PartDefinition": 3,
-        "PartUsage": 19,
-        "PerformActionUsage": 81,
+        "PartUsage": 29,
+        "PerformActionUsage": 30,
         "PortDefinition": 1,
-        "PortUsage": 6,
-        "ReferenceUsage": 616,
-        "RequirementUsage": 14,
-        "SatisfyRequirementUsage": 6,
-        "SuccessionAsUsage": 13,
+        "PortUsage": 7,
+        "ReferenceUsage": 470,
+        "RequirementUsage": 16,
+        "SatisfyRequirementUsage": 7,
         "VerificationCaseDefinition": 2
       },
       "named_elements": [
@@ -9299,6 +10617,15 @@
         },
         {
           "kind": "RequirementUsage",
+          "name": "mcpGatewayProjection",
+          "short_name": "contract.vellis.mcp.gateway_projection"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "mcpGatewayProjection"
+        },
+        {
+          "kind": "RequirementUsage",
           "name": "mcpInputEncoding",
           "short_name": "contract.vellis.mcp.input_encoding"
         },
@@ -9355,34 +10682,35 @@
     "VellisOperations": {
       "element_counts": {
         "ActionDefinition": 27,
-        "ActionUsage": 39,
-        "AttributeDefinition": 32,
-        "AttributeUsage": 308,
-        "ConstraintUsage": 35,
-        "Dependency": 101,
-        "Documentation": 121,
-        "EnumerationDefinition": 8,
-        "EnumerationUsage": 62,
-        "Feature": 196,
-        "FeatureChainExpression": 95,
-        "FeatureReferenceExpression": 49,
-        "ItemUsage": 2,
+        "ActionUsage": 44,
+        "AttributeDefinition": 38,
+        "AttributeUsage": 367,
+        "ConstraintUsage": 36,
+        "Dependency": 76,
+        "Documentation": 135,
+        "EnumerationDefinition": 11,
+        "EnumerationUsage": 69,
+        "Feature": 211,
+        "FeatureChainExpression": 106,
+        "FeatureReferenceExpression": 52,
+        "ItemUsage": 1,
         "LiteralBoolean": 4,
-        "LiteralInfinity": 42,
-        "LiteralInteger": 166,
-        "LiteralString": 62,
-        "MetadataUsage": 79,
-        "Multiplicity": 140,
-        "MultiplicityRange": 143,
-        "OperatorExpression": 22,
+        "LiteralInfinity": 43,
+        "LiteralInteger": 184,
+        "LiteralString": 61,
+        "MetadataUsage": 78,
+        "Multiplicity": 185,
+        "MultiplicityRange": 150,
+        "OperatorExpression": 23,
         "Package": 1,
         "PartDefinition": 1,
         "PartUsage": 11,
-        "PerformActionUsage": 76,
-        "ReferenceUsage": 506,
-        "RequirementUsage": 98,
-        "SatisfyRequirementUsage": 35,
-        "SuccessionAsUsage": 13,
+        "PerformActionUsage": 79,
+        "PortUsage": 1,
+        "ReferenceUsage": 519,
+        "RequirementUsage": 100,
+        "SatisfyRequirementUsage": 36,
+        "SuccessionAsUsage": 18,
         "VerificationCaseDefinition": 28
       },
       "named_elements": [
@@ -9559,6 +10887,10 @@
         },
         {
           "kind": "AttributeDefinition",
+          "name": "VellisDeprecatedLedgerFlushResult"
+        },
+        {
+          "kind": "AttributeDefinition",
           "name": "VellisFullQueryResponse"
         },
         {
@@ -9576,6 +10908,14 @@
         {
           "kind": "AttributeDefinition",
           "name": "VellisLoadedSnapshotResult"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "VellisMigrationHistory"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "VellisMigrationHistoryEvent"
         },
         {
           "kind": "AttributeDefinition",
@@ -9603,11 +10943,23 @@
         },
         {
           "kind": "AttributeDefinition",
+          "name": "VellisReplayVerificationResult"
+        },
+        {
+          "kind": "AttributeDefinition",
           "name": "VellisRequestInvalid"
         },
         {
           "kind": "AttributeDefinition",
           "name": "VellisResolvedAnchor"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "VellisRestoreOptions"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "VellisRuntimeState"
         },
         {
           "kind": "AttributeDefinition",
@@ -9663,7 +11015,19 @@
         },
         {
           "kind": "EnumerationDefinition",
+          "name": "VellisReconstructionVerificationStatus"
+        },
+        {
+          "kind": "EnumerationDefinition",
           "name": "VellisResolutionStatus"
+        },
+        {
+          "kind": "EnumerationDefinition",
+          "name": "VellisRestoreLedgerMode"
+        },
+        {
+          "kind": "EnumerationDefinition",
+          "name": "VellisRuntimeHistorySource"
         },
         {
           "kind": "EnumerationDefinition",
@@ -10088,6 +11452,15 @@
         },
         {
           "kind": "RequirementUsage",
+          "name": "runtimeProjectionSemantics",
+          "short_name": "contract.vellis.facade.runtime_projection"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "runtimeProjectionSemantics"
+        },
+        {
+          "kind": "RequirementUsage",
           "name": "schemaMigrationCompilation",
           "short_name": "contract.vellis.facade.schema_migration_compilation"
         },
@@ -10228,10 +11601,114 @@
       ],
       "source": "model/vellis/VellisOperations.sysml"
     },
+    "VellisRuntimePythonRealization": {
+      "element_counts": {
+        "AcceptActionUsage": 4,
+        "ActionUsage": 24,
+        "AllocationUsage": 16,
+        "AttributeUsage": 41,
+        "BindingConnectorAsUsage": 19,
+        "ConjugatedPortDefinition": 1,
+        "ConstraintUsage": 3,
+        "Dependency": 138,
+        "Documentation": 35,
+        "EnumerationUsage": 28,
+        "EventOccurrenceUsage": 8,
+        "Feature": 104,
+        "FeatureChainExpression": 8,
+        "FeatureReferenceExpression": 24,
+        "FlowUsage": 6,
+        "InterfaceUsage": 12,
+        "ItemUsage": 54,
+        "LiteralInfinity": 1,
+        "LiteralInteger": 7,
+        "LiteralString": 64,
+        "MetadataDefinition": 1,
+        "MetadataUsage": 55,
+        "Multiplicity": 118,
+        "MultiplicityRange": 12,
+        "Package": 1,
+        "PartDefinition": 4,
+        "PartUsage": 36,
+        "PayloadFeature": 4,
+        "PerformActionUsage": 119,
+        "PortUsage": 31,
+        "ReferenceUsage": 187,
+        "RequirementUsage": 7,
+        "SatisfyRequirementUsage": 3,
+        "SendActionUsage": 4,
+        "SuccessionAsUsage": 10,
+        "TransitionUsage": 1,
+        "VerificationCaseDefinition": 1
+      },
+      "named_elements": [
+        {
+          "kind": "ConjugatedPortDefinition",
+          "name": "~RuntimeMessagePort"
+        },
+        {
+          "kind": "MetadataDefinition",
+          "name": "RuntimeOccurrenceBinding"
+        },
+        {
+          "kind": "PartDefinition",
+          "name": "ExplicitPythonComponentAdapter"
+        },
+        {
+          "kind": "PartDefinition",
+          "name": "PythonMcpGateway"
+        },
+        {
+          "kind": "PartDefinition",
+          "name": "SqliteMessageRuntime"
+        },
+        {
+          "kind": "PartDefinition",
+          "name": "VellisRuntimePython"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "curatedRuntimeGateway",
+          "short_name": "invariant.vellis.runtime.curated_gateway"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "curatedRuntimeGateway"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "messageMediatedBoundaries",
+          "short_name": "invariant.vellis.runtime.message_mediated_boundaries"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "messageMediatedBoundaries"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "obj"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "snapshotTransferStartsNewChronology",
+          "short_name": "invariant.vellis.runtime.snapshot_transfer"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "snapshotTransferStartsNewChronology"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
+          "name": "VellisRuntimeCompositionVerification"
+        }
+      ],
+      "source": "model/vellis/realizations/VellisRuntimePython.sysml"
+    },
     "VellisUseCases": {
       "element_counts": {
         "ActionUsage": 18,
         "BindingConnectorAsUsage": 9,
+        "Dependency": 3,
         "Documentation": 27,
         "Feature": 16,
         "FeatureReferenceExpression": 16,
@@ -10242,7 +11719,7 @@
         "MultiplicityRange": 8,
         "Package": 1,
         "PartDefinition": 3,
-        "PartUsage": 47,
+        "PartUsage": 48,
         "PerformActionUsage": 45,
         "ReferenceUsage": 98,
         "RequirementUsage": 16,
@@ -10397,18 +11874,18 @@
     "VellisViews": {
       "element_counts": {
         "ActionUsage": 2,
-        "AttributeUsage": 10,
+        "AttributeUsage": 11,
         "BindingConnector": 3,
         "Comment": 1,
         "Connector": 7,
         "ConstraintUsage": 1,
         "Documentation": 18,
-        "Feature": 166,
+        "Feature": 186,
         "Invariant": 8,
-        "ItemUsage": 97,
+        "ItemUsage": 102,
         "Multiplicity": 3,
         "MultiplicityRange": 8,
-        "OperatorExpression": 11,
+        "OperatorExpression": 17,
         "Package": 1,
         "PartUsage": 3,
         "PortUsage": 1,
@@ -10452,7 +11929,7 @@
     }
   },
   "schema_version": 1,
-  "source_digest": "81161882fcc6e2c2484e2dd33b62db85309eec3520c8b3fe66e35b11820090f9",
+  "source_digest": "743c91c3cc0a70576a89da55386a42e05f2fd6ccdea34b7b99ac0697563ae883",
   "validator": {
     "implementation_version": "0.50.0",
     "provider": "Systems-Modeling/SysML-v2-Pilot-Implementation",

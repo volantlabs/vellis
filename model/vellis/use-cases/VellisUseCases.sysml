@@ -29,12 +29,12 @@ package VellisUseCases {
     use case def SnapshotAndRestoreSystem {
         subject application : VellisApplication;
         actor users[1..*] : VellisUser;
-        objective { doc /* Persist, inspect, and restore a coordinated system snapshot. */ }
+        objective { doc /* Persist, inspect, and restore a coordinated RTG snapshot, including snapshot-only transfer into a fresh runtime chronology. */ }
     }
     use case def AuditAndReplayActivity {
         subject application : VellisApplication;
         actor users[1..*] : VellisUser;
-        objective { doc /* Inspect durable activity and prove that replay reconstructs the expected state. */ }
+        objective { doc /* Inspect runtime causal traces and prove that committed canonical effects reconstruct the expected managed state. */ }
     }
     use case def InspectStateAndGuidance {
         subject application : VellisApplication;

@@ -82,7 +82,7 @@ def mcp_launch_metadata(
 ) -> dict[str, Any]:
     repo_root = repository_root()
     storage_root = _absolute(config.storage_root)
-    sql_database_path = _absolute(config.sql_database_path)
+    runtime_database_path = _absolute(config.runtime_database_path)
     if repo_root is not None:
         uv_command = _uv_command()
         launch_args = [
@@ -97,8 +97,8 @@ def mcp_launch_metadata(
             "stdio",
             "--storage-root",
             str(storage_root),
-            "--sql-database-path",
-            str(sql_database_path),
+            "--runtime-database-path",
+            str(runtime_database_path),
         ]
         _append_startup_mode_args(launch_args, config)
         launch = {
@@ -116,8 +116,8 @@ def mcp_launch_metadata(
             "stdio",
             "--storage-root",
             str(storage_root),
-            "--sql-database-path",
-            str(sql_database_path),
+            "--runtime-database-path",
+            str(runtime_database_path),
         ]
         _append_startup_mode_args(launch_args, config)
         launch = {
@@ -130,7 +130,7 @@ def mcp_launch_metadata(
     localhost_launch = _localhost_launch(
         repo_root=repo_root,
         storage_root=storage_root,
-        sql_database_path=sql_database_path,
+        runtime_database_path=runtime_database_path,
         host=localhost_host,
         port=localhost_port,
         path=localhost_path,
@@ -201,7 +201,7 @@ def _localhost_launch(
     *,
     repo_root: Path | None,
     storage_root: Path,
-    sql_database_path: Path,
+    runtime_database_path: Path,
     host: str,
     port: int,
     path: str,
@@ -226,8 +226,8 @@ def _localhost_launch(
             path,
             "--storage-root",
             str(storage_root),
-            "--sql-database-path",
-            str(sql_database_path),
+            "--runtime-database-path",
+            str(runtime_database_path),
         ]
         _append_startup_mode_args(args, config)
         return {
@@ -249,8 +249,8 @@ def _localhost_launch(
         path,
         "--storage-root",
         str(storage_root),
-        "--sql-database-path",
-        str(sql_database_path),
+        "--runtime-database-path",
+        str(runtime_database_path),
     ]
     _append_startup_mode_args(args, config)
     return {

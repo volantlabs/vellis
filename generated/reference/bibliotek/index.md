@@ -8,6 +8,7 @@ Bibliotek is a reusable SysML library package. It imports the generic modeling f
 
 | Component | Status | Generated view |
 |---|---|---|
+| `component.interface.mcp_gateway` | `accepted` | [component view](components/component.interface.mcp_gateway.md) |
 | `component.rtg.change_validation` | `accepted` | [component view](components/component.rtg.change_validation.md) |
 | `component.rtg.constraints` | `accepted` | [component view](components/component.rtg.constraints.md) |
 | `component.rtg.controller` | `accepted` | [component view](components/component.rtg.controller.md) |
@@ -16,6 +17,8 @@ Bibliotek is a reusable SysML library package. It imports the generic modeling f
 | `component.rtg.migration` | `accepted` | [component view](components/component.rtg.migration.md) |
 | `component.rtg.query` | `accepted` | [component view](components/component.rtg.query.md) |
 | `component.rtg.schema` | `accepted` | [component view](components/component.rtg.schema.md) |
+| `component.runtime.component_adapter` | `accepted` | [component view](components/component.runtime.component_adapter.md) |
+| `component.runtime.message_runtime` | `accepted` | [component view](components/component.runtime.message_runtime.md) |
 | `component.storage.json_file` | `accepted` | [component view](components/component.storage.json_file.md) |
 | `component.storage.sql` | `accepted` | [component view](components/component.storage.sql.md) |
 
@@ -50,9 +53,6 @@ Bibliotek is a reusable SysML library package. It imports the generic modeling f
 
 | Consumer | Retained role | Required component type | Provider |
 |---|---|---|---|
-| `component.rtg.controller` | `graph` | `RtgGraph` | `component.rtg.graph` |
-| `component.rtg.controller` | `schema` | `RtgSchema` | `component.rtg.schema` |
-| `component.rtg.controller` | `constraints` | `RtgConstraints` | `component.rtg.constraints` |
-| `component.rtg.controller` | `migration` | `RtgMigration` | `component.rtg.migration` |
+| `component.interface.mcp_gateway` | `runtime` | `MessageRuntime` | `component.runtime.message_runtime` |
 | `component.rtg.controller` | `jsonStorage` | `JsonFileStorage` | `component.storage.json_file` |
-| `component.rtg.controller` | `sqlStorage` | `SqlStorage` | `component.storage.sql` |
+| `component.runtime.component_adapter` | `runtime` | `MessageRuntime` | `component.runtime.message_runtime` |

@@ -22,8 +22,10 @@ Vellis is intended for a person's own local graph or a graph shared deliberately
 machine. Ordinary stdio mode opens no network service; advanced HTTP mode is unauthenticated and
 must remain bound to `127.0.0.1`.
 
-Graph state is reconstructed from the durable local controller ledger and stored unencrypted under
-the ignored `.data/rtg_knowledge_graph/` directory by default. The AI agent or model connected to
-Vellis can receive graph contents when it invokes tools. Back up local state as appropriate and do
-not use it for information you are unwilling to provide to that client or model. Vellis does not
-yet provide encryption, authentication, user accounts, or multi-user authorization.
+Managed component state is reconstructed from committed canonical effects in the durable local
+runtime ledger and stored unencrypted under the ignored `.data/rtg_knowledge_graph/` directory by
+default. Full request, response, fault, and trace payloads are also recorded there in v1. The AI
+agent or model connected to Vellis can receive graph contents when it invokes tools. Back up local
+state as appropriate and do not use it for information you are unwilling to provide to that client
+or model. Vellis does not yet provide encryption, authentication, user accounts, or multi-user
+authorization.

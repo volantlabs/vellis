@@ -6,10 +6,6 @@
       "role": "document_storage"
     },
     {
-      "id": "component.storage.sql",
-      "role": "controller_ledger_storage"
-    },
-    {
       "id": "component.rtg.controller",
       "role": "rtg_system_controller"
     },
@@ -38,7 +34,154 @@
       "role": "query_engine"
     }
   ],
-  "schema_version": 1,
+  "manifest_hash": "6347bf74cbcf57c1e318dc1e3d0b8db27477a989a002e9153468764d437b86bd",
+  "occurrences": [
+    {
+      "binding_version": 1,
+      "component_contract_id": "component.rtg.graph",
+      "configuration_references": [],
+      "implementation_binding": "VellisLocalPythonRealization::InMemoryRtgGraph",
+      "instance_key": "vellis.graph.primary",
+      "max_in_flight": 1,
+      "queue_capacity": 128,
+      "replay_authority": "canonical_effect",
+      "runtime_binding_id": "binding.python.rtg.graph.v1"
+    },
+    {
+      "binding_version": 1,
+      "component_contract_id": "component.rtg.schema",
+      "configuration_references": [],
+      "implementation_binding": "VellisLocalPythonRealization::InMemoryRtgSchema",
+      "instance_key": "vellis.schema.primary",
+      "max_in_flight": 1,
+      "queue_capacity": 128,
+      "replay_authority": "canonical_effect",
+      "runtime_binding_id": "binding.python.rtg.schema.v1"
+    },
+    {
+      "binding_version": 1,
+      "component_contract_id": "component.rtg.constraints",
+      "configuration_references": [],
+      "implementation_binding": "VellisLocalPythonRealization::InMemoryRtgConstraints",
+      "instance_key": "vellis.constraints.primary",
+      "max_in_flight": 1,
+      "queue_capacity": 128,
+      "replay_authority": "canonical_effect",
+      "runtime_binding_id": "binding.python.rtg.constraints.v1"
+    },
+    {
+      "binding_version": 1,
+      "component_contract_id": "component.rtg.migration",
+      "configuration_references": [],
+      "implementation_binding": "VellisLocalPythonRealization::InMemoryRtgMigration",
+      "instance_key": "vellis.migration.primary",
+      "max_in_flight": 1,
+      "queue_capacity": 128,
+      "replay_authority": "canonical_effect",
+      "runtime_binding_id": "binding.python.rtg.migration.v1"
+    },
+    {
+      "binding_version": 1,
+      "component_contract_id": "component.storage.json_file",
+      "configuration_references": [
+        "config.storage_root"
+      ],
+      "implementation_binding": "VellisLocalPythonRealization::LocalJsonFileStorage",
+      "instance_key": "vellis.storage.json.primary",
+      "max_in_flight": 1,
+      "queue_capacity": 128,
+      "replay_authority": "external_exchange",
+      "runtime_binding_id": "binding.python.storage.json_file.v1"
+    },
+    {
+      "binding_version": 1,
+      "component_contract_id": "component.rtg.query",
+      "configuration_references": [],
+      "implementation_binding": "VellisLocalPythonRealization::SimpleRtgQueryEngine",
+      "instance_key": "vellis.query.primary",
+      "max_in_flight": 1,
+      "queue_capacity": 128,
+      "replay_authority": "no_state_effect",
+      "runtime_binding_id": "binding.python.rtg.query.v1"
+    },
+    {
+      "binding_version": 1,
+      "component_contract_id": "component.rtg.change_validation",
+      "configuration_references": [],
+      "implementation_binding": "VellisLocalPythonRealization::DeterministicRtgChangeValidator",
+      "instance_key": "vellis.validation.primary",
+      "max_in_flight": 1,
+      "queue_capacity": 128,
+      "replay_authority": "no_state_effect",
+      "runtime_binding_id": "binding.python.rtg.change_validation.v1"
+    },
+    {
+      "binding_version": 1,
+      "component_contract_id": "component.rtg.controller",
+      "configuration_references": [],
+      "implementation_binding": "VellisLocalPythonRealization::InProcessRtgController",
+      "instance_key": "vellis.controller.primary",
+      "max_in_flight": 1,
+      "queue_capacity": 128,
+      "replay_authority": "canonical_effect",
+      "runtime_binding_id": "binding.python.rtg.controller.v1"
+    },
+    {
+      "binding_version": 1,
+      "component_contract_id": "application.vellis.facade",
+      "configuration_references": [],
+      "implementation_binding": "VellisLocalPythonRealization::PythonVellisFacade",
+      "instance_key": "vellis.facade.primary",
+      "max_in_flight": 1,
+      "queue_capacity": 128,
+      "replay_authority": "coordinator_trace",
+      "runtime_binding_id": "binding.python.vellis.facade.v1"
+    },
+    {
+      "binding_version": 1,
+      "component_contract_id": "component.interface.mcp_gateway",
+      "configuration_references": [],
+      "implementation_binding": "VellisRuntimePythonRealization::PythonMcpGateway",
+      "instance_key": "vellis.interface.mcp",
+      "max_in_flight": 1,
+      "queue_capacity": 1,
+      "replay_authority": "external_exchange",
+      "runtime_binding_id": "binding.python.interface.mcp_gateway.source.v1"
+    },
+    {
+      "binding_version": 1,
+      "component_contract_id": "application.vellis.starter_ontology_installer",
+      "configuration_references": [],
+      "implementation_binding": "VellisLocalPythonRealization::PythonEverydayLifeOntologyInstaller",
+      "instance_key": "vellis.starter_ontology.installer",
+      "max_in_flight": 1,
+      "queue_capacity": 1,
+      "replay_authority": "external_exchange",
+      "runtime_binding_id": "binding.python.vellis.starter_ontology_installer.source.v1"
+    },
+    {
+      "binding_version": 1,
+      "component_contract_id": "application.vellis.runner",
+      "configuration_references": [],
+      "implementation_binding": "VellisLocalPythonRealization::RtgKnowledgeGraphRunner",
+      "instance_key": "vellis.runner.local",
+      "max_in_flight": 1,
+      "queue_capacity": 1,
+      "replay_authority": "external_exchange",
+      "runtime_binding_id": "binding.python.vellis.runner.source.v1"
+    }
+  ],
+  "runtime": {
+    "component_contract_id": "component.runtime.message_runtime",
+    "configuration_references": [
+      "config.runtime_database_path"
+    ],
+    "implementation_binding": "VellisRuntimePythonRealization::SqliteMessageRuntime",
+    "ledger_backend": "sqlite_internal_bootstrap",
+    "routing_scope": "local_single_process",
+    "runtime_key": "vellis.rtg_knowledge_graph"
+  },
+  "schema_version": 3,
   "tools": [
     {
       "annotations": {
@@ -48,6 +191,8 @@
         "readOnlyHint": true
       },
       "audience": "everyday",
+      "codec_id": "codec.python.application.vellis.facade.request.json",
+      "codec_version": 1,
       "description": "Inspect RTG state and workflow guidance; Lane: state_and_discovery; call this before schema-dependent work.",
       "dry_run_tool": null,
       "failure_envelope": {
@@ -58,20 +203,29 @@
         "ok": false,
         "optional": [
           "error.diagnostic",
-          "transaction_id",
           "validation_report"
         ]
       },
       "lane": "state_and_discovery",
       "ledgers": false,
+      "message_schema_version": 1,
       "name": "rtg_get_system_state",
       "operation_id": "operation.vellis.rtg_get_system_state",
+      "parameter_schema": {
+        "additionalProperties": false,
+        "properties": {},
+        "required": [],
+        "type": "object"
+      },
       "parameters": [],
       "recommended_predecessors": [],
       "success_envelope": {
         "ok": true,
         "result": "<encoded action result>"
       },
+      "target_action_id": "application.vellis.facade.rtg_get_system_state",
+      "target_component_contract_id": "application.vellis.facade",
+      "target_instance_key": "vellis.facade.primary",
       "transports": [
         "stdio",
         "http"
@@ -85,6 +239,8 @@
         "readOnlyHint": true
       },
       "audience": "everyday",
+      "codec_id": "codec.python.application.vellis.facade.request.json",
+      "codec_version": 1,
       "description": "Read detailed RTG request shapes and workflows; Lane: state_and_discovery; use topic capabilities for the tool map.",
       "dry_run_tool": null,
       "failure_envelope": {
@@ -95,14 +251,26 @@
         "ok": false,
         "optional": [
           "error.diagnostic",
-          "transaction_id",
           "validation_report"
         ]
       },
       "lane": "state_and_discovery",
       "ledgers": false,
+      "message_schema_version": 1,
       "name": "rtg_get_usage_guide",
       "operation_id": "operation.vellis.rtg_get_usage_guide",
+      "parameter_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "topic": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "topic"
+        ],
+        "type": "object"
+      },
       "parameters": [
         {
           "name": "topic",
@@ -114,6 +282,9 @@
         "ok": true,
         "result": "<encoded action result>"
       },
+      "target_action_id": "application.vellis.facade.rtg_get_usage_guide",
+      "target_component_contract_id": "application.vellis.facade",
+      "target_instance_key": "vellis.facade.primary",
       "transports": [
         "stdio",
         "http"
@@ -127,6 +298,8 @@
         "readOnlyHint": false
       },
       "audience": "advanced",
+      "codec_id": "codec.python.application.vellis.facade.request.json",
+      "codec_version": 1,
       "description": "Stage an ergonomic schema migration; Lane: knowledge_engineering; inspect current schema and obtain approval first.",
       "dry_run_tool": null,
       "failure_envelope": {
@@ -137,14 +310,52 @@
         "ok": false,
         "optional": [
           "error.diagnostic",
-          "transaction_id",
           "validation_report"
         ]
       },
       "lane": "knowledge_engineering",
       "ledgers": true,
+      "message_schema_version": 1,
       "name": "rtg_stage_schema_migration",
       "operation_id": "operation.vellis.rtg_stage_schema_migration",
+      "parameter_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "description": {
+            "type": "string"
+          },
+          "migration_id": {
+            "type": "string"
+          },
+          "response_options": {
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "retire_live_schema": {
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "schema_definitions": {
+            "type": "array"
+          },
+          "validation_mode": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "migration_id",
+          "description",
+          "schema_definitions"
+        ],
+        "type": "object"
+      },
       "parameters": [
         {
           "name": "migration_id",
@@ -180,6 +391,9 @@
         "ok": true,
         "result": "<encoded action result>"
       },
+      "target_action_id": "application.vellis.facade.rtg_stage_schema_migration",
+      "target_component_contract_id": "application.vellis.facade",
+      "target_instance_key": "vellis.facade.primary",
       "transports": [
         "stdio",
         "http"
@@ -193,6 +407,8 @@
         "readOnlyHint": true
       },
       "audience": "everyday",
+      "codec_id": "codec.python.application.vellis.facade.request.json",
+      "codec_version": 1,
       "description": "Dry-run ergonomic anchor records without mutation or ledgering; Lane: live_graph.",
       "dry_run_tool": null,
       "failure_envelope": {
@@ -203,14 +419,38 @@
         "ok": false,
         "optional": [
           "error.diagnostic",
-          "transaction_id",
           "validation_report"
         ]
       },
       "lane": "live_graph",
       "ledgers": false,
+      "message_schema_version": 1,
       "name": "rtg_validate_live_anchor_records",
       "operation_id": "operation.vellis.rtg_validate_live_anchor_records",
+      "parameter_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "anchor_records": {
+            "type": "array"
+          },
+          "link_writes": {
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "validation_options": {
+            "type": [
+              "object",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "anchor_records"
+        ],
+        "type": "object"
+      },
       "parameters": [
         {
           "name": "anchor_records",
@@ -230,6 +470,9 @@
         "ok": true,
         "result": "<encoded action result>"
       },
+      "target_action_id": "application.vellis.facade.rtg_validate_live_anchor_records",
+      "target_component_contract_id": "application.vellis.facade",
+      "target_instance_key": "vellis.facade.primary",
       "transports": [
         "stdio",
         "http"
@@ -243,6 +486,8 @@
         "readOnlyHint": false
       },
       "audience": "everyday",
+      "codec_id": "codec.python.application.vellis.facade.request.json",
+      "codec_version": 1,
       "description": "Apply ergonomic anchor records to live state; Lane: live_graph; discover schema first.",
       "dry_run_tool": "rtg_validate_live_anchor_records",
       "failure_envelope": {
@@ -253,14 +498,44 @@
         "ok": false,
         "optional": [
           "error.diagnostic",
-          "transaction_id",
           "validation_report"
         ]
       },
       "lane": "live_graph",
       "ledgers": true,
+      "message_schema_version": 1,
       "name": "rtg_apply_live_anchor_records",
       "operation_id": "operation.vellis.rtg_apply_live_anchor_records",
+      "parameter_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "anchor_records": {
+            "type": "array"
+          },
+          "link_writes": {
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "response_options": {
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "validation_mode": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "anchor_records"
+        ],
+        "type": "object"
+      },
       "parameters": [
         {
           "name": "anchor_records",
@@ -287,6 +562,9 @@
         "ok": true,
         "result": "<encoded action result>"
       },
+      "target_action_id": "application.vellis.facade.rtg_apply_live_anchor_records",
+      "target_component_contract_id": "application.vellis.facade",
+      "target_instance_key": "vellis.facade.primary",
       "transports": [
         "stdio",
         "http"
@@ -300,6 +578,8 @@
         "readOnlyHint": true
       },
       "audience": "everyday",
+      "codec_id": "codec.python.application.vellis.facade.request.json",
+      "codec_version": 1,
       "description": "Dry-run normalized live graph changes without mutation or ledgering; Lane: live_graph.",
       "dry_run_tool": null,
       "failure_envelope": {
@@ -310,14 +590,32 @@
         "ok": false,
         "optional": [
           "error.diagnostic",
-          "transaction_id",
           "validation_report"
         ]
       },
       "lane": "live_graph",
       "ledgers": false,
+      "message_schema_version": 1,
       "name": "rtg_validate_live_graph_changes",
       "operation_id": "operation.vellis.rtg_validate_live_graph_changes",
+      "parameter_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "graph_changes": {
+            "type": "object"
+          },
+          "validation_options": {
+            "type": [
+              "object",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "graph_changes"
+        ],
+        "type": "object"
+      },
       "parameters": [
         {
           "name": "graph_changes",
@@ -333,6 +631,9 @@
         "ok": true,
         "result": "<encoded action result>"
       },
+      "target_action_id": "application.vellis.facade.rtg_validate_live_graph_changes",
+      "target_component_contract_id": "application.vellis.facade",
+      "target_instance_key": "vellis.facade.primary",
       "transports": [
         "stdio",
         "http"
@@ -346,6 +647,8 @@
         "readOnlyHint": false
       },
       "audience": "everyday",
+      "codec_id": "codec.python.application.vellis.facade.request.json",
+      "codec_version": 1,
       "description": "Apply normalized live graph changes; Lane: live_graph; use the validation predecessor for risky writes.",
       "dry_run_tool": "rtg_validate_live_graph_changes",
       "failure_envelope": {
@@ -356,14 +659,32 @@
         "ok": false,
         "optional": [
           "error.diagnostic",
-          "transaction_id",
           "validation_report"
         ]
       },
       "lane": "live_graph",
       "ledgers": true,
+      "message_schema_version": 1,
       "name": "rtg_apply_live_graph_changes",
       "operation_id": "operation.vellis.rtg_apply_live_graph_changes",
+      "parameter_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "graph_changes": {
+            "type": "object"
+          },
+          "validation_mode": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "graph_changes"
+        ],
+        "type": "object"
+      },
       "parameters": [
         {
           "name": "graph_changes",
@@ -382,6 +703,9 @@
         "ok": true,
         "result": "<encoded action result>"
       },
+      "target_action_id": "application.vellis.facade.rtg_apply_live_graph_changes",
+      "target_component_contract_id": "application.vellis.facade",
+      "target_instance_key": "vellis.facade.primary",
       "transports": [
         "stdio",
         "http"
@@ -395,6 +719,8 @@
         "readOnlyHint": false
       },
       "audience": "advanced",
+      "codec_id": "codec.python.application.vellis.facade.request.json",
+      "codec_version": 1,
       "description": "Stage an advanced normalized knowledge batch; Lane: knowledge_engineering; prefer ergonomic staging for ordinary schema work.",
       "dry_run_tool": null,
       "failure_envelope": {
@@ -405,14 +731,32 @@
         "ok": false,
         "optional": [
           "error.diagnostic",
-          "transaction_id",
           "validation_report"
         ]
       },
       "lane": "knowledge_engineering",
       "ledgers": true,
+      "message_schema_version": 1,
       "name": "rtg_stage_knowledge_changes",
       "operation_id": "operation.vellis.rtg_stage_knowledge_changes",
+      "parameter_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "knowledge_changes": {
+            "type": "object"
+          },
+          "validation_mode": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "knowledge_changes"
+        ],
+        "type": "object"
+      },
       "parameters": [
         {
           "name": "knowledge_changes",
@@ -432,6 +776,9 @@
         "ok": true,
         "result": "<encoded action result>"
       },
+      "target_action_id": "application.vellis.facade.rtg_stage_knowledge_changes",
+      "target_component_contract_id": "application.vellis.facade",
+      "target_instance_key": "vellis.facade.primary",
       "transports": [
         "stdio",
         "http"
@@ -445,6 +792,8 @@
         "readOnlyHint": false
       },
       "audience": "advanced",
+      "codec_id": "codec.python.application.vellis.facade.request.json",
+      "codec_version": 1,
       "description": "Apply a staged migration atomically; Lane: migration; validate the projected state first.",
       "dry_run_tool": null,
       "failure_envelope": {
@@ -455,14 +804,32 @@
         "ok": false,
         "optional": [
           "error.diagnostic",
-          "transaction_id",
           "validation_report"
         ]
       },
       "lane": "migration",
       "ledgers": true,
+      "message_schema_version": 1,
       "name": "rtg_apply_migration_cutover",
       "operation_id": "operation.vellis.rtg_apply_migration_cutover",
+      "parameter_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "cutover_options": {
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "migration_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "migration_id"
+        ],
+        "type": "object"
+      },
       "parameters": [
         {
           "name": "migration_id",
@@ -481,6 +848,9 @@
         "ok": true,
         "result": "<encoded action result>"
       },
+      "target_action_id": "application.vellis.facade.rtg_apply_migration_cutover",
+      "target_component_contract_id": "application.vellis.facade",
+      "target_instance_key": "vellis.facade.primary",
       "transports": [
         "stdio",
         "http"
@@ -494,6 +864,8 @@
         "readOnlyHint": false
       },
       "audience": "advanced",
+      "codec_id": "codec.python.application.vellis.facade.request.json",
+      "codec_version": 1,
       "description": "Abandon staged migration work and prune safe non-live candidates; Lane: migration.",
       "dry_run_tool": null,
       "failure_envelope": {
@@ -504,14 +876,32 @@
         "ok": false,
         "optional": [
           "error.diagnostic",
-          "transaction_id",
           "validation_report"
         ]
       },
       "lane": "migration",
       "ledgers": true,
+      "message_schema_version": 1,
       "name": "rtg_abandon_migration",
       "operation_id": "operation.vellis.rtg_abandon_migration",
+      "parameter_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "migration_id": {
+            "type": "string"
+          },
+          "reason": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "migration_id"
+        ],
+        "type": "object"
+      },
       "parameters": [
         {
           "name": "migration_id",
@@ -529,6 +919,9 @@
         "ok": true,
         "result": "<encoded action result>"
       },
+      "target_action_id": "application.vellis.facade.rtg_abandon_migration",
+      "target_component_contract_id": "application.vellis.facade",
+      "target_instance_key": "vellis.facade.primary",
       "transports": [
         "stdio",
         "http"
@@ -542,6 +935,8 @@
         "readOnlyHint": true
       },
       "audience": "everyday",
+      "codec_id": "codec.python.application.vellis.facade.request.json",
+      "codec_version": 1,
       "description": "Execute a read-only RTG query; Lane: query; detailed grammar and examples are in usage guides.",
       "dry_run_tool": null,
       "failure_envelope": {
@@ -552,14 +947,38 @@
         "ok": false,
         "optional": [
           "error.diagnostic",
-          "transaction_id",
           "validation_report"
         ]
       },
       "lane": "query",
       "ledgers": false,
+      "message_schema_version": 1,
       "name": "rtg_execute_query",
       "operation_id": "operation.vellis.rtg_execute_query",
+      "parameter_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "query_options": {
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "query_spec": {
+            "type": "object"
+          },
+          "response_options": {
+            "type": [
+              "object",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "query_spec"
+        ],
+        "type": "object"
+      },
       "parameters": [
         {
           "name": "query_spec",
@@ -579,6 +998,9 @@
         "ok": true,
         "result": "<encoded action result>"
       },
+      "target_action_id": "application.vellis.facade.rtg_execute_query",
+      "target_component_contract_id": "application.vellis.facade",
+      "target_instance_key": "vellis.facade.primary",
       "transports": [
         "stdio",
         "http"
@@ -592,6 +1014,8 @@
         "readOnlyHint": true
       },
       "audience": "everyday",
+      "codec_id": "codec.python.application.vellis.facade.request.json",
+      "codec_version": 1,
       "description": "Resolve zero, one, or multiple live anchors by typed fact; Lane: query; never guess among multiple matches.",
       "dry_run_tool": null,
       "failure_envelope": {
@@ -602,14 +1026,42 @@
         "ok": false,
         "optional": [
           "error.diagnostic",
-          "transaction_id",
           "validation_report"
         ]
       },
       "lane": "query",
       "ledgers": false,
+      "message_schema_version": 1,
       "name": "rtg_resolve_anchor_by_fact",
       "operation_id": "operation.vellis.rtg_resolve_anchor_by_fact",
+      "parameter_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "anchor_type": {
+            "type": "string"
+          },
+          "case_sensitive": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "data_type": {
+            "type": "string"
+          },
+          "property_path": {
+            "type": "array"
+          },
+          "value": {}
+        },
+        "required": [
+          "anchor_type",
+          "data_type",
+          "property_path",
+          "value"
+        ],
+        "type": "object"
+      },
       "parameters": [
         {
           "name": "anchor_type",
@@ -638,6 +1090,9 @@
         "ok": true,
         "result": "<encoded action result>"
       },
+      "target_action_id": "application.vellis.facade.rtg_resolve_anchor_by_fact",
+      "target_component_contract_id": "application.vellis.facade",
+      "target_instance_key": "vellis.facade.primary",
       "transports": [
         "stdio",
         "http"
@@ -651,6 +1106,8 @@
         "readOnlyHint": true
       },
       "audience": "everyday",
+      "codec_id": "codec.python.application.vellis.facade.request.json",
+      "codec_version": 1,
       "description": "Read one RTG graph object by UUID; Lane: state_and_discovery.",
       "dry_run_tool": null,
       "failure_envelope": {
@@ -661,14 +1118,26 @@
         "ok": false,
         "optional": [
           "error.diagnostic",
-          "transaction_id",
           "validation_report"
         ]
       },
       "lane": "state_and_discovery",
       "ledgers": false,
+      "message_schema_version": 1,
       "name": "rtg_get_object",
       "operation_id": "operation.vellis.rtg_get_object",
+      "parameter_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "object_uuid": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "object_uuid"
+        ],
+        "type": "object"
+      },
       "parameters": [
         {
           "name": "object_uuid",
@@ -680,6 +1149,9 @@
         "ok": true,
         "result": "<encoded action result>"
       },
+      "target_action_id": "application.vellis.facade.rtg_get_object",
+      "target_component_contract_id": "application.vellis.facade",
+      "target_instance_key": "vellis.facade.primary",
       "transports": [
         "stdio",
         "http"
@@ -693,6 +1165,8 @@
         "readOnlyHint": true
       },
       "audience": "everyday",
+      "codec_id": "codec.python.application.vellis.facade.request.json",
+      "codec_version": 1,
       "description": "List current migration-store records; Lane: migration; use history for pruned or rejected work.",
       "dry_run_tool": null,
       "failure_envelope": {
@@ -703,14 +1177,27 @@
         "ok": false,
         "optional": [
           "error.diagnostic",
-          "transaction_id",
           "validation_report"
         ]
       },
       "lane": "migration",
       "ledgers": false,
+      "message_schema_version": 1,
       "name": "rtg_list_migrations",
       "operation_id": "operation.vellis.rtg_list_migrations",
+      "parameter_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "status": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [],
+        "type": "object"
+      },
       "parameters": [
         {
           "name": "status",
@@ -722,6 +1209,9 @@
         "ok": true,
         "result": "<encoded action result>"
       },
+      "target_action_id": "application.vellis.facade.rtg_list_migrations",
+      "target_component_contract_id": "application.vellis.facade",
+      "target_instance_key": "vellis.facade.primary",
       "transports": [
         "stdio",
         "http"
@@ -735,6 +1225,8 @@
         "readOnlyHint": true
       },
       "audience": "everyday",
+      "codec_id": "codec.python.application.vellis.facade.request.json",
+      "codec_version": 1,
       "description": "Read one current migration-store record by ID; Lane: migration.",
       "dry_run_tool": null,
       "failure_envelope": {
@@ -745,14 +1237,26 @@
         "ok": false,
         "optional": [
           "error.diagnostic",
-          "transaction_id",
           "validation_report"
         ]
       },
       "lane": "migration",
       "ledgers": false,
+      "message_schema_version": 1,
       "name": "rtg_get_migration",
       "operation_id": "operation.vellis.rtg_get_migration",
+      "parameter_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "migration_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "migration_id"
+        ],
+        "type": "object"
+      },
       "parameters": [
         {
           "name": "migration_id",
@@ -764,6 +1268,9 @@
         "ok": true,
         "result": "<encoded action result>"
       },
+      "target_action_id": "application.vellis.facade.rtg_get_migration",
+      "target_component_contract_id": "application.vellis.facade",
+      "target_instance_key": "vellis.facade.primary",
       "transports": [
         "stdio",
         "http"
@@ -777,6 +1284,8 @@
         "readOnlyHint": true
       },
       "audience": "everyday",
+      "codec_id": "codec.python.application.vellis.facade.request.json",
+      "codec_version": 1,
       "description": "Validate current or migration-projected RTG state without mutation; Lane: live_graph.",
       "dry_run_tool": null,
       "failure_envelope": {
@@ -787,14 +1296,33 @@
         "ok": false,
         "optional": [
           "error.diagnostic",
-          "transaction_id",
           "validation_report"
         ]
       },
       "lane": "live_graph",
       "ledgers": false,
+      "message_schema_version": 1,
       "name": "rtg_validate_graph",
       "operation_id": "operation.vellis.rtg_validate_graph",
+      "parameter_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "migration_ids": {
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "validation_options": {
+            "type": [
+              "object",
+              "null"
+            ]
+          }
+        },
+        "required": [],
+        "type": "object"
+      },
       "parameters": [
         {
           "name": "migration_ids",
@@ -810,6 +1338,9 @@
         "ok": true,
         "result": "<encoded action result>"
       },
+      "target_action_id": "application.vellis.facade.rtg_validate_graph",
+      "target_component_contract_id": "application.vellis.facade",
+      "target_instance_key": "vellis.facade.primary",
       "transports": [
         "stdio",
         "http"
@@ -823,6 +1354,8 @@
         "readOnlyHint": true
       },
       "audience": "everyday",
+      "codec_id": "codec.python.application.vellis.facade.request.json",
+      "codec_version": 1,
       "description": "Discover anchor types and live counts; Lane: state_and_discovery; use before guessing type keys.",
       "dry_run_tool": null,
       "failure_envelope": {
@@ -833,14 +1366,27 @@
         "ok": false,
         "optional": [
           "error.diagnostic",
-          "transaction_id",
           "validation_report"
         ]
       },
       "lane": "state_and_discovery",
       "ledgers": false,
+      "message_schema_version": 1,
       "name": "rtg_discover_anchor_types",
       "operation_id": "operation.vellis.rtg_discover_anchor_types",
+      "parameter_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "discovery_options": {
+            "type": [
+              "object",
+              "null"
+            ]
+          }
+        },
+        "required": [],
+        "type": "object"
+      },
       "parameters": [
         {
           "name": "discovery_options",
@@ -852,6 +1398,9 @@
         "ok": true,
         "result": "<encoded action result>"
       },
+      "target_action_id": "application.vellis.facade.rtg_discover_anchor_types",
+      "target_component_contract_id": "application.vellis.facade",
+      "target_instance_key": "vellis.facade.primary",
       "transports": [
         "stdio",
         "http"
@@ -865,6 +1414,8 @@
         "readOnlyHint": true
       },
       "audience": "everyday",
+      "codec_id": "codec.python.application.vellis.facade.request.json",
+      "codec_version": 1,
       "description": "Read schema details for selected anchor types; Lane: state_and_discovery; use before writes.",
       "dry_run_tool": null,
       "failure_envelope": {
@@ -875,14 +1426,32 @@
         "ok": false,
         "optional": [
           "error.diagnostic",
-          "transaction_id",
           "validation_report"
         ]
       },
       "lane": "state_and_discovery",
       "ledgers": false,
+      "message_schema_version": 1,
       "name": "rtg_get_schema_pack",
       "operation_id": "operation.vellis.rtg_get_schema_pack",
+      "parameter_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "anchor_type_keys": {
+            "type": "array"
+          },
+          "schema_pack_options": {
+            "type": [
+              "object",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "anchor_type_keys"
+        ],
+        "type": "object"
+      },
       "parameters": [
         {
           "name": "anchor_type_keys",
@@ -898,6 +1467,9 @@
         "ok": true,
         "result": "<encoded action result>"
       },
+      "target_action_id": "application.vellis.facade.rtg_get_schema_pack",
+      "target_component_contract_id": "application.vellis.facade",
+      "target_instance_key": "vellis.facade.primary",
       "transports": [
         "stdio",
         "http"
@@ -911,6 +1483,8 @@
         "readOnlyHint": true
       },
       "audience": "everyday",
+      "codec_id": "codec.python.application.vellis.facade.request.json",
+      "codec_version": 1,
       "description": "Export current coordinated RTG state or a compact summary; Lane: recovery_and_audit.",
       "dry_run_tool": null,
       "failure_envelope": {
@@ -921,14 +1495,27 @@
         "ok": false,
         "optional": [
           "error.diagnostic",
-          "transaction_id",
           "validation_report"
         ]
       },
       "lane": "recovery_and_audit",
       "ledgers": false,
+      "message_schema_version": 1,
       "name": "rtg_export_system_snapshot",
       "operation_id": "operation.vellis.rtg_export_system_snapshot",
+      "parameter_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "summary": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          }
+        },
+        "required": [],
+        "type": "object"
+      },
       "parameters": [
         {
           "default": false,
@@ -941,6 +1528,9 @@
         "ok": true,
         "result": "<encoded action result>"
       },
+      "target_action_id": "application.vellis.facade.rtg_export_system_snapshot",
+      "target_component_contract_id": "application.vellis.facade",
+      "target_instance_key": "vellis.facade.primary",
       "transports": [
         "stdio",
         "http"
@@ -954,7 +1544,9 @@
         "readOnlyHint": false
       },
       "audience": "everyday",
-      "description": "Persist a coordinated RTG snapshot; Lane: recovery_and_audit; this records an administrative ledger event.",
+      "codec_id": "codec.python.application.vellis.facade.request.json",
+      "codec_version": 1,
+      "description": "Persist a coordinated RTG snapshot; Lane: recovery_and_audit; the runtime records the request, component calls, and terminal trace.",
       "dry_run_tool": null,
       "failure_envelope": {
         "error": {
@@ -964,14 +1556,32 @@
         "ok": false,
         "optional": [
           "error.diagnostic",
-          "transaction_id",
           "validation_report"
         ]
       },
       "lane": "recovery_and_audit",
       "ledgers": true,
+      "message_schema_version": 1,
       "name": "rtg_persist_system_snapshot",
       "operation_id": "operation.vellis.rtg_persist_system_snapshot",
+      "parameter_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "relative_path": {
+            "type": "string"
+          },
+          "return_snapshot": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "relative_path"
+        ],
+        "type": "object"
+      },
       "parameters": [
         {
           "name": "relative_path",
@@ -988,6 +1598,9 @@
         "ok": true,
         "result": "<encoded action result>"
       },
+      "target_action_id": "application.vellis.facade.rtg_persist_system_snapshot",
+      "target_component_contract_id": "application.vellis.facade",
+      "target_instance_key": "vellis.facade.primary",
       "transports": [
         "stdio",
         "http"
@@ -1001,6 +1614,8 @@
         "readOnlyHint": true
       },
       "audience": "everyday",
+      "codec_id": "codec.python.application.vellis.facade.request.json",
+      "codec_version": 1,
       "description": "List RTG snapshots visible through configured storage; Lane: recovery_and_audit.",
       "dry_run_tool": null,
       "failure_envelope": {
@@ -1011,20 +1626,29 @@
         "ok": false,
         "optional": [
           "error.diagnostic",
-          "transaction_id",
           "validation_report"
         ]
       },
       "lane": "recovery_and_audit",
       "ledgers": false,
+      "message_schema_version": 1,
       "name": "rtg_list_persisted_snapshots",
       "operation_id": "operation.vellis.rtg_list_persisted_snapshots",
+      "parameter_schema": {
+        "additionalProperties": false,
+        "properties": {},
+        "required": [],
+        "type": "object"
+      },
       "parameters": [],
       "recommended_predecessors": [],
       "success_envelope": {
         "ok": true,
         "result": "<encoded action result>"
       },
+      "target_action_id": "application.vellis.facade.rtg_list_persisted_snapshots",
+      "target_component_contract_id": "application.vellis.facade",
+      "target_instance_key": "vellis.facade.primary",
       "transports": [
         "stdio",
         "http"
@@ -1038,6 +1662,8 @@
         "readOnlyHint": true
       },
       "audience": "everyday",
+      "codec_id": "codec.python.application.vellis.facade.request.json",
+      "codec_version": 1,
       "description": "Load one persisted RTG snapshot without restoring it; Lane: recovery_and_audit.",
       "dry_run_tool": null,
       "failure_envelope": {
@@ -1048,14 +1674,32 @@
         "ok": false,
         "optional": [
           "error.diagnostic",
-          "transaction_id",
           "validation_report"
         ]
       },
       "lane": "recovery_and_audit",
       "ledgers": false,
+      "message_schema_version": 1,
       "name": "rtg_load_persisted_snapshot",
       "operation_id": "operation.vellis.rtg_load_persisted_snapshot",
+      "parameter_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "relative_path": {
+            "type": "string"
+          },
+          "return_snapshot": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "relative_path"
+        ],
+        "type": "object"
+      },
       "parameters": [
         {
           "name": "relative_path",
@@ -1072,6 +1716,9 @@
         "ok": true,
         "result": "<encoded action result>"
       },
+      "target_action_id": "application.vellis.facade.rtg_load_persisted_snapshot",
+      "target_component_contract_id": "application.vellis.facade",
+      "target_instance_key": "vellis.facade.primary",
       "transports": [
         "stdio",
         "http"
@@ -1085,7 +1732,9 @@
         "readOnlyHint": false
       },
       "audience": "operator",
-      "description": "Replay eligible mutations into empty or snapshot-seeded state; Lane: recovery_and_audit; operator use.",
+      "codec_id": "codec.python.application.vellis.facade.request.json",
+      "codec_version": 1,
+      "description": "Reconstruct committed canonical effects through an optional runtime cursor after explicit reset or compatible checkpoints; Lane: recovery_and_audit; operator use.",
       "dry_run_tool": null,
       "failure_envelope": {
         "error": {
@@ -1095,14 +1744,27 @@
         "ok": false,
         "optional": [
           "error.diagnostic",
-          "transaction_id",
           "validation_report"
         ]
       },
       "lane": "recovery_and_audit",
       "ledgers": false,
+      "message_schema_version": 1,
       "name": "rtg_replay_ledger",
       "operation_id": "operation.vellis.rtg_replay_ledger",
+      "parameter_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "replay_options": {
+            "type": [
+              "object",
+              "null"
+            ]
+          }
+        },
+        "required": [],
+        "type": "object"
+      },
       "parameters": [
         {
           "name": "replay_options",
@@ -1116,6 +1778,9 @@
         "ok": true,
         "result": "<encoded action result>"
       },
+      "target_action_id": "application.vellis.facade.rtg_replay_ledger",
+      "target_component_contract_id": "application.vellis.facade",
+      "target_instance_key": "vellis.facade.primary",
       "transports": [
         "stdio",
         "http"
@@ -1129,7 +1794,9 @@
         "readOnlyHint": true
       },
       "audience": "everyday",
-      "description": "Verify replay in isolated scratch state and restore live state exactly; Lane: recovery_and_audit.",
+      "codec_id": "codec.python.application.vellis.facade.request.json",
+      "codec_version": 1,
+      "description": "Report exact available reconstruction evidence and direct historical requests to an isolated data-root copy; Lane: recovery_and_audit.",
       "dry_run_tool": null,
       "failure_envelope": {
         "error": {
@@ -1139,14 +1806,27 @@
         "ok": false,
         "optional": [
           "error.diagnostic",
-          "transaction_id",
           "validation_report"
         ]
       },
       "lane": "recovery_and_audit",
       "ledgers": false,
+      "message_schema_version": 1,
       "name": "rtg_verify_replay_from_ledger",
       "operation_id": "operation.vellis.rtg_verify_replay_from_ledger",
+      "parameter_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "replay_options": {
+            "type": [
+              "object",
+              "null"
+            ]
+          }
+        },
+        "required": [],
+        "type": "object"
+      },
       "parameters": [
         {
           "name": "replay_options",
@@ -1158,6 +1838,9 @@
         "ok": true,
         "result": "<encoded action result>"
       },
+      "target_action_id": "application.vellis.facade.rtg_verify_replay_from_ledger",
+      "target_component_contract_id": "application.vellis.facade",
+      "target_instance_key": "vellis.facade.primary",
       "transports": [
         "stdio",
         "http"
@@ -1171,7 +1854,9 @@
         "readOnlyHint": true
       },
       "audience": "everyday",
-      "description": "Read ledger-projected migration events, including rejected proposals; Lane: migration.",
+      "codec_id": "codec.python.application.vellis.facade.request.json",
+      "codec_version": 1,
+      "description": "Read migration-related runtime traces in terminal-position order; Lane: migration.",
       "dry_run_tool": null,
       "failure_envelope": {
         "error": {
@@ -1181,20 +1866,29 @@
         "ok": false,
         "optional": [
           "error.diagnostic",
-          "transaction_id",
           "validation_report"
         ]
       },
       "lane": "migration",
       "ledgers": false,
+      "message_schema_version": 1,
       "name": "rtg_list_migration_history",
       "operation_id": "operation.vellis.rtg_list_migration_history",
+      "parameter_schema": {
+        "additionalProperties": false,
+        "properties": {},
+        "required": [],
+        "type": "object"
+      },
       "parameters": [],
       "recommended_predecessors": [],
       "success_envelope": {
         "ok": true,
         "result": "<encoded action result>"
       },
+      "target_action_id": "application.vellis.facade.rtg_list_migration_history",
+      "target_component_contract_id": "application.vellis.facade",
+      "target_instance_key": "vellis.facade.primary",
       "transports": [
         "stdio",
         "http"
@@ -1202,13 +1896,15 @@
     },
     {
       "annotations": {
-        "destructiveHint": true,
-        "idempotentHint": false,
+        "destructiveHint": false,
+        "idempotentHint": true,
         "openWorldHint": false,
-        "readOnlyHint": false
+        "readOnlyHint": true
       },
       "audience": "operator",
-      "description": "Retry queued controller ledger writes; Lane: recovery_and_audit; operator use.",
+      "codec_id": "codec.python.application.vellis.facade.request.json",
+      "codec_version": 1,
+      "description": "Deprecated health-only status for callers that still know the old tool name; Lane: recovery_and_audit; operator use.",
       "dry_run_tool": null,
       "failure_envelope": {
         "error": {
@@ -1218,14 +1914,20 @@
         "ok": false,
         "optional": [
           "error.diagnostic",
-          "transaction_id",
           "validation_report"
         ]
       },
       "lane": "recovery_and_audit",
       "ledgers": false,
+      "message_schema_version": 1,
       "name": "rtg_flush_ledger_failures",
       "operation_id": "operation.vellis.rtg_flush_ledger_failures",
+      "parameter_schema": {
+        "additionalProperties": false,
+        "properties": {},
+        "required": [],
+        "type": "object"
+      },
       "parameters": [],
       "recommended_predecessors": [
         "rtg_get_system_state"
@@ -1234,6 +1936,9 @@
         "ok": true,
         "result": "<encoded action result>"
       },
+      "target_action_id": "application.vellis.facade.rtg_flush_ledger_failures",
+      "target_component_contract_id": "application.vellis.facade",
+      "target_instance_key": "vellis.facade.primary",
       "transports": [
         "stdio",
         "http"
@@ -1247,6 +1952,8 @@
         "readOnlyHint": false
       },
       "audience": "operator",
+      "codec_id": "codec.python.application.vellis.facade.request.json",
+      "codec_version": 1,
       "description": "Restore coordinated RTG state from a supplied snapshot; Lane: recovery_and_audit; operator use.",
       "dry_run_tool": null,
       "failure_envelope": {
@@ -1257,14 +1964,32 @@
         "ok": false,
         "optional": [
           "error.diagnostic",
-          "transaction_id",
           "validation_report"
         ]
       },
       "lane": "recovery_and_audit",
       "ledgers": true,
+      "message_schema_version": 1,
       "name": "rtg_restore_from_snapshot",
       "operation_id": "operation.vellis.rtg_restore_from_snapshot",
+      "parameter_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "restore_options": {
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "snapshot": {
+            "type": "object"
+          }
+        },
+        "required": [
+          "snapshot"
+        ],
+        "type": "object"
+      },
       "parameters": [
         {
           "name": "snapshot",
@@ -1282,10 +2007,14 @@
         "ok": true,
         "result": "<encoded action result>"
       },
+      "target_action_id": "application.vellis.facade.rtg_restore_from_snapshot",
+      "target_component_contract_id": "application.vellis.facade",
+      "target_instance_key": "vellis.facade.primary",
       "transports": [
         "stdio",
         "http"
       ]
     }
-  ]
+  ],
+  "topology_migration_required_on_occurrence_change": true
 }

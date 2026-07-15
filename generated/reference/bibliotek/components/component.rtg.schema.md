@@ -11,6 +11,7 @@ Generated from textual SysML v2 by `just model-render` as a non-normative readin
 | Feature | Contract | Signature | Principal failures | Meaning |
 |---|---|---|---|---|
 | `exportSnapshot` | `ExportSchemaSnapshot` | out `snapshot: RtgSchemaSnapshot` | None | Export every full definition with normalized live metadata without mutation or filtering. |
+| `replaceSnapshot` | `ReplaceSchemaSnapshot` | in `snapshot: RtgSchemaSnapshot` | `RtgSchemaSnapshotInvalid`, `RtgSchemaUuidInvalid`, `RtgSchemaUuidConflict`, `RtgSchemaDefinitionKindInvalid`, `RtgSchemaTypeKeyInvalid`, `RtgSchemaDefinitionInvalid`, `RtgSchemaPayloadInvalid`, `RtgSchemaSystemValueInvalid`, `RtgSchemaLiveTypeConflict` | Validate the complete candidate, then atomically replace all definitions and rebuild derived indexes. |
 | `putDefinition` | `PutSchemaDefinition` | in `definition: RtgSchemaDefinition`; out `stored: RtgSchemaDefinition` | `RtgSchemaUuidInvalid`, `RtgSchemaDefinitionKindInvalid`, `RtgSchemaTypeKeyInvalid`, `RtgSchemaDefinitionInvalid`, `RtgSchemaPayloadInvalid`, `RtgSchemaSystemValueInvalid`, `RtgSchemaLiveTypeConflict` | Generate or preserve identity, validate definition structure and the selected payload, and atomically create or fully replace one definition. |
 | `getDefinition` | `GetSchemaDefinition` | in `definitionUuid: Uuid`; out `definition: RtgSchemaDefinition` | `RtgSchemaDefinitionNotFound` | Return one definition by UUID. |
 | `listDefinitions` | `ListSchemaDefinitions` | in `kind: RtgSchemaDefinitionKind[0..1]`; in `live: Boolean[0..1]`; out `result: RtgSchemaDefinitionList` | `RtgSchemaDefinitionKindInvalid` | List definitions with optional kind and live filters in deterministic order. |
@@ -46,6 +47,7 @@ Generated from textual SysML v2 by `just model-render` as a non-normative readin
 | Action | State / collaborator | Access | Modeled effect |
 |---|---|---|---|
 | `exportSnapshot` | `definitions` | `read` | read all canonical definitions. |
+| `replaceSnapshot` | `definitions` | `write` | validate before visibility, atomically replace every definition, and rebuild indexes. |
 | `putDefinition` | `definitions` | `write` | atomically create/replace definition and rebuild affected indexes. |
 | `getDefinition` | `definitions` | `read` | read one canonical definition. |
 | `listDefinitions` | `navigationIndexes` | `read` | read kind/live indexes. |
@@ -73,7 +75,8 @@ Generated from textual SysML v2 by `just model-render` as a non-normative readin
 | `contract.rtg.schema.payload_semantics` | `RtgSchema` | `schema` | Anchor payloads distinguish disjoint required and optional associated-data type-key sets; data-object payloads map unique property names to recursive field definitions; link payloads contain non-empty unique source and target type-key sets whose overlap is allowed. Kind and payload family must agree. |
 | `contract.rtg.schema.read_effect` | `RtgSchema` | `schema` | Reads are deterministic, derive only from definitions and indexes, honor explicit filters/defaults, never inspect graph state, and never mutate. |
 | `contract.rtg.schema.delete_effect` | `DeleteSchemaDefinition` | `schema.deleteDefinition` | Delete removes only one definition and its derived entries; it performs no safety decision or cross-component cascade. |
-| `contract.rtg.schema.snapshot_effect` | `RtgSchema` | `schema` | Snapshot round-trip preserves full records and normalized live state; import validates the whole candidate before visibility. |
+| `contract.rtg.schema.snapshot_effect` | `RtgSchema` | `schema` | Snapshot round-trip preserves full records and normalized live state; import and in-place replacement validate the whole candidate before visibility. Rejected replacement preserves prior state, and replacing with the current snapshot is idempotent. |
+| `contract.rtg.schema.snapshot_replacement` | `ReplaceSchemaSnapshot` | `schema.replaceSnapshot` | Whole-candidate validation precedes visibility; success atomically replaces all definitions and indexes, failure preserves the prior registry, and replacing with an identical snapshot is idempotent. |
 | `invariant.rtg.schema.uuid_unique` | `RtgSchema` | `schema` | Definition UUIDs are unique. |
 | `invariant.rtg.schema.live_type_unique` | `RtgSchema` | `schema` | At most one live definition across all definition kinds owns a type key. |
 | `invariant.rtg.schema.live_status_boolean` | `RtgSchema` | `schema` | Missing live normalizes to true and supplied live is Boolean. |
@@ -85,6 +88,7 @@ Generated from textual SysML v2 by `just model-render` as a non-normative readin
 | `invariant.rtg.schema.navigation_indexes_match_payloads` | `RtgSchema` | `schema` | Derived kind, type, live, associated-data, and link-participation indexes exactly match canonical payloads. |
 | `invariant.rtg.schema.deterministic_list_ordering` | `RtgSchema` | `schema` | Public list results are deterministic for one registry state. |
 | `contract.rtg.schema.export_schema_snapshot.failures` | `ExportSchemaSnapshot` | `schema.exportSnapshot` | Export has no declared domain failure. |
+| `contract.rtg.schema.replace_schema_snapshot.failures` | `ReplaceSchemaSnapshot` | `schema.replaceSnapshot` | Rejected replacement leaves definitions and indexes unchanged. |
 | `contract.rtg.schema.put_schema_definition.failures` | `PutSchemaDefinition` | `schema.putDefinition` | Rejected writes leave definitions and indexes unchanged. |
 | `contract.rtg.schema.get_schema_definition.failures` | `GetSchemaDefinition` | `schema.getDefinition` | Read failure has no effect. |
 | `contract.rtg.schema.list_schema_definitions.failures` | `ListSchemaDefinitions` | `schema.listDefinitions` | Read failure has no effect. |
@@ -146,6 +150,7 @@ Generated from textual SysML v2 by `just model-render` as a non-normative readin
 | `PutSchemaDefinitionContractVerification` | `PutSchemaDefinition` | `definitionWriteEffect`, `putSchemaDefinitionFailureSemantics` | `components/rtg/schema/tests/test_rtg_schema_contract.py#PutSchemaDefinitionContractVerification` |
 | `DeleteSchemaDefinitionContractVerification` | `DeleteSchemaDefinition` | `schemaDeleteEffect`, `deleteSchemaDefinitionFailureSemantics` | `components/rtg/schema/tests/test_rtg_schema_contract.py#DeleteSchemaDefinitionContractVerification` |
 | `ExportSchemaSnapshotContractVerification` | `ExportSchemaSnapshot` | `exportSchemaSnapshotFailureSemantics` | `components/rtg/schema/tests/test_rtg_schema_contract.py#ExportSchemaSnapshotContractVerification` |
+| `ReplaceSchemaSnapshotContractVerification` | `ReplaceSchemaSnapshot` | `schemaSnapshotReplacementEffect`, `replaceSchemaSnapshotFailureSemantics` | `components/rtg/schema/tests/test_rtg_schema_contract.py#ReplaceSchemaSnapshotContractVerification` |
 | `GetSchemaDefinitionContractVerification` | `GetSchemaDefinition` | `getSchemaDefinitionFailureSemantics` | `components/rtg/schema/tests/test_rtg_schema_contract.py#GetSchemaDefinitionContractVerification` |
 | `ListSchemaDefinitionsContractVerification` | `ListSchemaDefinitions` | `listSchemaDefinitionsFailureSemantics` | `components/rtg/schema/tests/test_rtg_schema_contract.py#ListSchemaDefinitionsContractVerification` |
 | `ListDefinitionsByTypeKeyContractVerification` | `ListDefinitionsByTypeKey` | `listDefinitionsByTypeKeyFailureSemantics` | `components/rtg/schema/tests/test_rtg_schema_contract.py#ListDefinitionsByTypeKeyContractVerification` |

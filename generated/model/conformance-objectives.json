@@ -2,6 +2,74 @@
   "description": "Generated implementation-neutral verification objectives derived from SysML subjects, requirements, and evidence bindings.",
   "objectives": [
     {
+      "evidence_id": "components/interface/mcp_gateway/tests/test_mcp_gateway_contract.py#GetMcpGatewayRegistrationsContractVerification",
+      "evidence_nodes": [
+        "components/interface/mcp_gateway/tests/test_mcp_gateway_contract.py::test_gateway_registration_inventory_is_a_defensive_snapshot"
+      ],
+      "model_source": "model/bibliotek/components/component.interface.mcp_gateway.sysml",
+      "requirements": [
+        "contract.interface.mcp_gateway.registrations.failures"
+      ],
+      "status": "resolved",
+      "subject": {
+        "role": "operation",
+        "type": "GetMcpGatewayRegistrations"
+      },
+      "verification": "GetMcpGatewayRegistrationsContractVerification"
+    },
+    {
+      "evidence_id": "components/interface/mcp_gateway/tests/test_mcp_gateway_contract.py#InvokeMcpGatewayToolContractVerification",
+      "evidence_nodes": [
+        "components/interface/mcp_gateway/tests/test_mcp_gateway_contract.py::test_gateway_dispatches_only_curated_registered_tools",
+        "components/interface/mcp_gateway/tests/test_mcp_gateway_contract.py::test_gateway_promotes_modeled_fault_evidence_into_the_external_envelope",
+        "components/interface/mcp_gateway/tests/test_mcp_gateway_contract.py::test_gateway_validates_arguments_before_dispatch",
+        "components/interface/mcp_gateway/tests/test_mcp_gateway_contract.py::test_gateway_propagates_runtime_failures_without_retyping"
+      ],
+      "model_source": "model/bibliotek/components/component.interface.mcp_gateway.sysml",
+      "requirements": [
+        "contract.interface.mcp_gateway.invoke.failures"
+      ],
+      "status": "resolved",
+      "subject": {
+        "role": "operation",
+        "type": "InvokeMcpGatewayTool"
+      },
+      "verification": "InvokeMcpGatewayToolContractVerification"
+    },
+    {
+      "evidence_id": "components/interface/mcp_gateway/tests/test_mcp_gateway_contract.py#McpGatewayBoundaryVerification",
+      "evidence_nodes": [
+        "components/interface/mcp_gateway/tests/test_mcp_gateway_contract.py::test_gateway_dispatches_only_curated_registered_tools"
+      ],
+      "model_source": "model/bibliotek/components/component.interface.mcp_gateway.sysml",
+      "requirements": [
+        "contract.interface.mcp_gateway.curated",
+        "contract.interface.mcp_gateway.transport_only"
+      ],
+      "status": "resolved",
+      "subject": {
+        "role": "gateway",
+        "type": "McpGateway"
+      },
+      "verification": "McpGatewayBoundaryVerification"
+    },
+    {
+      "evidence_id": "components/interface/mcp_gateway/tests/test_mcp_gateway_contract.py#RegisterMcpGatewayToolsContractVerification",
+      "evidence_nodes": [
+        "components/interface/mcp_gateway/tests/test_mcp_gateway_contract.py::test_gateway_registration_validation_is_atomic"
+      ],
+      "model_source": "model/bibliotek/components/component.interface.mcp_gateway.sysml",
+      "requirements": [
+        "contract.interface.mcp_gateway.register.failures"
+      ],
+      "status": "resolved",
+      "subject": {
+        "role": "operation",
+        "type": "RegisterMcpGatewayTools"
+      },
+      "verification": "RegisterMcpGatewayToolsContractVerification"
+    },
+    {
       "evidence_id": "components/rtg/change_validation/tests/test_rtg_change_validation_contract.py#RtgChangeValidationBoundaryVerification",
       "evidence_nodes": [
         "components/rtg/change_validation/tests/test_rtg_change_validation_contract.py::test_semantic_field_refinements_validate_values_recursively",
@@ -235,6 +303,23 @@
       "verification": "PutConstraintContractVerification"
     },
     {
+      "evidence_id": "components/rtg/constraints/tests/test_rtg_constraints_contract.py#ReplaceConstraintSnapshotContractVerification",
+      "evidence_nodes": [
+        "components/rtg/constraints/tests/test_rtg_constraints_contract.py::test_replace_constraint_snapshot_is_atomic_and_idempotent"
+      ],
+      "model_source": "model/bibliotek/components/component.rtg.constraints.sysml",
+      "requirements": [
+        "contract.rtg.constraints.snapshot_replacement",
+        "contract.rtg.constraints.replace_constraint_snapshot.failures"
+      ],
+      "status": "resolved",
+      "subject": {
+        "role": "operation",
+        "type": "ReplaceConstraintSnapshot"
+      },
+      "verification": "ReplaceConstraintSnapshotContractVerification"
+    },
+    {
       "evidence_id": "components/rtg/constraints/tests/test_rtg_constraints_contract.py#RtgConstraintsBoundaryVerification",
       "evidence_nodes": [
         "components/rtg/constraints/tests/test_rtg_constraints_contract.py::test_constraints_store_payloads_without_executing_them",
@@ -268,7 +353,7 @@
     {
       "evidence_id": "components/rtg/controller/tests/test_rtg_controller_contract.py#AbandonMigrationContractVerification",
       "evidence_nodes": [
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_migration_history_is_reconstructed_from_ledger"
+        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_abandon_migration_prunes_private_candidates"
       ],
       "model_source": "model/bibliotek/components/component.rtg.controller.sysml",
       "requirements": [
@@ -285,29 +370,9 @@
     {
       "evidence_id": "components/rtg/controller/tests/test_rtg_controller_contract.py#ApplyLiveGraphChangesContractVerification",
       "evidence_nodes": [
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_replay_can_resume_from_a_structurally_valid_skip_mode_snapshot",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_controller_writes_wait_while_replay_owns_system_state",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_live_graph_lane_resolves_local_refs_validates_applies_and_ledgers",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_live_graph_lane_rejects_invalid_batch_without_mutating",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_controller_cutover_flips_schema_live_status_and_prunes",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_cutover_rejects_schema_candidate_that_invalidates_live_graph_data",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_controller_maps_cutover_precondition_failures",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_live_graph_lane_rejects_non_live_candidate_creation",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_knowledge_staging_accepts_non_live_graph_candidate_when_migration_scoped",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_ledger_failures_are_queued_and_flushed",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_ledger_failure_degrades_result_and_flush_loads_json_queue",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_replay_accepts_persisted_start_snapshot_path",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_verify_replay_from_ledger_uses_scratch_state_and_preserves_current_state",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_replay_verification_restores_invalid_current_instances_exactly",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_replay_reconstructs_cutover_from_ledgered_request_after_pruning",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_replay_decodes_ledgered_schema_fields_with_null_items",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_failed_strict_cutover_status_is_replayable",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_replay_equivalence_detects_equal_counts_with_different_fact_values",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_rejected_staging_is_projected_from_existing_ledger_error",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_migration_history_is_reconstructed_from_ledger",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_restore_request_response_are_ledgered_and_replayed",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_normal_apply_failure_rolls_back_touched_graph_records",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_cutover_post_state_failure_restores_pre_cutover_state"
+        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_live_graph_mutation_resolves_ids_and_is_queryable",
+        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_rejected_live_mutation_has_no_effect",
+        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_normal_apply_failure_compensates_touched_records"
       ],
       "model_source": "model/bibliotek/components/component.rtg.controller.sysml",
       "requirements": [
@@ -325,16 +390,10 @@
     {
       "evidence_id": "components/rtg/controller/tests/test_rtg_controller_contract.py#ApplyMigrationCutoverContractVerification",
       "evidence_nodes": [
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_controller_cutover_flips_schema_live_status_and_prunes",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_cutover_rejects_schema_candidate_that_invalidates_live_graph_data",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_controller_rejects_unsupported_cutover_options",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_controller_maps_cutover_precondition_failures",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_knowledge_staging_accepts_non_live_graph_candidate_when_migration_scoped",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_replay_reconstructs_cutover_from_ledgered_request_after_pruning",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_replay_decodes_ledgered_schema_fields_with_null_items",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_failed_strict_cutover_status_is_replayable",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_migration_history_is_reconstructed_from_ledger",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_cutover_post_state_failure_restores_pre_cutover_state"
+        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_schema_cutover_replaces_live_definition",
+        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_failed_cutover_restores_domain_state_and_commits_failed_status",
+        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_cutover_compensation_failure_reports_recovery_indeterminate",
+        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_cutover_options_and_missing_migration_are_rejected"
       ],
       "model_source": "model/bibliotek/components/component.rtg.controller.sysml",
       "requirements": [
@@ -352,18 +411,7 @@
     {
       "evidence_id": "components/rtg/controller/tests/test_rtg_controller_contract.py#ControllerGetMigrationContractVerification",
       "evidence_nodes": [
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_get_object_maps_invalid_and_missing_graph_ids_to_controller_failure",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_system_state_uses_typed_compact_counts_and_snapshot_paths",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_validate_live_graph_changes_reports_findings_without_mutation",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_controller_cutover_flips_schema_live_status_and_prunes",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_cutover_rejects_schema_candidate_that_invalidates_live_graph_data",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_strict_knowledge_staging_rejects_invalid_cutover_projection",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_replay_reconstructs_cutover_from_ledgered_request_after_pruning",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_replay_decodes_ledgered_schema_fields_with_null_items",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_failed_strict_cutover_status_is_replayable",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_rejected_staging_is_projected_from_existing_ledger_error",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_migration_history_is_reconstructed_from_ledger",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_cutover_post_state_failure_restores_pre_cutover_state"
+        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_failed_cutover_restores_domain_state_and_commits_failed_status"
       ],
       "model_source": "model/bibliotek/components/component.rtg.controller.sysml",
       "requirements": [
@@ -379,17 +427,7 @@
     {
       "evidence_id": "components/rtg/controller/tests/test_rtg_controller_contract.py#ControllerGetObjectContractVerification",
       "evidence_nodes": [
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_get_object_maps_invalid_and_missing_graph_ids_to_controller_failure",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_system_state_uses_typed_compact_counts_and_snapshot_paths",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_validate_live_graph_changes_reports_findings_without_mutation",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_cutover_rejects_schema_candidate_that_invalidates_live_graph_data",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_strict_knowledge_staging_rejects_invalid_cutover_projection",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_replay_reconstructs_cutover_from_ledgered_request_after_pruning",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_replay_decodes_ledgered_schema_fields_with_null_items",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_failed_strict_cutover_status_is_replayable",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_rejected_staging_is_projected_from_existing_ledger_error",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_migration_history_is_reconstructed_from_ledger",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_cutover_post_state_failure_restores_pre_cutover_state"
+        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_get_object_maps_invalid_and_missing_ids"
       ],
       "model_source": "model/bibliotek/components/component.rtg.controller.sysml",
       "requirements": [
@@ -405,9 +443,7 @@
     {
       "evidence_id": "components/rtg/controller/tests/test_rtg_controller_contract.py#ControllerListMigrationsContractVerification",
       "evidence_nodes": [
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_strict_knowledge_staging_rejects_invalid_cutover_projection",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_replay_reconstructs_cutover_from_ledgered_request_after_pruning",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_rejected_staging_is_projected_from_existing_ledger_error"
+        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_staged_graph_candidate_becomes_live_at_cutover"
       ],
       "model_source": "model/bibliotek/components/component.rtg.controller.sysml",
       "requirements": [
@@ -423,11 +459,8 @@
     {
       "evidence_id": "components/rtg/controller/tests/test_rtg_controller_contract.py#DiscoverAnchorTypesContractVerification",
       "evidence_nodes": [
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_controller_cutover_flips_schema_live_status_and_prunes",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_cutover_rejects_schema_candidate_that_invalidates_live_graph_data",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_controller_rejects_unsupported_discovery_and_restore_options",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_replay_reconstructs_cutover_from_ledgered_request_after_pruning",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_cutover_post_state_failure_restores_pre_cutover_state"
+        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_schema_cutover_replaces_live_definition",
+        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_validate_graph_and_discovery_options"
       ],
       "model_source": "model/bibliotek/components/component.rtg.controller.sysml",
       "requirements": [
@@ -443,13 +476,7 @@
     {
       "evidence_id": "components/rtg/controller/tests/test_rtg_controller_contract.py#ExecuteControllerQueryContractVerification",
       "evidence_nodes": [
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_live_graph_lane_resolves_local_refs_validates_applies_and_ledgers",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_validate_live_graph_changes_resolves_without_mutation_or_ledger",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_live_graph_lane_rejects_invalid_batch_without_mutating",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_knowledge_staging_accepts_non_live_graph_candidate_when_migration_scoped",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_replay_accepts_persisted_start_snapshot_path",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_restore_request_response_are_ledgered_and_replayed",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_normal_apply_failure_rolls_back_touched_graph_records"
+        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_live_graph_mutation_resolves_ids_and_is_queryable"
       ],
       "model_source": "model/bibliotek/components/component.rtg.controller.sysml",
       "requirements": [
@@ -466,24 +493,8 @@
     {
       "evidence_id": "components/rtg/controller/tests/test_rtg_controller_contract.py#ExportSystemSnapshotContractVerification",
       "evidence_nodes": [
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_controller_reads_wait_while_restore_replaces_component_handles",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_restore_validates_combined_candidate_before_any_visible_replacement",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_replay_can_resume_from_a_structurally_valid_skip_mode_snapshot",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_failed_recorded_restore_preserves_components_but_may_advance_audit_pointer",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_controller_writes_wait_while_replay_owns_system_state",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_live_graph_lane_resolves_local_refs_validates_applies_and_ledgers",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_validate_live_graph_changes_resolves_without_mutation_or_ledger",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_validate_live_graph_changes_reports_findings_without_mutation",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_controller_rejects_unsupported_discovery_and_restore_options",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_replay_rejects_ambiguous_start_snapshot_options",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_verify_replay_from_ledger_uses_scratch_state_and_preserves_current_state",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_replay_verification_restores_invalid_current_instances_exactly",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_replay_reconstructs_cutover_from_ledgered_request_after_pruning",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_replay_decodes_ledgered_schema_fields_with_null_items",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_failed_strict_cutover_status_is_replayable",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_replay_equivalence_detects_equal_counts_with_different_fact_values",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_restore_request_response_are_ledgered_and_replayed",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_controller_exports_and_persists_snapshot"
+        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_snapshot_persist_load_and_restore_round_trip",
+        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_invalid_snapshot_restore_is_atomic"
       ],
       "model_source": "model/bibliotek/components/component.rtg.controller.sysml",
       "requirements": [
@@ -498,35 +509,9 @@
       "verification": "ExportSystemSnapshotContractVerification"
     },
     {
-      "evidence_id": "components/rtg/controller/tests/test_rtg_controller_contract.py#FlushLedgerFailuresContractVerification",
-      "evidence_nodes": [
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_ledger_failures_are_queued_and_flushed",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_ledger_failure_degrades_result_and_flush_loads_json_queue"
-      ],
-      "model_source": "model/bibliotek/components/component.rtg.controller.sysml",
-      "requirements": [
-        "contract.rtg.controller.ledger_failure_semantics",
-        "contract.rtg.controller.flush_ledger_failures.failures"
-      ],
-      "status": "resolved",
-      "subject": {
-        "role": "operation",
-        "type": "FlushLedgerFailures"
-      },
-      "verification": "FlushLedgerFailuresContractVerification"
-    },
-    {
       "evidence_id": "components/rtg/controller/tests/test_rtg_controller_contract.py#GetControllerSchemaPackContractVerification",
       "evidence_nodes": [
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_controller_cutover_flips_schema_live_status_and_prunes",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_cutover_rejects_schema_candidate_that_invalidates_live_graph_data",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_strict_knowledge_staging_rejects_invalid_cutover_projection",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_replay_reconstructs_cutover_from_ledgered_request_after_pruning",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_replay_decodes_ledgered_schema_fields_with_null_items",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_failed_strict_cutover_status_is_replayable",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_rejected_staging_is_projected_from_existing_ledger_error",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_migration_history_is_reconstructed_from_ledger",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_cutover_post_state_failure_restores_pre_cutover_state"
+        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_schema_cutover_replaces_live_definition"
       ],
       "model_source": "model/bibliotek/components/component.rtg.controller.sysml",
       "requirements": [
@@ -542,12 +527,7 @@
     {
       "evidence_id": "components/rtg/controller/tests/test_rtg_controller_contract.py#GetSystemStateContractVerification",
       "evidence_nodes": [
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_get_object_maps_invalid_and_missing_graph_ids_to_controller_failure",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_system_state_uses_typed_compact_counts_and_snapshot_paths",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_cutover_rejects_schema_candidate_that_invalidates_live_graph_data",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_strict_knowledge_staging_rejects_invalid_cutover_projection",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_rejected_staging_is_projected_from_existing_ledger_error",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_cutover_post_state_failure_restores_pre_cutover_state"
+        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_system_state_contains_only_domain_and_snapshot_state"
       ],
       "model_source": "model/bibliotek/components/component.rtg.controller.sysml",
       "requirements": [
@@ -562,28 +542,9 @@
       "verification": "GetSystemStateContractVerification"
     },
     {
-      "evidence_id": "components/rtg/controller/tests/test_rtg_controller_contract.py#ListMigrationHistoryContractVerification",
-      "evidence_nodes": [
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_rejected_staging_is_projected_from_existing_ledger_error",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_unprojectable_staging_is_rejected_and_has_a_terminal_ledger_outcome",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_migration_history_is_reconstructed_from_ledger"
-      ],
-      "model_source": "model/bibliotek/components/component.rtg.controller.sysml",
-      "requirements": [
-        "contract.rtg.controller.migration_history",
-        "contract.rtg.controller.list_migration_history.failures"
-      ],
-      "status": "resolved",
-      "subject": {
-        "role": "operation",
-        "type": "ListMigrationHistory"
-      },
-      "verification": "ListMigrationHistoryContractVerification"
-    },
-    {
       "evidence_id": "components/rtg/controller/tests/test_rtg_controller_contract.py#ListPersistedSnapshotsContractVerification",
       "evidence_nodes": [
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_replay_accepts_persisted_start_snapshot_path"
+        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_snapshot_persist_load_and_restore_round_trip"
       ],
       "model_source": "model/bibliotek/components/component.rtg.controller.sysml",
       "requirements": [
@@ -599,12 +560,7 @@
     {
       "evidence_id": "components/rtg/controller/tests/test_rtg_controller_contract.py#LoadPersistedSnapshotContractVerification",
       "evidence_nodes": [
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_system_state_uses_typed_compact_counts_and_snapshot_paths",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_replay_accepts_persisted_start_snapshot_path",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_replay_reconstructs_cutover_from_ledgered_request_after_pruning",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_replay_decodes_ledgered_schema_fields_with_null_items",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_failed_strict_cutover_status_is_replayable",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_controller_exports_and_persists_snapshot"
+        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_snapshot_persist_load_and_restore_round_trip"
       ],
       "model_source": "model/bibliotek/components/component.rtg.controller.sysml",
       "requirements": [
@@ -620,24 +576,8 @@
     {
       "evidence_id": "components/rtg/controller/tests/test_rtg_controller_contract.py#OpenRtgControllerContractVerification",
       "evidence_nodes": [
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_controller_writes_wait_while_replay_owns_system_state",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_validate_live_graph_changes_resolves_without_mutation_or_ledger",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_live_graph_lane_rejects_invalid_batch_without_mutating",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_cutover_rejects_schema_candidate_that_invalidates_live_graph_data",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_ledger_failures_are_queued_and_flushed",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_ledger_failure_degrades_result_and_flush_loads_json_queue",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_replay_accepts_persisted_start_snapshot_path",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_verify_replay_from_ledger_uses_scratch_state_and_preserves_current_state",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_replay_verification_restores_invalid_current_instances_exactly",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_replay_reconstructs_cutover_from_ledgered_request_after_pruning",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_replay_decodes_ledgered_schema_fields_with_null_items",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_failed_strict_cutover_status_is_replayable",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_replay_equivalence_detects_equal_counts_with_different_fact_values",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_rejected_staging_is_projected_from_existing_ledger_error",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_migration_history_is_reconstructed_from_ledger",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_restore_request_response_are_ledgered_and_replayed",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_normal_apply_failure_rolls_back_touched_graph_records",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_cutover_post_state_failure_restores_pre_cutover_state"
+        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_controller_construction_has_no_sql_or_ledger_dependency",
+        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_controller_uses_public_snapshot_replacement_contracts"
       ],
       "model_source": "model/bibliotek/components/component.rtg.controller.sysml",
       "requirements": [
@@ -653,10 +593,7 @@
     {
       "evidence_id": "components/rtg/controller/tests/test_rtg_controller_contract.py#PersistSystemSnapshotContractVerification",
       "evidence_nodes": [
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_system_state_uses_typed_compact_counts_and_snapshot_paths",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_replay_accepts_persisted_start_snapshot_path",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_verify_replay_from_ledger_uses_scratch_state_and_preserves_current_state",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_controller_exports_and_persists_snapshot"
+        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_snapshot_persist_load_and_restore_round_trip"
       ],
       "model_source": "model/bibliotek/components/component.rtg.controller.sysml",
       "requirements": [
@@ -670,45 +607,13 @@
       "verification": "PersistSystemSnapshotContractVerification"
     },
     {
-      "evidence_id": "components/rtg/controller/tests/test_rtg_controller_contract.py#ReplayLedgerContractVerification",
-      "evidence_nodes": [
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_replay_can_resume_from_a_structurally_valid_skip_mode_snapshot",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_controller_writes_wait_while_replay_owns_system_state",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_live_graph_lane_resolves_local_refs_validates_applies_and_ledgers",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_replay_rejects_non_empty_state_without_explicit_snapshot",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_replay_accepts_persisted_start_snapshot_path",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_replay_rejects_ambiguous_start_snapshot_options",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_verify_replay_from_ledger_uses_scratch_state_and_preserves_current_state",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_replay_verification_restores_invalid_current_instances_exactly",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_replay_reconstructs_cutover_from_ledgered_request_after_pruning",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_replay_decodes_ledgered_schema_fields_with_null_items",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_failed_strict_cutover_status_is_replayable",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_replay_equivalence_detects_equal_counts_with_different_fact_values",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_restore_request_response_are_ledgered_and_replayed"
-      ],
-      "model_source": "model/bibliotek/components/component.rtg.controller.sysml",
-      "requirements": [
-        "contract.rtg.controller.replay_flow",
-        "contract.rtg.controller.replay_selection",
-        "contract.rtg.controller.replay_ledger.failures"
-      ],
-      "status": "resolved",
-      "subject": {
-        "role": "operation",
-        "type": "ReplayLedger"
-      },
-      "verification": "ReplayLedgerContractVerification"
-    },
-    {
       "evidence_id": "components/rtg/controller/tests/test_rtg_controller_contract.py#RestoreFromSnapshotContractVerification",
       "evidence_nodes": [
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_controller_reads_wait_while_restore_replaces_component_handles",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_restore_validates_combined_candidate_before_any_visible_replacement",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_replay_can_resume_from_a_structurally_valid_skip_mode_snapshot",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_failed_recorded_restore_preserves_components_but_may_advance_audit_pointer",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_controller_rejects_unsupported_discovery_and_restore_options",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_replay_verification_restores_invalid_current_instances_exactly",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_restore_request_response_are_ledgered_and_replayed"
+        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_snapshot_persist_load_and_restore_round_trip",
+        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_invalid_snapshot_restore_is_atomic",
+        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_snapshot_compensation_failure_reports_recovery_indeterminate",
+        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_controller_uses_public_snapshot_replacement_contracts",
+        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_controller_serializes_reads_during_coordinated_restore"
       ],
       "model_source": "model/bibliotek/components/component.rtg.controller.sysml",
       "requirements": [
@@ -725,46 +630,13 @@
     {
       "evidence_id": "components/rtg/controller/tests/test_rtg_controller_contract.py#RtgControllerBoundaryVerification",
       "evidence_nodes": [
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_get_object_maps_invalid_and_missing_graph_ids_to_controller_failure",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_controller_reads_wait_while_restore_replaces_component_handles",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_restore_validates_combined_candidate_before_any_visible_replacement",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_replay_can_resume_from_a_structurally_valid_skip_mode_snapshot",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_failed_recorded_restore_preserves_components_but_may_advance_audit_pointer",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_system_state_uses_typed_compact_counts_and_snapshot_paths",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_controller_writes_wait_while_replay_owns_system_state",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_live_graph_lane_resolves_local_refs_validates_applies_and_ledgers",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_validate_live_graph_changes_resolves_without_mutation_or_ledger",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_validate_live_graph_changes_reports_findings_without_mutation",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_live_graph_lane_rejects_invalid_batch_without_mutating",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_controller_cutover_flips_schema_live_status_and_prunes",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_cutover_rejects_schema_candidate_that_invalidates_live_graph_data",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_concrete_controller_has_no_generic_change_batch_bypass",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_controller_rejects_unsupported_cutover_options",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_controller_maps_cutover_precondition_failures",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_controller_rejects_unsupported_discovery_and_restore_options",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_live_graph_lane_rejects_non_live_candidate_creation",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_knowledge_staging_rejects_unscoped_schema_candidate",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_knowledge_staging_rejects_direct_live_schema_write",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_knowledge_staging_accepts_non_live_graph_candidate_when_migration_scoped",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_strict_knowledge_staging_rejects_invalid_cutover_projection",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_ledger_failures_are_queued_and_flushed",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_ledger_failure_degrades_result_and_flush_loads_json_queue",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_replay_rejects_non_empty_state_without_explicit_snapshot",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_replay_accepts_persisted_start_snapshot_path",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_replay_rejects_ambiguous_start_snapshot_options",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_verify_replay_from_ledger_uses_scratch_state_and_preserves_current_state",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_replay_verification_restores_invalid_current_instances_exactly",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_replay_reconstructs_cutover_from_ledgered_request_after_pruning",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_replay_decodes_ledgered_schema_fields_with_null_items",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_failed_strict_cutover_status_is_replayable",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_replay_equivalence_detects_equal_counts_with_different_fact_values",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_rejected_staging_is_projected_from_existing_ledger_error",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_unprojectable_staging_is_rejected_and_has_a_terminal_ledger_outcome",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_migration_history_is_reconstructed_from_ledger",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_restore_request_response_are_ledgered_and_replayed",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_normal_apply_failure_rolls_back_touched_graph_records",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_cutover_post_state_failure_restores_pre_cutover_state",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_controller_exports_and_persists_snapshot"
+        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_controller_construction_has_no_sql_or_ledger_dependency",
+        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_live_graph_mutation_resolves_ids_and_is_queryable",
+        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_failed_cutover_restores_domain_state_and_commits_failed_status",
+        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_snapshot_persist_load_and_restore_round_trip",
+        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_controller_serializes_reads_during_coordinated_restore",
+        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_live_lane_rejects_non_live_candidate_creation",
+        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_strict_staging_rejects_invalid_projected_cutover"
       ],
       "model_source": "model/bibliotek/components/component.rtg.controller.sysml",
       "requirements": [
@@ -772,7 +644,6 @@
         "contract.rtg.controller.discovery_semantics",
         "contract.rtg.controller.persisted_snapshot_semantics",
         "contract.rtg.controller.operation_results",
-        "contract.rtg.controller.ledger_outcomes",
         "invariant.rtg.controller.public_contracts_only",
         "invariant.rtg.controller.no_transport_ownership",
         "contract.rtg.controller.intentional_boundary",
@@ -789,23 +660,16 @@
         "invariant.rtg.controller.validation_report_authoritative",
         "invariant.rtg.controller.snapshot_uses_component_snapshots",
         "invariant.rtg.controller.snapshot_json_serializable",
-        "invariant.rtg.controller.snapshot_records_ledger_position",
         "invariant.rtg.controller.persisted_snapshot_readback_is_storage_scoped",
         "invariant.rtg.controller.cutover_uses_migration_membership",
         "invariant.rtg.controller.reads_do_not_observe_transient_cutover",
         "invariant.rtg.controller.projected_queries_use_live_overlay",
         "invariant.rtg.controller.cutover_restores_on_failure",
         "invariant.rtg.controller.failed_cutover_is_legible",
-        "invariant.rtg.controller.failed_cutover_replay_preserves_status",
         "invariant.rtg.controller.cutover_order",
         "invariant.rtg.controller.abandonment_never_deletes_live_records",
         "invariant.rtg.controller.one_write_at_a_time",
-        "invariant.rtg.controller.ledger_records_black_box_activity",
-        "invariant.rtg.controller.ledger_payloads_are_json_text",
-        "invariant.rtg.controller.transaction_id_always_assigned",
-        "invariant.rtg.controller.transaction_ids_are_uuids",
-        "invariant.rtg.controller.ledger_position_is_replay_cursor",
-        "invariant.rtg.controller.resolved_uuids_before_ledger",
+        "invariant.rtg.controller.resolved_uuids_before_mutation",
         "invariant.rtg.controller.write_atomicity_scoped",
         "invariant.rtg.controller.reads_mediated",
         "invariant.rtg.controller.live_flips_via_full_record_write",
@@ -821,20 +685,10 @@
     {
       "evidence_id": "components/rtg/controller/tests/test_rtg_controller_contract.py#StageKnowledgeChangesContractVerification",
       "evidence_nodes": [
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_controller_cutover_flips_schema_live_status_and_prunes",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_cutover_rejects_schema_candidate_that_invalidates_live_graph_data",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_controller_maps_cutover_precondition_failures",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_knowledge_staging_rejects_unscoped_schema_candidate",
+        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_knowledge_staging_requires_migration_scope",
         "components/rtg/controller/tests/test_rtg_controller_contract.py::test_knowledge_staging_rejects_direct_live_schema_write",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_knowledge_staging_accepts_non_live_graph_candidate_when_migration_scoped",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_strict_knowledge_staging_rejects_invalid_cutover_projection",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_replay_reconstructs_cutover_from_ledgered_request_after_pruning",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_replay_decodes_ledgered_schema_fields_with_null_items",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_failed_strict_cutover_status_is_replayable",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_rejected_staging_is_projected_from_existing_ledger_error",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_unprojectable_staging_is_rejected_and_has_a_terminal_ledger_outcome",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_migration_history_is_reconstructed_from_ledger",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_cutover_post_state_failure_restores_pre_cutover_state"
+        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_strict_staging_rejects_invalid_projected_cutover",
+        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_staged_graph_candidate_becomes_live_at_cutover"
       ],
       "model_source": "model/bibliotek/components/component.rtg.controller.sysml",
       "requirements": [
@@ -851,15 +705,7 @@
     {
       "evidence_id": "components/rtg/controller/tests/test_rtg_controller_contract.py#ValidateGraphContractVerification",
       "evidence_nodes": [
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_controller_reads_wait_while_restore_replaces_component_handles",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_restore_validates_combined_candidate_before_any_visible_replacement",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_replay_can_resume_from_a_structurally_valid_skip_mode_snapshot",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_live_graph_lane_resolves_local_refs_validates_applies_and_ledgers",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_validate_live_graph_changes_resolves_without_mutation_or_ledger",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_validate_live_graph_changes_reports_findings_without_mutation",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_cutover_rejects_schema_candidate_that_invalidates_live_graph_data",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_replay_verification_restores_invalid_current_instances_exactly",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_failed_strict_cutover_status_is_replayable"
+        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_validate_graph_and_discovery_options"
       ],
       "model_source": "model/bibliotek/components/component.rtg.controller.sysml",
       "requirements": [
@@ -875,13 +721,7 @@
     {
       "evidence_id": "components/rtg/controller/tests/test_rtg_controller_contract.py#ValidateLiveGraphChangesContractVerification",
       "evidence_nodes": [
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_replay_can_resume_from_a_structurally_valid_skip_mode_snapshot",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_live_graph_lane_resolves_local_refs_validates_applies_and_ledgers",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_validate_live_graph_changes_resolves_without_mutation_or_ledger",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_validate_live_graph_changes_reports_findings_without_mutation",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_cutover_rejects_schema_candidate_that_invalidates_live_graph_data",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_replay_verification_restores_invalid_current_instances_exactly",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_failed_strict_cutover_status_is_replayable"
+        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_validation_preview_resolves_ids_without_mutation"
       ],
       "model_source": "model/bibliotek/components/component.rtg.controller.sysml",
       "requirements": [
@@ -894,25 +734,6 @@
         "type": "ValidateLiveGraphChanges"
       },
       "verification": "ValidateLiveGraphChangesContractVerification"
-    },
-    {
-      "evidence_id": "components/rtg/controller/tests/test_rtg_controller_contract.py#VerifyReplayFromLedgerContractVerification",
-      "evidence_nodes": [
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_verify_replay_from_ledger_uses_scratch_state_and_preserves_current_state",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_replay_verification_restores_invalid_current_instances_exactly",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_replay_equivalence_detects_equal_counts_with_different_fact_values"
-      ],
-      "model_source": "model/bibliotek/components/component.rtg.controller.sysml",
-      "requirements": [
-        "contract.rtg.controller.replay_verification",
-        "contract.rtg.controller.verify_replay_from_ledger.failures"
-      ],
-      "status": "resolved",
-      "subject": {
-        "role": "operation",
-        "type": "VerifyReplayFromLedger"
-      },
-      "verification": "VerifyReplayFromLedgerContractVerification"
     },
     {
       "evidence_id": "pending#CreateEmptyRtgDiscoveryContractVerification",
@@ -1436,6 +1257,23 @@
       "verification": "PutLinkContractVerification"
     },
     {
+      "evidence_id": "components/rtg/graph/tests/test_rtg_graph_contract.py#ReplaceGraphSnapshotContractVerification",
+      "evidence_nodes": [
+        "components/rtg/graph/tests/test_rtg_graph_contract.py::test_replace_snapshot_is_atomic_and_idempotent"
+      ],
+      "model_source": "model/bibliotek/components/component.rtg.graph.sysml",
+      "requirements": [
+        "contract.rtg.graph.snapshot_replacement",
+        "contract.rtg.graph.replace_graph_snapshot.failures"
+      ],
+      "status": "resolved",
+      "subject": {
+        "role": "operation",
+        "type": "ReplaceGraphSnapshot"
+      },
+      "verification": "ReplaceGraphSnapshotContractVerification"
+    },
+    {
       "evidence_id": "components/rtg/graph/tests/test_rtg_graph_contract.py#RtgGraphBoundaryVerification",
       "evidence_nodes": [
         "components/rtg/graph/tests/test_rtg_graph_contract.py::test_anchor_data_link_round_trip_and_indexes",
@@ -1663,6 +1501,23 @@
         "type": "PutMigration"
       },
       "verification": "PutMigrationContractVerification"
+    },
+    {
+      "evidence_id": "components/rtg/migration/tests/test_rtg_migration_contract.py#ReplaceMigrationSnapshotContractVerification",
+      "evidence_nodes": [
+        "components/rtg/migration/tests/test_rtg_migration_contract.py::test_replace_migration_snapshot_is_atomic_and_idempotent"
+      ],
+      "model_source": "model/bibliotek/components/component.rtg.migration.sysml",
+      "requirements": [
+        "contract.rtg.migration.snapshot_replacement",
+        "contract.rtg.migration.replace_migration_snapshot.failures"
+      ],
+      "status": "resolved",
+      "subject": {
+        "role": "operation",
+        "type": "ReplaceMigrationSnapshot"
+      },
+      "verification": "ReplaceMigrationSnapshotContractVerification"
     },
     {
       "evidence_id": "components/rtg/migration/tests/test_rtg_migration_contract.py#RtgMigrationBoundaryVerification",
@@ -2017,6 +1872,23 @@
       "verification": "PutSchemaDefinitionContractVerification"
     },
     {
+      "evidence_id": "components/rtg/schema/tests/test_rtg_schema_contract.py#ReplaceSchemaSnapshotContractVerification",
+      "evidence_nodes": [
+        "components/rtg/schema/tests/test_rtg_schema_contract.py::test_replace_schema_snapshot_is_atomic_and_idempotent"
+      ],
+      "model_source": "model/bibliotek/components/component.rtg.schema.sysml",
+      "requirements": [
+        "contract.rtg.schema.snapshot_replacement",
+        "contract.rtg.schema.replace_schema_snapshot.failures"
+      ],
+      "status": "resolved",
+      "subject": {
+        "role": "operation",
+        "type": "ReplaceSchemaSnapshot"
+      },
+      "verification": "ReplaceSchemaSnapshotContractVerification"
+    },
+    {
       "evidence_id": "components/rtg/schema/tests/test_rtg_schema_contract.py#RtgSchemaBoundaryVerification",
       "evidence_nodes": [
         "components/rtg/schema/tests/test_rtg_schema_contract.py::test_schema_stores_definitions_snapshots_and_schema_packs",
@@ -2055,6 +1927,356 @@
         "type": "RtgSchema"
       },
       "verification": "RtgSchemaBoundaryVerification"
+    },
+    {
+      "evidence_id": "components/runtime/component_adapter/tests/test_component_adapter_contract.py#ApplyCanonicalReplayEffectContractVerification",
+      "evidence_nodes": [
+        "components/runtime/component_adapter/tests/test_component_adapter_contract.py::test_generated_identity_is_captured_in_canonical_effect",
+        "components/runtime/component_adapter/tests/test_component_adapter_contract.py::test_canonical_effect_rejects_changed_contract_or_message_schema",
+        "components/runtime/component_adapter/tests/test_component_adapter_contract.py::test_modeled_fault_can_record_and_apply_its_documented_effect"
+      ],
+      "model_source": "model/bibliotek/components/component.runtime.component_adapter.sysml",
+      "requirements": [
+        "contract.runtime.component_adapter.replay.failures"
+      ],
+      "status": "resolved",
+      "subject": {
+        "role": "operation",
+        "type": "ApplyCanonicalReplayEffect"
+      },
+      "verification": "ApplyCanonicalReplayEffectContractVerification"
+    },
+    {
+      "evidence_id": "components/runtime/component_adapter/tests/test_component_adapter_contract.py#ComponentRuntimeAdapterBoundaryVerification",
+      "evidence_nodes": [
+        "components/runtime/component_adapter/tests/test_component_adapter_contract.py::test_graph_direct_and_message_invocation_are_equivalent",
+        "components/runtime/component_adapter/tests/test_component_adapter_contract.py::test_generated_identity_is_captured_in_canonical_effect",
+        "components/runtime/component_adapter/tests/test_component_adapter_contract.py::test_private_or_unregistered_methods_are_not_routable",
+        "components/runtime/component_adapter/tests/test_component_adapter_contract.py::test_recovery_authorization_is_limited_to_non_effectful_coordinators",
+        "components/runtime/component_adapter/tests/test_component_adapter_contract.py::test_standard_bibliotek_bindings_preserve_direct_protocol"
+      ],
+      "model_source": "model/bibliotek/components/component.runtime.component_adapter.sysml",
+      "requirements": [
+        "contract.runtime.component_adapter.explicit_mapping",
+        "contract.runtime.component_adapter.equivalence",
+        "contract.runtime.component_adapter.replay",
+        "contract.runtime.component_adapter.reconstruction",
+        "contract.runtime.component_adapter.recovery_authorization"
+      ],
+      "status": "resolved",
+      "subject": {
+        "role": "adapter",
+        "type": "ComponentRuntimeAdapter"
+      },
+      "verification": "ComponentRuntimeAdapterBoundaryVerification"
+    },
+    {
+      "evidence_id": "components/runtime/component_adapter/tests/test_component_adapter_contract.py#DescribeRuntimeBindingContractVerification",
+      "evidence_nodes": [
+        "components/runtime/component_adapter/tests/test_component_adapter_contract.py::test_private_or_unregistered_methods_are_not_routable",
+        "components/runtime/component_adapter/tests/test_component_adapter_contract.py::test_descriptor_is_complete_and_mutable_host_keeps_proxy_address_stable"
+      ],
+      "model_source": "model/bibliotek/components/component.runtime.component_adapter.sysml",
+      "requirements": [
+        "contract.runtime.component_adapter.describe.failures"
+      ],
+      "status": "resolved",
+      "subject": {
+        "role": "operation",
+        "type": "DescribeRuntimeBinding"
+      },
+      "verification": "DescribeRuntimeBindingContractVerification"
+    },
+    {
+      "evidence_id": "components/runtime/component_adapter/tests/test_component_adapter_contract.py#DispatchRuntimeMessageContractVerification",
+      "evidence_nodes": [
+        "components/runtime/component_adapter/tests/test_component_adapter_contract.py::test_graph_direct_and_message_invocation_are_equivalent",
+        "components/runtime/component_adapter/tests/test_component_adapter_contract.py::test_modeled_fault_can_record_and_apply_its_documented_effect"
+      ],
+      "model_source": "model/bibliotek/components/component.runtime.component_adapter.sysml",
+      "requirements": [
+        "contract.runtime.component_adapter.dispatch.failures"
+      ],
+      "status": "resolved",
+      "subject": {
+        "role": "operation",
+        "type": "DispatchRuntimeMessage"
+      },
+      "verification": "DispatchRuntimeMessageContractVerification"
+    },
+    {
+      "evidence_id": "components/runtime/component_adapter/tests/test_component_adapter_contract.py#ImportReplayCheckpointContractVerification",
+      "evidence_nodes": [
+        "components/runtime/component_adapter/tests/test_component_adapter_contract.py::test_replay_state_spi_is_explicit"
+      ],
+      "model_source": "model/bibliotek/components/component.runtime.component_adapter.sysml",
+      "requirements": [
+        "contract.runtime.component_adapter.checkpoint.failures"
+      ],
+      "status": "resolved",
+      "subject": {
+        "role": "operation",
+        "type": "ImportReplayCheckpoint"
+      },
+      "verification": "ImportReplayCheckpointContractVerification"
+    },
+    {
+      "evidence_id": "components/runtime/component_adapter/tests/test_component_adapter_contract.py#ReplayStateDigestContractVerification",
+      "evidence_nodes": [
+        "components/runtime/component_adapter/tests/test_component_adapter_contract.py::test_replay_state_spi_is_explicit"
+      ],
+      "model_source": "model/bibliotek/components/component.runtime.component_adapter.sysml",
+      "requirements": [
+        "contract.runtime.component_adapter.digest.failures"
+      ],
+      "status": "resolved",
+      "subject": {
+        "role": "operation",
+        "type": "ReplayStateDigest"
+      },
+      "verification": "ReplayStateDigestContractVerification"
+    },
+    {
+      "evidence_id": "components/runtime/component_adapter/tests/test_component_adapter_contract.py#ReplayStateStatusContractVerification",
+      "evidence_nodes": [
+        "components/runtime/component_adapter/tests/test_component_adapter_contract.py::test_replay_state_spi_is_explicit"
+      ],
+      "model_source": "model/bibliotek/components/component.runtime.component_adapter.sysml",
+      "requirements": [
+        "contract.runtime.component_adapter.replay_state_status.failures"
+      ],
+      "status": "resolved",
+      "subject": {
+        "role": "operation",
+        "type": "ReplayStateStatus"
+      },
+      "verification": "ReplayStateStatusContractVerification"
+    },
+    {
+      "evidence_id": "components/runtime/component_adapter/tests/test_component_adapter_contract.py#ResetReplayStateContractVerification",
+      "evidence_nodes": [
+        "components/runtime/component_adapter/tests/test_component_adapter_contract.py::test_replay_state_spi_is_explicit"
+      ],
+      "model_source": "model/bibliotek/components/component.runtime.component_adapter.sysml",
+      "requirements": [
+        "contract.runtime.component_adapter.reset.failures"
+      ],
+      "status": "resolved",
+      "subject": {
+        "role": "operation",
+        "type": "ResetReplayState"
+      },
+      "verification": "ResetReplayStateContractVerification"
+    },
+    {
+      "evidence_id": "components/runtime/component_adapter/tests/test_component_adapter_contract.py#VerifyReplayStateContractVerification",
+      "evidence_nodes": [
+        "components/runtime/component_adapter/tests/test_component_adapter_contract.py::test_replay_state_spi_is_explicit"
+      ],
+      "model_source": "model/bibliotek/components/component.runtime.component_adapter.sysml",
+      "requirements": [
+        "contract.runtime.component_adapter.invariants.failures"
+      ],
+      "status": "resolved",
+      "subject": {
+        "role": "operation",
+        "type": "VerifyReplayState"
+      },
+      "verification": "VerifyReplayStateContractVerification"
+    },
+    {
+      "evidence_id": "components/runtime/message_runtime/tests/test_message_runtime_contract.py#ConfirmStaticRuntimeTopologyContractVerification",
+      "evidence_nodes": [
+        "components/runtime/message_runtime/tests/test_message_runtime_contract.py::test_static_topology_requires_exact_manifest_inventory",
+        "components/runtime/message_runtime/tests/test_message_runtime_contract.py::test_static_topology_rejects_curated_operation_without_adapter_target",
+        "components/runtime/message_runtime/tests/test_message_runtime_contract.py::test_interrupted_first_start_retries_only_the_prepared_topology"
+      ],
+      "model_source": "model/bibliotek/components/component.runtime.message_runtime.sysml",
+      "requirements": [
+        "contract.runtime.message_runtime.topology.failures"
+      ],
+      "status": "resolved",
+      "subject": {
+        "role": "operation",
+        "type": "ConfirmStaticRuntimeTopology"
+      },
+      "verification": "ConfirmStaticRuntimeTopologyContractVerification"
+    },
+    {
+      "evidence_id": "components/runtime/message_runtime/tests/test_message_runtime_contract.py#GetRuntimeCausalTraceContractVerification",
+      "evidence_nodes": [
+        "components/runtime/message_runtime/tests/test_message_runtime_contract.py::test_history_is_cursor_paginated_and_filterable"
+      ],
+      "model_source": "model/bibliotek/components/component.runtime.message_runtime.sysml",
+      "requirements": [
+        "contract.runtime.message_runtime.trace.failures"
+      ],
+      "status": "resolved",
+      "subject": {
+        "role": "operation",
+        "type": "GetRuntimeCausalTrace"
+      },
+      "verification": "GetRuntimeCausalTraceContractVerification"
+    },
+    {
+      "evidence_id": "components/runtime/message_runtime/tests/test_message_runtime_contract.py#MessageRuntimeBoundaryVerification",
+      "evidence_nodes": [
+        "components/runtime/message_runtime/tests/test_message_runtime_contract.py::test_runtime_creates_ledger_parent_for_a_fresh_data_root",
+        "components/runtime/message_runtime/tests/test_message_runtime_contract.py::test_durable_acceptance_duplicate_protection_and_history",
+        "components/runtime/message_runtime/tests/test_message_runtime_contract.py::test_same_type_occurrences_are_isolated",
+        "components/runtime/message_runtime/tests/test_message_runtime_contract.py::test_restart_preserves_identity_and_reconstructs_committed_effects",
+        "components/runtime/message_runtime/tests/test_message_runtime_contract.py::test_terminal_persistence_failure_enters_fail_stop",
+        "components/runtime/message_runtime/tests/test_message_runtime_contract.py::test_post_effect_terminal_encoding_failure_enters_fail_stop",
+        "components/runtime/message_runtime/tests/test_message_runtime_contract.py::test_fail_stop_quiesces_already_accepted_queued_deliveries",
+        "components/runtime/message_runtime/tests/test_message_runtime_contract.py::test_runtime_dispatches_the_durable_canonical_payload_copy",
+        "components/runtime/message_runtime/tests/test_message_runtime_contract.py::test_recorded_external_response_is_supplied_without_a_live_collaborator",
+        "components/runtime/message_runtime/tests/test_message_runtime_contract.py::test_final_aggregate_effect_supersedes_derived_effects_in_its_trace",
+        "components/runtime/message_runtime/tests/test_message_runtime_contract.py::test_root_trace_waits_for_nested_signal_before_committing",
+        "components/runtime/message_runtime/tests/test_message_runtime_contract.py::test_nested_signal_uncertainty_marks_trace_and_runtime_recovery_required",
+        "components/runtime/message_runtime/tests/test_message_runtime_contract.py::test_post_terminal_causal_signal_is_rejected_without_poisoning_replay",
+        "components/runtime/message_runtime/tests/test_message_runtime_contract.py::test_recovery_ingress_reserves_one_root_until_its_trace_finishes"
+      ],
+      "model_source": "model/bibliotek/components/component.runtime.message_runtime.sysml",
+      "requirements": [
+        "contract.runtime.message_runtime.delivery",
+        "contract.runtime.message_runtime.identity",
+        "contract.runtime.message_runtime.static_topology_atomicity",
+        "contract.runtime.message_runtime.ordering",
+        "contract.runtime.message_runtime.deduplication",
+        "contract.runtime.message_runtime.fail_stop",
+        "contract.runtime.message_runtime.causality",
+        "contract.runtime.message_runtime.recovery_ingress",
+        "contract.runtime.message_runtime.replay",
+        "contract.runtime.message_runtime.branching"
+      ],
+      "status": "resolved",
+      "subject": {
+        "role": "runtime",
+        "type": "MessageRuntime"
+      },
+      "verification": "MessageRuntimeBoundaryVerification"
+    },
+    {
+      "evidence_id": "components/runtime/message_runtime/tests/test_message_runtime_contract.py#PrepareStaticRuntimeTopologyContractVerification",
+      "evidence_nodes": [
+        "components/runtime/message_runtime/tests/test_message_runtime_contract.py::test_confirmed_topology_rejects_new_occurrence_without_durable_insertion",
+        "components/runtime/message_runtime/tests/test_message_runtime_contract.py::test_interrupted_first_start_retries_only_the_prepared_topology"
+      ],
+      "model_source": "model/bibliotek/components/component.runtime.message_runtime.sysml",
+      "requirements": [
+        "contract.runtime.message_runtime.topology_prepare.failures"
+      ],
+      "status": "resolved",
+      "subject": {
+        "role": "operation",
+        "type": "PrepareStaticRuntimeTopology"
+      },
+      "verification": "PrepareStaticRuntimeTopologyContractVerification"
+    },
+    {
+      "evidence_id": "components/runtime/message_runtime/tests/test_message_runtime_contract.py#QueryRuntimeHistoryContractVerification",
+      "evidence_nodes": [
+        "components/runtime/message_runtime/tests/test_message_runtime_contract.py::test_history_is_cursor_paginated_and_filterable"
+      ],
+      "model_source": "model/bibliotek/components/component.runtime.message_runtime.sysml",
+      "requirements": [
+        "contract.runtime.message_runtime.history.failures"
+      ],
+      "status": "resolved",
+      "subject": {
+        "role": "operation",
+        "type": "QueryRuntimeHistory"
+      },
+      "verification": "QueryRuntimeHistoryContractVerification"
+    },
+    {
+      "evidence_id": "components/runtime/message_runtime/tests/test_message_runtime_contract.py#ReconstructRuntimeStateContractVerification",
+      "evidence_nodes": [
+        "components/runtime/message_runtime/tests/test_message_runtime_contract.py::test_restart_preserves_identity_and_reconstructs_committed_effects",
+        "components/runtime/message_runtime/tests/test_message_runtime_contract.py::test_reconstruction_requires_empty_reset_checkpoint_or_confirmed_state",
+        "components/runtime/message_runtime/tests/test_message_runtime_contract.py::test_reconstruction_rejects_a_canonical_effect_with_a_changed_digest",
+        "components/runtime/message_runtime/tests/test_message_runtime_contract.py::test_recorded_external_response_is_supplied_without_a_live_collaborator",
+        "components/runtime/message_runtime/tests/test_message_runtime_contract.py::test_final_aggregate_effect_supersedes_derived_effects_in_its_trace",
+        "components/runtime/message_runtime/tests/test_message_runtime_contract.py::test_checkpoint_digest_is_verified_before_later_effects",
+        "components/runtime/message_runtime/tests/test_message_runtime_contract.py::test_replay_verification_may_use_runtime_messages_without_growing_history",
+        "components/runtime/message_runtime/tests/test_message_runtime_contract.py::test_root_coordinator_may_initiate_reconstruction_as_only_pending_delivery",
+        "components/runtime/message_runtime/tests/test_message_runtime_contract.py::test_historical_reconstruction_requires_durable_branch_provenance_before_ingress"
+      ],
+      "model_source": "model/bibliotek/components/component.runtime.message_runtime.sysml",
+      "requirements": [
+        "contract.runtime.message_runtime.reconstruct.failures"
+      ],
+      "status": "resolved",
+      "subject": {
+        "role": "operation",
+        "type": "ReconstructRuntimeState"
+      },
+      "verification": "ReconstructRuntimeStateContractVerification"
+    },
+    {
+      "evidence_id": "components/runtime/message_runtime/tests/test_message_runtime_contract.py#RecordRuntimeBranchProvenanceContractVerification",
+      "evidence_nodes": [
+        "components/runtime/message_runtime/tests/test_message_runtime_contract.py::test_historical_reconstruction_requires_durable_branch_provenance_before_ingress"
+      ],
+      "model_source": "model/bibliotek/components/component.runtime.message_runtime.sysml",
+      "requirements": [
+        "contract.runtime.message_runtime.branch.failures"
+      ],
+      "status": "resolved",
+      "subject": {
+        "role": "operation",
+        "type": "RecordRuntimeBranchProvenance"
+      },
+      "verification": "RecordRuntimeBranchProvenanceContractVerification"
+    },
+    {
+      "evidence_id": "components/runtime/message_runtime/tests/test_message_runtime_contract.py#RegisterComponentOccurrenceContractVerification",
+      "evidence_nodes": [
+        "components/runtime/message_runtime/tests/test_message_runtime_contract.py::test_restart_preserves_identity_and_reconstructs_committed_effects",
+        "components/runtime/message_runtime/tests/test_message_runtime_contract.py::test_confirmed_topology_rejects_new_occurrence_without_durable_insertion"
+      ],
+      "model_source": "model/bibliotek/components/component.runtime.message_runtime.sysml",
+      "requirements": [
+        "contract.runtime.message_runtime.register.failures"
+      ],
+      "status": "resolved",
+      "subject": {
+        "role": "operation",
+        "type": "RegisterComponentOccurrence"
+      },
+      "verification": "RegisterComponentOccurrenceContractVerification"
+    },
+    {
+      "evidence_id": "components/runtime/message_runtime/tests/test_message_runtime_contract.py#RequestRuntimeMessageContractVerification",
+      "evidence_nodes": [
+        "components/runtime/message_runtime/tests/test_message_runtime_contract.py::test_timeout_does_not_cancel_or_redeliver"
+      ],
+      "model_source": "model/bibliotek/components/component.runtime.message_runtime.sysml",
+      "requirements": [
+        "contract.runtime.message_runtime.request.failures"
+      ],
+      "status": "resolved",
+      "subject": {
+        "role": "operation",
+        "type": "RequestRuntimeMessage"
+      },
+      "verification": "RequestRuntimeMessageContractVerification"
+    },
+    {
+      "evidence_id": "components/runtime/message_runtime/tests/test_message_runtime_contract.py#SendRuntimeMessageContractVerification",
+      "evidence_nodes": [
+        "components/runtime/message_runtime/tests/test_message_runtime_contract.py::test_initial_append_failure_prevents_dispatch"
+      ],
+      "model_source": "model/bibliotek/components/component.runtime.message_runtime.sysml",
+      "requirements": [
+        "contract.runtime.message_runtime.send.failures"
+      ],
+      "status": "resolved",
+      "subject": {
+        "role": "operation",
+        "type": "SendRuntimeMessage"
+      },
+      "verification": "SendRuntimeMessageContractVerification"
     },
     {
       "evidence_id": "components/storage/json_file/tests/test_storage_json_file_contract.py#DeleteJsonDocumentContractVerification",
@@ -2316,16 +2538,17 @@
       "evidence_nodes": [
         "apps/rtg_knowledge_graph/tests/test_starter_schema.py::test_everyday_life_bundle_is_exact_schema_only_and_deterministic",
         "apps/rtg_knowledge_graph/tests/test_starter_schema.py::test_modeled_ontology_installer_reports_installation_and_reuse",
-        "apps/rtg_knowledge_graph/tests/test_starter_schema.py::test_everyday_life_ontology_install_is_idempotent_and_replayable",
+        "apps/rtg_knowledge_graph/tests/test_starter_schema.py::test_everyday_life_ontology_install_is_idempotent_and_runtime_reconstructed",
         "apps/rtg_knowledge_graph/tests/test_starter_schema.py::test_custom_schema_is_preserved_and_not_overlaid",
-        "apps/rtg_knowledge_graph/tests/test_starter_schema.py::test_replayed_beta_shaped_custom_graph_with_overlapping_keys_starts",
+        "apps/rtg_knowledge_graph/tests/test_starter_schema.py::test_snapshot_transfers_beta_shaped_custom_graph_with_overlapping_keys",
         "apps/rtg_knowledge_graph/tests/test_starter_schema.py::test_installed_ontology_can_be_extended_without_bootstrap_overwrite",
         "apps/rtg_knowledge_graph/tests/test_starter_schema.py::test_starter_identity_collision_fails_without_partial_effects",
         "apps/rtg_knowledge_graph/tests/test_starter_schema.py::test_partial_starter_installation_fails_without_partial_effects",
         "apps/rtg_knowledge_graph/tests/test_starter_schema.py::test_startup_completes_an_exact_interrupted_starter_staging",
         "apps/rtg_knowledge_graph/tests/test_starter_schema.py::test_empty_mode_abandons_an_exact_interrupted_starter_staging",
         "apps/rtg_knowledge_graph/tests/test_starter_schema.py::test_manual_recovery_does_not_overlay_durable_history",
-        "apps/rtg_knowledge_graph/tests/test_starter_schema.py::test_failed_starter_cutover_removes_staged_state_and_replays_cleanly"
+        "apps/rtg_knowledge_graph/tests/test_starter_schema.py::test_manual_recovery_can_be_initiated_through_the_runtime_facade",
+        "apps/rtg_knowledge_graph/tests/test_starter_schema.py::test_failed_starter_cutover_removes_staged_state_and_reconstructs_cleanly"
       ],
       "model_source": "model/vellis/EverydayLifeOntology.sysml",
       "requirements": [
@@ -2365,7 +2588,8 @@
       "requirements": [
         "invariant.vellis.bibliotek_public_contracts_only",
         "invariant.vellis.discovery_draft_unbound",
-        "invariant.vellis.transport_outside_controller"
+        "invariant.vellis.transport_outside_controller",
+        "invariant.vellis.runtime_history_authority"
       ],
       "status": "resolved",
       "subject": {
@@ -2379,7 +2603,7 @@
       "evidence_nodes": [
         "apps/rtg_knowledge_graph/tests/test_rtg_knowledge_graph_mcp_user_flows.py::test_individual_rtg_mcp_suite_manages_multi_domain_life_graph",
         "apps/rtg_knowledge_graph/tests/test_rtg_knowledge_graph_mcp_user_flows.py::test_individual_rtg_mcp_suite_recovers_from_realistic_agent_mistakes",
-        "apps/rtg_knowledge_graph/tests/test_rtg_knowledge_graph_mcp_user_flows.py::test_individual_rtg_mcp_suite_replays_ledger_after_server_restart"
+        "apps/rtg_knowledge_graph/tests/test_rtg_knowledge_graph_mcp_user_flows.py::test_individual_rtg_mcp_suite_reconstructs_automatically_after_server_restart"
       ],
       "model_source": "model/vellis/VellisOperations.sysml",
       "requirements": [
@@ -2444,7 +2668,7 @@
       "evidence_id": "apps/rtg_knowledge_graph/tests/test_rtg_knowledge_graph_mcp_user_flows.py#RtgDiscoverAnchorTypesContractVerification",
       "evidence_nodes": [
         "apps/rtg_knowledge_graph/tests/test_rtg_knowledge_graph_mcp_user_flows.py::test_individual_rtg_mcp_suite_manages_multi_domain_life_graph",
-        "apps/rtg_knowledge_graph/tests/test_rtg_knowledge_graph_mcp_user_flows.py::test_individual_rtg_mcp_suite_replays_ledger_after_server_restart"
+        "apps/rtg_knowledge_graph/tests/test_rtg_knowledge_graph_mcp_user_flows.py::test_individual_rtg_mcp_suite_reconstructs_automatically_after_server_restart"
       ],
       "model_source": "model/vellis/VellisOperations.sysml",
       "requirements": [
@@ -2671,8 +2895,7 @@
     {
       "evidence_id": "apps/rtg_knowledge_graph/tests/test_rtg_knowledge_graph_mcp_user_flows.py#RtgReplayLedgerContractVerification",
       "evidence_nodes": [
-        "apps/rtg_knowledge_graph/tests/test_rtg_knowledge_graph_mcp_user_flows.py::test_individual_rtg_mcp_suite_manages_multi_domain_life_graph",
-        "apps/rtg_knowledge_graph/tests/test_rtg_knowledge_graph_mcp_user_flows.py::test_individual_rtg_mcp_suite_replays_ledger_after_server_restart"
+        "apps/rtg_knowledge_graph/tests/test_rtg_knowledge_graph_mcp_user_flows.py::test_individual_rtg_mcp_suite_manages_multi_domain_life_graph"
       ],
       "model_source": "model/vellis/VellisOperations.sysml",
       "requirements": [
@@ -2756,7 +2979,7 @@
       "evidence_nodes": [
         "apps/rtg_knowledge_graph/tests/test_rtg_knowledge_graph_mcp_user_flows.py::test_individual_rtg_mcp_suite_manages_multi_domain_life_graph",
         "apps/rtg_knowledge_graph/tests/test_rtg_knowledge_graph_mcp_user_flows.py::test_individual_rtg_mcp_suite_recovers_from_realistic_agent_mistakes",
-        "apps/rtg_knowledge_graph/tests/test_rtg_knowledge_graph_mcp_user_flows.py::test_individual_rtg_mcp_suite_replays_ledger_after_server_restart"
+        "apps/rtg_knowledge_graph/tests/test_rtg_knowledge_graph_mcp_user_flows.py::test_individual_rtg_mcp_suite_reconstructs_automatically_after_server_restart"
       ],
       "model_source": "model/vellis/VellisOperations.sysml",
       "requirements": [
@@ -2823,7 +3046,7 @@
       "evidence_nodes": [
         "apps/rtg_knowledge_graph/tests/test_rtg_knowledge_graph_mcp_user_flows.py::test_individual_rtg_mcp_suite_manages_multi_domain_life_graph",
         "apps/rtg_knowledge_graph/tests/test_rtg_knowledge_graph_mcp_user_flows.py::test_individual_rtg_mcp_suite_recovers_from_realistic_agent_mistakes",
-        "apps/rtg_knowledge_graph/tests/test_rtg_knowledge_graph_mcp_user_flows.py::test_individual_rtg_mcp_suite_replays_ledger_after_server_restart"
+        "apps/rtg_knowledge_graph/tests/test_rtg_knowledge_graph_mcp_user_flows.py::test_individual_rtg_mcp_suite_reconstructs_automatically_after_server_restart"
       ],
       "model_source": "model/vellis/VellisOperations.sysml",
       "requirements": [
@@ -2832,7 +3055,8 @@
         "contract.vellis.facade.anchor_record_compilation",
         "contract.vellis.facade.query_semantics",
         "contract.vellis.facade.snapshot_semantics",
-        "contract.vellis.facade.controller_forwarding"
+        "contract.vellis.facade.controller_forwarding",
+        "contract.vellis.facade.runtime_projection"
       ],
       "status": "resolved",
       "subject": {
@@ -2851,12 +3075,13 @@
         "apps/rtg_knowledge_graph/tests/test_rtg_knowledge_graph_mcp.py::test_mcp_codec_rejects_malformed_query_return_properties",
         "apps/rtg_knowledge_graph/tests/test_rtg_knowledge_graph_mcp.py::test_mcp_codec_rejects_non_string_query_terms",
         "apps/rtg_knowledge_graph/tests/test_rtg_knowledge_graph_mcp.py::test_mcp_codec_rejects_non_string_option_terms",
+        "apps/rtg_knowledge_graph/tests/test_rtg_knowledge_graph_mcp.py::test_mcp_codec_rejects_controller_ledger_replay_options",
         "apps/rtg_knowledge_graph/tests/test_rtg_knowledge_graph_mcp.py::test_mcp_codec_rejects_mutation_aliases_that_would_be_ignored",
         "apps/rtg_knowledge_graph/tests/test_rtg_knowledge_graph_mcp.py::test_mcp_toolset_rejects_wrong_mutation_fields_instead_of_noop",
         "apps/rtg_knowledge_graph/tests/test_rtg_knowledge_graph_mcp.py::test_mcp_codec_accepts_schema_field_null_items_from_json_round_trip",
         "apps/rtg_knowledge_graph/tests/test_rtg_knowledge_graph_mcp.py::test_rtg_mcp_skill_item_schema_live_write_and_query_path_runs",
         "apps/rtg_knowledge_graph/tests/test_rtg_knowledge_graph_mcp.py::test_mcp_toolset_live_graph_query_get_object_and_validation_error",
-        "apps/rtg_knowledge_graph/tests/test_rtg_knowledge_graph_mcp.py::test_mcp_toolset_validates_live_graph_changes_without_mutation_or_ledger",
+        "apps/rtg_knowledge_graph/tests/test_rtg_knowledge_graph_mcp.py::test_mcp_toolset_validates_live_graph_changes_without_mutation",
         "apps/rtg_knowledge_graph/tests/test_rtg_knowledge_graph_mcp.py::test_mcp_toolset_validates_and_applies_live_anchor_records",
         "apps/rtg_knowledge_graph/tests/test_rtg_knowledge_graph_mcp.py::test_compact_mutation_response_is_materially_smaller_than_full",
         "apps/rtg_knowledge_graph/tests/test_rtg_knowledge_graph_mcp.py::test_properties_only_preserves_aggregation_rows_and_pagination_metadata",
@@ -2865,7 +3090,7 @@
         "apps/rtg_knowledge_graph/tests/test_rtg_knowledge_graph_mcp.py::test_mcp_toolset_resolves_anchor_by_fact_through_query_facade",
         "apps/rtg_knowledge_graph/tests/test_rtg_knowledge_graph_mcp.py::test_mcp_toolset_resolve_anchor_by_fact_reports_ambiguous_matches",
         "apps/rtg_knowledge_graph/tests/test_rtg_knowledge_graph_mcp.py::test_mcp_toolset_stages_cuts_over_and_reads_schema_migration",
-        "apps/rtg_knowledge_graph/tests/test_rtg_knowledge_graph_mcp.py::test_mcp_toolset_snapshot_ledger_restore_tools",
+        "apps/rtg_knowledge_graph/tests/test_rtg_knowledge_graph_mcp.py::test_mcp_toolset_snapshot_restore_and_runtime_only_tools",
         "apps/rtg_knowledge_graph/tests/test_rtg_knowledge_graph_mcp.py::test_mcp_toolset_system_state_guides_schema_staging_and_abandonment",
         "apps/rtg_knowledge_graph/tests/test_rtg_knowledge_graph_mcp.py::test_schema_migration_rejects_duplicate_definition_correlation_keys_before_mutation",
         "apps/rtg_knowledge_graph/tests/test_rtg_knowledge_graph_mcp.py::test_mcp_toolset_system_state_workflows_for_schema_and_populated_states",
@@ -2874,18 +3099,22 @@
         "apps/rtg_knowledge_graph/tests/test_rtg_knowledge_graph_mcp.py::test_mcp_exposes_modeled_everyday_life_and_schema_design_guidance",
         "apps/rtg_knowledge_graph/tests/test_rtg_knowledge_graph_mcp.py::test_mcp_toolset_stage_schema_migration_can_replace_live_schema",
         "apps/rtg_knowledge_graph/tests/test_rtg_knowledge_graph_mcp.py::test_mcp_toolset_persisted_snapshot_readback",
-        "apps/rtg_knowledge_graph/tests/test_rtg_knowledge_graph_mcp.py::test_mcp_toolset_replay_path_and_migration_history",
+        "apps/rtg_knowledge_graph/tests/test_rtg_knowledge_graph_mcp.py::test_mcp_toolset_runtime_reconstruction_health_and_migration_history",
         "apps/rtg_knowledge_graph/tests/test_rtg_knowledge_graph_mcp.py::test_mcp_toolset_keeps_error_shape_for_unexpected_exceptions",
         "apps/rtg_knowledge_graph/tests/test_rtg_knowledge_graph_mcp.py::test_mcp_toolset_rejects_unsupported_controller_options",
         "apps/rtg_knowledge_graph/tests/test_rtg_knowledge_graph_mcp.py::test_mcp_toolset_errors_include_ref_and_uuid_diagnostics",
         "apps/rtg_knowledge_graph/tests/test_rtg_knowledge_graph_mcp.py::test_diagnostic_json_normalization_preserves_nested_sequences",
         "apps/rtg_knowledge_graph/tests/test_rtg_knowledge_graph_mcp.py::test_mcp_tool_metadata_is_concise_complete_and_annotated",
+        "apps/rtg_knowledge_graph/tests/test_rtg_knowledge_graph_mcp.py::test_runtime_gateway_server_projects_generated_vellis_tool_shapes",
+        "apps/rtg_knowledge_graph/tests/test_rtg_knowledge_graph_mcp.py::test_runtime_gateway_server_accepts_mcp_gateway_protocol_substitute",
+        "apps/rtg_knowledge_graph/tests/test_rtg_knowledge_graph_mcp.py::test_runtime_gateway_server_exposes_only_a_generic_registered_tool",
         "apps/rtg_knowledge_graph/tests/test_rtg_knowledge_graph_mcp.py::test_mcp_server_stdio_protocol_lists_tools_from_non_repo_cwd",
         "apps/rtg_knowledge_graph/tests/test_rtg_knowledge_graph_mcp.py::test_mcp_server_http_protocol_lists_tools_from_non_repo_cwd"
       ],
       "model_source": "model/vellis/realizations/VellisMcpPython.sysml",
       "requirements": [
         "contract.vellis.mcp.description_authority",
+        "contract.vellis.mcp.gateway_projection",
         "contract.vellis.mcp.input_encoding",
         "contract.vellis.mcp.result_encoding",
         "contract.vellis.mcp.failure_encoding",
@@ -2916,6 +3145,28 @@
         "type": "VellisMcpOutcome"
       },
       "verification": "VellisMcpOutcomeContractVerification"
+    },
+    {
+      "evidence_id": "apps/rtg_knowledge_graph/tests/test_rtg_knowledge_graph_app.py#VellisRuntimeCompositionVerification",
+      "evidence_nodes": [
+        "apps/rtg_knowledge_graph/tests/test_rtg_knowledge_graph_app.py::test_runtime_composition_manifest_and_curated_gateway",
+        "apps/rtg_knowledge_graph/tests/test_rtg_knowledge_graph_app.py::test_vellis_facade_binding_failures_match_accepted_model",
+        "apps/rtg_knowledge_graph/tests/test_rtg_knowledge_graph_app.py::test_runtime_facade_preserves_modeled_controller_and_collaborator_faults",
+        "apps/rtg_knowledge_graph/tests/test_rtg_knowledge_graph_app.py::test_snapshot_transfer_starts_a_fresh_runtime_chronology",
+        "apps/rtg_knowledge_graph/tests/test_rtg_knowledge_graph_app.py::test_failed_cutover_status_is_committed_and_reconstructed"
+      ],
+      "model_source": "model/vellis/realizations/VellisRuntimePython.sysml",
+      "requirements": [
+        "invariant.vellis.runtime.curated_gateway",
+        "invariant.vellis.runtime.message_mediated_boundaries",
+        "invariant.vellis.runtime.snapshot_transfer"
+      ],
+      "status": "resolved",
+      "subject": {
+        "role": "application",
+        "type": "VellisRuntimePython"
+      },
+      "verification": "VellisRuntimeCompositionVerification"
     }
   ],
   "schema_version": 1

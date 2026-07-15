@@ -180,6 +180,10 @@ class RtgGraph(RtgGraphReadView, Protocol):
         """Export a JSON-serializable graph snapshot."""
         ...
 
+    def replace_snapshot(self, snapshot: RtgGraphSnapshot) -> None:
+        """Atomically replace all graph state from a validated snapshot."""
+        ...
+
     def put_anchor(self, anchor: RtgAnchor) -> RtgAnchor:
         """Create or fully replace an anchor."""
         ...

@@ -67,7 +67,7 @@ def config_for_data_dir(
     root = data_dir.expanduser().resolve(strict=False)
     return RtgKnowledgeGraphConfig(
         storage_root=root / "json_file",
-        sql_database_path=root / "controller.sqlite",
+        runtime_database_path=root / "runtime.sqlite",
         install_starter_schema=install_starter_schema,
         automatic_recovery=automatic_recovery,
     )
@@ -156,14 +156,19 @@ def setup_vellis(
         stream = input_stream or sys.stdin
         if not stream.isatty():
             raise VellisStartupFailed("setup confirmation requires a terminal or --yes")
-        answer = _prompt(
-            "Continue? [y/N] ",
-            input_stream=stream,
-            output_stream=output,
-        ).strip().lower()
+        answer = (
+            _prompt(
+                "Continue? [y/N] ",
+                input_stream=stream,
+                output_stream=output,
+            )
+            .strip()
+            .lower()
+        )
         if answer not in {"y", "yes"}:
             raise VellisStartupFailed("setup cancelled")
 
+    composition = None
     try:
         composition = build_app(config)
         starter = composition.prepare()
@@ -177,6 +182,9 @@ def setup_vellis(
             "Vellis could not open or validate durable local state; no replacement empty graph "
             f"was configured. Run `uv run vellis doctor`. Cause: {error}"
         ) from error
+    finally:
+        if composition is not None:
+            composition.close()
 
     registration = register_client(
         selected,
@@ -266,8 +274,8 @@ def doctor_report(
             "detail": str(data_dir),
         }
     )
-    checks.append(_ledger_check(config.sql_database_path))
-    checks.append(_replay_check(config))
+    checks.append(_ledger_check(config.runtime_database_path))
+    checks.append(_reconstruction_check(config))
     checks.append(_ignored_data_check(data_dir))
     selected = select_client(
         client,
@@ -443,31 +451,31 @@ def _ledger_check(path: Path) -> JsonObject:
         return {"id": "ledger", "ok": False, "detail": str(error)}
 
 
-def _replay_check(config: RtgKnowledgeGraphConfig) -> JsonObject:
-    source = config.sql_database_path.expanduser().resolve(strict=False)
+def _reconstruction_check(config: RtgKnowledgeGraphConfig) -> JsonObject:
+    source = config.runtime_database_path.expanduser().resolve(strict=False)
     if not source.exists():
-        return {"id": "replay_feasibility", "ok": True, "detail": "no ledger yet"}
+        return {"id": "reconstruction_feasibility", "ok": True, "detail": "no ledger yet"}
     try:
         with tempfile.TemporaryDirectory(prefix="vellis-doctor-") as temporary:
             root = Path(temporary)
-            copied_ledger = root / "controller.sqlite"
+            copied_ledger = root / "runtime.sqlite"
             shutil.copy2(source, copied_ledger)
-            probe = build_app(
+            with build_app(
                 RtgKnowledgeGraphConfig(
                     storage_root=root / "json_file",
-                    sql_database_path=copied_ledger,
+                    runtime_database_path=copied_ledger,
                     install_starter_schema=False,
                     automatic_recovery=True,
                 )
-            )
-            status = probe.prepare()
+            ) as probe:
+                status = probe.prepare()
         return {
-            "id": "replay_feasibility",
+            "id": "reconstruction_feasibility",
             "ok": True,
             "detail": {"status": status.status, "recovery": status.recovery},
         }
     except Exception as error:  # noqa: BLE001 - doctor reports rather than raises
-        return {"id": "replay_feasibility", "ok": False, "detail": str(error)}
+        return {"id": "reconstruction_feasibility", "ok": False, "detail": str(error)}
 
 
 def _ignored_data_check(data_dir: Path) -> JsonObject:
@@ -507,8 +515,8 @@ def _single_server(raw: object) -> JsonObject:
 
 def _data_dir_for_config(config: RtgKnowledgeGraphConfig) -> Path:
     storage_root = config.storage_root.expanduser().resolve(strict=False)
-    sql_path = config.sql_database_path.expanduser().resolve(strict=False)
-    if storage_root.name == "json_file" and sql_path.parent == storage_root.parent:
+    runtime_path = config.runtime_database_path.expanduser().resolve(strict=False)
+    if storage_root.name == "json_file" and runtime_path.parent == storage_root.parent:
         return storage_root.parent
     return storage_root
 

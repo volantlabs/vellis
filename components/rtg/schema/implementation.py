@@ -88,6 +88,10 @@ class InMemoryRtgSchema:
             definitions=tuple(_definition_to_json(item) for item in self._sorted())
         )
 
+    def replace_snapshot(self, snapshot: RtgSchemaSnapshot) -> None:
+        candidate = type(self).import_snapshot(snapshot)
+        self._definitions = candidate._definitions
+
     def put_definition(self, definition: RtgSchemaDefinition) -> RtgSchemaDefinition:
         normalized = self._normalize_definition(definition)
         definition_uuid = _definition_uuid(normalized)

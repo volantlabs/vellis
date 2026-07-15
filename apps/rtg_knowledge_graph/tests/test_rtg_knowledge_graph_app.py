@@ -1,23 +1,50 @@
 from __future__ import annotations
 
+import hashlib
+import inspect
 import json
 import os
+import re
 import shlex
 import shutil
 import subprocess
 from pathlib import Path
+from typing import Any, cast
 
 import pytest
 
+from apps.rtg_knowledge_graph import composition as app_composition
 from apps.rtg_knowledge_graph import main as app_main
 from apps.rtg_knowledge_graph import mcp_launch
 from apps.rtg_knowledge_graph.composition import build_app
 from apps.rtg_knowledge_graph.config import (
-    DEFAULT_SQL_DATABASE_PATH,
+    DEFAULT_RUNTIME_DATABASE_PATH,
     DEFAULT_STORAGE_ROOT,
-    SQL_DATABASE_PATH_ENV_VAR,
+    RUNTIME_DATABASE_PATH_ENV_VAR,
     STORAGE_ROOT_ENV_VAR,
     RtgKnowledgeGraphConfig,
+)
+from apps.rtg_knowledge_graph.mcp_toolset import TOOL_NAMES, VellisRequestInvalid
+from apps.rtg_knowledge_graph.runtime_binding import create_vellis_facade_adapter
+from components.interface.mcp_gateway import McpGatewayInvocation
+from components.rtg.change_validation import (
+    DeterministicRtgChangeValidator,
+    RtgValidationFinding,
+    RtgValidationOptions,
+    RtgValidationReport,
+)
+from components.rtg.controller import (
+    RtgControllerPreconditionFailed,
+    RtgControllerRecoveryIndeterminate,
+    RtgControllerValidationFailed,
+)
+from components.rtg.migration import RtgMigrationNotFound
+from components.runtime.component_adapter.implementation import encode_json
+from components.runtime.message_runtime import (
+    JsonObject,
+    RuntimeHistoryQuery,
+    RuntimeMessageKind,
+    RuntimeTraceDisposition,
 )
 
 MODEL_EVIDENCE = {
@@ -38,14 +65,482 @@ MODEL_EVIDENCE = {
         "test_cli_reports_custom_http_mcp_dry_run_metadata",
         "test_mcp_launch_metadata_has_installed_package_fallback",
     ),
+    "VellisRuntimeCompositionVerification": (
+        "test_runtime_composition_manifest_and_curated_gateway",
+        "test_vellis_facade_binding_failures_match_accepted_model",
+        "test_runtime_facade_preserves_modeled_controller_and_collaborator_faults",
+        "test_snapshot_transfer_starts_a_fresh_runtime_chronology",
+        "test_failed_cutover_status_is_committed_and_reconstructed",
+    ),
 }
+
+
+class _TogglePostCutoverValidator(DeterministicRtgChangeValidator):
+    def __init__(self) -> None:
+        self.reject_actual_state = False
+
+    def validate_graph_state(
+        self,
+        graph: object,
+        schema: object,
+        constraints: object,
+        migration: object | None,
+        query: object,
+        migration_ids: tuple[str, ...] | None = None,
+        validation_options: RtgValidationOptions | None = None,
+    ) -> RtgValidationReport:
+        if not self.reject_actual_state:
+            return super().validate_graph_state(
+                graph,
+                schema,
+                constraints,
+                migration,
+                query,
+                migration_ids,
+                validation_options,
+            )
+        return RtgValidationReport(
+            accepted=False,
+            findings=(
+                RtgValidationFinding(
+                    track="schema_object",
+                    severity="blocking",
+                    code="test.post_cutover_rejected",
+                    message="post-cutover state rejected",
+                ),
+            ),
+        )
+
+
+def test_runtime_composition_manifest_and_curated_gateway(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(mcp_launch, "_uv_command", lambda: "uv")
+    opened_collaborators: list[tuple[object, ...]] = []
+    original_open = app_composition.InProcessRtgController.open
+
+    def audited_open(cls: type[object], *collaborators: object, **options: object) -> object:
+        del cls
+        assert len(collaborators) == 7
+        assert all(_is_runtime_proxy(item) for item in collaborators)
+        assert options == {}
+        opened_collaborators.append(collaborators)
+        return cast(Any, original_open)(*collaborators, **options)
+
+    monkeypatch.setattr(
+        app_composition.InProcessRtgController,
+        "open",
+        classmethod(audited_open),
+    )
+    config = RtgKnowledgeGraphConfig(
+        storage_root=tmp_path / "storage",
+        runtime_database_path=tmp_path / "runtime.sqlite",
+        install_starter_schema=False,
+    )
+    with build_app(config) as composition:
+        starter = composition.prepare()
+        composition.controller.get_system_state()
+        starter_source = composition.runtime.address_for(
+            "vellis.starter_ontology.installer"
+        )
+        setup_calls = composition.runtime.query_history_sync(
+            RuntimeHistoryQuery(
+                action_id="component.rtg.controller.get_system_state",
+                fact_type="message_accepted",
+                limit=100,
+            )
+        ).facts
+        assert setup_calls
+        assert all(
+            fact.envelope is not None and fact.envelope.source == starter_source
+            for fact in setup_calls
+        )
+        status = composition.runner.run()
+        gateway = composition.build_mcp_gateway(starter)
+        outcome = gateway.invoke_tool_sync(
+            McpGatewayInvocation(tool_name="rtg_get_system_state", arguments={})
+        )
+        validation = gateway.invoke_tool_sync(
+            McpGatewayInvocation(
+                tool_name="rtg_validate_graph",
+                arguments={"migration_ids": None, "validation_options": None},
+            )
+        )
+
+        assert outcome.result["ok"] is True
+        assert validation.result["ok"] is True
+        assert len(opened_collaborators) == 1
+        assert _is_runtime_proxy(composition.controller)
+        assert _is_runtime_proxy(composition._starter_controller)
+        assert _is_runtime_proxy(composition.runner._controller)
+        assert _is_runtime_proxy(composition.runner._document_storage)
+        facts = composition.runtime.query_history_sync(
+            RuntimeHistoryQuery(
+                trace_id=outcome.trace_id,
+                action_id="application.vellis.facade.rtg_get_system_state",
+            )
+        ).facts
+        assert facts[0].fact_type == "message_accepted"
+        assert facts[-1].fact_type == "trace_committed"
+
+        manifest = json.loads(
+            (config.storage_root / status.manifest_path).read_text(encoding="utf-8")
+        )
+
+    occurrence_keys = {item["instance_key"] for item in manifest["occurrences"]}
+    assert occurrence_keys == {
+        "vellis.graph.primary",
+        "vellis.schema.primary",
+        "vellis.constraints.primary",
+        "vellis.migration.primary",
+        "vellis.storage.json.primary",
+        "vellis.query.primary",
+        "vellis.validation.primary",
+        "vellis.controller.primary",
+        "vellis.facade.primary",
+        "vellis.interface.mcp",
+        "vellis.starter_ontology.installer",
+        "vellis.runner.local",
+    }
+    assert manifest["runtime"]["runtime_key"] == "vellis.rtg_knowledge_graph"
+    canonical = dict(manifest)
+    digest = canonical.pop("manifest_hash")
+    canonical.pop("interfaces")
+    encoded = json.dumps(canonical, sort_keys=True, separators=(",", ":"))
+    assert digest == hashlib.sha256(encoded.encode("utf-8")).hexdigest()
+    assert config.runtime_database_path.exists()
+
+    gateway_source = Path("components/interface/mcp_gateway/implementation.py").read_text(
+        encoding="utf-8"
+    )
+    assert "components.rtg" not in gateway_source
+    transport_source = Path("apps/rtg_knowledge_graph/mcp_server.py").read_text(
+        encoding="utf-8"
+    )
+    assert "RtgMcpToolset" not in transport_source
+    assert "def rtg_" not in transport_source
+    assert "components.rtg" not in transport_source
+    controller_replay_source = inspect.getsource(
+        app_composition._controller_replay_binding
+    )
+    assert ".resolve()" not in controller_replay_source
+    assert all(
+        f"{name}_proxy.export_snapshot()" in controller_replay_source
+        for name in ("graph", "schema", "constraints", "migration")
+    )
+
+
+def test_vellis_facade_binding_failures_match_accepted_model(tmp_path: Path) -> None:
+    config = RtgKnowledgeGraphConfig(
+        storage_root=tmp_path / "storage",
+        runtime_database_path=tmp_path / "runtime.sqlite",
+        install_starter_schema=False,
+    )
+    with build_app(config) as composition:
+        actions = create_vellis_facade_adapter(
+            composition._facade_host
+        ).describe().actions
+
+    model = (
+        Path(__file__).resolve().parents[3] / "model/vellis/VellisOperations.sysml"
+    ).read_text(encoding="utf-8")
+    assert tuple(action.action_id.rsplit(".", 1)[-1] for action in actions) == TOOL_NAMES
+    for action in actions:
+        tool_name = action.action_id.rsplit(".", 1)[-1]
+        definition = re.search(
+            rf"\baction def\s+<'operation\.vellis\.{re.escape(tool_name)}'>\s+\w+\s*\{{"
+            r"(?P<body>.*?)@FailureContract\s*\{(?P<contract>.*?)\}",
+            model,
+            flags=re.DOTALL,
+        )
+        assert definition is not None, tool_name
+        error_ids = re.search(
+            r"\berrorIds\s*=\s*\((?P<values>.*?)\)",
+            definition.group("contract"),
+            flags=re.DOTALL,
+        )
+        assert error_ids is not None, tool_name
+        modeled = tuple(re.findall(r'"([^"]+)"', error_ids.group("values")))
+        assert action.supported_failure_names == modeled
+
+
+def test_snapshot_transfer_starts_a_fresh_runtime_chronology(tmp_path: Path) -> None:
+    source_config = RtgKnowledgeGraphConfig(
+        storage_root=tmp_path / "source" / "storage",
+        runtime_database_path=tmp_path / "source" / "runtime.sqlite",
+    )
+    with build_app(source_config) as source:
+        source.prepare()
+        expected_snapshot = source.controller.export_system_snapshot()
+        encoded_snapshot = encode_json(expected_snapshot)
+    assert isinstance(encoded_snapshot, dict)
+    transfer_snapshot = {
+        **encoded_snapshot,
+        "transaction_id": "discarded-source-trace",
+        "ledger_position": 1234,
+        "legacy_controller_metadata": {"source": "pre-runtime"},
+    }
+
+    destination_config = RtgKnowledgeGraphConfig(
+        storage_root=tmp_path / "destination" / "storage",
+        runtime_database_path=tmp_path / "destination" / "runtime.sqlite",
+        install_starter_schema=False,
+    )
+    with build_app(destination_config) as destination:
+        empty = destination.prepare()
+        assert not destination.runtime.query_history_sync(
+            RuntimeHistoryQuery(fact_type="canonical_effect")
+        ).facts
+
+        result = destination.build_facade(empty).rtg_restore_from_snapshot(transfer_snapshot)
+
+        assert result["ok"] is True
+        roots = destination.runtime.query_history_sync(
+            RuntimeHistoryQuery(
+                fact_type="message_accepted",
+                action_id="application.vellis.facade.rtg_restore_from_snapshot",
+            )
+        ).facts
+        trace_id = roots[-1].trace_id
+        assert trace_id is not None
+        trace = destination.runtime.get_trace_sync(trace_id)
+        accepted_actions = {
+            fact.action_id for fact in trace.facts if fact.fact_type == "message_accepted"
+        }
+        assert {
+            "component.rtg.graph.replace_snapshot",
+            "component.rtg.schema.replace_snapshot",
+            "component.rtg.constraints.replace_snapshot",
+            "component.rtg.migration.replace_snapshot",
+            "component.rtg.change_validation.validate_graph_state",
+        }.issubset(accepted_actions)
+        effects = destination.runtime.query_history_sync(
+            RuntimeHistoryQuery(trace_id=trace_id, fact_type="canonical_effect")
+        ).facts
+        assert {item.instance_key for item in effects} == {
+            "vellis.graph.primary",
+            "vellis.schema.primary",
+            "vellis.constraints.primary",
+            "vellis.migration.primary",
+            "vellis.controller.primary",
+        }
+        controller_effect = next(
+            item for item in effects if item.instance_key == "vellis.controller.primary"
+        )
+        assert controller_effect.runtime_position == max(
+            item.runtime_position for item in effects
+        )
+        effect = controller_effect.details["effect"]
+        assert isinstance(effect, dict)
+        payload = effect["payload"]
+        assert isinstance(payload, dict)
+        assert payload["supersedes_trace_effects"] is True
+        arguments = payload["arguments"]
+        assert isinstance(arguments, dict)
+        restored_snapshot = arguments["snapshot"]
+        assert isinstance(restored_snapshot, dict)
+        assert "transaction_id" not in restored_snapshot
+        assert "ledger_position" not in restored_snapshot
+        assert "legacy_controller_metadata" not in restored_snapshot
+        accepted_before_restart = len(
+            destination.runtime.query_history_sync(
+                RuntimeHistoryQuery(fact_type="message_accepted", limit=1000)
+            ).facts
+        )
+
+    with build_app(destination_config) as restarted:
+        reconstruction = restarted.runtime_services.startup_reconstruction
+        assert reconstruction is not None
+        assert reconstruction.verified
+        assert reconstruction.skipped_effects >= 4
+        assert len(
+            restarted.runtime.query_history_sync(
+                RuntimeHistoryQuery(fact_type="message_accepted", limit=1000)
+            ).facts
+        ) == accepted_before_restart
+        assert restarted.controller.export_system_snapshot() == expected_snapshot
+
+
+def test_runtime_facade_preserves_modeled_controller_and_collaborator_faults(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    config = RtgKnowledgeGraphConfig(
+        storage_root=tmp_path / "storage",
+        runtime_database_path=tmp_path / "runtime.sqlite",
+        install_starter_schema=False,
+    )
+    with build_app(config) as composition:
+        starter = composition.prepare()
+        facade = composition.build_facade(starter)
+
+        with pytest.raises(RtgMigrationNotFound):
+            facade.rtg_get_migration("missing")
+        with pytest.raises(RtgControllerPreconditionFailed):
+            facade.rtg_apply_migration_cutover("missing")
+        with pytest.raises(RtgControllerPreconditionFailed):
+            facade.rtg_apply_migration_cutover(
+                "missing",
+                {"validation_mode": "invalid"},
+            )
+        with pytest.raises(VellisRequestInvalid):
+            facade.rtg_get_usage_guide("not-a-topic")
+
+        for action_id in (
+            "application.vellis.facade.rtg_get_migration",
+            "application.vellis.facade.rtg_apply_migration_cutover",
+            "application.vellis.facade.rtg_get_usage_guide",
+        ):
+            accepted = composition.runtime.query_history_sync(
+                RuntimeHistoryQuery(
+                    action_id=action_id,
+                    fact_type="message_accepted",
+                    limit=100,
+                )
+            ).facts
+            assert accepted
+            for root in accepted:
+                assert root.trace_id is not None
+                trace = composition.runtime.get_trace_sync(root.trace_id)
+                assert trace.disposition is RuntimeTraceDisposition.ABORTED
+                facade_faults = [
+                    fact
+                    for fact in trace.facts
+                    if fact.fact_type == "fault_recorded" and fact.action_id == action_id
+                ]
+                assert len(facade_faults) == 1
+                assert facade_faults[0].envelope is not None
+                assert facade_faults[0].envelope.kind is RuntimeMessageKind.FAULT
+
+        gateway = composition.build_mcp_gateway(starter)
+        external = gateway.invoke_tool_sync(
+            McpGatewayInvocation(
+                tool_name="rtg_get_migration",
+                arguments={"migration_id": "missing"},
+            )
+        )
+        external_error = cast(dict[str, object], external.result["error"])
+        assert external.result["ok"] is False
+        assert external_error["type"] == "RtgMigrationNotFound"
+        assert (
+            composition.runtime.get_trace_sync(external.trace_id).disposition
+            is RuntimeTraceDisposition.ABORTED
+        )
+        assert not composition.runtime.query_history_sync(
+            RuntimeHistoryQuery(fact_type="trace_indeterminate", limit=100)
+        ).facts
+
+        snapshot = composition.controller.export_system_snapshot()
+
+        def indeterminate_restore(*_args: object, **_kwargs: object) -> object:
+            raise RtgControllerRecoveryIndeterminate("compensation could not be confirmed")
+
+        monkeypatch.setattr(
+            app_composition.InProcessRtgController,
+            "restore_from_snapshot",
+            indeterminate_restore,
+        )
+        uncertain = gateway.invoke_tool_sync(
+            McpGatewayInvocation(
+                tool_name="rtg_restore_from_snapshot",
+                arguments=cast(JsonObject, {"snapshot": encode_json(snapshot)}),
+            )
+        )
+        uncertain_error = cast(dict[str, object], uncertain.result["error"])
+        assert uncertain.result["ok"] is False
+        assert uncertain_error["type"] == "RtgControllerRecoveryIndeterminate"
+        assert (
+            composition.runtime.get_trace_sync(uncertain.trace_id).disposition
+            is RuntimeTraceDisposition.INDETERMINATE
+        )
+        assert composition.runtime.health == "recovery_required"
+
+
+def test_failed_cutover_status_is_committed_and_reconstructed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    validator = _TogglePostCutoverValidator()
+    monkeypatch.setattr(
+        app_composition,
+        "DeterministicRtgChangeValidator",
+        lambda: validator,
+    )
+    config = RtgKnowledgeGraphConfig(
+        storage_root=tmp_path / "storage",
+        runtime_database_path=tmp_path / "runtime.sqlite",
+    )
+    migration_id = "runtime-failed-cutover"
+
+    with build_app(config) as original:
+        facade = original.build_facade(original.prepare())
+        staged = facade.rtg_stage_schema_migration(
+            migration_id,
+            "Exercise intentional failed-cutover reconstruction.",
+            [
+                {
+                    "kind": "anchor",
+                    "type_key": "RuntimeFailureProbe",
+                    "description": "A non-live candidate used only by this regression test.",
+                    "payload": {"required_data_types": []},
+                }
+            ],
+            validation_mode="skip",
+        )
+        assert staged["ok"] is True
+
+        validator.reject_actual_state = True
+        with pytest.raises(RtgControllerValidationFailed):
+            facade.rtg_apply_migration_cutover(migration_id)
+
+        accepted = original.runtime.query_history_sync(
+            RuntimeHistoryQuery(
+                action_id="component.rtg.controller.apply_migration_cutover",
+                fact_type="message_accepted",
+            )
+        ).facts
+        failed_trace_id = accepted[-1].trace_id
+        assert failed_trace_id is not None
+        assert (
+            original.runtime.get_trace_sync(failed_trace_id).disposition
+            is RuntimeTraceDisposition.COMMITTED
+        )
+        failure_effects = original.runtime.query_history_sync(
+            RuntimeHistoryQuery(
+                trace_id=failed_trace_id,
+                action_id="component.rtg.controller.apply_migration_cutover",
+                fact_type="canonical_effect",
+            )
+        ).facts
+        assert len(failure_effects) == 1
+        failure_effect = failure_effects[0].details["effect"]
+        assert isinstance(failure_effect, dict)
+        failure_payload = failure_effect["payload"]
+        assert isinstance(failure_payload, dict)
+        assert failure_payload["supersedes_trace_effects"] is True
+        assert original.controller.get_migration(migration_id).status == "failed"
+        expected_state = original.controller.export_system_snapshot()
+
+    validator.reject_actual_state = False
+    with build_app(config) as restarted:
+        reconstruction = restarted.runtime_services.startup_reconstruction
+        assert reconstruction is not None
+        assert reconstruction.verified
+        assert reconstruction.skipped_effects > 0
+        assert restarted.controller.get_migration(migration_id).status == "failed"
+        assert restarted.controller.export_system_snapshot() == expected_state
+
+
+def _is_runtime_proxy(value: object) -> bool:
+    return bool(getattr(value, "_bibliotek_runtime_proxy", False)) or type(
+        value
+    ).__module__.endswith(".runtime_binding")
 
 
 def test_config_uses_default_storage_root_relative_to_cwd(tmp_path: Path) -> None:
     config = RtgKnowledgeGraphConfig.from_env(env={}, cwd=tmp_path)
 
     assert config.storage_root == tmp_path / DEFAULT_STORAGE_ROOT
-    assert config.sql_database_path == tmp_path / DEFAULT_SQL_DATABASE_PATH
+    assert config.runtime_database_path == tmp_path / DEFAULT_RUNTIME_DATABASE_PATH
 
 
 def test_config_uses_env_storage_root(tmp_path: Path) -> None:
@@ -53,13 +548,13 @@ def test_config_uses_env_storage_root(tmp_path: Path) -> None:
     config = RtgKnowledgeGraphConfig.from_env(
         env={
             STORAGE_ROOT_ENV_VAR: str(configured),
-            SQL_DATABASE_PATH_ENV_VAR: str(tmp_path / "configured.sqlite"),
+            RUNTIME_DATABASE_PATH_ENV_VAR: str(tmp_path / "configured.sqlite"),
         },
         cwd=tmp_path / "ignored",
     )
 
     assert config.storage_root == configured
-    assert config.sql_database_path == tmp_path / "configured.sqlite"
+    assert config.runtime_database_path == tmp_path / "configured.sqlite"
 
 
 def test_composed_app_runs_and_writes_manifest(
@@ -68,7 +563,7 @@ def test_composed_app_runs_and_writes_manifest(
     monkeypatch.setattr(mcp_launch, "_uv_command", lambda: "uv")
     config = RtgKnowledgeGraphConfig(
         storage_root=tmp_path / "storage",
-        sql_database_path=tmp_path / "controller.sqlite",
+        runtime_database_path=tmp_path / "runtime.sqlite",
     )
     composition = build_app(config)
 
@@ -86,7 +581,6 @@ def test_composed_app_runs_and_writes_manifest(
     dependency_ids = {item["id"] for item in manifest["component_dependencies"]}
     assert dependency_ids == {
         "component.storage.json_file",
-        "component.storage.sql",
         "component.rtg.controller",
         "component.rtg.graph",
         "component.rtg.schema",
@@ -172,8 +666,8 @@ def test_composed_app_runs_and_writes_manifest(
                             "stdio",
                             "--storage-root",
                             str((tmp_path / "storage").resolve()),
-                            "--sql-database-path",
-                            str((tmp_path / "controller.sqlite").resolve()),
+                            "--runtime-database-path",
+                            str((tmp_path / "runtime.sqlite").resolve()),
                         ],
                         "cwd": str(Path(".").resolve()),
                     },
@@ -193,8 +687,8 @@ def test_composed_app_runs_and_writes_manifest(
                                     "stdio",
                                     "--storage-root",
                                     str((tmp_path / "storage").resolve()),
-                                    "--sql-database-path",
-                                    str((tmp_path / "controller.sqlite").resolve()),
+                                    "--runtime-database-path",
+                                    str((tmp_path / "runtime.sqlite").resolve()),
                                 ],
                                 "cwd": str(Path(".").resolve()),
                             }
@@ -229,8 +723,8 @@ def test_composed_app_runs_and_writes_manifest(
                             "/mcp",
                             "--storage-root",
                             str((tmp_path / "storage").resolve()),
-                            "--sql-database-path",
-                            str((tmp_path / "controller.sqlite").resolve()),
+                            "--runtime-database-path",
+                            str((tmp_path / "runtime.sqlite").resolve()),
                         ],
                         "cwd": str(Path(".").resolve()),
                     },
@@ -258,8 +752,8 @@ def test_composed_app_runs_and_writes_manifest(
                     "stdio",
                     "--storage-root",
                     str((tmp_path / "storage").resolve()),
-                    "--sql-database-path",
-                    str((tmp_path / "controller.sqlite").resolve()),
+                    "--runtime-database-path",
+                    str((tmp_path / "runtime.sqlite").resolve()),
                 ],
                 "cwd": str(Path(".").resolve()),
             },
@@ -279,8 +773,8 @@ def test_composed_app_runs_and_writes_manifest(
                             "stdio",
                             "--storage-root",
                             str((tmp_path / "storage").resolve()),
-                            "--sql-database-path",
-                            str((tmp_path / "controller.sqlite").resolve()),
+                            "--runtime-database-path",
+                            str((tmp_path / "runtime.sqlite").resolve()),
                         ],
                         "cwd": str(Path(".").resolve()),
                     }
@@ -296,7 +790,7 @@ def test_persisted_manifest_preserves_configured_startup_modes(
     monkeypatch.setattr(mcp_launch, "_uv_command", lambda: "uv")
     config = RtgKnowledgeGraphConfig(
         storage_root=tmp_path / "storage",
-        sql_database_path=tmp_path / "controller.sqlite",
+        runtime_database_path=tmp_path / "runtime.sqlite",
         install_starter_schema=False,
         automatic_recovery=False,
     )
@@ -335,12 +829,12 @@ def test_cli_runs_full_app(tmp_path: Path) -> None:
     assert status["json_document_count"] == 1
     assert status["rtg_controller_ready"] is True
     assert (storage_root / "system" / "app_manifest.json").exists()
-    assert (storage_root / "controller.sqlite").exists()
+    assert (storage_root / "runtime.sqlite").exists()
 
 
 def test_cli_reports_mcp_dry_run_metadata(tmp_path: Path) -> None:
     storage_root = tmp_path / "mcp-storage"
-    sql_database_path = tmp_path / "mcp-ledger.sqlite"
+    runtime_database_path = tmp_path / "runtime.sqlite"
 
     result = subprocess.run(
         [
@@ -352,8 +846,8 @@ def test_cli_reports_mcp_dry_run_metadata(tmp_path: Path) -> None:
             "serve-mcp",
             "--storage-root",
             str(storage_root),
-            "--sql-database-path",
-            str(sql_database_path),
+            "--runtime-database-path",
+            str(runtime_database_path),
             "--dry-run",
             "--json",
         ],
@@ -409,8 +903,8 @@ def test_cli_reports_mcp_dry_run_metadata(tmp_path: Path) -> None:
     assert launch["command"] == (shutil.which("uv") or "uv")
     assert launch["args"][:2] == ["--directory", str(Path(".").resolve())]
     assert "--storage-root" in launch["args"]
-    assert "--sql-database-path" in launch["args"]
-    assert str(sql_database_path.resolve()) in launch["args"]
+    assert "--runtime-database-path" in launch["args"]
+    assert str(runtime_database_path.resolve()) in launch["args"]
     assert client_config == launch
     assert localhost_http["url"] == "http://127.0.0.1:8765/mcp"
     assert localhost_http["client_config"]["mcpServers"]["rtg_knowledge_graph"] == {
@@ -420,7 +914,7 @@ def test_cli_reports_mcp_dry_run_metadata(tmp_path: Path) -> None:
     assert "--transport" in localhost_http["launch"]["args"]
     assert "http" in localhost_http["launch"]["args"]
     assert (storage_root / "system" / "app_manifest.json").exists()
-    assert sql_database_path.exists()
+    assert runtime_database_path.exists()
 
 
 def test_cli_prints_focused_stdio_client_config_without_initializing_app(tmp_path: Path) -> None:
@@ -638,7 +1132,7 @@ def test_mcp_launch_metadata_has_installed_package_fallback(
     monkeypatch.setattr(mcp_launch, "repository_root", lambda: None)
     config = RtgKnowledgeGraphConfig(
         storage_root=tmp_path / "storage",
-        sql_database_path=tmp_path / "controller.sqlite",
+        runtime_database_path=tmp_path / "runtime.sqlite",
     )
 
     metadata = mcp_launch.mcp_launch_metadata(config)

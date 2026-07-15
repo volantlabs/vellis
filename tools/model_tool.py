@@ -57,10 +57,11 @@ except ImportError:  # pragma: no cover - direct script execution
 GENERATED_COMPONENT_DOC_ROOT = BIBLIOTEK_COMPONENT_REFERENCE_ROOT
 OPTIONAL_IDENTIFICATION = r"(?:<'[^']+'>\s+)?"
 SYSML_IDENTIFIER = r"(?:[A-Za-z_]\w*|'[^']+')"
+SYSML_QUALIFIED_IDENTIFIER = rf"{SYSML_IDENTIFIER}(?:\.{SYSML_IDENTIFIER})*"
 
 EXPECTED_VELLIS_ROLES: dict[str, str] = {
+    "runtime": "component.runtime.message_runtime",
     "documentStorage": "component.storage.json_file",
-    "ledgerStorage": "component.storage.sql",
     "graphStore": "component.rtg.graph",
     "schemaRegistry": "component.rtg.schema",
     "constraintRegistry": "component.rtg.constraints",
@@ -71,8 +72,8 @@ EXPECTED_VELLIS_ROLES: dict[str, str] = {
 }
 
 RUNTIME_ROLE_NAMES: dict[str, str] = {
+    "runtime": "message_runtime",
     "documentStorage": "document_storage",
-    "ledgerStorage": "controller_ledger_storage",
     "graphStore": "graph_store",
     "schemaRegistry": "schema_registry",
     "constraintRegistry": "constraint_registry",
@@ -84,7 +85,6 @@ RUNTIME_ROLE_NAMES: dict[str, str] = {
 
 RUNTIME_MANIFEST_ROLE_ORDER = (
     "documentStorage",
-    "ledgerStorage",
     "controller",
     "graphStore",
     "schemaRegistry",
@@ -137,6 +137,21 @@ def _identifier_value(identifier: str) -> str:
 
 def _identifier_pattern(identifier: str) -> str:
     return rf"(?:{re.escape(identifier)}|'{re.escape(identifier)}')"
+
+
+def _satisfier_map(text: str) -> dict[str, str]:
+    """Project requirement satisfiers while preserving quoted SysML names."""
+
+    satisfiers: dict[str, str] = {}
+    for requirement, target in re.findall(
+        rf"\bsatisfy\s+(\w+)\s+by\s+({SYSML_QUALIFIED_IDENTIFIER})\s*;",
+        text,
+    ):
+        satisfiers[requirement] = ".".join(
+            _identifier_value(segment)
+            for segment in re.findall(SYSML_IDENTIFIER, target)
+        )
+    return satisfiers
 
 
 def _without_comments(text: str) -> str:
@@ -498,7 +513,25 @@ def _check_protocol_action_signatures() -> list[Finding]:
                 rf"{SYSML_IDENTIFIER}(?:\[[^]]+\])?\s*:\s*([\w:]+)",
                 action_blocks[action],
             )
-            expected_outputs = () if return_type in {None, "None"} else (return_type,)
+            normalized_return_types = {
+                "str": "String",
+                "int": "Integer",
+                "float": "Real",
+                "bool": "Boolean",
+                "tuple[str, ...]": "String",
+            }
+            if return_type is None or return_type == "None":
+                expected_outputs: tuple[str, ...] = ()
+            else:
+                repeated_return = re.fullmatch(r"tuple\[([^,]+), \.\.\.\]", return_type)
+                normalized_return = normalized_return_types.get(return_type)
+                if normalized_return is None:
+                    normalized_return = (
+                        repeated_return.group(1)
+                        if repeated_return is not None
+                        else return_type
+                    )
+                expected_outputs = (normalized_return,)
             if tuple(model_outputs) != expected_outputs:
                 findings.append(
                     Finding(
@@ -567,6 +600,10 @@ def _check_empty_public_definitions(files: list[Path]) -> list[Finding]:
         for match in braced.finditer(text):
             block = _extract_braced_block(text, match.start())
             if match.group(1) == "part" and "@ImplementationBinding" in block:
+                continue
+            if match.group(1) == "action" and "@FailureContract" in block:
+                # A parameterless command remains a concrete public action when its
+                # observable semantics and failure family are explicitly contracted.
                 continue
             body = _without_comments(block)
             body = body[body.find("{") + 1 : body.rfind("}")]
@@ -816,15 +853,18 @@ def _check_component_contract_completeness() -> list[Finding]:
 
         if component_block:
             for match in re.finditer(
-                r"perform action\s+(\w+)\[[^]]+\]\s*:\s*(\w+)", component_block
+                rf"perform action\s+({SYSML_IDENTIFIER})\[[^]]+\]\s*:\s*(\w+)",
+                component_block,
             ):
-                feature, action_name = match.groups()
+                raw_feature, action_name = match.groups()
+                feature = _identifier_value(raw_feature)
                 feature_block = _extract_braced_block(component_block, match.start())
                 direct_access = bool(_documentation(feature_block))
+                feature_pattern = rf"(?:{re.escape(feature)}|'{re.escape(feature)}')"
                 dependency_access = any(
                     _documentation(_extract_braced_block(component_block, dependency.start()))
                     for dependency in re.finditer(
-                        rf"\bdependency\s+\w+\s+from\s+{re.escape(feature)}\s+to\s+",
+                        rf"\bdependency\s+\w+\s+from\s+{feature_pattern}\s+to\s+",
                         component_block,
                     )
                 )
@@ -864,19 +904,25 @@ def _check_state_access_semantics() -> list[Finding]:
         complete_contract = "\n".join(_part_definition_chain(text, component_name)) or block
         state_features = set(
             re.findall(
-                r"\b(?:ref\s+)?(?:derived\s+)?(?:attribute|item)\s+(\w+)(?:\[[^]]+\])?\s*:",
+                r"(?m)^\s*(?:ref\s+)?(?:derived\s+)?(?:attribute|item)\s+"
+                r"(\w+)(?:\[[^]]+\])?\s*:",
                 block,
             )
         )
-        provided_actions = set(
-            re.findall(r"\bperform action\s+(\w+)\[[^]]+\]\s*:", complete_contract)
-        )
+        provided_actions = {
+            _identifier_value(name)
+            for name in re.findall(
+                rf"\bperform action\s+({SYSML_IDENTIFIER})\[[^]]+\]\s*:",
+                complete_contract,
+            )
+        }
         actions_with_state_semantics: set[str] = set()
         for match in re.finditer(
-            r"\bdependency\s+(\w+)\s+from\s+(\w+)\s+to\s+([\w.]+)\s*\{",
+            rf"\bdependency\s+(\w+)\s+from\s+({SYSML_IDENTIFIER})\s+to\s+([\w.]+)\s*\{{",
             block,
         ):
-            dependency_name, source, target = match.groups()
+            dependency_name, raw_source, target = match.groups()
+            source = _identifier_value(raw_source)
             dependency_block = _extract_braced_block(block, match.start())
             access = re.search(
                 r"@StateAccess\s*\{[^}]*kind\s*=\s*StateAccessKind::(\w+);",
@@ -914,11 +960,20 @@ def _check_native_behavior_realizations() -> list[Finding]:
         findings.append(Finding(operations_path, "facade still uses dependency as invocation"))
     facade_calls = re.findall(r"\baction\s+invoke\w*\s*:\s*\w+", facade)
     facade_performers = re.findall(r"\bperform\s+rtg\w+\.invoke\w*\s*;", facade)
-    if len(facade_calls) != 27 or len(facade_performers) != 27:
+    # Three façade actions are intentionally application-local projections:
+    # usage guidance, reconstruction-evidence inspection, and the deprecated
+    # runtime-health-only flush response. Every other action has a typed nested
+    # provider invocation and matching performer declaration.
+    expected_delegated_actions = 24
+    if (
+        len(facade_calls) != expected_delegated_actions
+        or len(facade_performers) != expected_delegated_actions
+    ):
         findings.append(
             Finding(
                 operations_path,
-                f"expected 27 native facade calls and performers; found "
+                f"expected {expected_delegated_actions} delegated facade calls and "
+                "performers; found "
                 f"{len(facade_calls)} and {len(facade_performers)}",
             )
         )
@@ -1027,38 +1082,39 @@ def _check_native_behavior_realizations() -> list[Finding]:
     mcp_path = MODEL_ROOT / "vellis" / "realizations" / "VellisMcpPython.sysml"
     mcp_text = mcp_path.read_text(encoding="utf-8")
     adapter = _definition_block(mcp_text, "part def", "VellisMcpAdapter")
-    delegations = re.findall(r"\baction invokeFacade\s*:\s*\w+", adapter)
-    performers = re.findall(r"\bperform\s+\w+\.invokeFacade\s*;", adapter)
-    allocations = re.findall(
-        r"\ballocate\s+application\.facade\.\w+\s+to\s+adapter\.\w+\s*;", mcp_text
+    registrations = re.findall(
+        r"\bperform action\s+\w+\[[^]]+\]\s*:\s*\w+\s*\{\s*@McpToolBinding",
+        adapter,
     )
-    if "bind adapter.facade = application.facade;" not in mcp_text:
-        findings.append(Finding(mcp_path, "MCP adapter is not bound to the application facade"))
-    if (len(delegations), len(performers), len(allocations)) != (27, 27, 27):
+    allocations = re.findall(
+        r"\ballocate\s+adapter\.\w+\s+to\s+application\.gateway\.invokeTool\s*;",
+        mcp_text,
+    )
+    if "ref part gateway[1] : McpGateway;" not in adapter:
+        findings.append(Finding(mcp_path, "MCP transport adapter lacks its generic gateway role"))
+    if "part application : VellisRuntimePython;" not in mcp_text:
+        findings.append(Finding(mcp_path, "MCP transport does not compose runtime-native Vellis"))
+    if "bind adapter.gateway = application.gateway;" not in mcp_text:
+        findings.append(Finding(mcp_path, "MCP transport is not bound to the generic gateway"))
+    if len(registrations) != 27 or len(allocations) != 27:
         findings.append(
             Finding(
                 mcp_path,
-                "MCP realization must contain 27 facade delegations, performers, and allocations",
+                "MCP realization must project all 27 typed registrations through "
+                "gateway.invokeTool",
             )
         )
-    for call in re.finditer(r"\baction\s+invokeFacade\s*:\s*(\w+)\s*\{", adapter):
-        call_type = call.group(1)
-        call_block = _extract_braced_block(adapter, call.start())
-        for direction in ("in", "out"):
-            for field in sorted(features(call_type, direction)):
-                field_pattern = _identifier_pattern(field)
-                if not re.search(
-                    rf"\b{direction}\s+(?:ref\s+)?(?:attribute\s+|part\s+|item\s+)?{field_pattern}"
-                    rf"\s+redefines\s+{re.escape(call_type)}::{field_pattern}\s*=",
-                    call_block,
-                ):
-                    findings.append(
-                        Finding(
-                            mcp_path,
-                            f"MCP facade call {call_type} leaves {direction} "
-                            f"parameter {field} unbound",
-                        )
-                    )
+    for forbidden in (
+        "invokeFacade",
+        "RtgMcpToolset",
+        "ref part facade",
+        "bind adapter.facade",
+        "VellisLocalPythonRealization",
+    ):
+        if forbidden in mcp_text:
+            findings.append(
+                Finding(mcp_path, f"generic MCP realization retains direct coupling: {forbidden}")
+            )
     local_path = MODEL_ROOT / "vellis" / "realizations" / "VellisLocalPython.sysml"
     local_text = local_path.read_text(encoding="utf-8")
     local_allocations = re.findall(
@@ -1111,7 +1167,11 @@ def _check_view_semantics() -> list[Finding]:
             findings.append(Finding(path, f"view projections omit filters: {missing}"))
     vellis_path = MODEL_ROOT / "vellis" / "views" / "VellisViews.sysml"
     vellis_text = vellis_path.read_text(encoding="utf-8")
-    for package in ("VellisLocalPythonRealization", "VellisMcpPythonRealization"):
+    for package in (
+        "VellisLocalPythonRealization",
+        "VellisMcpPythonRealization",
+        "VellisRuntimePythonRealization",
+    ):
         if f"private import {package}::*;" not in vellis_text:
             findings.append(Finding(vellis_path, f"Vellis views do not import {package}"))
         if f"expose {package}::**;" not in vellis_text:
@@ -1333,7 +1393,8 @@ def _audit_model_boundary(path: Path) -> dict[str, object]:
         fields: dict[str, object] = {}
         for field in re.finditer(
             rf"\b(?:attribute|item|ref item)\s+{OPTIONAL_IDENTIFICATION}({SYSML_IDENTIFIER})"
-            r"(?P<multiplicity>\[[^]]+\])?\s*:\s*(?P<type>[\w:']+)"
+            r"(?P<multiplicity>\[[^]]+\])?(?:\s+(?:ordered|nonunique))*"
+            r"\s*:\s*(?P<type>[\w:']+)"
             r"(?P<value>\s+default\s*=|\s*=)?",
             block,
         ):
@@ -1610,7 +1671,7 @@ def _consumer_reference_paths(pattern: str) -> list[str]:
             continue
         try:
             text = path.read_text(encoding="utf-8")
-        except (OSError, UnicodeDecodeError):
+        except OSError, UnicodeDecodeError:
             continue
         if expression.search(text):
             matches.append(normalized)
@@ -1832,6 +1893,7 @@ def _check_formal_model_index() -> list[Finding]:
         "calc": "CalculationDefinition",
         "constraint": "ConstraintDefinition",
         "item": "ItemDefinition",
+        "metadata": "MetadataDefinition",
         "part": "PartDefinition",
         "use case": "UseCaseDefinition",
         "verification": "VerificationCaseDefinition",
@@ -1934,29 +1996,36 @@ def _check_vellis_use_cases() -> list[Finding]:
 
 
 def _python_tool_names() -> tuple[str, ...]:
-    source_path = ROOT / "apps" / "rtg_knowledge_graph" / "mcp_server.py"
-    tree = ast.parse(source_path.read_text(encoding="utf-8"))
-    registrations: list[tuple[int, str]] = []
-    for node in ast.walk(tree):
-        if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-            continue
-        for decorator in node.decorator_list:
-            if not isinstance(decorator, ast.Call):
-                continue
-            if not (
-                (isinstance(decorator.func, ast.Attribute) and decorator.func.attr == "tool")
-                or (isinstance(decorator.func, ast.Name) and decorator.func.id == "_tool")
-            ):
-                continue
-            name_keyword = next(
-                (keyword for keyword in decorator.keywords if keyword.arg == "name"), None
-            )
-            if name_keyword is None or not isinstance(name_keyword.value, ast.Constant):
-                continue
-            registrations.append((node.lineno, str(name_keyword.value.value)))
-    if not registrations:
-        raise ValueError("FastMCP tool registrations were not found in mcp_server.py")
-    return tuple(name for _, name in sorted(registrations))
+    """Return the generated inventory projected by the generic MCP transport host.
+
+    The transport deliberately has no hard-coded Vellis tool functions.  Its concrete tool
+    inventory is the generated application manifest consumed by ``gateway_registration.py`` and
+    projected from ``gateway.registrations`` by ``mcp_server.py``.
+    """
+    return tuple(str(tool["name"]) for tool in _generated_gateway_tools())
+
+
+def _generated_gateway_tools() -> tuple[dict[str, Any], ...]:
+    manifest = _read_json(GENERATED_MANIFEST)
+    tools = manifest.get("tools")
+    if not isinstance(tools, list) or not tools:
+        raise ValueError("generated application manifest has no MCP tool registrations")
+    registrations: list[dict[str, Any]] = []
+    names: set[str] = set()
+    for value in tools:
+        if not isinstance(value, dict):
+            raise ValueError("generated MCP tool registration must be an object")
+        name = value.get("name")
+        description = value.get("description")
+        if not isinstance(name, str) or not name:
+            raise ValueError("generated MCP tool registration lacks a name")
+        if not isinstance(description, str) or not description.strip():
+            raise ValueError(f"generated MCP tool registration {name} lacks a description")
+        if name in names:
+            raise ValueError(f"generated MCP tool registration repeats {name}")
+        names.add(name)
+        registrations.append(value)
+    return tuple(registrations)
 
 
 def _python_tool_parameters() -> dict[str, tuple[tuple[str, bool, Any], ...]]:
@@ -2037,32 +2106,110 @@ def _model_tool_parameters() -> dict[str, tuple[tuple[str, bool, Any], ...]]:
     return parameters
 
 
-def _python_tool_description_names() -> set[str]:
-    source_path = ROOT / "apps" / "rtg_knowledge_graph" / "mcp_server.py"
-    tree = ast.parse(source_path.read_text(encoding="utf-8"))
-    names: set[str] = set()
-    for node in ast.walk(tree):
-        if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+def _model_tool_parameter_schemas() -> dict[str, dict[str, Any]]:
+    text = _without_comments(
+        (MODEL_ROOT / "vellis" / "VellisOperations.sysml").read_text(encoding="utf-8")
+    )
+    schemas: dict[str, dict[str, Any]] = {}
+    start_pattern = re.compile(r"action def\s+(?:<'([^']+)'>\s+)?\w+\s*\{")
+    for match in start_pattern.finditer(text):
+        depth = 0
+        end = match.end()
+        for index in range(match.end() - 1, len(text)):
+            if text[index] == "{":
+                depth += 1
+            elif text[index] == "}":
+                depth -= 1
+                if depth == 0:
+                    end = index + 1
+                    break
+        identity = match.group(1)
+        if not identity or not identity.startswith("operation.vellis."):
             continue
-        for decorator in node.decorator_list:
-            if not isinstance(decorator, ast.Call):
-                continue
-            description = next(
-                (keyword.value for keyword in decorator.keywords if keyword.arg == "description"),
-                None,
+        properties: dict[str, Any] = {}
+        required: list[str] = []
+        block = text[match.start() : end]
+        for parameter, type_name, multiplicity in re.findall(
+            rf"\bin\s+({SYSML_IDENTIFIER})\s*:\s*({SYSML_IDENTIFIER})(\[[^]]+\])?",
+            block,
+        ):
+            name = _identifier_value(parameter)
+            schema_type = _vellis_wire_schema_type(_identifier_value(type_name))
+            if schema_type is None:
+                properties[name] = {}
+            elif multiplicity == "[0..1]":
+                properties[name] = {"type": [schema_type, "null"]}
+            else:
+                properties[name] = {"type": schema_type}
+            if multiplicity != "[0..1]":
+                required.append(name)
+        schemas[identity.removeprefix("operation.vellis.")] = {
+            "type": "object",
+            "properties": properties,
+            "required": required,
+            "additionalProperties": False,
+        }
+    return schemas
+
+
+def _vellis_wire_schema_type(type_name: str) -> str | None:
+    if type_name in {"String", "Uuid", "JsonRelativePath"}:
+        return "string"
+    if type_name == "Boolean":
+        return "boolean"
+    if type_name == "Integer":
+        return "integer"
+    if type_name == "JsonValue":
+        return None
+    if type_name.endswith("List"):
+        return "array"
+    if type_name.startswith("Vellis") and type_name.endswith(("Topic", "Format", "Kind", "State")):
+        return "string"
+    if type_name.startswith("Rtg") and type_name.endswith(("Mode", "Status")):
+        return "string"
+    return "object"
+
+
+def _python_tool_description_names() -> set[str]:
+    return {str(tool["name"]) for tool in _generated_gateway_tools()}
+
+
+def _check_generic_mcp_transport_projection() -> list[Finding]:
+    """Keep the FastMCP host generic and the generated manifest authoritative."""
+    findings: list[Finding] = []
+    server_path = ROOT / "apps" / "rtg_knowledge_graph" / "mcp_server.py"
+    server_text = server_path.read_text(encoding="utf-8")
+    for forbidden in ("RtgMcpToolset", "components.rtg", "def rtg_"):
+        if forbidden in server_text:
+            findings.append(
+                Finding(server_path, f"generic MCP transport retains Vellis coupling: {forbidden}")
             )
-            if not isinstance(description, ast.Subscript):
-                continue
-            if (
-                not isinstance(description.value, ast.Name)
-                or description.value.id != "TOOL_DESCRIPTIONS"
-            ):
-                continue
-            if isinstance(description.slice, ast.Constant):
-                names.add(str(description.slice.value))
-    if not names:
-        raise ValueError("TOOL_DESCRIPTIONS references were not found in mcp_server.py")
-    return names
+    for required in (
+        "def build_mcp_server(gateway: McpGateway)",
+        "for registration in gateway.registrations:",
+        "server.add_tool(_RuntimeGatewayTool(gateway, registration))",
+        "await self._gateway.invoke_tool(",
+    ):
+        if required not in server_text:
+            findings.append(
+                Finding(server_path, f"generic MCP transport projection omits {required}")
+            )
+
+    registration_path = ROOT / "apps" / "rtg_knowledge_graph" / "gateway_registration.py"
+    registration_text = registration_path.read_text(encoding="utf-8")
+    for required in (
+        'joinpath("model_app_manifest.json")',
+        'manifest.get("tools")',
+        "McpGatewayToolRegistration(",
+    ):
+        if required not in registration_text:
+            findings.append(
+                Finding(
+                    registration_path,
+                    f"generated MCP gateway registration projection omits {required}",
+                )
+            )
+    return findings
 
 
 def _model_tool_names() -> tuple[str, ...]:
@@ -2170,6 +2317,7 @@ def _check_vellis_contract_completeness() -> list[Finding]:
         "contract.vellis.facade.query_semantics",
         "contract.vellis.facade.snapshot_semantics",
         "contract.vellis.facade.controller_forwarding",
+        "contract.vellis.facade.runtime_projection",
     ):
         if contract_id not in operations_text:
             findings.append(Finding(operations_path, f"Vellis facade omits {contract_id}"))
@@ -2229,16 +2377,27 @@ def _check_vellis_contract_completeness() -> list[Finding]:
     ).read_text(encoding="utf-8")
     required_controller_terms = (
         "enum strict; enum skip;",
-        "enum record; enum skip;",
         "enum restore_pre_cutover_snapshot;",
         "enum cutover_applied;",
-        "enum ledger_failures_flushed;",
         "contract.rtg.controller.operation_results",
-        "contract.rtg.controller.replay_selection",
+        "contract.rtg.controller.intentional_boundary",
     )
     for term in required_controller_terms:
         if term not in controller_text:
             findings.append(Finding(operations_path, f"controller black-box profile omits {term}"))
+    for forbidden in (
+        "sqlStorage",
+        "ReplayLedger",
+        "VerifyReplayFromLedger",
+        "ListMigrationHistory",
+        "FlushLedgerFailures",
+        "ledgerPosition",
+        "transactionId",
+    ):
+        if forbidden in controller_text:
+            findings.append(
+                Finding(operations_path, f"controller retains runtime-owned term {forbidden}")
+            )
     return findings
 
 
@@ -2247,14 +2406,14 @@ def _vellis_roles() -> dict[str, str]:
     role_types = dict(
         re.findall(
             r"(?m)^\s*part\s+(\w+)\s*:\s*"
-            r"(JsonFileStorage|SqlStorage|RtgGraph|RtgSchema|RtgConstraints|RtgMigration|"
+            r"(MessageRuntime|JsonFileStorage|RtgGraph|RtgSchema|RtgConstraints|RtgMigration|"
             r"RtgQueryEngine|RtgChangeValidator|RtgController)\s*;",
             text,
         )
     )
     type_to_id = {
+        "MessageRuntime": "component.runtime.message_runtime",
         "JsonFileStorage": "component.storage.json_file",
-        "SqlStorage": "component.storage.sql",
         "RtgGraph": "component.rtg.graph",
         "RtgSchema": "component.rtg.schema",
         "RtgConstraints": "component.rtg.constraints",
@@ -2528,9 +2687,9 @@ def check(scope: str = "all", *, require_external: bool = False) -> list[Finding
         if re.search(r"\bimport\s+Vellis", bibliotek_text):
             findings.append(Finding(MODEL_ROOT / "bibliotek", "Bibliotek must not import Vellis"))
         models = _component_model_statuses()
-        if len(models) != 10:
+        if len(models) != 13:
             findings.append(
-                Finding(COMPONENT_MODEL_ROOT, f"expected 10 components, found {len(models)}")
+                Finding(COMPONENT_MODEL_ROOT, f"expected 13 components, found {len(models)}")
             )
         findings.extend(_check_forbidden_component_imports())
         findings.extend(_check_protocol_action_coverage())
@@ -2566,10 +2725,11 @@ def check(scope: str = "all", *, require_external: bool = False) -> list[Finding
         if _python_tool_description_names() != set(python_tools):
             findings.append(
                 Finding(
-                    ROOT / "apps" / "rtg_knowledge_graph" / "mcp_toolset.py",
+                    GENERATED_MANIFEST,
                     "MCP descriptions do not match the exact tool surface",
                 )
             )
+        findings.extend(_check_generic_mcp_transport_projection())
         toolset_path = ROOT / "apps" / "rtg_knowledge_graph" / "mcp_toolset.py"
         toolset_text = toolset_path.read_text(encoding="utf-8")
         if (
@@ -2621,6 +2781,7 @@ def check(scope: str = "all", *, require_external: bool = False) -> list[Finding
         findings.extend(_check_contract_satisfaction())
         findings.extend(_check_vellis_use_cases())
         findings.extend(_check_native_behavior_realizations())
+        findings.extend(_check_vellis_runtime_topology_model())
 
     if scope == "all":
         findings.extend(_check_view_semantics())
@@ -2741,9 +2902,13 @@ def _component_page(path: Path) -> str:
         match.group(1): _extract_braced_block(text, match.start())
         for match in re.finditer(rf"\baction def\s+{OPTIONAL_IDENTIFICATION}(\w+)\s*\{{", text)
     }
-    provided = re.findall(
-        r"perform action\s+(\w+)\[[^]]+\]\s*:\s*(\w+)", complete_component_contract
-    )
+    provided = [
+        (_identifier_value(feature), action_type)
+        for feature, action_type in re.findall(
+            rf"perform action\s+({SYSML_IDENTIFIER})\[[^]]+\]\s*:\s*(\w+)",
+            complete_component_contract,
+        )
+    ]
     required = re.findall(
         r"ref (action|part)\s+(\w+)(?:\[[^]]+\])?\s*:\s*(\w+)",
         complete_component_contract,
@@ -2807,12 +2972,13 @@ def _component_page(path: Path) -> str:
 
     state_rows = ["| State feature | Type | Ownership | Meaning |", "|---|---|---|---|"]
     state_pattern = re.compile(
-        r"(?m)^\s*(ref\s+|derived\s+)?(?:attribute|item)\s+(\w+)"
-        r"(?:\[[^]]+\])?\s*:\s*([\w:]+)\s*\{(.*?)\}",
+        rf"(?m)^\s*(ref\s+|derived\s+)?(?:attribute|item)\s+({SYSML_IDENTIFIER})"
+        r"(?:\[[^]]+\])?\s*:\s*([\w:]+)(?:\s*\{(.*?)\}|\s*;)",
         flags=re.DOTALL,
     )
     for match in state_pattern.finditer(complete_component_contract):
-        modifier, name, type_name, body = match.groups()
+        modifier, raw_name, type_name, body = match.groups()
+        name = _identifier_value(raw_name)
         normalized_modifier = (modifier or "").strip()
         ownership = (
             "referenced"
@@ -2823,7 +2989,7 @@ def _component_page(path: Path) -> str:
         )
         state_rows.append(
             f"| `{name}` | `{type_name}` | `{ownership}` | "
-            f"{_documentation(body) or 'Typed component state.'} |"
+            f"{_documentation(body or '') or 'Typed component state.'} |"
         )
     if len(state_rows) == 2:
         state_rows.append("| — | — | — | This component owns no abstract state. |")
@@ -2833,18 +2999,17 @@ def _component_page(path: Path) -> str:
         "|---|---|---|---|",
     ]
     for match in re.finditer(
-        r"dependency\s+\w+\s+from\s+(\w+)\s+to\s+([\w.]+)\s*\{",
+        rf"dependency\s+\w+\s+from\s+({SYSML_IDENTIFIER})\s+to\s+([\w.]+)\s*\{{",
         complete_component_contract,
     ):
         body = _extract_braced_block(complete_component_contract, match.start())
         effect = _documentation(body)
         access = re.search(r"kind\s*=\s*StateAccessKind::(\w+)", body)
         if effect:
-            effect_rows.append(
-                f"| `{match.group(1)}` | `{match.group(2)}` | `{access.group(1)}` | {effect} |"
-                if access
-                else f"| `{match.group(1)}` | `{match.group(2)}` | `dependency` | {effect} |"
-            )
+            source = _identifier_value(match.group(1))
+            target = match.group(2)
+            access_kind = access.group(1) if access else "dependency"
+            effect_rows.append(f"| `{source}` | `{target}` | `{access_kind}` | {effect} |")
     for feature, _ in provided:
         feature_match = re.search(
             rf"perform action\s+{re.escape(feature)}\[[^]]+\]\s*:\s*\w+\s*\{{",
@@ -2885,7 +3050,7 @@ def _component_page(path: Path) -> str:
     if len(behavior_rows) == 2:
         behavior_rows.append("| — | — | No action decomposition required at this boundary. |")
 
-    satisfiers = dict(re.findall(r"\bsatisfy\s+(\w+)\s+by\s+([\w.]+)\s*;", text))
+    satisfiers = _satisfier_map(text)
     requirement_rows = [
         "| Stable ID | Subject | Satisfier | Required constraint |",
         "|---|---|---|---|",
@@ -3199,16 +3364,17 @@ def _render_operation_summary() -> str:
         )
         if match:
             block = _extract_braced_block(facade_block, match.start())
-            controller_calls[feature] = re.findall(r"\baction\s+invoke\w*\s*:\s*(\w+)", block)
+            controller_calls[feature] = re.findall(r"\baction\s+\w+\s*:\s*(\w+)", block)
     realization_text = (MODEL_ROOT / "vellis" / "realizations" / "VellisMcpPython.sysml").read_text(
         encoding="utf-8"
     )
-    allocations = dict(
-        re.findall(
-            r"allocate\s+application\.facade\.(\w+)\s+to\s+adapter\.(\w+)\s*;",
-            realization_text,
+    adapter_block = _definition_block(realization_text, "part def", "VellisMcpAdapter")
+    gateway_registrations = {
+        action_type: feature
+        for feature, action_type in re.findall(
+            r"perform action\s+(\w+)\[[^]]+\]\s*:\s*(\w+)", adapter_block
         )
-    )
+    }
     action_types = {
         identity.removeprefix("operation.vellis."): action_type
         for identity, action_type in re.findall(
@@ -3216,7 +3382,7 @@ def _render_operation_summary() -> str:
         )
     }
     rows = [
-        "| # | Tool | Façade / controller realization | Signature | Principal failures | Outcome |",
+        "| # | Tool | Façade / delegated realization | Signature | Principal failures | Outcome |",
         "|---:|---|---|---|---|---|",
     ]
     for index, tool in enumerate(_model_tool_names(), 1):
@@ -3229,10 +3395,11 @@ def _render_operation_summary() -> str:
         )
         facade_feature = facade_features.get(action_types.get(tool, ""), "unmapped")
         calls = controller_calls.get(facade_feature, [])
+        registration = gateway_registrations.get(action_types.get(tool, ""), "unmapped")
         realization = (
             f"`{facade_feature}` → "
             f"{', '.join(f'`{call}`' for call in calls) or '`application-local`'} → "
-            f"`{allocations.get(facade_feature, 'unmapped')}`"
+            f"`{registration}` registration → `gateway.invokeTool`"
         )
         rows.append(
             f"| {index} | `{tool}` | {realization} | {_feature_signature(block)} | "
@@ -3299,7 +3466,7 @@ def _render_operation_summary() -> str:
         "|---|---|---|---|",
     ]
     for contract_text in contract_texts:
-        satisfiers = dict(re.findall(r"\bsatisfy\s+(\w+)\s+by\s+([\w.]+)\s*;", contract_text))
+        satisfiers = _satisfier_map(contract_text)
         for requirement in re.finditer(r"\brequirement\s+<'([^']+)'>\s+(\w+)\s*\{", contract_text):
             block = _extract_braced_block(contract_text, requirement.start())
             subject = re.search(r"\bsubject\s+\w+\s*:\s*([\w:]+)", block)
@@ -3358,8 +3525,8 @@ def _render_operation_summary() -> str:
             "",
             "Successful MCP calls encode as `{ok: true, result: <encoded action result>}`. "
             "Failures encode as `{ok: false, error: {type, message, diagnostic?}}`; controller "
-            "validation failures also expose `transaction_id` and `validation_report` when "
-            "present.",
+            "validation failures also expose `validation_report` when present. Runtime message "
+            "and trace identities remain envelope/history metadata.",
             "",
             *rows,
             "",
@@ -3367,13 +3534,213 @@ def _render_operation_summary() -> str:
     )
 
 
+def _runtime_binding_string(
+    assignments: dict[str, str],
+    field_definitions: dict[str, tuple[str, bool, str | None]],
+    role_name: str,
+    name: str,
+) -> str:
+    value = assignments.get(name, field_definitions[name][2])
+    if value is None:
+        raise ValueError(f"runtime occurrence {role_name} lacks {name}")
+    match = re.fullmatch(r'"([^"\\]*(?:\\.[^"\\]*)*)"', value)
+    if match is None:
+        raise ValueError(f"runtime occurrence {role_name} has invalid {name}")
+    return bytes(match.group(1), "utf-8").decode("unicode_escape")
+
+
+def _runtime_binding_positive_integer(
+    assignments: dict[str, str],
+    field_definitions: dict[str, tuple[str, bool, str | None]],
+    role_name: str,
+    name: str,
+) -> int:
+    value = assignments.get(name, field_definitions[name][2])
+    if value is None or re.fullmatch(r"\d+", value) is None or int(value) < 1:
+        raise ValueError(f"runtime occurrence {role_name} has invalid {name}")
+    return int(value)
+
+
+def _vellis_runtime_occurrences() -> tuple[dict[str, Any], ...]:
+    path = MODEL_ROOT / "vellis" / "realizations" / "VellisRuntimePython.sysml"
+    text = path.read_text(encoding="utf-8")
+    metadata_definition = _definition_block(text, "metadata def", "RuntimeOccurrenceBinding")
+    if not metadata_definition:
+        raise ValueError("Vellis runtime realization lacks RuntimeOccurrenceBinding metadata")
+
+    field_definitions: dict[str, tuple[str, bool, str | None]] = {}
+    for match in re.finditer(
+        r"\battribute\s+(\w+)(\[[^]]+\])?\s*:\s*([\w:]+)"
+        r"(?:\s+default\s*=\s*([^;]+))?\s*;",
+        metadata_definition,
+    ):
+        name, multiplicity, type_name, default = match.groups()
+        field_definitions[name] = (
+            type_name,
+            bool(multiplicity and multiplicity.startswith("[0")),
+            default.strip() if default is not None else None,
+        )
+    expected_fields = {
+        "instanceKey",
+        "componentContractId",
+        "implementationBinding",
+        "runtimeBindingId",
+        "bindingVersion",
+        "queueCapacity",
+        "maxInFlight",
+        "configurationReferences",
+        "replayAuthority",
+    }
+    if set(field_definitions) != expected_fields:
+        raise ValueError(
+            "RuntimeOccurrenceBinding fields differ from the manifest projection: "
+            f"{sorted(field_definitions)}"
+        )
+
+    runtime_contract = (
+        MODEL_ROOT / "bibliotek" / "components" / "component.runtime.message_runtime.sysml"
+    ).read_text(encoding="utf-8")
+    replay_definition = _definition_block(runtime_contract, "enum def", "RuntimeReplayMode")
+    replay_modes = set(re.findall(rf"\benum\s+({SYSML_IDENTIFIER})\s*;", replay_definition))
+    if not replay_modes:
+        raise ValueError("RuntimeReplayMode has no modeled literals")
+
+    runtime_definition = _definition_block(text, "part def", "VellisRuntimePython")
+    if not runtime_definition:
+        raise ValueError("Vellis runtime realization lacks VellisRuntimePython")
+    occurrences: list[dict[str, Any]] = []
+    annotated_parts: set[str] = set()
+    part_pattern = re.compile(r"\bpart\s+(?::>>\s+)?(\w+)\s*:\s*([\w:]+)\s*\{")
+    for part_match in part_pattern.finditer(runtime_definition):
+        part_block = _extract_braced_block(runtime_definition, part_match.start())
+        binding_matches = list(re.finditer(r"@RuntimeOccurrenceBinding\s*\{", part_block))
+        if not binding_matches:
+            continue
+        role_name, type_name = part_match.groups()
+        if len(binding_matches) != 1:
+            raise ValueError(f"runtime occurrence {role_name} must have exactly one binding")
+        if role_name in annotated_parts:
+            raise ValueError(f"duplicate runtime occurrence role: {role_name}")
+        annotated_parts.add(role_name)
+        binding = _extract_braced_block(part_block, binding_matches[0].start())
+        assignments: dict[str, str] = {}
+        for assignment in re.finditer(r"\b(\w+)\s*=\s*([^;{}]+)\s*;", binding):
+            name, value = assignment.groups()
+            if name in assignments:
+                raise ValueError(f"runtime occurrence {role_name} repeats {name}")
+            assignments[name] = value.strip()
+        unknown = set(assignments) - expected_fields
+        if unknown:
+            raise ValueError(
+                f"runtime occurrence {role_name} has unknown fields: {sorted(unknown)}"
+            )
+        missing = {
+            name
+            for name, (_, optional, default) in field_definitions.items()
+            if not optional and default is None and name not in assignments
+        }
+        if missing:
+            raise ValueError(
+                f"runtime occurrence {role_name} lacks required fields: {sorted(missing)}"
+            )
+
+        replay_value = assignments["replayAuthority"]
+        replay_match = re.fullmatch(r"RuntimeReplayMode::(\w+)", replay_value)
+        if replay_match is None or replay_match.group(1) not in replay_modes:
+            raise ValueError(f"runtime occurrence {role_name} has invalid replayAuthority")
+        configuration_value = assignments.get("configurationReferences")
+        if configuration_value is None:
+            configuration_references: list[str] = []
+        else:
+            tuple_match = re.fullmatch(
+                r'\(\s*(?:"[^"\\]*(?:\\.[^"\\]*)*"\s*'
+                r'(?:,\s*"[^"\\]*(?:\\.[^"\\]*)*"\s*)*)?\)',
+                configuration_value,
+            )
+            if tuple_match is None:
+                raise ValueError(
+                    f"runtime occurrence {role_name} has invalid configurationReferences"
+                )
+            configuration_references = re.findall(
+                r'"([^"\\]*(?:\\.[^"\\]*)*)"', configuration_value
+            )
+
+        implementation_binding = _runtime_binding_string(
+            assignments, field_definitions, role_name, "implementationBinding"
+        )
+        if implementation_binding.rsplit("::", 1)[-1] != type_name.rsplit("::", 1)[-1]:
+            raise ValueError(
+                f"runtime occurrence {role_name} implementation binding differs from its type"
+            )
+        occurrence = {
+            "instance_key": _runtime_binding_string(
+                assignments, field_definitions, role_name, "instanceKey"
+            ),
+            "component_contract_id": _runtime_binding_string(
+                assignments, field_definitions, role_name, "componentContractId"
+            ),
+            "implementation_binding": implementation_binding,
+            "runtime_binding_id": _runtime_binding_string(
+                assignments, field_definitions, role_name, "runtimeBindingId"
+            ),
+            "binding_version": _runtime_binding_positive_integer(
+                assignments, field_definitions, role_name, "bindingVersion"
+            ),
+            "queue_capacity": _runtime_binding_positive_integer(
+                assignments, field_definitions, role_name, "queueCapacity"
+            ),
+            "max_in_flight": _runtime_binding_positive_integer(
+                assignments, field_definitions, role_name, "maxInFlight"
+            ),
+            "configuration_references": configuration_references,
+            "replay_authority": replay_match.group(1),
+        }
+        if any(not str(occurrence[field]).strip() for field in (
+            "instance_key",
+            "component_contract_id",
+            "implementation_binding",
+            "runtime_binding_id",
+        )):
+            raise ValueError(f"runtime occurrence {role_name} contains an empty identity")
+        occurrences.append(occurrence)
+
+    if runtime_definition.count("@RuntimeOccurrenceBinding") != len(occurrences):
+        raise ValueError("every RuntimeOccurrenceBinding must annotate one occurrence part usage")
+    instance_keys = [str(item["instance_key"]) for item in occurrences]
+    if len(instance_keys) != len(set(instance_keys)):
+        raise ValueError("Vellis runtime occurrence instance keys must be unique")
+    return tuple(occurrences)
+
+
+def _check_vellis_runtime_topology_model() -> list[Finding]:
+    path = MODEL_ROOT / "vellis" / "realizations" / "VellisRuntimePython.sysml"
+    try:
+        occurrences = _vellis_runtime_occurrences()
+    except (OSError, ValueError) as error:
+        return [Finding(path, f"invalid runtime occurrence topology: {error}")]
+    if len(occurrences) != 12:
+        return [Finding(path, f"expected 12 runtime occurrences, found {len(occurrences)}")]
+    return []
+
+
 def _manifest_data() -> dict[str, Any]:
     operation_parameters = _model_tool_parameters()
+    parameter_schemas = _model_tool_parameter_schemas()
     tool_descriptions = _model_tool_descriptions()
     tool_capabilities = _model_tool_capabilities()
-    return {
+    manifest = {
         "app_name": "rtg_knowledge_graph",
-        "schema_version": 1,
+        "schema_version": 3,
+        "runtime": {
+            "runtime_key": "vellis.rtg_knowledge_graph",
+            "component_contract_id": "component.runtime.message_runtime",
+            "implementation_binding": "VellisRuntimePythonRealization::SqliteMessageRuntime",
+            "ledger_backend": "sqlite_internal_bootstrap",
+            "configuration_references": ["config.runtime_database_path"],
+            "routing_scope": "local_single_process",
+        },
+        "occurrences": list(_vellis_runtime_occurrences()),
+        "topology_migration_required_on_occurrence_change": True,
         "component_dependencies": [
             {"id": _vellis_roles()[role], "role": RUNTIME_ROLE_NAMES[role]}
             for role in RUNTIME_MANIFEST_ROLE_ORDER
@@ -3382,8 +3749,15 @@ def _manifest_data() -> dict[str, Any]:
             {
                 "name": tool,
                 "operation_id": f"operation.vellis.{tool}",
+                "target_instance_key": "vellis.facade.primary",
+                "target_component_contract_id": "application.vellis.facade",
+                "target_action_id": f"application.vellis.facade.{tool}",
+                "message_schema_version": 1,
+                "codec_id": "codec.python.application.vellis.facade.request.json",
+                "codec_version": 1,
                 "description": tool_descriptions[tool],
                 **tool_capabilities[tool],
+                "parameter_schema": parameter_schemas[tool],
                 "parameters": [
                     {
                         "name": name,
@@ -3397,12 +3771,15 @@ def _manifest_data() -> dict[str, Any]:
                 "failure_envelope": {
                     "ok": False,
                     "error": {"type": "<failure type>", "message": "<message>"},
-                    "optional": ["error.diagnostic", "transaction_id", "validation_report"],
+                    "optional": ["error.diagnostic", "validation_report"],
                 },
             }
             for tool in _model_tool_names()
         ],
     }
+    canonical = json.dumps(manifest, sort_keys=True, separators=(",", ":"))
+    manifest["manifest_hash"] = hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+    return manifest
 
 
 def _starter_schema_data() -> dict[str, Any]:

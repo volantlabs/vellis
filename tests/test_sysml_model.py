@@ -16,9 +16,10 @@ def test_repository_model_profile_and_generated_artifacts_are_current() -> None:
     assert model_tool.check_generated() == []
 
 
-def test_bibliotek_model_has_all_ten_component_identities() -> None:
-    assert len(model_tool._component_model_statuses()) == 10
+def test_bibliotek_model_has_all_thirteen_component_identities() -> None:
+    assert len(model_tool._component_model_statuses()) == 13
     assert model_tool._component_model_statuses()["component.rtg.discovery"] == "draft"
+    assert model_tool._component_model_statuses()["component.runtime.message_runtime"] == "accepted"
 
 
 def test_vellis_has_nine_bibliotek_roles_and_exact_mcp_surface() -> None:
@@ -31,6 +32,95 @@ def test_vellis_has_nine_bibliotek_roles_and_exact_mcp_surface() -> None:
     manifest = json.loads(model_layout.GENERATED_MANIFEST.read_text(encoding="utf-8"))
     assert model_descriptions == {tool["name"]: tool["description"] for tool in manifest["tools"]}
     assert len(set(model_tool._model_operation_ids())) == 27
+    assert manifest["schema_version"] == 3
+    assert manifest["runtime"]["runtime_key"] == "vellis.rtg_knowledge_graph"
+    assert "compatibility" not in manifest
+    assert len(manifest["occurrences"]) == 12
+    assert all(
+        {
+            "instance_key",
+            "component_contract_id",
+            "implementation_binding",
+            "runtime_binding_id",
+            "binding_version",
+            "queue_capacity",
+            "max_in_flight",
+            "configuration_references",
+            "replay_authority",
+        }
+        <= occurrence.keys()
+        for occurrence in manifest["occurrences"]
+    )
+    occurrences = {item["instance_key"]: item for item in manifest["occurrences"]}
+    assert "vellis.storage.sql.primary" not in occurrences
+    assert occurrences["vellis.controller.primary"]["replay_authority"] == "canonical_effect"
+    for source_key in (
+        "vellis.interface.mcp",
+        "vellis.starter_ontology.installer",
+        "vellis.runner.local",
+    ):
+        assert occurrences[source_key]["queue_capacity"] == 1
+
+
+def test_vellis_runtime_manifest_occurrences_are_model_authored() -> None:
+    occurrences = model_tool._vellis_runtime_occurrences()
+
+    assert tuple(item["instance_key"] for item in occurrences) == (
+        "vellis.graph.primary",
+        "vellis.schema.primary",
+        "vellis.constraints.primary",
+        "vellis.migration.primary",
+        "vellis.storage.json.primary",
+        "vellis.query.primary",
+        "vellis.validation.primary",
+        "vellis.controller.primary",
+        "vellis.facade.primary",
+        "vellis.interface.mcp",
+        "vellis.starter_ontology.installer",
+        "vellis.runner.local",
+    )
+    assert model_tool._manifest_data()["occurrences"] == list(occurrences)
+    assert model_tool._check_vellis_runtime_topology_model() == []
+    assert "VELLIS_RUNTIME_OCCURRENCES" not in (ROOT / "tools" / "model_tool.py").read_text(
+        encoding="utf-8"
+    )
+
+
+def test_vellis_runtime_occurrence_projection_fails_on_missing_model_field(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    model_root = tmp_path / "model"
+    runtime_path = model_root / "vellis" / "realizations" / "VellisRuntimePython.sysml"
+    contract_path = (
+        model_root / "bibliotek" / "components" / "component.runtime.message_runtime.sysml"
+    )
+    runtime_path.parent.mkdir(parents=True)
+    contract_path.parent.mkdir(parents=True)
+    runtime_source = (
+        ROOT / "model" / "vellis" / "realizations" / "VellisRuntimePython.sysml"
+    ).read_text(encoding="utf-8")
+    runtime_path.write_text(
+        runtime_source.replace(
+            ' runtimeBindingId = "binding.python.rtg.graph.v1";',
+            "",
+            1,
+        ),
+        encoding="utf-8",
+    )
+    contract_path.write_text(
+        (
+            ROOT
+            / "model"
+            / "bibliotek"
+            / "components"
+            / "component.runtime.message_runtime.sysml"
+        ).read_text(encoding="utf-8"),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(model_tool, "MODEL_ROOT", model_root)
+
+    with pytest.raises(ValueError, match="lacks required fields.*runtimeBindingId"):
+        model_tool._vellis_runtime_occurrences()
 
 
 def test_formal_validator_is_pinned_and_covers_every_authored_model() -> None:
@@ -52,7 +142,7 @@ def test_formal_validator_is_pinned_and_covers_every_authored_model() -> None:
         ]
         == "required"
     )
-    assert len(sysml_validator._model_files("all")) == 22
+    assert len(sysml_validator._model_files("all")) == 26
     assert all(path.exists() for path in sysml_validator._model_files("all"))
     assert model_layout.SOFTWARE_COMPONENT_PATTERN_PATH not in sysml_validator._model_files("all")
 
@@ -145,9 +235,13 @@ def test_generated_conformance_objectives_resolve_model_requirements_and_evidenc
 def test_official_parser_index_covers_authored_packages_and_public_definitions() -> None:
     index = json.loads(model_layout.GENERATED_FORMAL_INDEX.read_text(encoding="utf-8"))
 
-    assert len(index["authored_packages"]) == 22
+    assert len(index["authored_packages"]) == 26
     assert "SoftwareComponentPattern" not in index["authored_packages"]
     assert set(index["packages"]) == set(index["authored_packages"])
+    assert {
+        "kind": "MetadataDefinition",
+        "name": "RuntimeOccurrenceBinding",
+    } in index["packages"]["VellisRuntimePythonRealization"]["named_elements"]
     assert model_tool._check_formal_model_index() == []
     graph_parts = {
         element["name"]
@@ -372,9 +466,9 @@ def test_model_audit_writes_advisory_bundle_without_ripgrep(
     assert payload["components"][0]["component_id"] == "component.rtg.query"
     assert payload["components"][0]["implementation_codecs"]
     assert payload["components"][0]["boundary_comparisons"]
-    assert "components/rtg/query/implementation.py" in payload["components"][0][
-        "consumer_references"
-    ]
+    assert (
+        "components/rtg/query/implementation.py" in payload["components"][0]["consumer_references"]
+    )
     assert "Advisory only" in markdown_path.read_text(encoding="utf-8")
 
 
@@ -569,7 +663,7 @@ def test_public_definitions_and_component_contracts_are_complete() -> None:
 def test_generated_component_views_cover_actions_state_and_invariants() -> None:
     pages = model_tool._component_pages()
 
-    assert len(pages) == 10
+    assert len(pages) == 13
     for content in pages.values():
         assert "## Provided actions" in content
         assert "## Construction actions" in content
@@ -613,6 +707,16 @@ def test_generated_component_views_cover_actions_state_and_invariants() -> None:
     assert "`uuid[0..1]: Uuid`" in graph_page
     assert "`type: String`" in graph_page
     assert "`system: RtgSystem`" in graph_page
+
+    runtime_page = next(
+        content
+        for path, content in pages.items()
+        if path.name == "component.runtime.message_runtime.md"
+    )
+    assert (
+        "| `contract.runtime.message_runtime.send.failures` | "
+        "`SendRuntimeMessage` | `runtime.send` |"
+    ) in runtime_page
 
     vellis_page = (ROOT / "generated" / "reference" / "vellis" / "index.md").read_text(
         encoding="utf-8"
@@ -659,10 +763,11 @@ def test_model_handoff_names_complete_products_and_application_sources(
         "model/vellis/use-cases/VellisUseCases.sysml",
         "model/vellis/realizations/VellisLocalPython.sysml",
         "model/vellis/realizations/VellisMcpPython.sysml",
+        "model/vellis/realizations/VellisRuntimePython.sysml",
     ):
         assert source in application_output
     assert "apps/rtg_knowledge_graph/resources/everyday_life_schema.json" in application_output
-    assert "Verification: 32 structured objective(s)" in application_output
+    assert "Verification: 33 structured objective(s)" in application_output
 
 
 def test_model_packages_exclude_fixture_configuration_and_migration(

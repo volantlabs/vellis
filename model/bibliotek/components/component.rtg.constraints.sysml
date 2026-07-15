@@ -51,6 +51,7 @@ library package BibliotekRtgConstraints {
     attribute def RtgConstraintTargetInvalid { attribute 'message' : String; }
 
     action def ExportConstraintSnapshot { out 'snapshot' : RtgConstraintSnapshot; doc /* Export every full constraint record without evaluating it or inspecting other components. */ @FailureContract { errorIds = (); } }
+    action def ReplaceConstraintSnapshot { in 'snapshot' : RtgConstraintSnapshot; doc /* Validate the complete candidate, then atomically replace every constraint record and rebuild derived indexes. */ @FailureContract { errorIds = ("RtgConstraintSnapshotInvalid", "RtgConstraintUuidInvalid", "RtgConstraintUuidConflict", "RtgConstraintKindInvalid", "RtgConstraintDefinitionInvalid", "RtgConstraintPayloadInvalid", "RtgConstraintSystemValueInvalid"); } }
     action def PutConstraint { in 'constraint' : RtgConstraintDefinition; out stored : RtgConstraintDefinition; doc /* Generate or preserve identity, validate kind-specific structure and bounds, and atomically create or fully replace one record. A kind/payload type mismatch is RtgConstraintDefinitionInvalid; malformed contents of the selected payload are RtgConstraintPayloadInvalid. */ @FailureContract { errorIds = ("RtgConstraintUuidInvalid", "RtgConstraintUuidConflict", "RtgConstraintKindInvalid", "RtgConstraintDefinitionInvalid", "RtgConstraintPayloadInvalid", "RtgConstraintSystemValueInvalid"); } }
     action def GetConstraint { in constraintUuid : Uuid; out 'constraint' : RtgConstraintDefinition; doc /* Return one full constraint definition by UUID without executing it. */ @FailureContract { errorIds = ("RtgConstraintNotFound"); } }
     action def ListConstraints { in kind[0..1] : RtgConstraintKind; in live[0..1] : Boolean; out result : RtgConstraintDefinitionList; doc /* List definitions with optional kind/live filters in deterministic order. */ @FailureContract { errorIds = ("RtgConstraintKindInvalid"); } }
@@ -62,9 +63,10 @@ library package BibliotekRtgConstraints {
         @SpecificationStatus { lifecycleStatus = SpecLifecycle::accepted; owner = "humans"; }
         item constraintRecords[0..*] : RtgConstraintDefinition { doc /* Canonical component-owned constraint-definition occurrences. */ }
         derived attribute derivedIndexes : JsonObject { doc /* Ephemeral indexes derived from canonical constraint definitions. */ }
-        perform action exportSnapshot[0..*] : ExportConstraintSnapshot; perform action putConstraint[0..*] : PutConstraint; perform action getConstraint[0..*] : GetConstraint;
+        perform action exportSnapshot[0..*] : ExportConstraintSnapshot; perform action replaceSnapshot[0..*] : ReplaceConstraintSnapshot; perform action putConstraint[0..*] : PutConstraint; perform action getConstraint[0..*] : GetConstraint;
         perform action listConstraints[0..*] : ListConstraints; perform action listConstraintsByTarget[0..*] : ListConstraintsByTarget; perform action deleteConstraint[0..*] : DeleteConstraint;
         dependency snapshotState from exportSnapshot to constraintRecords { @StateAccess { kind = StateAccessKind::read; } doc /* read all canonical records. */ }
+        dependency replaceSnapshotState from replaceSnapshot to constraintRecords { @StateAccess { kind = StateAccessKind::write; } doc /* validate before visibility, atomically replace every record, and rebuild indexes. */ }
         dependency putState from putConstraint to constraintRecords { @StateAccess { kind = StateAccessKind::write; } doc /* atomically create/replace one record and rebuild affected indexes. */ }
         dependency getState from getConstraint to constraintRecords { @StateAccess { kind = StateAccessKind::read; } doc /* read one canonical record. */ }
         dependency listState from listConstraints to derivedIndexes { @StateAccess { kind = StateAccessKind::read; } doc /* read kind/live indexes. */ }
@@ -99,7 +101,14 @@ library package BibliotekRtgConstraints {
     requirement <'contract.rtg.constraints.snapshot_effect'> snapshotEffect {
         subject constraints : RtgConstraints;
         require constraint {
-            doc /* Snapshot round-trip preserves full records and normalized live state; import validates the whole candidate before visibility. */
+            doc /* Snapshot round-trip preserves full records and normalized live state; import and in-place replacement validate the whole candidate before visibility. Rejected replacement preserves prior state, and replacing with the current snapshot is idempotent. */
+        }
+    }
+
+    requirement <'contract.rtg.constraints.snapshot_replacement'> snapshotReplacementEffect {
+        subject operation : ReplaceConstraintSnapshot;
+        require constraint {
+            doc /* Whole-candidate validation precedes visibility; success atomically replaces all records and indexes, failure preserves the prior registry, and replacing with an identical snapshot is idempotent. */
         }
     }
 
@@ -173,6 +182,11 @@ library package BibliotekRtgConstraints {
         }
     }
 
+    requirement <'contract.rtg.constraints.replace_constraint_snapshot.failures'> replaceConstraintSnapshotFailureSemantics {
+        subject operation : ReplaceConstraintSnapshot;
+        require constraint { doc /* Rejected replacement leaves canonical records and indexes unchanged. */ }
+    }
+
     requirement <'contract.rtg.constraints.put_constraint.failures'> putConstraintFailureSemantics {
         subject operation : PutConstraint;
         require constraint {
@@ -227,6 +241,7 @@ library package BibliotekRtgConstraints {
         satisfy constraintWriteEffect by registry.putConstraint;
         satisfy constraintReadEffect by registry;
         satisfy snapshotEffect by registry;
+        satisfy snapshotReplacementEffect by registry.replaceSnapshot;
         satisfy intentionalBoundary by registry;
         satisfy uuidUnique by registry;
         satisfy displayNameNotIdentity by registry;
@@ -239,6 +254,7 @@ library package BibliotekRtgConstraints {
         satisfy constraintDeleteEffect by registry.deleteConstraint;
 
         satisfy exportConstraintSnapshotFailureSemantics by registry.exportSnapshot;
+        satisfy replaceConstraintSnapshotFailureSemantics by registry.replaceSnapshot;
         satisfy putConstraintFailureSemantics by registry.putConstraint;
         satisfy getConstraintFailureSemantics by registry.getConstraint;
         satisfy listConstraintsFailureSemantics by registry.listConstraints;
@@ -279,6 +295,12 @@ library package BibliotekRtgConstraints {
         subject operation : ExportConstraintSnapshot;
         objective { verify exportConstraintSnapshotFailureSemantics; }
         @EvidenceBinding { evidenceId = "components/rtg/constraints/tests/test_rtg_constraints_contract.py#ExportConstraintSnapshotContractVerification"; implementationScope = "InMemoryRtgConstraints"; }
+    }
+
+    verification def ReplaceConstraintSnapshotContractVerification {
+        subject operation : ReplaceConstraintSnapshot;
+        objective { verify snapshotReplacementEffect; verify replaceConstraintSnapshotFailureSemantics; }
+        @EvidenceBinding { evidenceId = "components/rtg/constraints/tests/test_rtg_constraints_contract.py#ReplaceConstraintSnapshotContractVerification"; implementationScope = "InMemoryRtgConstraints"; }
     }
 
     verification def GetConstraintContractVerification {

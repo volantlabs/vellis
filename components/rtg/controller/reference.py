@@ -12,7 +12,6 @@ def create_reference_component(
     change_validator: object,
     query_engine: object,
     json_storage: object,
-    sql_storage: object,
 ) -> RtgController:
     return InProcessRtgController.open(
         graph,
@@ -22,5 +21,4 @@ def create_reference_component(
         change_validator,
         query_engine,
         json_storage,
-        sql_storage,
     )

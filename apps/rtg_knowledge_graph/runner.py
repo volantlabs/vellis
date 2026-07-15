@@ -8,7 +8,7 @@ from typing import cast
 
 from apps.rtg_knowledge_graph.config import RtgKnowledgeGraphConfig
 from apps.rtg_knowledge_graph.mcp_launch import MCP_SERVER_NAME, mcp_launch_metadata
-from components.rtg.controller import InProcessRtgController
+from components.rtg.controller import RtgController
 from components.storage.json_file.protocol import JsonFileStorage, JsonValue
 
 APP_NAME = "rtg_knowledge_graph"
@@ -19,7 +19,7 @@ APP_MANIFEST_PATH = "system/app_manifest.json"
 class RtgKnowledgeGraphRunStatus:
     app_name: str
     storage_root: str
-    sql_database_path: str
+    runtime_database_path: str
     manifest_path: str
     manifest_size_bytes: int
     json_document_count: int
@@ -29,7 +29,7 @@ class RtgKnowledgeGraphRunStatus:
         return {
             "app_name": self.app_name,
             "storage_root": self.storage_root,
-            "sql_database_path": self.sql_database_path,
+            "runtime_database_path": self.runtime_database_path,
             "manifest_path": self.manifest_path,
             "manifest_size_bytes": self.manifest_size_bytes,
             "json_document_count": self.json_document_count,
@@ -41,16 +41,16 @@ class RtgKnowledgeGraphRunner:
     def __init__(
         self,
         document_storage: JsonFileStorage,
-        controller: InProcessRtgController,
+        controller: RtgController,
         storage_root: Path,
-        sql_database_path: Path,
+        runtime_database_path: Path,
         install_starter_schema: bool = True,
         automatic_recovery: bool = True,
     ) -> None:
         self._document_storage = document_storage
         self._controller = controller
         self._storage_root = storage_root
-        self._sql_database_path = sql_database_path
+        self._runtime_database_path = runtime_database_path
         self._install_starter_schema = install_starter_schema
         self._automatic_recovery = automatic_recovery
 
@@ -63,7 +63,7 @@ class RtgKnowledgeGraphRunner:
         return RtgKnowledgeGraphRunStatus(
             app_name=APP_NAME,
             storage_root=str(self._storage_root),
-            sql_database_path=str(self._sql_database_path),
+            runtime_database_path=str(self._runtime_database_path),
             manifest_path=manifest_metadata.relative_path,
             manifest_size_bytes=manifest_metadata.size_bytes,
             json_document_count=len(documents.documents),
@@ -74,7 +74,7 @@ class RtgKnowledgeGraphRunner:
         mcp = mcp_launch_metadata(
             RtgKnowledgeGraphConfig(
                 storage_root=self._storage_root,
-                sql_database_path=self._sql_database_path,
+                runtime_database_path=self._runtime_database_path,
                 install_starter_schema=self._install_starter_schema,
                 automatic_recovery=self._automatic_recovery,
             )

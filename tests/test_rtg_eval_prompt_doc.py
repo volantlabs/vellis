@@ -19,7 +19,7 @@ def test_rtg_agent_affordance_eval_prompt_exists_and_covers_affordances() -> Non
         "ok: false",
         "query",
         "snapshot",
-        "ledger",
+        "runtime trace evidence",
         "human-facing brief",
     ):
         assert term in text
@@ -32,9 +32,9 @@ def test_rtg_agent_affordance_eval_runbook_covers_mcp_launch_and_sequence() -> N
     for term in (
         "uv --directory",
         "just rtg-eval-info",
-        "mcp-config --storage-root .data/vellis-beta-001",
+        "mcp-config --data-dir .data/vellis-runtime-eval-001",
         "mcp.first_call",
-        "fresh explicit storage root",
+        "fresh explicit data root",
         "manual_recovery",
         "--empty --manual-recovery",
         "not exposed as an MCP tool or resource",
@@ -50,7 +50,7 @@ def test_rtg_agent_affordance_eval_runbook_covers_mcp_launch_and_sequence() -> N
         "rtg_stage_knowledge_changes",
         "rtg_apply_migration_cutover",
         "rtg_resolve_anchor_by_fact",
-        "replay_window",
+        "through_runtime_position",
         "rtg-individual-life-graph-beta-prompt.md",
     ):
         assert term in text

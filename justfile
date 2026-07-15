@@ -87,24 +87,24 @@ rtg-mcp-info:
     @uv run python -m apps.rtg_knowledge_graph serve-mcp --transport stdio --dry-run --json
 
 # Print only copy-pastable stdio MCP client configuration.
-rtg-mcp-config storage_root=".data/vellis-beta-001":
-    @uv run vellis-rtg-knowledge-graph mcp-config --transport stdio --storage-root {{storage_root}}
+rtg-mcp-config data_root=".data/rtg_knowledge_graph":
+    @uv run vellis-rtg-knowledge-graph mcp-config --transport stdio --storage-root {{data_root}}/json_file --runtime-database-path {{data_root}}/runtime.sqlite
 
 # Launch the default RTG Knowledge Graph stdio MCP server.
 rtg-mcp:
     @uv run python -m apps.rtg_knowledge_graph serve-mcp --transport stdio
 
-# Print localhost HTTP MCP client config for a fresh beta storage root.
-rtg-mcp-http-info storage_root=".data/vellis-beta-001" host="127.0.0.1" port="8765" path="/mcp":
-    @uv run python -m apps.rtg_knowledge_graph serve-mcp --transport http --host {{host}} --port {{port}} --path {{path}} --dry-run --json --storage-root {{storage_root}}
+# Print localhost HTTP MCP client config for one explicit local data root.
+rtg-mcp-http-info data_root=".data/rtg_knowledge_graph" host="127.0.0.1" port="8765" path="/mcp":
+    @uv run python -m apps.rtg_knowledge_graph serve-mcp --transport http --host {{host}} --port {{port}} --path {{path}} --dry-run --json --storage-root {{data_root}}/json_file --runtime-database-path {{data_root}}/runtime.sqlite
 
 # Launch an unauthenticated localhost HTTP MCP server.
-rtg-mcp-http storage_root=".data/vellis-beta-001" host="127.0.0.1" port="8765" path="/mcp":
-    @uv run python -m apps.rtg_knowledge_graph serve-mcp --transport http --host {{host}} --port {{port}} --path {{path}} --storage-root {{storage_root}} --sql-database-path {{storage_root}}/controller.sqlite
+rtg-mcp-http data_root=".data/rtg_knowledge_graph" host="127.0.0.1" port="8765" path="/mcp":
+    @uv run python -m apps.rtg_knowledge_graph serve-mcp --transport http --host {{host}} --port {{port}} --path {{path}} --storage-root {{data_root}}/json_file --runtime-database-path {{data_root}}/runtime.sqlite
 
-# Print beta eval MCP metadata with an explicit storage root.
-rtg-eval-info storage_root=".data/vellis-beta-001":
-    @uv run python -m apps.rtg_knowledge_graph serve-mcp --transport stdio --dry-run --json --storage-root {{storage_root}} --empty --manual-recovery
+# Print eval MCP metadata with an isolated explicit data root.
+rtg-eval-info data_root=".data/vellis-runtime-eval-001":
+    @uv run python -m apps.rtg_knowledge_graph serve-mcp --transport stdio --dry-run --json --storage-root {{data_root}}/json_file --runtime-database-path {{data_root}}/runtime.sqlite --empty --manual-recovery
 
 run-rtg-knowledge-graph *args:
     @uv run python -m apps.rtg_knowledge_graph {{args}}

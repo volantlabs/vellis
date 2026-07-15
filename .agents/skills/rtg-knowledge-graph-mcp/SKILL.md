@@ -1,23 +1,23 @@
 ---
 name: rtg-knowledge-graph-mcp
-description: Operate the Vellis RTG Knowledge Graph MCP server for agent-driven graph work. Use when an agent has RTG MCP tools such as rtg_validate_graph, rtg_apply_live_graph_changes, rtg_stage_knowledge_changes, rtg_apply_migration_cutover, rtg_execute_query, snapshots, or ledger replay, especially for schema evolution, validation recovery, and query authoring.
+description: Operate the Vellis RTG Knowledge Graph MCP server for agent-driven graph work. Use when an agent has RTG MCP tools such as rtg_validate_graph, rtg_apply_live_graph_changes, rtg_stage_knowledge_changes, rtg_apply_migration_cutover, rtg_execute_query, snapshots, or runtime reconstruction, especially for schema evolution, validation recovery, and query authoring.
 ---
 
 # RTG Knowledge Graph MCP
 
-Use the RTG MCP server as a controller-facing graph memory, not as a loose JSON store. Start by validating the connection and reading system state, discover live schema before writing, use the correct mutation lane, and query through `rtg_execute_query` instead of manually scanning objects.
+Use the RTG MCP server as a curated Vellis application façade, not as a loose JSON store or an arbitrary component invoker. Start by validating the connection and reading system state, discover live schema before writing, use the correct mutation lane, and query through `rtg_execute_query` instead of manually scanning objects.
 
 ## Operator Card
 
 1. Validate the connection with `rtg_validate_graph({})`.
-2. Read `rtg_get_system_state({})` to classify the app as empty, schema-only, populated, staged, or needing replay.
+2. Read `rtg_get_system_state({})` to classify the domain as empty, schema-only, populated, or staged and confirm `runtime.health` is `ready`.
 3. If examples are needed, call `rtg_get_usage_guide` with `everyday_life_schema`, `schema_design`, `capabilities`, `workflow_patterns`, `request_patterns`, `mcp_bootstrap_checklist`, `operator_card`, `schema_staging_minimal`, `tool_call_shapes`, `live_write`, `lookup_examples`, `query_examples`, `recovery_and_replay`, `migration_history`, or `migration_abandonment`.
 4. Discover available anchor types with `rtg_discover_anchor_types`, then read details with `rtg_get_schema_pack`.
 5. Stage initial schema or schema evolution with `rtg_stage_schema_migration` unless you need the advanced normalized-batch surface.
 6. Make staged schema live with `rtg_apply_migration_cutover`.
 7. Resolve existing object UUIDs with `rtg_resolve_anchor_by_fact` or `rtg_execute_query` lookup examples before link writes; dry-run risky graph changes with `rtg_validate_live_graph_changes` or repeated anchor-with-facts records with `rtg_validate_live_anchor_records`.
 8. Write live graph data with `rtg_apply_live_graph_changes`; for repeated anchor plus required-facts ingestion, use `rtg_apply_live_anchor_records`.
-9. Preserve recovery evidence with persisted snapshots, snapshot load, restore, ledger replay, replay verification, and migration history.
+9. Preserve recovery evidence with coordinated snapshots, runtime reconstruction verification, and runtime-backed migration history.
 
 ## First Calls
 
@@ -41,15 +41,15 @@ If the graph has no live schema, create schema with `rtg_stage_schema_migration`
 ## Mutation Lanes
 
 - Use `rtg_apply_live_graph_changes` for normal live graph CRUD after schema exists.
-- Use `rtg_validate_live_graph_changes` before risky imports or recovery probes; it returns generated IDs and validation findings without mutation or ledger writes.
+- Use `rtg_validate_live_graph_changes` before risky imports or recovery probes; it returns generated IDs and validation findings without component-state mutation. The runtime still records the request and response.
 - Use `rtg_validate_live_anchor_records` and `rtg_apply_live_anchor_records` when the payload is mostly anchors with associated required facts. Both compile to canonical `graph_changes`. Validation returns the submitted low-level payload for audit; successful apply defaults to a compact result with durable generated IDs and fact-position correlation.
 - Use `rtg_resolve_anchor_by_fact` for common exact anchor lookups before link writes. It compiles to `rtg_execute_query` and returns the submitted query, matches, count, and guidance.
 - Use `rtg_stage_schema_migration` for ordinary schema bootstrap or schema evolution. It accepts type-key-oriented schema definitions, generates candidate UUIDs, and fills migration membership. Keep every `(kind, type_key)` pair unique within the request. Compact responses are the default and correlate durable candidate UUIDs through `generated_schema_ids["kind:type_key"]`; request `response_options.format: "full"` only when the submitted low-level payload is needed for debugging.
 - Use `rtg_stage_knowledge_changes` only for advanced schema, constraint, migration, and non-live candidate graph changes; staged candidates must be referenced by a migration record in the same request.
 - Use `rtg_apply_migration_cutover` to make staged candidates live and retire replaced records.
-- Use `rtg_abandon_migration` to retire accidental draft, ready, or failed staged work after recording the decision in the ledger.
+- Use `rtg_abandon_migration` to retire accidental draft, ready, or failed staged work; the runtime records its causal trace.
 - Use `rtg_validate_graph` before and after risky changes.
-- Use `rtg_export_system_snapshot`, `rtg_persist_system_snapshot`, `rtg_list_persisted_snapshots`, `rtg_load_persisted_snapshot`, `rtg_restore_from_snapshot`, `rtg_replay_ledger`, `rtg_verify_replay_from_ledger`, and `rtg_list_migration_history` for recovery, audit, and restart checks. Prefer `return_snapshot:false` for compact snapshot persistence/load and `start_snapshot_path` for path-based replay.
+- Use `rtg_export_system_snapshot`, `rtg_persist_system_snapshot`, `rtg_list_persisted_snapshots`, `rtg_load_persisted_snapshot`, `rtg_restore_from_snapshot`, `rtg_replay_ledger`, `rtg_verify_replay_from_ledger`, and `rtg_list_migration_history` for recovery, audit, and restart checks. Prefer `return_snapshot:false` for compact snapshot persistence/load. Snapshots are restored explicitly; they are not runtime-reconstruction seeds. Ordinary restart reconstructs the latest confirmed state automatically, and historical cursors must be evaluated in an isolated copy of the complete data root.
 
 Always use `validation_mode: "strict"` unless the user explicitly asks to skip validation for a controlled recovery or debugging step. If a response has `ok: false`, inspect `error.message` and `error.diagnostic`; when `validation_report` is present, use its findings to repair the smallest payload problem and retry.
 
@@ -145,7 +145,7 @@ After the Item schema example below has been cut over, this minimal live write s
 
 Do not send schema, constraint, migration, or non-live candidate work to `rtg_apply_live_graph_changes`.
 
-For dry-runs, use the same `graph_changes` payload with `rtg_validate_live_graph_changes`. It resolves `local_ref` values, returns `generated_ids` and `resolved_graph_changes`, and leaves the live graph and ledger unchanged.
+For dry-runs, use the same `graph_changes` payload with `rtg_validate_live_graph_changes`. It resolves `local_ref` values, returns `generated_ids` and `resolved_graph_changes`, and leaves component state unchanged. Its message trace remains part of runtime history.
 
 For link writes, both endpoint anchors must exist or be written in the same request, and a live link schema must allow the source and target anchor types:
 
@@ -366,8 +366,9 @@ with `function:"count"`; counts are distinct binding UUIDs. A link requirement m
 - Candidate not migration-scoped: add every staged candidate UUID to `schema_make_live`, `constraint_make_live`, or `graph_make_live` as appropriate.
 - Failed cutover: inspect the failed migration status metadata, validate with `migration_ids`, repair staged candidates or live data, and retry or call `rtg_abandon_migration`.
 - Intentional failed-cutover test: stage the invalid candidate with `validation_mode: "skip"`, then call cutover in strict mode and verify the live state is preserved.
-- Restart or persistence check: persist a compact snapshot, list and load it with `return_snapshot:false`, then call `rtg_verify_replay_from_ledger` with `start_snapshot_path` for a non-mutating check. Exact recovery evidence is `state_equivalent_to_live` plus matching domain digests; ledger cursor equality is reported separately. Accounting distinguishes scanned, eligible, replayed, administrative, terminal, and failed/rejected records.
-- Migration audit: `rtg_get_system_state.migration_counts_by_status` describes only the current migration store. Use `rtg_list_migration_history` for ledger-backed staged, applied, failed, abandoned, `staging_rejected`, and `staging_failed` events. Rejected staging is audit projection, not staged or replayable state.
+- Restart or persistence check: persist a compact snapshot, list and load it with `return_snapshot:false`, restart the current app normally, then call `rtg_verify_replay_from_ledger` with empty options to inspect the verified startup reconstruction report. For an earlier runtime cursor, copy the complete data root and reconstruct the isolated copy; never rewind live state in place.
+- Earlier-version transfer: open the source with the version that created it, validate and export one full coordinated snapshot, initialize a fresh current destination, and restore through `rtg_restore_from_snapshot`. Validate counts and restart reconstruction before retiring the source. Never import, merge, or replay an earlier controller ledger; follow `docs/guides/vellis/snapshot-transfer.md`.
+- Migration audit: `rtg_get_system_state.migration_counts_by_status` describes only the current migration store. Use `rtg_list_migration_history` for runtime-trace projections named `knowledge_staged`, `cutover_requested`, and `migration_abandoned`; use each event's trace disposition and arguments, and inspect the causal trace through trusted developer APIs when deeper outcome evidence is required.
 
 ## Domain Graph Pattern
 

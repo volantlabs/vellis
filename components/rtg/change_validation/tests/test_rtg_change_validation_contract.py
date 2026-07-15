@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from typing import cast
 from uuid import UUID, uuid4
 
 from components.rtg.change_validation import (
@@ -534,7 +535,7 @@ def test_unevaluable_constraint_payload_is_a_catalog_finding() -> None:
             display_name="Malformed query",
             description="The public payload is structurally valid but cannot be evaluated.",
             payload=RtgConstraintQueryPatternPayload(
-                query_spec={"not": "an RtgQuerySpec"},
+                query_spec=cast(RtgQuerySpec, {"not": "an RtgQuerySpec"}),
                 expectation="must_match_none",
             ),
         )

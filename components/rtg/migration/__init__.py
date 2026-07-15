@@ -26,6 +26,10 @@ from components.rtg.migration.protocol import (
     RtgMigrationStatusTransitionInvalid,
     UuidInput,
 )
+from components.rtg.migration.runtime_binding import (
+    create_rtg_migration_adapter,
+    create_rtg_migration_proxy,
+)
 
 __all__ = [
     "InMemoryRtgMigration",
@@ -52,4 +56,6 @@ __all__ = [
     "RtgMigrationStatusInvalid",
     "RtgMigrationStatusTransitionInvalid",
     "UuidInput",
+    "create_rtg_migration_adapter",
+    "create_rtg_migration_proxy",
 ]

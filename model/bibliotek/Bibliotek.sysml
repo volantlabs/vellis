@@ -12,12 +12,16 @@ library package Bibliotek {
     public import BibliotekRtgChangeValidation::*;
     public import BibliotekRtgDiscovery::*;
     public import BibliotekRtgController::*;
+    public import BibliotekRuntimeMessageRuntime::*;
+    public import BibliotekRuntimeComponentAdapter::*;
+    public import BibliotekInterfaceMcpGateway::*;
 
     doc /*
      * Bibliotek is the supported reusable-library facade. Public imports form its
      * consumer API; the modeling foundation remains a private authoring dependency.
-     * Bibliotek has no dependency on Vellis, MCP, REST, deployment topology, or a
-     * future messaging runtime. Reusable runtime contracts may be added as separate
-     * library packages after their observable semantics are intentionally designed.
+     * Bibliotek has no dependency on Vellis, Vellis-specific transport behavior,
+     * deployment topology, or a Vellis application behavior. Reusable runtime and
+     * interface components, including the generic MCP gateway, are exported as separate
+     * contracts; logical domain components remain topology-neutral.
      */
 }

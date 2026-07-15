@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import copy
 import json
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
+from contextlib import contextmanager
+from contextvars import ContextVar
 from importlib.resources import files
 from typing import Any, cast
 from uuid import uuid4
@@ -22,6 +24,7 @@ from apps.rtg_knowledge_graph.mcp_codec import (
     decode_validation_options,
     encode_json,
 )
+from apps.rtg_knowledge_graph.runtime_services import VellisRuntimeServices
 from apps.rtg_knowledge_graph.starter_schema import (
     StarterSchemaStatus,
     load_starter_schema_bundle,
@@ -30,7 +33,7 @@ from apps.rtg_knowledge_graph.starter_schema import (
 from components.rtg.change_validation import RtgValidationError
 from components.rtg.constraints import RtgConstraintError
 from components.rtg.controller import (
-    InProcessRtgController,
+    RtgController,
     RtgControllerError,
     RtgControllerValidationFailed,
 )
@@ -39,6 +42,27 @@ from components.rtg.graph import RtgGraphError
 from components.rtg.migration import RtgMigrationError
 from components.rtg.query import RtgQueryError
 from components.rtg.schema import RtgSchemaError
+
+
+class VellisRequestInvalid(RtgMcpInputInvalid):
+    """Logical Vellis input failure used at the runtime component boundary."""
+
+
+_RUNTIME_FAULT_BOUNDARY: ContextVar[bool] = ContextVar(
+    "vellis_runtime_fault_boundary",
+    default=False,
+)
+
+
+@contextmanager
+def runtime_fault_boundary() -> Iterator[None]:
+    """Let the runtime adapter observe modeled failures before MCP response shaping."""
+
+    token = _RUNTIME_FAULT_BOUNDARY.set(True)
+    try:
+        yield
+    finally:
+        _RUNTIME_FAULT_BOUNDARY.reset(token)
 
 
 def _load_model_tool_metadata() -> tuple[
@@ -108,6 +132,8 @@ _LANES = {
     "migration",
     "recovery_and_audit",
 }
+
+
 def _tool_capabilities() -> dict[str, dict[str, Any]]:
     capabilities: dict[str, dict[str, Any]] = {}
     for name in TOOL_NAMES:
@@ -139,8 +165,7 @@ def _tool_capabilities() -> dict[str, dict[str, Any]]:
     unknown_dry_run_tools = {
         capability["dry_run_tool"]
         for capability in capabilities.values()
-        if capability["dry_run_tool"] is not None
-        and capability["dry_run_tool"] not in capabilities
+        if capability["dry_run_tool"] is not None and capability["dry_run_tool"] not in capabilities
     }
     if unknown_dry_run_tools:
         raise RuntimeError(
@@ -169,11 +194,13 @@ def mcp_tool_metadata() -> list[dict[str, Any]]:
 class RtgMcpToolset:
     def __init__(
         self,
-        controller: InProcessRtgController,
+        controller: RtgController,
         starter_schema: StarterSchemaStatus | None = None,
+        runtime_services: VellisRuntimeServices | None = None,
     ) -> None:
         self._controller = controller
         self._starter_schema = starter_schema
+        self._runtime_services = runtime_services
 
     def rtg_get_system_state(self) -> dict[str, Any]:
         response = self._response(self._controller.get_system_state)
@@ -198,6 +225,8 @@ class RtgMcpToolset:
                         "The Everyday Life ontology is installed; ask what the user wants Vellis "
                         "to remember before proposing initial records.",
                     )
+        if response.get("ok") is True and isinstance(result, dict) and self._runtime_services:
+            result["runtime"] = self._runtime_services.status()
         return response
 
     def rtg_get_usage_guide(self, topic: str) -> dict[str, Any]:
@@ -438,7 +467,7 @@ class RtgMcpToolset:
 
     def rtg_replay_ledger(self, replay_options: dict[str, Any] | None = None) -> dict[str, Any]:
         return self._response(
-            lambda: self._controller.replay_ledger(decode_replay_options(replay_options))
+            lambda: self._runtime().reconstruct(decode_replay_options(replay_options))
         )
 
     def rtg_verify_replay_from_ledger(
@@ -446,28 +475,36 @@ class RtgMcpToolset:
         replay_options: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         return self._response(
-            lambda: self._controller.verify_replay_from_ledger(
-                decode_replay_options(replay_options)
-            )
+            lambda: self._runtime().verify_reconstruction(decode_replay_options(replay_options))
         )
 
     def rtg_list_migration_history(self) -> dict[str, Any]:
-        return self._response(self._controller.list_migration_history)
+        return self._response(lambda: self._runtime().migration_history())
 
     def rtg_flush_ledger_failures(self) -> dict[str, Any]:
-        return self._response(self._controller.flush_ledger_failures)
+        return self._response(lambda: self._runtime().deprecated_ledger_flush_status())
 
     def rtg_restore_from_snapshot(
         self,
         snapshot: dict[str, Any],
         restore_options: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
-        return self._response(
-            lambda: self._controller.restore_from_snapshot(
-                decode_system_snapshot(snapshot),
-                decode_restore_options(restore_options),
+        return self._response(lambda: self._restore_from_snapshot(snapshot, restore_options))
+
+    def _restore_from_snapshot(
+        self,
+        snapshot: dict[str, Any],
+        restore_options: dict[str, Any] | None,
+    ) -> object:
+        decode_restore_options(restore_options)
+        return self._controller.restore_from_snapshot(decode_system_snapshot(snapshot))
+
+    def _runtime(self) -> VellisRuntimeServices:
+        if self._runtime_services is None:
+            raise RtgMcpInputInvalid(
+                "this operation requires a runtime-native Vellis application composition"
             )
-        )
+        return self._runtime_services
 
     def _stage_schema_migration(
         self,
@@ -655,12 +692,12 @@ class RtgMcpToolset:
         try:
             return {"ok": True, "result": encode_json(action())}
         except RtgControllerValidationFailed as error:
+            if _RUNTIME_FAULT_BOUNDARY.get():
+                raise
             payload: dict[str, Any] = {
                 "ok": False,
                 "error": _error_payload(error),
             }
-            if error.transaction_id is not None:
-                payload["transaction_id"] = str(error.transaction_id)
             if error.validation_report is not None:
                 payload["validation_report"] = encode_json(error.validation_report)
             return payload
@@ -674,10 +711,21 @@ class RtgMcpToolset:
             RtgQueryError,
             RtgMcpInputInvalid,
         ) as error:
+            if _RUNTIME_FAULT_BOUNDARY.get():
+                if isinstance(error, RtgMcpInputInvalid) and not isinstance(
+                    error, VellisRequestInvalid
+                ):
+                    raise VellisRequestInvalid(str(error)) from error
+                raise
             return {"ok": False, "error": _error_payload(error)}
         except (KeyError, ValueError) as error:
+            normalized = VellisRequestInvalid(str(error))
+            if _RUNTIME_FAULT_BOUNDARY.get():
+                raise normalized from error
             return {"ok": False, "error": _error_payload(RtgMcpInputInvalid(str(error)))}
         except Exception as error:  # noqa: BLE001 - keep one error shape on the MCP boundary
+            if _RUNTIME_FAULT_BOUNDARY.get():
+                raise
             return {"ok": False, "error": _error_payload(error)}
 
 
@@ -1132,9 +1180,6 @@ def _snapshot_summary_from_json(snapshot: dict[str, Any]) -> dict[str, Any]:
         "schema_type_counts": _schema_type_counts(schema.get("definitions")),
         "migration_counts_by_status": _migration_counts(migration.get("migrations")),
         "constraint_count": len(_json_list(constraints.get("constraints"))),
-        "last_ledger_position": snapshot.get("last_ledger_position"),
-        "last_transaction_id": snapshot.get("last_transaction_id"),
-        "last_transaction_timestamp": snapshot.get("last_transaction_timestamp"),
     }
 
 
@@ -1382,16 +1427,15 @@ def _mcp_bootstrap_checklist_guide() -> dict[str, Any]:
             },
             {
                 "tool": "rtg_verify_replay_from_ledger",
-                "arguments": {"replay_options": {"start_snapshot_path": "snapshots/run.json"}},
+                "arguments": {"replay_options": {}},
                 "why": (
-                    "Prove or disprove exact domain-state equivalence with digests; report "
-                    "ledger-cursor equivalence separately and use replay accounting to explain "
-                    "the replay window."
+                    "Inspect the verified latest-startup runtime reconstruction report. To verify "
+                    "an earlier cursor, copy the data root and reconstruct the isolated copy."
                 ),
             },
             {
                 "tool": "rtg_list_migration_history",
-                "why": "Use for ledger-backed migration audit, even when current counts are zero.",
+                "why": "Use for runtime-trace migration audit, even when current counts are zero.",
             },
         ],
         "notes": [
@@ -1441,7 +1485,7 @@ def _operator_card_guide() -> dict[str, Any]:
             ),
             "Query with rtg_execute_query; use response_options.format=properties_only for briefs",
             "Persist and load snapshots with compact return options for recovery checks",
-            "Use rtg_list_migration_history for ledger-backed migration audit",
+            "Use rtg_list_migration_history for runtime-trace migration audit",
         ],
         "validation_options": {
             "valid_keys": ["tracks", "finding_limit"],
@@ -1465,7 +1509,7 @@ def _workflow_patterns_guide() -> dict[str, Any]:
                 ("rtg_validate_graph", "rtg_get_system_state"),
                 "Do not assume the app is empty or populated before reading state.",
                 "State response includes state_classification and recommended_workflows.",
-                ("Smoke check fails", "State says needs_replay"),
+                ("Smoke check fails", "Runtime health is not ready"),
             ),
             _workflow_pattern(
                 "schema_bootstrap",
@@ -1570,8 +1614,8 @@ def _workflow_patterns_guide() -> dict[str, Any]:
                 ("failed cutover", "unbackfilled required property"),
             ),
             _workflow_pattern(
-                "snapshot_replay_check",
-                "Use to prove durability or prepare recovery evidence.",
+                "snapshot_recovery_check",
+                "Use to preserve coordinated state or prepare transfer/recovery evidence.",
                 (
                     "rtg_persist_system_snapshot",
                     "rtg_list_persisted_snapshots",
@@ -1584,8 +1628,8 @@ def _workflow_patterns_guide() -> dict[str, Any]:
                     "rtg_verify_replay_from_ledger",
                 ),
                 "Do not require filesystem reads for MCP-only snapshot readback.",
-                "Snapshot loads through MCP and replay verification validates.",
-                ("snapshot path not found", "replay starts after snapshot ledger position"),
+                "Snapshot loads through MCP and latest-startup reconstruction is verified.",
+                ("snapshot path not found", "startup reconstruction is not verified"),
             ),
             _workflow_pattern(
                 "staged_work_review",
@@ -1606,13 +1650,13 @@ def _workflow_patterns_guide() -> dict[str, Any]:
                 ("failed cutover", "shared candidate not pruned"),
             ),
             _workflow_pattern(
-                "replay_recovery",
-                "Use when ledger records exist but in-memory state is empty.",
+                "runtime_reconstruction",
+                "Use only in an intentionally isolated or manual-recovery composition.",
                 ("rtg_replay_ledger", "rtg_validate_graph", "rtg_get_system_state"),
                 ("rtg_replay_ledger", "rtg_verify_replay_from_ledger"),
-                "Do not replay into active non-empty state without a start snapshot.",
-                "Replay reconstructs state and validation is accepted.",
-                ("replay non-empty state", "ambiguous replay start"),
+                "Do not rewind live state; copy the complete data root for historical cursors.",
+                "Committed canonical effects reconstruct state and verification is accepted.",
+                ("non-empty replay target", "incompatible binding or checkpoint"),
             ),
         ],
     }
@@ -1650,7 +1694,7 @@ def _request_patterns_guide() -> dict[str, Any]:
             ),
             _request_pattern(
                 "check/recover durability",
-                ("snapshot_replay_check", "replay_recovery"),
+                ("snapshot_recovery_check", "runtime_reconstruction"),
                 "Use when the user asks for snapshot, restore, replay, or audit confidence.",
             ),
             _request_pattern(
@@ -1941,7 +1985,7 @@ def _tool_call_shapes_guide() -> dict[str, Any]:
         },
         "rtg_verify_replay_from_ledger": {
             "tool": "rtg_verify_replay_from_ledger",
-            "arguments": {"replay_options": {"start_snapshot_path": "snapshots/run.json"}},
+            "arguments": {"replay_options": {}},
         },
     }
 
@@ -2338,10 +2382,10 @@ def _query_examples_guide() -> dict[str, Any]:
 def _recovery_and_replay_guide() -> dict[str, Any]:
     return {
         "topic": "recovery_and_replay",
-        "replay_from_empty": {
-            "tool": "rtg_replay_ledger",
-            "arguments": {"replay_options": {}},
-        },
+        "ordinary_restart": (
+            "The application automatically reconstructs managed component state through the "
+            "latest confirmed runtime position before accepting traffic."
+        ),
         "steps": [
             {
                 "tool": "rtg_persist_system_snapshot",
@@ -2356,27 +2400,24 @@ def _recovery_and_replay_guide() -> dict[str, Any]:
                 "arguments": {"relative_path": "snapshots/run.json", "return_snapshot": False},
             },
             {
-                "tool": "rtg_replay_ledger",
-                "argument_source": {
-                    "replay_options.start_snapshot_path": "Use snapshots/run.json."
-                },
-            },
-            {
                 "tool": "rtg_verify_replay_from_ledger",
-                "arguments": {"replay_options": {"start_snapshot_path": "snapshots/run.json"}},
+                "arguments": {"replay_options": {}},
             },
         ],
         "notes": [
             (
-                "Replay results include replay_window metadata. With start_snapshot_path, replay "
-                "starts after the snapshot ledger position, so a snapshot taken at the end of a "
-                "run may replay zero mutating requests."
+                "The legacy-named verification tool reports the latest verified startup runtime "
+                "reconstruction. It does not replay a controller ledger or restore a snapshot."
             ),
             (
-                "Replay verification directly reports state_equivalent_to_live, separate "
-                "ledger_cursor_equivalent_to_live, exact domain-state digests, live_count_diffs, "
-                "and accounting for scanned, eligible, replayed, administrative, and rejected "
-                "records. Counts alone are not equivalence evidence."
+                "Historical-cursor reconstruction is deliberately isolated: copy the complete "
+                "data root, attach empty compatible occurrences, and use through_runtime_position. "
+                "There is no live in-place rewind."
+            ),
+            (
+                "Move state from an earlier Vellis version by validating and exporting one full "
+                "coordinated snapshot with that source version, then restoring it into a fresh "
+                "current data root. Earlier controller-ledger rows are never imported."
             ),
             (
                 "Dry-run validation evidence can be reported in the final brief without writing "
@@ -2440,10 +2481,10 @@ def _migration_history_guide() -> dict[str, Any]:
         "notes": [
             "Use this for durable migration audit after applied migrations are pruned from "
             "the live migration store.",
-            "Expected event_type values include staged, staging_rejected, staging_failed, "
-            "cutover_applied, cutover_failed, and abandoned.",
-            "Rejected staging events are derived from existing request/error ledger pairs; they "
-            "do not create migration-store records or replayable mutations.",
+            "Current event_type values are knowledge_staged, cutover_requested, and "
+            "migration_abandoned.",
+            "Each event includes its root trace disposition, terminal runtime position, and "
+            "canonical arguments; inspect the causal trace when outcome detail is required.",
         ],
         "arguments": {},
     }
