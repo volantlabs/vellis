@@ -157,6 +157,7 @@ MODEL_EVIDENCE = {
     ),
     "RtgReplayLedgerContractVerification": (
         "test_individual_rtg_mcp_suite_manages_multi_domain_life_graph",
+        "test_manual_recovery_restart_accepts_replay_through_mcp",
     ),
     "RtgVerifyReplayFromLedgerContractVerification": (
         "test_individual_rtg_mcp_suite_manages_multi_domain_life_graph",
@@ -654,6 +655,65 @@ def test_individual_rtg_mcp_suite_reconstructs_automatically_after_server_restar
     asyncio.run(run_flow())
 
 
+def test_manual_recovery_restart_accepts_replay_through_mcp(tmp_path: Path) -> None:
+    async def run_flow() -> None:
+        storage_root = tmp_path / "manual-recovery-storage"
+        runtime_database_path = tmp_path / "manual-recovery-runtime.sqlite"
+        params = _server_params(tmp_path, storage_root, runtime_database_path)
+
+        async with _mcp_session(params) as first_session:
+            staged = await _call_tool(
+                first_session,
+                "rtg_stage_schema_migration",
+                {
+                    "migration_id": "manual-recovery-probe-v1",
+                    "description": "Create durable state for a manual recovery restart.",
+                    "schema_definitions": [
+                        {
+                            "kind": "anchor",
+                            "type_key": "ManualRecoveryProbe",
+                            "description": "A schema type used to verify explicit recovery.",
+                            "payload": {"required_data_types": []},
+                        }
+                    ],
+                    "validation_mode": "strict",
+                },
+            )
+            assert staged["ok"] is True
+            cutover = await _call_tool(
+                first_session,
+                "rtg_apply_migration_cutover",
+                {"migration_id": "manual-recovery-probe-v1"},
+            )
+            assert cutover["ok"] is True
+
+        manual_params = _server_params(
+            tmp_path,
+            storage_root,
+            runtime_database_path,
+            manual_recovery=True,
+        )
+        async with _mcp_session(manual_params) as recovery_session:
+            replay = await _call_tool(recovery_session, "rtg_replay_ledger", {})
+            assert replay["ok"] is True
+            assert replay["result"]["verified"] is True
+            assert replay["result"]["applied_effects"] > 0
+
+            state = await _call_tool(recovery_session, "rtg_get_system_state", {})
+            assert state["ok"] is True
+            assert state["result"]["runtime"]["health"] == "ready"
+            discovery = await _call_tool(
+                recovery_session,
+                "rtg_discover_anchor_types",
+                {},
+            )
+            assert "ManualRecoveryProbe" in _anchor_type_keys(discovery)
+            validation = await _call_tool(recovery_session, "rtg_validate_graph", {})
+            assert validation["result"]["accepted"] is True
+
+    asyncio.run(run_flow())
+
+
 async def _run_with_mcp_server(
     tmp_path: Path,
     flow: Callable[[ClientSession, Path], Awaitable[None]],
@@ -670,26 +730,31 @@ def _server_params(
     cwd: Path,
     storage_root: Path,
     runtime_database_path: Path,
+    *,
+    manual_recovery: bool = False,
 ) -> StdioServerParameters:
     repo_root = Path(__file__).resolve().parents[3]
+    args = [
+        "--directory",
+        str(repo_root),
+        "run",
+        "python",
+        "-m",
+        "apps.rtg_knowledge_graph",
+        "serve-mcp",
+        "--transport",
+        "stdio",
+        "--storage-root",
+        str(storage_root),
+        "--runtime-database-path",
+        str(runtime_database_path),
+        "--empty",
+    ]
+    if manual_recovery:
+        args.append("--manual-recovery")
     return StdioServerParameters(
         command="uv",
-        args=[
-            "--directory",
-            str(repo_root),
-            "run",
-            "python",
-            "-m",
-            "apps.rtg_knowledge_graph",
-            "serve-mcp",
-            "--transport",
-            "stdio",
-            "--storage-root",
-            str(storage_root),
-            "--runtime-database-path",
-            str(runtime_database_path),
-            "--empty",
-        ],
+        args=args,
         cwd=cwd,
     )
 

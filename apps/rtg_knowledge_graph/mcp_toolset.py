@@ -1822,6 +1822,11 @@ def _tool_call_shapes_guide() -> dict[str, Any]:
                 '{"resource_id": "<uuid>"} for objects returned by earlier calls.'
             ),
             ("Dry-run tools use validation_options. Mutation tools use validation_mode."),
+            (
+                "rtg_apply_live_graph_changes is the full low-level result surface and does not "
+                "accept response_options. Compact mutation response_options belong to "
+                "rtg_apply_live_anchor_records and rtg_stage_schema_migration."
+            ),
         ],
         "rtg_stage_schema_migration": {
             "tool": "rtg_stage_schema_migration",
@@ -2001,6 +2006,10 @@ def _live_write_guide() -> dict[str, Any]:
             (
                 "Dry-run validation tools accept validation_options.tracks and "
                 "validation_options.finding_limit. Do not pass validation_options.mode."
+            ),
+            (
+                "Do not pass response_options to rtg_apply_live_graph_changes; its result is the "
+                "canonical low-level mutation result."
             ),
         ],
         "anchor_record_tool": "rtg_apply_live_anchor_records",

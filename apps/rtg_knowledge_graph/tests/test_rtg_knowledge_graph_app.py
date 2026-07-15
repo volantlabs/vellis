@@ -52,6 +52,7 @@ MODEL_EVIDENCE = {
         "test_config_uses_default_storage_root_relative_to_cwd",
         "test_config_uses_env_storage_root",
         "test_composed_app_runs_and_writes_manifest",
+        "test_manual_recovery_startup_defers_runner_component_calls",
         "test_persisted_manifest_preserves_configured_startup_modes",
         "test_cli_runs_full_app",
         "test_cli_reports_mcp_dry_run_metadata",
@@ -140,9 +141,7 @@ def test_runtime_composition_manifest_and_curated_gateway(
     with build_app(config) as composition:
         starter = composition.prepare()
         composition.controller.get_system_state()
-        starter_source = composition.runtime.address_for(
-            "vellis.starter_ontology.installer"
-        )
+        starter_source = composition.runtime.address_for("vellis.starter_ontology.installer")
         setup_calls = composition.runtime.query_history_sync(
             RuntimeHistoryQuery(
                 action_id="component.rtg.controller.get_system_state",
@@ -214,15 +213,11 @@ def test_runtime_composition_manifest_and_curated_gateway(
         encoding="utf-8"
     )
     assert "components.rtg" not in gateway_source
-    transport_source = Path("apps/rtg_knowledge_graph/mcp_server.py").read_text(
-        encoding="utf-8"
-    )
+    transport_source = Path("apps/rtg_knowledge_graph/mcp_server.py").read_text(encoding="utf-8")
     assert "RtgMcpToolset" not in transport_source
     assert "def rtg_" not in transport_source
     assert "components.rtg" not in transport_source
-    controller_replay_source = inspect.getsource(
-        app_composition._controller_replay_binding
-    )
+    controller_replay_source = inspect.getsource(app_composition._controller_replay_binding)
     assert ".resolve()" not in controller_replay_source
     assert all(
         f"{name}_proxy.export_snapshot()" in controller_replay_source
@@ -237,13 +232,11 @@ def test_vellis_facade_binding_failures_match_accepted_model(tmp_path: Path) -> 
         install_starter_schema=False,
     )
     with build_app(config) as composition:
-        actions = create_vellis_facade_adapter(
-            composition._facade_host
-        ).describe().actions
+        actions = create_vellis_facade_adapter(composition._facade_host).describe().actions
 
-    model = (
-        Path(__file__).resolve().parents[3] / "model/vellis/VellisOperations.sysml"
-    ).read_text(encoding="utf-8")
+    model = (Path(__file__).resolve().parents[3] / "model/vellis/VellisOperations.sysml").read_text(
+        encoding="utf-8"
+    )
     assert tuple(action.action_id.rsplit(".", 1)[-1] for action in actions) == TOOL_NAMES
     for action in actions:
         tool_name = action.action_id.rsplit(".", 1)[-1]
@@ -327,9 +320,7 @@ def test_snapshot_transfer_starts_a_fresh_runtime_chronology(tmp_path: Path) -> 
         controller_effect = next(
             item for item in effects if item.instance_key == "vellis.controller.primary"
         )
-        assert controller_effect.runtime_position == max(
-            item.runtime_position for item in effects
-        )
+        assert controller_effect.runtime_position == max(item.runtime_position for item in effects)
         effect = controller_effect.details["effect"]
         assert isinstance(effect, dict)
         payload = effect["payload"]
@@ -353,11 +344,14 @@ def test_snapshot_transfer_starts_a_fresh_runtime_chronology(tmp_path: Path) -> 
         assert reconstruction is not None
         assert reconstruction.verified
         assert reconstruction.skipped_effects >= 4
-        assert len(
-            restarted.runtime.query_history_sync(
-                RuntimeHistoryQuery(fact_type="message_accepted", limit=1000)
-            ).facts
-        ) == accepted_before_restart
+        assert (
+            len(
+                restarted.runtime.query_history_sync(
+                    RuntimeHistoryQuery(fact_type="message_accepted", limit=1000)
+                ).facts
+            )
+            == accepted_before_restart
+        )
         assert restarted.controller.export_system_snapshot() == expected_snapshot
 
 
@@ -782,6 +776,40 @@ def test_composed_app_runs_and_writes_manifest(
             },
         }
     ]
+
+
+def test_manual_recovery_startup_defers_runner_component_calls(tmp_path: Path) -> None:
+    storage_root = tmp_path / "storage"
+    runtime_database_path = tmp_path / "runtime.sqlite"
+    ready_config = RtgKnowledgeGraphConfig(
+        storage_root=storage_root,
+        runtime_database_path=runtime_database_path,
+    )
+    with build_app(ready_config) as ready:
+        ready.prepare()
+
+    manual_config = RtgKnowledgeGraphConfig(
+        storage_root=storage_root,
+        runtime_database_path=runtime_database_path,
+        install_starter_schema=False,
+        automatic_recovery=False,
+    )
+    with build_app(manual_config) as manual:
+        manual.prepare()
+        messages_before = manual.runtime.query_history_sync(
+            RuntimeHistoryQuery(fact_type="message_accepted", limit=1000)
+        ).facts
+
+        status = manual.run()
+
+        messages_after = manual.runtime.query_history_sync(
+            RuntimeHistoryQuery(fact_type="message_accepted", limit=1000)
+        ).facts
+        assert status.rtg_controller_ready is False
+        assert status.manifest_size_bytes is None
+        assert status.json_document_count is None
+        assert manual.runtime.health == "recovery_required"
+        assert messages_after == messages_before
 
 
 def test_persisted_manifest_preserves_configured_startup_modes(

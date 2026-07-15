@@ -2,6 +2,8 @@
 
 Evaluation only: launch Vellis with `--empty --manual-recovery` before using this prompt. Ordinary
 users receive the modeled Everyday Life ontology automatically and should not use this prompt.
+On a restart of the same populated manual-recovery root, call `rtg_replay_ledger` before any
+ordinary state, validation, guidance, or graph tool, then resume the workflow after it verifies.
 
 Use this prompt manually with an agent after the `rtg_knowledge_graph` MCP server is
 connected. The prompt exercises the initial individual open-source RTG use case: one person

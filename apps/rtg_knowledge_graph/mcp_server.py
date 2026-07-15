@@ -86,7 +86,7 @@ def mcp_dry_run_status(
 ) -> dict[str, Any]:
     with build_app(config) as composition:
         starter_schema = composition.prepare()
-        status = composition.runner.run()
+        status = composition.run()
         launch_metadata = mcp_launch_metadata(
             config,
             localhost_host=host,
@@ -116,7 +116,7 @@ def run_mcp_server(
 ) -> None:
     with build_app(config) as composition:
         starter_schema = composition.prepare()
-        composition.runner.run()
+        composition.run()
         server = build_mcp_server(composition.build_mcp_gateway(starter_schema))
         if transport == "stdio":
             server.run(transport=transport)

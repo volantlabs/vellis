@@ -74,13 +74,14 @@ Then configure the other same-machine agent with
 `http://127.0.0.1:8765/mcp`. Keep this mode bound to `127.0.0.1`; it does not add
 authentication and is not intended for network exposure.
 
-After the MCP client connects, make the `mcp.first_call` tool call before giving the agent a
-long eval prompt. For the default metadata, call `rtg_validate_graph` with `{}`. A fresh server
-should return `ok: true`, `result.accepted: true`, and no findings.
-Then call `rtg_get_system_state` with `{}`. A fresh data root should report `empty`; an already
-bootstrapped root may report `schema_only` or `populated`. Normal application startup automatically
-reconstructs the latest committed managed state. This targeted eval uses `manual_recovery`, so after
-a restart it must explicitly reconstruct before expecting the prior domain classification.
+After the MCP client connects to a fresh data root, make the `mcp.first_call` tool call before
+giving the agent a long eval prompt. For the default metadata, call `rtg_validate_graph` with `{}`;
+expect `ok: true`, `result.accepted: true`, and no findings, then call `rtg_get_system_state` with
+`{}` and expect `empty`. Normal application startup automatically reconstructs the latest committed
+managed state. This targeted eval uses `manual_recovery`: when reconnecting it to a data root that
+already has committed effects, call `rtg_replay_ledger` first. Ordinary state, validation, and
+guidance calls intentionally remain closed until that reconstruction verifies; then call
+`rtg_validate_graph` and `rtg_get_system_state` and expect the prior domain classification.
 Inspect the nested `runtime` status for health, current runtime position, message count, and latest
 terminal trace evidence.
 

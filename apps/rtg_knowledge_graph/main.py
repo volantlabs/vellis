@@ -269,17 +269,23 @@ def _run_command(args: argparse.Namespace, config: RtgKnowledgeGraphConfig) -> i
 
     with build_app(config) as composition:
         composition.prepare()
-        status = composition.runner.run()
+        status = composition.run()
 
     if args.json:
         print(json.dumps(status.to_json_value(), sort_keys=True))
     else:
-        print(
-            f"{status.app_name}: "
-            f"{status.json_document_count} JSON document(s), "
-            f"manifest={status.manifest_path}, "
-            f"storage_root={status.storage_root}"
-        )
+        if status.rtg_controller_ready:
+            print(
+                f"{status.app_name}: "
+                f"{status.json_document_count} JSON document(s), "
+                f"manifest={status.manifest_path}, "
+                f"storage_root={status.storage_root}"
+            )
+        else:
+            print(
+                f"{status.app_name}: recovery pending; start the MCP interface and call "
+                f"rtg_replay_ledger, storage_root={status.storage_root}"
+            )
 
     return 0
 

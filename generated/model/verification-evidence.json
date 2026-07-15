@@ -8,6 +8,7 @@
         "apps/rtg_knowledge_graph/tests/test_rtg_knowledge_graph_app.py::test_config_uses_default_storage_root_relative_to_cwd",
         "apps/rtg_knowledge_graph/tests/test_rtg_knowledge_graph_app.py::test_config_uses_env_storage_root",
         "apps/rtg_knowledge_graph/tests/test_rtg_knowledge_graph_app.py::test_composed_app_runs_and_writes_manifest",
+        "apps/rtg_knowledge_graph/tests/test_rtg_knowledge_graph_app.py::test_manual_recovery_startup_defers_runner_component_calls",
         "apps/rtg_knowledge_graph/tests/test_rtg_knowledge_graph_app.py::test_persisted_manifest_preserves_configured_startup_modes",
         "apps/rtg_knowledge_graph/tests/test_rtg_knowledge_graph_app.py::test_cli_runs_full_app",
         "apps/rtg_knowledge_graph/tests/test_rtg_knowledge_graph_app.py::test_cli_reports_mcp_dry_run_metadata",
@@ -226,7 +227,8 @@
       "model_source": "model/vellis/VellisOperations.sysml",
       "status": "resolved",
       "test_nodes": [
-        "apps/rtg_knowledge_graph/tests/test_rtg_knowledge_graph_mcp_user_flows.py::test_individual_rtg_mcp_suite_manages_multi_domain_life_graph"
+        "apps/rtg_knowledge_graph/tests/test_rtg_knowledge_graph_mcp_user_flows.py::test_individual_rtg_mcp_suite_manages_multi_domain_life_graph",
+        "apps/rtg_knowledge_graph/tests/test_rtg_knowledge_graph_mcp_user_flows.py::test_manual_recovery_restart_accepts_replay_through_mcp"
       ]
     },
     "apps/rtg_knowledge_graph/tests/test_rtg_knowledge_graph_mcp_user_flows.py#RtgResolveAnchorByFactContractVerification": {

@@ -10,7 +10,10 @@ from apps.rtg_knowledge_graph.gateway_registration import (
     model_runtime_topology_manifest,
 )
 from apps.rtg_knowledge_graph.mcp_toolset import RtgMcpToolset
-from apps.rtg_knowledge_graph.runner import RtgKnowledgeGraphRunner
+from apps.rtg_knowledge_graph.runner import (
+    RtgKnowledgeGraphRunner,
+    RtgKnowledgeGraphRunStatus,
+)
 from apps.rtg_knowledge_graph.runtime_binding import (
     create_vellis_facade_adapter,
     create_vellis_facade_proxy,
@@ -126,6 +129,13 @@ class RtgKnowledgeGraphComposition:
         )
         self._starter_schema = status
         return status
+
+    def run(self) -> RtgKnowledgeGraphRunStatus:
+        """Run ready startup work or defer it until explicit recovery completes."""
+
+        if self.runtime.health == "recovery_required":
+            return self.runner.recovery_pending_status()
+        return self.runner.run()
 
     def build_facade(self, starter_schema: StarterSchemaStatus) -> RtgMcpToolset:
         if self._starter_schema != starter_schema:

@@ -171,7 +171,9 @@ The MCP surface includes low-level controller tools plus agent-facing response s
   submitted canonical payload is needed for debugging.
 - Use `rtg_validate_live_graph_changes` or `rtg_validate_live_anchor_records` before risky
   writes. Their `validation_options` support `tracks` and `finding_limit`; mutation tools use
-  `validation_mode`.
+  `validation_mode`. The low-level `rtg_apply_live_graph_changes` result is always full and does
+  not accept `response_options`; compact mutation shaping belongs to the anchor-record façade and
+  schema-staging façade.
 - Use `rtg_resolve_anchor_by_fact` for common exact anchor lookups before link writes; it returns
   the submitted `rtg_execute_query` payload so query remains the canonical read language.
 - Use `rtg_execute_query` with `response_options: {"format": "properties_only"}` for compact
@@ -283,7 +285,8 @@ Runtime recovery semantics:
   completed.
 - `--manual-recovery` is a developer/evaluation mode that leaves recovery explicitly pending;
   ordinary façade and component calls remain closed, and only the explicitly recovery-authorized
-  `rtg_replay_ledger` façade action may initiate reconstruction.
+  `rtg_replay_ledger` façade action may initiate reconstruction. Startup defers runner readiness
+  checks and manifest refresh while recovery is pending so the MCP transport can accept that call.
 - Earlier Vellis installations move state only through a validated coordinated snapshot restored
   into a fresh current data root; see [snapshot transfer](../../docs/guides/vellis/snapshot-transfer.md).
 - The agent affordance eval prompt lives in `docs/guides/vellis/evals/`. Generic operational examples are also

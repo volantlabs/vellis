@@ -43,6 +43,7 @@ If the graph has no live schema, create schema with `rtg_stage_schema_migration`
 - Use `rtg_apply_live_graph_changes` for normal live graph CRUD after schema exists.
 - Use `rtg_validate_live_graph_changes` before risky imports or recovery probes; it returns generated IDs and validation findings without component-state mutation. The runtime still records the request and response.
 - Use `rtg_validate_live_anchor_records` and `rtg_apply_live_anchor_records` when the payload is mostly anchors with associated required facts. Both compile to canonical `graph_changes`. Validation returns the submitted low-level payload for audit; successful apply defaults to a compact result with durable generated IDs and fact-position correlation.
+- `rtg_apply_live_graph_changes` returns the full canonical low-level mutation result and does not accept `response_options`. Compact mutation response shaping belongs to `rtg_apply_live_anchor_records` and `rtg_stage_schema_migration`.
 - Use `rtg_resolve_anchor_by_fact` for common exact anchor lookups before link writes. It compiles to `rtg_execute_query` and returns the submitted query, matches, count, and guidance.
 - Use `rtg_stage_schema_migration` for ordinary schema bootstrap or schema evolution. It accepts type-key-oriented schema definitions, generates candidate UUIDs, and fills migration membership. Keep every `(kind, type_key)` pair unique within the request. Compact responses are the default and correlate durable candidate UUIDs through `generated_schema_ids["kind:type_key"]`; request `response_options.format: "full"` only when the submitted low-level payload is needed for debugging.
 - Use `rtg_stage_knowledge_changes` only for advanced schema, constraint, migration, and non-live candidate graph changes; staged candidates must be referenced by a migration record in the same request.
@@ -144,6 +145,7 @@ After the Item schema example below has been cut over, this minimal live write s
 ```
 
 Do not send schema, constraint, migration, or non-live candidate work to `rtg_apply_live_graph_changes`.
+Do not pass `response_options` to `rtg_apply_live_graph_changes`; use its full result or choose the anchor-record façade when a compact mutation response is important.
 
 For dry-runs, use the same `graph_changes` payload with `rtg_validate_live_graph_changes`. It resolves `local_ref` values, returns `generated_ids` and `resolved_graph_changes`, and leaves component state unchanged. Its message trace remains part of runtime history.
 

@@ -1270,6 +1270,10 @@ def test_mcp_usage_guides_are_packaged_and_do_not_return_fake_snapshot_payloads(
     assert any(
         "Every ref-like field is a JSON object" in note for note in shapes["result"]["notes"]
     )
+    assert any(
+        "rtg_apply_live_graph_changes" in note and "does not accept response_options" in note
+        for note in shapes["result"]["notes"]
+    )
     assert shapes["result"]["rtg_validate_live_graph_changes"]["arguments"][
         "validation_options"
     ] == {"tracks": "all", "finding_limit": 20}
@@ -1674,9 +1678,7 @@ def test_runtime_gateway_server_accepts_mcp_gateway_protocol_substitute() -> Non
         def registrations(self) -> tuple[McpGatewayToolRegistration, ...]:
             return self._registrations
 
-        def register_tools(
-            self, registrations: tuple[McpGatewayToolRegistration, ...]
-        ) -> None:
+        def register_tools(self, registrations: tuple[McpGatewayToolRegistration, ...]) -> None:
             self._registrations = registrations
 
         async def invoke_tool(self, invocation: McpGatewayInvocation) -> McpGatewayOutcome:

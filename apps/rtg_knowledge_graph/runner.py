@@ -21,8 +21,8 @@ class RtgKnowledgeGraphRunStatus:
     storage_root: str
     runtime_database_path: str
     manifest_path: str
-    manifest_size_bytes: int
-    json_document_count: int
+    manifest_size_bytes: int | None
+    json_document_count: int | None
     rtg_controller_ready: bool
 
     def to_json_value(self) -> dict[str, JsonValue]:
@@ -68,6 +68,19 @@ class RtgKnowledgeGraphRunner:
             manifest_size_bytes=manifest_metadata.size_bytes,
             json_document_count=len(documents.documents),
             rtg_controller_ready=True,
+        )
+
+    def recovery_pending_status(self) -> RtgKnowledgeGraphRunStatus:
+        """Describe deferred startup without crossing a recovery-closed boundary."""
+
+        return RtgKnowledgeGraphRunStatus(
+            app_name=APP_NAME,
+            storage_root=str(self._storage_root),
+            runtime_database_path=str(self._runtime_database_path),
+            manifest_path=APP_MANIFEST_PATH,
+            manifest_size_bytes=None,
+            json_document_count=None,
+            rtg_controller_ready=False,
         )
 
     def _manifest_document(self) -> dict[str, JsonValue]:
