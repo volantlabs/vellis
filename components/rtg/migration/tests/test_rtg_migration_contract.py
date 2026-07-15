@@ -17,6 +17,7 @@ from components.rtg.migration import (
     RtgMigrationSnapshot,
     RtgMigrationSnapshotInvalid,
     RtgMigrationStatusTransitionInvalid,
+    RtgSchemaEvolutionOp,
     RtgSchemaTimeShapeRetrofit,
 )
 from components.rtg.migration.reference import create_reference_component
@@ -29,6 +30,8 @@ MODEL_EVIDENCE = {
         "test_migration_status_metadata_is_replaced_even_when_empty_or_same_status",
         "test_migration_membership_is_unique_consistent_and_canonical",
         "test_migration_cutover_sets_must_be_disjoint",
+        "test_schema_evolution_ops_round_trip_and_enter_cutover_plan",
+        "test_malformed_schema_evolution_op_names_field_and_leaves_no_trace",
     ),
     "SetMigrationStatusContractVerification": (
         "test_migration_tracks_cutover_membership_and_evidence",
@@ -41,6 +44,7 @@ MODEL_EVIDENCE = {
     "DeleteMigrationContractVerification": ("test_migration_status_and_delete_rules",),
     "BuildMigrationCutoverPlanContractVerification": (
         "test_migration_tracks_cutover_membership_and_evidence",
+        "test_schema_evolution_ops_round_trip_and_enter_cutover_plan",
     ),
     "ExportMigrationSnapshotContractVerification": (
         "test_migration_tracks_cutover_membership_and_evidence",
@@ -75,6 +79,8 @@ MODEL_EVIDENCE = {
         "test_migration_snapshot_import_rejects_duplicate_and_malformed_records_atomically",
         "test_migration_snapshot_accepts_independent_terminal_records",
         "test_migration_cutover_sets_must_be_disjoint",
+        "test_schema_evolution_ops_round_trip_and_enter_cutover_plan",
+        "test_malformed_schema_evolution_op_names_field_and_leaves_no_trace",
     ),
 }
 
@@ -286,3 +292,82 @@ def test_schema_time_shape_retrofit_rejects_invalid_shape() -> None:
                 ),
             )
         )
+
+
+def test_schema_evolution_ops_round_trip_and_enter_cutover_plan() -> None:
+    migration = create_reference_component()
+    old_definition = uuid4()
+    new_definition = uuid4()
+    op = RtgSchemaEvolutionOp(
+        op_id="rename-profile-name",
+        op_kind="rename_property",
+        target_kind="data_object",
+        target_type_key="Profile",
+        property_key="name",
+        replacement_key="full_name",
+        source_definition_uuid=old_definition,
+        candidate_definition_uuid=new_definition,
+        data_implication="rename_existing_values",
+    )
+
+    stored = migration.put_migration(
+        RtgMigrationRecord(
+            migration_id="profile-rename",
+            description="Rename profile name property.",
+            schema_make_live=(new_definition,),
+            schema_make_non_live=(old_definition,),
+            schema_evolution_ops=(op,),
+        )
+    )
+    restored = InMemoryRtgMigration.import_snapshot(migration.export_snapshot())
+    plan = RtgMigrationCutoverPlan.from_migration(stored)
+
+    assert stored.schema_evolution_ops == (op,)
+    assert restored.get_migration("profile-rename").schema_evolution_ops == (op,)
+    assert plan.schema_evolution_ops == (op,)
+
+
+def test_malformed_schema_evolution_op_names_field_and_leaves_no_trace() -> None:
+    migration = create_reference_component()
+    old_definition = uuid4()
+    new_definition = uuid4()
+    valid = RtgSchemaEvolutionOp(
+        op_id="rename-profile-name",
+        op_kind="rename_property",
+        target_kind="data_object",
+        target_type_key="Profile",
+        property_key="name",
+        replacement_key="full_name",
+        source_definition_uuid=old_definition,
+        candidate_definition_uuid=new_definition,
+        data_implication="rename_existing_values",
+    )
+    migration.put_migration(
+        RtgMigrationRecord(
+            migration_id="profile-rename",
+            description="Rename profile name property.",
+            schema_evolution_ops=(valid,),
+        )
+    )
+    invalid = RtgSchemaEvolutionOp(
+        op_id="rename-profile-name",
+        op_kind="rename_property",
+        target_kind="data_object",
+        target_type_key="Profile",
+        property_key="name",
+        replacement_key="full_name",
+        source_definition_uuid=old_definition,
+        candidate_definition_uuid=new_definition,
+        data_implication="surprise",
+    )
+
+    with pytest.raises(RtgMigrationRecordInvalid, match="data_implication"):
+        migration.put_migration(
+            RtgMigrationRecord(
+                migration_id="profile-rename",
+                description="Rename profile name property.",
+                schema_evolution_ops=(invalid,),
+            )
+        )
+
+    assert migration.get_migration("profile-rename").schema_evolution_ops == (valid,)

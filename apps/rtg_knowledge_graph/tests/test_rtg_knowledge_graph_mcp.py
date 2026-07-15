@@ -288,6 +288,45 @@ def test_mcp_codec_reports_path_specific_reference_and_uuid_errors() -> None:
     assert "migration_record.schema_make_live[0] must be a UUID" in str(uuid_error.value)
 
 
+def test_mcp_codec_decodes_reviewed_schema_evolution_ops() -> None:
+    old_definition = uuid4()
+    new_definition = uuid4()
+    changes = decode_migration_changes(
+        {
+            "migration_writes": [
+                {
+                    "ref": {"resource_id": "profile-rename"},
+                    "migration": {
+                        "migration_id": "profile-rename",
+                        "description": "Rename Profile.name.",
+                        "schema_make_live": [str(new_definition)],
+                        "schema_make_non_live": [str(old_definition)],
+                        "schema_evolution_ops": [
+                            {
+                                "op_id": "rename-profile-name",
+                                "op_kind": "rename_property",
+                                "target_kind": "data_object",
+                                "target_type_key": "Profile",
+                                "property_key": "name",
+                                "replacement_key": "full_name",
+                                "source_definition_uuid": str(old_definition),
+                                "candidate_definition_uuid": str(new_definition),
+                                "data_implication": "rename_existing_values",
+                            }
+                        ],
+                    },
+                }
+            ]
+        }
+    )
+
+    op = changes.migration_writes[0].migration.schema_evolution_ops[0]
+
+    assert op.op_id == "rename-profile-name"
+    assert op.source_definition_uuid == old_definition
+    assert op.candidate_definition_uuid == new_definition
+
+
 def test_mcp_codec_rejects_query_aliases_that_would_be_ignored() -> None:
     malformed_payloads = (
         (

@@ -271,6 +271,20 @@ library package BibliotekRtgSchema {
         }
     }
 
+    requirement <'invariant.rtg.schema.schema_evolution_ops_external'> schemaEvolutionOpsExternal {
+        subject schema : RtgSchema;
+        require constraint {
+            doc /* This component stores and validates full schema definitions. Reviewed schema-evolution operation history belongs to migration records, and diff review, graph-data effects, and cutover sequencing belong to the controller. */
+        }
+    }
+
+    requirement <'invariant.rtg.schema.destructive_changes_are_migration_concerns'> destructiveChangesAreMigrationConcerns {
+        subject schema : RtgSchema;
+        require constraint {
+            doc /* Destructive or data-affecting changes to live types, properties, or link types are not schema-store behavior. Deleting a schema definition deletes registry state only and never strips or rewrites graph data. */
+        }
+    }
+
     requirement <'invariant.rtg.schema.navigation_indexes_match_payloads'> navigationIndexesMatchPayloads {
         subject schema : RtgSchema;
         require constraint {
@@ -394,6 +408,8 @@ library package BibliotekRtgSchema {
         satisfy nativePayloads by schema;
         satisfy noInheritanceCompositionV1 by schema;
         satisfy typeKeyChangesAreMigrationConcerns by schema;
+        satisfy schemaEvolutionOpsExternal by schema;
+        satisfy destructiveChangesAreMigrationConcerns by schema;
         satisfy navigationIndexesMatchPayloads by schema;
         satisfy deterministicListOrdering by schema;
         satisfy schemaDeleteEffect by schema.deleteDefinition;
@@ -511,7 +527,7 @@ library package BibliotekRtgSchema {
 
     verification def RtgSchemaBoundaryVerification {
         subject schema : RtgSchema;
-        objective { verify fieldSemantics; verify payloadSemantics; verify kernelMetaModelSemantics; verify schemaReadEffect; verify canonicalOrdering; verify intentionalBoundary; verify schemaSnapshotEffect; verify uuidUnique; verify liveTypeUnique; verify liveStatusBoolean; verify noChangeSetOwnership; verify noObjectValidation; verify nativePayloads; verify noInheritanceCompositionV1; verify typeKeyChangesAreMigrationConcerns; verify navigationIndexesMatchPayloads; verify deterministicListOrdering; }
+        objective { verify fieldSemantics; verify payloadSemantics; verify kernelMetaModelSemantics; verify schemaReadEffect; verify canonicalOrdering; verify intentionalBoundary; verify schemaSnapshotEffect; verify uuidUnique; verify liveTypeUnique; verify liveStatusBoolean; verify noChangeSetOwnership; verify noObjectValidation; verify nativePayloads; verify noInheritanceCompositionV1; verify typeKeyChangesAreMigrationConcerns; verify schemaEvolutionOpsExternal; verify destructiveChangesAreMigrationConcerns; verify navigationIndexesMatchPayloads; verify deterministicListOrdering; }
         @EvidenceBinding { evidenceId = "components/rtg/schema/tests/test_rtg_schema_contract.py#RtgSchemaBoundaryVerification"; implementationScope = "InMemoryRtgSchema"; }
     }
 }

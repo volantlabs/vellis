@@ -26,9 +26,10 @@ Current checkpoint: the federation control plane, route packs, declared reads, c
 bridge traversal, SysML application authority, and read-only predecessor-snapshot projection have
 been reconciled. The schema-domain catalog now distinguishes available instructions from runtime
 readiness. Temporal schema shapes, identity criteria, link kinds, and their validation policies are
-now reconciled; the governance-core and agent-memory-spine instructions are runtime-ready. Explicit
-schema-evolution operations, write modes, and prototype fixture-backed domains remain deferred to
-later RTG kernel harmonization checkpoints.
+now reconciled; the governance-core and agent-memory-spine instructions are runtime-ready. Reviewed,
+diff-scoped schema-evolution operations and their kernel-sequenced property data effects are also
+reconciled. Write modes and prototype fixture-backed domains remain deferred to later RTG kernel
+harmonization checkpoints.
 
 During harmonization:
 

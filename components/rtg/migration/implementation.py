@@ -20,11 +20,36 @@ from components.rtg.migration.protocol import (
     RtgMigrationSnapshotInvalid,
     RtgMigrationStatusInvalid,
     RtgMigrationStatusTransitionInvalid,
+    RtgSchemaEvolutionOp,
     RtgSchemaTimeShapeRetrofit,
 )
 
 _STATUSES = {"draft", "ready", "applied", "failed", "abandoned"}
 _TIME_SHAPES = {"state_now", "state_as_of", "event"}
+_SCHEMA_OP_KINDS = {
+    "add_type",
+    "rename_type",
+    "delete_type",
+    "add_property",
+    "rename_property",
+    "retype_property",
+    "delete_property",
+    "add_link_type",
+    "rename_link_type",
+    "delete_link_type",
+}
+_SCHEMA_OP_TARGET_KINDS = {"anchor", "data_object", "link"}
+_SCHEMA_OP_DATA_IMPLICATIONS = {
+    "no_existing_data_change",
+    "rename_existing_values",
+    "rewrite_existing_type_key",
+    "strip_existing_values",
+    "requires_empty_type",
+    "requires_backfill",
+}
+_PROPERTY_OPS = {"add_property", "rename_property", "retype_property", "delete_property"}
+_RENAME_OPS = {"rename_type", "rename_property", "rename_link_type"}
+_LINK_TYPE_OPS = {"add_link_type", "rename_link_type", "delete_link_type"}
 _TERMINAL = {"applied", "abandoned"}
 _TRANSITIONS = {
     "draft": {"ready", "abandoned"},
@@ -126,6 +151,7 @@ class InMemoryRtgMigration:
             constraint_replacements=current.constraint_replacements,
             graph_replacements=current.graph_replacements,
             schema_time_shape_retrofits=current.schema_time_shape_retrofits,
+            schema_evolution_ops=current.schema_evolution_ops,
             evidence=current.evidence,
             metadata=metadata,
         )
@@ -156,6 +182,7 @@ class InMemoryRtgMigration:
             constraint_replacements=current.constraint_replacements,
             graph_replacements=current.graph_replacements,
             schema_time_shape_retrofits=current.schema_time_shape_retrofits,
+            schema_evolution_ops=current.schema_evolution_ops,
             evidence=(*current.evidence, normalized),
             metadata=current.metadata,
         )
@@ -236,6 +263,7 @@ class InMemoryRtgMigration:
                 _validate_time_shape_retrofit(item)
                 for item in migration.schema_time_shape_retrofits
             ),
+            schema_evolution_ops=_validate_schema_evolution_ops(migration.schema_evolution_ops),
             evidence=evidence,
             metadata=_validate_json_object(migration.metadata, "metadata"),
         )
@@ -320,6 +348,71 @@ def _validate_time_shape_retrofit(value: RtgSchemaTimeShapeRetrofit) -> RtgSchem
         definition_uuid=value.definition_uuid,
         time_shape=time_shape,
     )
+
+
+def _validate_schema_evolution_ops(
+    values: tuple[RtgSchemaEvolutionOp, ...],
+) -> tuple[RtgSchemaEvolutionOp, ...]:
+    normalized = tuple(_validate_schema_evolution_op(item) for item in values)
+    op_ids = [item.op_id for item in normalized]
+    if len(set(op_ids)) != len(op_ids):
+        raise RtgMigrationRecordInvalid("schema_evolution_ops.op_id values must be unique")
+    return normalized
+
+
+def _validate_schema_evolution_op(value: RtgSchemaEvolutionOp) -> RtgSchemaEvolutionOp:
+    if not isinstance(value, RtgSchemaEvolutionOp):
+        raise RtgMigrationRecordInvalid("schema_evolution_ops must contain schema evolution ops")
+    if not value.op_id or value.op_id != value.op_id.strip():
+        raise RtgMigrationRecordInvalid("schema_evolution_ops.op_id is required")
+    if value.op_kind not in _SCHEMA_OP_KINDS:
+        raise RtgMigrationRecordInvalid(f"schema_evolution_ops.op_kind invalid: {value.op_kind}")
+    if value.target_kind not in _SCHEMA_OP_TARGET_KINDS:
+        raise RtgMigrationRecordInvalid(
+            f"schema_evolution_ops.target_kind invalid: {value.target_kind}"
+        )
+    if not value.target_type_key or value.target_type_key != value.target_type_key.strip():
+        raise RtgMigrationRecordInvalid("schema_evolution_ops.target_type_key is required")
+    if value.data_implication not in _SCHEMA_OP_DATA_IMPLICATIONS:
+        raise RtgMigrationRecordInvalid(
+            f"schema_evolution_ops.data_implication invalid: {value.data_implication}"
+        )
+    if value.op_kind in _PROPERTY_OPS and value.target_kind != "data_object":
+        raise RtgMigrationRecordInvalid(
+            "schema_evolution_ops.target_kind must be data_object for property ops"
+        )
+    if value.op_kind in _LINK_TYPE_OPS and value.target_kind != "link":
+        raise RtgMigrationRecordInvalid(
+            "schema_evolution_ops.target_kind must be link for link-type ops"
+        )
+    if value.op_kind in _PROPERTY_OPS and not value.property_key:
+        raise RtgMigrationRecordInvalid("schema_evolution_ops.property_key is required")
+    if value.op_kind not in _PROPERTY_OPS and value.property_key is not None:
+        raise RtgMigrationRecordInvalid("schema_evolution_ops.property_key is not allowed")
+    if value.op_kind in _RENAME_OPS and not value.replacement_key:
+        raise RtgMigrationRecordInvalid("schema_evolution_ops.replacement_key is required")
+    if value.op_kind not in _RENAME_OPS and value.replacement_key is not None:
+        raise RtgMigrationRecordInvalid("schema_evolution_ops.replacement_key is not allowed")
+    if value.op_kind in {"add_property", "retype_property"} and value.replacement_field is None:
+        raise RtgMigrationRecordInvalid("schema_evolution_ops.replacement_field is required")
+    if (
+        value.op_kind not in {"add_property", "retype_property"}
+        and value.replacement_field is not None
+    ):
+        raise RtgMigrationRecordInvalid("schema_evolution_ops.replacement_field is not allowed")
+    if value.replacement_field is not None:
+        _validate_json_object(value.replacement_field, "schema_evolution_ops.replacement_field")
+    if value.source_definition_uuid is not None and not isinstance(
+        value.source_definition_uuid, UUID
+    ):
+        raise RtgMigrationRecordInvalid("schema_evolution_ops.source_definition_uuid must be UUID")
+    if value.candidate_definition_uuid is not None and not isinstance(
+        value.candidate_definition_uuid, UUID
+    ):
+        raise RtgMigrationRecordInvalid(
+            "schema_evolution_ops.candidate_definition_uuid must be UUID"
+        )
+    return copy.deepcopy(value)
 
 
 def _validate_evidence(evidence: RtgMigrationEvidence) -> RtgMigrationEvidence:

@@ -182,7 +182,7 @@ library package BibliotekRtgController {
     action def ApplyLiveGraphChanges { in graphChanges : RtgGraphChangeSet; in validationMode : RtgControllerValidationMode default = RtgControllerValidationMode::strict; out result : RtgControllerOperationResult; doc /* Validate and apply normal live graph CRUD in the serialized mutation lane. */ @FailureContract { errorIds = ("RtgControllerValidationFailed", "RtgControllerApplyFailed"); } }
     action def ValidateLiveGraphChanges { in graphChanges : RtgGraphChangeSet; in validationOptions[0..1] : RtgControllerValidationOptions; out result : RtgControllerLiveGraphValidationResult; doc /* Normalize exactly as apply would and return generated identities, resolved changes, and validation without component or ledger mutation. */ @FailureContract { errorIds = ("RtgControllerPreconditionFailed", "RtgValidationInputInvalid"); } }
     action def StageKnowledgeChanges { in knowledgeChanges : RtgChangeBatch; in validationMode : RtgControllerValidationMode default = RtgControllerValidationMode::strict; out result : RtgControllerOperationResult; doc /* Validate and stage migration-scoped non-live graph, schema, constraint, and migration records. */ @FailureContract { errorIds = ("RtgControllerValidationFailed", "RtgControllerPreconditionFailed", "RtgControllerApplyFailed"); } }
-    action def ApplyMigrationCutover { in migrationId : String; in cutoverOptions[0..1] : RtgControllerCutoverOptions; out result : RtgControllerOperationResult; doc /* Apply exactly one migration membership in reference-safe order, validate the result, and either commit or restore. */ @FailureContract { errorIds = ("RtgControllerPreconditionFailed", "RtgControllerValidationFailed", "RtgControllerApplyFailed"); } }
+    action def ApplyMigrationCutover { in migrationId : String; in cutoverOptions[0..1] : RtgControllerCutoverOptions; out result : RtgControllerOperationResult; doc /* Apply exactly one reviewed migration plan in reference-safe order, including kernel-sequenced schema-evolution data effects, validate the result, and either commit or restore. */ @FailureContract { errorIds = ("RtgControllerPreconditionFailed", "RtgControllerValidationFailed", "RtgControllerApplyFailed"); } }
     action def ExecuteControllerQuery { in querySpec : RtgQuerySpec; in queryOptions[0..1] : RtgQueryOptions; out result : RtgQueryResult; doc /* Execute against one coherent graph view while controller mutations are excluded; do not append a mutation ledger record. */ @FailureContract { errorIds = ("RtgQuerySpecInvalid", "RtgQueryUnsupported"); } }
     action def ControllerGetObject { in objectUuid : String; out ref object : RtgObject; doc /* Normalize UUID text and return the public graph record without lifecycle filtering; invalid and absent UUIDs are reported through the controller-owned not-found contract. */ @FailureContract { errorIds = ("RtgControllerObjectNotFound"); } }
     action def ControllerListMigrations { in status[0..1] : RtgMigrationStatus; out result : RtgMigrationRecordList; doc /* Return all migration records or one status in deterministic migration-ID order. */ @FailureContract { errorIds = ("RtgMigrationStatusInvalid"); } }
@@ -287,8 +287,13 @@ library package BibliotekRtgController {
                 in query redefines ValidateRtgChangeBatch::query = RtgController::queryEngine;
                 in changeBatch redefines ValidateRtgChangeBatch::changeBatch = derivePlan.projectedBatch;
                 in validationOptions redefines ValidateRtgChangeBatch::validationOptions = derivePlan.validationOptions;
+                doc /* Validate against an isolated graph projection after applying the reviewed schema-evolution data effects needed by the candidate schema. */
             }
             action capturePreimage { doc /* Capture the complete coordinated pre-cutover state. */ }
+            action applySchemaEvolutionDataEffects {
+                out attribute schemaEvolutionDiff : JsonObject;
+                doc /* Apply only reviewed property rename and delete effects, preserving graph identities and associations, and produce ordered per-op evidence. */
+            }
             action applyCutover {
                 out applied : Boolean;
                 doc /* Apply reference-safe schema, constraint, graph, and lifecycle changes. */
@@ -314,7 +319,8 @@ library package BibliotekRtgController {
             first derivePlan then validateProjection;
             succession acceptedCutoverProjection first validateProjection
                 if validateProjection.report.accepted then capturePreimage;
-            first capturePreimage then applyCutover;
+            first capturePreimage then applySchemaEvolutionDataEffects;
+            first applySchemaEvolutionDataEffects then applyCutover;
             succession appliedCutover first applyCutover
                 if applyCutover.applied then validateActualState;
             succession validCutoverState first validateActualState
@@ -659,14 +665,35 @@ library package BibliotekRtgController {
     requirement <'contract.rtg.controller.cutover_flow'> cutoverFlow {
         subject operation : ApplyMigrationCutover;
         require constraint {
-            doc /* Read the selected migration membership, snapshot coordinated state, apply make-live and make-non-live changes in reference-safe order, validate the result, and either commit an applied status or restore the snapshot and record failed status. */
+            doc /* Read the selected migration membership and reviewed schema-evolution ops, reject any uncovered schema diff, snapshot coordinated state, apply reviewed data effects and make-live/make-non-live changes in reference-safe order, validate the result, and either commit an applied status or restore the snapshot and record failed status. */
         }
     }
 
     requirement <'contract.rtg.controller.cutover_sequence'> cutoverSequence {
         subject operation : ApplyMigrationCutover;
         require constraint {
-            doc /* Under the write lock: derive the plan from the selected migration; validate the projected state; capture a coordinated preimage; make schema and constraint changes, with make-non-live before make-live for a type key; make graph live changes; validate actual state; optionally prune retired records; then remove the completed migration. Any failure restores the preimage, marks the migration failed when safe, and records cutover_failed. */
+            doc /* Under the write lock: derive the plan from the selected migration; prove its reviewed ops exactly cover property diffs; validate a projection with reviewed data effects; capture a coordinated preimage; apply property rename/delete data effects; make schema and constraint changes, with make-non-live before make-live for a type key; make graph live changes; validate actual state; optionally prune retired records; then remove the completed migration. Any failure restores the preimage, marks the migration failed when safe, and records cutover_failed. */
+        }
+    }
+
+    requirement <'invariant.rtg.controller.schema_evolution_cutover_is_diff_scoped'> schemaEvolutionCutoverDiffScoped {
+        subject operation : ApplyMigrationCutover;
+        require constraint {
+            doc /* Cutover accepts schema-evolution ops only from the stored migration plan. Every added, removed, or changed data-object property between paired live and candidate definitions must be covered by exactly the corresponding reviewed add, rename, delete, or retype op, and every reviewed property op must describe an actual diff. Ad hoc ops supplied at cutover and implied but unreviewed property diffs fail before mutation. */
+        }
+    }
+
+    requirement <'invariant.rtg.controller.schema_evolution_data_effects_are_kernel_sequenced'> schemaEvolutionDataEffectsSequenced {
+        subject operation : ApplyMigrationCutover;
+        require constraint {
+            doc /* Reviewed rename_property and delete_property effects rewrite every live data object of the target type before schema live-status flips, preserving object identity and anchor associations. Strict preview applies the same effects to isolated state. Failure restores the complete pre-cutover state. */
+        }
+    }
+
+    requirement <'invariant.rtg.controller.schema_evolution_ops_are_per_op_reported'> schemaEvolutionOpsPerOpReported {
+        subject operation : ApplyMigrationCutover;
+        require constraint {
+            doc /* A successful cutover returns details.schema_evolution_diff with ordered results for every reviewed op, including op identity, kind, target, declared data implication, affected count, and mutation state; its batch counts are derived from those results and the same evidence is ledgered and replayable. */
         }
     }
 
@@ -1204,6 +1231,9 @@ library package BibliotekRtgController {
         satisfy validationFlow by controller.validateLiveGraphChanges;
         satisfy cutoverFlow by controller.applyMigrationCutover;
         satisfy cutoverSequence by controller.applyMigrationCutover;
+        satisfy schemaEvolutionCutoverDiffScoped by controller.applyMigrationCutover;
+        satisfy schemaEvolutionDataEffectsSequenced by controller.applyMigrationCutover;
+        satisfy schemaEvolutionOpsPerOpReported by controller.applyMigrationCutover;
         satisfy abandonmentFlow by controller.abandonMigration;
         satisfy stableQueryFlow by controller.executeQuery;
         satisfy controllerReadSemantics by controller;
@@ -1329,6 +1359,9 @@ library package BibliotekRtgController {
         objective {
             verify cutoverFlow;
             verify cutoverSequence;
+            verify schemaEvolutionCutoverDiffScoped;
+            verify schemaEvolutionDataEffectsSequenced;
+            verify schemaEvolutionOpsPerOpReported;
 
             verify applyMigrationCutoverFailureSemantics;
         }

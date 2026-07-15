@@ -42,11 +42,12 @@ from components.rtg.controller import (
     RtgControllerSnapshotFailed,
     RtgControllerValidationFailed,
 )
-from components.rtg.graph import InMemoryRtgGraph, RtgAnchor
+from components.rtg.graph import InMemoryRtgGraph, RtgAnchor, RtgDataObject
 from components.rtg.migration import (
     InMemoryRtgMigration,
     RtgMigrationRecord,
     RtgMigrationSnapshot,
+    RtgSchemaEvolutionOp,
 )
 from components.rtg.query import RtgQueryAnchorBucket, RtgQuerySpec, SimpleRtgQueryEngine
 from components.rtg.schema import (
@@ -223,6 +224,51 @@ def json_object(value: object) -> dict[str, object]:
     return value
 
 
+def latest_ledger_payload(
+    ledger_path: Path,
+    operation_name: str,
+    record_kind: str,
+) -> dict[str, object]:
+    rows = (
+        SqliteStorage.open(ledger_path)
+        .query(
+            """
+        select payload_json
+        from rtg_controller_ledger
+        where operation_name = ? and record_kind = ?
+        order by ledger_position
+        """,
+            (operation_name, record_kind),
+        )
+        .rows
+    )
+    assert rows
+    payload = json.loads(str(rows[-1]["payload_json"]))
+    return json_object(payload)
+
+
+def latest_live_graph_data_uuid(ledger_path: Path) -> UUID:
+    request_payload = latest_ledger_payload(
+        ledger_path,
+        "apply_live_graph_changes",
+        "request",
+    )
+    graph_changes = json_object(request_payload["graph_changes"])
+    data_object_writes = cast(list[object], graph_changes["data_object_writes"])
+    first_write = json_object(data_object_writes[0])
+    ref = json_object(first_write["ref"])
+    return UUID(str(ref["resource_id"]))
+
+
+class InjectedSchemaEvolutionCutoverOptions:
+    validation_mode = "skip"
+    prune_retired = True
+    failure_restore = "restore_pre_cutover_snapshot"
+
+    def __init__(self, schema_evolution_ops: tuple[RtgSchemaEvolutionOp, ...]) -> None:
+        self.schema_evolution_ops = schema_evolution_ops
+
+
 def build_schema() -> InMemoryRtgSchema:
     schema = InMemoryRtgSchema.empty()
     schema.put_definition(
@@ -391,6 +437,10 @@ MODEL_EVIDENCE = {
         "test_failed_strict_cutover_status_is_replayable",
         "test_migration_history_is_reconstructed_from_ledger",
         "test_cutover_post_state_failure_restores_pre_cutover_state",
+        "test_schema_evolution_rename_property_rewrites_live_data_and_replays",
+        "test_schema_evolution_delete_property_strips_live_data_with_ledger_evidence",
+        "test_cutover_rejects_injected_unstaged_schema_evolution_ops",
+        "test_cutover_rejects_unreviewed_schema_property_diff",
     ),
     "AbandonMigrationContractVerification": (
         "test_migration_history_is_reconstructed_from_ledger",
@@ -974,9 +1024,13 @@ def test_strict_live_graph_apply_blocks_identity_merge_candidate_before_mutation
         )
     )
     baseline = controller.export_system_snapshot()
-    existing_uuid = controller.execute_query(
-        RtgQuerySpec(anchor_buckets=(RtgQueryAnchorBucket("person", ("Person",)),))
-    ).bindings[0].anchors["person"]
+    existing_uuid = (
+        controller.execute_query(
+            RtgQuerySpec(anchor_buckets=(RtgQueryAnchorBucket("person", ("Person",)),))
+        )
+        .bindings[0]
+        .anchors["person"]
+    )
 
     with pytest.raises(RtgControllerValidationFailed) as error:
         controller.apply_live_graph_changes(
@@ -1023,9 +1077,11 @@ def test_validate_live_graph_changes_reports_identity_merge_candidate_without_le
         )
     )
     baseline = controller.export_system_snapshot()
-    starting_ledger_count = SqliteStorage.open(ledger_path).query(
-        "select count(*) as count from rtg_controller_ledger"
-    ).rows[0]["count"]
+    starting_ledger_count = (
+        SqliteStorage.open(ledger_path)
+        .query("select count(*) as count from rtg_controller_ledger")
+        .rows[0]["count"]
+    )
 
     preview = controller.validate_live_graph_changes(
         RtgGraphChangeSet(
@@ -1108,11 +1164,14 @@ def test_force_create_identity_override_applies_and_is_preserved_in_request_ledg
     assert "merge_candidate.force_create_override" in {
         finding.code for finding in result.validation_report.findings
     }
-    assert len(
-        controller.execute_query(
-            RtgQuerySpec(anchor_buckets=(RtgQueryAnchorBucket("person", ("Person",)),))
-        ).bindings
-    ) == 2
+    assert (
+        len(
+            controller.execute_query(
+                RtgQuerySpec(anchor_buckets=(RtgQueryAnchorBucket("person", ("Person",)),))
+            ).bindings
+        )
+        == 2
+    )
     assert anchor_write["ref"]["resource_id"]
     assert anchor_write["identity_override"] == {
         "mode": "force_create",
@@ -1853,6 +1912,17 @@ def test_replay_decodes_ledgered_schema_fields_with_null_items(tmp_path: Path) -
         time_shape="state_now",
         system={"live": False},
     )
+    op = RtgSchemaEvolutionOp(
+        op_id="add-profile-preferred-contact",
+        op_kind="add_property",
+        target_kind="data_object",
+        target_type_key="Profile",
+        property_key="preferred_contact",
+        replacement_field={"required": False, "value_kinds": ["string"]},
+        source_definition_uuid=concrete_uuid(old_profile.uuid),
+        candidate_definition_uuid=concrete_uuid(replacement.uuid),
+        data_implication="no_existing_data_change",
+    )
     controller.stage_knowledge_changes(
         RtgChangeBatch(
             schema_changes=RtgSchemaChangeSet(
@@ -1873,6 +1943,7 @@ def test_replay_decodes_ledgered_schema_fields_with_null_items(tmp_path: Path) -
                             status="ready",
                             schema_make_live=(concrete_uuid(replacement.uuid),),
                             schema_make_non_live=(concrete_uuid(old_profile.uuid),),
+                            schema_evolution_ops=(op,),
                         ),
                     ),
                 )
@@ -1893,6 +1964,333 @@ def test_replay_decodes_ledgered_schema_fields_with_null_items(tmp_path: Path) -
     assert replayed_profile.description == "Profile with contact preference."
     assert "preferred_contact" in replayed_properties
     assert replayed_properties["preferred_contact"].items is None
+
+
+def test_schema_evolution_rename_property_rewrites_live_data_and_replays(
+    tmp_path: Path,
+) -> None:
+    ledger_path = tmp_path / "ledger.sqlite"
+    controller = build_controller_with_sql(tmp_path, SqliteStorage.open(ledger_path))
+    baseline = controller.export_system_snapshot()
+    controller.apply_live_graph_changes(
+        RtgGraphChangeSet(
+            anchor_writes=(RtgGraphAnchorWrite(RtgChangeReference(local_ref="ada"), "Person"),),
+            data_object_writes=(
+                RtgGraphDataObjectWrite(
+                    ref=RtgChangeReference(local_ref="ada-profile"),
+                    type="Profile",
+                    properties={"name": "Ada"},
+                    anchor_refs=(RtgChangeReference(local_ref="ada"),),
+                ),
+            ),
+        )
+    )
+    profile_uuid = latest_live_graph_data_uuid(ledger_path)
+    old_profile = controller.get_schema_pack(
+        ("Person",)
+    ).schema_pack.associated_data_object_schemas[0]
+    replacement = RtgSchemaDefinition(
+        uuid=uuid4(),
+        kind="data_object",
+        type_key="Profile",
+        description="Profile with renamed full name.",
+        payload=RtgDataObjectSchemaPayload(
+            properties={"full_name": RtgSchemaField(required=True, value_kinds=("string",))}
+        ),
+        time_shape="state_now",
+        system={"live": False},
+    )
+    op = RtgSchemaEvolutionOp(
+        op_id="rename-profile-name",
+        op_kind="rename_property",
+        target_kind="data_object",
+        target_type_key="Profile",
+        property_key="name",
+        replacement_key="full_name",
+        source_definition_uuid=concrete_uuid(old_profile.uuid),
+        candidate_definition_uuid=concrete_uuid(replacement.uuid),
+        data_implication="rename_existing_values",
+    )
+    controller.stage_knowledge_changes(
+        RtgChangeBatch(
+            schema_changes=RtgSchemaChangeSet(
+                definition_writes=(
+                    RtgSchemaDefinitionWrite(
+                        ref=RtgChangeReference(resource_id=concrete_uuid(replacement.uuid)),
+                        definition=replacement,
+                    ),
+                )
+            ),
+            migration_changes=RtgMigrationChangeSet(
+                migration_writes=(
+                    RtgMigrationRecordWrite(
+                        ref=RtgChangeReference(resource_id="profile-rename"),
+                        migration=RtgMigrationRecord(
+                            migration_id="profile-rename",
+                            description="Rename Profile.name to Profile.full_name.",
+                            status="ready",
+                            schema_make_live=(concrete_uuid(replacement.uuid),),
+                            schema_make_non_live=(concrete_uuid(old_profile.uuid),),
+                            schema_evolution_ops=(op,),
+                        ),
+                    ),
+                )
+            ),
+        ),
+        validation_mode="skip",
+    )
+
+    result = controller.apply_migration_cutover("profile-rename")
+    profile = controller.get_object(profile_uuid)
+    response_payload = latest_ledger_payload(
+        ledger_path,
+        "apply_migration_cutover",
+        "response",
+    )
+    response_details = json_object(response_payload["details"])
+    diff = json_object(response_details["schema_evolution_diff"])
+    op_results = cast(list[object], diff["ops"])
+    op_result = json_object(op_results[0])
+
+    assert isinstance(profile, RtgDataObject)
+    assert result.status == "cutover_applied"
+    assert profile.properties == {"full_name": "Ada"}
+    assert op_result["op_id"] == "rename-profile-name"
+    assert op_result["op_kind"] == "rename_property"
+    assert op_result["data_implication"] == "rename_existing_values"
+    assert op_result["affected_count"] == 1
+    assert op_result["mutation_state"] == "applied"
+
+    replay_controller = build_controller_with_sql(tmp_path, SqliteStorage.open(ledger_path))
+    replay = replay_controller.replay_ledger(RtgControllerReplayOptions(start_snapshot=baseline))
+    replayed_profile = replay_controller.get_object(profile_uuid)
+
+    assert replay.details["mutating_requests_replayed"] == 3
+    assert isinstance(replayed_profile, RtgDataObject)
+    assert replayed_profile.properties == {"full_name": "Ada"}
+
+
+def test_schema_evolution_delete_property_strips_live_data_with_ledger_evidence(
+    tmp_path: Path,
+) -> None:
+    ledger_path = tmp_path / "ledger.sqlite"
+    controller = build_controller_with_sql(tmp_path, SqliteStorage.open(ledger_path))
+    controller.apply_live_graph_changes(
+        RtgGraphChangeSet(
+            anchor_writes=(RtgGraphAnchorWrite(RtgChangeReference(local_ref="ada"), "Person"),),
+            data_object_writes=(
+                RtgGraphDataObjectWrite(
+                    ref=RtgChangeReference(local_ref="ada-profile"),
+                    type="Profile",
+                    properties={"name": "Ada"},
+                    anchor_refs=(RtgChangeReference(local_ref="ada"),),
+                ),
+            ),
+        )
+    )
+    profile_uuid = latest_live_graph_data_uuid(ledger_path)
+    old_profile = controller.get_schema_pack(
+        ("Person",)
+    ).schema_pack.associated_data_object_schemas[0]
+    replacement = RtgSchemaDefinition(
+        uuid=uuid4(),
+        kind="data_object",
+        type_key="Profile",
+        description="Profile without name.",
+        payload=RtgDataObjectSchemaPayload(properties={}),
+        time_shape="state_now",
+        system={"live": False},
+    )
+    op = RtgSchemaEvolutionOp(
+        op_id="delete-profile-name",
+        op_kind="delete_property",
+        target_kind="data_object",
+        target_type_key="Profile",
+        property_key="name",
+        source_definition_uuid=concrete_uuid(old_profile.uuid),
+        candidate_definition_uuid=concrete_uuid(replacement.uuid),
+        data_implication="strip_existing_values",
+    )
+    controller.stage_knowledge_changes(
+        RtgChangeBatch(
+            schema_changes=RtgSchemaChangeSet(
+                definition_writes=(
+                    RtgSchemaDefinitionWrite(
+                        ref=RtgChangeReference(resource_id=concrete_uuid(replacement.uuid)),
+                        definition=replacement,
+                    ),
+                )
+            ),
+            migration_changes=RtgMigrationChangeSet(
+                migration_writes=(
+                    RtgMigrationRecordWrite(
+                        ref=RtgChangeReference(resource_id="profile-delete-name"),
+                        migration=RtgMigrationRecord(
+                            migration_id="profile-delete-name",
+                            description="Delete Profile.name.",
+                            status="ready",
+                            schema_make_live=(concrete_uuid(replacement.uuid),),
+                            schema_make_non_live=(concrete_uuid(old_profile.uuid),),
+                            schema_evolution_ops=(op,),
+                        ),
+                    ),
+                )
+            ),
+        ),
+        validation_mode="skip",
+    )
+
+    result = controller.apply_migration_cutover("profile-delete-name")
+    profile = controller.get_object(profile_uuid)
+    response_payload = latest_ledger_payload(
+        ledger_path,
+        "apply_migration_cutover",
+        "response",
+    )
+    diff = json_object(json_object(response_payload["details"])["schema_evolution_diff"])
+    op_result = json_object(cast(list[object], diff["ops"])[0])
+
+    assert isinstance(profile, RtgDataObject)
+    assert result.status == "cutover_applied"
+    assert profile.properties == {}
+    assert op_result["op_id"] == "delete-profile-name"
+    assert op_result["op_kind"] == "delete_property"
+    assert op_result["data_implication"] == "strip_existing_values"
+    assert op_result["affected_count"] == 1
+    assert op_result["mutation_state"] == "applied"
+
+
+def test_cutover_rejects_injected_unstaged_schema_evolution_ops(
+    tmp_path: Path,
+) -> None:
+    controller = build_controller(tmp_path)
+    old_profile = controller.get_schema_pack(
+        ("Person",)
+    ).schema_pack.associated_data_object_schemas[0]
+    replacement = RtgSchemaDefinition(
+        uuid=uuid4(),
+        kind="data_object",
+        type_key="Profile",
+        description="Profile with renamed full name.",
+        payload=RtgDataObjectSchemaPayload(
+            properties={"full_name": RtgSchemaField(required=True, value_kinds=("string",))}
+        ),
+        time_shape="state_now",
+        system={"live": False},
+    )
+    reviewed = RtgSchemaEvolutionOp(
+        op_id="rename-profile-name",
+        op_kind="rename_property",
+        target_kind="data_object",
+        target_type_key="Profile",
+        property_key="name",
+        replacement_key="full_name",
+        source_definition_uuid=concrete_uuid(old_profile.uuid),
+        candidate_definition_uuid=concrete_uuid(replacement.uuid),
+        data_implication="rename_existing_values",
+    )
+    injected = RtgSchemaEvolutionOp(
+        op_id="delete-profile-name",
+        op_kind="delete_property",
+        target_kind="data_object",
+        target_type_key="Profile",
+        property_key="name",
+        source_definition_uuid=concrete_uuid(old_profile.uuid),
+        candidate_definition_uuid=concrete_uuid(replacement.uuid),
+        data_implication="strip_existing_values",
+    )
+    controller.stage_knowledge_changes(
+        RtgChangeBatch(
+            schema_changes=RtgSchemaChangeSet(
+                definition_writes=(
+                    RtgSchemaDefinitionWrite(
+                        ref=RtgChangeReference(resource_id=concrete_uuid(replacement.uuid)),
+                        definition=replacement,
+                    ),
+                )
+            ),
+            migration_changes=RtgMigrationChangeSet(
+                migration_writes=(
+                    RtgMigrationRecordWrite(
+                        ref=RtgChangeReference(resource_id="profile-rename"),
+                        migration=RtgMigrationRecord(
+                            migration_id="profile-rename",
+                            description="Rename Profile.name to Profile.full_name.",
+                            status="ready",
+                            schema_make_live=(concrete_uuid(replacement.uuid),),
+                            schema_make_non_live=(concrete_uuid(old_profile.uuid),),
+                            schema_evolution_ops=(reviewed,),
+                        ),
+                    ),
+                )
+            ),
+        ),
+        validation_mode="skip",
+    )
+
+    with pytest.raises(RtgControllerPreconditionFailed, match="schema_evolution_ops"):
+        controller.apply_migration_cutover(
+            "profile-rename",
+            cast(
+                RtgControllerCutoverOptions,
+                InjectedSchemaEvolutionCutoverOptions((injected,)),
+            ),
+        )
+
+    assert controller.get_migration("profile-rename").status == "ready"
+
+
+def test_cutover_rejects_unreviewed_schema_property_diff(tmp_path: Path) -> None:
+    controller = build_controller(tmp_path)
+    old_profile = controller.get_schema_pack(
+        ("Person",)
+    ).schema_pack.associated_data_object_schemas[0]
+    replacement = RtgSchemaDefinition(
+        uuid=uuid4(),
+        kind="data_object",
+        type_key="Profile",
+        description="Profile with contact preference.",
+        payload=RtgDataObjectSchemaPayload(
+            properties={
+                "name": RtgSchemaField(required=True, value_kinds=("string",)),
+                "preferred_contact": RtgSchemaField(required=False, value_kinds=("string",)),
+            }
+        ),
+        time_shape="state_now",
+        system={"live": False},
+    )
+    controller.stage_knowledge_changes(
+        RtgChangeBatch(
+            schema_changes=RtgSchemaChangeSet(
+                definition_writes=(
+                    RtgSchemaDefinitionWrite(
+                        ref=RtgChangeReference(resource_id=concrete_uuid(replacement.uuid)),
+                        definition=replacement,
+                    ),
+                )
+            ),
+            migration_changes=RtgMigrationChangeSet(
+                migration_writes=(
+                    RtgMigrationRecordWrite(
+                        ref=RtgChangeReference(resource_id="profile-unreviewed-diff"),
+                        migration=RtgMigrationRecord(
+                            migration_id="profile-unreviewed-diff",
+                            description="Try property add without reviewed op.",
+                            status="ready",
+                            schema_make_live=(concrete_uuid(replacement.uuid),),
+                            schema_make_non_live=(concrete_uuid(old_profile.uuid),),
+                        ),
+                    ),
+                )
+            ),
+        ),
+        validation_mode="skip",
+    )
+
+    with pytest.raises(RtgControllerPreconditionFailed, match="unreviewed schema evolution op"):
+        controller.apply_migration_cutover("profile-unreviewed-diff")
+
+    assert controller.get_migration("profile-unreviewed-diff").status == "ready"
 
 
 def test_failed_strict_cutover_status_is_replayable(tmp_path: Path) -> None:
@@ -1926,6 +2324,27 @@ def test_failed_strict_cutover_status_is_replayable(tmp_path: Path) -> None:
         time_shape="state_now",
         system={"live": False},
     )
+    add_age = RtgSchemaEvolutionOp(
+        op_id="add-profile-age",
+        op_kind="add_property",
+        target_kind="data_object",
+        target_type_key="Profile",
+        property_key="age",
+        replacement_field={"required": True, "value_kinds": ["integer"]},
+        source_definition_uuid=concrete_uuid(old_profile.uuid),
+        candidate_definition_uuid=concrete_uuid(replacement.uuid),
+        data_implication="requires_backfill",
+    )
+    delete_name = RtgSchemaEvolutionOp(
+        op_id="delete-profile-name",
+        op_kind="delete_property",
+        target_kind="data_object",
+        target_type_key="Profile",
+        property_key="name",
+        source_definition_uuid=concrete_uuid(old_profile.uuid),
+        candidate_definition_uuid=concrete_uuid(replacement.uuid),
+        data_implication="strip_existing_values",
+    )
     controller.stage_knowledge_changes(
         RtgChangeBatch(
             schema_changes=RtgSchemaChangeSet(
@@ -1946,6 +2365,7 @@ def test_failed_strict_cutover_status_is_replayable(tmp_path: Path) -> None:
                             status="ready",
                             schema_make_live=(concrete_uuid(replacement.uuid),),
                             schema_make_non_live=(concrete_uuid(old_profile.uuid),),
+                            schema_evolution_ops=(add_age, delete_name),
                         ),
                     ),
                 )
@@ -2151,6 +2571,27 @@ def test_migration_history_is_reconstructed_from_ledger(
         time_shape="state_now",
         system={"live": False},
     )
+    add_age = RtgSchemaEvolutionOp(
+        op_id="add-profile-age",
+        op_kind="add_property",
+        target_kind="data_object",
+        target_type_key="Profile",
+        property_key="age",
+        replacement_field={"required": True, "value_kinds": ["integer"]},
+        source_definition_uuid=concrete_uuid(old_profile.uuid),
+        candidate_definition_uuid=concrete_uuid(replacement.uuid),
+        data_implication="requires_backfill",
+    )
+    delete_name = RtgSchemaEvolutionOp(
+        op_id="delete-profile-name",
+        op_kind="delete_property",
+        target_kind="data_object",
+        target_type_key="Profile",
+        property_key="name",
+        source_definition_uuid=concrete_uuid(old_profile.uuid),
+        candidate_definition_uuid=concrete_uuid(replacement.uuid),
+        data_implication="strip_existing_values",
+    )
     controller.stage_knowledge_changes(
         RtgChangeBatch(
             schema_changes=RtgSchemaChangeSet(
@@ -2171,6 +2612,7 @@ def test_migration_history_is_reconstructed_from_ledger(
                             status="ready",
                             schema_make_live=(concrete_uuid(replacement.uuid),),
                             schema_make_non_live=(concrete_uuid(old_profile.uuid),),
+                            schema_evolution_ops=(add_age, delete_name),
                         ),
                     ),
                 )

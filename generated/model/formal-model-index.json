@@ -42,16 +42,16 @@
     "Bibliotek": {
       "element_counts": {
         "ActionDefinition": 141,
-        "AttributeDefinition": 290,
+        "AttributeDefinition": 291,
         "CalculationDefinition": 6,
         "ConstraintDefinition": 1,
         "Documentation": 16,
-        "EnumerationDefinition": 55,
+        "EnumerationDefinition": 58,
         "ItemDefinition": 19,
         "LibraryPackage": 1,
         "PartDefinition": 26,
         "PartUsage": 20,
-        "RequirementUsage": 455,
+        "RequirementUsage": 462,
         "VerificationCaseDefinition": 160
       },
       "named_elements": [
@@ -1537,6 +1537,10 @@
         },
         {
           "kind": "AttributeDefinition",
+          "name": "RtgSchemaEvolutionOp"
+        },
+        {
+          "kind": "AttributeDefinition",
           "name": "RtgSchemaField"
         },
         {
@@ -1970,6 +1974,18 @@
         {
           "kind": "EnumerationDefinition",
           "name": "RtgSchemaDefinitionKind"
+        },
+        {
+          "kind": "EnumerationDefinition",
+          "name": "RtgSchemaEvolutionDataImplication"
+        },
+        {
+          "kind": "EnumerationDefinition",
+          "name": "RtgSchemaEvolutionOpKind"
+        },
+        {
+          "kind": "EnumerationDefinition",
+          "name": "RtgSchemaEvolutionTargetKind"
         },
         {
           "kind": "EnumerationDefinition",
@@ -2701,6 +2717,11 @@
           "kind": "RequirementUsage",
           "name": "descriptorValidity",
           "short_name": "contract.rtg.graph_registry.descriptor_validity"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "destructiveChangesAreMigrationConcerns",
+          "short_name": "invariant.rtg.schema.destructive_changes_are_migration_concerns"
         },
         {
           "kind": "RequirementUsage",
@@ -4111,6 +4132,36 @@
           "kind": "RequirementUsage",
           "name": "schemaDeleteEffect",
           "short_name": "contract.rtg.schema.delete_effect"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "schemaEvolutionCutoverDiffScoped",
+          "short_name": "invariant.rtg.controller.schema_evolution_cutover_is_diff_scoped"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "schemaEvolutionDataEffectsSequenced",
+          "short_name": "invariant.rtg.controller.schema_evolution_data_effects_are_kernel_sequenced"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "schemaEvolutionOpsClosed",
+          "short_name": "invariant.rtg.migration.schema_evolution_ops_closed"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "schemaEvolutionOpsExternal",
+          "short_name": "invariant.rtg.schema.schema_evolution_ops_external"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "schemaEvolutionOpsPerOpReported",
+          "short_name": "invariant.rtg.controller.schema_evolution_ops_are_per_op_reported"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "schemaEvolutionOpsReviewData",
+          "short_name": "invariant.rtg.migration.schema_evolution_ops_are_review_data"
         },
         {
           "kind": "RequirementUsage",
@@ -6437,7 +6488,7 @@
         "ActionDefinition": 2,
         "ActionUsage": 4,
         "AttributeDefinition": 23,
-        "AttributeUsage": 124,
+        "AttributeUsage": 125,
         "ConstraintUsage": 22,
         "Dependency": 25,
         "Documentation": 51,
@@ -7471,18 +7522,18 @@
     "BibliotekRtgController": {
       "element_counts": {
         "ActionDefinition": 23,
-        "ActionUsage": 36,
+        "ActionUsage": 37,
         "AttributeDefinition": 32,
-        "AttributeUsage": 257,
+        "AttributeUsage": 259,
         "BindingConnectorAsUsage": 8,
-        "ConstraintUsage": 82,
+        "ConstraintUsage": 85,
         "Dependency": 151,
-        "Documentation": 173,
+        "Documentation": 178,
         "EnumerationDefinition": 12,
         "EnumerationUsage": 54,
-        "Feature": 204,
+        "Feature": 210,
         "FeatureChainExpression": 43,
-        "FeatureReferenceExpression": 105,
+        "FeatureReferenceExpression": 108,
         "ItemDefinition": 1,
         "ItemUsage": 16,
         "LibraryPackage": 1,
@@ -7491,17 +7542,17 @@
         "LiteralInteger": 122,
         "LiteralString": 64,
         "MetadataUsage": 58,
-        "Multiplicity": 195,
+        "Multiplicity": 198,
         "MultiplicityRange": 85,
         "NullExpression": 1,
         "OperatorExpression": 11,
         "PartDefinition": 1,
         "PartUsage": 27,
         "PerformActionUsage": 80,
-        "ReferenceUsage": 629,
-        "RequirementUsage": 188,
-        "SatisfyRequirementUsage": 82,
-        "SuccessionAsUsage": 21,
+        "ReferenceUsage": 640,
+        "RequirementUsage": 194,
+        "SatisfyRequirementUsage": 85,
+        "SuccessionAsUsage": 22,
         "TransitionUsage": 11,
         "VerificationCaseDefinition": 24
       },
@@ -8454,6 +8505,33 @@
         {
           "kind": "RequirementUsage",
           "name": "schemaConstraintDeletionUsesMigrations"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "schemaEvolutionCutoverDiffScoped",
+          "short_name": "invariant.rtg.controller.schema_evolution_cutover_is_diff_scoped"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "schemaEvolutionCutoverDiffScoped"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "schemaEvolutionDataEffectsSequenced",
+          "short_name": "invariant.rtg.controller.schema_evolution_data_effects_are_kernel_sequenced"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "schemaEvolutionDataEffectsSequenced"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "schemaEvolutionOpsPerOpReported",
+          "short_name": "invariant.rtg.controller.schema_evolution_ops_are_per_op_reported"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "schemaEvolutionOpsPerOpReported"
         },
         {
           "kind": "RequirementUsage",
@@ -11100,33 +11178,33 @@
       "element_counts": {
         "ActionDefinition": 10,
         "ActionUsage": 4,
-        "AttributeDefinition": 16,
-        "AttributeUsage": 47,
+        "AttributeDefinition": 17,
+        "AttributeUsage": 59,
         "CalculationDefinition": 1,
-        "ConstraintUsage": 27,
+        "ConstraintUsage": 29,
         "Dependency": 8,
-        "Documentation": 49,
-        "EnumerationDefinition": 1,
-        "EnumerationUsage": 14,
-        "Feature": 50,
-        "FeatureReferenceExpression": 29,
+        "Documentation": 52,
+        "EnumerationDefinition": 4,
+        "EnumerationUsage": 33,
+        "Feature": 53,
+        "FeatureReferenceExpression": 31,
         "ItemDefinition": 1,
         "ItemUsage": 4,
         "LibraryPackage": 1,
-        "LiteralInfinity": 32,
-        "LiteralInteger": 40,
+        "LiteralInfinity": 34,
+        "LiteralInteger": 52,
         "LiteralString": 26,
         "MetadataUsage": 22,
-        "Multiplicity": 30,
-        "MultiplicityRange": 37,
+        "Multiplicity": 35,
+        "MultiplicityRange": 44,
         "NullExpression": 2,
         "OperatorExpression": 6,
         "PartDefinition": 1,
         "PartUsage": 4,
         "PerformActionUsage": 8,
-        "ReferenceUsage": 175,
-        "RequirementUsage": 65,
-        "SatisfyRequirementUsage": 27,
+        "ReferenceUsage": 182,
+        "RequirementUsage": 69,
+        "SatisfyRequirementUsage": 29,
         "VerificationCaseDefinition": 11
       },
       "named_elements": [
@@ -11232,6 +11310,10 @@
         },
         {
           "kind": "AttributeDefinition",
+          "name": "RtgSchemaEvolutionOp"
+        },
+        {
+          "kind": "AttributeDefinition",
           "name": "RtgSchemaTimeShapeRetrofit"
         },
         {
@@ -11241,6 +11323,18 @@
         {
           "kind": "EnumerationDefinition",
           "name": "RtgMigrationStatus"
+        },
+        {
+          "kind": "EnumerationDefinition",
+          "name": "RtgSchemaEvolutionDataImplication"
+        },
+        {
+          "kind": "EnumerationDefinition",
+          "name": "RtgSchemaEvolutionOpKind"
+        },
+        {
+          "kind": "EnumerationDefinition",
+          "name": "RtgSchemaEvolutionTargetKind"
         },
         {
           "kind": "ItemDefinition",
@@ -11501,6 +11595,24 @@
         {
           "kind": "RequirementUsage",
           "name": "rollbackForwardChange"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "schemaEvolutionOpsClosed",
+          "short_name": "invariant.rtg.migration.schema_evolution_ops_closed"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "schemaEvolutionOpsClosed"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "schemaEvolutionOpsReviewData",
+          "short_name": "invariant.rtg.migration.schema_evolution_ops_are_review_data"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "schemaEvolutionOpsReviewData"
         },
         {
           "kind": "RequirementUsage",
@@ -12138,13 +12250,13 @@
         "AttributeDefinition": 30,
         "AttributeUsage": 64,
         "CalculationDefinition": 1,
-        "ConstraintUsage": 33,
+        "ConstraintUsage": 35,
         "Dependency": 10,
-        "Documentation": 64,
+        "Documentation": 66,
         "EnumerationDefinition": 9,
         "EnumerationUsage": 39,
-        "Feature": 56,
-        "FeatureReferenceExpression": 35,
+        "Feature": 58,
+        "FeatureReferenceExpression": 37,
         "ItemDefinition": 1,
         "ItemUsage": 7,
         "LibraryPackage": 1,
@@ -12160,9 +12272,9 @@
         "PartDefinition": 1,
         "PartUsage": 4,
         "PerformActionUsage": 10,
-        "ReferenceUsage": 225,
-        "RequirementUsage": 80,
-        "SatisfyRequirementUsage": 33,
+        "ReferenceUsage": 233,
+        "RequirementUsage": 84,
+        "SatisfyRequirementUsage": 35,
         "VerificationCaseDefinition": 14
       },
       "named_elements": [
@@ -12422,6 +12534,15 @@
         {
           "kind": "RequirementUsage",
           "name": "deleteSchemaDefinitionFailureSemantics"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "destructiveChangesAreMigrationConcerns",
+          "short_name": "invariant.rtg.schema.destructive_changes_are_migration_concerns"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "destructiveChangesAreMigrationConcerns"
         },
         {
           "kind": "RequirementUsage",
@@ -12703,6 +12824,15 @@
         {
           "kind": "RequirementUsage",
           "name": "schemaDeleteEffect"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "schemaEvolutionOpsExternal",
+          "short_name": "invariant.rtg.schema.schema_evolution_ops_external"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "schemaEvolutionOpsExternal"
         },
         {
           "kind": "RequirementUsage",
@@ -14039,7 +14169,7 @@
         "ActionUsage": 66,
         "AllocationUsage": 27,
         "AttributeDefinition": 4,
-        "AttributeUsage": 211,
+        "AttributeUsage": 212,
         "BindingConnectorAsUsage": 10,
         "ConjugatedPortDefinition": 1,
         "ConstraintDefinition": 1,
@@ -14225,7 +14355,7 @@
         "ActionDefinition": 27,
         "ActionUsage": 39,
         "AttributeDefinition": 32,
-        "AttributeUsage": 309,
+        "AttributeUsage": 310,
         "ConstraintUsage": 35,
         "Dependency": 101,
         "Documentation": 121,
@@ -15578,7 +15708,7 @@
     }
   },
   "schema_version": 1,
-  "source_digest": "6481998649e0e039b46f4c2d2a663039139dffcdca6c8f41db4ee601add3887e",
+  "source_digest": "a57d0703d203b882a80e470e73f91bd252064f01e1dfc8fb43471d78dfe90a7d",
   "validator": {
     "implementation_version": "0.50.0",
     "provider": "Systems-Modeling/SysML-v2-Pilot-Implementation",

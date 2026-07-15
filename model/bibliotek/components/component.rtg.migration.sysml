@@ -9,6 +9,25 @@ library package BibliotekRtgMigration {
         doc /* Observable record lifecycle. Transition legality is defined by statusTransitionTable; no event-driven state execution semantics are implied. */
     }
 
+    enum def RtgSchemaEvolutionOpKind {
+        enum add_type; enum rename_type; enum delete_type;
+        enum add_property; enum rename_property; enum retype_property; enum delete_property;
+        enum add_link_type; enum rename_link_type; enum delete_link_type;
+    }
+
+    enum def RtgSchemaEvolutionTargetKind {
+        enum anchor; enum data_object; enum link;
+    }
+
+    enum def RtgSchemaEvolutionDataImplication {
+        enum no_existing_data_change;
+        enum rename_existing_values;
+        enum rewrite_existing_type_key;
+        enum strip_existing_values;
+        enum requires_empty_type;
+        enum requires_backfill;
+    }
+
     calc def MigrationStatusTransitionAllowed {
         in current : RtgMigrationStatus;
         in requested : RtgMigrationStatus;
@@ -35,6 +54,19 @@ library package BibliotekRtgMigration {
         attribute timeShape[0..1] : RtgSchemaTimeShape;
         doc /* Omitted timeShape explicitly defaults a legacy node definition to state_now. */
     }
+    attribute def RtgSchemaEvolutionOp {
+        attribute opId : String;
+        attribute opKind : RtgSchemaEvolutionOpKind;
+        attribute targetKind : RtgSchemaEvolutionTargetKind;
+        attribute targetTypeKey : String;
+        attribute propertyKey[0..1] : String;
+        attribute replacementKey[0..1] : String;
+        attribute replacementField[0..1] : JsonObject;
+        attribute sourceDefinitionUuid[0..1] : Uuid;
+        attribute candidateDefinitionUuid[0..1] : Uuid;
+        attribute dataImplication : RtgSchemaEvolutionDataImplication;
+        doc /* One reviewed, declarative schema change. Shape is determined by opKind; this value contains no executable transform. */
+    }
     item def RtgMigrationRecord {
         attribute migrationId[0..1] : String;
         attribute description : String;
@@ -49,6 +81,7 @@ library package BibliotekRtgMigration {
         attribute constraintReplacements[0..*] : RtgMigrationReplacement;
         attribute graphReplacements[0..*] : RtgMigrationReplacement;
         attribute schemaTimeShapeRetrofits[0..*] : RtgSchemaTimeShapeRetrofit;
+        attribute schemaEvolutionOps[0..*] ordered : RtgSchemaEvolutionOp;
         attribute evidence[0..*] ordered : RtgMigrationEvidence;
         attribute 'metadata' : JsonObject;
         doc /* Identity may be absent only on write. Stored records have a concrete generated or caller-supplied ID. The record stores references and intent, never referenced resources or executable transforms. */
@@ -68,6 +101,7 @@ library package BibliotekRtgMigration {
         attribute constraintReplacements[0..*] ordered : RtgMigrationReplacement;
         attribute graphReplacements[0..*] ordered : RtgMigrationReplacement;
         attribute schemaTimeShapeRetrofits[0..*] ordered : RtgSchemaTimeShapeRetrofit;
+        attribute schemaEvolutionOps[0..*] ordered : RtgSchemaEvolutionOp;
     }
 
     attribute def RtgMigrationNotFound { attribute 'message' : String; }
@@ -99,7 +133,7 @@ library package BibliotekRtgMigration {
     }
     action def AddMigrationEvidence { in migrationId : String; in evidence : RtgMigrationEvidence; out migration : RtgMigrationRecord; doc /* Append one evidence identity without interpreting or fetching its referenced artifact. */ @FailureContract { errorIds = ("RtgMigrationNotFound", "RtgMigrationEvidenceInvalid"); } }
     action def DeleteMigration { in migrationId : String; out result : RtgMigrationDeleteResult; doc /* Delete one applied or abandoned record only; referenced resources and durable controller history remain unchanged. */ @FailureContract { errorIds = ("RtgMigrationIdInvalid", "RtgMigrationNotFound", "RtgMigrationDeleteNotAllowed"); } }
-    action def BuildMigrationCutoverPlan { in migration : RtgMigrationRecord; out plan : RtgMigrationCutoverPlan; doc /* Purely copy ordered lifecycle membership, replacement mappings, and time-shape retrofit operations from a concrete valid migration record. */ @FailureContract { errorIds = ("RtgMigrationRecordInvalid"); } }
+    action def BuildMigrationCutoverPlan { in migration : RtgMigrationRecord; out plan : RtgMigrationCutoverPlan; doc /* Purely copy ordered lifecycle membership, replacement mappings, time-shape retrofits, and reviewed schema-evolution operations from a concrete valid migration record. */ @FailureContract { errorIds = ("RtgMigrationRecordInvalid"); } }
 
     part def <'component.rtg.migration'> RtgMigration {
         doc /* Own identity-bearing migration records, lifecycle transitions, membership, and evidence. */
@@ -166,7 +200,21 @@ library package BibliotekRtgMigration {
     requirement <'contract.rtg.migration.cutover_plan'> cutoverPlanEffect {
         subject operation : BuildMigrationCutoverPlan;
         require constraint {
-            doc /* The plan deterministically copies all make-live, make-non-live, replacement, and schema time-shape retrofit membership without reading or mutating referenced component state. A retrofit has one concrete definition identity and defaults an omitted time shape to state_now. */
+            doc /* The plan deterministically copies all make-live, make-non-live, replacement, schema time-shape retrofit, and reviewed schema-evolution operation membership without reading or mutating referenced component state. Schema-evolution operation order is preserved. A retrofit has one concrete definition identity and defaults an omitted time shape to state_now. */
+        }
+    }
+
+    requirement <'invariant.rtg.migration.schema_evolution_ops_closed'> schemaEvolutionOpsClosed {
+        subject operation : PutMigration;
+        require constraint {
+            doc /* Every schema-evolution op has a non-empty unique opId; uses only the declared opKind, targetKind, and dataImplication vocabularies; and supplies exactly the fields required by its op kind. Property ops target data_object, link-type ops target link, propertyKey is present only for property ops, replacementKey only for rename ops, and replacementField only for add_property or retype_property. Invalid input names the offending field and replaces or creates no migration record. */
+        }
+    }
+
+    requirement <'invariant.rtg.migration.schema_evolution_ops_are_review_data'> schemaEvolutionOpsReviewData {
+        subject migration : RtgMigration;
+        require constraint {
+            doc /* Schema-evolution ops are ordered reviewed migration data. The migration component records and round-trips them but does not infer diffs, mutate schema or graph state, or execute their data implications. */
         }
     }
 
@@ -325,6 +373,8 @@ library package BibliotekRtgMigration {
         satisfy evidenceEffect by migration.addEvidence;
         satisfy deleteEffect by migration.deleteMigration;
         satisfy cutoverPlanEffect by migration.buildCutoverPlan;
+        satisfy schemaEvolutionOpsClosed by migration.putMigration;
+        satisfy schemaEvolutionOpsReviewData by migration;
         satisfy intentionalBoundary by migration;
         satisfy idUnique by migration;
         satisfy cutoverSetsDisjoint by migration;
@@ -356,6 +406,7 @@ library package BibliotekRtgMigration {
         objective {
             verify putMigrationEffect;
             verify membershipSemantics;
+            verify schemaEvolutionOpsClosed;
 
             verify putMigrationFailureSemantics;
         }
@@ -450,7 +501,7 @@ library package BibliotekRtgMigration {
 
     verification def RtgMigrationBoundaryVerification {
         subject migration : RtgMigration;
-        objective { verify intentionalBoundary; verify idUnique; verify cutoverSetsDisjoint; verify notNormalCrud; verify candidatesMaterialized; verify referencesAreData; verify noStoreMutation; verify statusTransitionControlled; verify statusTrackingNotProof; verify completedHistoryExternal; verify rollbackForwardChange; }
+        objective { verify intentionalBoundary; verify idUnique; verify cutoverSetsDisjoint; verify notNormalCrud; verify candidatesMaterialized; verify schemaEvolutionOpsReviewData; verify referencesAreData; verify noStoreMutation; verify statusTransitionControlled; verify statusTrackingNotProof; verify completedHistoryExternal; verify rollbackForwardChange; }
         @EvidenceBinding { evidenceId = "components/rtg/migration/tests/test_rtg_migration_contract.py#RtgMigrationBoundaryVerification"; implementationScope = "InMemoryRtgMigration"; }
     }
 }

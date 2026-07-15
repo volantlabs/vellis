@@ -93,6 +93,7 @@ from components.rtg.migration.protocol import (
     RtgMigrationRecordList,
     RtgMigrationReplacement,
     RtgMigrationSnapshot,
+    RtgSchemaEvolutionOp,
     RtgSchemaTimeShapeRetrofit,
 )
 from components.rtg.query.protocol import (
@@ -156,6 +157,18 @@ class _ReplayTransactionMetadata:
     ledger_position: int | None
     recorded_at: str | None
     response_payload: JsonObject
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class _CutoverApplyResult:
+    applied_changes: RtgControllerAppliedChanges
+    schema_evolution_diff: JsonObject
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class _SchemaDefinitionPair:
+    old: RtgSchemaDefinition
+    new: RtgSchemaDefinition
 
 
 class InProcessRtgController:
@@ -352,6 +365,10 @@ class InProcessRtgController:
         cutover_options: RtgControllerCutoverOptions | None = None,
     ) -> RtgControllerOperationResult:
         options = cutover_options or RtgControllerCutoverOptions()
+        if hasattr(options, "schema_evolution_ops"):
+            raise RtgControllerPreconditionFailed(
+                "schema_evolution_ops must be reviewed on the migration record"
+            )
         if options.validation_mode not in {"strict", "skip"}:
             raise RtgControllerPreconditionFailed("validation_mode must be strict or skip")
         if options.failure_restore != "restore_pre_cutover_snapshot":
@@ -364,6 +381,7 @@ class InProcessRtgController:
             try:
                 migration = self._migration.get_migration(migration_id)
                 plan = RtgMigrationCutoverPlan.from_migration(migration)
+                self._assert_schema_evolution_ops_cover_schema_diff(plan)
             except Exception as error:
                 raise RtgControllerPreconditionFailed(str(error)) from error
             request_payload = {
@@ -384,8 +402,9 @@ class InProcessRtgController:
                     self._assert_cutover_candidates_exist(plan)
                 except Exception as error:
                     raise RtgControllerPreconditionFailed(str(error)) from error
+                validation_graph = self._preview_graph_with_schema_evolution_data_effects(plan)
                 validation_report = self._change_validator.validate_batch(
-                    self._graph,
+                    validation_graph,
                     self._schema,
                     self._constraints,
                     self._migration,
@@ -433,7 +452,7 @@ class InProcessRtgController:
                         ),
                     )
             try:
-                applied = self._apply_cutover_plan(
+                cutover_result = self._apply_cutover_plan(
                     plan,
                     migration=migration,
                     options=options,
@@ -479,8 +498,9 @@ class InProcessRtgController:
             result = RtgControllerOperationResult(
                 status="cutover_applied",
                 transaction_id=transaction_id,
-                applied_changes=applied,
+                applied_changes=cutover_result.applied_changes,
                 validation_report=validation_report,
+                details={"schema_evolution_diff": cutover_result.schema_evolution_diff},
             )
             response_failure = self._record_ledger(
                 transaction_id, "apply_migration_cutover", "response", result
@@ -493,7 +513,7 @@ class InProcessRtgController:
             if ledger_failures:
                 result = dataclasses.replace(
                     result,
-                    details=_with_ledger_degraded({}, ledger_failures),
+                    details=_with_ledger_degraded(result.details, ledger_failures),
                 )
             return result
 
@@ -1958,6 +1978,237 @@ class InProcessRtgController:
             ),
         )
 
+    def _assert_schema_evolution_ops_cover_schema_diff(
+        self,
+        plan: RtgMigrationCutoverPlan,
+    ) -> None:
+        for pair in self._schema_definition_pairs(plan):
+            if not (
+                isinstance(pair.old.payload, RtgDataObjectSchemaPayload)
+                and isinstance(pair.new.payload, RtgDataObjectSchemaPayload)
+            ):
+                continue
+            self._assert_property_ops_cover_pair(
+                pair,
+                pair.old.payload,
+                pair.new.payload,
+                plan.schema_evolution_ops,
+            )
+
+    def _schema_definition_pairs(
+        self,
+        plan: RtgMigrationCutoverPlan,
+    ) -> tuple[_SchemaDefinitionPair, ...]:
+        pairs: list[_SchemaDefinitionPair] = []
+        used_old: set[UUID] = set()
+        used_new: set[UUID] = set()
+        for replacement in plan.schema_replacements:
+            old = self._schema.get_definition(replacement.old_resource_id)
+            new = self._schema.get_definition(replacement.new_resource_id)
+            pairs.append(_SchemaDefinitionPair(old=old, new=new))
+            used_old.add(replacement.old_resource_id)
+            used_new.add(replacement.new_resource_id)
+
+        old_defs = [
+            self._schema.get_definition(uuid_value)
+            for uuid_value in plan.schema_make_non_live
+            if uuid_value not in used_old
+        ]
+        new_defs = [
+            self._schema.get_definition(uuid_value)
+            for uuid_value in plan.schema_make_live
+            if uuid_value not in used_new
+        ]
+        for old in old_defs:
+            matches = [
+                new for new in new_defs if new.kind == old.kind and new.type_key == old.type_key
+            ]
+            if len(matches) == 1:
+                pairs.append(_SchemaDefinitionPair(old=old, new=matches[0]))
+        return tuple(pairs)
+
+    def _assert_property_ops_cover_pair(
+        self,
+        pair: _SchemaDefinitionPair,
+        old_payload: RtgDataObjectSchemaPayload,
+        new_payload: RtgDataObjectSchemaPayload,
+        ops: tuple[RtgSchemaEvolutionOp, ...],
+    ) -> None:
+        old_properties = old_payload.properties
+        new_properties = new_payload.properties
+        property_ops = tuple(
+            op
+            for op in ops
+            if op.target_kind == "data_object" and op.target_type_key == pair.old.type_key
+        )
+        for key in old_properties.keys() - new_properties.keys():
+            if not any(
+                op.op_kind == "delete_property" and op.property_key == key for op in property_ops
+            ) and not any(
+                op.op_kind == "rename_property"
+                and op.property_key == key
+                and op.replacement_key in new_properties
+                for op in property_ops
+            ):
+                raise RtgControllerPreconditionFailed(
+                    f"unreviewed schema evolution op for property delete: {pair.old.type_key}.{key}"
+                )
+        for key in new_properties.keys() - old_properties.keys():
+            if not any(
+                op.op_kind == "add_property" and op.property_key == key for op in property_ops
+            ) and not any(
+                op.op_kind == "rename_property"
+                and op.replacement_key == key
+                and op.property_key in old_properties
+                for op in property_ops
+            ):
+                raise RtgControllerPreconditionFailed(
+                    f"unreviewed schema evolution op for property add: {pair.old.type_key}.{key}"
+                )
+        for key in old_properties.keys() & new_properties.keys():
+            if old_properties[key] != new_properties[key] and not any(
+                op.op_kind == "retype_property" and op.property_key == key for op in property_ops
+            ):
+                raise RtgControllerPreconditionFailed(
+                    f"unreviewed schema evolution op for property retype: {pair.old.type_key}.{key}"
+                )
+        for op in property_ops:
+            self._assert_property_op_matches_pair(op, old_properties, new_properties)
+
+    def _assert_property_op_matches_pair(
+        self,
+        op: RtgSchemaEvolutionOp,
+        old_properties: dict[str, RtgSchemaField],
+        new_properties: dict[str, RtgSchemaField],
+    ) -> None:
+        if op.op_kind == "add_property":
+            if op.property_key not in new_properties or op.property_key in old_properties:
+                raise RtgControllerPreconditionFailed(
+                    f"schema_evolution_ops contains non-diff add_property: {op.op_id}"
+                )
+        elif op.op_kind == "delete_property":
+            if op.property_key not in old_properties or op.property_key in new_properties:
+                raise RtgControllerPreconditionFailed(
+                    f"schema_evolution_ops contains non-diff delete_property: {op.op_id}"
+                )
+        elif op.op_kind == "retype_property":
+            if (
+                op.property_key not in old_properties
+                or op.property_key not in new_properties
+                or old_properties[op.property_key] == new_properties[op.property_key]
+            ):
+                raise RtgControllerPreconditionFailed(
+                    f"schema_evolution_ops contains non-diff retype_property: {op.op_id}"
+                )
+        elif op.op_kind == "rename_property":
+            if (
+                op.property_key not in old_properties
+                or op.property_key in new_properties
+                or op.replacement_key not in new_properties
+                or op.replacement_key in old_properties
+            ):
+                raise RtgControllerPreconditionFailed(
+                    f"schema_evolution_ops contains non-diff rename_property: {op.op_id}"
+                )
+
+    def _preview_graph_with_schema_evolution_data_effects(
+        self,
+        plan: RtgMigrationCutoverPlan,
+    ) -> RtgGraph:
+        if not plan.schema_evolution_ops:
+            return self._graph
+        graph_type = type(self._graph)
+        preview = graph_type.import_snapshot(self._graph.export_snapshot())
+        self._apply_schema_evolution_data_effects(plan, preview)
+        return preview
+
+    def _apply_schema_evolution_data_effects(
+        self,
+        plan: RtgMigrationCutoverPlan,
+        graph: RtgGraph,
+    ) -> JsonObject:
+        op_results: list[JsonObject] = []
+        affected_total = 0
+        for op in plan.schema_evolution_ops:
+            affected_count = 0
+            mutation_state = "no_data_effect"
+            if op.op_kind == "rename_property":
+                affected_count = self._rename_data_property(graph, op)
+                mutation_state = "applied"
+            elif op.op_kind == "delete_property":
+                affected_count = self._delete_data_property(graph, op)
+                mutation_state = "applied"
+            affected_total += affected_count
+            op_results.append(
+                {
+                    "op_id": op.op_id,
+                    "op_kind": op.op_kind,
+                    "target_kind": op.target_kind,
+                    "target_type_key": op.target_type_key,
+                    "property_key": op.property_key,
+                    "replacement_key": op.replacement_key,
+                    "data_implication": op.data_implication,
+                    "affected_count": affected_count,
+                    "mutation_state": mutation_state,
+                }
+            )
+        return cast(
+            JsonObject,
+            {
+                "op_count": len(op_results),
+                "affected_count": affected_total,
+                "ops": op_results,
+            },
+        )
+
+    def _rename_data_property(self, graph: RtgGraph, op: RtgSchemaEvolutionOp) -> int:
+        if not op.property_key or not op.replacement_key:
+            raise RtgControllerPreconditionFailed(
+                "rename_property requires property_key and replacement_key"
+            )
+        affected = 0
+        for obj in graph.list_by_type(op.target_type_key).objects:
+            if not isinstance(obj, RtgDataObject) or not _system_live(obj.system):
+                continue
+            if op.property_key not in obj.properties:
+                continue
+            if op.replacement_key in obj.properties and op.replacement_key != op.property_key:
+                raise RtgControllerPreconditionFailed(
+                    f"replacement_key already exists: {op.replacement_key}"
+                )
+            properties = dict(obj.properties)
+            properties[op.replacement_key] = properties.pop(op.property_key)
+            self._put_data_object_preserving_anchors(graph, obj, properties)
+            affected += 1
+        return affected
+
+    def _delete_data_property(self, graph: RtgGraph, op: RtgSchemaEvolutionOp) -> int:
+        if not op.property_key:
+            raise RtgControllerPreconditionFailed("delete_property requires property_key")
+        affected = 0
+        for obj in graph.list_by_type(op.target_type_key).objects:
+            if not isinstance(obj, RtgDataObject) or not _system_live(obj.system):
+                continue
+            if op.property_key not in obj.properties:
+                continue
+            properties = dict(obj.properties)
+            properties.pop(op.property_key)
+            self._put_data_object_preserving_anchors(graph, obj, properties)
+            affected += 1
+        return affected
+
+    def _put_data_object_preserving_anchors(
+        self,
+        graph: RtgGraph,
+        obj: RtgDataObject,
+        properties: JsonObject,
+    ) -> None:
+        data_uuid = _record_uuid(obj)
+        anchor_uuids = tuple(
+            _record_uuid(anchor) for anchor in graph.list_data_anchors(data_uuid).anchors
+        )
+        graph.put_data_object(dataclasses.replace(obj, properties=properties), anchor_uuids)
+
     def _apply_cutover_plan(
         self,
         plan: RtgMigrationCutoverPlan,
@@ -1966,7 +2217,8 @@ class InProcessRtgController:
         options: RtgControllerCutoverOptions,
         validate_actual_post_state: bool,
         transaction_id: UUID | None,
-    ) -> RtgControllerAppliedChanges:
+    ) -> _CutoverApplyResult:
+        schema_evolution_diff = self._apply_schema_evolution_data_effects(plan, self._graph)
         self._apply_registry_live_flips(plan.schema_make_non_live, False, "schema")
         self._apply_registry_live_flips(plan.schema_make_live, True, "schema")
         self._apply_registry_live_flips(plan.constraint_make_non_live, False, "constraint")
@@ -2007,14 +2259,19 @@ class InProcessRtgController:
             if _migration_exists(self._migration, migration_id):
                 self._migration.delete_migration(migration_id)
                 deleted += 1
-        return RtgControllerAppliedChanges(
-            deletes=deleted,
-            live_status_changes=len(plan.schema_make_live)
-            + len(plan.schema_make_non_live)
-            + len(plan.constraint_make_live)
-            + len(plan.constraint_make_non_live)
-            + len(plan.graph_make_live)
-            + len(plan.graph_make_non_live),
+        affected_count = int(cast(int, schema_evolution_diff["affected_count"]))
+        return _CutoverApplyResult(
+            applied_changes=RtgControllerAppliedChanges(
+                graph_writes=affected_count,
+                deletes=deleted,
+                live_status_changes=len(plan.schema_make_live)
+                + len(plan.schema_make_non_live)
+                + len(plan.constraint_make_live)
+                + len(plan.constraint_make_non_live)
+                + len(plan.graph_make_live)
+                + len(plan.graph_make_non_live),
+            ),
+            schema_evolution_diff=schema_evolution_diff,
         )
 
     def _apply_cutover_without_ledger(
@@ -2032,7 +2289,7 @@ class InProcessRtgController:
                 options=options,
                 validate_actual_post_state=False,
                 transaction_id=None,
-            )
+            ).applied_changes
         except Exception:
             self._replace_state_from_snapshot(pre_snapshot, validate_semantics=False)
             raise
@@ -3241,8 +3498,7 @@ def _schema_definition_from_json(value: object) -> RtgSchemaDefinition:
         payload=payload,
         time_shape=str(data["time_shape"]) if data.get("time_shape") is not None else None,
         identity_criteria=tuple(
-            _identity_criterion_from_json(item)
-            for item in _list(data.get("identity_criteria", []))
+            _identity_criterion_from_json(item) for item in _list(data.get("identity_criteria", []))
         ),
         system=_json_object(data.get("system", {})),
     )
@@ -3341,6 +3597,10 @@ def _migration_record_from_json(value: object) -> RtgMigrationRecord:
             _schema_time_shape_retrofit_from_json(item)
             for item in _list(data.get("schema_time_shape_retrofits", []))
         ),
+        schema_evolution_ops=tuple(
+            _schema_evolution_op_from_json(item)
+            for item in _list(data.get("schema_evolution_ops", []))
+        ),
         evidence=tuple(
             _migration_evidence_from_json(item) for item in _list(data.get("evidence", []))
         ),
@@ -3361,6 +3621,28 @@ def _schema_time_shape_retrofit_from_json(value: object) -> RtgSchemaTimeShapeRe
     return RtgSchemaTimeShapeRetrofit(
         definition_uuid=UUID(str(data["definition_uuid"])),
         time_shape=str(data["time_shape"]) if data.get("time_shape") is not None else None,
+    )
+
+
+def _schema_evolution_op_from_json(value: object) -> RtgSchemaEvolutionOp:
+    data = _object(value)
+    return RtgSchemaEvolutionOp(
+        op_id=str(data["op_id"]),
+        op_kind=str(data["op_kind"]),
+        target_kind=str(data["target_kind"]),
+        target_type_key=str(data["target_type_key"]),
+        data_implication=str(data["data_implication"]),
+        property_key=str(data["property_key"]) if data.get("property_key") is not None else None,
+        replacement_key=(
+            str(data["replacement_key"]) if data.get("replacement_key") is not None else None
+        ),
+        replacement_field=(
+            _json_object(data["replacement_field"])
+            if data.get("replacement_field") is not None
+            else None
+        ),
+        source_definition_uuid=_optional_uuid_from_json(data.get("source_definition_uuid")),
+        candidate_definition_uuid=_optional_uuid_from_json(data.get("candidate_definition_uuid")),
     )
 
 

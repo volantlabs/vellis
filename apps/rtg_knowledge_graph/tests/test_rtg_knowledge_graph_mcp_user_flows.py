@@ -583,8 +583,8 @@ def test_individual_rtg_mcp_suite_recovers_from_realistic_agent_mistakes(
             {"migration_id": migration_uuid},
         )
         assert failed_cutover["ok"] is False
-        assert failed_cutover["error"]["type"] == "RtgControllerValidationFailed"
-        assert _finding_codes(failed_cutover) >= {"schema_object.missing_required_property"}
+        assert failed_cutover["error"]["type"] == "RtgControllerPreconditionFailed"
+        assert "unreviewed schema evolution op" in failed_cutover["error"]["message"]
 
         current_project_facts_uuid = await _schema_uuid_for_data_type(
             session,

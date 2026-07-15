@@ -24,6 +24,7 @@ from components.rtg.migration.protocol import (
     RtgMigrationSnapshotInvalid,
     RtgMigrationStatusInvalid,
     RtgMigrationStatusTransitionInvalid,
+    RtgSchemaEvolutionOp,
     RtgSchemaTimeShapeRetrofit,
     UuidInput,
 )
@@ -52,6 +53,7 @@ __all__ = [
     "RtgMigrationSnapshotInvalid",
     "RtgMigrationStatusInvalid",
     "RtgMigrationStatusTransitionInvalid",
+    "RtgSchemaEvolutionOp",
     "RtgSchemaTimeShapeRetrofit",
     "UuidInput",
 ]

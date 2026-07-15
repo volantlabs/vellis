@@ -45,6 +45,8 @@ from components.rtg.migration import (
     RtgMigrationRecord,
     RtgMigrationReplacement,
     RtgMigrationSnapshot,
+    RtgSchemaEvolutionOp,
+    RtgSchemaTimeShapeRetrofit,
 )
 from components.rtg.query import (
     RtgQueryAggregation,
@@ -505,9 +507,7 @@ def decode_schema_definition(value: object) -> RtgSchemaDefinition:
                 payload.get("allowed_target_types", []),
                 "schema_definition.payload.allowed_target_types",
             ),
-            link_kind=(
-                str(payload["link_kind"]) if payload.get("link_kind") is not None else None
-            ),
+            link_kind=(str(payload["link_kind"]) if payload.get("link_kind") is not None else None),
         )
     else:
         raise RtgMcpInputInvalid(f"unsupported schema definition kind: {kind}")
@@ -656,6 +656,8 @@ def decode_migration_record(value: object) -> RtgMigrationRecord:
             "schema_replacements",
             "constraint_replacements",
             "graph_replacements",
+            "schema_time_shape_retrofits",
+            "schema_evolution_ops",
             "evidence",
             "metadata",
         },
@@ -700,6 +702,13 @@ def decode_migration_record(value: object) -> RtgMigrationRecord:
         graph_replacements=tuple(
             decode_migration_replacement(item) for item in _list(data.get("graph_replacements", []))
         ),
+        schema_time_shape_retrofits=tuple(
+            decode_schema_time_shape_retrofit(item)
+            for item in _list(data.get("schema_time_shape_retrofits", []))
+        ),
+        schema_evolution_ops=tuple(
+            decode_schema_evolution_op(item) for item in _list(data.get("schema_evolution_ops", []))
+        ),
         evidence=tuple(decode_migration_evidence(item) for item in _list(data.get("evidence", []))),
         metadata=_json_object(data.get("metadata", {}), "migration_record.metadata"),
     )
@@ -716,6 +725,62 @@ def decode_migration_replacement(value: object) -> RtgMigrationReplacement:
     return RtgMigrationReplacement(
         old_resource_id=_required_uuid(data, "old_resource_id"),
         new_resource_id=_required_uuid(data, "new_resource_id"),
+    )
+
+
+def decode_schema_time_shape_retrofit(value: object) -> RtgSchemaTimeShapeRetrofit:
+    data = _object(value, "schema_time_shape_retrofit")
+    _reject_unknown_keys(
+        data,
+        {"definition_uuid", "time_shape"},
+        "schema_time_shape_retrofit",
+    )
+    return RtgSchemaTimeShapeRetrofit(
+        definition_uuid=_required_uuid(data, "definition_uuid"),
+        time_shape=_optional_str(data.get("time_shape")),
+    )
+
+
+def decode_schema_evolution_op(value: object) -> RtgSchemaEvolutionOp:
+    data = _object(value, "schema_evolution_op")
+    _reject_unknown_keys(
+        data,
+        {
+            "op_id",
+            "op_kind",
+            "target_kind",
+            "target_type_key",
+            "property_key",
+            "replacement_key",
+            "replacement_field",
+            "source_definition_uuid",
+            "candidate_definition_uuid",
+            "data_implication",
+        },
+        "schema_evolution_op",
+    )
+    replacement_field = data.get("replacement_field")
+    return RtgSchemaEvolutionOp(
+        op_id=_required_str(data, "op_id"),
+        op_kind=_required_str(data, "op_kind"),
+        target_kind=_required_str(data, "target_kind"),
+        target_type_key=_required_str(data, "target_type_key"),
+        property_key=_optional_str(data.get("property_key")),
+        replacement_key=_optional_str(data.get("replacement_key")),
+        replacement_field=(
+            _json_object(replacement_field, "schema_evolution_op.replacement_field")
+            if replacement_field is not None
+            else None
+        ),
+        source_definition_uuid=_optional_uuid(
+            data.get("source_definition_uuid"),
+            "schema_evolution_op.source_definition_uuid",
+        ),
+        candidate_definition_uuid=_optional_uuid(
+            data.get("candidate_definition_uuid"),
+            "schema_evolution_op.candidate_definition_uuid",
+        ),
+        data_implication=_required_str(data, "data_implication"),
     )
 
 

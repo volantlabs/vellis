@@ -26,10 +26,11 @@ Status vocabulary matches the research program: `open | in_progress | done | kil
 ordinary file edit. This is an engineering program, not a research program — items produce spec
 amendments, contract tests, and implementation, not RR reports.
 
-Post-merge harmonization checkpoint (2026-07-14): KM-2 through KM-4 now conform to the
+Post-merge harmonization checkpoint (2026-07-14): KM-2 through KM-5 now conform to the
 SysML-owned component tree, including MCP codecs, generated starter ontology, federation legacy
-snapshot backfill, repo-twin schema, and schema-domain readiness. `just check` passed with 567
-tests. KM-5 and KM-6 remain the next kernel harmonization tranche.
+snapshot backfill, repo-twin schema, schema-domain readiness, reviewed schema-evolution operation
+storage, diff-scoped cutover, kernel-sequenced property rename/delete effects, and replayable per-op
+evidence. `just check` passed with 574 tests. KM-6 is the next kernel harmonization tranche.
 
 ## The per-item loop
 
@@ -235,6 +236,10 @@ Surprises:
   replacement schema before the kernel-sequenced rewrite can run.
 - Existing MCP recovery coverage now treats a property schema diff without reviewed
   `schema_evolution_ops` as a controller precondition failure rather than a validation failure.
+
+Post-merge harmonization evidence (2026-07-14): the accepted migration, schema, and controller
+SysML contracts now own the KM-5 vocabulary and cutover obligations; generated projections and MCP
+input codecs include the operation records; and `just check` passed with 574 tests.
 
 ### KM-6 — Writes declare merge-vs-replace and ride optimistic concurrency
 

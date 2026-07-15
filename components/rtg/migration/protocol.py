@@ -32,6 +32,20 @@ class RtgSchemaTimeShapeRetrofit:
 
 
 @dataclass(frozen=True, slots=True)
+class RtgSchemaEvolutionOp:
+    op_id: str
+    op_kind: str
+    target_kind: str
+    target_type_key: str
+    data_implication: str
+    property_key: str | None = None
+    replacement_key: str | None = None
+    replacement_field: JsonObject | None = None
+    source_definition_uuid: UUID | None = None
+    candidate_definition_uuid: UUID | None = None
+
+
+@dataclass(frozen=True, slots=True)
 class RtgMigrationRecord:
     migration_id: str | None
     description: str
@@ -46,6 +60,7 @@ class RtgMigrationRecord:
     constraint_replacements: tuple[RtgMigrationReplacement, ...] = ()
     graph_replacements: tuple[RtgMigrationReplacement, ...] = ()
     schema_time_shape_retrofits: tuple[RtgSchemaTimeShapeRetrofit, ...] = ()
+    schema_evolution_ops: tuple[RtgSchemaEvolutionOp, ...] = ()
     evidence: tuple[RtgMigrationEvidence, ...] = ()
     metadata: JsonObject = field(default_factory=dict)
 
@@ -78,6 +93,7 @@ class RtgMigrationCutoverPlan:
     constraint_replacements: tuple[RtgMigrationReplacement, ...]
     graph_replacements: tuple[RtgMigrationReplacement, ...]
     schema_time_shape_retrofits: tuple[RtgSchemaTimeShapeRetrofit, ...]
+    schema_evolution_ops: tuple[RtgSchemaEvolutionOp, ...]
 
     @classmethod
     def from_migration(cls, migration: RtgMigrationRecord) -> RtgMigrationCutoverPlan:
@@ -95,6 +111,7 @@ class RtgMigrationCutoverPlan:
             constraint_replacements=migration.constraint_replacements,
             graph_replacements=migration.graph_replacements,
             schema_time_shape_retrofits=migration.schema_time_shape_retrofits,
+            schema_evolution_ops=migration.schema_evolution_ops,
         )
 
 

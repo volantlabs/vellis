@@ -972,12 +972,19 @@
         "components/rtg/controller/tests/test_rtg_controller_contract.py::test_replay_decodes_ledgered_schema_fields_with_null_items",
         "components/rtg/controller/tests/test_rtg_controller_contract.py::test_failed_strict_cutover_status_is_replayable",
         "components/rtg/controller/tests/test_rtg_controller_contract.py::test_migration_history_is_reconstructed_from_ledger",
-        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_cutover_post_state_failure_restores_pre_cutover_state"
+        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_cutover_post_state_failure_restores_pre_cutover_state",
+        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_schema_evolution_rename_property_rewrites_live_data_and_replays",
+        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_schema_evolution_delete_property_strips_live_data_with_ledger_evidence",
+        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_cutover_rejects_injected_unstaged_schema_evolution_ops",
+        "components/rtg/controller/tests/test_rtg_controller_contract.py::test_cutover_rejects_unreviewed_schema_property_diff"
       ],
       "model_source": "model/bibliotek/components/component.rtg.controller.sysml",
       "requirements": [
         "contract.rtg.controller.cutover_flow",
         "contract.rtg.controller.cutover_sequence",
+        "invariant.rtg.controller.schema_evolution_cutover_is_diff_scoped",
+        "invariant.rtg.controller.schema_evolution_data_effects_are_kernel_sequenced",
+        "invariant.rtg.controller.schema_evolution_ops_are_per_op_reported",
         "contract.rtg.controller.apply_migration_cutover.failures"
       ],
       "status": "resolved",
@@ -2710,7 +2717,8 @@
     {
       "evidence_id": "components/rtg/migration/tests/test_rtg_migration_contract.py#BuildMigrationCutoverPlanContractVerification",
       "evidence_nodes": [
-        "components/rtg/migration/tests/test_rtg_migration_contract.py::test_migration_tracks_cutover_membership_and_evidence"
+        "components/rtg/migration/tests/test_rtg_migration_contract.py::test_migration_tracks_cutover_membership_and_evidence",
+        "components/rtg/migration/tests/test_rtg_migration_contract.py::test_schema_evolution_ops_round_trip_and_enter_cutover_plan"
       ],
       "model_source": "model/bibliotek/components/component.rtg.migration.sysml",
       "requirements": [
@@ -2838,12 +2846,15 @@
         "components/rtg/migration/tests/test_rtg_migration_contract.py::test_migration_replacement_obeys_lifecycle_and_has_no_effect_on_rejection",
         "components/rtg/migration/tests/test_rtg_migration_contract.py::test_migration_status_metadata_is_replaced_even_when_empty_or_same_status",
         "components/rtg/migration/tests/test_rtg_migration_contract.py::test_migration_membership_is_unique_consistent_and_canonical",
-        "components/rtg/migration/tests/test_rtg_migration_contract.py::test_migration_cutover_sets_must_be_disjoint"
+        "components/rtg/migration/tests/test_rtg_migration_contract.py::test_migration_cutover_sets_must_be_disjoint",
+        "components/rtg/migration/tests/test_rtg_migration_contract.py::test_schema_evolution_ops_round_trip_and_enter_cutover_plan",
+        "components/rtg/migration/tests/test_rtg_migration_contract.py::test_malformed_schema_evolution_op_names_field_and_leaves_no_trace"
       ],
       "model_source": "model/bibliotek/components/component.rtg.migration.sysml",
       "requirements": [
         "contract.rtg.migration.put_effect",
         "contract.rtg.migration.membership",
+        "invariant.rtg.migration.schema_evolution_ops_closed",
         "contract.rtg.migration.put_migration.failures"
       ],
       "status": "resolved",
@@ -2863,7 +2874,9 @@
         "components/rtg/migration/tests/test_rtg_migration_contract.py::test_migration_membership_is_unique_consistent_and_canonical",
         "components/rtg/migration/tests/test_rtg_migration_contract.py::test_migration_snapshot_import_rejects_duplicate_and_malformed_records_atomically",
         "components/rtg/migration/tests/test_rtg_migration_contract.py::test_migration_snapshot_accepts_independent_terminal_records",
-        "components/rtg/migration/tests/test_rtg_migration_contract.py::test_migration_cutover_sets_must_be_disjoint"
+        "components/rtg/migration/tests/test_rtg_migration_contract.py::test_migration_cutover_sets_must_be_disjoint",
+        "components/rtg/migration/tests/test_rtg_migration_contract.py::test_schema_evolution_ops_round_trip_and_enter_cutover_plan",
+        "components/rtg/migration/tests/test_rtg_migration_contract.py::test_malformed_schema_evolution_op_names_field_and_leaves_no_trace"
       ],
       "model_source": "model/bibliotek/components/component.rtg.migration.sysml",
       "requirements": [
@@ -2872,6 +2885,7 @@
         "invariant.rtg.migration.cutover_sets_disjoint",
         "invariant.rtg.migration.not_normal_crud",
         "invariant.rtg.migration.candidates_are_materialized_v1",
+        "invariant.rtg.migration.schema_evolution_ops_are_review_data",
         "invariant.rtg.migration.references_are_data",
         "invariant.rtg.migration.no_store_mutation",
         "invariant.rtg.migration.status_transition_controlled",
@@ -3335,6 +3349,8 @@
         "invariant.rtg.schema.native_payloads",
         "invariant.rtg.schema.no_inheritance_composition_v1",
         "invariant.rtg.schema.type_key_changes_are_migration_concerns",
+        "invariant.rtg.schema.schema_evolution_ops_external",
+        "invariant.rtg.schema.destructive_changes_are_migration_concerns",
         "invariant.rtg.schema.navigation_indexes_match_payloads",
         "invariant.rtg.schema.deterministic_list_ordering"
       ],
