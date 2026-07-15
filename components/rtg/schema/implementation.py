@@ -15,6 +15,7 @@ from components.rtg.schema.protocol import (
     JsonValue,
     RtgAnchorSchemaPayload,
     RtgDataObjectSchemaPayload,
+    RtgIdentityCriterion,
     RtgLinkSchemaPayload,
     RtgSchemaAnchorTypeSummary,
     RtgSchemaAnchorTypeSummaryList,
@@ -27,6 +28,9 @@ from components.rtg.schema.protocol import (
     RtgSchemaDeleteResult,
     RtgSchemaDirectionInvalid,
     RtgSchemaField,
+    RtgSchemaLinkKindRetrofitEntry,
+    RtgSchemaLinkKindRetrofitReport,
+    RtgSchemaLinkKindRetrofitResult,
     RtgSchemaLinkParticipation,
     RtgSchemaLinkParticipationList,
     RtgSchemaLiveTypeConflict,
@@ -46,6 +50,10 @@ _ANCHOR = "anchor"
 _DATA_OBJECT = "data_object"
 _LINK = "link"
 _KINDS = {_ANCHOR, _DATA_OBJECT, _LINK}
+_TIME_SHAPES = {"state_now", "state_as_of", "event"}
+_IDENTITY_MATCH_STRATEGIES = {"exact", "normalized", "composite"}
+_IDENTITY_SCOPES = {"same_type"}
+_LINK_KINDS = {"semantic", "structural", "governance", "provenance", "versioning", "junction"}
 _VALUE_KIND_ORDER = {
     kind: index
     for index, kind in enumerate(
@@ -54,6 +62,7 @@ _VALUE_KIND_ORDER = {
 }
 _VALUE_KINDS = set(_VALUE_KIND_ORDER)
 _DIRECTIONS = {"source", "target", "either"}
+_RESERVED_SYSTEM_FIELDS = {"created_at", "updated_at"}
 
 
 class InMemoryRtgSchema:
@@ -82,6 +91,47 @@ class InMemoryRtgSchema:
             seen_uuids.add(definition_uuid)
             schema.put_definition(definition)
         return schema
+
+    @classmethod
+    def retrofit_snapshot_link_kinds(
+        cls,
+        snapshot: RtgSchemaSnapshot,
+        default_kind: str,
+    ) -> RtgSchemaLinkKindRetrofitResult:
+        if default_kind != "semantic":
+            raise RtgSchemaPayloadInvalid("link_kind retrofit default must be semantic")
+        definitions: list[JsonObject] = []
+        defaulted: list[RtgSchemaLinkKindRetrofitEntry] = []
+        try:
+            for record in snapshot.definitions:
+                copied = copy.deepcopy(record)
+                if copied.get("kind") == _LINK:
+                    payload = copied.get("payload")
+                    if not isinstance(payload, dict):
+                        raise RtgSchemaSnapshotInvalid("payload must be object")
+                    existing = payload.get("link_kind")
+                    if existing is None:
+                        payload["link_kind"] = default_kind
+                        defaulted.append(
+                            RtgSchemaLinkKindRetrofitEntry(
+                                definition_uuid=_parse_uuid(str(copied["uuid"])),
+                                type_key=str(copied["type_key"]),
+                                link_kind=default_kind,
+                            )
+                        )
+                    elif existing not in _LINK_KINDS:
+                        raise RtgSchemaPayloadInvalid(f"invalid link_kind: {existing}")
+                definitions.append(copied)
+        except (KeyError, TypeError, ValueError, AttributeError) as error:
+            raise RtgSchemaSnapshotInvalid(str(error)) from error
+        return RtgSchemaLinkKindRetrofitResult(
+            snapshot=RtgSchemaSnapshot(definitions=tuple(definitions)),
+            report=RtgSchemaLinkKindRetrofitReport(
+                defaulted_link_definitions=tuple(
+                    sorted(defaulted, key=lambda item: str(item.definition_uuid))
+                )
+            ),
+        )
 
     def export_snapshot(self) -> RtgSchemaSnapshot:
         return RtgSchemaSnapshot(
@@ -251,14 +301,22 @@ class InMemoryRtgSchema:
     def _normalize_definition(self, definition: RtgSchemaDefinition) -> RtgSchemaDefinition:
         kind = _validate_kind(definition.kind)
         payload = _validate_payload(kind, definition.payload)
+        type_key = _validate_type_key(definition.type_key)
+        description = _validate_description(definition.description)
+        time_shape = _validate_time_shape(kind, definition.time_shape, payload)
+        identity_criteria = _validate_identity_criteria(
+            kind, payload, definition.identity_criteria
+        )
         return RtgSchemaDefinition(
             uuid=_parse_uuid(definition.uuid)
             if definition.uuid is not None
             else self._generate_uuid(),
             kind=kind,
-            type_key=_validate_type_key(definition.type_key),
-            description=_validate_description(definition.description),
+            type_key=type_key,
+            description=description,
             payload=payload,
+            time_shape=time_shape,
+            identity_criteria=identity_criteria,
             system=_normalize_system(definition.system),
         )
 
@@ -349,11 +407,17 @@ def _validate_payload(kind: str, payload: RtgSchemaPayload) -> RtgSchemaPayload:
         for name, field in payload.properties.items():
             if not isinstance(name, str) or not name:
                 raise RtgSchemaPayloadInvalid("property names must be non-empty strings")
+            if name in _RESERVED_SYSTEM_FIELDS:
+                raise RtgSchemaPayloadInvalid(
+                    f"{name} is kernel-owned; model domain time with ordinary properties"
+                )
             properties[name] = _normalize_field(field)
         return RtgDataObjectSchemaPayload(
             properties={name: properties[name] for name in sorted(properties)}
         )
     if kind == _LINK and isinstance(payload, RtgLinkSchemaPayload):
+        if payload.link_kind not in _LINK_KINDS:
+            raise RtgSchemaPayloadInvalid(f"invalid link_kind: {payload.link_kind}")
         return RtgLinkSchemaPayload(
             allowed_source_types=_normalize_type_key_set(
                 payload.allowed_source_types, "allowed_source_types", nonempty=True
@@ -361,6 +425,7 @@ def _validate_payload(kind: str, payload: RtgSchemaPayload) -> RtgSchemaPayload:
             allowed_target_types=_normalize_type_key_set(
                 payload.allowed_target_types, "allowed_target_types", nonempty=True
             ),
+            link_kind=payload.link_kind,
         )
     raise RtgSchemaDefinitionInvalid(f"payload does not match schema kind {kind!r}")
 
@@ -375,6 +440,104 @@ def _normalize_type_key_set(
     if len(set(normalized)) != len(normalized):
         raise RtgSchemaPayloadInvalid(f"{field_name} must contain unique type keys")
     return tuple(sorted(normalized))
+
+def _validate_time_shape(
+    kind: str,
+    time_shape: str | None,
+    payload: RtgSchemaPayload,
+) -> str | None:
+    if kind == _LINK:
+        if time_shape is not None:
+            raise RtgSchemaPayloadInvalid("link definitions must not declare time_shape")
+        return None
+    if time_shape is None:
+        raise RtgSchemaPayloadInvalid(f"{kind} definitions require time_shape")
+    if time_shape not in _TIME_SHAPES:
+        raise RtgSchemaPayloadInvalid(f"invalid time_shape: {time_shape}")
+    if time_shape == "state_as_of":
+        if kind != _DATA_OBJECT or not isinstance(payload, RtgDataObjectSchemaPayload):
+            raise RtgSchemaPayloadInvalid("state_as_of is supported for data_object definitions")
+        _validate_state_as_of_interval(payload)
+    return time_shape
+
+
+def _validate_identity_criteria(
+    kind: str,
+    payload: RtgSchemaPayload,
+    criteria: tuple[RtgIdentityCriterion, ...],
+) -> tuple[RtgIdentityCriterion, ...]:
+    if kind == _LINK:
+        if criteria:
+            raise RtgSchemaPayloadInvalid("link definitions must not declare identity_criteria")
+        return ()
+    seen_keys: set[str] = set()
+    normalized: list[RtgIdentityCriterion] = []
+    for criterion in criteria:
+        if (
+            not isinstance(criterion.criterion_key, str)
+            or not criterion.criterion_key
+            or criterion.criterion_key != criterion.criterion_key.strip()
+        ):
+            raise RtgSchemaPayloadInvalid("identity_criteria criterion_key must be non-empty")
+        if criterion.criterion_key in seen_keys:
+            raise RtgSchemaPayloadInvalid(
+                f"duplicate identity_criteria criterion_key: {criterion.criterion_key}"
+            )
+        seen_keys.add(criterion.criterion_key)
+        if not criterion.property_paths or not all(
+            isinstance(path, str) and path and path == path.strip()
+            for path in criterion.property_paths
+        ):
+            raise RtgSchemaPayloadInvalid(
+                "identity_criteria property_paths must contain non-empty paths"
+            )
+        if criterion.match_strategy not in _IDENTITY_MATCH_STRATEGIES:
+            raise RtgSchemaPayloadInvalid(
+                f"invalid identity_criteria match_strategy: {criterion.match_strategy}"
+            )
+        if criterion.scope not in _IDENTITY_SCOPES:
+            raise RtgSchemaPayloadInvalid(f"invalid identity_criteria scope: {criterion.scope}")
+        if kind == _ANCHOR:
+            for path in criterion.property_paths:
+                if path != "display_name":
+                    raise RtgSchemaPayloadInvalid(
+                        f"anchor identity_criteria path is not supported: {path}"
+                    )
+        elif isinstance(payload, RtgDataObjectSchemaPayload):
+            for path in criterion.property_paths:
+                if not _data_property_path_exists(payload, path):
+                    raise RtgSchemaPayloadInvalid(f"unknown identity_criteria path: {path}")
+        normalized.append(copy.deepcopy(criterion))
+    return tuple(normalized)
+
+
+def _data_property_path_exists(payload: RtgDataObjectSchemaPayload, path: str) -> bool:
+    if not path.startswith("properties."):
+        return False
+    parts = path.split(".")[1:]
+    fields = payload.properties
+    field: RtgSchemaField | None = None
+    for part in parts:
+        field = fields.get(part)
+        if field is None:
+            return False
+        fields = field.properties
+    return field is not None
+
+
+def _validate_state_as_of_interval(payload: RtgDataObjectSchemaPayload) -> None:
+    for key in ("valid_from", "valid_to"):
+        field = payload.properties.get(key)
+        if field is None:
+            raise RtgSchemaPayloadInvalid(f"state_as_of requires {key}")
+        if (
+            not field.required
+            or "string" not in field.value_kinds
+            or field.format != "date_time"
+        ):
+            raise RtgSchemaPayloadInvalid(
+                f"state_as_of requires required date_time-formatted string {key}"
+            )
 
 
 def _normalize_field(field: RtgSchemaField) -> RtgSchemaField:
@@ -635,6 +798,7 @@ def _payload_to_json(payload: RtgSchemaPayload) -> JsonObject:
     return {
         "allowed_source_types": list(payload.allowed_source_types),
         "allowed_target_types": list(payload.allowed_target_types),
+        "link_kind": payload.link_kind,
     }
 
 
@@ -659,7 +823,7 @@ def _payload_from_json(kind: str, value: JsonValue) -> RtgSchemaPayload:
         return RtgDataObjectSchemaPayload(
             properties={str(key): _field_from_json(item) for key, item in properties.items()}
         )
-    _reject_payload_keys(value, {"allowed_source_types", "allowed_target_types"})
+    _reject_payload_keys(value, {"allowed_source_types", "allowed_target_types", "link_kind"})
     return RtgLinkSchemaPayload(
         allowed_source_types=_string_tuple(
             value.get("allowed_source_types", []), "allowed_source_types"
@@ -667,6 +831,7 @@ def _payload_from_json(kind: str, value: JsonValue) -> RtgSchemaPayload:
         allowed_target_types=_string_tuple(
             value.get("allowed_target_types", []), "allowed_target_types"
         ),
+        link_kind=cast(str | None, value.get("link_kind")),
     )
 
 
@@ -674,6 +839,26 @@ def _reject_payload_keys(value: JsonObject, allowed: set[str]) -> None:
     unknown = set(value).difference(allowed)
     if unknown:
         raise RtgSchemaPayloadInvalid(f"unknown payload keys: {sorted(unknown)}")
+
+
+def _identity_criterion_to_json(criterion: RtgIdentityCriterion) -> JsonObject:
+    return {
+        "criterion_key": criterion.criterion_key,
+        "property_paths": list(criterion.property_paths),
+        "match_strategy": criterion.match_strategy,
+        "scope": criterion.scope,
+    }
+
+
+def _identity_criterion_from_json(value: JsonValue) -> RtgIdentityCriterion:
+    if not isinstance(value, dict):
+        raise RtgSchemaSnapshotInvalid("identity criterion must be object")
+    return RtgIdentityCriterion(
+        criterion_key=str(value.get("criterion_key", "")),
+        property_paths=_string_tuple(value.get("property_paths", []), "property_paths"),
+        match_strategy=str(value.get("match_strategy", "")),
+        scope=str(value.get("scope", "")),
+    )
 
 
 def _string_tuple(value: object, field_name: str) -> tuple[str, ...]:
@@ -685,7 +870,7 @@ def _string_tuple(value: object, field_name: str) -> tuple[str, ...]:
 
 
 def _definition_to_json(definition: RtgSchemaDefinition) -> JsonObject:
-    return {
+    result: JsonObject = {
         "uuid": str(_definition_uuid(definition)),
         "kind": definition.kind,
         "type_key": definition.type_key,
@@ -693,6 +878,13 @@ def _definition_to_json(definition: RtgSchemaDefinition) -> JsonObject:
         "payload": _payload_to_json(definition.payload),
         "system": copy.deepcopy(definition.system),
     }
+    if definition.time_shape is not None:
+        result["time_shape"] = definition.time_shape
+    if definition.identity_criteria:
+        result["identity_criteria"] = [
+            _identity_criterion_to_json(item) for item in definition.identity_criteria
+        ]
+    return result
 
 
 def _definition_from_json(value: object) -> RtgSchemaDefinition:
@@ -700,7 +892,7 @@ def _definition_from_json(value: object) -> RtgSchemaDefinition:
         raise RtgSchemaSnapshotInvalid("snapshot definitions must be objects")
     required_keys = {"uuid", "kind", "type_key", "description", "payload"}
     missing = required_keys.difference(value)
-    unknown = set(value).difference(required_keys | {"system"})
+    unknown = set(value).difference(required_keys | {"system", "time_shape", "identity_criteria"})
     if missing or unknown:
         raise RtgSchemaSnapshotInvalid(
             f"definition keys invalid; missing={sorted(missing)}, unknown={sorted(unknown)}"
@@ -721,12 +913,19 @@ def _definition_from_json(value: object) -> RtgSchemaDefinition:
     system = value.get("system", {})
     if not isinstance(system, dict):
         raise RtgSchemaSystemValueInvalid("system must be an object")
+    identity_criteria = value.get("identity_criteria", [])
+    if not isinstance(identity_criteria, list):
+        raise RtgSchemaSnapshotInvalid("identity_criteria must be a list")
     return RtgSchemaDefinition(
         uuid=_parse_uuid(uuid_text),
         kind=kind,
         type_key=type_key,
         description=description,
         payload=_payload_from_json(kind, value["payload"]),
+        time_shape=str(value["time_shape"]) if value.get("time_shape") is not None else None,
+        identity_criteria=tuple(
+            _identity_criterion_from_json(item) for item in identity_criteria
+        ),
         system=system,
     )
 

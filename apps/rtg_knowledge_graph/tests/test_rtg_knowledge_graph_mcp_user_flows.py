@@ -1473,6 +1473,7 @@ def _anchor_schema(
         "type_key": type_key,
         "description": description,
         "payload": {"required_data_types": [required_data_type]},
+        "time_shape": "state_now",
         "system": {"live": False},
     }
 
@@ -1489,6 +1490,7 @@ def _data_schema(
         "type_key": type_key,
         "description": description,
         "payload": {"properties": properties},
+        "time_shape": "state_now",
         "system": {"live": False},
     }
 
@@ -1508,6 +1510,7 @@ def _link_schema(
         "payload": {
             "allowed_source_types": allowed_source_types,
             "allowed_target_types": allowed_target_types,
+            "link_kind": "semantic",
         },
         "system": {"live": False},
     }

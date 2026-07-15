@@ -3,7 +3,7 @@ from __future__ import annotations
 import dataclasses
 import json
 from datetime import date, datetime
-from typing import Any, cast
+from typing import Any, TypeGuard, cast
 from urllib.parse import urlparse
 from uuid import UUID
 
@@ -19,6 +19,7 @@ from components.rtg.change_validation.protocol import (
     RtgGraphDataObjectWrite,
     RtgGraphLinkWrite,
     RtgGraphLiveStatusChange,
+    RtgIdentityOverride,
     RtgLiveStatusChange,
     RtgSchemaChangeSet,
     RtgValidationFinding,
@@ -36,9 +37,11 @@ from components.rtg.constraints.protocol import (
 from components.rtg.diagnostics import rtg_diagnostic
 from components.rtg.graph.protocol import (
     JsonObject,
+    JsonValue,
     RtgAnchor,
     RtgDataObject,
     RtgGraph,
+    RtgGraphDeleteResult,
     RtgGraphError,
     RtgLink,
     RtgObject,
@@ -59,6 +62,7 @@ from components.rtg.query.protocol import (
 from components.rtg.schema.protocol import (
     RtgAnchorSchemaPayload,
     RtgDataObjectSchemaPayload,
+    RtgIdentityCriterion,
     RtgLinkSchemaPayload,
     RtgSchema,
     RtgSchemaDefinition,
@@ -67,8 +71,9 @@ from components.rtg.schema.protocol import (
     RtgSchemaField,
 )
 
-_TRACKS = {"schema_object", "constraint_network", "migration_cutover"}
+_TRACKS = {"schema_object", "merge_candidate", "constraint_network", "migration_cutover"}
 _SEVERITY_ORDER = {"blocking": 0, "warning": 1, "informational": 2}
+_LINK_KINDS = {"semantic", "structural", "governance", "provenance", "versioning", "junction"}
 
 
 class DeterministicRtgChangeValidator(RtgChangeValidator):
@@ -89,11 +94,31 @@ class DeterministicRtgChangeValidator(RtgChangeValidator):
         _validate_references(change_batch, tracks)
         findings: list[RtgValidationFinding] = []
         pre_projection_findings: list[RtgValidationFinding] = []
+        link_lifecycle_findings: list[RtgValidationFinding] = []
+        merge_candidate_findings: list[RtgValidationFinding] = []
         if "schema_object" in tracks:
+            pre_projection_findings.extend(_validate_schema_definition_writes(change_batch))
             pre_projection_findings.extend(_validate_graph_reference_closure(graph, change_batch))
+            pre_projection_findings.extend(_validate_kernel_system_field_writes(change_batch))
+            pre_projection_findings.extend(
+                _validate_event_data_object_writes(graph, schema, change_batch)
+            )
+            if not pre_projection_findings:
+                link_lifecycle_findings.extend(
+                    _validate_link_kind_delete_lifecycle(
+                        graph,
+                        schema,
+                        change_batch,
+                        migration_context=_has_migration_context(change_batch),
+                    )
+                )
         if pre_projection_findings:
             pre_projection_findings.extend(_validate_graph_writes(schema, change_batch))
             return _report(pre_projection_findings, options)
+        if "merge_candidate" in tracks:
+            merge_candidate_findings.extend(
+                _validate_identity_merge_candidates(graph, schema, change_batch)
+            )
         try:
             projected_graph, projected_schema, projected_constraints, projected_migration = (
                 _project_batch(graph, schema, constraints, migration, change_batch, tracks)
@@ -126,6 +151,8 @@ class DeterministicRtgChangeValidator(RtgChangeValidator):
                 )
             )
         findings.extend(post_state_findings)
+        findings.extend(merge_candidate_findings)
+        findings.extend(link_lifecycle_findings)
         if "migration_cutover" in tracks and migration is not None:
             if _has_cutover_projection(change_batch):
                 findings.extend(
@@ -398,6 +425,14 @@ def _project_migration_ids(
             migration,
             _change_batch_from_cutover_plans(tuple(plans)),
         )
+        projected_graph, projected_schema, projected_constraints, projected_migration = projected
+        _apply_schema_time_shape_retrofits(projected_schema, tuple(plans))
+        projected = (
+            projected_graph,
+            projected_schema,
+            projected_constraints,
+            projected_migration,
+        )
     except Exception as error:
         findings.append(
             _finding("migration_cutover", "migration_cutover.reference_missing", str(error))
@@ -579,6 +614,693 @@ def _validate_graph_reference_closure(
     return findings
 
 
+def _validate_schema_definition_writes(
+    change_batch: RtgChangeBatch,
+) -> list[RtgValidationFinding]:
+    findings: list[RtgValidationFinding] = []
+    for index, write in enumerate(change_batch.schema_changes.definition_writes):
+        definition = write.definition
+        if definition.kind != "link":
+            continue
+        payload = definition.payload
+        if not isinstance(payload, RtgLinkSchemaPayload):
+            continue
+        path = f"schema_changes.definition_writes[{index}].definition.payload"
+        link_kind = payload.link_kind
+        if link_kind is None:
+            findings.append(_link_kind_missing_finding(path, definition.type_key))
+        elif link_kind not in _LINK_KINDS:
+            findings.append(_link_kind_invalid_finding(path, definition.type_key, link_kind))
+    return findings
+
+
+def _validate_link_kind_delete_lifecycle(
+    graph: object,
+    schema: object,
+    change_batch: RtgChangeBatch,
+    *,
+    migration_context: bool,
+) -> list[RtgValidationFinding]:
+    _require_graph(graph)
+    _require_schema(schema)
+    graph = cast(RtgGraph, graph)
+    schema = cast(RtgSchema, schema)
+    findings: list[RtgValidationFinding] = []
+    for index, ref in enumerate(change_batch.graph_changes.delete_links):
+        link_uuid = _uuid_or_raise(ref)
+        try:
+            obj = graph.get_object(link_uuid)
+        except Exception:
+            continue
+        if not isinstance(obj, RtgLink):
+            continue
+        findings.extend(
+            _link_delete_lifecycle_findings(
+                schema,
+                RtgGraphDeleteResult(deleted_links=(obj,)),
+                f"graph_changes.delete_links[{index}]",
+                migration_context=migration_context,
+            )
+        )
+    for index, ref in enumerate(change_batch.graph_changes.delete_anchors):
+        try:
+            preview = graph.preview_delete_anchor(_uuid_or_raise(ref))
+        except Exception:
+            continue
+        findings.extend(
+            _link_delete_lifecycle_findings(
+                schema,
+                preview,
+                f"graph_changes.delete_anchors[{index}]",
+                migration_context=migration_context,
+            )
+        )
+    for index, ref in enumerate(change_batch.graph_changes.delete_data_objects):
+        try:
+            preview = graph.preview_delete_data_object(_uuid_or_raise(ref))
+        except Exception:
+            continue
+        findings.extend(
+            _link_delete_lifecycle_findings(
+                schema,
+                preview,
+                f"graph_changes.delete_data_objects[{index}]",
+                migration_context=migration_context,
+            )
+        )
+    for index, change in enumerate(change_batch.graph_changes.dissociate_data):
+        try:
+            preview = graph.preview_dissociate_data(
+                _uuid_or_raise(change.anchor_ref),
+                _uuid_or_raise(change.data_ref),
+            )
+        except Exception:
+            continue
+        findings.extend(
+            _link_delete_lifecycle_findings(
+                schema,
+                preview,
+                f"graph_changes.dissociate_data[{index}]",
+                migration_context=migration_context,
+            )
+        )
+    return findings
+
+
+def _link_delete_lifecycle_findings(
+    schema: RtgSchema,
+    preview: RtgGraphDeleteResult,
+    path: str,
+    *,
+    migration_context: bool,
+) -> list[RtgValidationFinding]:
+    if not preview.deleted_links:
+        return []
+    links_by_kind = _links_by_kind(schema, preview.deleted_links)
+    findings: list[RtgValidationFinding] = [
+        _delete_blast_radius_by_kind_finding(path, preview, links_by_kind)
+    ]
+    if not migration_context:
+        for link in preview.deleted_links:
+            if _link_kind(schema, link) == "provenance":
+                findings.append(_provenance_link_delete_rejected_finding(path, link))
+    return findings
+
+
+def _links_by_kind(
+    schema: RtgSchema,
+    links: tuple[RtgLink, ...],
+) -> dict[str, list[str]]:
+    grouped: dict[str, list[str]] = {}
+    for link in links:
+        grouped.setdefault(_link_kind(schema, link), []).append(str(_concrete_uuid(link.uuid)))
+    return {key: sorted(value) for key, value in sorted(grouped.items())}
+
+
+def _link_kind(schema: RtgSchema, link: RtgLink) -> str:
+    try:
+        definition = schema.list_definitions_by_type_key(
+            link.type, kind="link", live=True
+        ).definitions[0]
+    except (IndexError, RtgSchemaDefinitionNotFound):
+        return "unknown"
+    if not isinstance(definition.payload, RtgLinkSchemaPayload):
+        return "unknown"
+    return definition.payload.link_kind or "missing"
+
+
+def _has_migration_context(change_batch: RtgChangeBatch) -> bool:
+    return bool(
+        change_batch.migration_changes.migration_writes
+        or change_batch.migration_changes.delete_migrations
+        or change_batch.migration_changes.status_changes
+        or change_batch.migration_changes.evidence_additions
+    )
+
+
+_KERNEL_SYSTEM_FIELDS = {"created_at", "updated_at"}
+
+
+def _validate_kernel_system_field_writes(
+    change_batch: RtgChangeBatch,
+) -> list[RtgValidationFinding]:
+    findings: list[RtgValidationFinding] = []
+    for index, write in enumerate(change_batch.graph_changes.anchor_writes):
+        for field_name in sorted(set(write.system).intersection(_KERNEL_SYSTEM_FIELDS)):
+            findings.append(
+                _kernel_system_field_writable_finding(
+                    f"graph_changes.anchor_writes[{index}].system.{field_name}",
+                    field_name,
+                )
+            )
+    for index, write in enumerate(change_batch.graph_changes.data_object_writes):
+        for field_name in sorted(set(write.system).intersection(_KERNEL_SYSTEM_FIELDS)):
+            findings.append(
+                _kernel_system_field_writable_finding(
+                    f"graph_changes.data_object_writes[{index}].system.{field_name}",
+                    field_name,
+                )
+            )
+    return findings
+
+
+def _validate_event_data_object_writes(
+    graph: object,
+    schema: object,
+    change_batch: RtgChangeBatch,
+) -> list[RtgValidationFinding]:
+    _require_graph(graph)
+    _require_schema(schema)
+    graph = cast(RtgGraph, graph)
+    schema = cast(RtgSchema, schema)
+    findings: list[RtgValidationFinding] = []
+    for index, write in enumerate(change_batch.graph_changes.data_object_writes):
+        try:
+            definition = schema.list_definitions_by_type_key(
+                write.type, kind="data_object", live=True
+            ).definitions[0]
+        except (IndexError, RtgSchemaDefinitionNotFound):
+            continue
+        if definition.time_shape != "event":
+            continue
+        target_uuid = _reference_uuid_or_none(write.ref)
+        if target_uuid is None:
+            continue
+        try:
+            target = graph.get_object(target_uuid)
+        except Exception:
+            continue
+        if isinstance(target, RtgDataObject):
+            findings.append(_event_update_rejected_finding(index, target_uuid, write.type))
+    return findings
+
+
+def _validate_identity_merge_candidates(
+    graph: object,
+    schema: object,
+    change_batch: RtgChangeBatch,
+) -> list[RtgValidationFinding]:
+    _require_graph(graph)
+    _require_schema(schema)
+    graph = cast(RtgGraph, graph)
+    schema = cast(RtgSchema, schema)
+    findings: list[RtgValidationFinding] = []
+    for index, write in enumerate(change_batch.graph_changes.anchor_writes):
+        findings.extend(_validate_anchor_identity_merge_candidate(graph, schema, write, index))
+    for index, write in enumerate(change_batch.graph_changes.data_object_writes):
+        findings.extend(_validate_data_identity_merge_candidate(graph, schema, write, index))
+    return findings
+
+
+def _validate_anchor_identity_merge_candidate(
+    graph: RtgGraph,
+    schema: RtgSchema,
+    write: RtgGraphAnchorWrite,
+    index: int,
+) -> list[RtgValidationFinding]:
+    if _reference_resolves_to_existing_object(graph, write.ref):
+        return []
+    try:
+        definition = schema.list_definitions_by_type_key(
+            write.type, kind="anchor", live=True
+        ).definitions[0]
+    except (IndexError, RtgSchemaDefinitionNotFound):
+        return []
+    matches = _identity_matches_for_write(
+        graph,
+        definition.identity_criteria,
+        "anchor",
+        write.type,
+        {"display_name": write.display_name},
+        write.identity_override,
+        f"graph_changes.anchor_writes[{index}]",
+    )
+    return matches
+
+
+def _validate_data_identity_merge_candidate(
+    graph: RtgGraph,
+    schema: RtgSchema,
+    write: RtgGraphDataObjectWrite,
+    index: int,
+) -> list[RtgValidationFinding]:
+    if _reference_resolves_to_existing_object(graph, write.ref):
+        return []
+    try:
+        definition = schema.list_definitions_by_type_key(
+            write.type, kind="data_object", live=True
+        ).definitions[0]
+    except (IndexError, RtgSchemaDefinitionNotFound):
+        return []
+    matches = _identity_matches_for_write(
+        graph,
+        definition.identity_criteria,
+        "data_object",
+        write.type,
+        {"properties": write.properties},
+        write.identity_override,
+        f"graph_changes.data_object_writes[{index}]",
+    )
+    return matches
+
+
+def _identity_matches_for_write(
+    graph: RtgGraph,
+    criteria: tuple[RtgIdentityCriterion, ...],
+    object_kind: str,
+    type_key: str,
+    proposed: JsonObject,
+    override: RtgIdentityOverride | None,
+    path: str,
+) -> list[RtgValidationFinding]:
+    if not criteria:
+        return []
+    override_finding = _identity_override_invalid_finding(override, path)
+    if override_finding is not None:
+        return [override_finding]
+    existing = tuple(
+        obj
+        for obj in graph.list_by_type(type_key).objects
+        if _is_live_identity_object(obj, object_kind)
+    )
+    findings: list[RtgValidationFinding] = []
+    for criterion in criteria:
+        match_basis = _identity_basis(proposed, criterion)
+        if match_basis is None:
+            continue
+        candidate_uuids = sorted(
+            str(_concrete_uuid(candidate.uuid))
+            for candidate in existing
+            if _identity_basis(_object_identity_source(candidate), criterion) is not None
+            and _identity_values_match(
+                match_basis,
+                cast(
+                    dict[str, JsonValue],
+                    _identity_basis(_object_identity_source(candidate), criterion),
+                ),
+                criterion.match_strategy,
+            )
+        )
+        if not candidate_uuids:
+            continue
+        if _override_applies(override, criterion):
+            findings.append(
+                _identity_force_create_override_finding(
+                    path,
+                    type_key,
+                    criterion,
+                    candidate_uuids,
+                    match_basis,
+                    cast(RtgIdentityOverride, override),
+                )
+            )
+        else:
+            findings.append(
+                _identity_match_finding(
+                    path,
+                    type_key,
+                    criterion,
+                    candidate_uuids,
+                    match_basis,
+                )
+            )
+    return findings
+
+
+def _reference_resolves_to_existing_object(graph: RtgGraph, ref: RtgChangeReference) -> bool:
+    target_uuid = _reference_uuid_or_none(ref)
+    if target_uuid is None:
+        return False
+    try:
+        graph.get_object(target_uuid)
+    except Exception:
+        return False
+    return True
+
+
+def _is_live_identity_object(
+    obj: RtgObject,
+    object_kind: str,
+) -> TypeGuard[RtgAnchor | RtgDataObject]:
+    if object_kind == "anchor" and isinstance(obj, RtgAnchor):
+        return obj.system.get("live", True) is True
+    if object_kind == "data_object" and isinstance(obj, RtgDataObject):
+        return obj.system.get("live", True) is True
+    return False
+
+
+def _object_identity_source(obj: RtgObject) -> JsonObject:
+    if isinstance(obj, RtgAnchor):
+        return {"display_name": obj.display_name}
+    if isinstance(obj, RtgDataObject):
+        return {"properties": obj.properties}
+    return {}
+
+
+def _identity_basis(
+    source: JsonObject,
+    criterion: RtgIdentityCriterion,
+) -> dict[str, JsonValue] | None:
+    basis: dict[str, JsonValue] = {}
+    for property_path in criterion.property_paths:
+        found, value = _value_at_identity_path(source, property_path)
+        if not found or value is None:
+            return None
+        basis[property_path] = value
+    return basis
+
+
+def _value_at_identity_path(source: JsonObject, property_path: str) -> tuple[bool, JsonValue]:
+    value: JsonValue = source
+    for part in property_path.split("."):
+        if not isinstance(value, dict) or part not in value:
+            return False, None
+        value = value[part]
+    return True, value
+
+
+def _identity_values_match(
+    proposed: dict[str, JsonValue],
+    candidate: dict[str, JsonValue],
+    match_strategy: str,
+) -> bool:
+    if match_strategy == "normalized":
+        return {
+            key: _normalize_identity_value(value) for key, value in proposed.items()
+        } == {key: _normalize_identity_value(value) for key, value in candidate.items()}
+    if match_strategy == "composite":
+        return tuple(proposed.items()) == tuple(candidate.items())
+    return proposed == candidate
+
+
+def _normalize_identity_value(value: JsonValue) -> JsonValue:
+    if isinstance(value, str):
+        return " ".join(value.casefold().split())
+    return value
+
+
+def _identity_override_invalid_finding(
+    override: RtgIdentityOverride | None,
+    path: str,
+) -> RtgValidationFinding | None:
+    if override is None:
+        return None
+    if override.mode != "force_create":
+        return _finding(
+            "merge_candidate",
+            "merge_candidate.identity_override_invalid",
+            path,
+            diagnostic=rtg_diagnostic(
+                code="merge_candidate.identity_override_invalid",
+                category="validation_failure",
+                path=f"{path}.identity_override.mode",
+                problem="Identity override mode is not supported.",
+                remedy="Use mode='force_create' or remove the override.",
+                accepted_fields=("force_create",),
+                guide_topics=("workflow_patterns", "live_write"),
+            ),
+        )
+    if not isinstance(override.reason, str) or not override.reason.strip():
+        return _finding(
+            "merge_candidate",
+            "merge_candidate.identity_override_invalid",
+            path,
+            diagnostic=rtg_diagnostic(
+                code="merge_candidate.identity_override_invalid",
+                category="validation_failure",
+                path=f"{path}.identity_override.reason",
+                problem="Force-create identity overrides require a reason.",
+                remedy="Add a human-readable reason explaining why a distinct object is intended.",
+                guide_topics=("workflow_patterns", "live_write"),
+            ),
+        )
+    return None
+
+
+def _override_applies(
+    override: RtgIdentityOverride | None,
+    criterion: RtgIdentityCriterion,
+) -> bool:
+    if override is None or override.mode != "force_create":
+        return False
+    return not override.criterion_keys or criterion.criterion_key in override.criterion_keys
+
+
+def _identity_match_finding(
+    path: str,
+    type_key: str,
+    criterion: RtgIdentityCriterion,
+    candidate_uuids: list[str],
+    match_basis: dict[str, JsonValue],
+) -> RtgValidationFinding:
+    diagnostic = _identity_match_diagnostic(
+        "merge_candidate.identity_match",
+        path,
+        type_key,
+        criterion,
+        candidate_uuids,
+        match_basis,
+    )
+    return _finding(
+        "merge_candidate",
+        "merge_candidate.identity_match",
+        f"{path}:{criterion.criterion_key}",
+        suggestion=(
+            "Resolve the write to an existing UUID, abort it, or provide a force-create identity "
+            "override with a reason."
+        ),
+        diagnostic=diagnostic,
+    )
+
+
+def _identity_force_create_override_finding(
+    path: str,
+    type_key: str,
+    criterion: RtgIdentityCriterion,
+    candidate_uuids: list[str],
+    match_basis: dict[str, JsonValue],
+    override: RtgIdentityOverride,
+) -> RtgValidationFinding:
+    diagnostic = _identity_match_diagnostic(
+        "merge_candidate.force_create_override",
+        path,
+        type_key,
+        criterion,
+        candidate_uuids,
+        match_basis,
+    )
+    diagnostic["override_reason"] = override.reason
+    return _finding(
+        "merge_candidate",
+        "merge_candidate.force_create_override",
+        f"{path}:{criterion.criterion_key}",
+        suggestion="Force-create override supplied; keep the reason in the audit trail.",
+        diagnostic=diagnostic,
+    )
+
+
+def _identity_match_diagnostic(
+    code: str,
+    path: str,
+    type_key: str,
+    criterion: RtgIdentityCriterion,
+    candidate_uuids: list[str],
+    match_basis: dict[str, JsonValue],
+) -> JsonObject:
+    diagnostic = rtg_diagnostic(
+        code=code,
+        category="merge_candidate",
+        path=path,
+        problem="The proposed insert matches existing live object identity criteria.",
+        remedy=(
+            "Use the existing object UUID, abort the write, or force-create with a documented "
+            "override when a distinct object is intended."
+        ),
+        guide_topics=("workflow_patterns", "lookup_examples", "live_write"),
+    )
+    diagnostic["candidate_uuids"] = cast(JsonValue, candidate_uuids)
+    diagnostic["type_key"] = type_key
+    diagnostic["criterion_key"] = criterion.criterion_key
+    diagnostic["match_strategy"] = criterion.match_strategy
+    diagnostic["scope"] = criterion.scope
+    diagnostic["property_paths"] = cast(JsonValue, list(criterion.property_paths))
+    diagnostic["match_basis"] = cast(JsonValue, match_basis)
+    return diagnostic
+
+
+def _reference_uuid_or_none(ref: RtgChangeReference) -> UUID | None:
+    try:
+        return _uuid_or_raise(ref)
+    except Exception:
+        return None
+
+
+def _kernel_system_field_writable_finding(path: str, field_name: str) -> RtgValidationFinding:
+    diagnostic = rtg_diagnostic(
+        code="schema_object.kernel_system_field_writable",
+        category="validation_failure",
+        path=path,
+        problem=f"{field_name} is kernel-owned and cannot be supplied by callers.",
+        remedy="Omit created_at and updated_at; the kernel populates them during mutation.",
+        guide_topics=("workflow_patterns", "live_write", "tool_call_shapes"),
+    )
+    diagnostic["field"] = field_name
+    return _finding(
+        "schema_object",
+        "schema_object.kernel_system_field_writable",
+        field_name,
+        suggestion="Omit kernel-owned timestamp fields; they are populated during mutation.",
+        diagnostic=diagnostic,
+    )
+
+
+def _event_update_rejected_finding(
+    index: int,
+    object_uuid: UUID,
+    type_key: str,
+) -> RtgValidationFinding:
+    diagnostic = rtg_diagnostic(
+        code="schema_object.event_update_rejected",
+        category="validation_failure",
+        path=f"graph_changes.data_object_writes[{index}]",
+        problem=f"{type_key} is an event data-object type; existing event nodes are immutable.",
+        remedy="Append a new event data object instead of updating the existing one.",
+        guide_topics=("workflow_patterns", "live_write", "schema_staging_minimal"),
+    )
+    diagnostic["object_uuid"] = str(object_uuid)
+    diagnostic["time_shape"] = "event"
+    return _finding(
+        "schema_object",
+        "schema_object.event_update_rejected",
+        str(object_uuid),
+        suggestion="Append a new event data object instead of updating the existing one.",
+        diagnostic=diagnostic,
+    )
+
+
+def _link_kind_missing_finding(path: str, type_key: str) -> RtgValidationFinding:
+    return _finding(
+        "schema_object",
+        "schema_object.link_kind_missing",
+        type_key,
+        diagnostic=rtg_diagnostic(
+            code="schema_object.link_kind_missing",
+            category="schema_contract",
+            path=path,
+            problem=f"Link schema {type_key!r} omits required link_kind.",
+            remedy="Set link_kind to one of the v1 link kind enum values.",
+            accepted_fields=tuple(sorted(_LINK_KINDS)),
+            guide_topics=("schema_staging_minimal", "workflow_patterns"),
+        ),
+    )
+
+
+def _link_kind_invalid_finding(
+    path: str,
+    type_key: str,
+    link_kind: str,
+) -> RtgValidationFinding:
+    diagnostic = rtg_diagnostic(
+        code="schema_object.link_kind_invalid",
+        category="schema_contract",
+        path=f"{path}.link_kind",
+        problem=f"Link schema {type_key!r} declares invalid link_kind {link_kind!r}.",
+        remedy="Use one of the v1 link kind enum values.",
+        accepted_fields=tuple(sorted(_LINK_KINDS)),
+        guide_topics=("schema_staging_minimal", "workflow_patterns"),
+    )
+    diagnostic["link_kind"] = link_kind
+    return _finding(
+        "schema_object",
+        "schema_object.link_kind_invalid",
+        type_key,
+        diagnostic=diagnostic,
+    )
+
+
+def _provenance_link_delete_rejected_finding(
+    path: str,
+    link: RtgLink,
+) -> RtgValidationFinding:
+    link_uuid = _concrete_uuid(link.uuid)
+    diagnostic = rtg_diagnostic(
+        code="schema_object.provenance_link_delete_rejected",
+        category="validation_failure",
+        path=path,
+        problem="The proposed change would delete a provenance link outside migration context.",
+        remedy=(
+            "Leave the provenance link in place, or model the removal through an explicit "
+            "migration."
+        ),
+        guide_topics=("workflow_patterns", "live_write"),
+    )
+    diagnostic["link_uuid"] = str(link_uuid)
+    diagnostic["link_type"] = link.type
+    diagnostic["link_kind"] = "provenance"
+    return _finding(
+        "schema_object",
+        "schema_object.provenance_link_delete_rejected",
+        str(link_uuid),
+        suggestion="Provenance links are append-only outside migration.",
+        diagnostic=diagnostic,
+    )
+
+
+def _delete_blast_radius_by_kind_finding(
+    path: str,
+    preview: RtgGraphDeleteResult,
+    links_by_kind: dict[str, list[str]],
+) -> RtgValidationFinding:
+    diagnostic = rtg_diagnostic(
+        code="schema_object.delete_blast_radius_by_kind",
+        category="delete_preview",
+        path=path,
+        problem="The proposed delete or dissociation removes links grouped by schema link kind.",
+        remedy="Review the grouped blast radius before applying the change.",
+        guide_topics=("workflow_patterns", "live_write"),
+    )
+    diagnostic["links_by_kind"] = cast(JsonValue, links_by_kind)
+    diagnostic["deleted_anchor_uuids"] = cast(
+        JsonValue,
+        [str(_concrete_uuid(anchor.uuid)) for anchor in preview.deleted_anchors],
+    )
+    diagnostic["deleted_data_object_uuids"] = cast(
+        JsonValue,
+        [str(_concrete_uuid(data.uuid)) for data in preview.deleted_data_objects],
+    )
+    diagnostic["deleted_link_uuids"] = cast(
+        JsonValue,
+        [str(_concrete_uuid(link.uuid)) for link in preview.deleted_links],
+    )
+    return _finding(
+        "schema_object",
+        "schema_object.delete_blast_radius_by_kind",
+        path,
+        suggestion="Review the delete blast radius grouped by link kind.",
+        diagnostic=diagnostic,
+    )
+
+
 def _graph_reference_missing(
     path: str,
     ref: RtgChangeReference,
@@ -640,7 +1362,7 @@ def _validate_anchor_write(
 ) -> list[RtgValidationFinding]:
     try:
         schema.list_definitions_by_type_key(write.type, kind="anchor", live=True).definitions[0]
-    except IndexError, RtgSchemaDefinitionNotFound:
+    except (IndexError, RtgSchemaDefinitionNotFound):
         return [_unknown_type_finding(write.type, kind="anchor_write")]
     return []
 
@@ -652,7 +1374,7 @@ def _validate_data_write(
         definition = schema.list_definitions_by_type_key(
             write.type, kind="data_object", live=True
         ).definitions[0]
-    except IndexError, RtgSchemaDefinitionNotFound:
+    except (IndexError, RtgSchemaDefinitionNotFound):
         return [_unknown_type_finding(write.type, kind="data_object_write")]
     data = RtgDataObject(uuid=_uuid_or_nil(write.ref), type=write.type, properties=write.properties)
     return _validate_data_object(data, definition)
@@ -661,7 +1383,7 @@ def _validate_data_write(
 def _validate_link_write(schema: RtgSchema, write: RtgGraphLinkWrite) -> list[RtgValidationFinding]:
     try:
         schema.list_definitions_by_type_key(write.type, kind="link", live=True).definitions[0]
-    except IndexError, RtgSchemaDefinitionNotFound:
+    except (IndexError, RtgSchemaDefinitionNotFound):
         return [_unknown_type_finding(write.type, kind="link_write")]
     return []
 
@@ -1050,6 +1772,7 @@ def _validate_staged_migration_cutover_projections(
             or plan.constraint_make_non_live
             or plan.graph_make_live
             or plan.graph_make_non_live
+            or plan.schema_time_shape_retrofits
         ):
             migration_ids.append(plan.migration_id)
     if not migration_ids:
@@ -1150,7 +1873,37 @@ def _validate_migration_plans_against_state(
             findings.extend(_validate_replacement_pair(constraints.get_constraint, replacement))
         for replacement in plan.graph_replacements:
             findings.extend(_validate_replacement_pair(graph.get_object, replacement))
+        for retrofit in plan.schema_time_shape_retrofits:
+            try:
+                definition = schema.get_definition(retrofit.definition_uuid)
+            except Exception:
+                findings.append(
+                    _finding(
+                        "migration_cutover",
+                        "migration_cutover.reference_missing",
+                        str(retrofit.definition_uuid),
+                    )
+                )
+                continue
+            if definition.kind == "link":
+                findings.append(
+                    _finding(
+                        "migration_cutover",
+                        "migration_cutover.invalid_time_shape_retrofit",
+                        str(retrofit.definition_uuid),
+                    )
+                )
     return findings
+
+
+def _apply_schema_time_shape_retrofits(
+    schema: RtgSchema,
+    plans: tuple[RtgMigrationCutoverPlan, ...],
+) -> None:
+    for plan in plans:
+        for retrofit in plan.schema_time_shape_retrofits:
+            definition = schema.get_definition(retrofit.definition_uuid)
+            schema.put_definition(dataclasses.replace(definition, time_shape=retrofit.time_shape))
 
 
 def _validate_live_status_reference(
@@ -1476,9 +2229,17 @@ def _finding(
     suggestion: str = "Use controller discovery or schema packs to repair the proposed model.",
     diagnostic: JsonObject | None = None,
 ) -> RtgValidationFinding:
+    severity = "blocking"
+    if code.endswith("replacement_type_mismatch"):
+        severity = "warning"
+    elif (
+        code.endswith("force_create_override")
+        or code.endswith("delete_blast_radius_by_kind")
+    ):
+        severity = "informational"
     return RtgValidationFinding(
         track=track,
-        severity="blocking" if not code.endswith("replacement_type_mismatch") else "warning",
+        severity=severity,
         code=code,
         message=f"{code}: {affected}",
         suggestion=suggestion,

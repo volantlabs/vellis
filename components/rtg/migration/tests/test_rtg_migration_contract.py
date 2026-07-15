@@ -17,6 +17,7 @@ from components.rtg.migration import (
     RtgMigrationSnapshot,
     RtgMigrationSnapshotInvalid,
     RtgMigrationStatusTransitionInvalid,
+    RtgSchemaTimeShapeRetrofit,
 )
 from components.rtg.migration.reference import create_reference_component
 
@@ -241,5 +242,47 @@ def test_migration_cutover_sets_must_be_disjoint() -> None:
                 description="Invalid overlap.",
                 graph_make_live=(same,),
                 graph_make_non_live=(same,),
+            )
+        )
+
+
+def test_schema_time_shape_retrofit_defaults_and_enters_cutover_plan() -> None:
+    migration = create_reference_component()
+    legacy_definition = uuid4()
+
+    stored = migration.put_migration(
+        RtgMigrationRecord(
+            migration_id="retrofit-time-shape",
+            description="Retrofit legacy schema definitions with time shape.",
+            schema_time_shape_retrofits=(
+                RtgSchemaTimeShapeRetrofit(definition_uuid=legacy_definition),
+            ),
+        )
+    )
+    plan = RtgMigrationCutoverPlan.from_migration(stored)
+
+    assert stored.schema_time_shape_retrofits == (
+        RtgSchemaTimeShapeRetrofit(
+            definition_uuid=legacy_definition,
+            time_shape="state_now",
+        ),
+    )
+    assert plan.schema_time_shape_retrofits == stored.schema_time_shape_retrofits
+
+
+def test_schema_time_shape_retrofit_rejects_invalid_shape() -> None:
+    migration = create_reference_component()
+
+    with pytest.raises(RtgMigrationRecordInvalid, match="time_shape"):
+        migration.put_migration(
+            RtgMigrationRecord(
+                migration_id="bad-retrofit",
+                description="Invalid time shape.",
+                schema_time_shape_retrofits=(
+                    RtgSchemaTimeShapeRetrofit(
+                        definition_uuid=uuid4(),
+                        time_shape="mutable",
+                    ),
+                ),
             )
         )

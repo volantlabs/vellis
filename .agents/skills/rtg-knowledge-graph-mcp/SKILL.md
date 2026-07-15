@@ -176,6 +176,7 @@ Stage schema definitions as non-live candidates only when you need the advanced 
             "kind": "anchor",
             "type_key": "Item",
             "description": "A durable item.",
+            "time_shape": "state_now",
             "payload": {"required_data_types": ["ItemFacts"]},
             "system": {"live": false}
           }
@@ -187,6 +188,7 @@ Stage schema definitions as non-live candidates only when you need the advanced 
             "kind": "data_object",
             "type_key": "ItemFacts",
             "description": "Structured facts associated with an item anchor.",
+            "time_shape": "state_now",
             "payload": {
               "properties": {
                 "title": {"required": true, "value_kinds": ["string"]},

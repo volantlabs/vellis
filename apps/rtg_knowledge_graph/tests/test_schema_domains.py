@@ -59,7 +59,12 @@ def test_schema_domain_catalog_paths_and_usage_guide_are_aligned(tmp_path: Path)
         domain["domain_id"]
         for domain in guide["result"]["domains"]
         if domain["runtime_status"] == "ready"
-    } == {"individual_life_graph", "personal_operating_graph"}
+    } == {
+        "governance_core",
+        "agent_memory_spine",
+        "individual_life_graph",
+        "personal_operating_graph",
+    }
     assert guide["result"]["guardrails"][0].startswith("Do not auto-install")
 
 
@@ -77,4 +82,9 @@ def test_mcp_launch_metadata_exposes_available_schema_domains(tmp_path: Path) ->
         domain_id
         for domain_id, domain in metadata["schema_domains"].items()
         if domain["runtime_ready"]
-    } == {"individual_life_graph", "personal_operating_graph"}
+    } == {
+        "governance_core",
+        "agent_memory_spine",
+        "individual_life_graph",
+        "personal_operating_graph",
+    }

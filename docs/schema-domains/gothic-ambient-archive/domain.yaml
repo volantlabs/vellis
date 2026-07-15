@@ -19,10 +19,8 @@ runtime_compatibility:
   status: blocked
   requirements:
     - Nocturne Archive schema, seed, and query fixtures
-    - schema time shapes
-    - link kinds
   blockers:
-    - The referenced prototype fixtures and required temporal/link schema metadata are not yet present in the harmonized tree.
+    - The referenced prototype fixtures are not yet present in the harmonized tree.
 schema_summary:
   anchors:
     - Work

@@ -2,6 +2,7 @@ library package BibliotekRtgMigration {
     private import SoftwareComponentModeling::*;
     private import BibliotekSoftwareValues::*;
     private import ScalarValues::*;
+    private import BibliotekRtgSchema::*;
 
     enum def RtgMigrationStatus {
         enum draft; enum ready; enum applied; enum failed; enum abandoned;
@@ -29,6 +30,11 @@ library package BibliotekRtgMigration {
         attribute summary : String;
         attribute 'metadata' : JsonObject;
     }
+    attribute def RtgSchemaTimeShapeRetrofit {
+        attribute definitionUuid : Uuid;
+        attribute timeShape[0..1] : RtgSchemaTimeShape;
+        doc /* Omitted timeShape explicitly defaults a legacy node definition to state_now. */
+    }
     item def RtgMigrationRecord {
         attribute migrationId[0..1] : String;
         attribute description : String;
@@ -42,6 +48,7 @@ library package BibliotekRtgMigration {
         attribute schemaReplacements[0..*] : RtgMigrationReplacement;
         attribute constraintReplacements[0..*] : RtgMigrationReplacement;
         attribute graphReplacements[0..*] : RtgMigrationReplacement;
+        attribute schemaTimeShapeRetrofits[0..*] : RtgSchemaTimeShapeRetrofit;
         attribute evidence[0..*] ordered : RtgMigrationEvidence;
         attribute 'metadata' : JsonObject;
         doc /* Identity may be absent only on write. Stored records have a concrete generated or caller-supplied ID. The record stores references and intent, never referenced resources or executable transforms. */
@@ -60,6 +67,7 @@ library package BibliotekRtgMigration {
         attribute schemaReplacements[0..*] ordered : RtgMigrationReplacement;
         attribute constraintReplacements[0..*] ordered : RtgMigrationReplacement;
         attribute graphReplacements[0..*] ordered : RtgMigrationReplacement;
+        attribute schemaTimeShapeRetrofits[0..*] ordered : RtgSchemaTimeShapeRetrofit;
     }
 
     attribute def RtgMigrationNotFound { attribute 'message' : String; }
@@ -91,7 +99,7 @@ library package BibliotekRtgMigration {
     }
     action def AddMigrationEvidence { in migrationId : String; in evidence : RtgMigrationEvidence; out migration : RtgMigrationRecord; doc /* Append one evidence identity without interpreting or fetching its referenced artifact. */ @FailureContract { errorIds = ("RtgMigrationNotFound", "RtgMigrationEvidenceInvalid"); } }
     action def DeleteMigration { in migrationId : String; out result : RtgMigrationDeleteResult; doc /* Delete one applied or abandoned record only; referenced resources and durable controller history remain unchanged. */ @FailureContract { errorIds = ("RtgMigrationIdInvalid", "RtgMigrationNotFound", "RtgMigrationDeleteNotAllowed"); } }
-    action def BuildMigrationCutoverPlan { in migration : RtgMigrationRecord; out plan : RtgMigrationCutoverPlan; doc /* Purely copy ordered lifecycle membership and replacement mappings from a concrete valid migration record. */ @FailureContract { errorIds = ("RtgMigrationRecordInvalid"); } }
+    action def BuildMigrationCutoverPlan { in migration : RtgMigrationRecord; out plan : RtgMigrationCutoverPlan; doc /* Purely copy ordered lifecycle membership, replacement mappings, and time-shape retrofit operations from a concrete valid migration record. */ @FailureContract { errorIds = ("RtgMigrationRecordInvalid"); } }
 
     part def <'component.rtg.migration'> RtgMigration {
         doc /* Own identity-bearing migration records, lifecycle transitions, membership, and evidence. */
@@ -158,7 +166,7 @@ library package BibliotekRtgMigration {
     requirement <'contract.rtg.migration.cutover_plan'> cutoverPlanEffect {
         subject operation : BuildMigrationCutoverPlan;
         require constraint {
-            doc /* The plan deterministically copies all make-live, make-non-live, and replacement membership without reading or mutating referenced component state. */
+            doc /* The plan deterministically copies all make-live, make-non-live, replacement, and schema time-shape retrofit membership without reading or mutating referenced component state. A retrofit has one concrete definition identity and defaults an omitted time shape to state_now. */
         }
     }
 

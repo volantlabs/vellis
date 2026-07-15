@@ -16,6 +16,13 @@ library package BibliotekRtgSchema {
         enum object; enum list; enum uuid;
     }
     enum def RtgSchemaStringFormat { enum date; enum date_time; enum uri; }
+    enum def RtgSchemaTimeShape { enum state_now; enum state_as_of; enum 'event'; }
+    enum def RtgSchemaIdentityMatchStrategy { enum exact; enum normalized; enum composite; }
+    enum def RtgSchemaIdentityScope { enum same_type; }
+    enum def RtgSchemaLinkKind {
+        enum semantic; enum structural; enum governance;
+        enum provenance; enum versioning; enum junction;
+    }
 
     calc def SchemaValueKindCompatible {
         in actual : RtgSchemaValueKind;
@@ -56,7 +63,15 @@ library package BibliotekRtgSchema {
     attribute def RtgLinkSchemaPayload :> RtgSchemaPayload {
         attribute allowedSourceTypes[1..*] : String;
         attribute allowedTargetTypes[1..*] : String;
-        doc /* Each endpoint set is unique and unordered. One type may occur in both sets. */
+        attribute linkKind[0..1] : RtgSchemaLinkKind;
+        doc /* Each endpoint set is unique and unordered. One type may occur in both sets. New and stored link definitions require linkKind; omission is representable only for explicit legacy-snapshot retrofit. */
+    }
+    attribute def RtgIdentityCriterion {
+        attribute criterionKey : String;
+        attribute propertyPaths[1..*] : String;
+        attribute matchStrategy : RtgSchemaIdentityMatchStrategy;
+        attribute scope : RtgSchemaIdentityScope;
+        doc /* A stable named same-type identity rule over one or more unique logical property paths. */
     }
     item def RtgSchemaDefinition {
         attribute uuid[0..1] : Uuid;
@@ -64,8 +79,10 @@ library package BibliotekRtgSchema {
         attribute typeKey : String;
         attribute description : String;
         attribute payload : RtgSchemaPayload;
+        attribute timeShape[0..1] : RtgSchemaTimeShape;
+        attribute identityCriteria[0..*] : RtgIdentityCriterion;
         attribute system : JsonObject;
-        doc /* UUID may be absent on write only. Description is non-empty human-readable semantic text. Stored definitions have concrete UUID and Boolean system.live, defaulting missing live to true. */
+        doc /* UUID may be absent on write only. Description is non-empty human-readable semantic text. Anchor and data-object definitions require timeShape; links prohibit it. Identity criteria are optional for nodes and prohibited for links. Stored definitions have concrete UUID and Boolean system.live, defaulting missing live to true. */
     }
     attribute def RtgSchemaSnapshot { item definitions[0..*] ordered : RtgSchemaDefinition; }
     attribute def RtgSchemaDefinitionList { item definitions[0..*] ordered : RtgSchemaDefinition; }
@@ -76,6 +93,9 @@ library package BibliotekRtgSchema {
     attribute def RtgSchemaAnchorTypeSummaryList { attribute anchorTypes[0..*] ordered : RtgSchemaAnchorTypeSummary; }
     attribute def RtgSchemaPack { item anchorSchemas[0..*] ordered : RtgSchemaDefinition; item associatedDataObjectSchemas[0..*] ordered : RtgSchemaDefinition; item linkSchemas[0..*] ordered : RtgSchemaDefinition; }
     attribute def RtgSchemaDeleteResult { item deletedDefinition : RtgSchemaDefinition; }
+    attribute def RtgSchemaLinkKindRetrofitEntry { attribute definitionUuid : Uuid; attribute typeKey : String; attribute linkKind : RtgSchemaLinkKind; }
+    attribute def RtgSchemaLinkKindRetrofitReport { attribute defaultedLinkDefinitions[0..*] ordered : RtgSchemaLinkKindRetrofitEntry; }
+    attribute def RtgSchemaLinkKindRetrofitResult { attribute 'snapshot' : RtgSchemaSnapshot; attribute report : RtgSchemaLinkKindRetrofitReport; }
 
     attribute def RtgSchemaDefinitionNotFound { attribute 'message' : String; }
     attribute def RtgSchemaSnapshotInvalid { attribute 'message' : String; }
@@ -99,6 +119,7 @@ library package BibliotekRtgSchema {
     action def ListAnchorTypeSummaries { in live[0..1] : Boolean default = true; out result : RtgSchemaAnchorTypeSummaryList; doc /* Return anchor type identities and descriptions only, never graph counts. */ @FailureContract { errorIds = (); } }
     action def GetSchemaPack { in anchorTypeKeys[1..*] ordered : String; in live[0..1] : Boolean default = true; out result : RtgSchemaPack; doc /* Expand unique requested anchor schemas in request order with defined associated-data schemas and participating link schemas; omit missing referenced schemas but fail missing requested anchors. */ @FailureContract { errorIds = ("RtgSchemaTypeKeyInvalid", "RtgSchemaDefinitionNotFound"); } }
     action def DeleteSchemaDefinition { in definitionUuid : Uuid; out result : RtgSchemaDeleteResult; doc /* Delete exactly one definition and no graph, constraint, or migration record. */ @FailureContract { errorIds = ("RtgSchemaDefinitionNotFound"); } }
+    action def RetrofitSchemaSnapshotLinkKinds { in 'snapshot' : RtgSchemaSnapshot; in defaultKind : RtgSchemaLinkKind; out result : RtgSchemaLinkKindRetrofitResult; doc /* Return a new snapshot in which only missing legacy link kinds are defaulted; do not mutate the input snapshot. */ @FailureContract { errorIds = ("RtgSchemaSnapshotInvalid", "RtgSchemaPayloadInvalid"); } }
 
     part def <'component.rtg.schema'> RtgSchema {
         doc /* Own RTG-native schema definitions and derived navigation indexes, not object validation, graph state, migration membership, or cutover policy. */
@@ -155,7 +176,21 @@ library package BibliotekRtgSchema {
     requirement <'contract.rtg.schema.payload_semantics'> payloadSemantics {
         subject schema : RtgSchema;
         require constraint {
-            doc /* Anchor payloads distinguish disjoint required and optional associated-data type-key sets; data-object payloads map unique property names to recursive field definitions; link payloads contain non-empty unique source and target type-key sets whose overlap is allowed. Kind and payload family must agree. */
+            doc /* Anchor payloads distinguish disjoint required and optional associated-data type-key sets; data-object payloads map unique property names to recursive field definitions; link payloads contain non-empty unique source and target type-key sets whose overlap is allowed and require one of the six RtgSchemaLinkKind values. Kind and payload family must agree. */
+        }
+    }
+
+    requirement <'contract.rtg.schema.kernel_meta_model'> kernelMetaModelSemantics {
+        subject schema : RtgSchema;
+        require constraint {
+            doc /* Every anchor and data-object definition declares exactly one time shape: state_now, state_as_of, or event. Link definitions declare no time shape. state_as_of is valid only for data objects whose required valid_from and valid_to fields are strings refined by date_time format. created_at and updated_at are kernel-owned system fields and cannot be declared as domain properties. A node may declare uniquely keyed same-type identity criteria using exact, normalized, or composite matching; anchor paths are limited to display_name, data-object paths must resolve through declared properties, and links declare no identity criteria. */
+        }
+    }
+
+    requirement <'contract.rtg.schema.link_kind_retrofit'> linkKindRetrofitSemantics {
+        subject operation : RetrofitSchemaSnapshotLinkKinds;
+        require constraint {
+            doc /* The only permitted default is semantic. Each link definition missing linkKind receives that value and one deterministically ordered report entry; existing recognized kinds and every non-link definition remain unchanged. Invalid snapshots, defaults, or existing kinds fail without mutating the input. */
         }
     }
 
@@ -334,11 +369,19 @@ library package BibliotekRtgSchema {
         }
     }
 
+    requirement <'contract.rtg.schema.retrofit_schema_snapshot_link_kinds.failures'> retrofitSchemaSnapshotLinkKindsFailureSemantics {
+        subject operation : RetrofitSchemaSnapshotLinkKinds;
+        require constraint {
+            doc /* Failure returns no projected snapshot, does not mutate the input snapshot, and does not create a schema registry. */
+        }
+    }
+
     part contractContext {
         part schema : RtgSchema;
         satisfy definitionWriteEffect by schema.putDefinition;
         satisfy fieldSemantics by schema;
         satisfy payloadSemantics by schema;
+        satisfy kernelMetaModelSemantics by schema;
         satisfy schemaReadEffect by schema;
         satisfy canonicalOrdering by schema;
         satisfy intentionalBoundary by schema;
@@ -369,6 +412,9 @@ library package BibliotekRtgSchema {
         satisfy createEmptyRtgSchemaFailureSemantics by createEmptyRtgSchemaSubject;
         action importRtgSchemaSnapshotSubject : ImportRtgSchemaSnapshot;
         satisfy importRtgSchemaSnapshotFailureSemantics by importRtgSchemaSnapshotSubject;
+        action retrofitSchemaSnapshotLinkKindsSubject : RetrofitSchemaSnapshotLinkKinds;
+        satisfy linkKindRetrofitSemantics by retrofitSchemaSnapshotLinkKindsSubject;
+        satisfy retrofitSchemaSnapshotLinkKindsFailureSemantics by retrofitSchemaSnapshotLinkKindsSubject;
     }
 
     verification def PutSchemaDefinitionContractVerification {
@@ -455,12 +501,17 @@ library package BibliotekRtgSchema {
         objective { verify importRtgSchemaSnapshotFailureSemantics; }
         @EvidenceBinding { evidenceId = "components/rtg/schema/tests/test_rtg_schema_contract.py#ImportRtgSchemaSnapshotContractVerification"; implementationScope = "InMemoryRtgSchema"; }
     }
+    verification def RetrofitSchemaSnapshotLinkKindsContractVerification {
+        subject operation : RetrofitSchemaSnapshotLinkKinds;
+        objective { verify linkKindRetrofitSemantics; verify retrofitSchemaSnapshotLinkKindsFailureSemantics; }
+        @EvidenceBinding { evidenceId = "components/rtg/schema/tests/test_rtg_schema_contract.py#RetrofitSchemaSnapshotLinkKindsContractVerification"; implementationScope = "InMemoryRtgSchema"; }
+    }
 
 
 
     verification def RtgSchemaBoundaryVerification {
         subject schema : RtgSchema;
-        objective { verify fieldSemantics; verify payloadSemantics; verify schemaReadEffect; verify canonicalOrdering; verify intentionalBoundary; verify schemaSnapshotEffect; verify uuidUnique; verify liveTypeUnique; verify liveStatusBoolean; verify noChangeSetOwnership; verify noObjectValidation; verify nativePayloads; verify noInheritanceCompositionV1; verify typeKeyChangesAreMigrationConcerns; verify navigationIndexesMatchPayloads; verify deterministicListOrdering; }
+        objective { verify fieldSemantics; verify payloadSemantics; verify kernelMetaModelSemantics; verify schemaReadEffect; verify canonicalOrdering; verify intentionalBoundary; verify schemaSnapshotEffect; verify uuidUnique; verify liveTypeUnique; verify liveStatusBoolean; verify noChangeSetOwnership; verify noObjectValidation; verify nativePayloads; verify noInheritanceCompositionV1; verify typeKeyChangesAreMigrationConcerns; verify navigationIndexesMatchPayloads; verify deterministicListOrdering; }
         @EvidenceBinding { evidenceId = "components/rtg/schema/tests/test_rtg_schema_contract.py#RtgSchemaBoundaryVerification"; implementationScope = "InMemoryRtgSchema"; }
     }
 }

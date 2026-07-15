@@ -20,9 +20,11 @@ from components.rtg.migration.protocol import (
     RtgMigrationSnapshotInvalid,
     RtgMigrationStatusInvalid,
     RtgMigrationStatusTransitionInvalid,
+    RtgSchemaTimeShapeRetrofit,
 )
 
 _STATUSES = {"draft", "ready", "applied", "failed", "abandoned"}
+_TIME_SHAPES = {"state_now", "state_as_of", "event"}
 _TERMINAL = {"applied", "abandoned"}
 _TRANSITIONS = {
     "draft": {"ready", "abandoned"},
@@ -123,6 +125,7 @@ class InMemoryRtgMigration:
             schema_replacements=current.schema_replacements,
             constraint_replacements=current.constraint_replacements,
             graph_replacements=current.graph_replacements,
+            schema_time_shape_retrofits=current.schema_time_shape_retrofits,
             evidence=current.evidence,
             metadata=metadata,
         )
@@ -152,6 +155,7 @@ class InMemoryRtgMigration:
             schema_replacements=current.schema_replacements,
             constraint_replacements=current.constraint_replacements,
             graph_replacements=current.graph_replacements,
+            schema_time_shape_retrofits=current.schema_time_shape_retrofits,
             evidence=(*current.evidence, normalized),
             metadata=current.metadata,
         )
@@ -228,6 +232,10 @@ class InMemoryRtgMigration:
             schema_replacements=schema_replacements,
             constraint_replacements=constraint_replacements,
             graph_replacements=graph_replacements,
+            schema_time_shape_retrofits=tuple(
+                _validate_time_shape_retrofit(item)
+                for item in migration.schema_time_shape_retrofits
+            ),
             evidence=evidence,
             metadata=_validate_json_object(migration.metadata, "metadata"),
         )
@@ -299,6 +307,18 @@ def _normalize_replacements(
         raise RtgMigrationRecordInvalid(f"{label} replacement new IDs must be in make_live")
     return tuple(
         sorted(normalized, key=lambda item: (str(item.old_resource_id), str(item.new_resource_id)))
+    )
+
+
+def _validate_time_shape_retrofit(value: RtgSchemaTimeShapeRetrofit) -> RtgSchemaTimeShapeRetrofit:
+    if not isinstance(value.definition_uuid, UUID):
+        raise RtgMigrationRecordInvalid("schema time-shape retrofit definition_uuid must be UUID")
+    time_shape = value.time_shape or "state_now"
+    if time_shape not in _TIME_SHAPES:
+        raise RtgMigrationRecordInvalid(f"invalid time_shape: {time_shape}")
+    return RtgSchemaTimeShapeRetrofit(
+        definition_uuid=value.definition_uuid,
+        time_shape=time_shape,
     )
 
 

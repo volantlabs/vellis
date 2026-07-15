@@ -628,6 +628,13 @@ library package BibliotekRtgController {
         }
     }
 
+    requirement <'contract.rtg.controller.kernel_meta_model_apply'> kernelMetaModelApplySemantics {
+        subject operation : ApplyLiveGraphChanges;
+        require constraint {
+            doc /* Before graph mutation, the controller preserves identity overrides in the resolved request and ledger evidence, blocks strict merge candidates unless force_create converted them to informational evidence, and assigns kernel-owned created_at and updated_at timestamps. New records receive both timestamps; accepted updates preserve created_at and advance updated_at. Callers cannot supply either field. */
+        }
+    }
+
     requirement <'contract.rtg.controller.live_mutation_lane'> liveMutationLane {
         subject operation : ApplyLiveGraphChanges;
         require constraint {
@@ -1192,6 +1199,7 @@ library package BibliotekRtgController {
         part controller : RtgController;
         satisfy liveMutationFlow by controller.applyLiveGraphChanges;
         satisfy liveMutationLane by controller.applyLiveGraphChanges;
+        satisfy kernelMetaModelApplySemantics by controller.applyLiveGraphChanges;
         satisfy stagingFlow by controller.stageKnowledgeChanges;
         satisfy validationFlow by controller.validateLiveGraphChanges;
         satisfy cutoverFlow by controller.applyMigrationCutover;
@@ -1280,6 +1288,7 @@ library package BibliotekRtgController {
         objective {
             verify liveMutationFlow;
             verify liveMutationLane;
+            verify kernelMetaModelApplySemantics;
 
             verify applyLiveGraphChangesFailureSemantics;
         }

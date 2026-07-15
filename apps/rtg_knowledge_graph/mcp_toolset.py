@@ -1753,6 +1753,7 @@ def _schema_staging_minimal_guide() -> dict[str, Any]:
                     "kind": "data_object",
                     "type_key": "ItemFacts",
                     "description": "Structured facts for an item.",
+                    "time_shape": "state_now",
                     "payload": {
                         "properties": {
                             "title": {"required": True, "value_kinds": ["string"]},
@@ -1765,12 +1766,14 @@ def _schema_staging_minimal_guide() -> dict[str, Any]:
                     "kind": "anchor",
                     "type_key": "Item",
                     "description": "A durable item.",
+                    "time_shape": "state_now",
                     "payload": {"required_data_types": ["ItemFacts"]},
                 },
                 {
                     "kind": "data_object",
                     "type_key": "CollectionFacts",
                     "description": "Structured facts for a collection.",
+                    "time_shape": "state_now",
                     "payload": {
                         "properties": {
                             "title": {"required": True, "value_kinds": ["string"]},
@@ -1782,6 +1785,7 @@ def _schema_staging_minimal_guide() -> dict[str, Any]:
                     "kind": "anchor",
                     "type_key": "Collection",
                     "description": "A durable grouping of items.",
+                    "time_shape": "state_now",
                     "payload": {"required_data_types": ["CollectionFacts"]},
                 },
                 {
@@ -1791,6 +1795,7 @@ def _schema_staging_minimal_guide() -> dict[str, Any]:
                     "payload": {
                         "allowed_source_types": ["Item"],
                         "allowed_target_types": ["Collection"],
+                        "link_kind": "semantic",
                     },
                 },
                 {
@@ -1800,6 +1805,7 @@ def _schema_staging_minimal_guide() -> dict[str, Any]:
                     "payload": {
                         "allowed_source_types": ["Item"],
                         "allowed_target_types": ["Item"],
+                        "link_kind": "semantic",
                     },
                 },
             ],
@@ -1832,6 +1838,7 @@ def _tool_call_shapes_guide() -> dict[str, Any]:
                         "kind": "data_object",
                         "type_key": "ItemFacts",
                         "description": "Structured facts for an item.",
+                        "time_shape": "state_now",
                         "payload": {
                             "properties": {
                                 "title": {"required": True, "value_kinds": ["string"]},
@@ -1847,6 +1854,7 @@ def _tool_call_shapes_guide() -> dict[str, Any]:
                         "kind": "anchor",
                         "type_key": "Item",
                         "description": "A durable item.",
+                        "time_shape": "state_now",
                         "payload": {"required_data_types": ["ItemFacts"]},
                     },
                     {
@@ -1856,6 +1864,7 @@ def _tool_call_shapes_guide() -> dict[str, Any]:
                         "payload": {
                             "allowed_source_types": ["Item"],
                             "allowed_target_types": ["Item"],
+                            "link_kind": "semantic",
                         },
                     },
                 ],
@@ -2441,6 +2450,7 @@ def _recovery_and_replay_guide() -> dict[str, Any]:
                             "kind": "data_object",
                             "type_key": "ItemFacts",
                             "description": "Item facts with an explicit owner.",
+                            "time_shape": "state_now",
                             "payload": {
                                 "properties": {
                                     "title": {"required": True, "value_kinds": ["string"]},

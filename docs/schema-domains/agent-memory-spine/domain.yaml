@@ -15,14 +15,9 @@ domain_tags:
   - taxonomy
   - beta
 runtime_compatibility:
-  status: blocked
-  requirements:
-    - schema time shapes
-    - link kinds
-    - identity criteria
-    - merge-candidate, event-immutability, and protected-provenance validation
-  blockers:
-    - The harmonized kernel does not yet expose the required schema metadata or policy validation behaviors.
+  status: ready
+  requirements: []
+  blockers: []
 schema_summary:
   anchors:
     - Actor

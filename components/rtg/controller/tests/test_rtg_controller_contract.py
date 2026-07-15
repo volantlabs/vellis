@@ -3,6 +3,7 @@ from __future__ import annotations
 import dataclasses
 import json
 from concurrent.futures import ThreadPoolExecutor, TimeoutError
+from datetime import datetime
 from pathlib import Path
 from threading import Event
 from typing import cast
@@ -18,6 +19,7 @@ from components.rtg.change_validation import (
     RtgGraphChangeSet,
     RtgGraphDataObjectWrite,
     RtgGraphLinkWrite,
+    RtgIdentityOverride,
     RtgMigrationChangeSet,
     RtgMigrationRecordWrite,
     RtgSchemaChangeSet,
@@ -51,6 +53,7 @@ from components.rtg.schema import (
     InMemoryRtgSchema,
     RtgAnchorSchemaPayload,
     RtgDataObjectSchemaPayload,
+    RtgIdentityCriterion,
     RtgSchemaDefinition,
     RtgSchemaField,
 )
@@ -229,6 +232,7 @@ def build_schema() -> InMemoryRtgSchema:
             type_key="Person",
             description="Person.",
             payload=RtgAnchorSchemaPayload(required_data_types=("Profile",)),
+            time_shape="state_now",
         )
     )
     schema.put_definition(
@@ -239,6 +243,30 @@ def build_schema() -> InMemoryRtgSchema:
             description="Profile.",
             payload=RtgDataObjectSchemaPayload(
                 properties={"name": RtgSchemaField(required=True, value_kinds=("string",))}
+            ),
+            time_shape="state_now",
+        )
+    )
+    return schema
+
+
+def build_identity_schema() -> InMemoryRtgSchema:
+    schema = InMemoryRtgSchema.empty()
+    schema.put_definition(
+        RtgSchemaDefinition(
+            uuid=uuid4(),
+            kind="anchor",
+            type_key="Person",
+            description="Person.",
+            payload=RtgAnchorSchemaPayload(),
+            time_shape="state_now",
+            identity_criteria=(
+                RtgIdentityCriterion(
+                    "person_display_name",
+                    ("display_name",),
+                    "normalized",
+                    "same_type",
+                ),
             ),
         )
     )
@@ -259,6 +287,22 @@ def build_controller_with_sql(
     return InProcessRtgController.open(
         InMemoryRtgGraph.empty(),
         build_schema(),
+        InMemoryRtgConstraints.empty(),
+        InMemoryRtgMigration.empty(),
+        DeterministicRtgChangeValidator(),
+        SimpleRtgQueryEngine(),
+        LocalJsonFileStorage.open(tmp_path / "json"),
+        sql_storage,
+    )
+
+
+def build_identity_controller_with_sql(
+    tmp_path: Path,
+    sql_storage: object,
+) -> InProcessRtgController:
+    return InProcessRtgController.open(
+        InMemoryRtgGraph.empty(),
+        build_identity_schema(),
         InMemoryRtgConstraints.empty(),
         InMemoryRtgMigration.empty(),
         DeterministicRtgChangeValidator(),
@@ -760,6 +804,11 @@ def test_live_graph_lane_resolves_local_refs_validates_applies_and_ledgers(
     query_result = controller.execute_query(
         RtgQuerySpec(anchor_buckets=(RtgQueryAnchorBucket("person", ("Person",)),))
     )
+    anchor_uuid = query_result.bindings[0].anchors["person"]
+    applied_anchor = controller.get_object(anchor_uuid)
+    assert isinstance(applied_anchor, RtgAnchor)
+    created_at = applied_anchor.system["created_at"]
+    updated_at = applied_anchor.system["updated_at"]
 
     assert result.status == "applied"
     assert result.ledger_position is not None
@@ -767,6 +816,10 @@ def test_live_graph_lane_resolves_local_refs_validates_applies_and_ledgers(
     assert set(result.generated_ids) == {"person", "profile"}
     assert result.generated_ids["person"] == query_result.bindings[0].anchors["person"]
     assert len(query_result.bindings) == 1
+    assert isinstance(created_at, str)
+    assert isinstance(updated_at, str)
+    assert datetime.fromisoformat(created_at)
+    assert datetime.fromisoformat(updated_at)
     replay_controller = build_controller(tmp_path)
     ledger_records_seen = replay_controller.replay_ledger(
         RtgControllerReplayOptions(start_snapshot=baseline)
@@ -902,6 +955,172 @@ def test_live_graph_lane_rejects_invalid_batch_without_mutating(tmp_path: Path) 
     ]
 
 
+def test_strict_live_graph_apply_blocks_identity_merge_candidate_before_mutation(
+    tmp_path: Path,
+) -> None:
+    controller = build_identity_controller_with_sql(
+        tmp_path,
+        SqliteStorage.open(tmp_path / "ledger.sqlite"),
+    )
+    controller.apply_live_graph_changes(
+        RtgGraphChangeSet(
+            anchor_writes=(
+                RtgGraphAnchorWrite(
+                    ref=RtgChangeReference(local_ref="ada"),
+                    type="Person",
+                    display_name="Ada Lovelace",
+                ),
+            )
+        )
+    )
+    baseline = controller.export_system_snapshot()
+    existing_uuid = controller.execute_query(
+        RtgQuerySpec(anchor_buckets=(RtgQueryAnchorBucket("person", ("Person",)),))
+    ).bindings[0].anchors["person"]
+
+    with pytest.raises(RtgControllerValidationFailed) as error:
+        controller.apply_live_graph_changes(
+            RtgGraphChangeSet(
+                anchor_writes=(
+                    RtgGraphAnchorWrite(
+                        ref=RtgChangeReference(local_ref="ada-again"),
+                        type="Person",
+                        display_name="ada lovelace",
+                    ),
+                )
+            )
+        )
+
+    assert error.value.validation_report is not None
+    finding = next(
+        finding
+        for finding in error.value.validation_report.findings
+        if finding.code == "merge_candidate.identity_match"
+    )
+    assert finding.track == "merge_candidate"
+    assert finding.diagnostic["candidate_uuids"] == [str(existing_uuid)]
+    after = controller.export_system_snapshot()
+    assert after.graph == baseline.graph
+    assert after.schema == baseline.schema
+    assert after.constraints == baseline.constraints
+    assert after.migration == baseline.migration
+
+
+def test_validate_live_graph_changes_reports_identity_merge_candidate_without_ledger(
+    tmp_path: Path,
+) -> None:
+    ledger_path = tmp_path / "ledger.sqlite"
+    controller = build_identity_controller_with_sql(tmp_path, SqliteStorage.open(ledger_path))
+    controller.apply_live_graph_changes(
+        RtgGraphChangeSet(
+            anchor_writes=(
+                RtgGraphAnchorWrite(
+                    ref=RtgChangeReference(local_ref="ada"),
+                    type="Person",
+                    display_name="Ada Lovelace",
+                ),
+            )
+        )
+    )
+    baseline = controller.export_system_snapshot()
+    starting_ledger_count = SqliteStorage.open(ledger_path).query(
+        "select count(*) as count from rtg_controller_ledger"
+    ).rows[0]["count"]
+
+    preview = controller.validate_live_graph_changes(
+        RtgGraphChangeSet(
+            anchor_writes=(
+                RtgGraphAnchorWrite(
+                    ref=RtgChangeReference(local_ref="ada-again"),
+                    type="Person",
+                    display_name="Ada Lovelace",
+                ),
+            )
+        )
+    )
+
+    assert preview.status == "validated"
+    assert preview.mutation_state == "not_mutated"
+    assert preview.accepted is False
+    assert "merge_candidate.identity_match" in {
+        finding.code for finding in preview.validation_report.findings
+    }
+    assert controller.export_system_snapshot() == baseline
+    assert (
+        SqliteStorage.open(ledger_path)
+        .query("select count(*) as count from rtg_controller_ledger")
+        .rows[0]["count"]
+        == starting_ledger_count
+    )
+
+
+def test_force_create_identity_override_applies_and_is_preserved_in_request_ledger(
+    tmp_path: Path,
+) -> None:
+    ledger_path = tmp_path / "ledger.sqlite"
+    controller = build_identity_controller_with_sql(tmp_path, SqliteStorage.open(ledger_path))
+    controller.apply_live_graph_changes(
+        RtgGraphChangeSet(
+            anchor_writes=(
+                RtgGraphAnchorWrite(
+                    ref=RtgChangeReference(local_ref="ada"),
+                    type="Person",
+                    display_name="Ada Lovelace",
+                ),
+            )
+        )
+    )
+
+    result = controller.apply_live_graph_changes(
+        RtgGraphChangeSet(
+            anchor_writes=(
+                RtgGraphAnchorWrite(
+                    ref=RtgChangeReference(local_ref="ada-distinct"),
+                    type="Person",
+                    display_name="Ada Lovelace",
+                    identity_override=RtgIdentityOverride(
+                        mode="force_create",
+                        reason="confirmed distinct person with the same display name",
+                        criterion_keys=("person_display_name",),
+                    ),
+                ),
+            )
+        )
+    )
+    rows = (
+        SqliteStorage.open(ledger_path)
+        .query(
+            """
+        select payload_json
+        from rtg_controller_ledger
+        where operation_name = ? and record_kind = ?
+        order by ledger_position
+        """,
+            ("apply_live_graph_changes", "request"),
+        )
+        .rows
+    )
+    request_payload = json.loads(str(rows[-1]["payload_json"]))
+    anchor_write = request_payload["graph_changes"]["anchor_writes"][0]
+
+    assert result.status == "applied"
+    assert result.validation_report is not None
+    assert "merge_candidate.force_create_override" in {
+        finding.code for finding in result.validation_report.findings
+    }
+    assert len(
+        controller.execute_query(
+            RtgQuerySpec(anchor_buckets=(RtgQueryAnchorBucket("person", ("Person",)),))
+        ).bindings
+    ) == 2
+    assert anchor_write["ref"]["resource_id"]
+    assert anchor_write["identity_override"] == {
+        "mode": "force_create",
+        "reason": "confirmed distinct person with the same display name",
+        "criterion_keys": ["person_display_name"],
+    }
+
+
 def test_controller_cutover_flips_schema_live_status_and_prunes(tmp_path: Path) -> None:
     controller = build_controller(tmp_path)
     old = controller.get_schema_pack(("Person",)).schema_pack.anchor_schemas[0]
@@ -911,6 +1130,7 @@ def test_controller_cutover_flips_schema_live_status_and_prunes(tmp_path: Path) 
         type_key="Person",
         description="Expanded person.",
         payload=RtgAnchorSchemaPayload(required_data_types=("Profile",)),
+        time_shape="state_now",
         system={"live": False},
     )
     controller.stage_knowledge_changes(
@@ -974,6 +1194,7 @@ def test_cutover_rejects_schema_candidate_that_invalidates_live_graph_data(
         type_key="Person",
         description="Person now requires badge data.",
         payload=RtgAnchorSchemaPayload(required_data_types=("Profile", "Badge")),
+        time_shape="state_now",
         system={"live": False},
     )
     controller.stage_knowledge_changes(
@@ -1131,6 +1352,7 @@ def test_knowledge_staging_rejects_unscoped_schema_candidate(tmp_path: Path) -> 
         type_key="Project",
         description="Project.",
         payload=RtgAnchorSchemaPayload(),
+        time_shape="state_now",
         system={"live": False},
     )
 
@@ -1158,6 +1380,7 @@ def test_knowledge_staging_rejects_direct_live_schema_write(tmp_path: Path) -> N
         type_key="Project",
         description="Project.",
         payload=RtgAnchorSchemaPayload(),
+        time_shape="state_now",
     )
 
     with pytest.raises(RtgControllerPreconditionFailed):
@@ -1260,6 +1483,7 @@ def test_strict_knowledge_staging_rejects_invalid_cutover_projection(
         payload=RtgDataObjectSchemaPayload(
             properties={"age": RtgSchemaField(required=True, value_kinds=("integer",))}
         ),
+        time_shape="state_now",
         system={"live": False},
     )
     person_uuid = uuid4()
@@ -1561,6 +1785,7 @@ def test_replay_reconstructs_cutover_from_ledgered_request_after_pruning(
         type_key="Person",
         description="Expanded person.",
         payload=RtgAnchorSchemaPayload(required_data_types=("Profile",)),
+        time_shape="state_now",
         system={"live": False},
     )
     staged = controller.stage_knowledge_changes(
@@ -1625,6 +1850,7 @@ def test_replay_decodes_ledgered_schema_fields_with_null_items(tmp_path: Path) -
                 "preferred_contact": RtgSchemaField(required=False, value_kinds=("string",)),
             }
         ),
+        time_shape="state_now",
         system={"live": False},
     )
     controller.stage_knowledge_changes(
@@ -1697,6 +1923,7 @@ def test_failed_strict_cutover_status_is_replayable(tmp_path: Path) -> None:
         payload=RtgDataObjectSchemaPayload(
             properties={"age": RtgSchemaField(required=True, value_kinds=("integer",))}
         ),
+        time_shape="state_now",
         system={"live": False},
     )
     controller.stage_knowledge_changes(
@@ -1921,6 +2148,7 @@ def test_migration_history_is_reconstructed_from_ledger(
         payload=RtgDataObjectSchemaPayload(
             properties={"age": RtgSchemaField(required=True, value_kinds=("integer",))}
         ),
+        time_shape="state_now",
         system={"live": False},
     )
     controller.stage_knowledge_changes(
@@ -2107,6 +2335,7 @@ def test_cutover_post_state_failure_restores_pre_cutover_state(tmp_path: Path) -
         type_key="Person",
         description="Expanded person.",
         payload=RtgAnchorSchemaPayload(required_data_types=("Profile",)),
+        time_shape="state_now",
         system={"live": False},
     )
     controller.stage_knowledge_changes(

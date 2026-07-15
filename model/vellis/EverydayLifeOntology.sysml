@@ -12,6 +12,7 @@ package VellisEverydayLifeOntology {
         attribute typeKey : String;
         attribute factsTypeKey : String;
         attribute description : String;
+        attribute timeShape : String = "state_now";
     }
 
     metadata def StarterLinkDefinition {
@@ -20,6 +21,7 @@ package VellisEverydayLifeOntology {
         attribute description : String;
         attribute sourceTypes[1..*] : String;
         attribute targetTypes[1..*] : String;
+        attribute linkKind : String = "semantic";
     }
 
     attribute def EverydayLifeOntologyIdentity {

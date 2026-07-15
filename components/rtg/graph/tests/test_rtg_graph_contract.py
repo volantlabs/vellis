@@ -527,6 +527,38 @@ def test_delete_previews_match_mutations_without_mutating_graph() -> None:
     assert preview.deleted_links == (link,)
 
 
+def test_delete_anchor_preview_exposes_complete_raw_link_blast_radius() -> None:
+    graph = empty_graph()
+    source = graph.put_anchor(RtgAnchor(uuid=uuid4(), type="Person"))
+    target = graph.put_anchor(RtgAnchor(uuid=uuid4(), type="Person"))
+    orphaned = graph.put_data_object(
+        RtgDataObject(uuid=uuid4(), type="Profile"), (concrete_uuid(source.uuid),)
+    )
+    semantic = graph.put_link(
+        RtgLink(
+            uuid=uuid4(),
+            type="knows",
+            source_uuid=concrete_uuid(source.uuid),
+            target_uuid=concrete_uuid(target.uuid),
+        )
+    )
+    structural = graph.put_link(
+        RtgLink(
+            uuid=uuid4(),
+            type="has_profile",
+            source_uuid=concrete_uuid(source.uuid),
+            target_uuid=concrete_uuid(orphaned.uuid),
+        )
+    )
+
+    preview = graph.preview_delete_anchor(concrete_uuid(source.uuid))
+
+    assert preview.deleted_links == tuple(
+        sorted((semantic, structural), key=lambda link: str(link.uuid))
+    )
+    assert preview.deleted_data_objects == (orphaned,)
+
+
 def test_dissociation_and_data_delete_previews_match_mutations_without_mutating() -> None:
     dissociation_graph = empty_graph()
     anchor = dissociation_graph.put_anchor(RtgAnchor(uuid=uuid4(), type="Anchor"))

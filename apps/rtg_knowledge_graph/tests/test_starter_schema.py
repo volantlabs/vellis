@@ -248,10 +248,11 @@ def test_custom_schema_is_preserved_and_not_overlaid(tmp_path: Path, type_key: s
         RtgSchemaDefinition(
             uuid=custom_id,
             kind="anchor",
-            type_key=type_key,
-            description="Existing custom schema.",
-            payload=RtgAnchorSchemaPayload(),
-            system={"live": True},
+                type_key=type_key,
+                description="Existing custom schema.",
+                payload=RtgAnchorSchemaPayload(),
+                time_shape="state_now",
+                system={"live": True},
         )
     )
     controller = _controller(tmp_path, schema)
@@ -280,14 +281,16 @@ def test_replayed_beta_shaped_custom_graph_with_overlapping_keys_starts(
             (
                 {
                     "kind": "anchor",
-                    "type_key": type_key,
-                    "description": f"Custom beta {type_key}.",
-                    "payload": {"required_data_types": [facts_type]},
+                        "type_key": type_key,
+                        "description": f"Custom beta {type_key}.",
+                        "time_shape": "state_now",
+                        "payload": {"required_data_types": [facts_type]},
                 },
                 {
                     "kind": "data_object",
-                    "type_key": facts_type,
-                    "description": f"Custom beta {type_key} facts.",
+                        "type_key": facts_type,
+                        "description": f"Custom beta {type_key} facts.",
+                        "time_shape": "state_now",
                     "payload": {
                         "properties": {"title": {"required": True, "value_kinds": ["string"]}}
                     },
@@ -299,10 +302,11 @@ def test_replayed_beta_shaped_custom_graph_with_overlapping_keys_starts(
             "kind": "link",
             "type_key": "belongs_to",
             "description": "Custom beta primary-area relation.",
-            "payload": {
-                "allowed_source_types": ["Project"],
-                "allowed_target_types": ["Area"],
-            },
+                "payload": {
+                    "allowed_source_types": ["Project"],
+                    "allowed_target_types": ["Area"],
+                    "link_kind": "semantic",
+                },
         }
     )
     assert (
@@ -414,9 +418,10 @@ def test_installed_ontology_can_be_extended_without_bootstrap_overwrite(tmp_path
         schema_definitions=[
             {
                 "kind": "anchor",
-                "type_key": "UserExtension",
-                "description": "An approved application extension.",
-                "payload": {"required_data_types": []},
+                    "type_key": "UserExtension",
+                    "description": "An approved application extension.",
+                    "time_shape": "state_now",
+                    "payload": {"required_data_types": []},
             }
         ],
     )
@@ -438,10 +443,11 @@ def test_starter_identity_collision_fails_without_partial_effects(tmp_path: Path
         RtgSchemaDefinition(
             uuid=UUID(first_definition["uuid"]),
             kind="anchor",
-            type_key="ConflictingPerson",
-            description="Conflicts with a reserved starter identity.",
-            payload=decode_schema_definition(first_definition).payload,
-            system={"live": True},
+                type_key="ConflictingPerson",
+                description="Conflicts with a reserved starter identity.",
+                payload=decode_schema_definition(first_definition).payload,
+                time_shape=str(first_definition["time_shape"]),
+                system={"live": True},
         )
     )
     controller = _controller(tmp_path, schema)
@@ -461,10 +467,11 @@ def test_partial_starter_installation_fails_without_partial_effects(tmp_path: Pa
         RtgSchemaDefinition(
             uuid=UUID(first_definition["uuid"]),
             kind=first_definition["kind"],
-            type_key=first_definition["type_key"],
-            description=first_definition["description"],
-            payload=decode_schema_definition(first_definition).payload,
-            system={"live": True},
+                type_key=first_definition["type_key"],
+                description=first_definition["description"],
+                payload=decode_schema_definition(first_definition).payload,
+                time_shape=str(first_definition["time_shape"]),
+                system={"live": True},
         )
     )
     controller = _controller(tmp_path, schema)

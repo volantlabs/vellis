@@ -41,18 +41,18 @@
   "packages": {
     "Bibliotek": {
       "element_counts": {
-        "ActionDefinition": 140,
-        "AttributeDefinition": 284,
+        "ActionDefinition": 141,
+        "AttributeDefinition": 290,
         "CalculationDefinition": 6,
         "ConstraintDefinition": 1,
         "Documentation": 16,
-        "EnumerationDefinition": 50,
+        "EnumerationDefinition": 55,
         "ItemDefinition": 19,
         "LibraryPackage": 1,
         "PartDefinition": 26,
         "PartUsage": 20,
-        "RequirementUsage": 450,
-        "VerificationCaseDefinition": 159
+        "RequirementUsage": 455,
+        "VerificationCaseDefinition": 160
       },
       "named_elements": [
         {
@@ -542,6 +542,10 @@
         {
           "kind": "ActionDefinition",
           "name": "RestoreFromSnapshot"
+        },
+        {
+          "kind": "ActionDefinition",
+          "name": "RetrofitSchemaSnapshotLinkKinds"
         },
         {
           "kind": "ActionDefinition",
@@ -1281,6 +1285,14 @@
         },
         {
           "kind": "AttributeDefinition",
+          "name": "RtgIdentityCriterion"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "RtgIdentityOverride"
+        },
+        {
+          "kind": "AttributeDefinition",
           "name": "RtgLinkList"
         },
         {
@@ -1529,6 +1541,18 @@
         },
         {
           "kind": "AttributeDefinition",
+          "name": "RtgSchemaLinkKindRetrofitEntry"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "RtgSchemaLinkKindRetrofitReport"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "RtgSchemaLinkKindRetrofitResult"
+        },
+        {
+          "kind": "AttributeDefinition",
           "name": "RtgSchemaLinkParticipation"
         },
         {
@@ -1566,6 +1590,10 @@
         {
           "kind": "AttributeDefinition",
           "name": "RtgSchemaSystemValueInvalid"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "RtgSchemaTimeShapeRetrofit"
         },
         {
           "kind": "AttributeDefinition",
@@ -1893,6 +1921,10 @@
         },
         {
           "kind": "EnumerationDefinition",
+          "name": "RtgIdentityOverrideMode"
+        },
+        {
+          "kind": "EnumerationDefinition",
           "name": "RtgLinkDirection"
         },
         {
@@ -1941,6 +1973,18 @@
         },
         {
           "kind": "EnumerationDefinition",
+          "name": "RtgSchemaIdentityMatchStrategy"
+        },
+        {
+          "kind": "EnumerationDefinition",
+          "name": "RtgSchemaIdentityScope"
+        },
+        {
+          "kind": "EnumerationDefinition",
+          "name": "RtgSchemaLinkKind"
+        },
+        {
+          "kind": "EnumerationDefinition",
           "name": "RtgSchemaParticipationDirection"
         },
         {
@@ -1950,6 +1994,10 @@
         {
           "kind": "EnumerationDefinition",
           "name": "RtgSchemaStringFormat"
+        },
+        {
+          "kind": "EnumerationDefinition",
+          "name": "RtgSchemaTimeShape"
         },
         {
           "kind": "EnumerationDefinition",
@@ -3146,6 +3194,21 @@
         },
         {
           "kind": "RequirementUsage",
+          "name": "kernelMetaModelApplySemantics",
+          "short_name": "contract.rtg.controller.kernel_meta_model_apply"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "kernelMetaModelSemantics",
+          "short_name": "contract.rtg.schema.kernel_meta_model"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "kernelMetaModelValidation",
+          "short_name": "contract.rtg.change_validation.kernel_meta_model"
+        },
+        {
+          "kind": "RequirementUsage",
           "name": "knowledgeChangesMigrationScoped",
           "short_name": "invariant.rtg.controller.knowledge_changes_are_migration_scoped"
         },
@@ -3193,6 +3256,11 @@
           "kind": "RequirementUsage",
           "name": "lifecycleFiltering",
           "short_name": "contract.rtg.query.lifecycle_filtering"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "linkKindRetrofitSemantics",
+          "short_name": "contract.rtg.schema.link_kind_retrofit"
         },
         {
           "kind": "RequirementUsage",
@@ -3983,6 +4051,11 @@
           "kind": "RequirementUsage",
           "name": "resultSemantics",
           "short_name": "contract.rtg.bridge_traversal.result_semantics"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "retrofitSchemaSnapshotLinkKindsFailureSemantics",
+          "short_name": "contract.rtg.schema.retrofit_schema_snapshot_link_kinds.failures"
         },
         {
           "kind": "RequirementUsage",
@@ -4924,6 +4997,10 @@
         {
           "kind": "VerificationCaseDefinition",
           "name": "RestoreFromSnapshotContractVerification"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
+          "name": "RetrofitSchemaSnapshotLinkKindsContractVerification"
         },
         {
           "kind": "VerificationCaseDefinition",
@@ -6359,29 +6436,29 @@
       "element_counts": {
         "ActionDefinition": 2,
         "ActionUsage": 4,
-        "AttributeDefinition": 22,
-        "AttributeUsage": 116,
-        "ConstraintUsage": 21,
+        "AttributeDefinition": 23,
+        "AttributeUsage": 124,
+        "ConstraintUsage": 22,
         "Dependency": 25,
-        "Documentation": 50,
-        "EnumerationDefinition": 3,
-        "EnumerationUsage": 19,
-        "Feature": 28,
-        "FeatureReferenceExpression": 23,
+        "Documentation": 51,
+        "EnumerationDefinition": 4,
+        "EnumerationUsage": 20,
+        "Feature": 29,
+        "FeatureReferenceExpression": 24,
         "ItemUsage": 6,
         "LibraryPackage": 1,
-        "LiteralInfinity": 26,
-        "LiteralInteger": 58,
+        "LiteralInfinity": 27,
+        "LiteralInteger": 63,
         "LiteralString": 9,
         "MetadataUsage": 10,
-        "Multiplicity": 48,
-        "MultiplicityRange": 43,
+        "Multiplicity": 50,
+        "MultiplicityRange": 46,
         "PartDefinition": 1,
         "PartUsage": 2,
         "PerformActionUsage": 34,
-        "ReferenceUsage": 123,
-        "RequirementUsage": 45,
-        "SatisfyRequirementUsage": 21,
+        "ReferenceUsage": 127,
+        "RequirementUsage": 47,
+        "SatisfyRequirementUsage": 22,
         "SuccessionAsUsage": 3,
         "VerificationCaseDefinition": 3
       },
@@ -6436,6 +6513,10 @@
         },
         {
           "kind": "AttributeDefinition",
+          "name": "RtgIdentityOverride"
+        },
+        {
+          "kind": "AttributeDefinition",
           "name": "RtgLiveStatusChange"
         },
         {
@@ -6481,6 +6562,10 @@
         {
           "kind": "AttributeDefinition",
           "name": "RtgValidationReport"
+        },
+        {
+          "kind": "EnumerationDefinition",
+          "name": "RtgIdentityOverrideMode"
         },
         {
           "kind": "EnumerationDefinition",
@@ -6570,6 +6655,15 @@
         {
           "kind": "RequirementUsage",
           "name": "intentionalBoundary"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "kernelMetaModelValidation",
+          "short_name": "contract.rtg.change_validation.kernel_meta_model"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "kernelMetaModelValidation"
         },
         {
           "kind": "RequirementUsage",
@@ -7379,16 +7473,16 @@
         "ActionDefinition": 23,
         "ActionUsage": 36,
         "AttributeDefinition": 32,
-        "AttributeUsage": 256,
+        "AttributeUsage": 257,
         "BindingConnectorAsUsage": 8,
-        "ConstraintUsage": 81,
+        "ConstraintUsage": 82,
         "Dependency": 151,
-        "Documentation": 172,
+        "Documentation": 173,
         "EnumerationDefinition": 12,
         "EnumerationUsage": 54,
-        "Feature": 202,
+        "Feature": 204,
         "FeatureChainExpression": 43,
-        "FeatureReferenceExpression": 104,
+        "FeatureReferenceExpression": 105,
         "ItemDefinition": 1,
         "ItemUsage": 16,
         "LibraryPackage": 1,
@@ -7404,9 +7498,9 @@
         "PartDefinition": 1,
         "PartUsage": 27,
         "PerformActionUsage": 80,
-        "ReferenceUsage": 626,
-        "RequirementUsage": 186,
-        "SatisfyRequirementUsage": 81,
+        "ReferenceUsage": 629,
+        "RequirementUsage": 188,
+        "SatisfyRequirementUsage": 82,
         "SuccessionAsUsage": 21,
         "TransitionUsage": 11,
         "VerificationCaseDefinition": 24
@@ -7931,6 +8025,15 @@
         {
           "kind": "RequirementUsage",
           "name": "intentionalBoundary"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "kernelMetaModelApplySemantics",
+          "short_name": "contract.rtg.controller.kernel_meta_model_apply"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "kernelMetaModelApplySemantics"
         },
         {
           "kind": "RequirementUsage",
@@ -10997,25 +11100,25 @@
       "element_counts": {
         "ActionDefinition": 10,
         "ActionUsage": 4,
-        "AttributeDefinition": 15,
-        "AttributeUsage": 43,
+        "AttributeDefinition": 16,
+        "AttributeUsage": 47,
         "CalculationDefinition": 1,
         "ConstraintUsage": 27,
         "Dependency": 8,
-        "Documentation": 48,
+        "Documentation": 49,
         "EnumerationDefinition": 1,
-        "EnumerationUsage": 11,
+        "EnumerationUsage": 14,
         "Feature": 50,
         "FeatureReferenceExpression": 29,
         "ItemDefinition": 1,
         "ItemUsage": 4,
         "LibraryPackage": 1,
-        "LiteralInfinity": 30,
-        "LiteralInteger": 36,
+        "LiteralInfinity": 32,
+        "LiteralInteger": 40,
         "LiteralString": 26,
         "MetadataUsage": 22,
-        "Multiplicity": 29,
-        "MultiplicityRange": 34,
+        "Multiplicity": 30,
+        "MultiplicityRange": 37,
         "NullExpression": 2,
         "OperatorExpression": 6,
         "PartDefinition": 1,
@@ -11126,6 +11229,10 @@
         {
           "kind": "AttributeDefinition",
           "name": "RtgMigrationStatusTransitionInvalid"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "RtgSchemaTimeShapeRetrofit"
         },
         {
           "kind": "CalculationDefinition",
@@ -12026,37 +12133,37 @@
     },
     "BibliotekRtgSchema": {
       "element_counts": {
-        "ActionDefinition": 12,
-        "ActionUsage": 4,
-        "AttributeDefinition": 26,
-        "AttributeUsage": 51,
+        "ActionDefinition": 13,
+        "ActionUsage": 7,
+        "AttributeDefinition": 30,
+        "AttributeUsage": 64,
         "CalculationDefinition": 1,
-        "ConstraintUsage": 30,
+        "ConstraintUsage": 33,
         "Dependency": 10,
-        "Documentation": 59,
-        "EnumerationDefinition": 5,
-        "EnumerationUsage": 26,
-        "Feature": 52,
-        "FeatureReferenceExpression": 32,
+        "Documentation": 64,
+        "EnumerationDefinition": 9,
+        "EnumerationUsage": 39,
+        "Feature": 56,
+        "FeatureReferenceExpression": 35,
         "ItemDefinition": 1,
         "ItemUsage": 7,
         "LibraryPackage": 1,
         "LiteralBoolean": 4,
-        "LiteralInfinity": 31,
-        "LiteralInteger": 59,
-        "LiteralString": 30,
-        "MetadataUsage": 26,
-        "Multiplicity": 36,
-        "MultiplicityRange": 46,
+        "LiteralInfinity": 34,
+        "LiteralInteger": 66,
+        "LiteralString": 32,
+        "MetadataUsage": 28,
+        "Multiplicity": 44,
+        "MultiplicityRange": 51,
         "NullExpression": 3,
-        "OperatorExpression": 7,
+        "OperatorExpression": 8,
         "PartDefinition": 1,
         "PartUsage": 4,
         "PerformActionUsage": 10,
-        "ReferenceUsage": 207,
-        "RequirementUsage": 73,
-        "SatisfyRequirementUsage": 30,
-        "VerificationCaseDefinition": 13
+        "ReferenceUsage": 225,
+        "RequirementUsage": 80,
+        "SatisfyRequirementUsage": 33,
+        "VerificationCaseDefinition": 14
       },
       "named_elements": [
         {
@@ -12108,12 +12215,20 @@
           "name": "PutSchemaDefinition"
         },
         {
+          "kind": "ActionDefinition",
+          "name": "RetrofitSchemaSnapshotLinkKinds"
+        },
+        {
           "kind": "AttributeDefinition",
           "name": "RtgAnchorSchemaPayload"
         },
         {
           "kind": "AttributeDefinition",
           "name": "RtgDataObjectSchemaPayload"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "RtgIdentityCriterion"
         },
         {
           "kind": "AttributeDefinition",
@@ -12158,6 +12273,18 @@
         {
           "kind": "AttributeDefinition",
           "name": "RtgSchemaField"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "RtgSchemaLinkKindRetrofitEntry"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "RtgSchemaLinkKindRetrofitReport"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "RtgSchemaLinkKindRetrofitResult"
         },
         {
           "kind": "AttributeDefinition",
@@ -12221,6 +12348,18 @@
         },
         {
           "kind": "EnumerationDefinition",
+          "name": "RtgSchemaIdentityMatchStrategy"
+        },
+        {
+          "kind": "EnumerationDefinition",
+          "name": "RtgSchemaIdentityScope"
+        },
+        {
+          "kind": "EnumerationDefinition",
+          "name": "RtgSchemaLinkKind"
+        },
+        {
+          "kind": "EnumerationDefinition",
           "name": "RtgSchemaParticipationDirection"
         },
         {
@@ -12230,6 +12369,10 @@
         {
           "kind": "EnumerationDefinition",
           "name": "RtgSchemaStringFormat"
+        },
+        {
+          "kind": "EnumerationDefinition",
+          "name": "RtgSchemaTimeShape"
         },
         {
           "kind": "EnumerationDefinition",
@@ -12342,6 +12485,24 @@
         {
           "kind": "RequirementUsage",
           "name": "intentionalBoundary"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "kernelMetaModelSemantics",
+          "short_name": "contract.rtg.schema.kernel_meta_model"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "kernelMetaModelSemantics"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "linkKindRetrofitSemantics",
+          "short_name": "contract.rtg.schema.link_kind_retrofit"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "linkKindRetrofitSemantics"
         },
         {
           "kind": "RequirementUsage",
@@ -12505,6 +12666,10 @@
         },
         {
           "kind": "RequirementUsage",
+          "name": "obj"
+        },
+        {
+          "kind": "RequirementUsage",
           "name": "payloadSemantics",
           "short_name": "contract.rtg.schema.payload_semantics"
         },
@@ -12520,6 +12685,15 @@
         {
           "kind": "RequirementUsage",
           "name": "putSchemaDefinitionFailureSemantics"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "retrofitSchemaSnapshotLinkKindsFailureSemantics",
+          "short_name": "contract.rtg.schema.retrofit_schema_snapshot_link_kinds.failures"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "retrofitSchemaSnapshotLinkKindsFailureSemantics"
         },
         {
           "kind": "RequirementUsage",
@@ -12613,6 +12787,10 @@
         {
           "kind": "VerificationCaseDefinition",
           "name": "PutSchemaDefinitionContractVerification"
+        },
+        {
+          "kind": "VerificationCaseDefinition",
+          "name": "RetrofitSchemaSnapshotLinkKindsContractVerification"
         },
         {
           "kind": "VerificationCaseDefinition",
@@ -13522,7 +13700,7 @@
       "element_counts": {
         "ActionDefinition": 1,
         "AttributeDefinition": 14,
-        "AttributeUsage": 96,
+        "AttributeUsage": 98,
         "ConstraintUsage": 5,
         "Documentation": 10,
         "EnumerationDefinition": 1,
@@ -13533,10 +13711,10 @@
         "ItemUsage": 31,
         "LiteralInfinity": 3,
         "LiteralInteger": 99,
-        "LiteralString": 73,
+        "LiteralString": 75,
         "MetadataDefinition": 2,
         "MetadataUsage": 22,
-        "Multiplicity": 46,
+        "Multiplicity": 48,
         "MultiplicityRange": 52,
         "OperatorExpression": 13,
         "Package": 1,
@@ -13861,7 +14039,7 @@
         "ActionUsage": 66,
         "AllocationUsage": 27,
         "AttributeDefinition": 4,
-        "AttributeUsage": 210,
+        "AttributeUsage": 211,
         "BindingConnectorAsUsage": 10,
         "ConjugatedPortDefinition": 1,
         "ConstraintDefinition": 1,
@@ -14047,7 +14225,7 @@
         "ActionDefinition": 27,
         "ActionUsage": 39,
         "AttributeDefinition": 32,
-        "AttributeUsage": 308,
+        "AttributeUsage": 309,
         "ConstraintUsage": 35,
         "Dependency": 101,
         "Documentation": 121,
@@ -15400,7 +15578,7 @@
     }
   },
   "schema_version": 1,
-  "source_digest": "7341af683ae7e5711f06073f2def8eb0908d98a9c943781f7c72c802ef0e7ec7",
+  "source_digest": "6481998649e0e039b46f4c2d2a663039139dffcdca6c8f41db4ee601add3887e",
   "validator": {
     "implementation_version": "0.50.0",
     "provider": "Systems-Modeling/SysML-v2-Pilot-Implementation",

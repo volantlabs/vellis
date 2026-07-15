@@ -13,17 +13,9 @@ SCHEMA_DOMAINS: dict[str, dict[str, object]] = {
         ),
         "recommended_first_call": {"tool": "rtg_get_system_state", "arguments": {}},
         "domain_tags": ["governance", "provenance", "policy", "beta"],
-        "runtime_status": "blocked",
-        "runtime_requirements": [
-            "schema time shapes",
-            "link kinds",
-            "identity criteria",
-            "event immutability and protected-provenance validation",
-        ],
-        "runtime_blockers": [
-            "The harmonized kernel does not yet expose the required schema metadata or policy "
-            "validation behaviors."
-        ],
+        "runtime_status": "ready",
+        "runtime_requirements": [],
+        "runtime_blockers": [],
     },
     "agent_memory_spine": {
         "title": "Agent Memory Spine",
@@ -39,17 +31,9 @@ SCHEMA_DOMAINS: dict[str, dict[str, object]] = {
         ),
         "recommended_first_call": {"tool": "rtg_get_system_state", "arguments": {}},
         "domain_tags": ["agent", "memory", "provenance", "taxonomy", "beta"],
-        "runtime_status": "blocked",
-        "runtime_requirements": [
-            "schema time shapes",
-            "link kinds",
-            "identity criteria",
-            "merge-candidate, event-immutability, and protected-provenance validation",
-        ],
-        "runtime_blockers": [
-            "The harmonized kernel does not yet expose the required schema metadata or policy "
-            "validation behaviors."
-        ],
+        "runtime_status": "ready",
+        "runtime_requirements": [],
+        "runtime_blockers": [],
     },
     "individual_life_graph": {
         "title": "Individual Life Graph",
@@ -106,11 +90,9 @@ SCHEMA_DOMAINS: dict[str, dict[str, object]] = {
         "runtime_status": "blocked",
         "runtime_requirements": [
             "experience-studio schema, seed, and query fixtures",
-            "link kinds",
         ],
         "runtime_blockers": [
-            "The referenced prototype fixtures and required link-kind schema metadata are not "
-            "yet present in the harmonized tree."
+            "The referenced prototype fixtures are not yet present in the harmonized tree."
         ],
     },
     "gothic_ambient_archive": {
@@ -130,12 +112,9 @@ SCHEMA_DOMAINS: dict[str, dict[str, object]] = {
         "runtime_status": "blocked",
         "runtime_requirements": [
             "Nocturne Archive schema, seed, and query fixtures",
-            "schema time shapes",
-            "link kinds",
         ],
         "runtime_blockers": [
-            "The referenced prototype fixtures and required temporal/link schema metadata are "
-            "not yet present in the harmonized tree."
+            "The referenced prototype fixtures are not yet present in the harmonized tree."
         ],
     },
     "time_room_history": {

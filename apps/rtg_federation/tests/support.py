@@ -389,6 +389,7 @@ def _build_personal_ops_schema() -> InMemoryRtgSchema:
                 type_key=anchor_type,
                 description=f"{anchor_type} anchor.",
                 payload=RtgAnchorSchemaPayload(required_data_types=(fact_type,)),
+                time_shape="state_now",
             )
         )
     schema.put_definition(
@@ -400,6 +401,7 @@ def _build_personal_ops_schema() -> InMemoryRtgSchema:
             payload=RtgLinkSchemaPayload(
                 allowed_source_types=("Evidence",),
                 allowed_target_types=("Commitment",),
+                link_kind="semantic",
             ),
         )
     )
@@ -416,6 +418,7 @@ def _build_personal_ops_schema() -> InMemoryRtgSchema:
                         for field in fields
                     }
                 ),
+                time_shape="state_now",
             )
         )
     return schema
@@ -470,6 +473,7 @@ def _build_gothic_archive_schema() -> InMemoryRtgSchema:
                 type_key=anchor_type,
                 description=f"{anchor_type} anchor.",
                 payload=RtgAnchorSchemaPayload(required_data_types=(fact_type,)),
+                time_shape="state_now",
             )
         )
     for fact_type, fields in fact_fields.items():
@@ -485,6 +489,7 @@ def _build_gothic_archive_schema() -> InMemoryRtgSchema:
                         for field, (required, value_kind) in fields.items()
                     }
                 ),
+                time_shape="state_now",
             )
         )
     return schema

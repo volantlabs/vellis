@@ -66,6 +66,7 @@ def build_schema() -> InMemoryRtgSchema:
             type_key="Person",
             description="Person.",
             payload=RtgAnchorSchemaPayload(required_data_types=("Profile",)),
+            time_shape="state_now",
         )
     )
     schema.put_definition(
@@ -77,6 +78,7 @@ def build_schema() -> InMemoryRtgSchema:
             payload=RtgDataObjectSchemaPayload(
                 properties={"name": RtgSchemaField(required=True, value_kinds=("string",))}
             ),
+            time_shape="state_now",
         )
     )
     return schema
@@ -898,6 +900,7 @@ def test_mcp_toolset_stages_cuts_over_and_reads_schema_migration(
                         "type_key": "Person",
                         "description": "Expanded person.",
                         "payload": {"required_data_types": ["Profile"]},
+                        "time_shape": "state_now",
                         "system": {"live": False},
                     },
                 }
@@ -1289,6 +1292,7 @@ def test_mcp_toolset_stage_schema_migration_can_replace_live_schema(
                 "type_key": "Person",
                 "description": "Expanded person.",
                 "payload": {"required_data_types": ["Profile"]},
+                "time_shape": "state_now",
             }
         ],
         retire_live_schema=[{"kind": "anchor", "type_key": "Person"}],

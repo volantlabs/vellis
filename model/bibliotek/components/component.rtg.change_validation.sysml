@@ -29,8 +29,10 @@ library package BibliotekRtgChangeValidation {
         attribute localRef[0..1] : String;
         doc /* Exactly one of resourceId and localRef identifies the target. localRef is unique within one batch and may be resolved by a controller before apply. */
     }
-    attribute def RtgGraphAnchorWrite { attribute 'ref' : RtgChangeReference; attribute type : String; attribute displayName[0..1] : String; attribute system : JsonObject; }
-    attribute def RtgGraphDataObjectWrite { attribute 'ref' : RtgChangeReference; attribute type : String; attribute properties : JsonObject; attribute system : JsonObject; attribute anchorRefs[1..*] : RtgChangeReference; }
+    enum def RtgIdentityOverrideMode { enum force_create; }
+    attribute def RtgIdentityOverride { attribute mode : RtgIdentityOverrideMode; attribute reason : String; attribute criterionKeys[0..*] : String; }
+    attribute def RtgGraphAnchorWrite { attribute 'ref' : RtgChangeReference; attribute type : String; attribute displayName[0..1] : String; attribute system : JsonObject; attribute identityOverride[0..1] : RtgIdentityOverride; }
+    attribute def RtgGraphDataObjectWrite { attribute 'ref' : RtgChangeReference; attribute type : String; attribute properties : JsonObject; attribute system : JsonObject; attribute anchorRefs[1..*] : RtgChangeReference; attribute identityOverride[0..1] : RtgIdentityOverride; }
     attribute def RtgGraphLinkWrite { attribute 'ref' : RtgChangeReference; attribute type : String; attribute sourceRef : RtgChangeReference; attribute targetRef : RtgChangeReference; attribute system : JsonObject; }
     attribute def RtgGraphAssociationChange { attribute anchorRef : RtgChangeReference; attribute dataRef : RtgChangeReference; }
     attribute def RtgGraphLiveStatusChange { attribute objectRef : RtgChangeReference; attribute live : Boolean; }
@@ -128,7 +130,7 @@ library package BibliotekRtgChangeValidation {
     requirement <'contract.rtg.change_validation.rule_catalog'> validationRuleCatalog {
         subject validator : RtgChangeValidator;
         require constraint {
-            doc /* Stable blocking codes are schema_object.unknown_type, undeclared_property, property_kind_mismatch, missing_required_property, missing_required_associated_data, link_endpoint_type_invalid, reference_missing; constraint_network.pattern_unsatisfied, cardinality_out_of_bounds, constraint_target_unknown, constraint_payload_unevaluable; and migration_cutover.reference_missing, wrong_live_state, invalid_status_transition, post_state_invalid. migration_cutover.replacement_type_mismatch is warning. Each code retains this track and severity. */
+            doc /* Stable blocking codes include schema_object.unknown_type, undeclared_property, property_kind_mismatch, missing_required_property, missing_required_associated_data, link_endpoint_type_invalid, reference_missing, kernel_system_field_write_rejected, event_update_rejected, link_kind_missing, link_kind_invalid, provenance_link_delete_rejected, and merge_candidate.identity_match; constraint_network.pattern_unsatisfied, cardinality_out_of_bounds, constraint_target_unknown, constraint_payload_unevaluable; and migration_cutover.reference_missing, wrong_live_state, invalid_status_transition, post_state_invalid, invalid_time_shape_retrofit. schema_object.delete_blast_radius_by_kind and merge_candidate.identity_force_create_override are informational; migration_cutover.replacement_type_mismatch is warning. Each code retains its declared track and severity. */
         }
     }
 
@@ -136,6 +138,13 @@ library package BibliotekRtgChangeValidation {
         subject validator : RtgChangeValidator;
         require constraint {
             doc /* Schema/object checks public schema compatibility and references; constraint/network evaluates compatible query patterns, cardinalities, targets, and payloads through query; migration/cutover checks membership, replacements, lifecycle, live state, and projected post-state. */
+        }
+    }
+
+    requirement <'contract.rtg.change_validation.kernel_meta_model'> kernelMetaModelValidation {
+        subject validator : RtgChangeValidator;
+        require constraint {
+            doc /* Schema/object validation rejects caller writes to created_at or updated_at, rejects updates to existing event-shaped data objects while permitting new event records, and reports a proposed insert matching live same-type identity criteria as a blocking merge candidate without mutation. An explicit force_create override requires a non-empty reason, optionally scopes named criteria, converts each corresponding identity match to informational evidence, and remains part of the resolved request. Staged link definitions require a recognized link kind. Direct provenance-link deletion outside migration is blocking, while anchor deletion reports the complete affected-link blast radius grouped by kind before apply. Migration projection applies only declared valid node time-shape retrofits. */
         }
     }
 
@@ -256,6 +265,7 @@ library package BibliotekRtgChangeValidation {
         satisfy referenceSemantics by validator;
         satisfy validationRuleCatalog by validator;
         satisfy validationRules by validator;
+        satisfy kernelMetaModelValidation by validator;
         satisfy reportSemantics by validator;
         satisfy validationOptionSemantics by validator;
         satisfy intentionalBoundary by validator;
@@ -300,7 +310,7 @@ library package BibliotekRtgChangeValidation {
 
     verification def RtgChangeValidationBoundaryVerification {
         subject validator : RtgChangeValidator;
-        objective { verify referenceSemantics; verify validationRuleCatalog; verify validationRules; verify reportSemantics; verify validationOptionSemantics; verify intentionalBoundary; verify noMutation; verify deterministicReports; verify findingsComprehensive; verify sourceOfTruthExternal; verify blockingFindingsControlAcceptance; verify findingsAgentActionable; verify tracksExtractable; verify batchSectionsExplicit; verify constraintSchemaCompatibility; verify patternEvaluationDelegated; verify cascadeEffectsFromPreview; }
+        objective { verify referenceSemantics; verify validationRuleCatalog; verify validationRules; verify kernelMetaModelValidation; verify reportSemantics; verify validationOptionSemantics; verify intentionalBoundary; verify noMutation; verify deterministicReports; verify findingsComprehensive; verify sourceOfTruthExternal; verify blockingFindingsControlAcceptance; verify findingsAgentActionable; verify tracksExtractable; verify batchSectionsExplicit; verify constraintSchemaCompatibility; verify patternEvaluationDelegated; verify cascadeEffectsFromPreview; }
         @EvidenceBinding { evidenceId = "components/rtg/change_validation/tests/test_rtg_change_validation_contract.py#RtgChangeValidationBoundaryVerification"; implementationScope = "DeterministicRtgChangeValidator"; }
     }
 }

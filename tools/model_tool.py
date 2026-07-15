@@ -3552,9 +3552,13 @@ def _starter_schema_data() -> dict[str, Any]:
     path = MODEL_ROOT / "vellis" / "EverydayLifeOntology.sysml"
     text = path.read_text(encoding="utf-8")
     identity = _definition_block(text, "attribute def", "EverydayLifeOntologyIdentity")
+    anchor_metadata = _definition_block(text, "metadata def", "StarterAnchorDefinition")
+    link_metadata = _definition_block(text, "metadata def", "StarterLinkDefinition")
     ontology_id = _required_string_default(identity, "ontologyId")
     version = _required_string_default(identity, "version")
     migration_id = _required_string_default(identity, "bootstrapMigrationId")
+    node_time_shape = _required_string_default(anchor_metadata, "timeShape")
+    link_kind = _required_string_default(link_metadata, "linkKind")
 
     definitions: list[dict[str, Any]] = []
     schema_ids: list[str] = []
@@ -3588,6 +3592,7 @@ def _starter_schema_data() -> dict[str, Any]:
                     "kind": "anchor",
                     "type_key": type_key,
                     "description": description,
+                    "time_shape": node_time_shape,
                     "payload": {"required_data_types": [facts_type]},
                     "system": {"live": False},
                 },
@@ -3596,6 +3601,7 @@ def _starter_schema_data() -> dict[str, Any]:
                     "kind": "data_object",
                     "type_key": facts_type,
                     "description": f"Typed facts for {type_key} anchors.",
+                    "time_shape": node_time_shape,
                     "payload": {"properties": fields},
                     "system": {"live": False},
                 },
@@ -3619,6 +3625,7 @@ def _starter_schema_data() -> dict[str, Any]:
                 "payload": {
                     "allowed_source_types": _string_tuple_assignment(metadata, "sourceTypes"),
                     "allowed_target_types": _string_tuple_assignment(metadata, "targetTypes"),
+                    "link_kind": link_kind,
                 },
                 "system": {"live": False},
             }

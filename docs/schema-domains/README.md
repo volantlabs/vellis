@@ -28,14 +28,13 @@ Currently runnable on the harmonized kernel:
   planning graph for one operator.
 - [`personal-operating-graph`](personal-operating-graph/domain.yaml): governed operating graph for
   commitments, decisions, reviews, evidence, routines, and attention planning.
-
-Cataloged but blocked pending kernel or fixture harmonization:
-
 - [`governance-core`](governance-core/domain.yaml): kernel-adjacent principles, decisions,
   conventions, policies, versioning, and authorship provenance.
 - [`agent-memory-spine`](agent-memory-spine/domain.yaml): flagship reference vocabulary for
   actors, working context, traces, facts, assessments, decisions, capabilities, classification,
   media, and graph domains.
+
+Cataloged but blocked pending fixture harmonization:
 - [`experience-studio`](experience-studio/domain.yaml): governed product-planning graph for
   graph-backed public games, visual explorations, and interactive experiences.
 - [`gothic-ambient-archive`](gothic-ambient-archive/domain.yaml): alpha public-domain Gothic

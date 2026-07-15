@@ -26,6 +26,11 @@ Status vocabulary matches the research program: `open | in_progress | done | kil
 ordinary file edit. This is an engineering program, not a research program — items produce spec
 amendments, contract tests, and implementation, not RR reports.
 
+Post-merge harmonization checkpoint (2026-07-14): KM-2 through KM-4 now conform to the
+SysML-owned component tree, including MCP codecs, generated starter ontology, federation legacy
+snapshot backfill, repo-twin schema, and schema-domain readiness. `just check` passed with 567
+tests. KM-5 and KM-6 remain the next kernel harmonization tranche.
+
 ## The per-item loop
 
 Every KM item runs the same loop. Do not skip steps; the loop *is* the methodology this program

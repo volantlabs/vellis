@@ -11,6 +11,7 @@ from components.rtg.change_validation import (
     RtgGraphChangeSet,
     RtgGraphDataObjectWrite,
     RtgGraphLinkWrite,
+    RtgIdentityOverride,
     RtgMigrationChangeSet,
     RtgMigrationRecordWrite,
     RtgSchemaChangeSet,
@@ -40,6 +41,7 @@ from components.rtg.schema import (
     InMemoryRtgSchema,
     RtgAnchorSchemaPayload,
     RtgDataObjectSchemaPayload,
+    RtgIdentityCriterion,
     RtgLinkSchemaPayload,
     RtgSchemaDefinition,
     RtgSchemaField,
@@ -60,6 +62,7 @@ def _validate_refined_value(value: str | int | float | bool | None, field: RtgSc
             type_key="Item",
             description="Item.",
             payload=RtgAnchorSchemaPayload(required_data_types=("ItemFacts",)),
+            time_shape="state_now",
         )
     )
     schema.put_definition(
@@ -69,6 +72,7 @@ def _validate_refined_value(value: str | int | float | bool | None, field: RtgSc
             type_key="ItemFacts",
             description="Refined item facts.",
             payload=RtgDataObjectSchemaPayload(properties={"value": field}),
+            time_shape="state_now",
         )
     )
     graph = InMemoryRtgGraph.empty()
@@ -172,6 +176,7 @@ def test_grouped_cardinality_counts_distinct_targets_per_source() -> None:
                 type_key=type_key,
                 description=f"{type_key}.",
                 payload=RtgAnchorSchemaPayload(),
+                time_shape="state_now",
             )
         )
     schema.put_definition(
@@ -180,7 +185,7 @@ def test_grouped_cardinality_counts_distinct_targets_per_source() -> None:
             kind="link",
             type_key="belongs_to",
             description="Membership.",
-            payload=RtgLinkSchemaPayload(("Project",), ("Area",)),
+            payload=RtgLinkSchemaPayload(("Project",), ("Area",), link_kind="semantic"),
         )
     )
     graph = InMemoryRtgGraph.empty()
@@ -243,6 +248,7 @@ def test_global_cardinality_counts_distinct_bindings_not_expanded_rows() -> None
             type_key="Thing",
             description="Thing.",
             payload=RtgAnchorSchemaPayload(optional_data_types=("Facts",)),
+            time_shape="state_now",
         )
     )
     schema.put_definition(
@@ -252,6 +258,7 @@ def test_global_cardinality_counts_distinct_bindings_not_expanded_rows() -> None
             type_key="Facts",
             description="Facts.",
             payload=RtgDataObjectSchemaPayload(),
+            time_shape="state_now",
         )
     )
     graph = InMemoryRtgGraph.empty()
@@ -300,6 +307,7 @@ def build_schema() -> InMemoryRtgSchema:
             type_key="Person",
             description="Person.",
             payload=RtgAnchorSchemaPayload(required_data_types=("Profile",)),
+            time_shape="state_now",
         )
     )
     schema.put_definition(
@@ -311,6 +319,122 @@ def build_schema() -> InMemoryRtgSchema:
             payload=RtgDataObjectSchemaPayload(
                 properties={"name": RtgSchemaField(required=True, value_kinds=("string",))}
             ),
+            time_shape="state_now",
+        )
+    )
+    return schema
+
+
+def build_link_kind_schema() -> InMemoryRtgSchema:
+    schema = InMemoryRtgSchema.empty()
+    schema.put_definition(
+        RtgSchemaDefinition(
+            uuid=uuid4(),
+            kind="anchor",
+            type_key="Person",
+            description="Person.",
+            payload=RtgAnchorSchemaPayload(),
+            time_shape="state_now",
+        )
+    )
+    for type_key, link_kind in (
+        ("knows", "semantic"),
+        ("has_profile", "structural"),
+        ("cited_by", "provenance"),
+    ):
+        schema.put_definition(
+            RtgSchemaDefinition(
+                uuid=uuid4(),
+                kind="link",
+                type_key=type_key,
+                description=f"{type_key} link.",
+                payload=RtgLinkSchemaPayload(
+                    allowed_source_types=("Person", "Profile"),
+                    allowed_target_types=("Person", "Profile"),
+                    link_kind=link_kind,
+                ),
+            )
+        )
+    schema.put_definition(
+        RtgSchemaDefinition(
+            uuid=uuid4(),
+            kind="data_object",
+            type_key="Profile",
+            description="Profile.",
+            payload=RtgDataObjectSchemaPayload(
+                properties={"name": RtgSchemaField(required=True, value_kinds=("string",))}
+            ),
+            time_shape="state_now",
+        )
+    )
+    return schema
+
+
+def build_identity_schema() -> InMemoryRtgSchema:
+    schema = InMemoryRtgSchema.empty()
+    schema.put_definition(
+        RtgSchemaDefinition(
+            uuid=uuid4(),
+            kind="anchor",
+            type_key="Person",
+            description="Person.",
+            payload=RtgAnchorSchemaPayload(),
+            time_shape="state_now",
+            identity_criteria=(
+                RtgIdentityCriterion(
+                    "person_display_name",
+                    ("display_name",),
+                    "normalized",
+                    "same_type",
+                ),
+            ),
+        )
+    )
+    schema.put_definition(
+        RtgSchemaDefinition(
+            uuid=uuid4(),
+            kind="data_object",
+            type_key="Profile",
+            description="Profile.",
+            payload=RtgDataObjectSchemaPayload(
+                properties={"name": RtgSchemaField(required=True, value_kinds=("string",))}
+            ),
+            time_shape="state_now",
+            identity_criteria=(
+                RtgIdentityCriterion(
+                    "profile_name",
+                    ("properties.name",),
+                    "exact",
+                    "same_type",
+                ),
+            ),
+        )
+    )
+    return schema
+
+
+def build_event_schema() -> InMemoryRtgSchema:
+    schema = InMemoryRtgSchema.empty()
+    schema.put_definition(
+        RtgSchemaDefinition(
+            uuid=uuid4(),
+            kind="anchor",
+            type_key="Person",
+            description="Person.",
+            payload=RtgAnchorSchemaPayload(),
+            time_shape="state_now",
+        )
+    )
+    schema.put_definition(
+        RtgSchemaDefinition(
+            uuid=uuid4(),
+            kind="data_object",
+            type_key="ProfileEvent",
+            description="Immutable profile event.",
+            payload=RtgDataObjectSchemaPayload(
+                properties={"name": RtgSchemaField(required=True, value_kinds=("string",))}
+            ),
+            time_shape="event",
         )
     )
     return schema
@@ -360,6 +484,7 @@ def test_schema_value_kind_refinements_and_nested_strictness() -> None:
             type_key="Person",
             description="Person.",
             payload=RtgAnchorSchemaPayload(required_data_types=("Profile",)),
+            time_shape="state_now",
         )
     )
     schema.put_definition(
@@ -382,6 +507,7 @@ def test_schema_value_kind_refinements_and_nested_strictness() -> None:
                     ),
                 }
             ),
+            time_shape="state_now",
         )
     )
     graph = InMemoryRtgGraph.empty()
@@ -554,6 +680,234 @@ def test_unevaluable_constraint_payload_is_a_catalog_finding() -> None:
     ]
 
 
+def test_validation_rejects_updates_to_event_data_objects_but_allows_new_events() -> None:
+    graph = InMemoryRtgGraph.empty()
+    anchor = graph.put_anchor(RtgAnchor(uuid=uuid4(), type="Person"))
+    event = graph.put_data_object(
+        RtgDataObject(
+            uuid=uuid4(),
+            type="ProfileEvent",
+            properties={"name": "Ada"},
+        ),
+        (concrete_uuid(anchor.uuid),),
+    )
+    schema = build_event_schema()
+
+    update_report = DeterministicRtgChangeValidator().validate_batch(
+        graph,
+        schema,
+        InMemoryRtgConstraints.empty(),
+        InMemoryRtgMigration.empty(),
+        SimpleRtgQueryEngine(),
+        RtgChangeBatch(
+            graph_changes=RtgGraphChangeSet(
+                data_object_writes=(
+                    RtgGraphDataObjectWrite(
+                        ref=RtgChangeReference(resource_id=concrete_uuid(event.uuid)),
+                        type="ProfileEvent",
+                        properties={"name": "Grace"},
+                        anchor_refs=(RtgChangeReference(resource_id=concrete_uuid(anchor.uuid)),),
+                    ),
+                )
+            )
+        ),
+    )
+    append_report = DeterministicRtgChangeValidator().validate_batch(
+        graph,
+        schema,
+        InMemoryRtgConstraints.empty(),
+        InMemoryRtgMigration.empty(),
+        SimpleRtgQueryEngine(),
+        RtgChangeBatch(
+            graph_changes=RtgGraphChangeSet(
+                data_object_writes=(
+                    RtgGraphDataObjectWrite(
+                        ref=RtgChangeReference(resource_id=uuid4()),
+                        type="ProfileEvent",
+                        properties={"name": "Grace"},
+                        anchor_refs=(RtgChangeReference(resource_id=concrete_uuid(anchor.uuid)),),
+                    ),
+                )
+            )
+        ),
+    )
+
+    assert update_report.accepted is False
+    finding = next(
+        finding
+        for finding in update_report.findings
+        if finding.code == "schema_object.event_update_rejected"
+    )
+    assert "append" in (finding.suggestion or "").lower()
+    assert finding.diagnostic["path"] == "graph_changes.data_object_writes[0]"
+    assert append_report.accepted is True
+    assert "schema_object.event_update_rejected" not in {
+        finding.code for finding in append_report.findings
+    }
+
+
+def test_validation_reports_data_identity_merge_candidates_without_mutation() -> None:
+    graph = InMemoryRtgGraph.empty()
+    anchor = graph.put_anchor(RtgAnchor(uuid=uuid4(), type="Person", display_name="Ada"))
+    existing = graph.put_data_object(
+        RtgDataObject(
+            uuid=uuid4(),
+            type="Profile",
+            properties={"name": "Ada Lovelace"},
+        ),
+        (concrete_uuid(anchor.uuid),),
+    )
+    before = graph.export_snapshot()
+
+    report = DeterministicRtgChangeValidator().validate_batch(
+        graph,
+        build_identity_schema(),
+        InMemoryRtgConstraints.empty(),
+        InMemoryRtgMigration.empty(),
+        SimpleRtgQueryEngine(),
+        RtgChangeBatch(
+            graph_changes=RtgGraphChangeSet(
+                data_object_writes=(
+                    RtgGraphDataObjectWrite(
+                        ref=RtgChangeReference(resource_id=uuid4()),
+                        type="Profile",
+                        properties={"name": "Ada Lovelace"},
+                        anchor_refs=(RtgChangeReference(resource_id=concrete_uuid(anchor.uuid)),),
+                    ),
+                )
+            )
+        ),
+    )
+
+    assert report.accepted is False
+    finding = next(
+        finding
+        for finding in report.findings
+        if finding.code == "merge_candidate.identity_match"
+    )
+    assert finding.track == "merge_candidate"
+    assert finding.severity == "blocking"
+    assert finding.diagnostic["candidate_uuids"] == [str(existing.uuid)]
+    assert finding.diagnostic["type_key"] == "Profile"
+    assert finding.diagnostic["criterion_key"] == "profile_name"
+    assert finding.diagnostic["match_strategy"] == "exact"
+    assert finding.diagnostic["scope"] == "same_type"
+    assert finding.diagnostic["property_paths"] == ["properties.name"]
+    assert finding.diagnostic["match_basis"] == {"properties.name": "Ada Lovelace"}
+    assert graph.export_snapshot() == before
+
+
+def test_validation_reports_force_create_override_as_informational_evidence() -> None:
+    graph = InMemoryRtgGraph.empty()
+    existing = graph.put_anchor(
+        RtgAnchor(uuid=uuid4(), type="Person", display_name="Ada Lovelace")
+    )
+
+    report = DeterministicRtgChangeValidator().validate_batch(
+        graph,
+        build_identity_schema(),
+        InMemoryRtgConstraints.empty(),
+        InMemoryRtgMigration.empty(),
+        SimpleRtgQueryEngine(),
+        RtgChangeBatch(
+            graph_changes=RtgGraphChangeSet(
+                anchor_writes=(
+                    RtgGraphAnchorWrite(
+                        ref=RtgChangeReference(resource_id=uuid4()),
+                        type="Person",
+                        display_name="Ada Lovelace",
+                        identity_override=RtgIdentityOverride(
+                            mode="force_create",
+                            reason="confirmed distinct person with the same display name",
+                            criterion_keys=("person_display_name",),
+                        ),
+                    ),
+                )
+            )
+        ),
+    )
+
+    assert report.accepted is True
+    finding = next(
+        finding
+        for finding in report.findings
+        if finding.code == "merge_candidate.force_create_override"
+    )
+    assert finding.track == "merge_candidate"
+    assert finding.severity == "informational"
+    assert finding.diagnostic["candidate_uuids"] == [str(existing.uuid)]
+    assert finding.diagnostic["override_reason"] == (
+        "confirmed distinct person with the same display name"
+    )
+    assert finding.diagnostic["criterion_key"] == "person_display_name"
+
+
+def test_validation_preserves_current_behavior_for_types_without_identity_criteria() -> None:
+    graph = InMemoryRtgGraph.empty()
+    anchor = graph.put_anchor(RtgAnchor(uuid=uuid4(), type="Person", display_name="Ada"))
+    graph.put_data_object(
+        RtgDataObject(
+            uuid=uuid4(),
+            type="Profile",
+            properties={"name": "Ada Lovelace"},
+        ),
+        (concrete_uuid(anchor.uuid),),
+    )
+
+    report = DeterministicRtgChangeValidator().validate_batch(
+        graph,
+        build_schema(),
+        InMemoryRtgConstraints.empty(),
+        InMemoryRtgMigration.empty(),
+        SimpleRtgQueryEngine(),
+        RtgChangeBatch(
+            graph_changes=RtgGraphChangeSet(
+                data_object_writes=(
+                    RtgGraphDataObjectWrite(
+                        ref=RtgChangeReference(resource_id=uuid4()),
+                        type="Profile",
+                        properties={"name": "Ada Lovelace"},
+                        anchor_refs=(RtgChangeReference(resource_id=concrete_uuid(anchor.uuid)),),
+                    ),
+                )
+            )
+        ),
+    )
+
+    assert report.accepted is True
+    assert not [finding for finding in report.findings if finding.track == "merge_candidate"]
+
+
+def test_validation_rejects_caller_owned_kernel_timestamp_fields() -> None:
+    report = DeterministicRtgChangeValidator().validate_batch(
+        InMemoryRtgGraph.empty(),
+        build_schema(),
+        InMemoryRtgConstraints.empty(),
+        InMemoryRtgMigration.empty(),
+        SimpleRtgQueryEngine(),
+        RtgChangeBatch(
+            graph_changes=RtgGraphChangeSet(
+                anchor_writes=(
+                    RtgGraphAnchorWrite(
+                        ref=RtgChangeReference(resource_id=uuid4()),
+                        type="Person",
+                        system={"created_at": "2026-01-01T00:00:00Z"},
+                    ),
+                )
+            )
+        ),
+    )
+
+    assert report.accepted is False
+    finding = next(
+        finding
+        for finding in report.findings
+        if finding.code == "schema_object.kernel_system_field_writable"
+    )
+    assert finding.diagnostic["field"] == "created_at"
+    assert finding.diagnostic["path"] == "graph_changes.anchor_writes[0].system.created_at"
+
+
 def test_validation_reports_unresolved_link_endpoints_with_paths() -> None:
     report = DeterministicRtgChangeValidator().validate_batch(
         InMemoryRtgGraph.empty(),
@@ -594,6 +948,139 @@ def test_validation_reports_unresolved_link_endpoints_with_paths() -> None:
         assert "lookup_examples" in guide_topics
 
 
+def test_validation_rejects_staged_link_schema_without_link_kind() -> None:
+    report = DeterministicRtgChangeValidator().validate_batch(
+        InMemoryRtgGraph.empty(),
+        build_schema(),
+        InMemoryRtgConstraints.empty(),
+        InMemoryRtgMigration.empty(),
+        SimpleRtgQueryEngine(),
+        RtgChangeBatch(
+            schema_changes=RtgSchemaChangeSet(
+                definition_writes=(
+                    RtgSchemaDefinitionWrite(
+                        ref=RtgChangeReference(resource_id=uuid4()),
+                        definition=RtgSchemaDefinition(
+                            uuid=uuid4(),
+                            kind="link",
+                            type_key="knows",
+                            description="Person knows person.",
+                            payload=RtgLinkSchemaPayload(
+                                allowed_source_types=("Person",),
+                                allowed_target_types=("Person",),
+                            ),
+                            system={"live": False},
+                        ),
+                    ),
+                )
+            )
+        ),
+    )
+
+    assert report.accepted is False
+    finding = next(
+        finding for finding in report.findings if finding.code == "schema_object.link_kind_missing"
+    )
+    assert finding.diagnostic["path"] == "schema_changes.definition_writes[0].definition.payload"
+
+
+def test_validation_rejects_direct_provenance_link_delete_without_mutation() -> None:
+    graph = InMemoryRtgGraph.empty()
+    source = graph.put_anchor(RtgAnchor(uuid=uuid4(), type="Person"))
+    target = graph.put_anchor(RtgAnchor(uuid=uuid4(), type="Person"))
+    provenance = graph.put_link(
+        RtgLink(
+            uuid=uuid4(),
+            type="cited_by",
+            source_uuid=concrete_uuid(source.uuid),
+            target_uuid=concrete_uuid(target.uuid),
+        )
+    )
+    before = graph.export_snapshot()
+
+    report = DeterministicRtgChangeValidator().validate_batch(
+        graph,
+        build_link_kind_schema(),
+        InMemoryRtgConstraints.empty(),
+        InMemoryRtgMigration.empty(),
+        SimpleRtgQueryEngine(),
+        RtgChangeBatch(
+            graph_changes=RtgGraphChangeSet(
+                delete_links=(RtgChangeReference(resource_id=concrete_uuid(provenance.uuid)),)
+            )
+        ),
+    )
+
+    assert report.accepted is False
+    finding = next(
+        finding
+        for finding in report.findings
+        if finding.code == "schema_object.provenance_link_delete_rejected"
+    )
+    assert finding.diagnostic["link_uuid"] == str(provenance.uuid)
+    assert finding.diagnostic["link_kind"] == "provenance"
+    assert graph.export_snapshot() == before
+
+
+def test_validation_reports_kind_grouped_delete_blast_radius_without_mutation() -> None:
+    graph = InMemoryRtgGraph.empty()
+    source = graph.put_anchor(RtgAnchor(uuid=uuid4(), type="Person"))
+    target = graph.put_anchor(RtgAnchor(uuid=uuid4(), type="Person"))
+    profile = graph.put_data_object(
+        RtgDataObject(
+            uuid=uuid4(),
+            type="Profile",
+            properties={"name": "Ada"},
+        ),
+        (concrete_uuid(source.uuid),),
+    )
+    semantic = graph.put_link(
+        RtgLink(
+            uuid=uuid4(),
+            type="knows",
+            source_uuid=concrete_uuid(source.uuid),
+            target_uuid=concrete_uuid(target.uuid),
+        )
+    )
+    structural = graph.put_link(
+        RtgLink(
+            uuid=uuid4(),
+            type="has_profile",
+            source_uuid=concrete_uuid(source.uuid),
+            target_uuid=concrete_uuid(profile.uuid),
+        )
+    )
+    before = graph.export_snapshot()
+
+    report = DeterministicRtgChangeValidator().validate_batch(
+        graph,
+        build_link_kind_schema(),
+        InMemoryRtgConstraints.empty(),
+        InMemoryRtgMigration.empty(),
+        SimpleRtgQueryEngine(),
+        RtgChangeBatch(
+            graph_changes=RtgGraphChangeSet(
+                delete_anchors=(RtgChangeReference(resource_id=concrete_uuid(source.uuid)),)
+            )
+        ),
+    )
+
+    assert report.accepted is True
+    finding = next(
+        finding
+        for finding in report.findings
+        if finding.code == "schema_object.delete_blast_radius_by_kind"
+    )
+    assert finding.severity == "informational"
+    assert finding.diagnostic["links_by_kind"] == {
+        "semantic": [str(semantic.uuid)],
+        "structural": [str(structural.uuid)],
+    }
+    assert finding.diagnostic["deleted_anchor_uuids"] == [str(source.uuid)]
+    assert finding.diagnostic["deleted_data_object_uuids"] == [str(profile.uuid)]
+    assert graph.export_snapshot() == before
+
+
 def test_migration_projection_reports_wrong_live_state() -> None:
     schema = build_schema()
     live_person = schema.list_definitions_by_type_key("Person", kind="anchor").definitions[0]
@@ -629,6 +1116,7 @@ def test_migration_projection_reports_replacement_type_mismatch_as_warning() -> 
         type_key="Project",
         description="Project.",
         payload=RtgAnchorSchemaPayload(),
+        time_shape="state_now",
         system={"live": False},
     )
     schema.put_definition(project_candidate)
@@ -677,6 +1165,7 @@ def test_finding_limit_does_not_hide_blocking_acceptance() -> None:
         type_key="Project",
         description="Project.",
         payload=RtgAnchorSchemaPayload(),
+        time_shape="state_now",
         system={"live": False},
     )
     schema.put_definition(project_candidate)
@@ -733,6 +1222,7 @@ def test_staged_migration_batch_validates_projected_cutover_state() -> None:
         payload=RtgDataObjectSchemaPayload(
             properties={"age": RtgSchemaField(required=True, value_kinds=("integer",))}
         ),
+        time_shape="state_now",
         system={"live": False},
     )
     person_uuid = uuid4()

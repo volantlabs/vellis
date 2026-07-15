@@ -17,11 +17,19 @@ class RtgChangeReference:
 
 
 @dataclass(frozen=True, slots=True)
+class RtgIdentityOverride:
+    mode: str
+    reason: str
+    criterion_keys: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True, slots=True)
 class RtgGraphAnchorWrite:
     ref: RtgChangeReference
     type: str
     display_name: str | None = None
     system: JsonObject = field(default_factory=dict)
+    identity_override: RtgIdentityOverride | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -31,6 +39,7 @@ class RtgGraphDataObjectWrite:
     properties: JsonObject = field(default_factory=dict)
     system: JsonObject = field(default_factory=dict)
     anchor_refs: tuple[RtgChangeReference, ...] = ()
+    identity_override: RtgIdentityOverride | None = None
 
 
 @dataclass(frozen=True, slots=True)

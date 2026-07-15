@@ -67,6 +67,7 @@ from components.rtg.query import (
 from components.rtg.schema import (
     RtgAnchorSchemaPayload,
     RtgDataObjectSchemaPayload,
+    RtgIdentityCriterion,
     RtgLinkSchemaPayload,
     RtgSchemaDefinition,
     RtgSchemaField,
@@ -432,7 +433,16 @@ def decode_schema_definition(value: object) -> RtgSchemaDefinition:
     data = _object(value, "schema_definition")
     _reject_unknown_keys(
         data,
-        {"uuid", "kind", "type_key", "description", "payload", "system"},
+        {
+            "uuid",
+            "kind",
+            "type_key",
+            "description",
+            "payload",
+            "time_shape",
+            "identity_criteria",
+            "system",
+        },
         "schema_definition",
         {"type": "type_key", "name": "type_key", "schema_type": "type_key"},
     )
@@ -476,13 +486,14 @@ def decode_schema_definition(value: object) -> RtgSchemaDefinition:
     elif kind == "link":
         _reject_unknown_keys(
             payload,
-            {"allowed_source_types", "allowed_target_types"},
+            {"allowed_source_types", "allowed_target_types", "link_kind"},
             "schema_definition.payload",
             {
                 "source_types": "allowed_source_types",
                 "target_types": "allowed_target_types",
                 "allowed_sources": "allowed_source_types",
                 "allowed_targets": "allowed_target_types",
+                "kind": "link_kind",
             },
         )
         decoded_payload = RtgLinkSchemaPayload(
@@ -494,6 +505,9 @@ def decode_schema_definition(value: object) -> RtgSchemaDefinition:
                 payload.get("allowed_target_types", []),
                 "schema_definition.payload.allowed_target_types",
             ),
+            link_kind=(
+                str(payload["link_kind"]) if payload.get("link_kind") is not None else None
+            ),
         )
     else:
         raise RtgMcpInputInvalid(f"unsupported schema definition kind: {kind}")
@@ -503,7 +517,27 @@ def decode_schema_definition(value: object) -> RtgSchemaDefinition:
         type_key=_required_str(data, "type_key"),
         description=_required_str(data, "description"),
         payload=decoded_payload,
+        time_shape=str(data["time_shape"]) if data.get("time_shape") is not None else None,
+        identity_criteria=tuple(
+            _decode_identity_criterion(item)
+            for item in _list(data.get("identity_criteria", []), "identity_criteria")
+        ),
         system=_json_object(data.get("system", {}), "schema_definition.system"),
+    )
+
+
+def _decode_identity_criterion(value: object) -> RtgIdentityCriterion:
+    data = _object(value, "identity_criterion")
+    _reject_unknown_keys(
+        data,
+        {"criterion_key", "property_paths", "match_strategy", "scope"},
+        "identity_criterion",
+    )
+    return RtgIdentityCriterion(
+        criterion_key=_required_str(data, "criterion_key"),
+        property_paths=_str_tuple(data.get("property_paths", []), "property_paths"),
+        match_strategy=_required_str(data, "match_strategy"),
+        scope=_required_str(data, "scope"),
     )
 
 

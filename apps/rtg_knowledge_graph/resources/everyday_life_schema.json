@@ -66,6 +66,7 @@
             "system": {
               "live": false
             },
+            "time_shape": "state_now",
             "type_key": "Person",
             "uuid": "13e1fba4-7ad1-5d29-b3dd-84b4a8c6b421"
           },
@@ -108,6 +109,7 @@
             "system": {
               "live": false
             },
+            "time_shape": "state_now",
             "type_key": "PersonFacts",
             "uuid": "c1aa90b0-07ab-5d5b-b0a8-4fb660b61127"
           },
@@ -127,6 +129,7 @@
             "system": {
               "live": false
             },
+            "time_shape": "state_now",
             "type_key": "Group",
             "uuid": "e6c85b1d-f947-56b7-aa9e-e546d1673ee9"
           },
@@ -163,6 +166,7 @@
             "system": {
               "live": false
             },
+            "time_shape": "state_now",
             "type_key": "GroupFacts",
             "uuid": "46a947bf-2080-575f-882b-a96c4ae0d3cb"
           },
@@ -182,6 +186,7 @@
             "system": {
               "live": false
             },
+            "time_shape": "state_now",
             "type_key": "Area",
             "uuid": "fe252f6e-287b-5193-b111-069234d733ad"
           },
@@ -224,6 +229,7 @@
             "system": {
               "live": false
             },
+            "time_shape": "state_now",
             "type_key": "AreaFacts",
             "uuid": "2f2c434e-5743-507e-85b0-5189f72b841f"
           },
@@ -243,6 +249,7 @@
             "system": {
               "live": false
             },
+            "time_shape": "state_now",
             "type_key": "Goal",
             "uuid": "c58d39f8-dd1c-5ff9-9ea7-6cca694640ba"
           },
@@ -297,6 +304,7 @@
             "system": {
               "live": false
             },
+            "time_shape": "state_now",
             "type_key": "GoalFacts",
             "uuid": "0d76f3b3-a2a5-5085-8fd9-c13c11f09c53"
           },
@@ -316,6 +324,7 @@
             "system": {
               "live": false
             },
+            "time_shape": "state_now",
             "type_key": "Project",
             "uuid": "d733a4ab-ff34-5f27-a24a-b66b1b5d6c3c"
           },
@@ -370,6 +379,7 @@
             "system": {
               "live": false
             },
+            "time_shape": "state_now",
             "type_key": "ProjectFacts",
             "uuid": "41201a3f-f960-5f9f-9d2a-689e197b769f"
           },
@@ -389,6 +399,7 @@
             "system": {
               "live": false
             },
+            "time_shape": "state_now",
             "type_key": "Task",
             "uuid": "5bec5645-bc29-5c84-8039-70f897a07b7c"
           },
@@ -443,6 +454,7 @@
             "system": {
               "live": false
             },
+            "time_shape": "state_now",
             "type_key": "TaskFacts",
             "uuid": "150d262e-dc49-52ef-b8be-c478d460674c"
           },
@@ -462,6 +474,7 @@
             "system": {
               "live": false
             },
+            "time_shape": "state_now",
             "type_key": "Event",
             "uuid": "c707ab80-658d-5d97-9df5-6ae7d8f578c1"
           },
@@ -516,6 +529,7 @@
             "system": {
               "live": false
             },
+            "time_shape": "state_now",
             "type_key": "EventFacts",
             "uuid": "dd389759-aeeb-54f6-b572-9a8afa9ec442"
           },
@@ -535,6 +549,7 @@
             "system": {
               "live": false
             },
+            "time_shape": "state_now",
             "type_key": "Routine",
             "uuid": "4407ab29-893e-5f3e-beea-a3e95d773296"
           },
@@ -589,6 +604,7 @@
             "system": {
               "live": false
             },
+            "time_shape": "state_now",
             "type_key": "RoutineFacts",
             "uuid": "c74f16e6-07b1-5837-8702-e8df86a90849"
           },
@@ -608,6 +624,7 @@
             "system": {
               "live": false
             },
+            "time_shape": "state_now",
             "type_key": "Decision",
             "uuid": "b0448826-6355-59bf-90c7-bd4cffeab0f7"
           },
@@ -656,6 +673,7 @@
             "system": {
               "live": false
             },
+            "time_shape": "state_now",
             "type_key": "DecisionFacts",
             "uuid": "f457bb5e-c2c0-5fae-82f3-e3f5ab99cfab"
           },
@@ -675,6 +693,7 @@
             "system": {
               "live": false
             },
+            "time_shape": "state_now",
             "type_key": "Note",
             "uuid": "7b7b7d4a-fd2f-592f-8d9b-7df759f80fa4"
           },
@@ -723,6 +742,7 @@
             "system": {
               "live": false
             },
+            "time_shape": "state_now",
             "type_key": "NoteFacts",
             "uuid": "31750272-2c79-549b-b64d-bd728b976062"
           },
@@ -742,6 +762,7 @@
             "system": {
               "live": false
             },
+            "time_shape": "state_now",
             "type_key": "Resource",
             "uuid": "7839ce6d-f5bb-5827-be76-5d4db08acb1c"
           },
@@ -790,6 +811,7 @@
             "system": {
               "live": false
             },
+            "time_shape": "state_now",
             "type_key": "ResourceFacts",
             "uuid": "997a7d71-d2ab-5d33-a406-23a3e052080a"
           },
@@ -809,6 +831,7 @@
             "system": {
               "live": false
             },
+            "time_shape": "state_now",
             "type_key": "Place",
             "uuid": "a78005e2-dc7b-5883-9396-444bd2b5f84b"
           },
@@ -851,6 +874,7 @@
             "system": {
               "live": false
             },
+            "time_shape": "state_now",
             "type_key": "PlaceFacts",
             "uuid": "5a242c08-9773-5695-8c24-a159790012c0"
           },
@@ -875,7 +899,8 @@
               ],
               "allowed_target_types": [
                 "Area"
-              ]
+              ],
+              "link_kind": "semantic"
             },
             "system": {
               "live": false
@@ -904,7 +929,8 @@
               "allowed_target_types": [
                 "Goal",
                 "Project"
-              ]
+              ],
+              "link_kind": "semantic"
             },
             "system": {
               "live": false
@@ -932,7 +958,8 @@
                 "Task",
                 "Event",
                 "Routine"
-              ]
+              ],
+              "link_kind": "semantic"
             },
             "system": {
               "live": false
@@ -954,7 +981,8 @@
               ],
               "allowed_target_types": [
                 "Group"
-              ]
+              ],
+              "link_kind": "semantic"
             },
             "system": {
               "live": false
@@ -982,7 +1010,8 @@
               "allowed_target_types": [
                 "Person",
                 "Group"
-              ]
+              ],
+              "link_kind": "semantic"
             },
             "system": {
               "live": false
@@ -1007,7 +1036,8 @@
               ],
               "allowed_target_types": [
                 "Place"
-              ]
+              ],
+              "link_kind": "semantic"
             },
             "system": {
               "live": false
@@ -1041,7 +1071,8 @@
                 "Note",
                 "Resource",
                 "Place"
-              ]
+              ],
+              "link_kind": "semantic"
             },
             "system": {
               "live": false
@@ -1074,7 +1105,8 @@
                 "Note",
                 "Resource",
                 "Place"
-              ]
+              ],
+              "link_kind": "semantic"
             },
             "system": {
               "live": false
@@ -1100,7 +1132,8 @@
                 "Goal",
                 "Project",
                 "Task"
-              ]
+              ],
+              "link_kind": "semantic"
             },
             "system": {
               "live": false

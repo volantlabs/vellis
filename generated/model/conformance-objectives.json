@@ -550,6 +550,7 @@
         "contract.rtg.change_validation.references",
         "contract.rtg.change_validation.rule_catalog",
         "contract.rtg.change_validation.rules",
+        "contract.rtg.change_validation.kernel_meta_model",
         "contract.rtg.change_validation.report",
         "contract.rtg.change_validation.options",
         "contract.rtg.change_validation.intentional_boundary",
@@ -949,6 +950,7 @@
       "requirements": [
         "contract.rtg.controller.live_mutation_flow",
         "contract.rtg.controller.live_mutation_lane",
+        "contract.rtg.controller.kernel_meta_model_apply",
         "contract.rtg.controller.apply_live_graph_changes.failures"
       ],
       "status": "resolved",
@@ -3258,7 +3260,13 @@
         "components/rtg/schema/tests/test_rtg_schema_contract.py::test_schema_field_refinements_are_normalized_and_reject_invalid_combinations",
         "components/rtg/schema/tests/test_rtg_schema_contract.py::test_allowed_values_preserve_distinct_large_json_integers",
         "components/rtg/schema/tests/test_rtg_schema_contract.py::test_schema_payload_sets_are_unique_disjoint_and_canonical",
-        "components/rtg/schema/tests/test_rtg_schema_contract.py::test_schema_failure_vocabulary_is_boundary_specific"
+        "components/rtg/schema/tests/test_rtg_schema_contract.py::test_schema_failure_vocabulary_is_boundary_specific",
+        "components/rtg/schema/tests/test_rtg_schema_contract.py::test_node_definitions_require_time_shape_and_links_reject_it",
+        "components/rtg/schema/tests/test_rtg_schema_contract.py::test_state_as_of_requires_interval_fields_and_reserved_system_fields_are_rejected",
+        "components/rtg/schema/tests/test_rtg_schema_contract.py::test_node_identity_criteria_are_stored_and_snapshotted",
+        "components/rtg/schema/tests/test_rtg_schema_contract.py::test_identity_criteria_reject_invalid_shape_and_payload_paths",
+        "components/rtg/schema/tests/test_rtg_schema_contract.py::test_link_definitions_reject_identity_criteria",
+        "components/rtg/schema/tests/test_rtg_schema_contract.py::test_link_definitions_require_link_kind_and_validate_enum"
       ],
       "model_source": "model/bibliotek/components/component.rtg.schema.sysml",
       "requirements": [
@@ -3273,6 +3281,23 @@
       "verification": "PutSchemaDefinitionContractVerification"
     },
     {
+      "evidence_id": "components/rtg/schema/tests/test_rtg_schema_contract.py#RetrofitSchemaSnapshotLinkKindsContractVerification",
+      "evidence_nodes": [
+        "components/rtg/schema/tests/test_rtg_schema_contract.py::test_legacy_snapshot_link_kind_retrofit_defaults_missing_links"
+      ],
+      "model_source": "model/bibliotek/components/component.rtg.schema.sysml",
+      "requirements": [
+        "contract.rtg.schema.link_kind_retrofit",
+        "contract.rtg.schema.retrofit_schema_snapshot_link_kinds.failures"
+      ],
+      "status": "resolved",
+      "subject": {
+        "role": "operation",
+        "type": "RetrofitSchemaSnapshotLinkKinds"
+      },
+      "verification": "RetrofitSchemaSnapshotLinkKindsContractVerification"
+    },
+    {
       "evidence_id": "components/rtg/schema/tests/test_rtg_schema_contract.py#RtgSchemaBoundaryVerification",
       "evidence_nodes": [
         "components/rtg/schema/tests/test_rtg_schema_contract.py::test_schema_stores_definitions_snapshots_and_schema_packs",
@@ -3284,12 +3309,20 @@
         "components/rtg/schema/tests/test_rtg_schema_contract.py::test_schema_payload_sets_are_unique_disjoint_and_canonical",
         "components/rtg/schema/tests/test_rtg_schema_contract.py::test_schema_failure_vocabulary_is_boundary_specific",
         "components/rtg/schema/tests/test_rtg_schema_contract.py::test_schema_snapshot_rejects_duplicate_and_coercive_input",
-        "components/rtg/schema/tests/test_rtg_schema_contract.py::test_schema_pack_selection_is_unique_and_ordered"
+        "components/rtg/schema/tests/test_rtg_schema_contract.py::test_schema_pack_selection_is_unique_and_ordered",
+        "components/rtg/schema/tests/test_rtg_schema_contract.py::test_node_definitions_require_time_shape_and_links_reject_it",
+        "components/rtg/schema/tests/test_rtg_schema_contract.py::test_state_as_of_requires_interval_fields_and_reserved_system_fields_are_rejected",
+        "components/rtg/schema/tests/test_rtg_schema_contract.py::test_node_identity_criteria_are_stored_and_snapshotted",
+        "components/rtg/schema/tests/test_rtg_schema_contract.py::test_identity_criteria_reject_invalid_shape_and_payload_paths",
+        "components/rtg/schema/tests/test_rtg_schema_contract.py::test_link_definitions_reject_identity_criteria",
+        "components/rtg/schema/tests/test_rtg_schema_contract.py::test_link_definitions_require_link_kind_and_validate_enum",
+        "components/rtg/schema/tests/test_rtg_schema_contract.py::test_legacy_snapshot_link_kind_retrofit_defaults_missing_links"
       ],
       "model_source": "model/bibliotek/components/component.rtg.schema.sysml",
       "requirements": [
         "contract.rtg.schema.field_semantics",
         "contract.rtg.schema.payload_semantics",
+        "contract.rtg.schema.kernel_meta_model",
         "contract.rtg.schema.read_effect",
         "contract.rtg.schema.canonical_ordering",
         "contract.rtg.schema.intentional_boundary",

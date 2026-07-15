@@ -44,6 +44,7 @@ def build_schema() -> InMemoryRtgSchema:
                 type_key=type_key,
                 description=f"{type_key} anchor.",
                 payload=RtgAnchorSchemaPayload(optional_data_types=data_types),
+                time_shape="state_now",
             )
         )
 
@@ -122,6 +123,7 @@ def build_schema() -> InMemoryRtgSchema:
                 type_key=type_key,
                 description=f"{type_key} facts.",
                 payload=RtgDataObjectSchemaPayload(properties=fields),
+                time_shape="state_now",
             )
         )
 
@@ -143,6 +145,7 @@ def build_schema() -> InMemoryRtgSchema:
                 payload=RtgLinkSchemaPayload(
                     allowed_source_types=sources,
                     allowed_target_types=targets,
+                    link_kind="semantic",
                 ),
             )
         )

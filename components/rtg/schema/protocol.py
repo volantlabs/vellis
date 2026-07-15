@@ -38,9 +38,18 @@ class RtgDataObjectSchemaPayload:
 class RtgLinkSchemaPayload:
     allowed_source_types: tuple[str, ...]
     allowed_target_types: tuple[str, ...]
+    link_kind: str | None = None
 
 
 type RtgSchemaPayload = RtgAnchorSchemaPayload | RtgDataObjectSchemaPayload | RtgLinkSchemaPayload
+
+
+@dataclass(frozen=True, slots=True)
+class RtgIdentityCriterion:
+    criterion_key: str
+    property_paths: tuple[str, ...]
+    match_strategy: str
+    scope: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -50,12 +59,32 @@ class RtgSchemaDefinition:
     type_key: str
     description: str
     payload: RtgSchemaPayload
+    time_shape: str | None = None
+    identity_criteria: tuple[RtgIdentityCriterion, ...] = ()
     system: JsonObject = field(default_factory=dict)
 
 
 @dataclass(frozen=True, slots=True)
 class RtgSchemaSnapshot:
     definitions: tuple[JsonObject, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class RtgSchemaLinkKindRetrofitEntry:
+    definition_uuid: UUID
+    type_key: str
+    link_kind: str
+
+
+@dataclass(frozen=True, slots=True)
+class RtgSchemaLinkKindRetrofitReport:
+    defaulted_link_definitions: tuple[RtgSchemaLinkKindRetrofitEntry, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class RtgSchemaLinkKindRetrofitResult:
+    snapshot: RtgSchemaSnapshot
+    report: RtgSchemaLinkKindRetrofitReport
 
 
 @dataclass(frozen=True, slots=True)
@@ -173,6 +202,15 @@ class RtgSchema(Protocol):
     @classmethod
     def import_snapshot(cls, snapshot: RtgSchemaSnapshot) -> RtgSchema:
         """Create a schema registry from a snapshot."""
+        ...
+
+    @classmethod
+    def retrofit_snapshot_link_kinds(
+        cls,
+        snapshot: RtgSchemaSnapshot,
+        default_kind: str,
+    ) -> RtgSchemaLinkKindRetrofitResult:
+        """Return a snapshot with missing legacy link kinds defaulted."""
         ...
 
     def export_snapshot(self) -> RtgSchemaSnapshot:

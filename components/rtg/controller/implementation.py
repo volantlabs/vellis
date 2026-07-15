@@ -20,6 +20,7 @@ from components.rtg.change_validation.protocol import (
     RtgGraphDataObjectWrite,
     RtgGraphLinkWrite,
     RtgGraphLiveStatusChange,
+    RtgIdentityOverride,
     RtgLiveStatusChange,
     RtgMigrationChangeSet,
     RtgMigrationEvidenceAddition,
@@ -92,6 +93,7 @@ from components.rtg.migration.protocol import (
     RtgMigrationRecordList,
     RtgMigrationReplacement,
     RtgMigrationSnapshot,
+    RtgSchemaTimeShapeRetrofit,
 )
 from components.rtg.query.protocol import (
     RtgQueryAggregation,
@@ -112,6 +114,7 @@ from components.rtg.query.protocol import (
 from components.rtg.schema.protocol import (
     RtgAnchorSchemaPayload,
     RtgDataObjectSchemaPayload,
+    RtgIdentityCriterion,
     RtgLinkSchemaPayload,
     RtgSchema,
     RtgSchemaDefinition,
@@ -984,12 +987,13 @@ class InProcessRtgController:
                     raise RtgControllerReplayFailed("ledger payload is not JSON text")
                 payload = json.loads(payload_json)
                 try:
+                    transaction = successful_transactions[transaction_id_text]
+                    self._last_transaction_timestamp = str(row["recorded_at"])
                     if operation_name in {"apply_live_graph_changes", "stage_knowledge_changes"}:
                         self._apply_resolved_batch(_change_batch_from_json(payload))
                         replayed += 1
                     elif operation_name == "apply_migration_cutover":
                         request = _object(payload)
-                        transaction = successful_transactions[transaction_id_text]
                         if transaction.status == "cutover_failed":
                             response_details = _object(
                                 transaction.response_payload.get("details", {})
@@ -1035,7 +1039,6 @@ class InProcessRtgController:
                         replayed += 1
                     else:
                         raise RtgControllerReplayFailed(operation_name)
-                    transaction = successful_transactions[transaction_id_text]
                     self._last_ledger_position = transaction.ledger_position
                     self._last_transaction_id = UUID(transaction_id_text)
                     self._last_transaction_timestamp = transaction.recorded_at
@@ -1440,6 +1443,7 @@ class InProcessRtgController:
                     type=write.type,
                     display_name=write.display_name,
                     system=write.system,
+                    identity_override=write.identity_override,
                 )
                 for write in batch.graph_changes.anchor_writes
             ),
@@ -1453,6 +1457,7 @@ class InProcessRtgController:
                         RtgChangeReference(resource_id=resolve_uuid(ref))
                         for ref in write.anchor_refs
                     ),
+                    identity_override=write.identity_override,
                 )
                 for write in batch.graph_changes.data_object_writes
             ),
@@ -1587,22 +1592,24 @@ class InProcessRtgController:
     def _apply_resolved_batch(self, batch: RtgChangeBatch) -> RtgControllerAppliedChanges:
         graph_writes = 0
         for write in batch.graph_changes.anchor_writes:
+            anchor_uuid = _uuid_ref(write.ref)
             self._graph.put_anchor(
                 RtgAnchor(
-                    uuid=_uuid_ref(write.ref),
+                    uuid=anchor_uuid,
                     type=write.type,
                     display_name=write.display_name,
-                    system=write.system,
+                    system=self._stamped_graph_system(anchor_uuid, write.system),
                 )
             )
             graph_writes += 1
         for write in batch.graph_changes.data_object_writes:
+            data_uuid = _uuid_ref(write.ref)
             self._graph.put_data_object(
                 RtgDataObject(
-                    uuid=_uuid_ref(write.ref),
+                    uuid=data_uuid,
                     type=write.type,
                     properties=write.properties,
-                    system=write.system,
+                    system=self._stamped_graph_system(data_uuid, write.system),
                 ),
                 tuple(_uuid_ref(ref) for ref in write.anchor_refs),
             )
@@ -1697,8 +1704,10 @@ class InProcessRtgController:
             obj = self._graph.get_object(uuid_value)
             system = {**obj.system, "live": live}
             if isinstance(obj, RtgAnchor):
+                system = self._stamped_system(_record_uuid(obj), {**obj.system, "live": live})
                 self._graph.put_anchor(dataclasses.replace(obj, system=system))
             elif isinstance(obj, RtgDataObject):
+                system = self._stamped_system(_record_uuid(obj), {**obj.system, "live": live})
                 anchors = tuple(
                     anchor.uuid
                     for anchor in self._graph.list_data_anchors(uuid_value).anchors
@@ -1707,6 +1716,22 @@ class InProcessRtgController:
                 self._graph.put_data_object(dataclasses.replace(obj, system=system), anchors)
             elif isinstance(obj, RtgLink):
                 self._graph.put_link(dataclasses.replace(obj, system=system))
+
+    def _stamped_graph_system(self, object_uuid: UUID, requested_system: JsonObject) -> JsonObject:
+        return self._stamped_system(object_uuid, requested_system)
+
+    def _stamped_system(self, object_uuid: UUID, requested_system: JsonObject) -> JsonObject:
+        system = dict(requested_system)
+        now = self._last_transaction_timestamp or datetime.now(UTC).isoformat()
+        existing = self._try_get_graph_object(object_uuid)
+        created_at = None
+        if isinstance(existing, RtgAnchor | RtgDataObject):
+            raw_created_at = existing.system.get("created_at")
+            if isinstance(raw_created_at, str):
+                created_at = raw_created_at
+        system["created_at"] = created_at or now
+        system["updated_at"] = now
+        return system
 
     def _capture_apply_preimage(self, batch: RtgChangeBatch) -> _ApplyPreimage:
         graph_ids = self._graph_touched_ids(batch)
@@ -3018,6 +3043,7 @@ def _graph_changes_from_json(value: object) -> RtgGraphChangeSet:
                 type=str(item["type"]),
                 display_name=cast(str | None, item.get("display_name")),
                 system=_json_object(item.get("system", {})),
+                identity_override=_identity_override_from_json(item.get("identity_override")),
             )
             for item in _objects(data.get("anchor_writes", []))
         ),
@@ -3030,6 +3056,7 @@ def _graph_changes_from_json(value: object) -> RtgGraphChangeSet:
                 anchor_refs=tuple(
                     _ref_from_json(ref) for ref in _list(item.get("anchor_refs", []))
                 ),
+                identity_override=_identity_override_from_json(item.get("identity_override")),
             )
             for item in _objects(data.get("data_object_writes", []))
         ),
@@ -3151,6 +3178,17 @@ def _migration_changes_from_json(value: object) -> RtgMigrationChangeSet:
     )
 
 
+def _identity_override_from_json(value: object) -> RtgIdentityOverride | None:
+    if value is None:
+        return None
+    data = _object(value)
+    return RtgIdentityOverride(
+        mode=str(data.get("mode", "")),
+        reason=str(data.get("reason", "")),
+        criterion_keys=tuple(str(item) for item in _list(data.get("criterion_keys", []))),
+    )
+
+
 def _ref_from_json(value: object) -> RtgChangeReference:
     data = _object(value)
     resource_id = data.get("resource_id")
@@ -3189,6 +3227,11 @@ def _schema_definition_from_json(value: object) -> RtgSchemaDefinition:
             allowed_target_types=tuple(
                 str(item) for item in _list(payload_data.get("allowed_target_types", []))
             ),
+            link_kind=(
+                str(payload_data["link_kind"])
+                if payload_data.get("link_kind") is not None
+                else None
+            ),
         )
     return RtgSchemaDefinition(
         uuid=UUID(str(data["uuid"])) if data.get("uuid") is not None else None,
@@ -3196,7 +3239,22 @@ def _schema_definition_from_json(value: object) -> RtgSchemaDefinition:
         type_key=str(data["type_key"]),
         description=str(data.get("description", "")),
         payload=payload,
+        time_shape=str(data["time_shape"]) if data.get("time_shape") is not None else None,
+        identity_criteria=tuple(
+            _identity_criterion_from_json(item)
+            for item in _list(data.get("identity_criteria", []))
+        ),
         system=_json_object(data.get("system", {})),
+    )
+
+
+def _identity_criterion_from_json(value: object) -> RtgIdentityCriterion:
+    data = _object(value)
+    return RtgIdentityCriterion(
+        criterion_key=str(data.get("criterion_key", "")),
+        property_paths=tuple(str(item) for item in _list(data.get("property_paths", []))),
+        match_strategy=str(data.get("match_strategy", "")),
+        scope=str(data.get("scope", "")),
     )
 
 
@@ -3279,6 +3337,10 @@ def _migration_record_from_json(value: object) -> RtgMigrationRecord:
             _migration_replacement_from_json(item)
             for item in _list(data.get("graph_replacements", []))
         ),
+        schema_time_shape_retrofits=tuple(
+            _schema_time_shape_retrofit_from_json(item)
+            for item in _list(data.get("schema_time_shape_retrofits", []))
+        ),
         evidence=tuple(
             _migration_evidence_from_json(item) for item in _list(data.get("evidence", []))
         ),
@@ -3291,6 +3353,14 @@ def _migration_replacement_from_json(value: object) -> RtgMigrationReplacement:
     return RtgMigrationReplacement(
         old_resource_id=UUID(str(data["old_resource_id"])),
         new_resource_id=UUID(str(data["new_resource_id"])),
+    )
+
+
+def _schema_time_shape_retrofit_from_json(value: object) -> RtgSchemaTimeShapeRetrofit:
+    data = _object(value)
+    return RtgSchemaTimeShapeRetrofit(
+        definition_uuid=UUID(str(data["definition_uuid"])),
+        time_shape=str(data["time_shape"]) if data.get("time_shape") is not None else None,
     )
 
 

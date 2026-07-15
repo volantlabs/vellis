@@ -991,28 +991,19 @@ def test_federation_toolset_canned_personal_attention_overview(
     assert result["result"]["route"]["selected_graph_id"] == "personal_ops"
     assert result["result"]["snapshot_restore"]["legacy_link_system_stripped_count"] == 1
     assert result["result"]["snapshot_restore"]["compatibility_projection"] == (
-        "read_only_current_kernel"
+        "kernel_meta_model_harmonized"
     )
-    assert (
-        result["result"]["snapshot_restore"][
-            "unsupported_schema_time_shape_stripped_count"
-        ]
-        > 0
-    )
-    assert (
-        result["result"]["snapshot_restore"][
-            "unsupported_schema_identity_criteria_stripped_count"
-        ]
-        > 0
-    )
-    assert (
-        result["result"]["snapshot_restore"][
-            "unsupported_schema_link_kind_stripped_count"
-        ]
-        > 0
-    )
-    assert result["result"]["snapshot_restore"]["legacy_schema_time_shape_backfilled_count"] == 0
-    assert result["result"]["snapshot_restore"]["legacy_schema_link_kind_defaulted_count"] == 0
+    assert result["result"]["snapshot_restore"][
+        "unsupported_schema_time_shape_stripped_count"
+    ] == 0
+    assert result["result"]["snapshot_restore"][
+        "unsupported_schema_identity_criteria_stripped_count"
+    ] == 0
+    assert result["result"]["snapshot_restore"][
+        "unsupported_schema_link_kind_stripped_count"
+    ] == 0
+    assert result["result"]["snapshot_restore"]["legacy_schema_time_shape_backfilled_count"] > 0
+    assert result["result"]["snapshot_restore"]["legacy_schema_link_kind_defaulted_count"] > 0
     assert result["result"]["canned_query"]["name"] == "personal_attention_overview"
     assert result["result"]["answer"]["item_count"] == 5
     assert result["result"]["answer"]["attention_scope"] == "this_week"
@@ -1385,6 +1376,7 @@ def _seed_person_snapshot(graph_root: Path, snapshot_path: str) -> None:
             type_key="Person",
             description="Person.",
             payload=RtgAnchorSchemaPayload(required_data_types=("Profile",)),
+            time_shape="state_now",
         )
     )
     schema.put_definition(
@@ -1396,6 +1388,7 @@ def _seed_person_snapshot(graph_root: Path, snapshot_path: str) -> None:
             payload=RtgDataObjectSchemaPayload(
                 properties={"name": RtgSchemaField(required=True, value_kinds=("string",))}
             ),
+            time_shape="state_now",
         )
     )
     controller = InProcessRtgController.open(
@@ -1435,10 +1428,10 @@ def _make_snapshot_legacy_for_federation_restore(snapshot_path: Path) -> None:
         link["system"] = {"live": True}
     for definition in payload["schema"]["definitions"]:
         if definition["kind"] in {"anchor", "data_object"}:
-            definition["time_shape"] = "state_now"
+            definition.pop("time_shape", None)
             definition["identity_criteria"] = []
         if definition["kind"] == "link":
-            definition["payload"]["link_kind"] = "semantic"
+            definition["payload"].pop("link_kind", None)
     snapshot_path.write_text(json.dumps(payload), encoding="utf-8")
 
 

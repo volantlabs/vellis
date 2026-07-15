@@ -22,9 +22,8 @@ runtime_compatibility:
   status: blocked
   requirements:
     - experience-studio schema, seed, and query fixtures
-    - link kinds
   blockers:
-    - The referenced prototype fixtures and required link-kind schema metadata are not yet present in the harmonized tree.
+    - The referenced prototype fixtures are not yet present in the harmonized tree.
 schema_summary:
   anchors:
     - Experience

@@ -1593,9 +1593,8 @@ def _restore_declared_snapshot(
         raise RtgGraphRegistryInvalid("metadata.snapshot_path must be a non-empty string")
     (
         snapshot,
-        stripped_time_shape_count,
-        stripped_identity_criteria_count,
-        stripped_link_kind_count,
+        backfilled_time_shape_count,
+        defaulted_link_kind_count,
         converted_datetime_kind_count,
     ) = _load_read_compatible_snapshot(composition, snapshot_path)
     snapshot, stripped_link_system_count = _snapshot_without_legacy_link_system(snapshot)
@@ -1607,23 +1606,21 @@ def _restore_declared_snapshot(
         "status": "restored",
         "snapshot_path": snapshot_path,
         "restore_status": restored.status,
-        "compatibility_projection": "read_only_current_kernel",
+        "compatibility_projection": "kernel_meta_model_harmonized",
         "legacy_link_system_stripped_count": stripped_link_system_count,
-        "unsupported_schema_time_shape_stripped_count": stripped_time_shape_count,
-        "unsupported_schema_identity_criteria_stripped_count": (
-            stripped_identity_criteria_count
-        ),
-        "unsupported_schema_link_kind_stripped_count": stripped_link_kind_count,
+        "unsupported_schema_time_shape_stripped_count": 0,
+        "unsupported_schema_identity_criteria_stripped_count": 0,
+        "unsupported_schema_link_kind_stripped_count": 0,
         "legacy_datetime_kind_converted_count": converted_datetime_kind_count,
-        "legacy_schema_time_shape_backfilled_count": 0,
-        "legacy_schema_link_kind_defaulted_count": 0,
+        "legacy_schema_time_shape_backfilled_count": backfilled_time_shape_count,
+        "legacy_schema_link_kind_defaulted_count": defaulted_link_kind_count,
     }
 
 
 def _load_read_compatible_snapshot(
     composition: RtgKnowledgeGraphComposition,
     snapshot_path: str,
-) -> tuple[Any, int, int, int, int]:
+) -> tuple[Any, int, int, int]:
     storage_root = Path(composition.config.storage_root).resolve()
     absolute_snapshot_path = (storage_root / snapshot_path).resolve()
     if not absolute_snapshot_path.is_relative_to(storage_root):
@@ -1646,29 +1643,35 @@ def _load_read_compatible_snapshot(
             "metadata.snapshot_path schema.definitions must be a JSON list"
         )
 
-    stripped_time_shape_count = 0
-    stripped_identity_criteria_count = 0
-    stripped_link_kind_count = 0
+    backfilled_time_shape_count = 0
+    defaulted_link_kind_count = 0
     converted_datetime_kind_count = 0
     for definition in definitions:
         if not isinstance(definition, dict):
             raise RtgGraphRegistryInvalid(
                 "metadata.snapshot_path schema definitions must be JSON objects"
             )
-        time_shape = definition.pop("time_shape", None)
-        if time_shape is not None:
+        kind = definition.get("kind")
+        time_shape = definition.get("time_shape")
+        if kind in {"anchor", "data_object"}:
+            if time_shape is None:
+                definition["time_shape"] = "state_now"
+                backfilled_time_shape_count += 1
+            elif time_shape not in {"state_now", "state_as_of", "event"}:
+                raise RtgGraphRegistryInvalid(
+                    "metadata.snapshot_path contains an unrecognized schema time_shape"
+                )
+        elif time_shape is not None:
             if time_shape not in {"state_now", "state_as_of", "event"}:
                 raise RtgGraphRegistryInvalid(
                     "metadata.snapshot_path contains an unrecognized schema time_shape"
                 )
-            stripped_time_shape_count += 1
-        identity_criteria = definition.pop("identity_criteria", None)
+        identity_criteria = definition.get("identity_criteria")
         if identity_criteria is not None:
             if not isinstance(identity_criteria, list):
                 raise RtgGraphRegistryInvalid(
                     "metadata.snapshot_path schema identity_criteria must be a JSON list"
                 )
-            stripped_identity_criteria_count += 1
         definition_payload = definition.get("payload")
         if not isinstance(definition_payload, dict):
             continue
@@ -1677,8 +1680,11 @@ def _load_read_compatible_snapshot(
             converted_datetime_kind_count += sum(
                 _convert_legacy_datetime_kind(field) for field in properties.values()
             )
-        link_kind = definition_payload.pop("link_kind", None)
-        if link_kind is not None:
+        link_kind = definition_payload.get("link_kind")
+        if kind == "link" and link_kind is None:
+            definition_payload["link_kind"] = "semantic"
+            defaulted_link_kind_count += 1
+        elif link_kind is not None:
             if link_kind not in {
                 "semantic",
                 "structural",
@@ -1690,12 +1696,10 @@ def _load_read_compatible_snapshot(
                 raise RtgGraphRegistryInvalid(
                     "metadata.snapshot_path contains an unrecognized schema link_kind"
                 )
-            stripped_link_kind_count += 1
     return (
         decode_system_snapshot(compatible),
-        stripped_time_shape_count,
-        stripped_identity_criteria_count,
-        stripped_link_kind_count,
+        backfilled_time_shape_count,
+        defaulted_link_kind_count,
         converted_datetime_kind_count,
     )
 
