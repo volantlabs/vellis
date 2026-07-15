@@ -1,0 +1,76 @@
+{
+  "tool": "rtg_execute_query",
+  "arguments": {
+    "query_options": {
+      "live_filter": "live",
+      "order_by": [
+        { "data_requirement": "stop_facts", "path": ["ordinal"], "direction": "ascending" }
+      ]
+    },
+    "response_options": { "format": "properties_only" },
+    "query_spec": {
+      "anchor_buckets": [
+        { "name": "trail", "anchor_type_keys": ["ReadingTrail"] },
+        { "name": "stop", "anchor_type_keys": ["TrailStop"] },
+        {
+          "name": "focus",
+          "anchor_type_keys": [
+            "Work",
+            "Source",
+            "Passage",
+            "Character",
+            "Place",
+            "Object",
+            "Event",
+            "Motif",
+            "Theme",
+            "StylePack"
+          ]
+        }
+      ],
+      "link_requirements": [
+        {
+          "name": "includes_stop",
+          "source_bucket": "trail",
+          "target_bucket": "stop",
+          "link_type_keys": ["includes_stop"]
+        },
+        {
+          "name": "focuses_on",
+          "source_bucket": "stop",
+          "target_bucket": "focus",
+          "link_type_keys": ["focuses_on"]
+        }
+      ],
+      "data_requirements": [
+        {
+          "name": "trail_facts",
+          "anchor_bucket": "trail",
+          "data_type_key": "ReadingTrailFacts",
+          "required": true,
+          "predicates": [
+            { "path": ["label"], "operator": "equals", "value": "Blood Trail" }
+          ]
+        },
+        {
+          "name": "stop_facts",
+          "anchor_bucket": "stop",
+          "data_type_key": "TrailStopFacts",
+          "required": true,
+          "predicates": []
+        }
+      ],
+      "return_spec": {
+        "anchor_buckets": ["trail", "stop", "focus"],
+        "link_requirements": ["includes_stop", "focuses_on"],
+        "data_requirements": ["trail_facts", "stop_facts"],
+        "properties": [
+          ["trail_facts", ["label"]],
+          ["stop_facts", ["ordinal"]],
+          ["stop_facts", ["label"]],
+          ["stop_facts", ["note"]]
+        ]
+      }
+    }
+  }
+}

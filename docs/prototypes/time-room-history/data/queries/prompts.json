@@ -1,0 +1,36 @@
+{
+  "arguments": {
+    "query_options": {
+      "live_filter": "live"
+    },
+    "query_spec": {
+      "anchor_buckets": [
+        {
+          "anchor_type_keys": [
+            "LearningPrompt"
+          ],
+          "name": "prompt"
+        }
+      ],
+      "data_requirements": [
+        {
+          "anchor_bucket": "prompt",
+          "data_type_key": "LearningPromptFacts",
+          "name": "facts"
+        }
+      ],
+      "return_spec": {
+        "anchor_buckets": [
+          "prompt"
+        ],
+        "data_requirements": [
+          "facts"
+        ]
+      }
+    },
+    "response_options": {
+      "format": "properties_only"
+    }
+  },
+  "tool": "rtg_execute_query"
+}

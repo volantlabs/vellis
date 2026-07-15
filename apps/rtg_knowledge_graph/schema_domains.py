@@ -87,13 +87,9 @@ SCHEMA_DOMAINS: dict[str, dict[str, object]] = {
             "publish",
             "alpha",
         ],
-        "runtime_status": "blocked",
-        "runtime_requirements": [
-            "experience-studio schema, seed, and query fixtures",
-        ],
-        "runtime_blockers": [
-            "The referenced prototype fixtures are not yet present in the harmonized tree."
-        ],
+        "runtime_status": "ready",
+        "runtime_requirements": [],
+        "runtime_blockers": [],
     },
     "gothic_ambient_archive": {
         "title": "Gothic Ambient Archive",
@@ -109,13 +105,9 @@ SCHEMA_DOMAINS: dict[str, dict[str, object]] = {
         ),
         "recommended_first_call": {"tool": "rtg_get_system_state", "arguments": {}},
         "domain_tags": ["literature", "public-domain", "gothic", "ambient", "docent", "alpha"],
-        "runtime_status": "blocked",
-        "runtime_requirements": [
-            "Nocturne Archive schema, seed, and query fixtures",
-        ],
-        "runtime_blockers": [
-            "The referenced prototype fixtures are not yet present in the harmonized tree."
-        ],
+        "runtime_status": "ready",
+        "runtime_requirements": [],
+        "runtime_blockers": [],
     },
     "time_room_history": {
         "title": "Time Room History",
@@ -137,12 +129,8 @@ SCHEMA_DOMAINS: dict[str, dict[str, object]] = {
             "time-room",
             "alpha",
         ],
-        "runtime_status": "blocked",
-        "runtime_requirements": [
-            "Time Room History schema, seed, and query fixtures",
-        ],
-        "runtime_blockers": [
-            "The referenced prototype fixtures are not yet present in the harmonized tree."
-        ],
+        "runtime_status": "ready",
+        "runtime_requirements": [],
+        "runtime_blockers": [],
     },
 }

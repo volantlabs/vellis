@@ -1,0 +1,431 @@
+{
+  "tool": "rtg_stage_schema_migration",
+  "arguments": {
+    "migration_id": "gothic-ambient-archive-schema-v0",
+    "description": "Introduce the alpha Gothic Ambient Archive schema for source-grounded public-domain literature exploration.",
+    "validation_mode": "strict",
+    "schema_definitions": [
+      {
+        "kind": "data_object",
+        "type_key": "WorkFacts",
+        "description": "Compact bibliographic and public-domain facts for a literary work.",
+        "time_shape": "state_now",
+        "payload": {
+          "properties": {
+            "title": { "required": true, "value_kinds": ["string"] },
+            "creator": { "required": true, "value_kinds": ["string"] },
+            "publication_year": { "required": true, "value_kinds": ["integer"] },
+            "public_domain_basis": { "required": true, "value_kinds": ["string"] },
+            "source_language": { "required": false, "value_kinds": ["string"] },
+            "notes": { "required": false, "value_kinds": ["string"] },
+            "verification_status": { "required": true, "value_kinds": ["string"] }
+          }
+        }
+      },
+      {
+        "kind": "anchor",
+        "type_key": "Work",
+        "description": "A public-domain literary work represented by source-grounded graph records.",
+        "time_shape": "state_now",
+        "payload": { "required_data_types": ["WorkFacts"] }
+      },
+      {
+        "kind": "data_object",
+        "type_key": "SourceFacts",
+        "description": "Source, edition, provider, license, and retrieval facts for an ingested text or asset.",
+        "time_shape": "state_now",
+        "payload": {
+          "properties": {
+            "label": { "required": true, "value_kinds": ["string"] },
+            "edition": { "required": false, "value_kinds": ["string"] },
+            "provider": { "required": true, "value_kinds": ["string"] },
+            "url": { "required": false, "value_kinds": ["string"] },
+            "license_status": { "required": true, "value_kinds": ["string"] },
+            "retrieved_at": { "required": false, "value_kinds": ["string"] },
+            "notes": { "required": false, "value_kinds": ["string"] },
+            "verification_status": { "required": true, "value_kinds": ["string"] }
+          }
+        }
+      },
+      {
+        "kind": "anchor",
+        "type_key": "Source",
+        "description": "A source edition, text provider, or asset source used as evidence or media provenance.",
+        "time_shape": "state_now",
+        "payload": { "required_data_types": ["SourceFacts"] }
+      },
+      {
+        "kind": "data_object",
+        "type_key": "PassageFacts",
+        "description": "A bounded source passage or source marker used as evidence without storing long body text in the graph.",
+        "time_shape": "state_now",
+        "payload": {
+          "properties": {
+            "label": { "required": true, "value_kinds": ["string"] },
+            "source_marker": { "required": true, "value_kinds": ["string"] },
+            "summary": { "required": true, "value_kinds": ["string"] },
+            "quote_policy": { "required": true, "value_kinds": ["string"] },
+            "verification_status": { "required": true, "value_kinds": ["string"] }
+          }
+        }
+      },
+      {
+        "kind": "anchor",
+        "type_key": "Passage",
+        "description": "A source-bounded textual passage or marker that can evidence graph claims.",
+        "time_shape": "state_now",
+        "payload": { "required_data_types": ["PassageFacts"] }
+      },
+      {
+        "kind": "data_object",
+        "type_key": "CharacterFacts",
+        "description": "Compact source-scoped facts for a literary character.",
+        "time_shape": "state_now",
+        "payload": {
+          "properties": {
+            "name": { "required": true, "value_kinds": ["string"] },
+            "role": { "required": true, "value_kinds": ["string"] },
+            "source_work": { "required": true, "value_kinds": ["string"] },
+            "public_domain_scope_note": { "required": true, "value_kinds": ["string"] },
+            "verification_status": { "required": true, "value_kinds": ["string"] }
+          }
+        }
+      },
+      {
+        "kind": "anchor",
+        "type_key": "Character",
+        "description": "A public-domain literary character represented within a source-work scope.",
+        "time_shape": "state_now",
+        "payload": { "required_data_types": ["CharacterFacts"] }
+      },
+      {
+        "kind": "data_object",
+        "type_key": "PlaceFacts",
+        "description": "Compact source-scoped facts for a literary or geographic place.",
+        "time_shape": "state_now",
+        "payload": {
+          "properties": {
+            "name": { "required": true, "value_kinds": ["string"] },
+            "kind": { "required": true, "value_kinds": ["string"] },
+            "geographic_status": { "required": true, "value_kinds": ["string"] },
+            "description": { "required": true, "value_kinds": ["string"] },
+            "verification_status": { "required": true, "value_kinds": ["string"] }
+          }
+        }
+      },
+      {
+        "kind": "anchor",
+        "type_key": "Place",
+        "description": "A place that grounds literary events, scenes, or ambient visual zones.",
+        "time_shape": "state_now",
+        "payload": { "required_data_types": ["PlaceFacts"] }
+      },
+      {
+        "kind": "data_object",
+        "type_key": "ObjectFacts",
+        "description": "Compact facts for a literary object, record, or material motif carrier.",
+        "time_shape": "state_now",
+        "payload": {
+          "properties": {
+            "name": { "required": true, "value_kinds": ["string"] },
+            "kind": { "required": true, "value_kinds": ["string"] },
+            "description": { "required": true, "value_kinds": ["string"] },
+            "verification_status": { "required": true, "value_kinds": ["string"] }
+          }
+        }
+      },
+      {
+        "kind": "anchor",
+        "type_key": "Object",
+        "description": "A source-grounded object, record, instrument, or material item.",
+        "time_shape": "state_now",
+        "payload": { "required_data_types": ["ObjectFacts"] }
+      },
+      {
+        "kind": "data_object",
+        "type_key": "EventFacts",
+        "description": "Append-only facts for a source-grounded or curatorial event in the literary graph.",
+        "time_shape": "event",
+        "payload": {
+          "properties": {
+            "label": { "required": true, "value_kinds": ["string"] },
+            "sequence_order": { "required": true, "value_kinds": ["integer"] },
+            "date_label": { "required": false, "value_kinds": ["string"] },
+            "certainty": { "required": true, "value_kinds": ["string"] },
+            "summary": { "required": true, "value_kinds": ["string"] },
+            "verification_status": { "required": true, "value_kinds": ["string"] }
+          }
+        }
+      },
+      {
+        "kind": "anchor",
+        "type_key": "Event",
+        "description": "An append-only event or modeled event-like turn in a source-grounded literary sequence.",
+        "time_shape": "event",
+        "payload": { "required_data_types": ["EventFacts"] }
+      },
+      {
+        "kind": "data_object",
+        "type_key": "MotifFacts",
+        "description": "Curatorial definition and status for a recurring motif.",
+        "time_shape": "state_now",
+        "payload": {
+          "properties": {
+            "label": { "required": true, "value_kinds": ["string"] },
+            "definition": { "required": true, "value_kinds": ["string"] },
+            "interpretive_status": { "required": true, "value_kinds": ["string"] }
+          }
+        }
+      },
+      {
+        "kind": "anchor",
+        "type_key": "Motif",
+        "description": "A reusable interpretive motif that links events, objects, places, and works.",
+        "time_shape": "state_now",
+        "payload": { "required_data_types": ["MotifFacts"] }
+      },
+      {
+        "kind": "data_object",
+        "type_key": "ThemeFacts",
+        "description": "Curatorial definition and status for a larger theme.",
+        "time_shape": "state_now",
+        "payload": {
+          "properties": {
+            "label": { "required": true, "value_kinds": ["string"] },
+            "definition": { "required": true, "value_kinds": ["string"] },
+            "interpretive_status": { "required": true, "value_kinds": ["string"] }
+          }
+        }
+      },
+      {
+        "kind": "anchor",
+        "type_key": "Theme",
+        "description": "A higher-level interpretive theme that can gather motifs and events.",
+        "time_shape": "state_now",
+        "payload": { "required_data_types": ["ThemeFacts"] }
+      },
+      {
+        "kind": "data_object",
+        "type_key": "StylePackFacts",
+        "description": "Presentation-only facts and guardrails for an ambient style pack.",
+        "time_shape": "state_now",
+        "payload": {
+          "properties": {
+            "label": { "required": true, "value_kinds": ["string"] },
+            "presentation_only": { "required": true, "value_kinds": ["boolean"] },
+            "asset_policy": { "required": true, "value_kinds": ["string"] },
+            "voice_summary": { "required": true, "value_kinds": ["string"] }
+          }
+        }
+      },
+      {
+        "kind": "anchor",
+        "type_key": "StylePack",
+        "description": "A presentation-only aesthetic layer for rendering the same graph facts.",
+        "time_shape": "state_now",
+        "payload": { "required_data_types": ["StylePackFacts"] }
+      },
+      {
+        "kind": "data_object",
+        "type_key": "ReadingTrailFacts",
+        "description": "Curatorial facts for a named reading trail through graph nodes.",
+        "time_shape": "state_now",
+        "payload": {
+          "properties": {
+            "label": { "required": true, "value_kinds": ["string"] },
+            "summary": { "required": true, "value_kinds": ["string"] },
+            "curation_status": { "required": true, "value_kinds": ["string"] }
+          }
+        }
+      },
+      {
+        "kind": "anchor",
+        "type_key": "ReadingTrail",
+        "description": "A reusable guided path through graph nodes, sources, motifs, and citations.",
+        "time_shape": "state_now",
+        "payload": { "required_data_types": ["ReadingTrailFacts"] }
+      },
+      {
+        "kind": "data_object",
+        "type_key": "TrailStopFacts",
+        "description": "Ordered stop facts for a reading trail; reifies order instead of putting metadata on links.",
+        "time_shape": "state_now",
+        "payload": {
+          "properties": {
+            "label": { "required": true, "value_kinds": ["string"] },
+            "ordinal": { "required": true, "value_kinds": ["integer"] },
+            "note": { "required": false, "value_kinds": ["string"] },
+            "curation_status": { "required": true, "value_kinds": ["string"] }
+          }
+        }
+      },
+      {
+        "kind": "anchor",
+        "type_key": "TrailStop",
+        "description": "A reified ordered stop inside a reading trail.",
+        "time_shape": "state_now",
+        "payload": { "required_data_types": ["TrailStopFacts"] }
+      },
+      {
+        "kind": "link",
+        "type_key": "appears_in",
+        "description": "A graph entity appears in a work.",
+        "payload": {
+          "allowed_source_types": ["Character", "Place", "Object", "Event", "Motif", "Theme"],
+          "allowed_target_types": ["Work"],
+          "link_kind": "semantic"
+        }
+      },
+      {
+        "kind": "link",
+        "type_key": "evidenced_by",
+        "description": "A graph entity is evidenced by a source or passage.",
+        "payload": {
+          "allowed_source_types": ["Work", "Character", "Place", "Object", "Event", "Motif", "Theme", "Passage"],
+          "allowed_target_types": ["Source", "Passage"],
+          "link_kind": "provenance"
+        }
+      },
+      {
+        "kind": "link",
+        "type_key": "occurs_in",
+        "description": "An event occurs in a work.",
+        "payload": {
+          "allowed_source_types": ["Event"],
+          "allowed_target_types": ["Work"],
+          "link_kind": "semantic"
+        }
+      },
+      {
+        "kind": "link",
+        "type_key": "located_at",
+        "description": "An event or object is located at a place.",
+        "payload": {
+          "allowed_source_types": ["Event", "Object"],
+          "allowed_target_types": ["Place"],
+          "link_kind": "semantic"
+        }
+      },
+      {
+        "kind": "link",
+        "type_key": "present_at",
+        "description": "A character is present at or directly attached to an event.",
+        "payload": {
+          "allowed_source_types": ["Character"],
+          "allowed_target_types": ["Event"],
+          "link_kind": "semantic"
+        }
+      },
+      {
+        "kind": "link",
+        "type_key": "uses",
+        "description": "An event uses or foregrounds an object.",
+        "payload": {
+          "allowed_source_types": ["Event"],
+          "allowed_target_types": ["Object"],
+          "link_kind": "semantic"
+        }
+      },
+      {
+        "kind": "link",
+        "type_key": "transforms_into",
+        "description": "A modeled event turns into or enables a later transformed event state.",
+        "payload": {
+          "allowed_source_types": ["Event"],
+          "allowed_target_types": ["Event"],
+          "link_kind": "semantic"
+        }
+      },
+      {
+        "kind": "link",
+        "type_key": "causes",
+        "description": "An event is modeled as causing another event.",
+        "payload": {
+          "allowed_source_types": ["Event"],
+          "allowed_target_types": ["Event"],
+          "link_kind": "semantic"
+        }
+      },
+      {
+        "kind": "link",
+        "type_key": "contradicts",
+        "description": "A passage, event, or motif contradicts another passage, event, or motif.",
+        "payload": {
+          "allowed_source_types": ["Passage", "Event", "Motif"],
+          "allowed_target_types": ["Passage", "Event", "Motif"],
+          "link_kind": "semantic"
+        }
+      },
+      {
+        "kind": "link",
+        "type_key": "variant_of",
+        "description": "A passage, event, motif, or theme is a variant of another.",
+        "payload": {
+          "allowed_source_types": ["Passage", "Event", "Motif", "Theme"],
+          "allowed_target_types": ["Passage", "Event", "Motif", "Theme"],
+          "link_kind": "versioning"
+        }
+      },
+      {
+        "kind": "link",
+        "type_key": "has_motif",
+        "description": "A graph entity is associated with an interpretive motif.",
+        "payload": {
+          "allowed_source_types": ["Work", "Character", "Place", "Object", "Event", "Theme"],
+          "allowed_target_types": ["Motif"],
+          "link_kind": "semantic"
+        }
+      },
+      {
+        "kind": "link",
+        "type_key": "develops_theme",
+        "description": "A graph entity develops or contributes to a theme.",
+        "payload": {
+          "allowed_source_types": ["Work", "Event", "Motif"],
+          "allowed_target_types": ["Theme"],
+          "link_kind": "semantic"
+        }
+      },
+      {
+        "kind": "link",
+        "type_key": "rendered_as",
+        "description": "A graph entity or trail has a presentation under a style pack.",
+        "payload": {
+          "allowed_source_types": ["Work", "Character", "Place", "Object", "Event", "Motif", "Theme", "ReadingTrail"],
+          "allowed_target_types": ["StylePack"],
+          "link_kind": "semantic"
+        }
+      },
+      {
+        "kind": "link",
+        "type_key": "includes_stop",
+        "description": "A reading trail includes a reified ordered stop.",
+        "payload": {
+          "allowed_source_types": ["ReadingTrail"],
+          "allowed_target_types": ["TrailStop"],
+          "link_kind": "structural"
+        }
+      },
+      {
+        "kind": "link",
+        "type_key": "focuses_on",
+        "description": "A trail stop focuses on a graph entity.",
+        "payload": {
+          "allowed_source_types": ["TrailStop"],
+          "allowed_target_types": ["Work", "Source", "Passage", "Character", "Place", "Object", "Event", "Motif", "Theme", "StylePack"],
+          "link_kind": "semantic"
+        }
+      },
+      {
+        "kind": "link",
+        "type_key": "follows",
+        "description": "A reified trail stop follows another reified trail stop.",
+        "payload": {
+          "allowed_source_types": ["TrailStop"],
+          "allowed_target_types": ["TrailStop"],
+          "link_kind": "structural"
+        }
+      }
+    ]
+  }
+}

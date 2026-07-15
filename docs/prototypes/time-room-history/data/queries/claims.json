@@ -1,0 +1,36 @@
+{
+  "arguments": {
+    "query_options": {
+      "live_filter": "live"
+    },
+    "query_spec": {
+      "anchor_buckets": [
+        {
+          "anchor_type_keys": [
+            "HistoricalClaim"
+          ],
+          "name": "claim"
+        }
+      ],
+      "data_requirements": [
+        {
+          "anchor_bucket": "claim",
+          "data_type_key": "HistoricalClaimFacts",
+          "name": "facts"
+        }
+      ],
+      "return_spec": {
+        "anchor_buckets": [
+          "claim"
+        ],
+        "data_requirements": [
+          "facts"
+        ]
+      }
+    },
+    "response_options": {
+      "format": "properties_only"
+    }
+  },
+  "tool": "rtg_execute_query"
+}

@@ -33,8 +33,6 @@ Currently runnable on the harmonized kernel:
 - [`agent-memory-spine`](agent-memory-spine/domain.yaml): flagship reference vocabulary for
   actors, working context, traces, facts, assessments, decisions, capabilities, classification,
   media, and graph domains.
-
-Cataloged but blocked pending fixture harmonization:
 - [`experience-studio`](experience-studio/domain.yaml): governed product-planning graph for
   graph-backed public games, visual explorations, and interactive experiences.
 - [`gothic-ambient-archive`](gothic-ambient-archive/domain.yaml): alpha public-domain Gothic
@@ -47,6 +45,7 @@ Cataloged but blocked pending fixture harmonization:
 - Keep domain descriptors small and human-readable.
 - Keep runtime compatibility, requirements, and blockers explicit.
 - Point to prompts and walkthroughs instead of duplicating full schemas.
+- Keep alpha fixture payloads reviewable and apply them only through governed RTG lanes.
 - Do not auto-install opaque schema payloads from the catalog.
 - Prefer validated recreate instructions over prebuilt schema blobs.
 - Add a known-good walkthrough once a domain has been exercised through MCP.

@@ -1,0 +1,463 @@
+{
+  "tool": "rtg_apply_live_anchor_records",
+  "arguments": {
+    "validation_mode": "strict",
+    "anchor_records": [
+      {
+        "ref": { "local_ref": "experience-ocean-signal-atlas" },
+        "type": "Experience",
+        "display_name": "Ocean Signal Atlas",
+        "facts": [{
+          "type": "ExperienceFacts",
+          "mode": "merge",
+          "properties": {
+            "slug": "ocean-signal-atlas",
+            "title": "Ocean Signal Atlas",
+            "medium": "interactive evidence atlas",
+            "lifecycle_status": "prototype",
+            "thesis": "Public-domain ocean signals become understandable when every visual claim can be traversed to source, snapshot, and caveat.",
+            "owner_scope": "Experience Studio owns product planning; the future ocean domain graph owns source-grounded runtime facts.",
+            "commercial_surface": true
+          }
+        }]
+      },
+      {
+        "ref": { "local_ref": "audience-business-technical-evaluators" },
+        "type": "Audience",
+        "display_name": "Business and technical evaluators",
+        "facts": [{
+          "type": "AudienceFacts",
+          "mode": "merge",
+          "properties": {
+            "key": "business-technical-evaluators",
+            "label": "Business and technical evaluators",
+            "need": "Understand why a graph is useful without first learning graph terminology.",
+            "context": "Commercial Vellis website visitors evaluating graph-backed product experiences."
+          }
+        }]
+      },
+      {
+        "ref": { "local_ref": "question-reef-signal-trust" },
+        "type": "ExperienceQuestion",
+        "display_name": "What does this reef heat signal mean, and can I trust it?",
+        "facts": [{
+          "type": "ExperienceQuestionFacts",
+          "mode": "merge",
+          "properties": {
+            "key": "reef-signal-meaning-and-trust",
+            "prompt": "What does this reef heat signal mean, and can I trust it?",
+            "desired_insight": "The graph makes source, interpretation, and limitations inspectable as one connected experience.",
+            "status": "active",
+            "valid_from": "2026-07-10T00:00:00Z",
+            "valid_to": "9999-12-31T23:59:59Z"
+          }
+        }]
+      },
+      {
+        "ref": { "local_ref": "scene-global-overview" },
+        "type": "Scene",
+        "display_name": "Global overview",
+        "facts": [{
+          "type": "SceneFacts",
+          "mode": "merge",
+          "properties": {
+            "key": "global-overview",
+            "label": "Global overview",
+            "purpose": "Invite geographic exploration through a small set of source-backed reef signals.",
+            "status": "prototype",
+            "valid_from": "2026-07-10T00:00:00Z",
+            "valid_to": "9999-12-31T23:59:59Z"
+          }
+        }]
+      },
+      {
+        "ref": { "local_ref": "scene-region-signal" },
+        "type": "Scene",
+        "display_name": "Region signal",
+        "facts": [{
+          "type": "SceneFacts",
+          "mode": "merge",
+          "properties": {
+            "key": "region-signal",
+            "label": "Region signal",
+            "purpose": "Connect a selected reef region to observed heat-stress values and interpretation.",
+            "status": "prototype",
+            "valid_from": "2026-07-10T00:00:00Z",
+            "valid_to": "9999-12-31T23:59:59Z"
+          }
+        }]
+      },
+      {
+        "ref": { "local_ref": "scene-prove-it" },
+        "type": "Scene",
+        "display_name": "Prove It",
+        "facts": [{
+          "type": "SceneFacts",
+          "mode": "merge",
+          "properties": {
+            "key": "prove-it",
+            "label": "Prove It",
+            "purpose": "Expose source, retrieval time, graph path, publication posture, and caveats.",
+            "status": "prototype",
+            "valid_from": "2026-07-10T00:00:00Z",
+            "valid_to": "9999-12-31T23:59:59Z"
+          }
+        }]
+      },
+      {
+        "ref": { "local_ref": "interaction-select-region" },
+        "type": "Interaction",
+        "display_name": "Select reef region",
+        "facts": [{
+          "type": "InteractionFacts",
+          "mode": "merge",
+          "properties": {
+            "key": "select-reef-region",
+            "label": "Select reef region",
+            "mode": "map selection",
+            "desired_outcome": "The visitor chooses a place and sees the interface reorganize around one connected signal.",
+            "status": "prototype",
+            "valid_from": "2026-07-10T00:00:00Z",
+            "valid_to": "9999-12-31T23:59:59Z"
+          }
+        }]
+      },
+      {
+        "ref": { "local_ref": "interaction-follow-evidence-trail" },
+        "type": "Interaction",
+        "display_name": "Follow evidence trail",
+        "facts": [{
+          "type": "InteractionFacts",
+          "mode": "merge",
+          "properties": {
+            "key": "follow-evidence-trail",
+            "label": "Follow evidence trail",
+            "mode": "guided traversal",
+            "desired_outcome": "The visitor understands the signal through an ordered path rather than a dense dashboard.",
+            "status": "prototype",
+            "valid_from": "2026-07-10T00:00:00Z",
+            "valid_to": "9999-12-31T23:59:59Z"
+          }
+        }]
+      },
+      {
+        "ref": { "local_ref": "interaction-inspect-graph-record" },
+        "type": "Interaction",
+        "display_name": "Inspect graph record",
+        "facts": [{
+          "type": "InteractionFacts",
+          "mode": "merge",
+          "properties": {
+            "key": "inspect-graph-record",
+            "label": "Inspect graph record",
+            "mode": "evidence inspection",
+            "desired_outcome": "The visitor can verify which nodes and links support the visible claim.",
+            "status": "prototype",
+            "valid_from": "2026-07-10T00:00:00Z",
+            "valid_to": "9999-12-31T23:59:59Z"
+          }
+        }]
+      },
+      {
+        "ref": { "local_ref": "source-noaa-crw-5km" },
+        "type": "SourceCandidate",
+        "display_name": "NOAA Coral Reef Watch Daily Global 5km products",
+        "facts": [{
+          "type": "SourceCandidateFacts",
+          "mode": "merge",
+          "properties": {
+            "provider": "NOAA Coral Reef Watch",
+            "product_id": "daily-global-5km-coral-bleaching-heat-stress",
+            "label": "NOAA Coral Reef Watch Daily Global 5km products",
+            "source_url": "https://coralreefwatch.noaa.gov/product/5km/",
+            "authority": "U.S. National Oceanic and Atmospheric Administration",
+            "public_domain_or_license_basis": "NOAA Coral Reef Watch states that posted CRW data are public-domain and freely distributable; confirm the current source policy before publication.",
+            "recommended_credit": "Data: NOAA Coral Reef Watch. Map context: project-original schematic.",
+            "review_status": "planning_eligible_pending_publication_review"
+          }
+        }]
+      },
+      {
+        "ref": { "local_ref": "assessment-noaa-crw-2026-07-10" },
+        "type": "SourceAssessment",
+        "display_name": "NOAA CRW commercial publication planning assessment",
+        "facts": [{
+          "type": "SourceAssessmentFacts",
+          "mode": "merge",
+          "properties": {
+            "assessed_at": "2026-07-10T00:00:00Z",
+            "outcome": "planning_eligible_pending_publication_review",
+            "confidence": "medium",
+            "assessor": "Vellis prototype planning",
+            "rationale": "The recorded NOAA CRW policy supports public-domain use with courtesy credit and a visible non-endorsement posture.",
+            "limitations": "This is a product-planning assessment, not legal advice; exact product, query, geography, citation, and current provider policy require final human review."
+          }
+        }]
+      },
+      {
+        "ref": { "local_ref": "claim-source-backed-reef-signal" },
+        "type": "Claim",
+        "display_name": "Source-backed reef heat signals are inspectable",
+        "facts": [{
+          "type": "ClaimFacts",
+          "mode": "merge",
+          "properties": {
+            "key": "source-backed-reef-signal-inspectable",
+            "statement": "A static, source-backed graph view can make public reef heat signals inspectable without implying live monitoring or regional aggregation.",
+            "status": "prototype_claim",
+            "qualifier": "Point samples are not regional averages, the prototype is not a live NOAA feed, and NOAA endorsement is not implied.",
+            "valid_from": "2026-07-10T00:00:00Z",
+            "valid_to": "9999-12-31T23:59:59Z"
+          }
+        }]
+      },
+      {
+        "ref": { "local_ref": "graph-model-ocean-signal-atlas-alpha" },
+        "type": "GraphModel",
+        "display_name": "Ocean Signal Atlas alpha graph model",
+        "facts": [{
+          "type": "GraphModelFacts",
+          "mode": "merge",
+          "properties": {
+            "domain_id": "ocean_signal_atlas",
+            "summary": "Proposed source-grounded ocean graph connecting reef regions, observations, alert levels, snapshots, source products, caveats, and reading trails.",
+            "schema_status": "candidate",
+            "body_locator": "docs/prototypes/ocean-signal-atlas/graph-handoff.md",
+            "valid_from": "2026-07-10T00:00:00Z",
+            "valid_to": "9999-12-31T23:59:59Z"
+          }
+        }]
+      },
+      {
+        "ref": { "local_ref": "build-ocean-signal-atlas-static-2026-07-09" },
+        "type": "PrototypeBuild",
+        "display_name": "Ocean Signal Atlas static prototype build",
+        "facts": [{
+          "type": "PrototypeBuildFacts",
+          "mode": "merge",
+          "properties": {
+            "build_id": "ocean-signal-atlas-static-2026-07-09",
+            "built_at": "2026-07-09T18:04:42Z",
+            "artifact_locator": "docs/prototypes/ocean-signal-atlas/index.html",
+            "status": "verified_local",
+            "verification_summary": "Static desktop and mobile browser checks passed; graph record, publication checklist, source links, and caveats render without console errors."
+          }
+        }]
+      },
+      {
+        "ref": { "local_ref": "criterion-static-snapshot" },
+        "type": "PublicationCriterion",
+        "display_name": "Static snapshot is explicit",
+        "facts": [{
+          "type": "PublicationCriterionFacts",
+          "mode": "merge",
+          "properties": {
+            "key": "static-snapshot-not-live-feed",
+            "label": "Static snapshot is explicit",
+            "category": "claim_integrity",
+            "sequence_order": 1,
+            "requirement": "Describe the experience as a static snapshot and never imply a live NOAA feed.",
+            "valid_from": "2026-07-10T00:00:00Z",
+            "valid_to": "9999-12-31T23:59:59Z"
+          }
+        }]
+      },
+      {
+        "ref": { "local_ref": "criterion-public-domain-basis" },
+        "type": "PublicationCriterion",
+        "display_name": "Public-domain basis is visible",
+        "facts": [{
+          "type": "PublicationCriterionFacts",
+          "mode": "merge",
+          "properties": {
+            "key": "public-domain-basis-visible",
+            "label": "Public-domain basis is visible",
+            "category": "rights",
+            "sequence_order": 2,
+            "requirement": "Show the recorded source policy and retain a final human review gate.",
+            "valid_from": "2026-07-10T00:00:00Z",
+            "valid_to": "9999-12-31T23:59:59Z"
+          }
+        }]
+      },
+      {
+        "ref": { "local_ref": "criterion-courtesy-credit" },
+        "type": "PublicationCriterion",
+        "display_name": "Courtesy credit is visible",
+        "facts": [{
+          "type": "PublicationCriterionFacts",
+          "mode": "merge",
+          "properties": {
+            "key": "courtesy-credit-visible",
+            "label": "Courtesy credit is visible",
+            "category": "attribution",
+            "sequence_order": 3,
+            "requirement": "Display NOAA Coral Reef Watch courtesy credit near the source explanation.",
+            "valid_from": "2026-07-10T00:00:00Z",
+            "valid_to": "9999-12-31T23:59:59Z"
+          }
+        }]
+      },
+      {
+        "ref": { "local_ref": "criterion-no-endorsement" },
+        "type": "PublicationCriterion",
+        "display_name": "No provider endorsement is implied",
+        "facts": [{
+          "type": "PublicationCriterionFacts",
+          "mode": "merge",
+          "properties": {
+            "key": "no-provider-endorsement",
+            "label": "No provider endorsement is implied",
+            "category": "brand_safety",
+            "sequence_order": 4,
+            "requirement": "State that NOAA, Coral Reef Watch, and U.S. Government endorsement is not implied.",
+            "valid_from": "2026-07-10T00:00:00Z",
+            "valid_to": "9999-12-31T23:59:59Z"
+          }
+        }]
+      },
+      {
+        "ref": { "local_ref": "criterion-point-sample-caveats" },
+        "type": "PublicationCriterion",
+        "display_name": "Point-sample caveats are visible",
+        "facts": [{
+          "type": "PublicationCriterionFacts",
+          "mode": "merge",
+          "properties": {
+            "key": "point-sample-caveats-visible",
+            "label": "Point-sample caveats are visible",
+            "category": "scientific_context",
+            "sequence_order": 5,
+            "requirement": "Describe sampled coordinates as point samples and surface satellite context, not regional summaries.",
+            "valid_from": "2026-07-10T00:00:00Z",
+            "valid_to": "9999-12-31T23:59:59Z"
+          }
+        }]
+      },
+      {
+        "ref": { "local_ref": "criterion-region-review" },
+        "type": "PublicationCriterion",
+        "display_name": "Region labels and coordinates are approved",
+        "facts": [{
+          "type": "PublicationCriterionFacts",
+          "mode": "merge",
+          "properties": {
+            "key": "region-label-coordinate-review",
+            "label": "Region labels and coordinates are approved",
+            "category": "human_review",
+            "sequence_order": 6,
+            "requirement": "A human reviewer approves selected reef labels, sample coordinates, and publication framing.",
+            "valid_from": "2026-07-10T00:00:00Z",
+            "valid_to": "9999-12-31T23:59:59Z"
+          }
+        }]
+      },
+      {
+        "ref": { "local_ref": "check-static-snapshot-2026-07-10" },
+        "type": "PublicationCheck",
+        "display_name": "Static snapshot publication check",
+        "facts": [{ "type": "PublicationCheckFacts", "mode": "merge", "properties": {
+          "checked_at": "2026-07-10T00:00:00Z", "outcome": "pass", "reviewer": "prototype verification", "notes": "The interface labels the data as a static fixture and not a live feed."
+        }}]
+      },
+      {
+        "ref": { "local_ref": "check-public-domain-2026-07-10" },
+        "type": "PublicationCheck",
+        "display_name": "Public-domain basis publication check",
+        "facts": [{ "type": "PublicationCheckFacts", "mode": "merge", "properties": {
+          "checked_at": "2026-07-10T00:00:00Z", "outcome": "pass_with_final_review", "reviewer": "source planning", "notes": "The source basis is visible; current provider policy still needs final human confirmation before publication."
+        }}]
+      },
+      {
+        "ref": { "local_ref": "check-credit-2026-07-10" },
+        "type": "PublicationCheck",
+        "display_name": "Courtesy credit publication check",
+        "facts": [{ "type": "PublicationCheckFacts", "mode": "merge", "properties": {
+          "checked_at": "2026-07-10T00:00:00Z", "outcome": "pass", "reviewer": "prototype verification", "notes": "The recommended NOAA Coral Reef Watch credit is present in the source panel."
+        }}]
+      },
+      {
+        "ref": { "local_ref": "check-no-endorsement-2026-07-10" },
+        "type": "PublicationCheck",
+        "display_name": "No-endorsement publication check",
+        "facts": [{ "type": "PublicationCheckFacts", "mode": "merge", "properties": {
+          "checked_at": "2026-07-10T00:00:00Z", "outcome": "pass", "reviewer": "prototype verification", "notes": "The prototype explicitly states that provider and government endorsement is not implied."
+        }}]
+      },
+      {
+        "ref": { "local_ref": "check-point-caveats-2026-07-10" },
+        "type": "PublicationCheck",
+        "display_name": "Point-sample caveat publication check",
+        "facts": [{ "type": "PublicationCheckFacts", "mode": "merge", "properties": {
+          "checked_at": "2026-07-10T00:00:00Z", "outcome": "pass", "reviewer": "prototype verification", "notes": "Point-sample and surface-satellite limitations are visible in the proof surface."
+        }}]
+      },
+      {
+        "ref": { "local_ref": "check-region-review-2026-07-10" },
+        "type": "PublicationCheck",
+        "display_name": "Region review publication check",
+        "facts": [{ "type": "PublicationCheckFacts", "mode": "merge", "properties": {
+          "checked_at": "2026-07-10T00:00:00Z", "outcome": "pending_human_review", "reviewer": "unassigned", "notes": "Selected labels, coordinates, and publication framing have not yet received a named human approval."
+        }}]
+      },
+      {
+        "ref": { "local_ref": "decision-separate-graph-layers-2026-07-10" },
+        "type": "Decision",
+        "display_name": "Separate operator, experience, and runtime graph ownership",
+        "facts": [{
+          "type": "DecisionFacts",
+          "mode": "merge",
+          "properties": {
+            "title": "Separate operator, experience, and runtime graph ownership",
+            "decided_at": "2026-07-10T00:00:00Z",
+            "rationale": "Personal Ops should manage attention, Experience Studio should manage reusable product planning, and source-authoritative domain graphs should power published experiences.",
+            "reversibility": "reversible_with_migration",
+            "status": "active",
+            "review_date": "after_second_experience_seed"
+          }
+        }]
+      }
+    ],
+    "link_writes": [
+      { "ref": { "local_ref": "link-targets-audience" }, "type": "targets_audience", "source_ref": { "local_ref": "experience-ocean-signal-atlas" }, "target_ref": { "local_ref": "audience-business-technical-evaluators" } },
+      { "ref": { "local_ref": "link-answers-question" }, "type": "answers_question", "source_ref": { "local_ref": "experience-ocean-signal-atlas" }, "target_ref": { "local_ref": "question-reef-signal-trust" } },
+      { "ref": { "local_ref": "link-contains-global" }, "type": "contains_scene", "source_ref": { "local_ref": "experience-ocean-signal-atlas" }, "target_ref": { "local_ref": "scene-global-overview" } },
+      { "ref": { "local_ref": "link-contains-region" }, "type": "contains_scene", "source_ref": { "local_ref": "experience-ocean-signal-atlas" }, "target_ref": { "local_ref": "scene-region-signal" } },
+      { "ref": { "local_ref": "link-contains-prove" }, "type": "contains_scene", "source_ref": { "local_ref": "experience-ocean-signal-atlas" }, "target_ref": { "local_ref": "scene-prove-it" } },
+      { "ref": { "local_ref": "link-global-select" }, "type": "offers_interaction", "source_ref": { "local_ref": "scene-global-overview" }, "target_ref": { "local_ref": "interaction-select-region" } },
+      { "ref": { "local_ref": "link-region-trail" }, "type": "offers_interaction", "source_ref": { "local_ref": "scene-region-signal" }, "target_ref": { "local_ref": "interaction-follow-evidence-trail" } },
+      { "ref": { "local_ref": "link-prove-inspect" }, "type": "offers_interaction", "source_ref": { "local_ref": "scene-prove-it" }, "target_ref": { "local_ref": "interaction-inspect-graph-record" } },
+      { "ref": { "local_ref": "link-region-follows-global" }, "type": "follows", "source_ref": { "local_ref": "scene-region-signal" }, "target_ref": { "local_ref": "scene-global-overview" } },
+      { "ref": { "local_ref": "link-prove-follows-region" }, "type": "follows", "source_ref": { "local_ref": "scene-prove-it" }, "target_ref": { "local_ref": "scene-region-signal" } },
+      { "ref": { "local_ref": "link-considers-noaa" }, "type": "considers_source", "source_ref": { "local_ref": "experience-ocean-signal-atlas" }, "target_ref": { "local_ref": "source-noaa-crw-5km" } },
+      { "ref": { "local_ref": "link-assessment-for-ocean" }, "type": "assessment_for", "source_ref": { "local_ref": "assessment-noaa-crw-2026-07-10" }, "target_ref": { "local_ref": "experience-ocean-signal-atlas" } },
+      { "ref": { "local_ref": "link-assesses-noaa" }, "type": "assesses_source", "source_ref": { "local_ref": "assessment-noaa-crw-2026-07-10" }, "target_ref": { "local_ref": "source-noaa-crw-5km" } },
+      { "ref": { "local_ref": "link-presents-claim" }, "type": "presents_claim", "source_ref": { "local_ref": "experience-ocean-signal-atlas" }, "target_ref": { "local_ref": "claim-source-backed-reef-signal" } },
+      { "ref": { "local_ref": "link-proposes-model" }, "type": "proposes_model", "source_ref": { "local_ref": "experience-ocean-signal-atlas" }, "target_ref": { "local_ref": "graph-model-ocean-signal-atlas-alpha" } },
+      { "ref": { "local_ref": "link-has-build" }, "type": "has_build", "source_ref": { "local_ref": "experience-ocean-signal-atlas" }, "target_ref": { "local_ref": "build-ocean-signal-atlas-static-2026-07-09" } },
+      { "ref": { "local_ref": "link-build-implements-model" }, "type": "implements_model", "source_ref": { "local_ref": "build-ocean-signal-atlas-static-2026-07-09" }, "target_ref": { "local_ref": "graph-model-ocean-signal-atlas-alpha" } },
+      { "ref": { "local_ref": "link-check-static-for" }, "type": "check_for", "source_ref": { "local_ref": "check-static-snapshot-2026-07-10" }, "target_ref": { "local_ref": "experience-ocean-signal-atlas" } },
+      { "ref": { "local_ref": "link-check-static-criterion" }, "type": "checks_criterion", "source_ref": { "local_ref": "check-static-snapshot-2026-07-10" }, "target_ref": { "local_ref": "criterion-static-snapshot" } },
+      { "ref": { "local_ref": "link-check-domain-for" }, "type": "check_for", "source_ref": { "local_ref": "check-public-domain-2026-07-10" }, "target_ref": { "local_ref": "experience-ocean-signal-atlas" } },
+      { "ref": { "local_ref": "link-check-domain-criterion" }, "type": "checks_criterion", "source_ref": { "local_ref": "check-public-domain-2026-07-10" }, "target_ref": { "local_ref": "criterion-public-domain-basis" } },
+      { "ref": { "local_ref": "link-check-credit-for" }, "type": "check_for", "source_ref": { "local_ref": "check-credit-2026-07-10" }, "target_ref": { "local_ref": "experience-ocean-signal-atlas" } },
+      { "ref": { "local_ref": "link-check-credit-criterion" }, "type": "checks_criterion", "source_ref": { "local_ref": "check-credit-2026-07-10" }, "target_ref": { "local_ref": "criterion-courtesy-credit" } },
+      { "ref": { "local_ref": "link-check-endorsement-for" }, "type": "check_for", "source_ref": { "local_ref": "check-no-endorsement-2026-07-10" }, "target_ref": { "local_ref": "experience-ocean-signal-atlas" } },
+      { "ref": { "local_ref": "link-check-endorsement-criterion" }, "type": "checks_criterion", "source_ref": { "local_ref": "check-no-endorsement-2026-07-10" }, "target_ref": { "local_ref": "criterion-no-endorsement" } },
+      { "ref": { "local_ref": "link-check-caveat-for" }, "type": "check_for", "source_ref": { "local_ref": "check-point-caveats-2026-07-10" }, "target_ref": { "local_ref": "experience-ocean-signal-atlas" } },
+      { "ref": { "local_ref": "link-check-caveat-criterion" }, "type": "checks_criterion", "source_ref": { "local_ref": "check-point-caveats-2026-07-10" }, "target_ref": { "local_ref": "criterion-point-sample-caveats" } },
+      { "ref": { "local_ref": "link-check-region-for" }, "type": "check_for", "source_ref": { "local_ref": "check-region-review-2026-07-10" }, "target_ref": { "local_ref": "experience-ocean-signal-atlas" } },
+      { "ref": { "local_ref": "link-check-region-criterion" }, "type": "checks_criterion", "source_ref": { "local_ref": "check-region-review-2026-07-10" }, "target_ref": { "local_ref": "criterion-region-review" } },
+      { "ref": { "local_ref": "link-decision-governs-experience" }, "type": "governs", "source_ref": { "local_ref": "decision-separate-graph-layers-2026-07-10" }, "target_ref": { "local_ref": "experience-ocean-signal-atlas" } },
+      { "ref": { "local_ref": "link-decision-governs-model" }, "type": "governs", "source_ref": { "local_ref": "decision-separate-graph-layers-2026-07-10" }, "target_ref": { "local_ref": "graph-model-ocean-signal-atlas-alpha" } },
+      { "ref": { "local_ref": "link-assessment-evidence" }, "type": "evidenced_by", "source_ref": { "local_ref": "assessment-noaa-crw-2026-07-10" }, "target_ref": { "local_ref": "source-noaa-crw-5km" } },
+      { "ref": { "local_ref": "link-claim-evidence" }, "type": "evidenced_by", "source_ref": { "local_ref": "claim-source-backed-reef-signal" }, "target_ref": { "local_ref": "source-noaa-crw-5km" } },
+      { "ref": { "local_ref": "link-static-evidence" }, "type": "evidenced_by", "source_ref": { "local_ref": "check-static-snapshot-2026-07-10" }, "target_ref": { "local_ref": "build-ocean-signal-atlas-static-2026-07-09" } },
+      { "ref": { "local_ref": "link-domain-evidence" }, "type": "evidenced_by", "source_ref": { "local_ref": "check-public-domain-2026-07-10" }, "target_ref": { "local_ref": "source-noaa-crw-5km" } },
+      { "ref": { "local_ref": "link-credit-evidence" }, "type": "evidenced_by", "source_ref": { "local_ref": "check-credit-2026-07-10" }, "target_ref": { "local_ref": "source-noaa-crw-5km" } },
+      { "ref": { "local_ref": "link-endorsement-evidence" }, "type": "evidenced_by", "source_ref": { "local_ref": "check-no-endorsement-2026-07-10" }, "target_ref": { "local_ref": "source-noaa-crw-5km" } },
+      { "ref": { "local_ref": "link-caveat-evidence" }, "type": "evidenced_by", "source_ref": { "local_ref": "check-point-caveats-2026-07-10" }, "target_ref": { "local_ref": "build-ocean-signal-atlas-static-2026-07-09" } },
+      { "ref": { "local_ref": "link-region-evidence" }, "type": "evidenced_by", "source_ref": { "local_ref": "check-region-review-2026-07-10" }, "target_ref": { "local_ref": "build-ocean-signal-atlas-static-2026-07-09" } }
+    ]
+  }
+}

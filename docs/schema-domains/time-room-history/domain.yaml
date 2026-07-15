@@ -17,11 +17,9 @@ domain_tags:
   - time-room
   - alpha
 runtime_compatibility:
-  status: blocked
-  requirements:
-    - Time Room History schema, seed, and query fixtures
-  blockers:
-    - The referenced prototype fixtures are not yet present in the harmonized tree.
+  status: ready
+  requirements: []
+  blockers: []
 schema_summary:
   anchors:
     - HistoricalFigure

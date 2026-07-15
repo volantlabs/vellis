@@ -1,0 +1,49 @@
+{
+  "tool": "rtg_execute_query",
+  "arguments": {
+    "query_options": {
+      "live_filter": "live",
+      "order_by": [
+        { "data_requirement": "criterion_facts", "path": ["sequence_order"], "direction": "ascending" }
+      ]
+    },
+    "response_options": { "format": "properties_only" },
+    "query_spec": {
+      "anchor_buckets": [
+        { "name": "check", "anchor_type_keys": ["PublicationCheck"] },
+        { "name": "experience", "anchor_type_keys": ["Experience"] },
+        { "name": "criterion", "anchor_type_keys": ["PublicationCriterion"] }
+      ],
+      "link_requirements": [
+        { "name": "for_experience", "source_bucket": "check", "target_bucket": "experience", "link_type_keys": ["check_for"] },
+        { "name": "criterion_checked", "source_bucket": "check", "target_bucket": "criterion", "link_type_keys": ["checks_criterion"] }
+      ],
+      "data_requirements": [
+        {
+          "name": "experience_facts",
+          "anchor_bucket": "experience",
+          "data_type_key": "ExperienceFacts",
+          "required": true,
+          "predicates": [{ "path": ["slug"], "operator": "equals", "value": "ocean-signal-atlas" }]
+        },
+        { "name": "check_facts", "anchor_bucket": "check", "data_type_key": "PublicationCheckFacts", "required": true, "predicates": [] },
+        { "name": "criterion_facts", "anchor_bucket": "criterion", "data_type_key": "PublicationCriterionFacts", "required": true, "predicates": [] }
+      ],
+      "return_spec": {
+        "anchor_buckets": ["check", "experience", "criterion"],
+        "link_requirements": ["for_experience", "criterion_checked"],
+        "data_requirements": ["experience_facts", "check_facts", "criterion_facts"],
+        "properties": [
+          ["experience_facts", ["title"]],
+          ["criterion_facts", ["sequence_order"]],
+          ["criterion_facts", ["label"]],
+          ["criterion_facts", ["category"]],
+          ["check_facts", ["checked_at"]],
+          ["check_facts", ["outcome"]],
+          ["check_facts", ["reviewer"]],
+          ["check_facts", ["notes"]]
+        ]
+      }
+    }
+  }
+}

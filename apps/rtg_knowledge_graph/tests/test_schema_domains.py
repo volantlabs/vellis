@@ -64,6 +64,9 @@ def test_schema_domain_catalog_paths_and_usage_guide_are_aligned(tmp_path: Path)
         "agent_memory_spine",
         "individual_life_graph",
         "personal_operating_graph",
+        "experience_studio",
+        "gothic_ambient_archive",
+        "time_room_history",
     }
     assert guide["result"]["guardrails"][0].startswith("Do not auto-install")
 
@@ -87,4 +90,7 @@ def test_mcp_launch_metadata_exposes_available_schema_domains(tmp_path: Path) ->
         "agent_memory_spine",
         "individual_life_graph",
         "personal_operating_graph",
+        "experience_studio",
+        "gothic_ambient_archive",
+        "time_room_history",
     }

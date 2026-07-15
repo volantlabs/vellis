@@ -1,0 +1,413 @@
+{
+  "tool": "rtg_stage_schema_migration",
+  "arguments": {
+    "migration_id": "experience-studio-schema-v0",
+    "description": "Introduce the alpha Experience Studio schema for governed planning of graph-backed public experiences.",
+    "validation_mode": "strict",
+    "schema_definitions": [
+      {
+        "kind": "data_object",
+        "type_key": "ExperienceFacts",
+        "description": "Current product identity, thesis, lifecycle, and ownership boundary for an experience.",
+        "time_shape": "state_now",
+        "payload": {
+          "properties": {
+            "slug": { "required": true, "value_kinds": ["string"] },
+            "title": { "required": true, "value_kinds": ["string"] },
+            "medium": { "required": true, "value_kinds": ["string"] },
+            "lifecycle_status": { "required": true, "value_kinds": ["string"] },
+            "thesis": { "required": true, "value_kinds": ["string"] },
+            "owner_scope": { "required": true, "value_kinds": ["string"] },
+            "commercial_surface": { "required": true, "value_kinds": ["boolean"] }
+          }
+        }
+      },
+      {
+        "kind": "anchor",
+        "type_key": "Experience",
+        "description": "A graph-backed public game, visual exploration, or interactive experience.",
+        "time_shape": "state_now",
+        "payload": { "required_data_types": ["ExperienceFacts"] }
+      },
+      {
+        "kind": "data_object",
+        "type_key": "AudienceFacts",
+        "description": "Current audience need and usage context for one reusable audience segment.",
+        "time_shape": "state_now",
+        "payload": {
+          "properties": {
+            "key": { "required": true, "value_kinds": ["string"] },
+            "label": { "required": true, "value_kinds": ["string"] },
+            "need": { "required": true, "value_kinds": ["string"] },
+            "context": { "required": true, "value_kinds": ["string"] }
+          }
+        }
+      },
+      {
+        "kind": "anchor",
+        "type_key": "Audience",
+        "description": "A target audience segment with a distinct need or decision context.",
+        "time_shape": "state_now",
+        "payload": { "required_data_types": ["AudienceFacts"] }
+      },
+      {
+        "kind": "data_object",
+        "type_key": "ExperienceQuestionFacts",
+        "description": "Versioned framing question and intended insight for an experience.",
+        "time_shape": "state_as_of",
+        "payload": {
+          "properties": {
+            "key": { "required": true, "value_kinds": ["string"] },
+            "prompt": { "required": true, "value_kinds": ["string"] },
+            "desired_insight": { "required": true, "value_kinds": ["string"] },
+            "status": { "required": true, "value_kinds": ["string"] },
+            "valid_from": { "required": true, "value_kinds": ["string"], "format": "date_time" },
+            "valid_to": { "required": true, "value_kinds": ["string"], "format": "date_time" }
+          }
+        }
+      },
+      {
+        "kind": "anchor",
+        "type_key": "ExperienceQuestion",
+        "description": "A stable question identity whose framing may evolve over time.",
+        "time_shape": "state_now",
+        "payload": { "required_data_types": ["ExperienceQuestionFacts"] }
+      },
+      {
+        "kind": "data_object",
+        "type_key": "SceneFacts",
+        "description": "Versioned purpose and status for one bounded experience scene.",
+        "time_shape": "state_as_of",
+        "payload": {
+          "properties": {
+            "key": { "required": true, "value_kinds": ["string"] },
+            "label": { "required": true, "value_kinds": ["string"] },
+            "purpose": { "required": true, "value_kinds": ["string"] },
+            "status": { "required": true, "value_kinds": ["string"] },
+            "valid_from": { "required": true, "value_kinds": ["string"], "format": "date_time" },
+            "valid_to": { "required": true, "value_kinds": ["string"], "format": "date_time" }
+          }
+        }
+      },
+      {
+        "kind": "anchor",
+        "type_key": "Scene",
+        "description": "A stable scene or mode identity inside an experience.",
+        "time_shape": "state_now",
+        "payload": { "required_data_types": ["SceneFacts"] }
+      },
+      {
+        "kind": "data_object",
+        "type_key": "InteractionFacts",
+        "description": "Versioned interaction behavior and desired user outcome.",
+        "time_shape": "state_as_of",
+        "payload": {
+          "properties": {
+            "key": { "required": true, "value_kinds": ["string"] },
+            "label": { "required": true, "value_kinds": ["string"] },
+            "mode": { "required": true, "value_kinds": ["string"] },
+            "desired_outcome": { "required": true, "value_kinds": ["string"] },
+            "status": { "required": true, "value_kinds": ["string"] },
+            "valid_from": { "required": true, "value_kinds": ["string"], "format": "date_time" },
+            "valid_to": { "required": true, "value_kinds": ["string"], "format": "date_time" }
+          }
+        }
+      },
+      {
+        "kind": "anchor",
+        "type_key": "Interaction",
+        "description": "A stable interaction identity used by one or more experience scenes.",
+        "time_shape": "state_now",
+        "payload": { "required_data_types": ["InteractionFacts"] }
+      },
+      {
+        "kind": "data_object",
+        "type_key": "SourceCandidateFacts",
+        "description": "Current source identity, authority, rights basis, credit, and review status.",
+        "time_shape": "state_now",
+        "payload": {
+          "properties": {
+            "provider": { "required": true, "value_kinds": ["string"] },
+            "product_id": { "required": true, "value_kinds": ["string"] },
+            "label": { "required": true, "value_kinds": ["string"] },
+            "source_url": { "required": true, "value_kinds": ["string"] },
+            "authority": { "required": true, "value_kinds": ["string"] },
+            "public_domain_or_license_basis": { "required": true, "value_kinds": ["string"] },
+            "recommended_credit": { "required": true, "value_kinds": ["string"] },
+            "review_status": { "required": true, "value_kinds": ["string"] }
+          }
+        }
+      },
+      {
+        "kind": "anchor",
+        "type_key": "SourceCandidate",
+        "description": "A public-data, source, or asset candidate considered for an experience.",
+        "time_shape": "state_now",
+        "payload": { "required_data_types": ["SourceCandidateFacts"] }
+      },
+      {
+        "kind": "data_object",
+        "type_key": "SourceAssessmentFacts",
+        "description": "Append-only assessment of a source candidate for one experience.",
+        "time_shape": "event",
+        "payload": {
+          "properties": {
+            "assessed_at": { "required": true, "value_kinds": ["string"], "format": "date_time" },
+            "outcome": { "required": true, "value_kinds": ["string"] },
+            "confidence": { "required": true, "value_kinds": ["string"] },
+            "assessor": { "required": true, "value_kinds": ["string"] },
+            "rationale": { "required": true, "value_kinds": ["string"] },
+            "limitations": { "required": true, "value_kinds": ["string"] }
+          }
+        }
+      },
+      {
+        "kind": "anchor",
+        "type_key": "SourceAssessment",
+        "description": "An append-only source eligibility and publication-planning assessment.",
+        "time_shape": "event",
+        "payload": { "required_data_types": ["SourceAssessmentFacts"] }
+      },
+      {
+        "kind": "data_object",
+        "type_key": "ClaimFacts",
+        "description": "Versioned public-facing claim with publication status and qualifier.",
+        "time_shape": "state_as_of",
+        "payload": {
+          "properties": {
+            "key": { "required": true, "value_kinds": ["string"] },
+            "statement": { "required": true, "value_kinds": ["string"] },
+            "status": { "required": true, "value_kinds": ["string"] },
+            "qualifier": { "required": true, "value_kinds": ["string"] },
+            "valid_from": { "required": true, "value_kinds": ["string"], "format": "date_time" },
+            "valid_to": { "required": true, "value_kinds": ["string"], "format": "date_time" }
+          }
+        }
+      },
+      {
+        "kind": "anchor",
+        "type_key": "Claim",
+        "description": "A stable public-claim identity whose wording and publication posture may evolve.",
+        "time_shape": "state_now",
+        "payload": { "required_data_types": ["ClaimFacts"] }
+      },
+      {
+        "kind": "data_object",
+        "type_key": "GraphModelFacts",
+        "description": "Versioned graph-domain proposal and locator for its detailed design body.",
+        "time_shape": "state_as_of",
+        "payload": {
+          "properties": {
+            "domain_id": { "required": true, "value_kinds": ["string"] },
+            "summary": { "required": true, "value_kinds": ["string"] },
+            "schema_status": { "required": true, "value_kinds": ["string"] },
+            "body_locator": { "required": true, "value_kinds": ["string"] },
+            "valid_from": { "required": true, "value_kinds": ["string"], "format": "date_time" },
+            "valid_to": { "required": true, "value_kinds": ["string"], "format": "date_time" }
+          }
+        }
+      },
+      {
+        "kind": "anchor",
+        "type_key": "GraphModel",
+        "description": "A stable proposed domain model for an experience or family of experiences.",
+        "time_shape": "state_now",
+        "payload": { "required_data_types": ["GraphModelFacts"] }
+      },
+      {
+        "kind": "data_object",
+        "type_key": "PrototypeBuildFacts",
+        "description": "Append-only build artifact, status, locator, and verification summary.",
+        "time_shape": "event",
+        "payload": {
+          "properties": {
+            "build_id": { "required": true, "value_kinds": ["string"] },
+            "built_at": { "required": true, "value_kinds": ["string"], "format": "date_time" },
+            "artifact_locator": { "required": true, "value_kinds": ["string"] },
+            "status": { "required": true, "value_kinds": ["string"] },
+            "verification_summary": { "required": true, "value_kinds": ["string"] }
+          }
+        }
+      },
+      {
+        "kind": "anchor",
+        "type_key": "PrototypeBuild",
+        "description": "An immutable build event for a prototype or published experience artifact.",
+        "time_shape": "event",
+        "payload": { "required_data_types": ["PrototypeBuildFacts"] }
+      },
+      {
+        "kind": "data_object",
+        "type_key": "PublicationCriterionFacts",
+        "description": "Versioned reusable publication requirement with stable ordering.",
+        "time_shape": "state_as_of",
+        "payload": {
+          "properties": {
+            "key": { "required": true, "value_kinds": ["string"] },
+            "label": { "required": true, "value_kinds": ["string"] },
+            "category": { "required": true, "value_kinds": ["string"] },
+            "sequence_order": { "required": true, "value_kinds": ["integer"] },
+            "requirement": { "required": true, "value_kinds": ["string"] },
+            "valid_from": { "required": true, "value_kinds": ["string"], "format": "date_time" },
+            "valid_to": { "required": true, "value_kinds": ["string"], "format": "date_time" }
+          }
+        }
+      },
+      {
+        "kind": "anchor",
+        "type_key": "PublicationCriterion",
+        "description": "A stable publication gate whose requirement may evolve over time.",
+        "time_shape": "state_now",
+        "payload": { "required_data_types": ["PublicationCriterionFacts"] }
+      },
+      {
+        "kind": "data_object",
+        "type_key": "PublicationCheckFacts",
+        "description": "Append-only outcome for one publication criterion and experience.",
+        "time_shape": "event",
+        "payload": {
+          "properties": {
+            "checked_at": { "required": true, "value_kinds": ["string"], "format": "date_time" },
+            "outcome": { "required": true, "value_kinds": ["string"] },
+            "reviewer": { "required": true, "value_kinds": ["string"] },
+            "notes": { "required": true, "value_kinds": ["string"] }
+          }
+        }
+      },
+      {
+        "kind": "anchor",
+        "type_key": "PublicationCheck",
+        "description": "An immutable check event reifying publication outcome, reviewer, and time.",
+        "time_shape": "event",
+        "payload": { "required_data_types": ["PublicationCheckFacts"] }
+      },
+      {
+        "kind": "data_object",
+        "type_key": "DecisionFacts",
+        "description": "Append-only product decision with rationale and review posture.",
+        "time_shape": "event",
+        "payload": {
+          "properties": {
+            "title": { "required": true, "value_kinds": ["string"] },
+            "decided_at": { "required": true, "value_kinds": ["string"], "format": "date_time" },
+            "rationale": { "required": true, "value_kinds": ["string"] },
+            "reversibility": { "required": true, "value_kinds": ["string"] },
+            "status": { "required": true, "value_kinds": ["string"] },
+            "review_date": { "required": false, "value_kinds": ["string"] }
+          }
+        }
+      },
+      {
+        "kind": "anchor",
+        "type_key": "Decision",
+        "description": "An immutable product-design or graph-boundary decision.",
+        "time_shape": "event",
+        "payload": { "required_data_types": ["DecisionFacts"] }
+      },
+      {
+        "kind": "link",
+        "type_key": "targets_audience",
+        "description": "An experience is designed for an audience segment.",
+        "payload": { "allowed_source_types": ["Experience"], "allowed_target_types": ["Audience"], "link_kind": "semantic" }
+      },
+      {
+        "kind": "link",
+        "type_key": "answers_question",
+        "description": "An experience is organized around a framing question.",
+        "payload": { "allowed_source_types": ["Experience"], "allowed_target_types": ["ExperienceQuestion"], "link_kind": "semantic" }
+      },
+      {
+        "kind": "link",
+        "type_key": "contains_scene",
+        "description": "An experience contains a bounded scene or mode.",
+        "payload": { "allowed_source_types": ["Experience"], "allowed_target_types": ["Scene"], "link_kind": "structural" }
+      },
+      {
+        "kind": "link",
+        "type_key": "offers_interaction",
+        "description": "A scene offers an interaction behavior.",
+        "payload": { "allowed_source_types": ["Scene"], "allowed_target_types": ["Interaction"], "link_kind": "structural" }
+      },
+      {
+        "kind": "link",
+        "type_key": "follows",
+        "description": "A scene follows another scene in the intended experience sequence.",
+        "payload": { "allowed_source_types": ["Scene"], "allowed_target_types": ["Scene"], "link_kind": "structural" }
+      },
+      {
+        "kind": "link",
+        "type_key": "considers_source",
+        "description": "An experience considers a source candidate.",
+        "payload": { "allowed_source_types": ["Experience"], "allowed_target_types": ["SourceCandidate"], "link_kind": "semantic" }
+      },
+      {
+        "kind": "link",
+        "type_key": "assessment_for",
+        "description": "A source assessment was performed for an experience.",
+        "payload": { "allowed_source_types": ["SourceAssessment"], "allowed_target_types": ["Experience"], "link_kind": "semantic" }
+      },
+      {
+        "kind": "link",
+        "type_key": "assesses_source",
+        "description": "A source assessment evaluates a source candidate.",
+        "payload": { "allowed_source_types": ["SourceAssessment"], "allowed_target_types": ["SourceCandidate"], "link_kind": "semantic" }
+      },
+      {
+        "kind": "link",
+        "type_key": "presents_claim",
+        "description": "An experience or scene presents a public-facing claim.",
+        "payload": { "allowed_source_types": ["Experience", "Scene"], "allowed_target_types": ["Claim"], "link_kind": "semantic" }
+      },
+      {
+        "kind": "link",
+        "type_key": "proposes_model",
+        "description": "An experience proposes a graph-domain model.",
+        "payload": { "allowed_source_types": ["Experience"], "allowed_target_types": ["GraphModel"], "link_kind": "semantic" }
+      },
+      {
+        "kind": "link",
+        "type_key": "has_build",
+        "description": "An experience has an immutable prototype build.",
+        "payload": { "allowed_source_types": ["Experience"], "allowed_target_types": ["PrototypeBuild"], "link_kind": "versioning" }
+      },
+      {
+        "kind": "link",
+        "type_key": "implements_model",
+        "description": "A prototype build implements a graph-model proposal.",
+        "payload": { "allowed_source_types": ["PrototypeBuild"], "allowed_target_types": ["GraphModel"], "link_kind": "semantic" }
+      },
+      {
+        "kind": "link",
+        "type_key": "check_for",
+        "description": "A publication check applies to an experience.",
+        "payload": { "allowed_source_types": ["PublicationCheck"], "allowed_target_types": ["Experience"], "link_kind": "governance" }
+      },
+      {
+        "kind": "link",
+        "type_key": "checks_criterion",
+        "description": "A publication check evaluates a publication criterion.",
+        "payload": { "allowed_source_types": ["PublicationCheck"], "allowed_target_types": ["PublicationCriterion"], "link_kind": "governance" }
+      },
+      {
+        "kind": "link",
+        "type_key": "governs",
+        "description": "A product decision governs an experience or one of its planning artifacts.",
+        "payload": {
+          "allowed_source_types": ["Decision"],
+          "allowed_target_types": ["Experience", "SourceCandidate", "Claim", "GraphModel", "Scene", "Interaction"],
+          "link_kind": "governance"
+        }
+      },
+      {
+        "kind": "link",
+        "type_key": "evidenced_by",
+        "description": "A planning assertion or review event is evidenced by a source, build, or graph-model record.",
+        "payload": {
+          "allowed_source_types": ["SourceAssessment", "Claim", "PublicationCheck", "Decision"],
+          "allowed_target_types": ["SourceCandidate", "PrototypeBuild", "GraphModel"],
+          "link_kind": "provenance"
+        }
+      }
+    ]
+  }
+}

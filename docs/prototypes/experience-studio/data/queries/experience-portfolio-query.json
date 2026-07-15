@@ -1,0 +1,44 @@
+{
+  "tool": "rtg_execute_query",
+  "arguments": {
+    "query_options": { "live_filter": "live" },
+    "response_options": { "format": "properties_only" },
+    "query_spec": {
+      "anchor_buckets": [
+        { "name": "experience", "anchor_type_keys": ["Experience"] },
+        { "name": "audience", "anchor_type_keys": ["Audience"] },
+        { "name": "question", "anchor_type_keys": ["ExperienceQuestion"] },
+        { "name": "graph_model", "anchor_type_keys": ["GraphModel"] },
+        { "name": "build", "anchor_type_keys": ["PrototypeBuild"] }
+      ],
+      "link_requirements": [
+        { "name": "targets", "source_bucket": "experience", "target_bucket": "audience", "link_type_keys": ["targets_audience"] },
+        { "name": "answers", "source_bucket": "experience", "target_bucket": "question", "link_type_keys": ["answers_question"] },
+        { "name": "model", "source_bucket": "experience", "target_bucket": "graph_model", "link_type_keys": ["proposes_model"] },
+        { "name": "build_link", "source_bucket": "experience", "target_bucket": "build", "link_type_keys": ["has_build"] }
+      ],
+      "data_requirements": [
+        { "name": "experience_facts", "anchor_bucket": "experience", "data_type_key": "ExperienceFacts", "required": true, "predicates": [] },
+        { "name": "audience_facts", "anchor_bucket": "audience", "data_type_key": "AudienceFacts", "required": true, "predicates": [] },
+        { "name": "question_facts", "anchor_bucket": "question", "data_type_key": "ExperienceQuestionFacts", "required": true, "predicates": [] },
+        { "name": "model_facts", "anchor_bucket": "graph_model", "data_type_key": "GraphModelFacts", "required": true, "predicates": [] },
+        { "name": "build_facts", "anchor_bucket": "build", "data_type_key": "PrototypeBuildFacts", "required": true, "predicates": [] }
+      ],
+      "return_spec": {
+        "anchor_buckets": ["experience", "audience", "question", "graph_model", "build"],
+        "link_requirements": ["targets", "answers", "model", "build_link"],
+        "data_requirements": ["experience_facts", "audience_facts", "question_facts", "model_facts", "build_facts"],
+        "properties": [
+          ["experience_facts", ["slug"]],
+          ["experience_facts", ["title"]],
+          ["experience_facts", ["lifecycle_status"]],
+          ["audience_facts", ["label"]],
+          ["question_facts", ["prompt"]],
+          ["model_facts", ["domain_id"]],
+          ["model_facts", ["schema_status"]],
+          ["build_facts", ["status"]]
+        ]
+      }
+    }
+  }
+}

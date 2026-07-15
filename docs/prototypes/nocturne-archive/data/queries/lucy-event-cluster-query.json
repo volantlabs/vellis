@@ -1,0 +1,50 @@
+{
+  "tool": "rtg_execute_query",
+  "arguments": {
+    "query_options": { "live_filter": "live" },
+    "response_options": { "format": "properties_only" },
+    "query_spec": {
+      "anchor_buckets": [
+        { "name": "lucy", "anchor_type_keys": ["Character"] },
+        { "name": "event", "anchor_type_keys": ["Event"] }
+      ],
+      "link_requirements": [
+        {
+          "name": "lucy_present",
+          "source_bucket": "lucy",
+          "target_bucket": "event",
+          "link_type_keys": ["present_at"]
+        }
+      ],
+      "data_requirements": [
+        {
+          "name": "lucy_facts",
+          "anchor_bucket": "lucy",
+          "data_type_key": "CharacterFacts",
+          "required": true,
+          "predicates": [
+            { "path": ["name"], "operator": "equals", "value": "Lucy Westenra" }
+          ]
+        },
+        {
+          "name": "event_facts",
+          "anchor_bucket": "event",
+          "data_type_key": "EventFacts",
+          "required": true,
+          "predicates": []
+        }
+      ],
+      "return_spec": {
+        "anchor_buckets": ["lucy", "event"],
+        "link_requirements": ["lucy_present"],
+        "data_requirements": ["lucy_facts", "event_facts"],
+        "properties": [
+          ["lucy_facts", ["name"]],
+          ["event_facts", ["label"]],
+          ["event_facts", ["sequence_order"]],
+          ["event_facts", ["verification_status"]]
+        ]
+      }
+    }
+  }
+}

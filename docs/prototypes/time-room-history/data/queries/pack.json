@@ -1,0 +1,36 @@
+{
+  "arguments": {
+    "query_options": {
+      "live_filter": "live"
+    },
+    "query_spec": {
+      "anchor_buckets": [
+        {
+          "anchor_type_keys": [
+            "RuntimePack"
+          ],
+          "name": "pack"
+        }
+      ],
+      "data_requirements": [
+        {
+          "anchor_bucket": "pack",
+          "data_type_key": "RuntimePackFacts",
+          "name": "facts"
+        }
+      ],
+      "return_spec": {
+        "anchor_buckets": [
+          "pack"
+        ],
+        "data_requirements": [
+          "facts"
+        ]
+      }
+    },
+    "response_options": {
+      "format": "properties_only"
+    }
+  },
+  "tool": "rtg_execute_query"
+}

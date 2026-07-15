@@ -26,14 +26,18 @@ Status vocabulary matches the research program: `open | in_progress | done | kil
 ordinary file edit. This is an engineering program, not a research program — items produce spec
 amendments, contract tests, and implementation, not RR reports.
 
-Post-merge harmonization checkpoint (2026-07-14): KM-2 through KM-6 now conform to the
-SysML-owned component tree, including MCP codecs, generated starter ontology, federation legacy
-snapshot backfill, repo-twin schema, schema-domain readiness, reviewed schema-evolution operation
-storage, diff-scoped cutover, kernel-sequenced property rename/delete effects, and replayable per-op
-evidence. Explicit merge/replace intent, controller-issued data-object version tokens, batch-atomic
-stale-write conflicts, replay compatibility, and token-aware repo-twin synchronization are now also
-owned by accepted SysML contracts. `just check` passed with 582 tests. Prototype fixture-backed
-domains are the next harmonization tranche.
+Post-merge harmonization completed 2026-07-14. KM-2 through KM-6 conform to the SysML-owned
+component tree, including MCP codecs, generated starter ontology, federation legacy-snapshot
+backfill, repo-twin schema, reviewed schema-evolution operation storage, diff-scoped cutover,
+kernel-sequenced property rename/delete effects, replayable per-operation evidence, explicit
+merge/replace intent, controller-issued data-object version tokens, batch-atomic stale-write
+conflicts, replay compatibility, and token-aware repo-twin synchronization.
+
+The retained Experience Studio, Gothic Ambient Archive, and Time Room History predecessor domains
+now have current-kernel schema, seed, query, loader, snapshot, and replay evidence. Time Room also
+retains deterministic fixture generation and runtime-pack compilation. All seven catalog domains
+are runtime-ready; active workflow references resolve to the consolidated tree, and the temporary
+post-merge burn notice has been retired. `just check` passed with 585 tests.
 
 ## The per-item loop
 

@@ -1,0 +1,45 @@
+{
+  "tool": "rtg_execute_query",
+  "arguments": {
+    "query_options": { "live_filter": "live" },
+    "response_options": { "format": "properties_only" },
+    "query_spec": {
+      "anchor_buckets": [
+        { "name": "assessment", "anchor_type_keys": ["SourceAssessment"] },
+        { "name": "experience", "anchor_type_keys": ["Experience"] },
+        { "name": "source", "anchor_type_keys": ["SourceCandidate"] }
+      ],
+      "link_requirements": [
+        { "name": "for_experience", "source_bucket": "assessment", "target_bucket": "experience", "link_type_keys": ["assessment_for"] },
+        { "name": "source_assessed", "source_bucket": "assessment", "target_bucket": "source", "link_type_keys": ["assesses_source"] }
+      ],
+      "data_requirements": [
+        {
+          "name": "experience_facts",
+          "anchor_bucket": "experience",
+          "data_type_key": "ExperienceFacts",
+          "required": true,
+          "predicates": [{ "path": ["slug"], "operator": "equals", "value": "ocean-signal-atlas" }]
+        },
+        { "name": "assessment_facts", "anchor_bucket": "assessment", "data_type_key": "SourceAssessmentFacts", "required": true, "predicates": [] },
+        { "name": "source_facts", "anchor_bucket": "source", "data_type_key": "SourceCandidateFacts", "required": true, "predicates": [] }
+      ],
+      "return_spec": {
+        "anchor_buckets": ["assessment", "experience", "source"],
+        "link_requirements": ["for_experience", "source_assessed"],
+        "data_requirements": ["experience_facts", "assessment_facts", "source_facts"],
+        "properties": [
+          ["experience_facts", ["title"]],
+          ["source_facts", ["provider"]],
+          ["source_facts", ["product_id"]],
+          ["source_facts", ["source_url"]],
+          ["source_facts", ["review_status"]],
+          ["assessment_facts", ["assessed_at"]],
+          ["assessment_facts", ["outcome"]],
+          ["assessment_facts", ["confidence"]],
+          ["assessment_facts", ["limitations"]]
+        ]
+      }
+    }
+  }
+}

@@ -15,44 +15,6 @@ Prefer reusable, self-contained behavior over one-off application code. Treat ap
 
 Use textual SysML v2 under `model/` as the normative source for component and application design. The pinned official Java validator is mandatory through `just model-check`; repository regex/profile checks are not formal language validation. Validate Foundation, Bibliotek, and Vellis from independently packaged KPAR contents, and keep the official parser-backed inventory and structured conformance objectives current through `just model-render`. Generated explanatory pages live under `generated/reference/`, while generated machine projections live under `generated/model/`. Do not introduce a parallel hand-authored component specification.
 
-## Temporary Post-Merge Harmonization Notice
-
-Status: temporary burn notice. The `sysml-foundation` work is merged into `main`, but the newer
-launcher, shell, repo-twin, schema-domain, monograph, federation, routing, and reference-application
-work from `codex/personal-launcher-app` is still being deliberately reconciled with the SysML-owned
-tree. Remove this section only after that consolidation is complete.
-
-Current checkpoint: the federation control plane, route packs, declared reads, citation resolution,
-bridge traversal, SysML application authority, and read-only predecessor-snapshot projection have
-been reconciled. The schema-domain catalog now distinguishes available instructions from runtime
-readiness. Temporal schema shapes, identity criteria, link kinds, and their validation policies are
-now reconciled; the governance-core and agent-memory-spine instructions are runtime-ready. Reviewed,
-diff-scoped schema-evolution operations and their kernel-sequenced property data effects are also
-reconciled. Explicit merge/replace writes, controller-issued version tokens, and stale-write conflict
-responses are reconciled. Prototype fixture-backed domains remain deferred to the final RTG kernel
-harmonization checkpoint.
-
-During harmonization:
-
-- SysML under `model/` is the sole design authority on this line. Migrate useful predecessor
-  contracts into SysML; do not restore the former Markdown component-specification tree as a
-  second normative specification set.
-- Before changing component contracts, RTG kernel behavior, application composition, onboarding,
-  repo-twin behavior, schema domains, monographs, federation, routing, or related skills, inspect
-  the corresponding predecessor work and record whether it is superseded, migrated, or intentionally
-  deferred. Avoid silently dropping a surface or creating a third representation.
-- Do not delete predecessor graph registries, schema-domain catalogs, monograph data, federation
-  surfaces, or launcher/application work merely because its former Markdown authority no longer
-  applies. Cleanup belongs to the change that supplies the SysML authority, implementation,
-  verification, and current documentation replacing it.
-- Keep ignored graph state under `.data/` intact. Never use `git clean -x` for transition cleanup,
-  and preserve graph ledgers and snapshots before testing consolidated startup or recovery.
-
-Retire this notice only when every retained component and application has one declared SysML
-authority, generated projections are current, implementations and evidence are reconciled, skills
-and onboarding point only at current surfaces, graph recovery has been verified, and superseded
-predecessor locations have no active workflow references.
-
 Before making or reviewing a SysML/KerML syntax or semantics decision, use
 `.agents/skills/sysml-reference/SKILL.md` and search the generated, checksum-pinned page corpus under
 `reference/specifications/`. Read the smallest sufficient page set, follow normative cross-references,

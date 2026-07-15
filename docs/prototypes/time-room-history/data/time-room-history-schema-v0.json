@@ -1,0 +1,700 @@
+{
+  "arguments": {
+    "description": "Introduce the alpha source-grounded Time Room history schema and deterministic runtime-pack projection types.",
+    "migration_id": "time-room-history-schema-v0",
+    "schema_definitions": [
+      {
+        "description": "Structured facts for HistoricalFigure.",
+        "kind": "data_object",
+        "payload": {
+          "properties": {
+            "name": {
+              "required": true,
+              "value_kinds": [
+                "string"
+              ]
+            },
+            "place": {
+              "required": true,
+              "value_kinds": [
+                "string"
+              ]
+            },
+            "stable_key": {
+              "required": true,
+              "value_kinds": [
+                "string"
+              ]
+            },
+            "summary": {
+              "required": true,
+              "value_kinds": [
+                "string"
+              ]
+            },
+            "years": {
+              "required": true,
+              "value_kinds": [
+                "string"
+              ]
+            }
+          }
+        },
+        "time_shape": "state_now",
+        "type_key": "HistoricalFigureFacts"
+      },
+      {
+        "description": "A historical figure with a bounded runtime identity and biographical scope.",
+        "kind": "anchor",
+        "payload": {
+          "required_data_types": [
+            "HistoricalFigureFacts"
+          ]
+        },
+        "time_shape": "state_now",
+        "type_key": "HistoricalFigure"
+      },
+      {
+        "description": "Structured facts for HistoricalSource.",
+        "kind": "data_object",
+        "payload": {
+          "properties": {
+            "provider": {
+              "required": true,
+              "value_kinds": [
+                "string"
+              ]
+            },
+            "publication_note": {
+              "required": true,
+              "value_kinds": [
+                "string"
+              ]
+            },
+            "source_kind": {
+              "required": true,
+              "value_kinds": [
+                "string"
+              ]
+            },
+            "stable_key": {
+              "required": true,
+              "value_kinds": [
+                "string"
+              ]
+            },
+            "title": {
+              "required": true,
+              "value_kinds": [
+                "string"
+              ]
+            },
+            "url": {
+              "required": true,
+              "value_kinds": [
+                "string"
+              ]
+            },
+            "verification_status": {
+              "required": true,
+              "value_kinds": [
+                "string"
+              ]
+            }
+          }
+        },
+        "time_shape": "state_now",
+        "type_key": "HistoricalSourceFacts"
+      },
+      {
+        "description": "An authoritative source or archival locator used to support historical claims.",
+        "kind": "anchor",
+        "payload": {
+          "required_data_types": [
+            "HistoricalSourceFacts"
+          ]
+        },
+        "time_shape": "state_now",
+        "type_key": "HistoricalSource"
+      },
+      {
+        "description": "Structured facts for HistoricalEntity.",
+        "kind": "data_object",
+        "payload": {
+          "properties": {
+            "kind": {
+              "required": true,
+              "value_kinds": [
+                "string"
+              ]
+            },
+            "name": {
+              "required": true,
+              "value_kinds": [
+                "string"
+              ]
+            },
+            "stable_key": {
+              "required": true,
+              "value_kinds": [
+                "string"
+              ]
+            },
+            "summary": {
+              "required": true,
+              "value_kinds": [
+                "string"
+              ]
+            }
+          }
+        },
+        "time_shape": "state_now",
+        "type_key": "HistoricalEntityFacts"
+      },
+      {
+        "description": "A person, machine, publication, concept, or technology mentioned by claims.",
+        "kind": "anchor",
+        "payload": {
+          "required_data_types": [
+            "HistoricalEntityFacts"
+          ]
+        },
+        "time_shape": "state_now",
+        "type_key": "HistoricalEntity"
+      },
+      {
+        "description": "Structured facts for HistoricalClaim.",
+        "kind": "data_object",
+        "payload": {
+          "properties": {
+            "certainty": {
+              "required": true,
+              "value_kinds": [
+                "string"
+              ]
+            },
+            "fact_boundary": {
+              "required": true,
+              "value_kinds": [
+                "string"
+              ]
+            },
+            "keywords": {
+              "required": true,
+              "value_kinds": [
+                "string"
+              ]
+            },
+            "kid_summary": {
+              "required": true,
+              "value_kinds": [
+                "string"
+              ]
+            },
+            "stable_key": {
+              "required": true,
+              "value_kinds": [
+                "string"
+              ]
+            },
+            "text": {
+              "required": true,
+              "value_kinds": [
+                "string"
+              ]
+            },
+            "topic": {
+              "required": true,
+              "value_kinds": [
+                "string"
+              ]
+            },
+            "valid_from": {
+              "required": true,
+              "format": "date_time",
+              "value_kinds": [
+                "string"
+              ]
+            },
+            "valid_to": {
+              "required": true,
+              "format": "date_time",
+              "value_kinds": [
+                "string"
+              ]
+            },
+            "verification_status": {
+              "required": true,
+              "value_kinds": [
+                "string"
+              ]
+            }
+          }
+        },
+        "time_shape": "state_as_of",
+        "type_key": "HistoricalClaimFacts"
+      },
+      {
+        "description": "A compact, source-supported historical assertion suitable for bounded runtime projection.",
+        "kind": "anchor",
+        "payload": {
+          "required_data_types": [
+            "HistoricalClaimFacts"
+          ]
+        },
+        "time_shape": "state_now",
+        "type_key": "HistoricalClaim"
+      },
+      {
+        "description": "Structured facts for ReconstructionScene.",
+        "kind": "data_object",
+        "payload": {
+          "properties": {
+            "imagination_note": {
+              "required": true,
+              "value_kinds": [
+                "string"
+              ]
+            },
+            "mood": {
+              "required": true,
+              "value_kinds": [
+                "string"
+              ]
+            },
+            "place": {
+              "required": true,
+              "value_kinds": [
+                "string"
+              ]
+            },
+            "scene": {
+              "required": true,
+              "value_kinds": [
+                "string"
+              ]
+            },
+            "stable_key": {
+              "required": true,
+              "value_kinds": [
+                "string"
+              ]
+            },
+            "title": {
+              "required": true,
+              "value_kinds": [
+                "string"
+              ]
+            },
+            "valid_from": {
+              "required": true,
+              "format": "date_time",
+              "value_kinds": [
+                "string"
+              ]
+            },
+            "valid_to": {
+              "required": true,
+              "format": "date_time",
+              "value_kinds": [
+                "string"
+              ]
+            }
+          }
+        },
+        "time_shape": "state_as_of",
+        "type_key": "ReconstructionSceneFacts"
+      },
+      {
+        "description": "A presentation scene explicitly separated from its grounding historical claims.",
+        "kind": "anchor",
+        "payload": {
+          "required_data_types": [
+            "ReconstructionSceneFacts"
+          ]
+        },
+        "time_shape": "state_now",
+        "type_key": "ReconstructionScene"
+      },
+      {
+        "description": "Structured facts for LearningPrompt.",
+        "kind": "data_object",
+        "payload": {
+          "properties": {
+            "answer": {
+              "required": true,
+              "value_kinds": [
+                "string"
+              ]
+            },
+            "hint": {
+              "required": true,
+              "value_kinds": [
+                "string"
+              ]
+            },
+            "mode": {
+              "required": true,
+              "value_kinds": [
+                "string"
+              ]
+            },
+            "prompt": {
+              "required": true,
+              "value_kinds": [
+                "string"
+              ]
+            },
+            "stable_key": {
+              "required": true,
+              "value_kinds": [
+                "string"
+              ]
+            },
+            "valid_from": {
+              "required": true,
+              "format": "date_time",
+              "value_kinds": [
+                "string"
+              ]
+            },
+            "valid_to": {
+              "required": true,
+              "format": "date_time",
+              "value_kinds": [
+                "string"
+              ]
+            }
+          }
+        },
+        "time_shape": "state_as_of",
+        "type_key": "LearningPromptFacts"
+      },
+      {
+        "description": "A deterministic chat, story, quiz, or comparison prompt grounded by claims.",
+        "kind": "anchor",
+        "payload": {
+          "required_data_types": [
+            "LearningPromptFacts"
+          ]
+        },
+        "time_shape": "state_now",
+        "type_key": "LearningPrompt"
+      },
+      {
+        "description": "Structured facts for Misconception.",
+        "kind": "data_object",
+        "payload": {
+          "properties": {
+            "correction": {
+              "required": true,
+              "value_kinds": [
+                "string"
+              ]
+            },
+            "kid_response": {
+              "required": true,
+              "value_kinds": [
+                "string"
+              ]
+            },
+            "misconception": {
+              "required": true,
+              "value_kinds": [
+                "string"
+              ]
+            },
+            "stable_key": {
+              "required": true,
+              "value_kinds": [
+                "string"
+              ]
+            },
+            "valid_from": {
+              "required": true,
+              "format": "date_time",
+              "value_kinds": [
+                "string"
+              ]
+            },
+            "valid_to": {
+              "required": true,
+              "format": "date_time",
+              "value_kinds": [
+                "string"
+              ]
+            }
+          }
+        },
+        "time_shape": "state_as_of",
+        "type_key": "MisconceptionFacts"
+      },
+      {
+        "description": "A known misleading simplification with a claim-grounded correction.",
+        "kind": "anchor",
+        "payload": {
+          "required_data_types": [
+            "MisconceptionFacts"
+          ]
+        },
+        "time_shape": "state_now",
+        "type_key": "Misconception"
+      },
+      {
+        "description": "Structured facts for RuntimePack.",
+        "kind": "data_object",
+        "payload": {
+          "properties": {
+            "figure_key": {
+              "required": true,
+              "value_kinds": [
+                "string"
+              ]
+            },
+            "guardrails": {
+              "required": true,
+              "value_kinds": [
+                "string"
+              ]
+            },
+            "output_schema_version": {
+              "required": true,
+              "value_kinds": [
+                "integer"
+              ]
+            },
+            "stable_key": {
+              "required": true,
+              "value_kinds": [
+                "string"
+              ]
+            },
+            "status": {
+              "required": true,
+              "value_kinds": [
+                "string"
+              ]
+            },
+            "version": {
+              "required": true,
+              "value_kinds": [
+                "string"
+              ]
+            }
+          }
+        },
+        "time_shape": "event",
+        "type_key": "RuntimePackFacts"
+      },
+      {
+        "description": "An append-only compilation target describing one bounded offline runtime projection.",
+        "kind": "anchor",
+        "payload": {
+          "required_data_types": [
+            "RuntimePackFacts"
+          ]
+        },
+        "time_shape": "event",
+        "type_key": "RuntimePack"
+      },
+      {
+        "description": "Connects a historical claim to its subject figure.",
+        "kind": "link",
+        "payload": {
+          "allowed_source_types": [
+            "HistoricalClaim"
+          ],
+          "allowed_target_types": [
+            "HistoricalFigure"
+          ],
+          "link_kind": "semantic"
+        },
+        "type_key": "claim_about_figure"
+      },
+      {
+        "description": "Connects a historical claim to an authoritative supporting source.",
+        "kind": "link",
+        "payload": {
+          "allowed_source_types": [
+            "HistoricalClaim"
+          ],
+          "allowed_target_types": [
+            "HistoricalSource"
+          ],
+          "link_kind": "provenance"
+        },
+        "type_key": "claim_supported_by"
+      },
+      {
+        "description": "Connects a historical claim to an entity needed for traversal or explanation.",
+        "kind": "link",
+        "payload": {
+          "allowed_source_types": [
+            "HistoricalClaim"
+          ],
+          "allowed_target_types": [
+            "HistoricalEntity"
+          ],
+          "link_kind": "semantic"
+        },
+        "type_key": "claim_mentions"
+      },
+      {
+        "description": "Connects a reconstruction scene to its figure.",
+        "kind": "link",
+        "payload": {
+          "allowed_source_types": [
+            "ReconstructionScene"
+          ],
+          "allowed_target_types": [
+            "HistoricalFigure"
+          ],
+          "link_kind": "semantic"
+        },
+        "type_key": "scene_about_figure"
+      },
+      {
+        "description": "Connects a reconstruction scene to a historical claim that bounds it.",
+        "kind": "link",
+        "payload": {
+          "allowed_source_types": [
+            "ReconstructionScene"
+          ],
+          "allowed_target_types": [
+            "HistoricalClaim"
+          ],
+          "link_kind": "provenance"
+        },
+        "type_key": "scene_grounded_by"
+      },
+      {
+        "description": "Connects a learning prompt to its figure.",
+        "kind": "link",
+        "payload": {
+          "allowed_source_types": [
+            "LearningPrompt"
+          ],
+          "allowed_target_types": [
+            "HistoricalFigure"
+          ],
+          "link_kind": "semantic"
+        },
+        "type_key": "prompt_about_figure"
+      },
+      {
+        "description": "Connects a learning prompt to a historical claim used in its answer.",
+        "kind": "link",
+        "payload": {
+          "allowed_source_types": [
+            "LearningPrompt"
+          ],
+          "allowed_target_types": [
+            "HistoricalClaim"
+          ],
+          "link_kind": "provenance"
+        },
+        "type_key": "prompt_grounded_by"
+      },
+      {
+        "description": "Connects a misconception to the figure whose history it can distort.",
+        "kind": "link",
+        "payload": {
+          "allowed_source_types": [
+            "Misconception"
+          ],
+          "allowed_target_types": [
+            "HistoricalFigure"
+          ],
+          "link_kind": "semantic"
+        },
+        "type_key": "misconception_about_figure"
+      },
+      {
+        "description": "Connects a misconception to the claim that corrects it.",
+        "kind": "link",
+        "payload": {
+          "allowed_source_types": [
+            "Misconception"
+          ],
+          "allowed_target_types": [
+            "HistoricalClaim"
+          ],
+          "link_kind": "provenance"
+        },
+        "type_key": "misconception_corrected_by"
+      },
+      {
+        "description": "Connects a runtime pack build to its subject figure.",
+        "kind": "link",
+        "payload": {
+          "allowed_source_types": [
+            "RuntimePack"
+          ],
+          "allowed_target_types": [
+            "HistoricalFigure"
+          ],
+          "link_kind": "semantic"
+        },
+        "type_key": "pack_for_figure"
+      },
+      {
+        "description": "Declares a claim included in a runtime pack.",
+        "kind": "link",
+        "payload": {
+          "allowed_source_types": [
+            "RuntimePack"
+          ],
+          "allowed_target_types": [
+            "HistoricalClaim"
+          ],
+          "link_kind": "structural"
+        },
+        "type_key": "pack_includes_claim"
+      },
+      {
+        "description": "Declares a reconstruction scene included in a runtime pack.",
+        "kind": "link",
+        "payload": {
+          "allowed_source_types": [
+            "RuntimePack"
+          ],
+          "allowed_target_types": [
+            "ReconstructionScene"
+          ],
+          "link_kind": "structural"
+        },
+        "type_key": "pack_includes_scene"
+      },
+      {
+        "description": "Declares a learning prompt included in a runtime pack.",
+        "kind": "link",
+        "payload": {
+          "allowed_source_types": [
+            "RuntimePack"
+          ],
+          "allowed_target_types": [
+            "LearningPrompt"
+          ],
+          "link_kind": "structural"
+        },
+        "type_key": "pack_includes_prompt"
+      },
+      {
+        "description": "Declares a misconception guard included in a runtime pack.",
+        "kind": "link",
+        "payload": {
+          "allowed_source_types": [
+            "RuntimePack"
+          ],
+          "allowed_target_types": [
+            "Misconception"
+          ],
+          "link_kind": "structural"
+        },
+        "type_key": "pack_includes_misconception"
+      }
+    ],
+    "validation_mode": "strict"
+  },
+  "tool": "rtg_stage_schema_migration"
+}

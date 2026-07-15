@@ -16,11 +16,9 @@ domain_tags:
   - docent
   - alpha
 runtime_compatibility:
-  status: blocked
-  requirements:
-    - Nocturne Archive schema, seed, and query fixtures
-  blockers:
-    - The referenced prototype fixtures are not yet present in the harmonized tree.
+  status: ready
+  requirements: []
+  blockers: []
 schema_summary:
   anchors:
     - Work

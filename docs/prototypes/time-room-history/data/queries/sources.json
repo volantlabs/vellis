@@ -1,0 +1,36 @@
+{
+  "arguments": {
+    "query_options": {
+      "live_filter": "live"
+    },
+    "query_spec": {
+      "anchor_buckets": [
+        {
+          "anchor_type_keys": [
+            "HistoricalSource"
+          ],
+          "name": "source"
+        }
+      ],
+      "data_requirements": [
+        {
+          "anchor_bucket": "source",
+          "data_type_key": "HistoricalSourceFacts",
+          "name": "facts"
+        }
+      ],
+      "return_spec": {
+        "anchor_buckets": [
+          "source"
+        ],
+        "data_requirements": [
+          "facts"
+        ]
+      }
+    },
+    "response_options": {
+      "format": "properties_only"
+    }
+  },
+  "tool": "rtg_execute_query"
+}

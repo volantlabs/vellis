@@ -1,0 +1,831 @@
+{
+  "tool": "rtg_apply_live_anchor_records",
+  "arguments": {
+    "validation_mode": "strict",
+    "anchor_records": [
+      {
+        "ref": { "local_ref": "work-dracula" },
+        "type": "Work",
+        "display_name": "Dracula",
+        "facts": [
+          {
+            "type": "WorkFacts",
+            "mode": "merge",
+            "properties": {
+              "title": "Dracula",
+              "creator": "Bram Stoker",
+              "publication_year": 1897,
+              "public_domain_basis": "Published in 1897; public-domain basis must be verified for each target jurisdiction before publication use.",
+              "source_language": "English",
+              "notes": "Alpha modeling work; do not treat source spans as verified yet.",
+              "verification_status": "planning_seed"
+            }
+          }
+        ]
+      },
+      {
+        "ref": { "local_ref": "source-dracula-selected-edition" },
+        "type": "Source",
+        "display_name": "Selected public-domain Dracula edition",
+        "facts": [
+          {
+            "type": "SourceFacts",
+            "mode": "merge",
+            "properties": {
+              "label": "Selected public-domain Dracula edition",
+              "edition": "To choose",
+              "provider": "To choose",
+              "url": "To verify",
+              "license_status": "to_verify",
+              "retrieved_at": "not_yet_retrieved",
+              "notes": "Choose Project Gutenberg, Standard Ebooks, or another explicit public-domain/open source before authoritative ingestion.",
+              "verification_status": "unverified"
+            }
+          }
+        ]
+      },
+      {
+        "ref": { "local_ref": "passage-lucy-cluster-todo" },
+        "type": "Passage",
+        "display_name": "Lucy transformation source-span placeholder",
+        "facts": [
+          {
+            "type": "PassageFacts",
+            "mode": "merge",
+            "properties": {
+              "label": "Lucy transformation source-span placeholder",
+              "source_marker": "To verify against selected edition",
+              "summary": "Placeholder evidence bundle for the Lucy transformation cluster.",
+              "quote_policy": "Do not quote until source-span policy and edition markers are chosen.",
+              "verification_status": "unverified"
+            }
+          }
+        ]
+      },
+      {
+        "ref": { "local_ref": "character-lucy-westenra" },
+        "type": "Character",
+        "display_name": "Lucy Westenra",
+        "facts": [
+          {
+            "type": "CharacterFacts",
+            "mode": "merge",
+            "properties": {
+              "name": "Lucy Westenra",
+              "role": "central focus for the first ambient slice",
+              "source_work": "Dracula",
+              "public_domain_scope_note": "Source-scoped to Bram Stoker's 1897 novel; avoid modern adaptation traits.",
+              "verification_status": "planning_seed"
+            }
+          }
+        ]
+      },
+      {
+        "ref": { "local_ref": "character-mina-murray" },
+        "type": "Character",
+        "display_name": "Mina Murray",
+        "facts": [
+          {
+            "type": "CharacterFacts",
+            "mode": "merge",
+            "properties": {
+              "name": "Mina Murray",
+              "role": "witness and record keeper",
+              "source_work": "Dracula",
+              "public_domain_scope_note": "Source-scoped to Bram Stoker's 1897 novel.",
+              "verification_status": "planning_seed"
+            }
+          }
+        ]
+      },
+      {
+        "ref": { "local_ref": "character-count-dracula" },
+        "type": "Character",
+        "display_name": "Count Dracula",
+        "facts": [
+          {
+            "type": "CharacterFacts",
+            "mode": "merge",
+            "properties": {
+              "name": "Count Dracula",
+              "role": "supernatural antagonist connected to Lucy's transformation",
+              "source_work": "Dracula",
+              "public_domain_scope_note": "Source-scoped to Bram Stoker's 1897 novel; avoid modern adaptation traits.",
+              "verification_status": "planning_seed"
+            }
+          }
+        ]
+      },
+      {
+        "ref": { "local_ref": "character-abraham-van-helsing" },
+        "type": "Character",
+        "display_name": "Abraham Van Helsing",
+        "facts": [
+          {
+            "type": "CharacterFacts",
+            "mode": "merge",
+            "properties": {
+              "name": "Abraham Van Helsing",
+              "role": "medical and occult investigator",
+              "source_work": "Dracula",
+              "public_domain_scope_note": "Source-scoped to Bram Stoker's 1897 novel.",
+              "verification_status": "planning_seed"
+            }
+          }
+        ]
+      },
+      {
+        "ref": { "local_ref": "character-john-seward" },
+        "type": "Character",
+        "display_name": "John Seward",
+        "facts": [
+          {
+            "type": "CharacterFacts",
+            "mode": "merge",
+            "properties": {
+              "name": "John Seward",
+              "role": "doctor and recorder",
+              "source_work": "Dracula",
+              "public_domain_scope_note": "Source-scoped to Bram Stoker's 1897 novel.",
+              "verification_status": "planning_seed"
+            }
+          }
+        ]
+      },
+      {
+        "ref": { "local_ref": "character-arthur-holmwood" },
+        "type": "Character",
+        "display_name": "Arthur Holmwood",
+        "facts": [
+          {
+            "type": "CharacterFacts",
+            "mode": "merge",
+            "properties": {
+              "name": "Arthur Holmwood",
+              "role": "Lucy-associated suitor and participant in intervention",
+              "source_work": "Dracula",
+              "public_domain_scope_note": "Source-scoped to Bram Stoker's 1897 novel.",
+              "verification_status": "planning_seed"
+            }
+          }
+        ]
+      },
+      {
+        "ref": { "local_ref": "place-whitby" },
+        "type": "Place",
+        "display_name": "Whitby",
+        "facts": [
+          {
+            "type": "PlaceFacts",
+            "mode": "merge",
+            "properties": {
+              "name": "Whitby",
+              "kind": "coastal town",
+              "geographic_status": "real_place",
+              "description": "Coastal place used by the first slice as an exterior threshold zone.",
+              "verification_status": "planning_seed"
+            }
+          }
+        ]
+      },
+      {
+        "ref": { "local_ref": "place-westenra-household" },
+        "type": "Place",
+        "display_name": "Westenra household",
+        "facts": [
+          {
+            "type": "PlaceFacts",
+            "mode": "merge",
+            "properties": {
+              "name": "Westenra household",
+              "kind": "domestic interior",
+              "geographic_status": "literary_place",
+              "description": "Domestic protection zone for Lucy's illness and interventions.",
+              "verification_status": "planning_seed"
+            }
+          }
+        ]
+      },
+      {
+        "ref": { "local_ref": "place-grave-tomb" },
+        "type": "Place",
+        "display_name": "grave or tomb",
+        "facts": [
+          {
+            "type": "PlaceFacts",
+            "mode": "merge",
+            "properties": {
+              "name": "grave or tomb",
+              "kind": "burial threshold",
+              "geographic_status": "literary_place",
+              "description": "Burial threshold used by the posthumous investigation trail.",
+              "verification_status": "planning_seed"
+            }
+          }
+        ]
+      },
+      {
+        "ref": { "local_ref": "object-letters-diaries" },
+        "type": "Object",
+        "display_name": "letters and diaries",
+        "facts": [
+          {
+            "type": "ObjectFacts",
+            "mode": "merge",
+            "properties": {
+              "name": "letters and diaries",
+              "kind": "source record",
+              "description": "Epistolary and diary records that frame witness testimony.",
+              "verification_status": "planning_seed"
+            }
+          }
+        ]
+      },
+      {
+        "ref": { "local_ref": "object-blood" },
+        "type": "Object",
+        "display_name": "blood",
+        "facts": [
+          {
+            "type": "ObjectFacts",
+            "mode": "merge",
+            "properties": {
+              "name": "blood",
+              "kind": "medical and symbolic object",
+              "description": "Material object for medical intervention and symbolic reading.",
+              "verification_status": "planning_seed"
+            }
+          }
+        ]
+      },
+      {
+        "ref": { "local_ref": "object-garlic-flowers" },
+        "type": "Object",
+        "display_name": "garlic flowers",
+        "facts": [
+          {
+            "type": "ObjectFacts",
+            "mode": "merge",
+            "properties": {
+              "name": "garlic flowers",
+              "kind": "protective object",
+              "description": "Protective object attached to the threshold and intervention lens.",
+              "verification_status": "planning_seed"
+            }
+          }
+        ]
+      },
+      {
+        "ref": { "local_ref": "event-sleepwalking" },
+        "type": "Event",
+        "display_name": "Lucy sleepwalks or is found outside",
+        "facts": [
+          {
+            "type": "EventFacts",
+            "mode": "merge",
+            "properties": {
+              "label": "Lucy sleepwalks or is found outside",
+              "sequence_order": 10,
+              "date_label": "to_verify",
+              "certainty": "to_verify",
+              "summary": "Planning event for Lucy's nighttime exposure and threshold motif.",
+              "verification_status": "unverified"
+            }
+          }
+        ]
+      },
+      {
+        "ref": { "local_ref": "event-illness" },
+        "type": "Event",
+        "display_name": "Lucy's illness deepens",
+        "facts": [
+          {
+            "type": "EventFacts",
+            "mode": "merge",
+            "properties": {
+              "label": "Lucy's illness deepens",
+              "sequence_order": 20,
+              "date_label": "to_verify",
+              "certainty": "to_verify",
+              "summary": "Planning event for the transition from social concern to medical crisis.",
+              "verification_status": "unverified"
+            }
+          }
+        ]
+      },
+      {
+        "ref": { "local_ref": "event-transfusion-attempts" },
+        "type": "Event",
+        "display_name": "blood transfusions are attempted",
+        "facts": [
+          {
+            "type": "EventFacts",
+            "mode": "merge",
+            "properties": {
+              "label": "blood transfusions are attempted",
+              "sequence_order": 30,
+              "date_label": "to_verify",
+              "certainty": "to_verify",
+              "summary": "Planning event for medical intervention and blood motif.",
+              "verification_status": "unverified"
+            }
+          }
+        ]
+      },
+      {
+        "ref": { "local_ref": "event-garlic-protection" },
+        "type": "Event",
+        "display_name": "garlic protection is applied",
+        "facts": [
+          {
+            "type": "EventFacts",
+            "mode": "merge",
+            "properties": {
+              "label": "garlic protection is applied",
+              "sequence_order": 40,
+              "date_label": "to_verify",
+              "certainty": "to_verify",
+              "summary": "Planning event for protective intervention and threshold control.",
+              "verification_status": "unverified"
+            }
+          }
+        ]
+      },
+      {
+        "ref": { "local_ref": "event-death" },
+        "type": "Event",
+        "display_name": "Lucy dies",
+        "facts": [
+          {
+            "type": "EventFacts",
+            "mode": "merge",
+            "properties": {
+              "label": "Lucy dies",
+              "sequence_order": 50,
+              "date_label": "to_verify",
+              "certainty": "to_verify",
+              "summary": "Planning event for the death threshold in Lucy's arc.",
+              "verification_status": "unverified"
+            }
+          }
+        ]
+      },
+      {
+        "ref": { "local_ref": "event-posthumous-investigation" },
+        "type": "Event",
+        "display_name": "posthumous appearances are investigated",
+        "facts": [
+          {
+            "type": "EventFacts",
+            "mode": "merge",
+            "properties": {
+              "label": "posthumous appearances are investigated",
+              "sequence_order": 60,
+              "date_label": "to_verify",
+              "certainty": "to_verify",
+              "summary": "Planning event for the shift into posthumous horror and inquiry.",
+              "verification_status": "unverified"
+            }
+          }
+        ]
+      },
+      {
+        "ref": { "local_ref": "motif-sleep" },
+        "type": "Motif",
+        "display_name": "sleep",
+        "facts": [
+          {
+            "type": "MotifFacts",
+            "mode": "merge",
+            "properties": {
+              "label": "sleep",
+              "definition": "States of vulnerability, altered agency, and night movement.",
+              "interpretive_status": "curatorial"
+            }
+          }
+        ]
+      },
+      {
+        "ref": { "local_ref": "motif-blood" },
+        "type": "Motif",
+        "display_name": "blood",
+        "facts": [
+          {
+            "type": "MotifFacts",
+            "mode": "merge",
+            "properties": {
+              "label": "blood",
+              "definition": "Material life, medical intervention, exchange, and supernatural threat.",
+              "interpretive_status": "curatorial"
+            }
+          }
+        ]
+      },
+      {
+        "ref": { "local_ref": "motif-thresholds" },
+        "type": "Motif",
+        "display_name": "thresholds",
+        "facts": [
+          {
+            "type": "MotifFacts",
+            "mode": "merge",
+            "properties": {
+              "label": "thresholds",
+              "definition": "Doors, windows, beds, graves, and other boundaries where protection shifts.",
+              "interpretive_status": "curatorial"
+            }
+          }
+        ]
+      },
+      {
+        "ref": { "local_ref": "motif-medical-uncertainty" },
+        "type": "Motif",
+        "display_name": "medical uncertainty",
+        "facts": [
+          {
+            "type": "MotifFacts",
+            "mode": "merge",
+            "properties": {
+              "label": "medical uncertainty",
+              "definition": "Moments where medical observation cannot fully explain what is happening.",
+              "interpretive_status": "curatorial"
+            }
+          }
+        ]
+      },
+      {
+        "ref": { "local_ref": "motif-witness-testimony" },
+        "type": "Motif",
+        "display_name": "witness testimony",
+        "facts": [
+          {
+            "type": "MotifFacts",
+            "mode": "merge",
+            "properties": {
+              "label": "witness testimony",
+              "definition": "The assembly of truth through letters, diaries, clinical notes, and partial accounts.",
+              "interpretive_status": "curatorial"
+            }
+          }
+        ]
+      },
+      {
+        "ref": { "local_ref": "theme-science-superstition" },
+        "type": "Theme",
+        "display_name": "science and superstition",
+        "facts": [
+          {
+            "type": "ThemeFacts",
+            "mode": "merge",
+            "properties": {
+              "label": "science and superstition",
+              "definition": "The tension between clinical explanation and occult interpretation.",
+              "interpretive_status": "curatorial"
+            }
+          }
+        ]
+      },
+      {
+        "ref": { "local_ref": "theme-protection-control" },
+        "type": "Theme",
+        "display_name": "social protection and control",
+        "facts": [
+          {
+            "type": "ThemeFacts",
+            "mode": "merge",
+            "properties": {
+              "label": "social protection and control",
+              "definition": "Protective actions that also constrain Lucy's body, room, and movement.",
+              "interpretive_status": "curatorial"
+            }
+          }
+        ]
+      },
+      {
+        "ref": { "local_ref": "style-candlelit-gothic" },
+        "type": "StylePack",
+        "display_name": "Candlelit Gothic",
+        "facts": [
+          {
+            "type": "StylePackFacts",
+            "mode": "merge",
+            "properties": {
+              "label": "Candlelit Gothic",
+              "presentation_only": true,
+              "asset_policy": "Use original or explicit public-domain assets only; no modern adaptation trade dress.",
+              "voice_summary": "Restrained literary curator with atmospheric restraint."
+            }
+          }
+        ]
+      },
+      {
+        "ref": { "local_ref": "style-neon-nocturne" },
+        "type": "StylePack",
+        "display_name": "Neon Nocturne",
+        "facts": [
+          {
+            "type": "StylePackFacts",
+            "mode": "merge",
+            "properties": {
+              "label": "Neon Nocturne",
+              "presentation_only": true,
+              "asset_policy": "Use original cybernetic-medical abstractions; avoid specific protected cyberpunk properties.",
+              "voice_summary": "Cool systems analyst distinguishing observation, inference, and missing data."
+            }
+          }
+        ]
+      },
+      {
+        "ref": { "local_ref": "style-idol-stage-editorial" },
+        "type": "StylePack",
+        "display_name": "Idol Stage Editorial",
+        "facts": [
+          {
+            "type": "StylePackFacts",
+            "mode": "merge",
+            "properties": {
+              "label": "Idol Stage Editorial",
+              "presentation_only": true,
+              "asset_policy": "Use original theatrical staging cues; no real groups, logos, likenesses, or choreography.",
+              "voice_summary": "Crisp cultural commentator focused on attention, roles, and staging."
+            }
+          }
+        ]
+      },
+      {
+        "ref": { "local_ref": "style-museum-impression" },
+        "type": "StylePack",
+        "display_name": "Museum Impression",
+        "facts": [
+          {
+            "type": "StylePackFacts",
+            "mode": "merge",
+            "properties": {
+              "label": "Museum Impression",
+              "presentation_only": true,
+              "asset_policy": "Use original compositions or verified open-access museum assets.",
+              "voice_summary": "Museum educator; precise, reflective, and careful about interpretation."
+            }
+          }
+        ]
+      },
+      {
+        "ref": { "local_ref": "style-concrete-brutalist" },
+        "type": "StylePack",
+        "display_name": "Concrete Brutalist",
+        "facts": [
+          {
+            "type": "StylePackFacts",
+            "mode": "merge",
+            "properties": {
+              "label": "Concrete Brutalist",
+              "presentation_only": true,
+              "asset_policy": "Use original hard-grid visual language; preserve accessibility and citation visibility.",
+              "voice_summary": "Terse archivist prioritizing evidence and gaps."
+            }
+          }
+        ]
+      },
+      {
+        "ref": { "local_ref": "trail-blood" },
+        "type": "ReadingTrail",
+        "display_name": "Blood Trail",
+        "facts": [
+          {
+            "type": "ReadingTrailFacts",
+            "mode": "merge",
+            "properties": {
+              "label": "Blood Trail",
+              "summary": "How the slice moves from medical crisis to supernatural explanation.",
+              "curation_status": "planning_seed"
+            }
+          }
+        ]
+      },
+      {
+        "ref": { "local_ref": "trail-thresholds" },
+        "type": "ReadingTrail",
+        "display_name": "Threshold Trail",
+        "facts": [
+          {
+            "type": "ReadingTrailFacts",
+            "mode": "merge",
+            "properties": {
+              "label": "Threshold Trail",
+              "summary": "Where the story blurs safety, exposure, inside, outside, life, and death.",
+              "curation_status": "planning_seed"
+            }
+          }
+        ]
+      },
+      {
+        "ref": { "local_ref": "trail-witness" },
+        "type": "ReadingTrail",
+        "display_name": "Witness Trail",
+        "facts": [
+          {
+            "type": "ReadingTrailFacts",
+            "mode": "merge",
+            "properties": {
+              "label": "Witness Trail",
+              "summary": "How the novel assembles truth from partial records.",
+              "curation_status": "planning_seed"
+            }
+          }
+        ]
+      },
+      {
+        "ref": { "local_ref": "stop-blood-1" },
+        "type": "TrailStop",
+        "display_name": "Blood Trail 1: Lucy Westenra",
+        "facts": [{ "type": "TrailStopFacts", "mode": "merge", "properties": { "label": "Lucy Westenra", "ordinal": 1, "note": "Start with the affected character.", "curation_status": "planning_seed" } }]
+      },
+      {
+        "ref": { "local_ref": "stop-blood-2" },
+        "type": "TrailStop",
+        "display_name": "Blood Trail 2: illness",
+        "facts": [{ "type": "TrailStopFacts", "mode": "merge", "properties": { "label": "Lucy's illness deepens", "ordinal": 2, "note": "Shift from social concern to medical crisis.", "curation_status": "planning_seed" } }]
+      },
+      {
+        "ref": { "local_ref": "stop-blood-3" },
+        "type": "TrailStop",
+        "display_name": "Blood Trail 3: transfusion attempts",
+        "facts": [{ "type": "TrailStopFacts", "mode": "merge", "properties": { "label": "blood transfusions are attempted", "ordinal": 3, "note": "Medical intervention becomes graph-visible.", "curation_status": "planning_seed" } }]
+      },
+      {
+        "ref": { "local_ref": "stop-blood-4" },
+        "type": "TrailStop",
+        "display_name": "Blood Trail 4: blood motif",
+        "facts": [{ "type": "TrailStopFacts", "mode": "merge", "properties": { "label": "blood", "ordinal": 4, "note": "Material and symbolic reading converge.", "curation_status": "planning_seed" } }]
+      },
+      {
+        "ref": { "local_ref": "stop-blood-5" },
+        "type": "TrailStop",
+        "display_name": "Blood Trail 5: medical uncertainty",
+        "facts": [{ "type": "TrailStopFacts", "mode": "merge", "properties": { "label": "medical uncertainty", "ordinal": 5, "note": "Clinical explanation begins to strain.", "curation_status": "planning_seed" } }]
+      },
+      {
+        "ref": { "local_ref": "stop-blood-6" },
+        "type": "TrailStop",
+        "display_name": "Blood Trail 6: science and superstition",
+        "facts": [{ "type": "TrailStopFacts", "mode": "merge", "properties": { "label": "science and superstition", "ordinal": 6, "note": "The trail ends in a thematic tension.", "curation_status": "planning_seed" } }]
+      },
+      {
+        "ref": { "local_ref": "stop-threshold-1" },
+        "type": "TrailStop",
+        "display_name": "Threshold Trail 1: Lucy Westenra",
+        "facts": [{ "type": "TrailStopFacts", "mode": "merge", "properties": { "label": "Lucy Westenra", "ordinal": 1, "note": "Start with the exposed figure.", "curation_status": "planning_seed" } }]
+      },
+      {
+        "ref": { "local_ref": "stop-threshold-2" },
+        "type": "TrailStop",
+        "display_name": "Threshold Trail 2: sleepwalking",
+        "facts": [{ "type": "TrailStopFacts", "mode": "merge", "properties": { "label": "sleepwalking", "ordinal": 2, "note": "Night movement crosses safety boundaries.", "curation_status": "planning_seed" } }]
+      },
+      {
+        "ref": { "local_ref": "stop-threshold-3" },
+        "type": "TrailStop",
+        "display_name": "Threshold Trail 3: Whitby",
+        "facts": [{ "type": "TrailStopFacts", "mode": "merge", "properties": { "label": "Whitby", "ordinal": 3, "note": "Exterior zone for exposure and atmosphere.", "curation_status": "planning_seed" } }]
+      },
+      {
+        "ref": { "local_ref": "stop-threshold-4" },
+        "type": "TrailStop",
+        "display_name": "Threshold Trail 4: thresholds",
+        "facts": [{ "type": "TrailStopFacts", "mode": "merge", "properties": { "label": "thresholds", "ordinal": 4, "note": "The motif gathers doors, windows, beds, and graves.", "curation_status": "planning_seed" } }]
+      },
+      {
+        "ref": { "local_ref": "stop-threshold-5" },
+        "type": "TrailStop",
+        "display_name": "Threshold Trail 5: grave or tomb",
+        "facts": [{ "type": "TrailStopFacts", "mode": "merge", "properties": { "label": "grave or tomb", "ordinal": 5, "note": "The boundary becomes posthumous.", "curation_status": "planning_seed" } }]
+      },
+      {
+        "ref": { "local_ref": "stop-threshold-6" },
+        "type": "TrailStop",
+        "display_name": "Threshold Trail 6: posthumous investigation",
+        "facts": [{ "type": "TrailStopFacts", "mode": "merge", "properties": { "label": "posthumous appearances are investigated", "ordinal": 6, "note": "Inquiry follows the transformed threshold.", "curation_status": "planning_seed" } }]
+      },
+      {
+        "ref": { "local_ref": "stop-witness-1" },
+        "type": "TrailStop",
+        "display_name": "Witness Trail 1: Mina Murray",
+        "facts": [{ "type": "TrailStopFacts", "mode": "merge", "properties": { "label": "Mina Murray", "ordinal": 1, "note": "Begin with a witness and record keeper.", "curation_status": "planning_seed" } }]
+      },
+      {
+        "ref": { "local_ref": "stop-witness-2" },
+        "type": "TrailStop",
+        "display_name": "Witness Trail 2: letters and diaries",
+        "facts": [{ "type": "TrailStopFacts", "mode": "merge", "properties": { "label": "letters and diaries", "ordinal": 2, "note": "Written records become graph evidence.", "curation_status": "planning_seed" } }]
+      },
+      {
+        "ref": { "local_ref": "stop-witness-3" },
+        "type": "TrailStop",
+        "display_name": "Witness Trail 3: John Seward",
+        "facts": [{ "type": "TrailStopFacts", "mode": "merge", "properties": { "label": "John Seward", "ordinal": 3, "note": "Clinical witnessing enters the trail.", "curation_status": "planning_seed" } }]
+      },
+      {
+        "ref": { "local_ref": "stop-witness-4" },
+        "type": "TrailStop",
+        "display_name": "Witness Trail 4: witness testimony",
+        "facts": [{ "type": "TrailStopFacts", "mode": "merge", "properties": { "label": "witness testimony", "ordinal": 4, "note": "The motif turns records into narrative assembly.", "curation_status": "planning_seed" } }]
+      },
+      {
+        "ref": { "local_ref": "stop-witness-5" },
+        "type": "TrailStop",
+        "display_name": "Witness Trail 5: posthumous investigation",
+        "facts": [{ "type": "TrailStopFacts", "mode": "merge", "properties": { "label": "posthumous appearances are investigated", "ordinal": 5, "note": "Partial records converge into inquiry.", "curation_status": "planning_seed" } }]
+      }
+    ],
+    "link_writes": [
+      { "ref": { "local_ref": "link-work-evidence-source" }, "type": "evidenced_by", "source_ref": { "local_ref": "work-dracula" }, "target_ref": { "local_ref": "source-dracula-selected-edition" } },
+      { "ref": { "local_ref": "link-passage-source" }, "type": "evidenced_by", "source_ref": { "local_ref": "passage-lucy-cluster-todo" }, "target_ref": { "local_ref": "source-dracula-selected-edition" } },
+      { "ref": { "local_ref": "link-sleepwalking-evidence-passage" }, "type": "evidenced_by", "source_ref": { "local_ref": "event-sleepwalking" }, "target_ref": { "local_ref": "passage-lucy-cluster-todo" } },
+      { "ref": { "local_ref": "link-transfusion-evidence-passage" }, "type": "evidenced_by", "source_ref": { "local_ref": "event-transfusion-attempts" }, "target_ref": { "local_ref": "passage-lucy-cluster-todo" } },
+      { "ref": { "local_ref": "link-posthumous-evidence-passage" }, "type": "evidenced_by", "source_ref": { "local_ref": "event-posthumous-investigation" }, "target_ref": { "local_ref": "passage-lucy-cluster-todo" } },
+      { "ref": { "local_ref": "link-lucy-appears" }, "type": "appears_in", "source_ref": { "local_ref": "character-lucy-westenra" }, "target_ref": { "local_ref": "work-dracula" } },
+      { "ref": { "local_ref": "link-mina-appears" }, "type": "appears_in", "source_ref": { "local_ref": "character-mina-murray" }, "target_ref": { "local_ref": "work-dracula" } },
+      { "ref": { "local_ref": "link-dracula-appears" }, "type": "appears_in", "source_ref": { "local_ref": "character-count-dracula" }, "target_ref": { "local_ref": "work-dracula" } },
+      { "ref": { "local_ref": "link-van-helsing-appears" }, "type": "appears_in", "source_ref": { "local_ref": "character-abraham-van-helsing" }, "target_ref": { "local_ref": "work-dracula" } },
+      { "ref": { "local_ref": "link-seward-appears" }, "type": "appears_in", "source_ref": { "local_ref": "character-john-seward" }, "target_ref": { "local_ref": "work-dracula" } },
+      { "ref": { "local_ref": "link-arthur-appears" }, "type": "appears_in", "source_ref": { "local_ref": "character-arthur-holmwood" }, "target_ref": { "local_ref": "work-dracula" } },
+      { "ref": { "local_ref": "link-sleepwalking-occurs" }, "type": "occurs_in", "source_ref": { "local_ref": "event-sleepwalking" }, "target_ref": { "local_ref": "work-dracula" } },
+      { "ref": { "local_ref": "link-illness-occurs" }, "type": "occurs_in", "source_ref": { "local_ref": "event-illness" }, "target_ref": { "local_ref": "work-dracula" } },
+      { "ref": { "local_ref": "link-transfusion-occurs" }, "type": "occurs_in", "source_ref": { "local_ref": "event-transfusion-attempts" }, "target_ref": { "local_ref": "work-dracula" } },
+      { "ref": { "local_ref": "link-garlic-occurs" }, "type": "occurs_in", "source_ref": { "local_ref": "event-garlic-protection" }, "target_ref": { "local_ref": "work-dracula" } },
+      { "ref": { "local_ref": "link-death-occurs" }, "type": "occurs_in", "source_ref": { "local_ref": "event-death" }, "target_ref": { "local_ref": "work-dracula" } },
+      { "ref": { "local_ref": "link-posthumous-occurs" }, "type": "occurs_in", "source_ref": { "local_ref": "event-posthumous-investigation" }, "target_ref": { "local_ref": "work-dracula" } },
+      { "ref": { "local_ref": "link-lucy-sleepwalking" }, "type": "present_at", "source_ref": { "local_ref": "character-lucy-westenra" }, "target_ref": { "local_ref": "event-sleepwalking" } },
+      { "ref": { "local_ref": "link-lucy-illness" }, "type": "present_at", "source_ref": { "local_ref": "character-lucy-westenra" }, "target_ref": { "local_ref": "event-illness" } },
+      { "ref": { "local_ref": "link-lucy-transfusion" }, "type": "present_at", "source_ref": { "local_ref": "character-lucy-westenra" }, "target_ref": { "local_ref": "event-transfusion-attempts" } },
+      { "ref": { "local_ref": "link-van-helsing-transfusion" }, "type": "present_at", "source_ref": { "local_ref": "character-abraham-van-helsing" }, "target_ref": { "local_ref": "event-transfusion-attempts" } },
+      { "ref": { "local_ref": "link-seward-transfusion" }, "type": "present_at", "source_ref": { "local_ref": "character-john-seward" }, "target_ref": { "local_ref": "event-transfusion-attempts" } },
+      { "ref": { "local_ref": "link-arthur-transfusion" }, "type": "present_at", "source_ref": { "local_ref": "character-arthur-holmwood" }, "target_ref": { "local_ref": "event-transfusion-attempts" } },
+      { "ref": { "local_ref": "link-lucy-garlic" }, "type": "present_at", "source_ref": { "local_ref": "character-lucy-westenra" }, "target_ref": { "local_ref": "event-garlic-protection" } },
+      { "ref": { "local_ref": "link-van-helsing-garlic" }, "type": "present_at", "source_ref": { "local_ref": "character-abraham-van-helsing" }, "target_ref": { "local_ref": "event-garlic-protection" } },
+      { "ref": { "local_ref": "link-lucy-death" }, "type": "present_at", "source_ref": { "local_ref": "character-lucy-westenra" }, "target_ref": { "local_ref": "event-death" } },
+      { "ref": { "local_ref": "link-van-helsing-posthumous" }, "type": "present_at", "source_ref": { "local_ref": "character-abraham-van-helsing" }, "target_ref": { "local_ref": "event-posthumous-investigation" } },
+      { "ref": { "local_ref": "link-sleepwalking-whitby" }, "type": "located_at", "source_ref": { "local_ref": "event-sleepwalking" }, "target_ref": { "local_ref": "place-whitby" } },
+      { "ref": { "local_ref": "link-illness-household" }, "type": "located_at", "source_ref": { "local_ref": "event-illness" }, "target_ref": { "local_ref": "place-westenra-household" } },
+      { "ref": { "local_ref": "link-transfusion-household" }, "type": "located_at", "source_ref": { "local_ref": "event-transfusion-attempts" }, "target_ref": { "local_ref": "place-westenra-household" } },
+      { "ref": { "local_ref": "link-garlic-household" }, "type": "located_at", "source_ref": { "local_ref": "event-garlic-protection" }, "target_ref": { "local_ref": "place-westenra-household" } },
+      { "ref": { "local_ref": "link-posthumous-grave" }, "type": "located_at", "source_ref": { "local_ref": "event-posthumous-investigation" }, "target_ref": { "local_ref": "place-grave-tomb" } },
+      { "ref": { "local_ref": "link-transfusion-blood" }, "type": "uses", "source_ref": { "local_ref": "event-transfusion-attempts" }, "target_ref": { "local_ref": "object-blood" } },
+      { "ref": { "local_ref": "link-garlic-object" }, "type": "uses", "source_ref": { "local_ref": "event-garlic-protection" }, "target_ref": { "local_ref": "object-garlic-flowers" } },
+      { "ref": { "local_ref": "link-death-posthumous-transform" }, "type": "transforms_into", "source_ref": { "local_ref": "event-death" }, "target_ref": { "local_ref": "event-posthumous-investigation" } },
+      { "ref": { "local_ref": "link-sleepwalking-motif-sleep" }, "type": "has_motif", "source_ref": { "local_ref": "event-sleepwalking" }, "target_ref": { "local_ref": "motif-sleep" } },
+      { "ref": { "local_ref": "link-sleepwalking-motif-thresholds" }, "type": "has_motif", "source_ref": { "local_ref": "event-sleepwalking" }, "target_ref": { "local_ref": "motif-thresholds" } },
+      { "ref": { "local_ref": "link-transfusion-motif-blood" }, "type": "has_motif", "source_ref": { "local_ref": "event-transfusion-attempts" }, "target_ref": { "local_ref": "motif-blood" } },
+      { "ref": { "local_ref": "link-transfusion-motif-medical" }, "type": "has_motif", "source_ref": { "local_ref": "event-transfusion-attempts" }, "target_ref": { "local_ref": "motif-medical-uncertainty" } },
+      { "ref": { "local_ref": "link-garlic-motif-thresholds" }, "type": "has_motif", "source_ref": { "local_ref": "event-garlic-protection" }, "target_ref": { "local_ref": "motif-thresholds" } },
+      { "ref": { "local_ref": "link-posthumous-motif-thresholds" }, "type": "has_motif", "source_ref": { "local_ref": "event-posthumous-investigation" }, "target_ref": { "local_ref": "motif-thresholds" } },
+      { "ref": { "local_ref": "link-records-motif-witness" }, "type": "has_motif", "source_ref": { "local_ref": "object-letters-diaries" }, "target_ref": { "local_ref": "motif-witness-testimony" } },
+      { "ref": { "local_ref": "link-medical-theme" }, "type": "develops_theme", "source_ref": { "local_ref": "motif-medical-uncertainty" }, "target_ref": { "local_ref": "theme-science-superstition" } },
+      { "ref": { "local_ref": "link-threshold-theme" }, "type": "develops_theme", "source_ref": { "local_ref": "motif-thresholds" }, "target_ref": { "local_ref": "theme-protection-control" } },
+      { "ref": { "local_ref": "link-blood-style-candlelit" }, "type": "rendered_as", "source_ref": { "local_ref": "trail-blood" }, "target_ref": { "local_ref": "style-candlelit-gothic" } },
+      { "ref": { "local_ref": "link-blood-style-neon" }, "type": "rendered_as", "source_ref": { "local_ref": "trail-blood" }, "target_ref": { "local_ref": "style-neon-nocturne" } },
+      { "ref": { "local_ref": "link-threshold-style-impression" }, "type": "rendered_as", "source_ref": { "local_ref": "trail-thresholds" }, "target_ref": { "local_ref": "style-museum-impression" } },
+      { "ref": { "local_ref": "link-witness-style-brutalist" }, "type": "rendered_as", "source_ref": { "local_ref": "trail-witness" }, "target_ref": { "local_ref": "style-concrete-brutalist" } },
+      { "ref": { "local_ref": "link-witness-style-idol" }, "type": "rendered_as", "source_ref": { "local_ref": "trail-witness" }, "target_ref": { "local_ref": "style-idol-stage-editorial" } },
+      { "ref": { "local_ref": "link-blood-stop-1" }, "type": "includes_stop", "source_ref": { "local_ref": "trail-blood" }, "target_ref": { "local_ref": "stop-blood-1" } },
+      { "ref": { "local_ref": "link-blood-stop-2" }, "type": "includes_stop", "source_ref": { "local_ref": "trail-blood" }, "target_ref": { "local_ref": "stop-blood-2" } },
+      { "ref": { "local_ref": "link-blood-stop-3" }, "type": "includes_stop", "source_ref": { "local_ref": "trail-blood" }, "target_ref": { "local_ref": "stop-blood-3" } },
+      { "ref": { "local_ref": "link-blood-stop-4" }, "type": "includes_stop", "source_ref": { "local_ref": "trail-blood" }, "target_ref": { "local_ref": "stop-blood-4" } },
+      { "ref": { "local_ref": "link-blood-stop-5" }, "type": "includes_stop", "source_ref": { "local_ref": "trail-blood" }, "target_ref": { "local_ref": "stop-blood-5" } },
+      { "ref": { "local_ref": "link-blood-stop-6" }, "type": "includes_stop", "source_ref": { "local_ref": "trail-blood" }, "target_ref": { "local_ref": "stop-blood-6" } },
+      { "ref": { "local_ref": "link-blood-focus-1" }, "type": "focuses_on", "source_ref": { "local_ref": "stop-blood-1" }, "target_ref": { "local_ref": "character-lucy-westenra" } },
+      { "ref": { "local_ref": "link-blood-focus-2" }, "type": "focuses_on", "source_ref": { "local_ref": "stop-blood-2" }, "target_ref": { "local_ref": "event-illness" } },
+      { "ref": { "local_ref": "link-blood-focus-3" }, "type": "focuses_on", "source_ref": { "local_ref": "stop-blood-3" }, "target_ref": { "local_ref": "event-transfusion-attempts" } },
+      { "ref": { "local_ref": "link-blood-focus-4" }, "type": "focuses_on", "source_ref": { "local_ref": "stop-blood-4" }, "target_ref": { "local_ref": "motif-blood" } },
+      { "ref": { "local_ref": "link-blood-focus-5" }, "type": "focuses_on", "source_ref": { "local_ref": "stop-blood-5" }, "target_ref": { "local_ref": "motif-medical-uncertainty" } },
+      { "ref": { "local_ref": "link-blood-focus-6" }, "type": "focuses_on", "source_ref": { "local_ref": "stop-blood-6" }, "target_ref": { "local_ref": "theme-science-superstition" } },
+      { "ref": { "local_ref": "link-blood-follows-2" }, "type": "follows", "source_ref": { "local_ref": "stop-blood-2" }, "target_ref": { "local_ref": "stop-blood-1" } },
+      { "ref": { "local_ref": "link-blood-follows-3" }, "type": "follows", "source_ref": { "local_ref": "stop-blood-3" }, "target_ref": { "local_ref": "stop-blood-2" } },
+      { "ref": { "local_ref": "link-blood-follows-4" }, "type": "follows", "source_ref": { "local_ref": "stop-blood-4" }, "target_ref": { "local_ref": "stop-blood-3" } },
+      { "ref": { "local_ref": "link-blood-follows-5" }, "type": "follows", "source_ref": { "local_ref": "stop-blood-5" }, "target_ref": { "local_ref": "stop-blood-4" } },
+      { "ref": { "local_ref": "link-blood-follows-6" }, "type": "follows", "source_ref": { "local_ref": "stop-blood-6" }, "target_ref": { "local_ref": "stop-blood-5" } },
+      { "ref": { "local_ref": "link-threshold-stop-1" }, "type": "includes_stop", "source_ref": { "local_ref": "trail-thresholds" }, "target_ref": { "local_ref": "stop-threshold-1" } },
+      { "ref": { "local_ref": "link-threshold-stop-2" }, "type": "includes_stop", "source_ref": { "local_ref": "trail-thresholds" }, "target_ref": { "local_ref": "stop-threshold-2" } },
+      { "ref": { "local_ref": "link-threshold-stop-3" }, "type": "includes_stop", "source_ref": { "local_ref": "trail-thresholds" }, "target_ref": { "local_ref": "stop-threshold-3" } },
+      { "ref": { "local_ref": "link-threshold-stop-4" }, "type": "includes_stop", "source_ref": { "local_ref": "trail-thresholds" }, "target_ref": { "local_ref": "stop-threshold-4" } },
+      { "ref": { "local_ref": "link-threshold-stop-5" }, "type": "includes_stop", "source_ref": { "local_ref": "trail-thresholds" }, "target_ref": { "local_ref": "stop-threshold-5" } },
+      { "ref": { "local_ref": "link-threshold-stop-6" }, "type": "includes_stop", "source_ref": { "local_ref": "trail-thresholds" }, "target_ref": { "local_ref": "stop-threshold-6" } },
+      { "ref": { "local_ref": "link-threshold-focus-1" }, "type": "focuses_on", "source_ref": { "local_ref": "stop-threshold-1" }, "target_ref": { "local_ref": "character-lucy-westenra" } },
+      { "ref": { "local_ref": "link-threshold-focus-2" }, "type": "focuses_on", "source_ref": { "local_ref": "stop-threshold-2" }, "target_ref": { "local_ref": "event-sleepwalking" } },
+      { "ref": { "local_ref": "link-threshold-focus-3" }, "type": "focuses_on", "source_ref": { "local_ref": "stop-threshold-3" }, "target_ref": { "local_ref": "place-whitby" } },
+      { "ref": { "local_ref": "link-threshold-focus-4" }, "type": "focuses_on", "source_ref": { "local_ref": "stop-threshold-4" }, "target_ref": { "local_ref": "motif-thresholds" } },
+      { "ref": { "local_ref": "link-threshold-focus-5" }, "type": "focuses_on", "source_ref": { "local_ref": "stop-threshold-5" }, "target_ref": { "local_ref": "place-grave-tomb" } },
+      { "ref": { "local_ref": "link-threshold-focus-6" }, "type": "focuses_on", "source_ref": { "local_ref": "stop-threshold-6" }, "target_ref": { "local_ref": "event-posthumous-investigation" } },
+      { "ref": { "local_ref": "link-witness-stop-1" }, "type": "includes_stop", "source_ref": { "local_ref": "trail-witness" }, "target_ref": { "local_ref": "stop-witness-1" } },
+      { "ref": { "local_ref": "link-witness-stop-2" }, "type": "includes_stop", "source_ref": { "local_ref": "trail-witness" }, "target_ref": { "local_ref": "stop-witness-2" } },
+      { "ref": { "local_ref": "link-witness-stop-3" }, "type": "includes_stop", "source_ref": { "local_ref": "trail-witness" }, "target_ref": { "local_ref": "stop-witness-3" } },
+      { "ref": { "local_ref": "link-witness-stop-4" }, "type": "includes_stop", "source_ref": { "local_ref": "trail-witness" }, "target_ref": { "local_ref": "stop-witness-4" } },
+      { "ref": { "local_ref": "link-witness-stop-5" }, "type": "includes_stop", "source_ref": { "local_ref": "trail-witness" }, "target_ref": { "local_ref": "stop-witness-5" } },
+      { "ref": { "local_ref": "link-witness-focus-1" }, "type": "focuses_on", "source_ref": { "local_ref": "stop-witness-1" }, "target_ref": { "local_ref": "character-mina-murray" } },
+      { "ref": { "local_ref": "link-witness-focus-2" }, "type": "focuses_on", "source_ref": { "local_ref": "stop-witness-2" }, "target_ref": { "local_ref": "object-letters-diaries" } },
+      { "ref": { "local_ref": "link-witness-focus-3" }, "type": "focuses_on", "source_ref": { "local_ref": "stop-witness-3" }, "target_ref": { "local_ref": "character-john-seward" } },
+      { "ref": { "local_ref": "link-witness-focus-4" }, "type": "focuses_on", "source_ref": { "local_ref": "stop-witness-4" }, "target_ref": { "local_ref": "motif-witness-testimony" } },
+      { "ref": { "local_ref": "link-witness-focus-5" }, "type": "focuses_on", "source_ref": { "local_ref": "stop-witness-5" }, "target_ref": { "local_ref": "event-posthumous-investigation" } }
+    ]
+  }
+}

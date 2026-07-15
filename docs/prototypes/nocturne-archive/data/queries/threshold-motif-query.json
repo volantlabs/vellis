@@ -1,0 +1,50 @@
+{
+  "tool": "rtg_execute_query",
+  "arguments": {
+    "query_options": { "live_filter": "live" },
+    "response_options": { "format": "properties_only" },
+    "query_spec": {
+      "anchor_buckets": [
+        { "name": "event", "anchor_type_keys": ["Event"] },
+        { "name": "motif", "anchor_type_keys": ["Motif"] }
+      ],
+      "link_requirements": [
+        {
+          "name": "has_motif",
+          "source_bucket": "event",
+          "target_bucket": "motif",
+          "link_type_keys": ["has_motif"]
+        }
+      ],
+      "data_requirements": [
+        {
+          "name": "motif_facts",
+          "anchor_bucket": "motif",
+          "data_type_key": "MotifFacts",
+          "required": true,
+          "predicates": [
+            { "path": ["label"], "operator": "equals", "value": "thresholds" }
+          ]
+        },
+        {
+          "name": "event_facts",
+          "anchor_bucket": "event",
+          "data_type_key": "EventFacts",
+          "required": true,
+          "predicates": []
+        }
+      ],
+      "return_spec": {
+        "anchor_buckets": ["event", "motif"],
+        "link_requirements": ["has_motif"],
+        "data_requirements": ["motif_facts", "event_facts"],
+        "properties": [
+          ["motif_facts", ["label"]],
+          ["event_facts", ["label"]],
+          ["event_facts", ["sequence_order"]],
+          ["event_facts", ["verification_status"]]
+        ]
+      }
+    }
+  }
+}
