@@ -6,6 +6,7 @@ from pathlib import Path
 
 import pytest
 
+from apps.personal_launcher import runtime as launcher_runtime
 from apps.personal_launcher.catalog_store import load_catalog, load_or_create_catalog, write_catalog
 from apps.personal_launcher.desktop import install_desktop_app
 from apps.personal_launcher.runtime import DesktopRuntimeAdapter
@@ -235,7 +236,23 @@ def test_command_surface_records_process_session(tmp_path: Path) -> None:
     )
 
 
-def test_completed_command_becomes_handoff_instead_of_running_session(tmp_path: Path) -> None:
+def test_completed_command_becomes_handoff_instead_of_running_session(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class CompletedCommand:
+        pid = 12345
+
+        def wait(self, timeout: float) -> int:
+            assert timeout == launcher_runtime._STARTUP_GRACE_SECONDS
+            return 0
+
+    def start_completed_command(command: object, *, cwd: object = None) -> CompletedCommand:
+        assert command == [sys.executable, "-c", "raise SystemExit(0)"]
+        assert cwd is None
+        return CompletedCommand()
+
+    monkeypatch.setattr(launcher_runtime.subprocess, "Popen", start_completed_command)
     catalog_path = tmp_path / "catalog.json"
     write_catalog(
         catalog_path,

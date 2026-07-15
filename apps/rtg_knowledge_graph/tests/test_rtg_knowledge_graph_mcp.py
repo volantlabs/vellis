@@ -439,6 +439,19 @@ def test_mcp_codec_rejects_non_string_option_terms() -> None:
             decode()
 
 
+def test_validation_option_codec_maps_transport_shorthand_to_modeled_shape() -> None:
+    all_tracks = decode_validation_options({"tracks": "all", "finding_limit": 20})
+    selected_tracks = decode_validation_options({"tracks": ["schema_object"]})
+
+    assert all_tracks is not None
+    assert all_tracks.selection == "all"
+    assert all_tracks.tracks == ()
+    assert all_tracks.finding_limit == 20
+    assert selected_tracks is not None
+    assert selected_tracks.selection == "selected"
+    assert selected_tracks.tracks == ("schema_object",)
+
+
 def test_mcp_codec_rejects_mutation_aliases_that_would_be_ignored() -> None:
     malformed_payloads = (
         (lambda: decode_graph_changes({"anchors": []}), "anchors", "anchor_writes"),

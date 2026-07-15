@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from uuid import UUID, uuid4
 
+import pytest
+
 from components.rtg.change_validation import (
     DeterministicRtgChangeValidator,
     RtgChangeBatch,
@@ -16,6 +18,7 @@ from components.rtg.change_validation import (
     RtgMigrationRecordWrite,
     RtgSchemaChangeSet,
     RtgSchemaDefinitionWrite,
+    RtgValidationInputInvalid,
     RtgValidationOptions,
 )
 from components.rtg.constraints import (
@@ -99,6 +102,7 @@ MODEL_EVIDENCE = {
         "test_validation_rejects_malformed_proposed_data_batch",
         "test_validation_reports_an_unprojectable_delete_as_a_blocking_finding",
         "test_unselected_malformed_sections_do_not_affect_selected_track",
+        "test_validation_options_enforce_modeled_selection_shape",
         "test_validation_reports_unresolved_link_endpoints_with_paths",
         "test_staged_migration_batch_validates_projected_cutover_state",
     ),
@@ -123,6 +127,7 @@ MODEL_EVIDENCE = {
         "test_validation_rejects_malformed_proposed_data_batch",
         "test_validation_reports_an_unprojectable_delete_as_a_blocking_finding",
         "test_unselected_malformed_sections_do_not_affect_selected_track",
+        "test_validation_options_enforce_modeled_selection_shape",
         "test_duplicate_findings_collapse_before_evidence_and_acceptance",
         "test_unevaluable_constraint_payload_is_a_catalog_finding",
         "test_validation_reports_unresolved_link_endpoints_with_paths",
@@ -773,11 +778,38 @@ def test_unselected_malformed_sections_do_not_affect_selected_track() -> None:
         RtgChangeBatch(
             constraint_changes=RtgConstraintChangeSet(delete_constraints=(RtgChangeReference(),))
         ),
-        RtgValidationOptions(tracks=("schema_object",)),
+        RtgValidationOptions(selection="selected", tracks=("schema_object",)),
     )
 
     assert report.accepted is True
     assert report.findings == ()
+
+
+@pytest.mark.parametrize(
+    "options",
+    (
+        RtgValidationOptions(selection="all", tracks=("schema_object",)),
+        RtgValidationOptions(selection="selected"),
+        RtgValidationOptions(
+            selection="selected",
+            tracks=("schema_object", "schema_object"),
+        ),
+        RtgValidationOptions(selection="unsupported"),
+    ),
+)
+def test_validation_options_enforce_modeled_selection_shape(
+    options: RtgValidationOptions,
+) -> None:
+    with pytest.raises(RtgValidationInputInvalid):
+        DeterministicRtgChangeValidator().validate_batch(
+            object(),
+            object(),
+            object(),
+            None,
+            object(),
+            RtgChangeBatch(),
+            options,
+        )
 
 
 def test_duplicate_findings_collapse_before_evidence_and_acceptance() -> None:
@@ -795,7 +827,10 @@ def test_duplicate_findings_collapse_before_evidence_and_acceptance() -> None:
         InMemoryRtgConstraints.empty(),
         None,
         SimpleRtgQueryEngine(),
-        validation_options=RtgValidationOptions(tracks=("schema_object",)),
+        validation_options=RtgValidationOptions(
+            selection="selected",
+            tracks=("schema_object",),
+        ),
     )
 
     assert report.accepted is False
@@ -827,7 +862,10 @@ def test_unevaluable_constraint_payload_is_a_catalog_finding() -> None:
         constraints,
         None,
         SimpleRtgQueryEngine(),
-        validation_options=RtgValidationOptions(tracks=("constraint_network",)),
+        validation_options=RtgValidationOptions(
+            selection="selected",
+            tracks=("constraint_network",),
+        ),
     )
 
     assert [finding.code for finding in report.findings] == [

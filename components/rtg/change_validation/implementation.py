@@ -2235,10 +2235,16 @@ def _value_satisfies_schema_kind(value: object, kind: str) -> bool:
 def _selected_tracks(options: RtgValidationOptions) -> set[str]:
     if options.finding_limit is not None and options.finding_limit <= 0:
         raise RtgValidationInputInvalid("finding_limit must be positive")
-    if options.tracks == "all":
+    if options.selection == "all":
+        if options.tracks:
+            raise RtgValidationInputInvalid(
+                "all-track selection requires an empty tracks collection"
+            )
         return set(_TRACKS)
+    if options.selection != "selected":
+        raise RtgValidationInputInvalid("validation selection must be all or selected")
     tracks = set(options.tracks)
-    if not tracks or tracks - _TRACKS:
+    if not tracks or len(tracks) != len(options.tracks) or tracks - _TRACKS:
         raise RtgValidationInputInvalid("invalid validation track selection")
     return tracks
 

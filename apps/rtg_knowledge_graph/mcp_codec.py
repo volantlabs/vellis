@@ -1138,7 +1138,8 @@ def decode_validation_options(value: object | None) -> RtgControllerValidationOp
     )
     tracks = data.get("tracks", "all")
     return RtgControllerValidationOptions(
-        tracks="all" if tracks == "all" else _str_tuple(tracks, "validation_options.tracks"),
+        selection="all" if tracks == "all" else "selected",
+        tracks=() if tracks == "all" else _str_tuple(tracks, "validation_options.tracks"),
         finding_limit=_optional_int(data.get("finding_limit"), "validation_options.finding_limit"),
     )
 

@@ -537,6 +537,7 @@
         "components/rtg/change_validation/tests/test_rtg_change_validation_contract.py::test_validation_rejects_malformed_proposed_data_batch",
         "components/rtg/change_validation/tests/test_rtg_change_validation_contract.py::test_validation_reports_an_unprojectable_delete_as_a_blocking_finding",
         "components/rtg/change_validation/tests/test_rtg_change_validation_contract.py::test_unselected_malformed_sections_do_not_affect_selected_track",
+        "components/rtg/change_validation/tests/test_rtg_change_validation_contract.py::test_validation_options_enforce_modeled_selection_shape",
         "components/rtg/change_validation/tests/test_rtg_change_validation_contract.py::test_duplicate_findings_collapse_before_evidence_and_acceptance",
         "components/rtg/change_validation/tests/test_rtg_change_validation_contract.py::test_unevaluable_constraint_payload_is_a_catalog_finding",
         "components/rtg/change_validation/tests/test_rtg_change_validation_contract.py::test_validation_reports_unresolved_link_endpoints_with_paths",
@@ -579,6 +580,7 @@
         "components/rtg/change_validation/tests/test_rtg_change_validation_contract.py::test_validation_rejects_malformed_proposed_data_batch",
         "components/rtg/change_validation/tests/test_rtg_change_validation_contract.py::test_validation_reports_an_unprojectable_delete_as_a_blocking_finding",
         "components/rtg/change_validation/tests/test_rtg_change_validation_contract.py::test_unselected_malformed_sections_do_not_affect_selected_track",
+        "components/rtg/change_validation/tests/test_rtg_change_validation_contract.py::test_validation_options_enforce_modeled_selection_shape",
         "components/rtg/change_validation/tests/test_rtg_change_validation_contract.py::test_validation_reports_unresolved_link_endpoints_with_paths",
         "components/rtg/change_validation/tests/test_rtg_change_validation_contract.py::test_staged_migration_batch_validates_projected_cutover_state"
       ],

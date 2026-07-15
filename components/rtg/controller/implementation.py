@@ -269,6 +269,7 @@ class InProcessRtgController:
                 self._query_engine,
                 resolved,
                 RtgValidationOptions(
+                    selection=options.selection,
                     tracks=options.tracks,
                     finding_limit=options.finding_limit,
                 ),
@@ -621,7 +622,11 @@ class InProcessRtgController:
                 self._migration,
                 self._query_engine,
                 migration_ids,
-                RtgValidationOptions(tracks=options.tracks, finding_limit=options.finding_limit),
+                RtgValidationOptions(
+                    selection=options.selection,
+                    tracks=options.tracks,
+                    finding_limit=options.finding_limit,
+                ),
             )
 
     def discover_anchor_types(

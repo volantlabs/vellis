@@ -147,7 +147,8 @@ class RtgChangeBatch:
 
 @dataclass(frozen=True, slots=True)
 class RtgValidationOptions:
-    tracks: str | tuple[str, ...] = "all"
+    selection: str = "all"
+    tracks: tuple[str, ...] = ()
     finding_limit: int | None = None
 
 

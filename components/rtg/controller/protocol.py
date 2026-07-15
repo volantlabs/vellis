@@ -28,7 +28,8 @@ from components.rtg.schema.protocol import RtgSchemaPack, RtgSchemaSnapshot
 
 @dataclass(frozen=True, slots=True)
 class RtgControllerValidationOptions:
-    tracks: str | tuple[str, ...] = "all"
+    selection: str = "all"
+    tracks: tuple[str, ...] = ()
     finding_limit: int | None = None
 
 
