@@ -311,6 +311,9 @@ Agent operation notes:
 
 - `local_ref` values are request-local. Use `resource_id` values returned by earlier calls when
   linking to existing graph objects.
+- Every data-object write declares `mode: "merge" | "replace"`. Use merge for inserts and partial
+  updates. Replace requires the current `version_token` returned by `rtg_get_object`, removes
+  omitted properties, and returns the winning current state when the token is stale.
 - Use `rtg_resolve_anchor_by_fact` for exact fact lookups before link writes, or
   `rtg_get_usage_guide` with `topic: "lookup_examples"` when a full query payload is more useful.
   Use `rtg_validate_live_graph_changes` before risky imports or recovery probes when validation

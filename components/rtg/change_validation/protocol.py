@@ -40,6 +40,8 @@ class RtgGraphDataObjectWrite:
     system: JsonObject = field(default_factory=dict)
     anchor_refs: tuple[RtgChangeReference, ...] = ()
     identity_override: RtgIdentityOverride | None = None
+    mode: str | None = None
+    expected_version: str | None = None
 
 
 @dataclass(frozen=True, slots=True)

@@ -28,8 +28,9 @@ been reconciled. The schema-domain catalog now distinguishes available instructi
 readiness. Temporal schema shapes, identity criteria, link kinds, and their validation policies are
 now reconciled; the governance-core and agent-memory-spine instructions are runtime-ready. Reviewed,
 diff-scoped schema-evolution operations and their kernel-sequenced property data effects are also
-reconciled. Write modes and prototype fixture-backed domains remain deferred to later RTG kernel
-harmonization checkpoints.
+reconciled. Explicit merge/replace writes, controller-issued version tokens, and stale-write conflict
+responses are reconciled. Prototype fixture-backed domains remain deferred to the final RTG kernel
+harmonization checkpoint.
 
 During harmonization:
 

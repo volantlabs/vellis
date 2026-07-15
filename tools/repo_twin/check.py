@@ -31,7 +31,7 @@ def evaluate_findings(
             )
         else:
             snapshot = current_snapshot(storage_root)
-            summary, _changes = plan_sync(scan, snapshot)
+            summary, _changes = plan_sync(scan, snapshot, materialize_changes=False)
             if summary.changed:
                 findings.append(
                     Finding(

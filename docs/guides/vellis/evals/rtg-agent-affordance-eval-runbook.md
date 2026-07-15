@@ -207,6 +207,7 @@ Live graph writes go through `rtg_apply_live_graph_changes`:
       {
         "ref": {"local_ref": "component-graph-facts"},
         "type": "ComponentFacts",
+        "mode": "merge",
         "properties": {"component_id": "component.rtg.graph", "status": "accepted"},
         "anchor_refs": [{"local_ref": "component-graph"}]
       }

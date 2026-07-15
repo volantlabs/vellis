@@ -171,6 +171,7 @@ def test_mcp_codec_decodes_changes_and_encodes_json() -> None:
             {
                 "ref": {"local_ref": "profile"},
                 "type": "Profile",
+                "mode": "merge",
                 "properties": {"name": "Ada"},
                 "anchor_refs": [{"local_ref": "person"}],
             }
@@ -553,6 +554,7 @@ def test_mcp_toolset_live_graph_query_get_object_and_validation_error(
                 {
                     "ref": {"local_ref": "profile"},
                     "type": "Profile",
+                    "mode": "merge",
                     "properties": {"name": "Ada"},
                     "anchor_refs": [{"local_ref": "person"}],
                 }
@@ -570,7 +572,8 @@ def test_mcp_toolset_live_graph_query_get_object_and_validation_error(
     assert malformed["error"]["type"] == "RtgMcpInputInvalid"
     assert applied["ok"] is True
     assert query["ok"] is True
-    assert read["result"]["type"] == "Person"
+    assert read["result"]["object"]["type"] == "Person"
+    assert read["result"]["version_token"] is None
     assert missing["ok"] is False
     assert missing["error"]["type"] == "RtgControllerObjectNotFound"
 
@@ -587,6 +590,7 @@ def test_mcp_toolset_validates_live_graph_changes_without_mutation_or_ledger(
                 {
                     "ref": {"local_ref": "profile"},
                     "type": "Profile",
+                    "mode": "merge",
                     "properties": {"name": "Ada"},
                     "anchor_refs": [{"local_ref": "person"}],
                 }
@@ -611,6 +615,59 @@ def test_mcp_toolset_validates_live_graph_changes_without_mutation_or_ledger(
     assert query_after_preview["result"]["bindings"] == []
 
 
+def test_mcp_replace_uses_read_token_and_returns_stale_conflict_state(
+    tmp_path: Path,
+) -> None:
+    toolset = build_toolset(tmp_path)
+    person_uuid = str(uuid4())
+    profile_uuid = str(uuid4())
+    created = toolset.rtg_apply_live_graph_changes(
+        {
+            "anchor_writes": [
+                {
+                    "ref": {"resource_id": person_uuid},
+                    "type": "Person",
+                    "display_name": "Ada",
+                }
+            ],
+            "data_object_writes": [
+                {
+                    "ref": {"resource_id": profile_uuid},
+                    "type": "Profile",
+                    "mode": "merge",
+                    "properties": {"name": "Ada"},
+                    "anchor_refs": [{"resource_id": person_uuid}],
+                }
+            ],
+        }
+    )
+    read = toolset.rtg_get_object(profile_uuid)
+    version_token = read["result"]["version_token"]
+    replacement = {
+        "data_object_writes": [
+            {
+                "ref": {"resource_id": profile_uuid},
+                "type": "Profile",
+                "mode": "replace",
+                "expected_version": version_token,
+                "properties": {"name": "Grace"},
+                "anchor_refs": [{"resource_id": person_uuid}],
+            }
+        ]
+    }
+
+    applied = toolset.rtg_apply_live_graph_changes(replacement)
+    stale = toolset.rtg_apply_live_graph_changes(replacement)
+
+    assert created["ok"] is True
+    assert applied["ok"] is True
+    assert stale["ok"] is False
+    assert stale["error"]["type"] == "RtgControllerWriteConflict"
+    assert stale["transaction_id"]
+    assert stale["conflicts"][0]["current_object"]["properties"] == {"name": "Grace"}
+    assert stale["conflicts"][0]["current_version"] != version_token
+
+
 def test_mcp_toolset_validates_and_applies_live_anchor_records(
     tmp_path: Path,
 ) -> None:
@@ -622,7 +679,7 @@ def test_mcp_toolset_validates_and_applies_live_anchor_records(
                 "ref": {"local_ref": "ada"},
                 "type": "Person",
                 "display_name": "Ada",
-                "facts": [{"type": "Profile", "properties": {"name": "Ada"}}],
+                "facts": [{"type": "Profile", "mode": "merge", "properties": {"name": "Ada"}}],
             }
         ]
     )
@@ -635,7 +692,7 @@ def test_mcp_toolset_validates_and_applies_live_anchor_records(
                 "ref": {"local_ref": "ada"},
                 "type": "Person",
                 "display_name": "Ada",
-                "facts": [{"type": "Profile", "properties": {"name": "Ada"}}],
+                "facts": [{"type": "Profile", "mode": "merge", "properties": {"name": "Ada"}}],
             }
         ]
     )
@@ -696,6 +753,7 @@ def test_compact_mutation_response_is_materially_smaller_than_full(tmp_path: Pat
             "facts": [
                 {
                     "type": "Profile",
+                    "mode": "merge",
                     "properties": {"name": f"Person {index} " + "planning context " * 15},
                 }
             ],
@@ -724,7 +782,7 @@ def test_properties_only_preserves_aggregation_rows_and_pagination_metadata(
             {
                 "ref": {"local_ref": f"ada-{index}"},
                 "type": "Person",
-                "facts": [{"type": "Profile", "properties": {"name": "Ada"}}],
+                "facts": [{"type": "Profile", "mode": "merge", "properties": {"name": "Ada"}}],
             }
             for index in range(2)
         ]
@@ -775,7 +833,7 @@ def test_invalid_mutation_response_format_fails_before_controller_invocation(
             {
                 "ref": {"local_ref": "ada"},
                 "type": "Person",
-                "facts": [{"type": "Profile", "properties": {"name": "Ada"}}],
+                "facts": [{"type": "Profile", "mode": "merge", "properties": {"name": "Ada"}}],
             }
         ],
         response_options={"format": "verbose"},
@@ -797,7 +855,7 @@ def test_mcp_properties_only_without_returned_properties_teaches_return_spec(
                 "ref": {"local_ref": "ada"},
                 "type": "Person",
                 "display_name": "Ada",
-                "facts": [{"type": "Profile", "properties": {"name": "Ada"}}],
+                "facts": [{"type": "Profile", "mode": "merge", "properties": {"name": "Ada"}}],
             }
         ]
     )
@@ -838,13 +896,13 @@ def test_mcp_toolset_resolves_anchor_by_fact_through_query_facade(
                 "ref": {"local_ref": "ada"},
                 "type": "Person",
                 "display_name": "Ada",
-                "facts": [{"type": "Profile", "properties": {"name": "Ada"}}],
+                "facts": [{"type": "Profile", "mode": "merge", "properties": {"name": "Ada"}}],
             },
             {
                 "ref": {"local_ref": "grace"},
                 "type": "Person",
                 "display_name": "Grace",
-                "facts": [{"type": "Profile", "properties": {"name": "Grace"}}],
+                "facts": [{"type": "Profile", "mode": "merge", "properties": {"name": "Grace"}}],
             },
         ]
     )
@@ -883,12 +941,12 @@ def test_mcp_toolset_resolve_anchor_by_fact_reports_ambiguous_matches(
             {
                 "ref": {"local_ref": "ada-1"},
                 "type": "Person",
-                "facts": [{"type": "Profile", "properties": {"name": "Ada"}}],
+                "facts": [{"type": "Profile", "mode": "merge", "properties": {"name": "Ada"}}],
             },
             {
                 "ref": {"local_ref": "ada-2"},
                 "type": "Person",
-                "facts": [{"type": "Profile", "properties": {"name": "Ada"}}],
+                "facts": [{"type": "Profile", "mode": "merge", "properties": {"name": "Ada"}}],
             },
         ]
     )
@@ -1106,7 +1164,7 @@ def test_mcp_toolset_system_state_workflows_for_schema_and_populated_states(
                 "ref": {"local_ref": "ada"},
                 "type": "Person",
                 "display_name": "Ada",
-                "facts": [{"type": "Profile", "properties": {"name": "Ada"}}],
+                "facts": [{"type": "Profile", "mode": "merge", "properties": {"name": "Ada"}}],
             }
         ]
     )

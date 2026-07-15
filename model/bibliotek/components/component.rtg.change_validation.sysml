@@ -30,9 +30,20 @@ library package BibliotekRtgChangeValidation {
         doc /* Exactly one of resourceId and localRef identifies the target. localRef is unique within one batch and may be resolved by a controller before apply. */
     }
     enum def RtgIdentityOverrideMode { enum force_create; }
+    enum def RtgDataObjectWriteMode { enum 'merge'; enum 'replace'; }
     attribute def RtgIdentityOverride { attribute mode : RtgIdentityOverrideMode; attribute reason : String; attribute criterionKeys[0..*] : String; }
     attribute def RtgGraphAnchorWrite { attribute 'ref' : RtgChangeReference; attribute type : String; attribute displayName[0..1] : String; attribute system : JsonObject; attribute identityOverride[0..1] : RtgIdentityOverride; }
-    attribute def RtgGraphDataObjectWrite { attribute 'ref' : RtgChangeReference; attribute type : String; attribute properties : JsonObject; attribute system : JsonObject; attribute anchorRefs[1..*] : RtgChangeReference; attribute identityOverride[0..1] : RtgIdentityOverride; }
+    attribute def RtgGraphDataObjectWrite {
+        attribute 'ref' : RtgChangeReference;
+        attribute type : String;
+        attribute mode[0..1] : RtgDataObjectWriteMode;
+        attribute expectedVersion[0..1] : String;
+        attribute properties : JsonObject;
+        attribute system : JsonObject;
+        attribute anchorRefs[1..*] : RtgChangeReference;
+        attribute identityOverride[0..1] : RtgIdentityOverride;
+        doc /* mode remains optional in the transport-neutral input so validation can report an omitted mode. merge preserves unspecified existing properties and forbids expectedVersion. replace denotes a complete property set and requires expectedVersion for an existing target. */
+    }
     attribute def RtgGraphLinkWrite { attribute 'ref' : RtgChangeReference; attribute type : String; attribute sourceRef : RtgChangeReference; attribute targetRef : RtgChangeReference; attribute system : JsonObject; }
     attribute def RtgGraphAssociationChange { attribute anchorRef : RtgChangeReference; attribute dataRef : RtgChangeReference; }
     attribute def RtgGraphLiveStatusChange { attribute objectRef : RtgChangeReference; attribute live : Boolean; }
@@ -120,6 +131,13 @@ library package BibliotekRtgChangeValidation {
         }
     }
 
+    requirement <'contract.rtg.change_validation.data_write_intent'> dataWriteIntentSemantics {
+        subject operation : ValidateRtgChangeBatch;
+        require constraint {
+            doc /* Every data-object write explicitly selects merge or replace. Missing or unsupported modes, merge with an expected version, replace without an existing target, and replace without an expected version are blocking schema/object findings. Projection preserves omitted existing properties for merge and removes them for replace. Validation does not compare expectedVersion with current state; optimistic-concurrency comparison remains controller sequencing authority. */
+        }
+    }
+
     requirement <'contract.rtg.change_validation.track_isolation'> trackIsolation {
         subject operation : ValidateRtgChangeBatch;
         require constraint {
@@ -130,7 +148,7 @@ library package BibliotekRtgChangeValidation {
     requirement <'contract.rtg.change_validation.rule_catalog'> validationRuleCatalog {
         subject validator : RtgChangeValidator;
         require constraint {
-            doc /* Stable blocking codes include schema_object.unknown_type, undeclared_property, property_kind_mismatch, missing_required_property, missing_required_associated_data, link_endpoint_type_invalid, reference_missing, kernel_system_field_write_rejected, event_update_rejected, link_kind_missing, link_kind_invalid, provenance_link_delete_rejected, and merge_candidate.identity_match; constraint_network.pattern_unsatisfied, cardinality_out_of_bounds, constraint_target_unknown, constraint_payload_unevaluable; and migration_cutover.reference_missing, wrong_live_state, invalid_status_transition, post_state_invalid, invalid_time_shape_retrofit. schema_object.delete_blast_radius_by_kind and merge_candidate.identity_force_create_override are informational; migration_cutover.replacement_type_mismatch is warning. Each code retains its declared track and severity. */
+            doc /* Stable blocking codes include schema_object.unknown_type, undeclared_property, property_kind_mismatch, missing_required_property, missing_required_associated_data, link_endpoint_type_invalid, reference_missing, kernel_system_field_write_rejected, event_update_rejected, data_write_mode_missing, data_write_mode_invalid, data_write_mode_conflict, link_kind_missing, link_kind_invalid, provenance_link_delete_rejected, and merge_candidate.identity_match; constraint_network.pattern_unsatisfied, cardinality_out_of_bounds, constraint_target_unknown, constraint_payload_unevaluable; and migration_cutover.reference_missing, wrong_live_state, invalid_status_transition, post_state_invalid, invalid_time_shape_retrofit. schema_object.delete_blast_radius_by_kind and merge_candidate.identity_force_create_override are informational; migration_cutover.replacement_type_mismatch is warning. Each code retains its declared track and severity. */
         }
     }
 
@@ -281,6 +299,7 @@ library package BibliotekRtgChangeValidation {
         satisfy patternEvaluationDelegated by validator;
         satisfy cascadeEffectsFromPreview by validator;
         satisfy projectionSemantics by validator.validateBatch;
+        satisfy dataWriteIntentSemantics by validator.validateBatch;
         satisfy trackIsolation by validator.validateBatch;
 
         satisfy validateRtgChangeBatchFailureSemantics by validator.validateBatch;
@@ -291,6 +310,7 @@ library package BibliotekRtgChangeValidation {
         subject operation : ValidateRtgChangeBatch;
         objective {
             verify projectionSemantics;
+            verify dataWriteIntentSemantics;
             verify trackIsolation;
 
             verify validateRtgChangeBatchFailureSemantics;

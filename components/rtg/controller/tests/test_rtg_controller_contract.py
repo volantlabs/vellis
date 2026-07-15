@@ -41,6 +41,7 @@ from components.rtg.controller import (
     RtgControllerRestoreOptions,
     RtgControllerSnapshotFailed,
     RtgControllerValidationFailed,
+    RtgControllerWriteConflict,
 )
 from components.rtg.graph import InMemoryRtgGraph, RtgAnchor, RtgDataObject
 from components.rtg.migration import (
@@ -269,8 +270,16 @@ class InjectedSchemaEvolutionCutoverOptions:
         self.schema_evolution_ops = schema_evolution_ops
 
 
-def build_schema() -> InMemoryRtgSchema:
+def build_schema(*, include_title: bool = False) -> InMemoryRtgSchema:
     schema = InMemoryRtgSchema.empty()
+    profile_properties = {
+        "name": RtgSchemaField(required=True, value_kinds=("string",)),
+    }
+    if include_title:
+        profile_properties["title"] = RtgSchemaField(
+            required=False,
+            value_kinds=("string",),
+        )
     schema.put_definition(
         RtgSchemaDefinition(
             uuid=uuid4(),
@@ -287,9 +296,7 @@ def build_schema() -> InMemoryRtgSchema:
             kind="data_object",
             type_key="Profile",
             description="Profile.",
-            payload=RtgDataObjectSchemaPayload(
-                properties={"name": RtgSchemaField(required=True, value_kinds=("string",))}
-            ),
+            payload=RtgDataObjectSchemaPayload(properties=profile_properties),
             time_shape="state_now",
         )
     )
@@ -342,6 +349,22 @@ def build_controller_with_sql(
     )
 
 
+def build_merge_replace_controller_with_sql(
+    tmp_path: Path,
+    sql_storage: object,
+) -> InProcessRtgController:
+    return InProcessRtgController.open(
+        InMemoryRtgGraph.empty(),
+        build_schema(include_title=True),
+        InMemoryRtgConstraints.empty(),
+        InMemoryRtgMigration.empty(),
+        DeterministicRtgChangeValidator(),
+        SimpleRtgQueryEngine(),
+        LocalJsonFileStorage.open(tmp_path / "json"),
+        sql_storage,
+    )
+
+
 def build_identity_controller_with_sql(
     tmp_path: Path,
     sql_storage: object,
@@ -375,12 +398,48 @@ def build_controller_with_graph_and_validator(
     )
 
 
+def create_profile(
+    controller: InProcessRtgController,
+    *,
+    person_uuid: UUID | None = None,
+    profile_uuid: UUID | None = None,
+) -> tuple[UUID, UUID]:
+    person_uuid = person_uuid or uuid4()
+    profile_uuid = profile_uuid or uuid4()
+    controller.apply_live_graph_changes(
+        RtgGraphChangeSet(
+            anchor_writes=(
+                RtgGraphAnchorWrite(
+                    ref=RtgChangeReference(resource_id=person_uuid),
+                    type="Person",
+                    display_name="Ada",
+                ),
+            ),
+            data_object_writes=(
+                RtgGraphDataObjectWrite(
+                    ref=RtgChangeReference(resource_id=profile_uuid),
+                    type="Profile",
+                    mode="merge",
+                    properties={"name": "Ada", "title": "Countess"},
+                    anchor_refs=(RtgChangeReference(resource_id=person_uuid),),
+                ),
+            ),
+        )
+    )
+    return person_uuid, profile_uuid
+
+
 MODEL_EVIDENCE = {
     "ApplyLiveGraphChangesContractVerification": (
         "test_replay_can_resume_from_a_structurally_valid_skip_mode_snapshot",
         "test_controller_writes_wait_while_replay_owns_system_state",
         "test_live_graph_lane_resolves_local_refs_validates_applies_and_ledgers",
         "test_live_graph_lane_rejects_invalid_batch_without_mutating",
+        "test_live_graph_lane_rejects_missing_data_write_mode_without_mutating",
+        "test_data_object_reads_issue_stable_tokens_and_merge_replace_are_explicit",
+        "test_stale_replace_returns_winning_state_and_ledgers_conflict",
+        "test_interleaved_replace_writers_cannot_both_succeed",
+        "test_version_tokens_protect_replace_when_ledger_persistence_is_degraded",
         "test_controller_cutover_flips_schema_live_status_and_prunes",
         "test_cutover_rejects_schema_candidate_that_invalidates_live_graph_data",
         "test_controller_maps_cutover_precondition_failures",
@@ -810,6 +869,7 @@ def test_controller_writes_wait_while_replay_owns_system_state(tmp_path: Path) -
                     RtgGraphDataObjectWrite(
                         ref=RtgChangeReference(local_ref="profile"),
                         type="Profile",
+                        mode="merge",
                         properties={"name": "Ada"},
                         anchor_refs=(RtgChangeReference(local_ref="person"),),
                     ),
@@ -843,6 +903,7 @@ def test_live_graph_lane_resolves_local_refs_validates_applies_and_ledgers(
                 RtgGraphDataObjectWrite(
                     ref=RtgChangeReference(local_ref="profile"),
                     type="Profile",
+                    mode="merge",
                     properties={"name": "Ada"},
                     anchor_refs=(RtgChangeReference(local_ref="person"),),
                 ),
@@ -855,7 +916,7 @@ def test_live_graph_lane_resolves_local_refs_validates_applies_and_ledgers(
         RtgQuerySpec(anchor_buckets=(RtgQueryAnchorBucket("person", ("Person",)),))
     )
     anchor_uuid = query_result.bindings[0].anchors["person"]
-    applied_anchor = controller.get_object(anchor_uuid)
+    applied_anchor = controller.get_object(anchor_uuid).object
     assert isinstance(applied_anchor, RtgAnchor)
     created_at = applied_anchor.system["created_at"]
     updated_at = applied_anchor.system["updated_at"]
@@ -901,6 +962,7 @@ def test_validate_live_graph_changes_resolves_without_mutation_or_ledger(
                 RtgGraphDataObjectWrite(
                     ref=RtgChangeReference(local_ref="profile"),
                     type="Profile",
+                    mode="merge",
                     properties={"name": "Ada"},
                     anchor_refs=(RtgChangeReference(local_ref="person"),),
                 ),
@@ -970,6 +1032,7 @@ def test_live_graph_lane_rejects_invalid_batch_without_mutating(tmp_path: Path) 
                 RtgGraphDataObjectWrite(
                     ref=RtgChangeReference(local_ref="profile"),
                     type="Profile",
+                    mode="merge",
                     properties={"extra": "invalid"},
                     anchor_refs=(RtgChangeReference(local_ref="person"),),
                 ),
@@ -1003,6 +1066,233 @@ def test_live_graph_lane_rejects_invalid_batch_without_mutating(tmp_path: Path) 
         ("apply_live_graph_changes", "request"),
         ("apply_live_graph_changes", "error"),
     ]
+
+
+def test_live_graph_lane_rejects_missing_data_write_mode_without_mutating(
+    tmp_path: Path,
+) -> None:
+    controller = build_controller(tmp_path)
+    person_uuid = uuid4()
+    profile_uuid = uuid4()
+
+    with pytest.raises(RtgControllerValidationFailed) as error:
+        controller.apply_live_graph_changes(
+            RtgGraphChangeSet(
+                anchor_writes=(
+                    RtgGraphAnchorWrite(
+                        ref=RtgChangeReference(resource_id=person_uuid),
+                        type="Person",
+                    ),
+                ),
+                data_object_writes=(
+                    RtgGraphDataObjectWrite(
+                        ref=RtgChangeReference(resource_id=profile_uuid),
+                        type="Profile",
+                        properties={"name": "Ada"},
+                        anchor_refs=(RtgChangeReference(resource_id=person_uuid),),
+                    ),
+                ),
+            )
+        )
+
+    assert error.value.validation_report is not None
+    assert "schema_object.data_write_mode_missing" in {
+        finding.code for finding in error.value.validation_report.findings
+    }
+    assert controller.export_system_snapshot().graph.data_objects == ()
+
+
+def test_data_object_reads_issue_stable_tokens_and_merge_replace_are_explicit(
+    tmp_path: Path,
+) -> None:
+    controller = build_merge_replace_controller_with_sql(
+        tmp_path,
+        SqliteStorage.open(tmp_path / "ledger.sqlite"),
+    )
+    person_uuid, profile_uuid = create_profile(controller)
+    initial = controller.get_object(profile_uuid)
+
+    assert isinstance(initial.object, RtgDataObject)
+    assert initial.object.properties == {"name": "Ada", "title": "Countess"}
+    assert initial.direct_anchor_refs == (person_uuid,)
+    assert initial.version_token is not None
+    assert initial.observed_ledger_position is not None
+
+    controller.apply_live_graph_changes(
+        RtgGraphChangeSet(
+            anchor_writes=(
+                RtgGraphAnchorWrite(
+                    ref=RtgChangeReference(resource_id=person_uuid),
+                    type="Person",
+                    display_name="Ada Lovelace",
+                ),
+            )
+        )
+    )
+    after_unrelated_anchor_write = controller.get_object(profile_uuid)
+    assert after_unrelated_anchor_write.version_token == initial.version_token
+    assert after_unrelated_anchor_write.observed_ledger_position is not None
+    assert after_unrelated_anchor_write.observed_ledger_position > initial.observed_ledger_position
+
+    controller.apply_live_graph_changes(
+        RtgGraphChangeSet(
+            data_object_writes=(
+                RtgGraphDataObjectWrite(
+                    ref=RtgChangeReference(resource_id=profile_uuid),
+                    type="Profile",
+                    mode="merge",
+                    properties={"title": "Mathematician"},
+                    anchor_refs=(RtgChangeReference(resource_id=person_uuid),),
+                ),
+            )
+        )
+    )
+    merged = controller.get_object(profile_uuid)
+    assert isinstance(merged.object, RtgDataObject)
+    assert merged.object.properties == {"name": "Ada", "title": "Mathematician"}
+    assert merged.version_token != initial.version_token
+    assert merged.version_token is not None
+
+    controller.apply_live_graph_changes(
+        RtgGraphChangeSet(
+            data_object_writes=(
+                RtgGraphDataObjectWrite(
+                    ref=RtgChangeReference(resource_id=profile_uuid),
+                    type="Profile",
+                    mode="replace",
+                    expected_version=merged.version_token,
+                    properties={"name": "Ada Lovelace"},
+                    anchor_refs=(RtgChangeReference(resource_id=person_uuid),),
+                ),
+            )
+        )
+    )
+    replaced = controller.get_object(profile_uuid)
+    assert isinstance(replaced.object, RtgDataObject)
+    assert replaced.object.properties == {"name": "Ada Lovelace"}
+
+
+def test_stale_replace_returns_winning_state_and_ledgers_conflict(tmp_path: Path) -> None:
+    ledger_path = tmp_path / "ledger.sqlite"
+    controller = build_merge_replace_controller_with_sql(
+        tmp_path,
+        SqliteStorage.open(ledger_path),
+    )
+    person_uuid, profile_uuid = create_profile(controller)
+    starting = controller.get_object(profile_uuid)
+    assert starting.version_token is not None
+
+    controller.apply_live_graph_changes(
+        RtgGraphChangeSet(
+            data_object_writes=(
+                RtgGraphDataObjectWrite(
+                    ref=RtgChangeReference(resource_id=profile_uuid),
+                    type="Profile",
+                    mode="replace",
+                    expected_version=starting.version_token,
+                    properties={"name": "Grace", "title": "Rear Admiral"},
+                    anchor_refs=(RtgChangeReference(resource_id=person_uuid),),
+                ),
+            )
+        )
+    )
+    winning = controller.get_object(profile_uuid)
+    baseline = controller.export_system_snapshot()
+
+    with pytest.raises(RtgControllerWriteConflict) as error:
+        controller.apply_live_graph_changes(
+            RtgGraphChangeSet(
+                data_object_writes=(
+                    RtgGraphDataObjectWrite(
+                        ref=RtgChangeReference(resource_id=profile_uuid),
+                        type="Profile",
+                        mode="replace",
+                        expected_version=starting.version_token,
+                        properties={"name": "Katherine"},
+                        anchor_refs=(RtgChangeReference(resource_id=person_uuid),),
+                    ),
+                )
+            )
+        )
+
+    conflict = error.value.conflicts[0]
+    assert conflict.object_uuid == profile_uuid
+    assert conflict.current_version == winning.version_token
+    assert conflict.current_object == winning.object
+    assert conflict.current_direct_anchor_refs == (person_uuid,)
+    assert controller.export_system_snapshot().graph == baseline.graph
+    error_payload = latest_ledger_payload(ledger_path, "apply_live_graph_changes", "error")
+    assert error_payload["status"] == "write_conflict"
+
+
+def test_interleaved_replace_writers_cannot_both_succeed(tmp_path: Path) -> None:
+    controller = build_merge_replace_controller_with_sql(
+        tmp_path,
+        SqliteStorage.open(tmp_path / "ledger.sqlite"),
+    )
+    person_uuid, profile_uuid = create_profile(controller)
+    starting = controller.get_object(profile_uuid)
+    assert starting.version_token is not None
+
+    def replace_name(name: str) -> str:
+        try:
+            controller.apply_live_graph_changes(
+                RtgGraphChangeSet(
+                    data_object_writes=(
+                        RtgGraphDataObjectWrite(
+                            ref=RtgChangeReference(resource_id=profile_uuid),
+                            type="Profile",
+                            mode="replace",
+                            expected_version=starting.version_token,
+                            properties={"name": name},
+                            anchor_refs=(RtgChangeReference(resource_id=person_uuid),),
+                        ),
+                    )
+                )
+            )
+        except RtgControllerWriteConflict:
+            return "conflict"
+        return "applied"
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        outcomes = tuple(executor.map(replace_name, ("Grace", "Katherine")))
+
+    assert sorted(outcomes) == ["applied", "conflict"]
+
+
+def test_version_tokens_protect_replace_when_ledger_persistence_is_degraded(
+    tmp_path: Path,
+) -> None:
+    controller = build_merge_replace_controller_with_sql(
+        tmp_path,
+        FlakyLedgerSqlStorage(SqliteStorage.open(tmp_path / "ledger.sqlite")),
+    )
+    person_uuid, profile_uuid = create_profile(controller)
+    current = controller.get_object(profile_uuid)
+    assert current.version_token is not None
+    assert current.observed_ledger_position is None
+
+    result = controller.apply_live_graph_changes(
+        RtgGraphChangeSet(
+            data_object_writes=(
+                RtgGraphDataObjectWrite(
+                    ref=RtgChangeReference(resource_id=profile_uuid),
+                    type="Profile",
+                    mode="replace",
+                    expected_version=current.version_token,
+                    properties={"name": "Grace"},
+                    anchor_refs=(RtgChangeReference(resource_id=person_uuid),),
+                ),
+            )
+        )
+    )
+
+    assert result.status == "applied"
+    assert result.details["audit_degraded"] is True
+    replaced = controller.get_object(profile_uuid)
+    assert isinstance(replaced.object, RtgDataObject)
+    assert replaced.object.properties == {"name": "Grace"}
+    assert replaced.version_token != current.version_token
 
 
 def test_strict_live_graph_apply_blocks_identity_merge_candidate_before_mutation(
@@ -1240,6 +1530,7 @@ def test_cutover_rejects_schema_candidate_that_invalidates_live_graph_data(
                 RtgGraphDataObjectWrite(
                     ref=RtgChangeReference(local_ref="profile"),
                     type="Profile",
+                    mode="merge",
                     properties={"name": "Ada"},
                     anchor_refs=(RtgChangeReference(local_ref="person"),),
                 ),
@@ -1489,6 +1780,7 @@ def test_knowledge_staging_accepts_non_live_graph_candidate_when_migration_scope
                     RtgGraphDataObjectWrite(
                         ref=RtgChangeReference(resource_id=profile_uuid),
                         type="Profile",
+                        mode="merge",
                         properties={"name": "Grace"},
                         system={"live": False},
                         anchor_refs=(RtgChangeReference(resource_id=person_uuid),),
@@ -1573,6 +1865,7 @@ def test_strict_knowledge_staging_rejects_invalid_cutover_projection(
                         RtgGraphDataObjectWrite(
                             ref=RtgChangeReference(resource_id=profile_uuid),
                             type="Profile",
+                            mode="merge",
                             properties={"age": "not an integer"},
                             system={"live": False},
                             anchor_refs=(RtgChangeReference(resource_id=person_uuid),),
@@ -1621,6 +1914,7 @@ def test_ledger_failures_are_queued_and_flushed(tmp_path: Path) -> None:
                 RtgGraphDataObjectWrite(
                     ref=RtgChangeReference(local_ref="profile"),
                     type="Profile",
+                    mode="merge",
                     properties={"name": "Ada"},
                     anchor_refs=(RtgChangeReference(local_ref="person"),),
                 ),
@@ -1652,6 +1946,7 @@ def test_ledger_failure_degrades_result_and_flush_loads_json_queue(tmp_path: Pat
                 RtgGraphDataObjectWrite(
                     ref=RtgChangeReference(local_ref="profile"),
                     type="Profile",
+                    mode="merge",
                     properties={"name": "Ada"},
                     anchor_refs=(RtgChangeReference(local_ref="person"),),
                 ),
@@ -1690,6 +1985,7 @@ def test_replay_accepts_persisted_start_snapshot_path(tmp_path: Path) -> None:
                 RtgGraphDataObjectWrite(
                     ref=RtgChangeReference(local_ref="ada-profile"),
                     type="Profile",
+                    mode="merge",
                     properties={"name": "Ada"},
                     anchor_refs=(RtgChangeReference(local_ref="ada"),),
                 ),
@@ -1747,6 +2043,7 @@ def test_verify_replay_from_ledger_uses_scratch_state_and_preserves_current_stat
                 RtgGraphDataObjectWrite(
                     ref=RtgChangeReference(local_ref="ada-profile"),
                     type="Profile",
+                    mode="merge",
                     properties={"name": "Ada"},
                     anchor_refs=(RtgChangeReference(local_ref="ada"),),
                 ),
@@ -1801,6 +2098,7 @@ def test_replay_verification_restores_invalid_current_instances_exactly(tmp_path
                 RtgGraphDataObjectWrite(
                     ref=RtgChangeReference(local_ref="ada-profile"),
                     type="Profile",
+                    mode="merge",
                     properties={"name": "Ada"},
                     anchor_refs=(RtgChangeReference(local_ref="ada"),),
                 ),
@@ -1979,6 +2277,7 @@ def test_schema_evolution_rename_property_rewrites_live_data_and_replays(
                 RtgGraphDataObjectWrite(
                     ref=RtgChangeReference(local_ref="ada-profile"),
                     type="Profile",
+                    mode="merge",
                     properties={"name": "Ada"},
                     anchor_refs=(RtgChangeReference(local_ref="ada"),),
                 ),
@@ -2041,7 +2340,7 @@ def test_schema_evolution_rename_property_rewrites_live_data_and_replays(
     )
 
     result = controller.apply_migration_cutover("profile-rename")
-    profile = controller.get_object(profile_uuid)
+    profile = controller.get_object(profile_uuid).object
     response_payload = latest_ledger_payload(
         ledger_path,
         "apply_migration_cutover",
@@ -2063,7 +2362,7 @@ def test_schema_evolution_rename_property_rewrites_live_data_and_replays(
 
     replay_controller = build_controller_with_sql(tmp_path, SqliteStorage.open(ledger_path))
     replay = replay_controller.replay_ledger(RtgControllerReplayOptions(start_snapshot=baseline))
-    replayed_profile = replay_controller.get_object(profile_uuid)
+    replayed_profile = replay_controller.get_object(profile_uuid).object
 
     assert replay.details["mutating_requests_replayed"] == 3
     assert isinstance(replayed_profile, RtgDataObject)
@@ -2082,6 +2381,7 @@ def test_schema_evolution_delete_property_strips_live_data_with_ledger_evidence(
                 RtgGraphDataObjectWrite(
                     ref=RtgChangeReference(local_ref="ada-profile"),
                     type="Profile",
+                    mode="merge",
                     properties={"name": "Ada"},
                     anchor_refs=(RtgChangeReference(local_ref="ada"),),
                 ),
@@ -2141,7 +2441,7 @@ def test_schema_evolution_delete_property_strips_live_data_with_ledger_evidence(
     )
 
     result = controller.apply_migration_cutover("profile-delete-name")
-    profile = controller.get_object(profile_uuid)
+    profile = controller.get_object(profile_uuid).object
     response_payload = latest_ledger_payload(
         ledger_path,
         "apply_migration_cutover",
@@ -2304,6 +2604,7 @@ def test_failed_strict_cutover_status_is_replayable(tmp_path: Path) -> None:
                 RtgGraphDataObjectWrite(
                     ref=RtgChangeReference(local_ref="ada-profile"),
                     type="Profile",
+                    mode="merge",
                     properties={"name": "Ada"},
                     anchor_refs=(RtgChangeReference(local_ref="ada"),),
                 ),
@@ -2403,6 +2704,7 @@ def test_replay_equivalence_detects_equal_counts_with_different_fact_values(
                     RtgChangeReference(local_ref="profile"),
                     "Profile",
                     {"name": "Ada"},
+                    mode="merge",
                     anchor_refs=(RtgChangeReference(local_ref="person"),),
                 ),
             ),
@@ -2416,6 +2718,7 @@ def test_replay_equivalence_detects_equal_counts_with_different_fact_values(
                     RtgChangeReference(resource_id=profile_id),
                     "Profile",
                     {"name": "Grace"},
+                    mode="merge",
                     anchor_refs=(RtgChangeReference(resource_id=first.generated_ids["person"]),),
                 ),
             )
@@ -2447,6 +2750,7 @@ def test_rejected_staging_is_projected_from_existing_ledger_error(
                 RtgGraphDataObjectWrite(
                     ref=RtgChangeReference(local_ref="ada-profile"),
                     type="Profile",
+                    mode="merge",
                     properties={"name": "Ada"},
                     anchor_refs=(RtgChangeReference(local_ref="ada"),),
                 ),
@@ -2551,6 +2855,7 @@ def test_migration_history_is_reconstructed_from_ledger(
                 RtgGraphDataObjectWrite(
                     ref=RtgChangeReference(local_ref="ada-profile"),
                     type="Profile",
+                    mode="merge",
                     properties={"name": "Ada"},
                     anchor_refs=(RtgChangeReference(local_ref="ada"),),
                 ),
@@ -2651,6 +2956,7 @@ def test_restore_request_response_are_ledgered_and_replayed(tmp_path: Path) -> N
                 RtgGraphDataObjectWrite(
                     ref=RtgChangeReference(local_ref="ada-profile"),
                     type="Profile",
+                    mode="merge",
                     properties={"name": "Ada"},
                     anchor_refs=(RtgChangeReference(local_ref="ada"),),
                 ),
@@ -2665,6 +2971,7 @@ def test_restore_request_response_are_ledgered_and_replayed(tmp_path: Path) -> N
                 RtgGraphDataObjectWrite(
                     ref=RtgChangeReference(local_ref="grace-profile"),
                     type="Profile",
+                    mode="merge",
                     properties={"name": "Grace"},
                     anchor_refs=(RtgChangeReference(local_ref="grace"),),
                 ),
@@ -2743,6 +3050,7 @@ def test_normal_apply_failure_rolls_back_touched_graph_records(tmp_path: Path) -
                     RtgGraphDataObjectWrite(
                         ref=RtgChangeReference(local_ref="profile"),
                         type="Profile",
+                        mode="merge",
                         properties={"name": "Ada"},
                         anchor_refs=(RtgChangeReference(local_ref="person"),),
                     ),

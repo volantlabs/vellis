@@ -104,26 +104,26 @@ package VellisOperations {
     action def <'operation.vellis.rtg_validate_live_anchor_records'> RtgValidateLiveAnchorRecords {
         in anchor_records : VellisAnchorRecordList[1]; in link_writes : RtgGraphLinkWriteList[0..1];
         in validation_options : RtgControllerValidationOptions[0..1]; out result : VellisAnchorValidationResult[1];
-        doc /* Compile each anchor and nested fact into canonical writes, generate deterministic request-local fact references where omitted, pass through canonical link writes, and return compiled changes plus validation without mutation or ledger writes. */
+        doc /* Compile each anchor and nested fact into canonical writes, requiring every fact to declare merge or replace intent and any replace version token; generate deterministic request-local fact references where omitted, pass through canonical link writes, and return compiled changes plus validation without mutation or ledger writes. */
         @FailureContract { errorIds = ("VellisRequestInvalid", "RtgControllerPreconditionFailed", "RtgValidationInputInvalid"); }
     }
     action def <'operation.vellis.rtg_apply_live_anchor_records'> RtgApplyLiveAnchorRecords {
         in anchor_records : VellisAnchorRecordList[1]; in link_writes : RtgGraphLinkWriteList[0..1];
         in validation_mode : RtgControllerValidationMode[0..1] default = RtgControllerValidationMode::strict; in response_options : VellisMutationResponseOptions[0..1]; out result : VellisAnchorApplyResult[1];
-        doc /* Compile anchor-with-facts input identically to validation and apply it once through the controller. Compact is the default and returns all generated local-reference UUIDs plus generated fact references while omitting submittedGraphChanges; full adds exactly the submitted graph changes without changing the operation. */
-        @FailureContract { errorIds = ("VellisRequestInvalid", "RtgControllerValidationFailed", "RtgControllerApplyFailed"); }
+        doc /* Compile anchor-with-facts input identically to validation, preserving explicit merge or replace intent and replace tokens, and apply it once through the controller. Compact is the default and returns all generated local-reference UUIDs plus generated fact references while omitting submittedGraphChanges; full adds exactly the submitted graph changes without changing the operation. */
+        @FailureContract { errorIds = ("VellisRequestInvalid", "RtgControllerValidationFailed", "RtgControllerWriteConflict", "RtgControllerApplyFailed"); }
     }
     action def <'operation.vellis.rtg_validate_live_graph_changes'> RtgValidateLiveGraphChanges {
         in graph_changes : RtgGraphChangeSet[1]; in validation_options : RtgControllerValidationOptions[0..1];
         out result : RtgControllerLiveGraphValidationResult[1];
-        doc /* Validate normal live graph CRUD without mutation or ledger writes. */
+        doc /* Validate normal live graph CRUD, including explicit merge/replace shape and projected property semantics, without comparing version tokens, mutation, or ledger writes. */
         @FailureContract { errorIds = ("VellisRequestInvalid", "RtgControllerPreconditionFailed", "RtgValidationInputInvalid"); }
     }
     action def <'operation.vellis.rtg_apply_live_graph_changes'> RtgApplyLiveGraphChanges {
         in graph_changes : RtgGraphChangeSet[1]; in validation_mode : RtgControllerValidationMode[0..1] default = RtgControllerValidationMode::strict;
         out result : RtgControllerOperationResult[1];
-        doc /* Apply normal live graph CRUD through strict controller policy by default. */
-        @FailureContract { errorIds = ("VellisRequestInvalid", "RtgControllerValidationFailed", "RtgControllerApplyFailed"); }
+        doc /* Apply normal live graph CRUD through strict controller policy by default. Data-object writes require explicit merge or replace intent; replace requires the current token returned by rtg_get_object and returns winning state on conflict. */
+        @FailureContract { errorIds = ("VellisRequestInvalid", "RtgControllerValidationFailed", "RtgControllerWriteConflict", "RtgControllerApplyFailed"); }
     }
     action def <'operation.vellis.rtg_stage_knowledge_changes'> RtgStageKnowledgeChanges {
         in knowledge_changes : RtgChangeBatch[1]; in validation_mode : RtgControllerValidationMode[0..1] default = RtgControllerValidationMode::strict;
@@ -154,7 +154,7 @@ package VellisOperations {
         doc /* Build one live-only anchor-plus-associated-data equality query, return resolved status, deterministic matches with resource IDs and selected properties, the submitted query/options, query diagnostics, and guidance that distinguishes zero, one, and multiple matches. */
         @FailureContract { errorIds = ("VellisRequestInvalid", "RtgQuerySpecInvalid", "RtgQueryUnsupported"); }
     }
-    action def <'operation.vellis.rtg_get_object'> RtgGetObject { in object_uuid : String[1]; out result : RtgObject[1]; doc /* Return one graph object by UUID without lifecycle filtering or mutation. */ @FailureContract { errorIds = ("VellisRequestInvalid", "RtgControllerObjectNotFound"); } }
+    action def <'operation.vellis.rtg_get_object'> RtgGetObject { in object_uuid : String[1]; out result : RtgControllerObjectRead[1]; doc /* Return one graph object by UUID without lifecycle filtering or mutation, including data-object version and direct-association context. */ @FailureContract { errorIds = ("VellisRequestInvalid", "RtgControllerObjectNotFound"); } }
     action def <'operation.vellis.rtg_list_migrations'> RtgListMigrations { in status : RtgMigrationStatus[0..1]; out result : RtgMigrationRecordList[1]; doc /* Return every current migration, or one status, in deterministic migration-ID order. */ @FailureContract { errorIds = ("VellisRequestInvalid", "RtgMigrationStatusInvalid"); } }
     action def <'operation.vellis.rtg_get_migration'> RtgGetMigration { in migration_id : String[1]; out result : RtgMigrationRecord[1]; doc /* Return one current migration record by stable migration ID. */ @FailureContract { errorIds = ("VellisRequestInvalid", "RtgMigrationNotFound"); } }
     action def <'operation.vellis.rtg_validate_graph'> RtgValidateGraph {
@@ -414,7 +414,7 @@ package VellisOperations {
         perform action rtgGetObject[0..*] : RtgGetObject {
             action invokeController : ControllerGetObject {
                 in objectUuid redefines ControllerGetObject::objectUuid = rtgGetObject.object_uuid;
-                out object redefines ControllerGetObject::object = rtgGetObject.result;
+                out result redefines ControllerGetObject::result = rtgGetObject.result;
             }
         }
         perform action rtgListMigrations[0..*] : RtgListMigrations {

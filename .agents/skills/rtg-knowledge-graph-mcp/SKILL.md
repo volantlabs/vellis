@@ -93,6 +93,7 @@ For repeated anchor plus facts ingestion, prefer the compact anchor-record facad
       "facts": [
         {
           "type": "ItemFacts",
+          "mode": "merge",
           "properties": {
             "title": "Item alpha",
             "category": "example",
@@ -129,6 +130,7 @@ After the Item schema example below has been cut over, this minimal live write s
       {
         "ref": {"local_ref": "item-alpha-facts"},
         "type": "ItemFacts",
+        "mode": "merge",
         "properties": {
           "title": "Item alpha",
           "category": "example",
@@ -146,6 +148,8 @@ After the Item schema example below has been cut over, this minimal live write s
 Do not send schema, constraint, migration, or non-live candidate work to `rtg_apply_live_graph_changes`.
 
 For dry-runs, use the same `graph_changes` payload with `rtg_validate_live_graph_changes`. It resolves `local_ref` values, returns `generated_ids` and `resolved_graph_changes`, and leaves the live graph and ledger unchanged.
+
+Every data-object write must declare `mode`. Use `merge` for new objects and partial updates; omitted properties remain unchanged and `expected_version` must be absent. Use `replace` only for an existing data object after calling `rtg_get_object`: copy its `result.version_token` into `expected_version`, and treat the supplied properties as complete because omitted properties are deleted. A stale replace returns `RtgControllerWriteConflict` with the winning current object, direct anchor references, and current version token; review that state before retrying.
 
 For link writes, both endpoint anchors must exist or be written in the same request, and a live link schema must allow the source and target anchor types:
 

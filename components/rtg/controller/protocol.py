@@ -12,6 +12,7 @@ from components.rtg.change_validation.protocol import (
 from components.rtg.constraints.protocol import RtgConstraintSnapshot
 from components.rtg.graph.protocol import (
     JsonObject,
+    RtgDataObject,
     RtgGraphSnapshot,
     RtgObject,
     RtgTypeCountList,
@@ -221,6 +222,23 @@ class RtgPersistedSnapshotDocument:
 
 
 @dataclass(frozen=True, slots=True)
+class RtgControllerObjectRead:
+    object: RtgObject
+    direct_anchor_refs: tuple[UUID, ...] = ()
+    version_token: str | None = None
+    observed_ledger_position: int | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class RtgControllerWriteConflictDetail:
+    object_uuid: UUID
+    expected_version: str
+    current_version: str
+    current_object: RtgDataObject
+    current_direct_anchor_refs: tuple[UUID, ...]
+
+
+@dataclass(frozen=True, slots=True)
 class RtgControllerAppliedChanges:
     graph_writes: int = 0
     schema_writes: int = 0
@@ -274,6 +292,22 @@ class RtgControllerValidationFailed(RtgControllerError):
 
 class RtgControllerPreconditionFailed(RtgControllerError):
     """A controller-owned precondition failed."""
+
+
+class RtgControllerWriteConflict(RtgControllerError):
+    """One or more replace-mode writes supplied stale version tokens."""
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        transaction_id: UUID,
+        conflicts: tuple[RtgControllerWriteConflictDetail, ...],
+        diagnostic: JsonObject | None = None,
+    ) -> None:
+        super().__init__(message, diagnostic=diagnostic)
+        self.transaction_id = transaction_id
+        self.conflicts = conflicts
 
 
 class RtgControllerApplyFailed(RtgControllerError):
@@ -352,8 +386,8 @@ class RtgController(Protocol):
         """Execute a query through the controller."""
         ...
 
-    def get_object(self, object_uuid: UUID | str) -> RtgObject:
-        """Read a graph object by UUID."""
+    def get_object(self, object_uuid: UUID | str) -> RtgControllerObjectRead:
+        """Read a graph object with controller version context."""
         ...
 
     def list_migrations(self, status: str | None = None) -> RtgMigrationRecordList:

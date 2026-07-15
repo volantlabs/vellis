@@ -42,16 +42,16 @@
     "Bibliotek": {
       "element_counts": {
         "ActionDefinition": 141,
-        "AttributeDefinition": 291,
+        "AttributeDefinition": 294,
         "CalculationDefinition": 6,
         "ConstraintDefinition": 1,
         "Documentation": 16,
-        "EnumerationDefinition": 58,
+        "EnumerationDefinition": 59,
         "ItemDefinition": 19,
         "LibraryPackage": 1,
         "PartDefinition": 26,
         "PartUsage": 20,
-        "RequirementUsage": 462,
+        "RequirementUsage": 465,
         "VerificationCaseDefinition": 160
       },
       "named_elements": [
@@ -989,6 +989,10 @@
         },
         {
           "kind": "AttributeDefinition",
+          "name": "RtgControllerObjectRead"
+        },
+        {
+          "kind": "AttributeDefinition",
           "name": "RtgControllerOperationResult"
         },
         {
@@ -1038,6 +1042,14 @@
         {
           "kind": "AttributeDefinition",
           "name": "RtgControllerValidationOptions"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "RtgControllerWriteConflict"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "RtgControllerWriteConflictDetail"
         },
         {
           "kind": "AttributeDefinition",
@@ -1885,6 +1897,10 @@
         },
         {
           "kind": "EnumerationDefinition",
+          "name": "RtgDataObjectWriteMode"
+        },
+        {
+          "kind": "EnumerationDefinition",
           "name": "RtgEntailmentStatus"
         },
         {
@@ -2632,6 +2648,16 @@
           "kind": "RequirementUsage",
           "name": "cutoverUsesMigrationMembership",
           "short_name": "invariant.rtg.controller.cutover_uses_migration_membership"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "dataObjectWriteSemantics",
+          "short_name": "contract.rtg.controller.data_object_write_semantics"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "dataWriteIntentSemantics",
+          "short_name": "contract.rtg.change_validation.data_write_intent"
         },
         {
           "kind": "RequirementUsage",
@@ -3712,6 +3738,11 @@
           "kind": "RequirementUsage",
           "name": "operationResultSemantics",
           "short_name": "contract.rtg.controller.operation_results"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "optimisticConcurrencySemantics",
+          "short_name": "contract.rtg.controller.optimistic_concurrency"
         },
         {
           "kind": "RequirementUsage",
@@ -6488,28 +6519,28 @@
         "ActionDefinition": 2,
         "ActionUsage": 4,
         "AttributeDefinition": 23,
-        "AttributeUsage": 125,
-        "ConstraintUsage": 22,
+        "AttributeUsage": 127,
+        "ConstraintUsage": 23,
         "Dependency": 25,
-        "Documentation": 51,
-        "EnumerationDefinition": 4,
-        "EnumerationUsage": 20,
-        "Feature": 29,
-        "FeatureReferenceExpression": 24,
+        "Documentation": 53,
+        "EnumerationDefinition": 5,
+        "EnumerationUsage": 22,
+        "Feature": 31,
+        "FeatureReferenceExpression": 25,
         "ItemUsage": 6,
         "LibraryPackage": 1,
         "LiteralInfinity": 27,
-        "LiteralInteger": 63,
+        "LiteralInteger": 67,
         "LiteralString": 9,
         "MetadataUsage": 10,
         "Multiplicity": 50,
-        "MultiplicityRange": 46,
+        "MultiplicityRange": 48,
         "PartDefinition": 1,
         "PartUsage": 2,
         "PerformActionUsage": 34,
-        "ReferenceUsage": 127,
-        "RequirementUsage": 47,
-        "SatisfyRequirementUsage": 22,
+        "ReferenceUsage": 130,
+        "RequirementUsage": 49,
+        "SatisfyRequirementUsage": 23,
         "SuccessionAsUsage": 3,
         "VerificationCaseDefinition": 3
       },
@@ -6616,6 +6647,10 @@
         },
         {
           "kind": "EnumerationDefinition",
+          "name": "RtgDataObjectWriteMode"
+        },
+        {
+          "kind": "EnumerationDefinition",
           "name": "RtgIdentityOverrideMode"
         },
         {
@@ -6670,6 +6705,15 @@
         {
           "kind": "RequirementUsage",
           "name": "constraintSchemaCompatibility"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "dataWriteIntentSemantics",
+          "short_name": "contract.rtg.change_validation.data_write_intent"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "dataWriteIntentSemantics"
         },
         {
           "kind": "RequirementUsage",
@@ -7523,35 +7567,35 @@
       "element_counts": {
         "ActionDefinition": 23,
         "ActionUsage": 37,
-        "AttributeDefinition": 32,
-        "AttributeUsage": 259,
+        "AttributeDefinition": 35,
+        "AttributeUsage": 271,
         "BindingConnectorAsUsage": 8,
-        "ConstraintUsage": 85,
+        "ConstraintUsage": 87,
         "Dependency": 151,
-        "Documentation": 178,
+        "Documentation": 182,
         "EnumerationDefinition": 12,
         "EnumerationUsage": 54,
-        "Feature": 210,
+        "Feature": 214,
         "FeatureChainExpression": 43,
-        "FeatureReferenceExpression": 108,
+        "FeatureReferenceExpression": 110,
         "ItemDefinition": 1,
-        "ItemUsage": 16,
+        "ItemUsage": 18,
         "LibraryPackage": 1,
         "LiteralBoolean": 4,
-        "LiteralInfinity": 32,
-        "LiteralInteger": 122,
+        "LiteralInfinity": 35,
+        "LiteralInteger": 131,
         "LiteralString": 64,
         "MetadataUsage": 58,
-        "Multiplicity": 198,
-        "MultiplicityRange": 85,
+        "Multiplicity": 205,
+        "MultiplicityRange": 91,
         "NullExpression": 1,
         "OperatorExpression": 11,
         "PartDefinition": 1,
         "PartUsage": 27,
         "PerformActionUsage": 80,
-        "ReferenceUsage": 640,
-        "RequirementUsage": 194,
-        "SatisfyRequirementUsage": 85,
+        "ReferenceUsage": 646,
+        "RequirementUsage": 198,
+        "SatisfyRequirementUsage": 87,
         "SuccessionAsUsage": 22,
         "TransitionUsage": 11,
         "VerificationCaseDefinition": 24
@@ -7711,6 +7755,10 @@
         },
         {
           "kind": "AttributeDefinition",
+          "name": "RtgControllerObjectRead"
+        },
+        {
+          "kind": "AttributeDefinition",
           "name": "RtgControllerOperationResult"
         },
         {
@@ -7760,6 +7808,14 @@
         {
           "kind": "AttributeDefinition",
           "name": "RtgControllerValidationOptions"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "RtgControllerWriteConflict"
+        },
+        {
+          "kind": "AttributeDefinition",
+          "name": "RtgControllerWriteConflictDetail"
         },
         {
           "kind": "AttributeDefinition",
@@ -7977,6 +8033,15 @@
         {
           "kind": "RequirementUsage",
           "name": "cutoverUsesMigrationMembership"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "dataObjectWriteSemantics",
+          "short_name": "contract.rtg.controller.data_object_write_semantics"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "dataObjectWriteSemantics"
         },
         {
           "kind": "RequirementUsage",
@@ -8361,6 +8426,15 @@
         {
           "kind": "RequirementUsage",
           "name": "operationResultSemantics"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "optimisticConcurrencySemantics",
+          "short_name": "contract.rtg.controller.optimistic_concurrency"
+        },
+        {
+          "kind": "RequirementUsage",
+          "name": "optimisticConcurrencySemantics"
         },
         {
           "kind": "RequirementUsage",
@@ -14185,7 +14259,7 @@
         "InterfaceDefinition": 1,
         "InterfaceUsage": 1,
         "ItemDefinition": 2,
-        "ItemUsage": 38,
+        "ItemUsage": 39,
         "LiteralBoolean": 141,
         "LiteralInfinity": 31,
         "LiteralInteger": 44,
@@ -14364,7 +14438,7 @@
         "Feature": 196,
         "FeatureChainExpression": 95,
         "FeatureReferenceExpression": 49,
-        "ItemUsage": 2,
+        "ItemUsage": 3,
         "LiteralBoolean": 4,
         "LiteralInfinity": 42,
         "LiteralInteger": 166,
@@ -15708,7 +15782,7 @@
     }
   },
   "schema_version": 1,
-  "source_digest": "a57d0703d203b882a80e470e73f91bd252064f01e1dfc8fb43471d78dfe90a7d",
+  "source_digest": "5a17aebffd46ab09d1fbeee693d58df1aadfd909416d83a2e736bcd2763ce9d8",
   "validator": {
     "implementation_version": "0.50.0",
     "provider": "Systems-Modeling/SysML-v2-Pilot-Implementation",

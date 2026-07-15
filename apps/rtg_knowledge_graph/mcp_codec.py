@@ -154,6 +154,8 @@ def decode_graph_changes(value: object) -> RtgGraphChangeSet:
                     "data_object_writes.ref",
                 ),
                 type=_required_str(item, "type"),
+                mode=_optional_str(item.get("mode")),
+                expected_version=_optional_str(item.get("expected_version")),
                 properties=_json_object(item.get("properties", {}), "properties"),
                 system=_json_object(item.get("system", {}), "data_object_writes.system"),
                 anchor_refs=tuple(
@@ -164,7 +166,15 @@ def decode_graph_changes(value: object) -> RtgGraphChangeSet:
             for item in _checked_objects(
                 data.get("data_object_writes", []),
                 "graph_changes.data_object_writes",
-                {"ref", "type", "properties", "system", "anchor_refs"},
+                {
+                    "ref",
+                    "type",
+                    "mode",
+                    "expected_version",
+                    "properties",
+                    "system",
+                    "anchor_refs",
+                },
                 {
                     "data_type": "type",
                     "data_type_key": "type",

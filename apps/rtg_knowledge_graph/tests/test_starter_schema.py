@@ -220,7 +220,9 @@ def test_everyday_life_ontology_install_is_idempotent_and_replayable(tmp_path: P
                 "ref": {"local_ref": "person-alex"},
                 "type": "Person",
                 "display_name": "Alex",
-                "facts": [{"type": "PersonFacts", "properties": {"name": "Alex"}}],
+                "facts": [
+                    {"type": "PersonFacts", "mode": "merge", "properties": {"name": "Alex"}}
+                ],
             }
         ]
     )
@@ -320,7 +322,9 @@ def test_replayed_beta_shaped_custom_graph_with_overlapping_keys_starts(
         {
             "ref": {"local_ref": type_key.lower()},
             "type": type_key,
-            "facts": [{"type": f"{type_key}Facts", "properties": {"title": type_key}}],
+            "facts": [
+                {"type": f"{type_key}Facts", "mode": "merge", "properties": {"title": type_key}}
+            ],
         }
         for type_key in anchor_types
     ]

@@ -464,6 +464,7 @@ def test_individual_rtg_mcp_suite_recovers_from_realistic_agent_mistakes(
                         {
                             "ref": {"local_ref": "task-kind-error-facts"},
                             "type": "TaskFacts",
+                            "mode": "merge",
                             "properties": {
                                 "title": "Task with bad due date",
                                 "domain": "professional",
@@ -1297,6 +1298,7 @@ async def _add_valid_task(
                         {
                             "ref": {"local_ref": fact_ref},
                             "type": "TaskFacts",
+                            "mode": "merge",
                             "properties": {
                                 "title": title,
                                 "domain": domain,
@@ -1443,6 +1445,7 @@ def _data(ref: str, type_key: str, properties: JsonObject, anchor_ref: str) -> J
     return {
         "ref": {"local_ref": ref},
         "type": type_key,
+        "mode": "merge",
         "properties": properties,
         "anchor_refs": [{"local_ref": anchor_ref}],
     }

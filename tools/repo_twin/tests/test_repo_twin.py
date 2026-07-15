@@ -241,6 +241,7 @@ def _write_test_run_evidence(
                 RtgGraphDataObjectWrite(
                     ref=RtgChangeReference(resource_id=record.uuid),
                     type=record.type_key,
+                    mode="merge",
                     properties=record.properties,
                     system=managed_system(record.natural_key, authority="evidence"),
                     anchor_refs=tuple(

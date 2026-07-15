@@ -26,11 +26,14 @@ Status vocabulary matches the research program: `open | in_progress | done | kil
 ordinary file edit. This is an engineering program, not a research program — items produce spec
 amendments, contract tests, and implementation, not RR reports.
 
-Post-merge harmonization checkpoint (2026-07-14): KM-2 through KM-5 now conform to the
+Post-merge harmonization checkpoint (2026-07-14): KM-2 through KM-6 now conform to the
 SysML-owned component tree, including MCP codecs, generated starter ontology, federation legacy
 snapshot backfill, repo-twin schema, schema-domain readiness, reviewed schema-evolution operation
 storage, diff-scoped cutover, kernel-sequenced property rename/delete effects, and replayable per-op
-evidence. `just check` passed with 574 tests. KM-6 is the next kernel harmonization tranche.
+evidence. Explicit merge/replace intent, controller-issued data-object version tokens, batch-atomic
+stale-write conflicts, replay compatibility, and token-aware repo-twin synchronization are now also
+owned by accepted SysML contracts. `just check` passed with 582 tests. Prototype fixture-backed
+domains are the next harmonization tranche.
 
 ## The per-item loop
 
@@ -272,6 +275,13 @@ Surprises:
   multi-phase coordination.
 - Deterministic repo-twin synchronization must read current version tokens before replacing
   existing derived records; merge mode would preserve properties removed from repository source.
+
+Post-merge harmonization evidence (2026-07-14): accepted change-validation, controller, and Vellis
+facade SysML contracts now own the KM-6 write-mode, read-envelope, version-token, and conflict
+semantics. MCP codecs and compact anchor records preserve explicit intent; legacy ledger replay
+decodes pre-KM-6 data writes as full replacements; repo-twin synchronization reads fresh tokens
+before replacing existing facts; and stale conflicts return the winning record and associations
+without mutation. `just check` passed with 582 tests.
 
 ### KM-7 — Governance vocabulary as kernel-adjacent schema domain; memory spine as flagship catalog domain
 

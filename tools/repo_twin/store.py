@@ -117,7 +117,11 @@ def sync_scan(scan: ScanResult, storage_root: Path) -> SyncSummary:
         raise ValueError("cannot sync a repo twin scan with parse issues")
     controller = open_controller(storage_root)
     snapshot = controller.export_system_snapshot().graph
-    summary, changes = plan_sync(scan, snapshot)
+    data_version_tokens = {
+        str(item["uuid"]): controller.get_object(str(item["uuid"])).version_token
+        for item in snapshot.data_objects
+    }
+    summary, changes = plan_sync(scan, snapshot, data_version_tokens=data_version_tokens)
     if changes is not None:
         controller.apply_live_graph_changes(changes)
     controller.persist_system_snapshot(SNAPSHOT_PATH)
@@ -127,7 +131,11 @@ def sync_scan(scan: ScanResult, storage_root: Path) -> SyncSummary:
 def plan_sync(
     scan: ScanResult,
     snapshot: RtgGraphSnapshot,
+    *,
+    data_version_tokens: dict[str, str | None] | None = None,
+    materialize_changes: bool = True,
 ) -> tuple[SyncSummary, RtgGraphChangeSet | None]:
+    data_version_tokens = data_version_tokens or {}
     existing_anchors = {
         str(item["uuid"]): _without_kernel_system_fields(item) for item in snapshot.anchors
     }
@@ -199,10 +207,15 @@ def plan_sync(
             else:
                 updated += 1
             authority = str(record.properties.get("authority", "repo"))
+            expected_version = data_version_tokens.get(uuid_text)
+            if materialize_changes and existing is not None and not expected_version:
+                raise RuntimeError(f"missing version token for existing data object {uuid_text}")
             data_writes.append(
                 RtgGraphDataObjectWrite(
                     ref=RtgChangeReference(resource_id=record.uuid),
                     type=record.type_key,
+                    mode="replace" if existing is not None and expected_version else "merge",
+                    expected_version=expected_version if materialize_changes else None,
                     properties=record.properties,
                     system=managed_system(record.natural_key, authority=authority),
                     anchor_refs=tuple(
@@ -254,7 +267,7 @@ def plan_sync(
         data_objects=len(scan.data_objects),
         links=len(scan.links),
     )
-    if not summary.changed:
+    if not summary.changed or not materialize_changes:
         return summary, None
     return (
         summary,

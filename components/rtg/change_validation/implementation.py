@@ -98,6 +98,7 @@ class DeterministicRtgChangeValidator(RtgChangeValidator):
         merge_candidate_findings: list[RtgValidationFinding] = []
         if "schema_object" in tracks:
             pre_projection_findings.extend(_validate_schema_definition_writes(change_batch))
+            pre_projection_findings.extend(_validate_data_write_modes(graph, change_batch))
             pre_projection_findings.extend(_validate_graph_reference_closure(graph, change_batch))
             pre_projection_findings.extend(_validate_kernel_system_field_writes(change_batch))
             pre_projection_findings.extend(
@@ -308,11 +309,20 @@ def _project_batch(
             )
         )
     for write in change_batch.graph_changes.data_object_writes:
+        data_uuid = _uuid_or_raise(write.ref)
+        properties = write.properties
+        if write.mode == "merge":
+            try:
+                current = graph_view.get_object(data_uuid)
+            except Exception:
+                current = None
+            if isinstance(current, RtgDataObject):
+                properties = {**current.properties, **write.properties}
         graph_view.put_data_object(
             RtgDataObject(
-                uuid=_uuid_or_raise(write.ref),
+                uuid=data_uuid,
                 type=write.type,
-                properties=write.properties,
+                properties=properties,
                 system=write.system,
             ),
             tuple(_uuid_or_raise(ref) for ref in write.anchor_refs),
@@ -761,6 +771,78 @@ def _has_migration_context(change_batch: RtgChangeBatch) -> bool:
 _KERNEL_SYSTEM_FIELDS = {"created_at", "updated_at"}
 
 
+def _validate_data_write_modes(
+    graph: object,
+    change_batch: RtgChangeBatch,
+) -> list[RtgValidationFinding]:
+    _require_graph(graph)
+    graph = cast(RtgGraph, graph)
+    findings: list[RtgValidationFinding] = []
+    for index, write in enumerate(change_batch.graph_changes.data_object_writes):
+        if write.mode is None:
+            findings.append(
+                _data_write_mode_finding(
+                    index,
+                    "schema_object.data_write_mode_missing",
+                    "Data-object writes must declare mode as merge or replace.",
+                    (
+                        "Set mode to merge for inserts or partial updates, or replace for a "
+                        "fresh-read full replacement."
+                    ),
+                )
+            )
+            continue
+        if write.mode not in {"merge", "replace"}:
+            findings.append(
+                _data_write_mode_finding(
+                    index,
+                    "schema_object.data_write_mode_invalid",
+                    f"Unsupported data-object write mode: {write.mode}.",
+                    "Set mode to merge or replace.",
+                )
+            )
+            continue
+        if write.mode == "merge":
+            if write.expected_version is not None:
+                findings.append(
+                    _data_write_mode_finding(
+                        index,
+                        "schema_object.data_write_mode_conflict",
+                        "Merge-mode writes must not supply expected_version.",
+                        (
+                            "Remove expected_version or use replace mode after reading the "
+                            "current object."
+                        ),
+                    )
+                )
+            continue
+        target_uuid = _reference_uuid_or_none(write.ref)
+        current: RtgObject | None = None
+        if target_uuid is not None:
+            try:
+                current = graph.get_object(target_uuid)
+            except Exception:
+                current = None
+        problems: list[str] = []
+        if not isinstance(current, RtgDataObject):
+            problems.append("replace mode requires an existing data object")
+        if write.expected_version is None:
+            problems.append("replace mode requires expected_version")
+        if problems:
+            findings.append(
+                _data_write_mode_finding(
+                    index,
+                    "schema_object.data_write_mode_conflict",
+                    "; ".join(problems) + ".",
+                    (
+                        "Use merge for a new object, or read the existing object and supply its "
+                        "version token for replace."
+                    ),
+                )
+            )
+    return findings
+
+
 def _validate_kernel_system_field_writes(
     change_batch: RtgChangeBatch,
 ) -> list[RtgValidationFinding]:
@@ -1174,6 +1256,30 @@ def _kernel_system_field_writable_finding(path: str, field_name: str) -> RtgVali
     )
 
 
+def _data_write_mode_finding(
+    index: int,
+    code: str,
+    problem: str,
+    remedy: str,
+) -> RtgValidationFinding:
+    path = f"graph_changes.data_object_writes[{index}]"
+    diagnostic = rtg_diagnostic(
+        code=code,
+        category="validation_failure",
+        path=path,
+        problem=problem,
+        remedy=remedy,
+        accepted_fields=("merge", "replace"),
+        guide_topics=("workflow_patterns", "live_write", "tool_call_shapes"),
+        mutation_state="not_mutated",
+    )
+    return _finding(
+        "schema_object",
+        code,
+        path,
+        suggestion=remedy,
+        diagnostic=diagnostic,
+    )
 def _event_update_rejected_finding(
     index: int,
     object_uuid: UUID,

@@ -44,6 +44,7 @@ def seed_repo_component_snapshot(graph_root: Path, snapshot_path: str) -> None:
                 "facts": [
                     {
                         "type": "twin.ComponentFact",
+                        "mode": "merge",
                         "properties": {
                             **_common_repo_properties(
                                 source_path=(
@@ -64,6 +65,7 @@ def seed_repo_component_snapshot(graph_root: Path, snapshot_path: str) -> None:
                     },
                     {
                         "type": "twin.EvidenceRecord",
+                        "mode": "merge",
                         "properties": {
                             **_common_repo_properties(
                                 source_path="components/with/evidence/tests/test_contract.py",
@@ -87,6 +89,7 @@ def seed_repo_component_snapshot(graph_root: Path, snapshot_path: str) -> None:
                 "facts": [
                     {
                         "type": "twin.ComponentFact",
+                        "mode": "merge",
                         "properties": {
                             **_common_repo_properties(
                                 source_path=(
@@ -134,6 +137,7 @@ def seed_personal_ops_snapshot(graph_root: Path, snapshot_path: str) -> None:
             "facts": [
                 {
                     "type": "CommitmentFacts",
+                    "mode": "merge",
                     "properties": {
                         "title": "Invite first beta testers",
                         "domain": "professional",
@@ -154,6 +158,7 @@ def seed_personal_ops_snapshot(graph_root: Path, snapshot_path: str) -> None:
             "facts": [
                 {
                     "type": "RoutineFacts",
+                    "mode": "merge",
                     "properties": {
                         "title": "Sunday household reset",
                         "domain": "personal",
@@ -172,6 +177,7 @@ def seed_personal_ops_snapshot(graph_root: Path, snapshot_path: str) -> None:
             "facts": [
                 {
                     "type": "DecisionFacts",
+                    "mode": "merge",
                     "properties": {
                         "title": "Use Friday review as primary cadence",
                         "domain": "professional",
@@ -191,6 +197,7 @@ def seed_personal_ops_snapshot(graph_root: Path, snapshot_path: str) -> None:
             "facts": [
                 {
                     "type": "EvidenceFacts",
+                    "mode": "merge",
                     "properties": {
                         "title": "Doctor portal reminder",
                         "domain": "personal",
@@ -209,6 +216,7 @@ def seed_personal_ops_snapshot(graph_root: Path, snapshot_path: str) -> None:
             "facts": [
                 {
                     "type": "RelationshipContextFacts",
+                    "mode": "merge",
                     "properties": {
                         "person_name": "Jordan",
                         "relationship": "partner",
@@ -259,6 +267,7 @@ def seed_gothic_archive_snapshot(graph_root: Path, snapshot_path: str) -> None:
                 "facts": [
                     {
                         "type": "WorkFacts",
+                        "mode": "merge",
                         "properties": {
                             "title": "Dracula",
                             "creator": "Bram Stoker",
@@ -278,6 +287,7 @@ def seed_gothic_archive_snapshot(graph_root: Path, snapshot_path: str) -> None:
                 "facts": [
                     {
                         "type": "SourceFacts",
+                        "mode": "merge",
                         "properties": {
                             "label": "Project Gutenberg Dracula",
                             "edition": "ebook 345",
@@ -298,6 +308,7 @@ def seed_gothic_archive_snapshot(graph_root: Path, snapshot_path: str) -> None:
                 "facts": [
                     {
                         "type": "PassageFacts",
+                        "mode": "merge",
                         "properties": {
                             "label": "Lucy transformation source span",
                             "source_marker": "Chapter 16",
@@ -315,6 +326,7 @@ def seed_gothic_archive_snapshot(graph_root: Path, snapshot_path: str) -> None:
                 "facts": [
                     {
                         "type": "ReadingTrailFacts",
+                        "mode": "merge",
                         "properties": {
                             "label": "Blood Trail",
                             "summary": "Medical crisis to supernatural explanation.",

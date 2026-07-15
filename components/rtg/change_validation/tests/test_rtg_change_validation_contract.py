@@ -325,6 +325,36 @@ def build_schema() -> InMemoryRtgSchema:
     return schema
 
 
+def build_merge_replace_schema() -> InMemoryRtgSchema:
+    schema = InMemoryRtgSchema.empty()
+    schema.put_definition(
+        RtgSchemaDefinition(
+            uuid=uuid4(),
+            kind="anchor",
+            type_key="Person",
+            description="Person.",
+            payload=RtgAnchorSchemaPayload(),
+            time_shape="state_now",
+        )
+    )
+    schema.put_definition(
+        RtgSchemaDefinition(
+            uuid=uuid4(),
+            kind="data_object",
+            type_key="Profile",
+            description="Profile.",
+            payload=RtgDataObjectSchemaPayload(
+                properties={
+                    "name": RtgSchemaField(required=True, value_kinds=("string",)),
+                    "title": RtgSchemaField(required=True, value_kinds=("string",)),
+                }
+            ),
+            time_shape="state_now",
+        )
+    )
+    return schema
+
+
 def build_link_kind_schema() -> InMemoryRtgSchema:
     schema = InMemoryRtgSchema.empty()
     schema.put_definition(
@@ -567,6 +597,7 @@ def test_validation_rejects_malformed_proposed_data_batch() -> None:
                 RtgGraphDataObjectWrite(
                     ref=RtgChangeReference(resource_id=uuid4()),
                     type="Profile",
+                    mode="merge",
                     properties={"extra": "nope"},
                     anchor_refs=(RtgChangeReference(resource_id=uuid4()),),
                 ),
@@ -585,6 +616,130 @@ def test_validation_rejects_malformed_proposed_data_batch() -> None:
 
     assert report.accepted is False
     assert "schema_object.undeclared_property" in {finding.code for finding in report.findings}
+
+
+def test_validation_rejects_missing_invalid_and_conflicting_data_write_modes() -> None:
+    graph = InMemoryRtgGraph.empty()
+    anchor = graph.put_anchor(RtgAnchor(uuid=uuid4(), type="Person"))
+    existing = graph.put_data_object(
+        RtgDataObject(uuid=uuid4(), type="Profile", properties={"name": "Ada"}),
+        (concrete_uuid(anchor.uuid),),
+    )
+    anchor_ref = RtgChangeReference(resource_id=concrete_uuid(anchor.uuid))
+    report = DeterministicRtgChangeValidator().validate_batch(
+        graph,
+        build_schema(),
+        InMemoryRtgConstraints.empty(),
+        InMemoryRtgMigration.empty(),
+        SimpleRtgQueryEngine(),
+        RtgChangeBatch(
+            graph_changes=RtgGraphChangeSet(
+                data_object_writes=(
+                    RtgGraphDataObjectWrite(
+                        RtgChangeReference(resource_id=uuid4()),
+                        "Profile",
+                        {"name": "Missing"},
+                        anchor_refs=(anchor_ref,),
+                    ),
+                    RtgGraphDataObjectWrite(
+                        RtgChangeReference(resource_id=uuid4()),
+                        "Profile",
+                        {"name": "Invalid"},
+                        anchor_refs=(anchor_ref,),
+                        mode="upsert",
+                    ),
+                    RtgGraphDataObjectWrite(
+                        RtgChangeReference(resource_id=uuid4()),
+                        "Profile",
+                        {"name": "Merge conflict"},
+                        anchor_refs=(anchor_ref,),
+                        mode="merge",
+                        expected_version="unexpected",
+                    ),
+                    RtgGraphDataObjectWrite(
+                        RtgChangeReference(resource_id=concrete_uuid(existing.uuid)),
+                        "Profile",
+                        {"name": "Replace conflict"},
+                        anchor_refs=(anchor_ref,),
+                        mode="replace",
+                    ),
+                )
+            )
+        ),
+    )
+
+    codes = [finding.code for finding in report.findings]
+    assert report.accepted is False
+    assert codes.count("schema_object.data_write_mode_missing") == 1
+    assert codes.count("schema_object.data_write_mode_invalid") == 1
+    assert codes.count("schema_object.data_write_mode_conflict") == 2
+    assert all(finding.diagnostic["mutation_state"] == "not_mutated" for finding in report.findings)
+
+
+def test_validation_projects_merge_and_replace_properties_without_comparing_tokens() -> None:
+    graph = InMemoryRtgGraph.empty()
+    anchor = graph.put_anchor(RtgAnchor(uuid=uuid4(), type="Person"))
+    existing = graph.put_data_object(
+        RtgDataObject(
+            uuid=uuid4(),
+            type="Profile",
+            properties={"name": "Ada", "title": "Countess"},
+        ),
+        (concrete_uuid(anchor.uuid),),
+    )
+    ref = RtgChangeReference(resource_id=concrete_uuid(existing.uuid))
+    anchor_refs = (RtgChangeReference(resource_id=concrete_uuid(anchor.uuid)),)
+    validator = DeterministicRtgChangeValidator()
+    dependencies = (
+        graph,
+        build_merge_replace_schema(),
+        InMemoryRtgConstraints.empty(),
+        InMemoryRtgMigration.empty(),
+        SimpleRtgQueryEngine(),
+    )
+
+    merge_report = validator.validate_batch(
+        *dependencies,
+        RtgChangeBatch(
+            graph_changes=RtgGraphChangeSet(
+                data_object_writes=(
+                    RtgGraphDataObjectWrite(
+                        ref=ref,
+                        type="Profile",
+                        mode="merge",
+                        properties={"name": "Ada Lovelace"},
+                        anchor_refs=anchor_refs,
+                    ),
+                )
+            )
+        ),
+    )
+    replace_report = validator.validate_batch(
+        *dependencies,
+        RtgChangeBatch(
+            graph_changes=RtgGraphChangeSet(
+                data_object_writes=(
+                    RtgGraphDataObjectWrite(
+                        ref=ref,
+                        type="Profile",
+                        mode="replace",
+                        expected_version="validator-does-not-compare-this-token",
+                        properties={"name": "Ada Lovelace"},
+                        anchor_refs=anchor_refs,
+                    ),
+                )
+            )
+        ),
+    )
+
+    assert merge_report.accepted is True
+    assert replace_report.accepted is False
+    assert "schema_object.missing_required_property" in {
+        finding.code for finding in replace_report.findings
+    }
+    assert "schema_object.data_write_mode_conflict" not in {
+        finding.code for finding in replace_report.findings
+    }
 
 
 def test_validation_reports_an_unprojectable_delete_as_a_blocking_finding() -> None:
@@ -702,9 +857,10 @@ def test_validation_rejects_updates_to_event_data_objects_but_allows_new_events(
         RtgChangeBatch(
             graph_changes=RtgGraphChangeSet(
                 data_object_writes=(
-                    RtgGraphDataObjectWrite(
-                        ref=RtgChangeReference(resource_id=concrete_uuid(event.uuid)),
-                        type="ProfileEvent",
+                RtgGraphDataObjectWrite(
+                    ref=RtgChangeReference(resource_id=concrete_uuid(event.uuid)),
+                    type="ProfileEvent",
+                    mode="merge",
                         properties={"name": "Grace"},
                         anchor_refs=(RtgChangeReference(resource_id=concrete_uuid(anchor.uuid)),),
                     ),
@@ -721,9 +877,10 @@ def test_validation_rejects_updates_to_event_data_objects_but_allows_new_events(
         RtgChangeBatch(
             graph_changes=RtgGraphChangeSet(
                 data_object_writes=(
-                    RtgGraphDataObjectWrite(
-                        ref=RtgChangeReference(resource_id=uuid4()),
-                        type="ProfileEvent",
+                RtgGraphDataObjectWrite(
+                    ref=RtgChangeReference(resource_id=uuid4()),
+                    type="ProfileEvent",
+                    mode="merge",
                         properties={"name": "Grace"},
                         anchor_refs=(RtgChangeReference(resource_id=concrete_uuid(anchor.uuid)),),
                     ),
@@ -768,10 +925,11 @@ def test_validation_reports_data_identity_merge_candidates_without_mutation() ->
         RtgChangeBatch(
             graph_changes=RtgGraphChangeSet(
                 data_object_writes=(
-                    RtgGraphDataObjectWrite(
-                        ref=RtgChangeReference(resource_id=uuid4()),
-                        type="Profile",
-                        properties={"name": "Ada Lovelace"},
+                RtgGraphDataObjectWrite(
+                    ref=RtgChangeReference(resource_id=uuid4()),
+                    type="Profile",
+                    mode="merge",
+                    properties={"name": "Ada Lovelace"},
                         anchor_refs=(RtgChangeReference(resource_id=concrete_uuid(anchor.uuid)),),
                     ),
                 )
@@ -863,10 +1021,11 @@ def test_validation_preserves_current_behavior_for_types_without_identity_criter
         RtgChangeBatch(
             graph_changes=RtgGraphChangeSet(
                 data_object_writes=(
-                    RtgGraphDataObjectWrite(
-                        ref=RtgChangeReference(resource_id=uuid4()),
-                        type="Profile",
-                        properties={"name": "Ada Lovelace"},
+                RtgGraphDataObjectWrite(
+                    ref=RtgChangeReference(resource_id=uuid4()),
+                    type="Profile",
+                    mode="merge",
+                    properties={"name": "Ada Lovelace"},
                         anchor_refs=(RtgChangeReference(resource_id=concrete_uuid(anchor.uuid)),),
                     ),
                 )
@@ -1248,6 +1407,7 @@ def test_staged_migration_batch_validates_projected_cutover_state() -> None:
                 RtgGraphDataObjectWrite(
                     ref=RtgChangeReference(resource_id=profile_uuid),
                     type="Profile",
+                    mode="merge",
                     properties={"age": "not an integer"},
                     system={"live": False},
                     anchor_refs=(RtgChangeReference(resource_id=person_uuid),),

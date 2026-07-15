@@ -12,6 +12,7 @@ from components.rtg.change_validation import (
     RtgGraphChangeSet,
     RtgGraphDataObjectWrite,
 )
+from components.rtg.controller import RtgControllerObjectNotFound
 from components.rtg.graph.protocol import JsonObject
 from tools.repo_twin.model import DataRecord, managed_system, twin_uuid
 from tools.repo_twin.scanner import component_subject_hashes, repo_metadata, scan_repo
@@ -79,12 +80,18 @@ def run_and_record(repo_root: Path, storage_root: Path, kind: str, command: tupl
         tuple(sorted(anchor_keys)),
     )
     controller = open_controller(storage_root)
+    try:
+        existing = controller.get_object(record.uuid)
+    except RtgControllerObjectNotFound:
+        existing = None
     controller.apply_live_graph_changes(
         RtgGraphChangeSet(
             data_object_writes=(
                 RtgGraphDataObjectWrite(
                     ref=RtgChangeReference(resource_id=record.uuid),
                     type=record.type_key,
+                    mode="replace" if existing is not None else "merge",
+                    expected_version=(existing.version_token if existing is not None else None),
                     properties=record.properties,
                     system=managed_system(record.natural_key, authority="evidence"),
                     anchor_refs=tuple(

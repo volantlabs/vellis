@@ -34,6 +34,7 @@ from components.rtg.controller import (
     InProcessRtgController,
     RtgControllerError,
     RtgControllerValidationFailed,
+    RtgControllerWriteConflict,
 )
 from components.rtg.diagnostics import diagnostic_as_json, rtg_diagnostic
 from components.rtg.graph import RtgGraphError
@@ -665,6 +666,13 @@ class RtgMcpToolset:
             if error.validation_report is not None:
                 payload["validation_report"] = encode_json(error.validation_report)
             return payload
+        except RtgControllerWriteConflict as error:
+            return {
+                "ok": False,
+                "transaction_id": str(error.transaction_id),
+                "conflicts": encode_json(error.conflicts),
+                "error": _error_payload(error),
+            }
         except (
             RtgControllerError,
             RtgGraphError,
@@ -743,6 +751,11 @@ def _compile_live_anchor_records(
                     "type",
                     f"anchor_records[{anchor_index}].facts[{fact_index}].type",
                 ),
+                "mode": _required_text(
+                    fact,
+                    "mode",
+                    f"anchor_records[{anchor_index}].facts[{fact_index}].mode",
+                ),
                 "properties": _required_object(
                     fact,
                     "properties",
@@ -750,6 +763,8 @@ def _compile_live_anchor_records(
                 ),
                 "anchor_refs": [anchor_ref],
             }
+            if "expected_version" in fact:
+                data_write["expected_version"] = fact["expected_version"]
             if "system" in fact:
                 data_write["system"] = fact["system"]
             data_object_writes.append(data_write)
@@ -775,7 +790,7 @@ def _reject_anchor_record_keys(anchor: dict[str, Any], anchor_index: int) -> Non
 
 
 def _reject_fact_record_keys(fact: dict[str, Any], anchor_index: int, fact_index: int) -> None:
-    allowed = {"ref", "type", "properties", "system"}
+    allowed = {"ref", "type", "mode", "expected_version", "properties", "system"}
     unknown = sorted(set(fact) - allowed)
     if unknown:
         raise RtgMcpInputInvalid(
@@ -1883,6 +1898,7 @@ def _tool_call_shapes_guide() -> dict[str, Any]:
                         "facts": [
                             {
                                 "type": "ItemFacts",
+                                "mode": "merge",
                                 "properties": {"title": "Item alpha", "status": "active"},
                             }
                         ],
@@ -1903,6 +1919,7 @@ def _tool_call_shapes_guide() -> dict[str, Any]:
                         "facts": [
                             {
                                 "type": "ItemFacts",
+                                "mode": "merge",
                                 "properties": {"title": "Item alpha", "status": "active"},
                             }
                         ],
@@ -1914,6 +1931,7 @@ def _tool_call_shapes_guide() -> dict[str, Any]:
                         "facts": [
                             {
                                 "type": "ItemFacts",
+                                "mode": "merge",
                                 "properties": {"title": "Item beta", "status": "active"},
                             }
                         ],
@@ -1950,6 +1968,7 @@ def _tool_call_shapes_guide() -> dict[str, Any]:
                         {
                             "ref": {"local_ref": "item-alpha-facts"},
                             "type": "ItemFacts",
+                            "mode": "merge",
                             "properties": {"title": "Item alpha", "status": "active"},
                             "anchor_refs": [{"local_ref": "item-alpha"}],
                         }
@@ -2021,6 +2040,7 @@ def _live_write_guide() -> dict[str, Any]:
                     "facts": [
                         {
                             "type": "ItemFacts",
+                            "mode": "merge",
                             "properties": {
                                 "title": "Item alpha",
                                 "category": "example",
@@ -2046,6 +2066,7 @@ def _live_write_guide() -> dict[str, Any]:
                     {
                         "ref": {"local_ref": "item-alpha-facts"},
                         "type": "ItemFacts",
+                        "mode": "merge",
                         "properties": {
                             "title": "Item alpha",
                             "category": "example",

@@ -1411,6 +1411,7 @@ def _seed_person_snapshot(graph_root: Path, snapshot_path: str) -> None:
                 "facts": [
                     {
                         "type": "Profile",
+                        "mode": "merge",
                         "properties": {"name": "Ada"},
                     }
                 ],

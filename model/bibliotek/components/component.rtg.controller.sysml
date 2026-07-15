@@ -169,22 +169,37 @@ library package BibliotekRtgController {
     }
     attribute def RtgPersistedSnapshotList { attribute snapshots[0..*] : RtgPersistedSnapshotMetadata; }
     attribute def RtgPersistedSnapshotDocument { attribute relativePath : JsonRelativePath; attribute 'snapshot' : RtgSystemSnapshot; }
+    attribute def RtgControllerObjectRead {
+        ref item object : RtgObject;
+        attribute directAnchorRefs[0..*] ordered : Uuid;
+        attribute versionToken[0..1] : String;
+        attribute observedLedgerPosition[0..1] : Integer;
+        doc /* Data-object reads include their complete ordered direct-anchor set and an opaque version token derived from both visible inputs. Other graph object kinds have neither token nor direct anchors. The observed ledger position is independent audit context. */
+    }
+    attribute def RtgControllerWriteConflictDetail {
+        attribute objectUuid : Uuid;
+        attribute expectedVersion : String;
+        attribute currentVersion : String;
+        item currentObject : RtgDataObject;
+        attribute currentDirectAnchorRefs[0..*] ordered : Uuid;
+    }
 
     attribute def RtgControllerConfigurationInvalid { attribute 'message' : String; attribute diagnostic[0..1] : RtgDiagnostic; }
     attribute def RtgControllerValidationFailed { attribute 'message' : String; attribute transactionId[0..1] : Uuid; attribute validationReport[0..1] : RtgValidationReport; attribute diagnostic[0..1] : RtgDiagnostic; }
     attribute def RtgControllerPreconditionFailed { attribute 'message' : String; attribute diagnostic[0..1] : RtgDiagnostic; }
     attribute def RtgControllerApplyFailed { attribute 'message' : String; attribute diagnostic[0..1] : RtgDiagnostic; }
+    attribute def RtgControllerWriteConflict { attribute 'message' : String; attribute transactionId : Uuid; attribute conflicts[1..*] : RtgControllerWriteConflictDetail; attribute diagnostic[0..1] : RtgDiagnostic; }
     attribute def RtgControllerObjectNotFound { attribute 'message' : String; attribute diagnostic[0..1] : RtgDiagnostic; }
     attribute def RtgControllerDiscoveryFailed { attribute 'message' : String; attribute diagnostic[0..1] : RtgDiagnostic; }
     attribute def RtgControllerSnapshotFailed { attribute 'message' : String; attribute diagnostic[0..1] : RtgDiagnostic; }
     attribute def RtgControllerReplayFailed { attribute 'message' : String; attribute diagnostic[0..1] : RtgDiagnostic; }
 
-    action def ApplyLiveGraphChanges { in graphChanges : RtgGraphChangeSet; in validationMode : RtgControllerValidationMode default = RtgControllerValidationMode::strict; out result : RtgControllerOperationResult; doc /* Validate and apply normal live graph CRUD in the serialized mutation lane. */ @FailureContract { errorIds = ("RtgControllerValidationFailed", "RtgControllerApplyFailed"); } }
+    action def ApplyLiveGraphChanges { in graphChanges : RtgGraphChangeSet; in validationMode : RtgControllerValidationMode default = RtgControllerValidationMode::strict; out result : RtgControllerOperationResult; doc /* Validate and apply normal live graph CRUD in the serialized mutation lane. */ @FailureContract { errorIds = ("RtgControllerValidationFailed", "RtgControllerWriteConflict", "RtgControllerApplyFailed"); } }
     action def ValidateLiveGraphChanges { in graphChanges : RtgGraphChangeSet; in validationOptions[0..1] : RtgControllerValidationOptions; out result : RtgControllerLiveGraphValidationResult; doc /* Normalize exactly as apply would and return generated identities, resolved changes, and validation without component or ledger mutation. */ @FailureContract { errorIds = ("RtgControllerPreconditionFailed", "RtgValidationInputInvalid"); } }
     action def StageKnowledgeChanges { in knowledgeChanges : RtgChangeBatch; in validationMode : RtgControllerValidationMode default = RtgControllerValidationMode::strict; out result : RtgControllerOperationResult; doc /* Validate and stage migration-scoped non-live graph, schema, constraint, and migration records. */ @FailureContract { errorIds = ("RtgControllerValidationFailed", "RtgControllerPreconditionFailed", "RtgControllerApplyFailed"); } }
     action def ApplyMigrationCutover { in migrationId : String; in cutoverOptions[0..1] : RtgControllerCutoverOptions; out result : RtgControllerOperationResult; doc /* Apply exactly one reviewed migration plan in reference-safe order, including kernel-sequenced schema-evolution data effects, validate the result, and either commit or restore. */ @FailureContract { errorIds = ("RtgControllerPreconditionFailed", "RtgControllerValidationFailed", "RtgControllerApplyFailed"); } }
     action def ExecuteControllerQuery { in querySpec : RtgQuerySpec; in queryOptions[0..1] : RtgQueryOptions; out result : RtgQueryResult; doc /* Execute against one coherent graph view while controller mutations are excluded; do not append a mutation ledger record. */ @FailureContract { errorIds = ("RtgQuerySpecInvalid", "RtgQueryUnsupported"); } }
-    action def ControllerGetObject { in objectUuid : String; out ref object : RtgObject; doc /* Normalize UUID text and return the public graph record without lifecycle filtering; invalid and absent UUIDs are reported through the controller-owned not-found contract. */ @FailureContract { errorIds = ("RtgControllerObjectNotFound"); } }
+    action def ControllerGetObject { in objectUuid : String; out result : RtgControllerObjectRead; doc /* Normalize UUID text and return the public graph record without lifecycle filtering, plus concurrency and audit context; invalid and absent UUIDs are reported through the controller-owned not-found contract. */ @FailureContract { errorIds = ("RtgControllerObjectNotFound"); } }
     action def ControllerListMigrations { in status[0..1] : RtgMigrationStatus; out result : RtgMigrationRecordList; doc /* Return all migration records or one status in deterministic migration-ID order. */ @FailureContract { errorIds = ("RtgMigrationStatusInvalid"); } }
     action def ControllerGetMigration { in migrationId : String; out result : RtgMigrationRecord; doc /* Return one migration tracking record by stable migration ID. */ @FailureContract { errorIds = ("RtgMigrationNotFound"); } }
     action def ValidateGraph { in migrationIds[0..*] : String; in validationOptions[0..1] : RtgControllerValidationOptions; out report : RtgValidationReport; doc /* Validate current state or named migration projections without mutation. */ @FailureContract { errorIds = ("RtgControllerValidationFailed"); } }
@@ -641,6 +656,20 @@ library package BibliotekRtgController {
         }
     }
 
+    requirement <'contract.rtg.controller.data_object_write_semantics'> dataObjectWriteSemantics {
+        subject operation : ApplyLiveGraphChanges;
+        require constraint {
+            doc /* Every controller-mediated data-object write explicitly selects merge or replace. Merge is valid for inserts and partial updates, preserves omitted properties, and rejects expectedVersion. Replace is valid only for an existing object with expectedVersion, treats supplied properties as complete, and removes omitted properties. The controller never infers a missing mode. */
+        }
+    }
+
+    requirement <'contract.rtg.controller.optimistic_concurrency'> optimisticConcurrencySemantics {
+        subject operation : ApplyLiveGraphChanges;
+        require constraint {
+            doc /* While holding the serialized write lane and before any mutation, recompute every replace target's opaque version from the complete current data-object record and ordered direct-anchor associations. If any expectedVersion is stale, reject the whole batch without mutation and return every conflict with the supplied token, winning object, winning associations, and current token. One of two interleaved replace writers sharing a starting token may apply, but both cannot. Token validity is independent of ledger persistence. */
+        }
+    }
+
     requirement <'contract.rtg.controller.live_mutation_lane'> liveMutationLane {
         subject operation : ApplyLiveGraphChanges;
         require constraint {
@@ -714,7 +743,7 @@ library package BibliotekRtgController {
     requirement <'contract.rtg.controller.read_semantics'> controllerReadSemantics {
         subject controller : RtgController;
         require constraint {
-            doc /* Query defaults to live-only at the controller boundary unless explicit query options override it. Direct object reads do not lifecycle-filter. Migration reads are deterministically ordered. All reads queue behind cutover, restore, and replay mutation and never append mutation ledger records. */
+            doc /* Query defaults to live-only at the controller boundary unless explicit query options override it. Direct object reads do not lifecycle-filter. A data-object read returns its complete ordered direct-anchor set and a stable opaque version token that changes whenever the visible record or associations change, while unrelated writes do not change it; observedLedgerPosition reports independent persisted-ledger context and may be absent. Migration reads are deterministically ordered. All reads queue behind cutover, restore, and replay mutation and never append mutation ledger records. */
         }
     }
 
@@ -1227,6 +1256,8 @@ library package BibliotekRtgController {
         satisfy liveMutationFlow by controller.applyLiveGraphChanges;
         satisfy liveMutationLane by controller.applyLiveGraphChanges;
         satisfy kernelMetaModelApplySemantics by controller.applyLiveGraphChanges;
+        satisfy dataObjectWriteSemantics by controller.applyLiveGraphChanges;
+        satisfy optimisticConcurrencySemantics by controller.applyLiveGraphChanges;
         satisfy stagingFlow by controller.stageKnowledgeChanges;
         satisfy validationFlow by controller.validateLiveGraphChanges;
         satisfy cutoverFlow by controller.applyMigrationCutover;
@@ -1319,6 +1350,8 @@ library package BibliotekRtgController {
             verify liveMutationFlow;
             verify liveMutationLane;
             verify kernelMetaModelApplySemantics;
+            verify dataObjectWriteSemantics;
+            verify optimisticConcurrencySemantics;
 
             verify applyLiveGraphChangesFailureSemantics;
         }

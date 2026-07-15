@@ -54,6 +54,7 @@ from components.rtg.controller.protocol import (
     RtgControllerMigrationHistory,
     RtgControllerMigrationHistoryEvent,
     RtgControllerObjectNotFound,
+    RtgControllerObjectRead,
     RtgControllerOperationResult,
     RtgControllerPreconditionFailed,
     RtgControllerReplayFailed,
@@ -67,6 +68,8 @@ from components.rtg.controller.protocol import (
     RtgControllerSystemState,
     RtgControllerValidationFailed,
     RtgControllerValidationOptions,
+    RtgControllerWriteConflict,
+    RtgControllerWriteConflictDetail,
     RtgPersistedSnapshotDocument,
     RtgPersistedSnapshotList,
     RtgSystemSnapshot,
@@ -329,6 +332,47 @@ class InProcessRtgController:
                         transaction_id=transaction_id,
                         validation_report=validation_report,
                     )
+            try:
+                self._assert_data_write_mode_preconditions(resolved)
+            except RtgControllerPreconditionFailed as error:
+                self._record_ledger(
+                    transaction_id,
+                    operation_name,
+                    "error",
+                    {"status": "precondition_failed", "message": str(error)},
+                )
+                raise
+            conflicts = self._replace_write_conflicts(resolved)
+            if conflicts:
+                diagnostic = rtg_diagnostic(
+                    code="controller.data_object.replace_conflict",
+                    category="optimistic_concurrency",
+                    path="graph_changes.data_object_writes",
+                    problem="One or more replace-mode writes used stale version tokens.",
+                    remedy=(
+                        "Review the returned current objects, then issue an explicit merge or "
+                        "replace request using fresh version tokens."
+                    ),
+                    safe_to_retry=False,
+                    mutation_state="not_mutated",
+                )
+                self._record_ledger(
+                    transaction_id,
+                    operation_name,
+                    "error",
+                    {
+                        "status": "write_conflict",
+                        "transaction_id": str(transaction_id),
+                        "conflicts": _to_json_value(conflicts),
+                        "diagnostic": diagnostic,
+                    },
+                )
+                raise RtgControllerWriteConflict(
+                    "replace-mode write conflict",
+                    transaction_id=transaction_id,
+                    conflicts=conflicts,
+                    diagnostic=diagnostic,
+                )
             preimage = self._capture_apply_preimage(resolved)
             try:
                 applied = self._apply_resolved_batch(resolved)
@@ -526,10 +570,10 @@ class InProcessRtgController:
             options = query_options or RtgQueryOptions(live_filter="live")
             return self._query_engine.execute(self._graph, query_spec, options)
 
-    def get_object(self, object_uuid: UUID | str) -> RtgObject:
+    def get_object(self, object_uuid: UUID | str) -> RtgControllerObjectRead:
         with self._lock:
             try:
-                return self._graph.get_object(object_uuid)
+                obj = self._graph.get_object(object_uuid)
             except (RtgGraphObjectNotFound, RtgGraphUuidInvalid) as error:
                 raise RtgControllerObjectNotFound(
                     str(error),
@@ -543,6 +587,17 @@ class InProcessRtgController:
                         mutation_state="not_mutated",
                     ),
                 ) from error
+            direct_anchor_refs: tuple[UUID, ...] = ()
+            version_token = None
+            if isinstance(obj, RtgDataObject):
+                direct_anchor_refs = self._data_object_anchor_refs(_record_uuid(obj))
+                version_token = self._data_object_version_token(obj, direct_anchor_refs)
+            return RtgControllerObjectRead(
+                object=obj,
+                direct_anchor_refs=direct_anchor_refs,
+                version_token=version_token,
+                observed_ledger_position=self._latest_persisted_ledger_position(),
+            )
 
     def list_migrations(self, status: str | None = None) -> RtgMigrationRecordList:
         with self._lock:
@@ -1417,6 +1472,18 @@ class InProcessRtgController:
         value = rows[0].get("count")
         return int(cast(int, value)) if value is not None else 0
 
+    def _latest_persisted_ledger_position(self) -> int | None:
+        try:
+            rows = self._sql_storage.query(
+                "select max(ledger_position) as ledger_position from rtg_controller_ledger"
+            ).rows
+        except Exception:
+            return self._last_ledger_position
+        if not rows:
+            return self._last_ledger_position
+        value = rows[0].get("ledger_position")
+        return int(cast(int, value)) if value is not None else None
+
     def _resolve_batch(self, batch: RtgChangeBatch) -> RtgChangeBatch:
         return self._resolve_batch_with_generated_ids(batch)[0]
 
@@ -1471,6 +1538,8 @@ class InProcessRtgController:
                 RtgGraphDataObjectWrite(
                     ref=RtgChangeReference(resource_id=resolve_uuid(write.ref)),
                     type=write.type,
+                    mode=write.mode,
+                    expected_version=write.expected_version,
                     properties=write.properties,
                     system=write.system,
                     anchor_refs=tuple(
@@ -1628,7 +1697,7 @@ class InProcessRtgController:
                 RtgDataObject(
                     uuid=data_uuid,
                     type=write.type,
-                    properties=write.properties,
+                    properties=self._materialized_data_object_properties(write),
                     system=self._stamped_graph_system(data_uuid, write.system),
                 ),
                 tuple(_uuid_ref(ref) for ref in write.anchor_refs),
@@ -1700,6 +1769,95 @@ class InProcessRtgController:
             deletes=deletes,
             live_status_changes=live_status_changes,
         )
+
+    def _assert_data_write_mode_preconditions(self, batch: RtgChangeBatch) -> None:
+        for index, write in enumerate(batch.graph_changes.data_object_writes):
+            path = f"graph_changes.data_object_writes[{index}]"
+            if write.mode not in {"merge", "replace"}:
+                raise RtgControllerPreconditionFailed(
+                    f"{path}.mode must be explicitly set to merge or replace"
+                )
+            if write.mode == "merge":
+                if write.expected_version is not None:
+                    raise RtgControllerPreconditionFailed(
+                        f"{path}.expected_version is forbidden in merge mode"
+                    )
+                continue
+            target = self._try_get_graph_object(_uuid_ref(write.ref))
+            if not isinstance(target, RtgDataObject):
+                raise RtgControllerPreconditionFailed(
+                    f"{path} replace mode requires an existing data object"
+                )
+            if write.expected_version is None:
+                raise RtgControllerPreconditionFailed(
+                    f"{path}.expected_version is required in replace mode"
+                )
+
+    def _replace_write_conflicts(
+        self,
+        batch: RtgChangeBatch,
+    ) -> tuple[RtgControllerWriteConflictDetail, ...]:
+        conflicts: list[RtgControllerWriteConflictDetail] = []
+        for write in batch.graph_changes.data_object_writes:
+            if write.mode != "replace" or write.expected_version is None:
+                continue
+            object_uuid = _uuid_ref(write.ref)
+            current = self._graph.get_object(object_uuid)
+            if not isinstance(current, RtgDataObject):
+                continue
+            anchors = self._data_object_anchor_refs(object_uuid)
+            current_version = self._data_object_version_token(current, anchors)
+            if write.expected_version == current_version:
+                continue
+            conflicts.append(
+                RtgControllerWriteConflictDetail(
+                    object_uuid=object_uuid,
+                    expected_version=write.expected_version,
+                    current_version=current_version,
+                    current_object=current,
+                    current_direct_anchor_refs=anchors,
+                )
+            )
+        return tuple(conflicts)
+
+    def _materialized_data_object_properties(
+        self,
+        write: RtgGraphDataObjectWrite,
+    ) -> JsonObject:
+        if write.mode != "merge":
+            return write.properties
+        existing = self._try_get_graph_object(_uuid_ref(write.ref))
+        if not isinstance(existing, RtgDataObject):
+            return write.properties
+        return {**existing.properties, **write.properties}
+
+    def _data_object_anchor_refs(self, object_uuid: UUID) -> tuple[UUID, ...]:
+        return tuple(
+            sorted(
+                (
+                    _record_uuid(anchor)
+                    for anchor in self._graph.list_data_anchors(object_uuid).anchors
+                ),
+                key=str,
+            )
+        )
+
+    def _data_object_version_token(
+        self,
+        data_object: RtgDataObject,
+        direct_anchor_refs: tuple[UUID, ...],
+    ) -> str:
+        canonical = json.dumps(
+            _to_json_value(
+                {
+                    "object": data_object,
+                    "direct_anchor_refs": direct_anchor_refs,
+                }
+            ),
+            sort_keys=True,
+            separators=(",", ":"),
+        )
+        return f"sha256:{hashlib.sha256(canonical.encode()).hexdigest()}"
 
     def _apply_registry_live_flips(
         self,
@@ -3308,6 +3466,12 @@ def _graph_changes_from_json(value: object) -> RtgGraphChangeSet:
             RtgGraphDataObjectWrite(
                 ref=_ref_from_json(item["ref"]),
                 type=str(item["type"]),
+                mode=(str(item["mode"]) if item.get("mode") is not None else "replace"),
+                expected_version=(
+                    str(item["expected_version"])
+                    if item.get("expected_version") is not None
+                    else None
+                ),
                 properties=_json_object(item.get("properties", {})),
                 system=_json_object(item.get("system", {})),
                 anchor_refs=tuple(
