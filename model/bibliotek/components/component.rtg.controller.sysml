@@ -40,26 +40,26 @@ library package BibliotekRtgController {
     attribute def RtgControllerValidationOptions :> RtgValidationOptions {
         doc /* Controller validation uses the same canonical track-selection and finding-limit semantics as change validation. */
     }
-    attribute def RtgControllerCutoverOptions { attribute validationMode : RtgControllerValidationMode = RtgControllerValidationMode::strict; attribute pruneRetired : Boolean = true; attribute failureRestore : RtgControllerFailureRestore = RtgControllerFailureRestore::restore_pre_cutover_snapshot; }
-    attribute def RtgControllerDiscoveryOptions { attribute includeNonLive : Boolean = false; attribute limit[0..1] : Integer; }
-    attribute def RtgControllerSchemaPackOptions { attribute live[0..1] : Boolean = true; attribute includeLiveCounts : Boolean = true; }
+    attribute def RtgControllerCutoverOptions { attribute validationMode : RtgControllerValidationMode default = RtgControllerValidationMode::strict; attribute pruneRetired : Boolean default = true; attribute failureRestore : RtgControllerFailureRestore default = RtgControllerFailureRestore::restore_pre_cutover_snapshot; }
+    attribute def RtgControllerDiscoveryOptions { attribute includeNonLive : Boolean default = false; attribute limit[0..1] : Integer; }
+    attribute def RtgControllerSchemaPackOptions { attribute live[0..1] : Boolean default = true; attribute includeLiveCounts : Boolean default = true; }
     attribute def RtgControllerAppliedChanges {
-        attribute graphWrites : Integer;
-        attribute schemaWrites : Integer;
-        attribute constraintWrites : Integer;
-        attribute migrationWrites : Integer;
-        attribute deletes : Integer;
-        attribute liveStatusChanges : Integer;
+        attribute graphWrites : Integer default = 0;
+        attribute schemaWrites : Integer default = 0;
+        attribute constraintWrites : Integer default = 0;
+        attribute migrationWrites : Integer default = 0;
+        attribute deletes : Integer default = 0;
+        attribute liveStatusChanges : Integer default = 0;
     }
     attribute def RtgControllerOperationResult {
         attribute status : RtgControllerOperationStatus;
         attribute appliedChanges : RtgControllerAppliedChanges;
         attribute validationReport[0..1] : RtgValidationReport;
-        attribute 'snapshot'[0..1] : RtgSystemSnapshot;
         attribute details : JsonObject;
         attribute generatedIds : JsonObject;
+        doc /* Construction supplies all-zero applied counts and empty details/generatedIds when omitted. details is limited to operation-specific identifiers, candidate counts, pruned/skipped identity summaries, and short reasons; it never contains submitted changes, snapshots, validation report copies, or arbitrary exception data. */
     }
-    attribute def RtgControllerLiveGraphValidationResult { attribute status : RtgControllerValidationStatus; attribute mutationState : RtgControllerMutationState; attribute accepted : Boolean; attribute generatedIds : JsonObject; attribute resolvedGraphChanges : RtgGraphChangeSet; attribute validationReport : RtgValidationReport; doc /* generatedIds maps each request-local reference to its resolved UUID exactly as apply would. */ }
+    attribute def RtgControllerLiveGraphValidationResult { attribute status : RtgControllerValidationStatus; attribute mutationState : RtgControllerMutationState; attribute accepted : Boolean; attribute generatedIds : JsonObject; attribute validationReport : RtgValidationReport; doc /* generatedIds maps each request-local reference to its resolved UUID exactly as apply would; the resolved change batch is not repeated in the result. */ }
     attribute def RtgSystemSnapshot { attribute graph : RtgGraphSnapshot; attribute schema : RtgSchemaSnapshot; attribute constraints : RtgConstraintSnapshot; attribute migration : RtgMigrationSnapshot; }
     attribute def RtgAnchorTypeDiscoveryEntry { attribute typeKey : String; attribute description : String; attribute liveCount : Integer; }
     attribute def RtgAnchorTypeDiscoveryResult { attribute anchorTypes[0..*] : RtgAnchorTypeDiscoveryEntry; }
@@ -96,8 +96,10 @@ library package BibliotekRtgController {
         attribute recommendedWorkflows[0..*] : RtgControllerWorkflow;
         attribute recommendedNextSteps[0..*] : String;
     }
-    attribute def RtgPersistedSnapshotList { attribute snapshots[0..*] : RtgPersistedSnapshotMetadata; }
+    attribute def RtgPersistedSnapshotList { attribute snapshots[0..*] : RtgPersistedSnapshotMetadata; attribute total : Integer; attribute nextOffset : Integer[0..1]; }
     attribute def RtgPersistedSnapshotDocument { attribute relativePath : JsonRelativePath; attribute 'snapshot' : RtgSystemSnapshot; }
+    attribute def RtgSnapshotStateCounts { attribute anchors : Integer; attribute dataObjects : Integer; attribute links : Integer; attribute schemaDefinitions : Integer; attribute constraints : Integer; attribute migrations : Integer; }
+    attribute def RtgSnapshotPersistenceResult { attribute status : RtgControllerOperationStatus; attribute relativePath : JsonRelativePath; attribute sizeBytes : Integer; attribute digest : String; attribute stateCounts : RtgSnapshotStateCounts; doc /* Compact metadata for one persisted state transfer. The persisted snapshot is not repeated in this result. */ }
 
     attribute def RtgControllerConfigurationInvalid { attribute 'message' : String; attribute diagnostic[0..1] : RtgDiagnostic; }
     attribute def RtgControllerValidationFailed { attribute 'message' : String; attribute validationReport[0..1] : RtgValidationReport; attribute diagnostic[0..1] : RtgDiagnostic; }
@@ -108,44 +110,41 @@ library package BibliotekRtgController {
     attribute def RtgControllerSnapshotFailed { attribute 'message' : String; attribute diagnostic[0..1] : RtgDiagnostic; }
     attribute def RtgControllerRecoveryIndeterminate { attribute 'message' : String; attribute diagnostic[0..1] : RtgDiagnostic; }
 
-    action def ApplyLiveGraphChanges { in graphChanges : RtgGraphChangeSet; in validationMode : RtgControllerValidationMode default = RtgControllerValidationMode::strict; out result : RtgControllerOperationResult; doc /* Validate and apply normal live graph CRUD in the serialized mutation lane. */ @FailureContract { errorIds = ("RtgControllerValidationFailed", "RtgControllerApplyFailed"); } }
-    action def ValidateLiveGraphChanges { in graphChanges : RtgGraphChangeSet; in validationOptions[0..1] : RtgControllerValidationOptions; out result : RtgControllerLiveGraphValidationResult; doc /* Normalize exactly as apply would and return generated identities, resolved changes, and validation without component mutation. */ @FailureContract { errorIds = ("RtgControllerPreconditionFailed", "RtgValidationInputInvalid"); } }
-    action def StageKnowledgeChanges { in knowledgeChanges : RtgChangeBatch; in validationMode : RtgControllerValidationMode default = RtgControllerValidationMode::strict; out result : RtgControllerOperationResult; doc /* Validate and stage migration-scoped non-live graph, schema, constraint, and migration records. */ @FailureContract { errorIds = ("RtgControllerValidationFailed", "RtgControllerPreconditionFailed", "RtgControllerApplyFailed"); } }
+    action def ApplyLiveGraphChanges { in graphChanges : RtgGraphChangeSet; in validationMode : RtgControllerValidationMode default = RtgControllerValidationMode::strict; out result : RtgControllerOperationResult; doc /* Validate and apply normal live graph CRUD in the serialized mutation lane. */ @FailureContract { errorIds = ("RtgControllerValidationFailed", "RtgControllerApplyFailed", "RtgControllerRecoveryIndeterminate"); } }
+    action def ValidateLiveGraphChanges { in graphChanges : RtgGraphChangeSet; in validationOptions[0..1] : RtgControllerValidationOptions; out result : RtgControllerLiveGraphValidationResult; doc /* Normalize exactly as apply would and return generated identities plus bounded validation without component mutation or repeating the resolved batch. */ @FailureContract { errorIds = ("RtgControllerPreconditionFailed", "RtgValidationInputInvalid"); } }
+    action def StageKnowledgeChanges { in knowledgeChanges : RtgChangeBatch; in validationMode : RtgControllerValidationMode default = RtgControllerValidationMode::strict; out result : RtgControllerOperationResult; doc /* Validate and stage migration-scoped non-live graph, schema, constraint, and migration records. */ @FailureContract { errorIds = ("RtgControllerValidationFailed", "RtgControllerPreconditionFailed", "RtgControllerApplyFailed", "RtgControllerRecoveryIndeterminate"); } }
     action def ApplyMigrationCutover { in migrationId : String; in cutoverOptions[0..1] : RtgControllerCutoverOptions; out result : RtgControllerOperationResult; doc /* Apply exactly one migration membership in reference-safe order, validate the result, and either commit or restore. */ @FailureContract { errorIds = ("RtgControllerPreconditionFailed", "RtgControllerValidationFailed", "RtgControllerApplyFailed", "RtgControllerRecoveryIndeterminate"); } }
     action def ExecuteControllerQuery { in querySpec : RtgQuerySpec; in queryOptions[0..1] : RtgQueryOptions; out result : RtgQueryResult; doc /* Execute against one coherent graph view while controller mutations are excluded. */ @FailureContract { errorIds = ("RtgQuerySpecInvalid", "RtgQueryUnsupported"); } }
     action def ControllerGetObject { in objectUuid : String; out ref object : RtgObject; doc /* Normalize UUID text and return the public graph record without lifecycle filtering; invalid and absent UUIDs are reported through the controller-owned not-found contract. */ @FailureContract { errorIds = ("RtgControllerObjectNotFound"); } }
-    action def ControllerListMigrations { in status[0..1] : RtgMigrationStatus; out result : RtgMigrationRecordList; doc /* Return all migration records or one status in deterministic migration-ID order. */ @FailureContract { errorIds = ("RtgMigrationStatusInvalid"); } }
+    action def ControllerListMigrations { in status[0..1] : RtgMigrationStatus; in offset : Integer default = 0; in limit : Integer default = 100; out result : RtgMigrationRecordList; doc /* Return a stable bounded page of migration records in migration-ID order. */ @FailureContract { errorIds = ("RtgMigrationStatusInvalid"); } }
     action def ControllerGetMigration { in migrationId : String; out result : RtgMigrationRecord; doc /* Return one migration tracking record by stable migration ID. */ @FailureContract { errorIds = ("RtgMigrationNotFound"); } }
     action def ValidateGraph { in migrationIds[0..*] : String; in validationOptions[0..1] : RtgControllerValidationOptions; out report : RtgValidationReport; doc /* Validate current state or named migration projections without mutation. */ @FailureContract { errorIds = ("RtgControllerValidationFailed"); } }
     action def DiscoverAnchorTypes { in discoveryOptions[0..1] : RtgControllerDiscoveryOptions; out result : RtgAnchorTypeDiscoveryResult; doc /* Compose schema summaries and graph counts; absent options exclude non-live types and impose no limit. */ @FailureContract { errorIds = ("RtgControllerDiscoveryFailed"); } }
     action def GetControllerSchemaPack { in anchorTypeKeys[1..*] : String; in schemaPackOptions[0..1] : RtgControllerSchemaPackOptions; out result : RtgControllerSchemaPack; doc /* Return the schema closure for named anchors and, by default, current live counts. */ @FailureContract { errorIds = ("RtgControllerDiscoveryFailed"); } }
+    action def ListSchemaDefinitionsByTypeKey { in typeKey : String; in kind[0..1] : RtgSchemaDefinitionKind; in live[0..1] : Boolean; in offset : Integer default = 0; in limit[0..1] : Integer; out result : RtgSchemaDefinitionList; doc /* Return a deterministic bounded page for one type key without exporting coordinated system state. */ @FailureContract { errorIds = ("RtgControllerPreconditionFailed"); } }
     action def GetSystemState { out result : RtgControllerSystemState; doc /* Return a read-only classified domain summary, persisted snapshot paths, and recommended workflows. */ @FailureContract { errorIds = ("RtgControllerDiscoveryFailed"); } }
     action def ExportSystemSnapshot { out 'snapshot' : RtgSystemSnapshot; doc /* Export all four component snapshots from one coordinated visible state. */ @FailureContract { errorIds = ("RtgControllerSnapshotFailed"); } }
-    action def PersistSystemSnapshot { in relativePath : JsonRelativePath; out result : RtgControllerOperationResult; doc /* Export and atomically store one coordinated snapshot under JSON storage authority. */ @FailureContract { errorIds = ("RtgControllerSnapshotFailed"); } }
-    action def ListPersistedSnapshots { out result : RtgPersistedSnapshotList; doc /* List only valid persisted system snapshots visible through the bound JSON storage root. */ @FailureContract { errorIds = ("RtgControllerSnapshotFailed"); } }
+    action def PersistSystemSnapshot { in relativePath : JsonRelativePath; out result : RtgSnapshotPersistenceResult; doc /* Export and atomically store one coordinated snapshot under JSON storage authority, returning only path, byte size, digest, and state counts. */ @FailureContract { errorIds = ("RtgControllerSnapshotFailed"); } }
+    action def ListPersistedSnapshots { in offset : Integer default = 0; in limit : Integer default = 100; out result : RtgPersistedSnapshotList; doc /* Return a stable bounded page of valid persisted system snapshots visible through the bound JSON storage root. */ @FailureContract { errorIds = ("RtgControllerSnapshotFailed"); } }
     action def LoadPersistedSnapshot { in relativePath : JsonRelativePath; out result : RtgPersistedSnapshotDocument; doc /* Read and validate a persisted snapshot document without applying it. */ @FailureContract { errorIds = ("RtgControllerSnapshotFailed"); } }
-    action def AbandonMigration { in migrationId : String; in reason[0..1] : String; out result : RtgControllerOperationResult; doc /* Mark migration work abandoned and prune only safe non-live candidates owned by that migration. */ @FailureContract { errorIds = ("RtgControllerPreconditionFailed", "RtgControllerApplyFailed"); } }
-    action def RestoreFromSnapshot { in 'snapshot' : RtgSystemSnapshot; out result : RtgControllerOperationResult; doc /* Validate then atomically replace coordinated graph, schema, constraint, and migration state. */ @FailureContract { errorIds = ("RtgControllerSnapshotFailed", "RtgControllerRecoveryIndeterminate"); } }
+    action def AbandonMigration { in migrationId : String; in reason[0..1] : String; out result : RtgControllerOperationResult; doc /* Mark migration work abandoned and prune only safe non-live candidates owned by that migration. */ @FailureContract { errorIds = ("RtgControllerPreconditionFailed", "RtgControllerApplyFailed", "RtgControllerRecoveryIndeterminate"); } }
+    action def RestoreFromSnapshot { in 'snapshot' : RtgSystemSnapshot; out result : RtgControllerOperationResult; doc /* Validate an explicitly supplied whole-system state-transfer document, replace each state owner while writes are excluded, and require runtime reconstruction before reopening if a partial replacement cannot be resolved. */ @FailureContract { errorIds = ("RtgControllerSnapshotFailed", "RtgControllerRecoveryIndeterminate"); } }
 
     part def <'component.rtg.controller'> RtgController {
-        doc /* Coordinate RTG mutation and validation lanes, saga compensation, cross-component invariants, query consistency, and coordinated snapshot export, persistence, and restoration. */
+        doc /* Coordinate RTG mutation and validation lanes, component-local atomic batches, cross-component recovery classification, query consistency, and explicit snapshot export, persistence, and restoration. */
         @SpecificationStatus { lifecycleStatus = SpecLifecycle::accepted; owner = "humans"; }
 
         ref part graph[1] : RtgGraph {
             perform restoreFromSnapshot.replaceGraph;
-            perform restoreFromSnapshot.compensateGraph;
         }
         ref part schema[1] : RtgSchema {
             perform restoreFromSnapshot.replaceSchema;
-            perform restoreFromSnapshot.compensateSchema;
         }
         ref part constraints[1] : RtgConstraints {
             perform restoreFromSnapshot.replaceConstraints;
-            perform restoreFromSnapshot.compensateConstraints;
         }
         ref part migration[1] : RtgMigration {
             perform restoreFromSnapshot.replaceMigration;
-            perform restoreFromSnapshot.compensateMigration;
         }
         ref part changeValidator[1] : RtgChangeValidator {
             perform applyLiveGraphChanges.validateProjection;
@@ -158,7 +157,7 @@ library package BibliotekRtgController {
         }
         ref part jsonStorage[1] : JsonFileStorage;
         perform action applyLiveGraphChanges[0..*] : ApplyLiveGraphChanges {
-            doc /* Serialized validation, component mutation, restoration on failure, and domain result. */
+            doc /* Serialized validation followed by one graph-local atomic batch and a domain result. */
             action normalize {
                 in attribute graphChanges = applyLiveGraphChanges.graphChanges;
                 in attribute validationMode = applyLiveGraphChanges.validationMode;
@@ -181,7 +180,6 @@ library package BibliotekRtgController {
                 doc /* Apply the accepted projected graph change through public graph actions. */
             }
             action reject { doc /* Return the blocking validation report without mutation. */ }
-            action restorePreimage { doc /* Restore every touched component after an apply failure. */ }
             action returnOutcome {
                 out attribute result = applyLiveGraphChanges.result;
                 doc /* Return the applied, rejected, or restored domain outcome. */
@@ -191,17 +189,14 @@ library package BibliotekRtgController {
                 if validateProjection.report.accepted then applyProjection;
             succession rejectedProjection first validateProjection
                 if not validateProjection.report.accepted then reject;
-            succession failedApply first applyProjection
-                if not applyProjection.applied then restorePreimage;
             succession successfulApply first applyProjection
                 if applyProjection.applied then returnOutcome;
-            first restorePreimage then returnOutcome;
             first reject then returnOutcome;
         }
         perform action validateLiveGraphChanges[0..*] : ValidateLiveGraphChanges { doc /* read and project dependencies with no component mutation. */ }
         perform action stageKnowledgeChanges[0..*] : StageKnowledgeChanges { doc /* serialized migration-scoped staging with rollback and a domain result. */ }
         perform action applyMigrationCutover[0..*] : ApplyMigrationCutover {
-            doc /* Serialized coordinated cutover with validation, restoration, and a legible outcome. */
+            doc /* Serialized coordinated cutover using component-local atomic batches and recovery-required classification for unresolved cross-owner faults. */
             action derivePlan {
                 in attribute migrationId = applyMigrationCutover.migrationId;
                 in attribute cutoverOptions = applyMigrationCutover.cutoverOptions;
@@ -218,7 +213,6 @@ library package BibliotekRtgController {
                 in changeBatch redefines ValidateRtgChangeBatch::changeBatch = derivePlan.projectedBatch;
                 in validationOptions redefines ValidateRtgChangeBatch::validationOptions = derivePlan.validationOptions;
             }
-            action capturePreimage { doc /* Capture the complete coordinated pre-cutover state. */ }
             action applyCutover {
                 out applied : Boolean;
                 doc /* Apply reference-safe schema, constraint, graph, and lifecycle changes. */
@@ -236,24 +230,19 @@ library package BibliotekRtgController {
                 out attribute result = applyMigrationCutover.result;
                 doc /* Commit applied lifecycle status and optional pruning, then return the applied outcome. */
             }
-            action restorePreimage { doc /* Restore the coordinated preimage after any failed apply or validation. */ }
             action recordFailed {
                 out attribute result = applyMigrationCutover.result;
-                doc /* Return cutover_failed with actionable diagnostics after restoration and the documented migration failure-state effect. */
+                doc /* Return cutover_failed only when no cross-owner effect is uncertain; unresolved partial effects are recovery-indeterminate. */
             }
             first derivePlan then validateProjection;
             succession acceptedCutoverProjection first validateProjection
-                if validateProjection.report.accepted then capturePreimage;
-            first capturePreimage then applyCutover;
+                if validateProjection.report.accepted then applyCutover;
             succession appliedCutover first applyCutover
                 if applyCutover.applied then validateActualState;
             succession validCutoverState first validateActualState
                 if validateActualState.report.accepted then commitApplied;
-            succession failedCutoverApply first applyCutover
-                if not applyCutover.applied then restorePreimage;
-            succession invalidCutoverState first validateActualState
-                if not validateActualState.report.accepted then restorePreimage;
-            first restorePreimage then recordFailed;
+            succession rejectedCutoverProjection first validateProjection
+                if not validateProjection.report.accepted then recordFailed;
         }
         perform action executeQuery[0..*] : ExecuteControllerQuery {
             doc /* Evaluate once against a coherent graph view while component writes are excluded. */
@@ -270,6 +259,7 @@ library package BibliotekRtgController {
         perform action validateGraph[0..*] : ValidateGraph { doc /* read and project dependencies without mutation. */ }
         perform action discoverAnchorTypes[0..*] : DiscoverAnchorTypes { doc /* compose schema and count reads without mutation. */ }
         perform action getSchemaPack[0..*] : GetControllerSchemaPack { doc /* compose schema and count reads without mutation. */ }
+        perform action listSchemaDefinitionsByTypeKey[0..*] : ListSchemaDefinitionsByTypeKey { doc /* delegate one targeted schema read without mutation. */ }
         perform action getSystemState[0..*] : GetSystemState { doc /* summarize domain components and persisted snapshots without mutation. */ }
         perform action exportSystemSnapshot[0..*] : ExportSystemSnapshot { doc /* coordinated read of all four state-owning RTG components. */ }
         perform action persistSystemSnapshot[0..*] : PersistSystemSnapshot { doc /* write one atomic JSON snapshot document and return its domain outcome. */ }
@@ -296,29 +286,17 @@ library package BibliotekRtgController {
                 in query redefines ValidateRtgGraphState::query = projectSnapshot.query;
                 in validationOptions redefines ValidateRtgGraphState::validationOptions = projectSnapshot.validationOptions;
             }
-            action capturePreimage {
-                out attribute graph : RtgGraphSnapshot;
-                out attribute schema : RtgSchemaSnapshot;
-                out attribute constraints : RtgConstraintSnapshot;
-                out attribute migration : RtgMigrationSnapshot;
-                doc /* Capture the complete prior state before any component replacement. */
-            }
             action replaceGraph : ReplaceGraphSnapshot { in 'snapshot' redefines ReplaceGraphSnapshot::'snapshot' = restoreFromSnapshot.'snapshot'.graph; }
             action replaceSchema : ReplaceSchemaSnapshot { in 'snapshot' redefines ReplaceSchemaSnapshot::'snapshot' = restoreFromSnapshot.'snapshot'.schema; }
             action replaceConstraints : ReplaceConstraintSnapshot { in 'snapshot' redefines ReplaceConstraintSnapshot::'snapshot' = restoreFromSnapshot.'snapshot'.constraints; }
             action replaceMigration : ReplaceMigrationSnapshot { in 'snapshot' redefines ReplaceMigrationSnapshot::'snapshot' = restoreFromSnapshot.'snapshot'.migration; }
-            action compensateGraph : ReplaceGraphSnapshot { in 'snapshot' redefines ReplaceGraphSnapshot::'snapshot' = capturePreimage.graph; }
-            action compensateSchema : ReplaceSchemaSnapshot { in 'snapshot' redefines ReplaceSchemaSnapshot::'snapshot' = capturePreimage.schema; }
-            action compensateConstraints : ReplaceConstraintSnapshot { in 'snapshot' redefines ReplaceConstraintSnapshot::'snapshot' = capturePreimage.constraints; }
-            action compensateMigration : ReplaceMigrationSnapshot { in 'snapshot' redefines ReplaceMigrationSnapshot::'snapshot' = capturePreimage.migration; }
             action returnRestore {
                 out attribute result = restoreFromSnapshot.result;
                 doc /* Return the restoration outcome after the coordinated replacement. */
             }
             first projectSnapshot then validateSnapshot;
             succession acceptedSnapshot first validateSnapshot
-                if validateSnapshot.report.accepted then capturePreimage;
-            first capturePreimage then replaceGraph;
+                if validateSnapshot.report.accepted then replaceGraph;
             first replaceGraph then replaceSchema;
             first replaceSchema then replaceConstraints;
             first replaceConstraints then replaceMigration;
@@ -424,7 +402,7 @@ library package BibliotekRtgController {
     requirement <'contract.rtg.controller.live_mutation_flow'> liveMutationFlow {
         subject operation : ApplyLiveGraphChanges;
         require constraint {
-            doc /* Normalize references, construct a projected state, validate it in strict mode, apply only an accepted projection, restore all touched component state on apply failure, then return the domain outcome. */
+            doc /* Normalize references, construct a projected state, validate it in strict mode, and submit one graph-local atomic batch only for an accepted projection. Rejection and local batch failure expose unchanged graph state. */
         }
     }
 
@@ -452,14 +430,14 @@ library package BibliotekRtgController {
     requirement <'contract.rtg.controller.cutover_flow'> cutoverFlow {
         subject operation : ApplyMigrationCutover;
         require constraint {
-            doc /* Read the selected migration membership, snapshot coordinated state, apply make-live and make-non-live changes in reference-safe order, validate the result, and either commit an applied status or restore the snapshot and record failed status. A failed compensation never claims restoration or an ordinary failed outcome; it reports RtgControllerRecoveryIndeterminate. */
+            doc /* Read selected migration membership, validate the projection, apply non-empty component-local batches in reference-safe order, validate the result, and commit applied status. Before any owner commits, rejection is an ordinary no-effect failure. After an owner commits, unresolved delivery or a later-owner failure is recovery-indeterminate and ordinary traffic remains closed until reconstruction verifies a coherent outcome. */
         }
     }
 
     requirement <'contract.rtg.controller.cutover_sequence'> cutoverSequence {
         subject operation : ApplyMigrationCutover;
         require constraint {
-            doc /* Under the write lock: derive the plan from the selected migration; validate the projected state; capture a coordinated preimage; make schema and constraint changes, with make-non-live before make-live for a type key; make graph live changes; validate actual state; optionally prune retired records; then remove the completed migration. An ordinary failure restores the preimage, marks the migration failed when safe, and records cutover_failed. Failed compensation reports recovery-indeterminate state and does not assert either restoration or a safe failed-migration status. */
+            doc /* Under the write lock: derive and validate the plan; submit one non-empty atomic batch per state owner in reference-safe order; validate actual state; optionally prune retired records; then remove the completed migration. A known pre-commit rejection records cutover_failed. An unresolved fault after any owner commits reports recovery-indeterminate and does not assert restoration or a safe migration status. */
         }
     }
 
@@ -515,7 +493,7 @@ library package BibliotekRtgController {
     requirement <'contract.rtg.controller.restore_flow'> restoreFlow {
         subject operation : RestoreFromSnapshot;
         require constraint {
-            doc /* Construct and semantically validate all four candidate component states before replacing any current component. Invoke each state owner's public full-snapshot replacement action while controller reads and writes are excluded. Success exposes the coordinated domain state as one serialized visible change; a component failure invokes the same public replacement actions with the captured preimage before returning ordinary failure. Completed compensation preserves the complete prior domain state; failed compensation reports RtgControllerRecoveryIndeterminate and makes no coordinated-state claim. */
+            doc /* Construct and semantically validate all four candidate component states before replacing current components. Invoke each state owner's public full-snapshot replacement action while controller reads and writes are excluded. The controller does not capture another full preimage. Success exposes the requested logical restoration. Any unresolved partial replacement reports RtgControllerRecoveryIndeterminate, keeps ordinary traffic closed, and relies on the explicit restore target plus runtime reconstruction before reopening. */
         }
     }
 
@@ -529,7 +507,7 @@ library package BibliotekRtgController {
     requirement <'invariant.rtg.controller.public_contracts_only'> publicContractsOnly {
         subject controller : RtgController;
         require constraint {
-            doc /* Lower components are used only through public contracts, including snapshot replacement and compensation; no private host-swapping callback may replace a runtime-managed occurrence. */
+            doc /* Lower components are used only through public contracts, including atomic batches and explicit snapshot replacement; no private host-swapping callback may replace a runtime-managed occurrence. */
         }
     }
 
@@ -543,7 +521,7 @@ library package BibliotekRtgController {
     requirement <'contract.rtg.controller.intentional_boundary'> intentionalBoundary {
         subject controller : RtgController;
         require constraint {
-            doc /* The controller owns RTG saga sequencing, compensation, coordinated snapshot export/restore, and snapshot persistence through its JSON collaborator, not lower-store records or algorithms. It owns no traffic ledger, generic history/replay, runtime trace/cursor, authentication/authorization, UI or transport, storage-engine mechanics, replication/deployment topology, distributed lock, or distributed transaction guarantee. Curated discovery-view state remains outside v1. */
+            doc /* The controller owns RTG operation sequencing, cross-component invariant checks, recovery-required classification, coordinated snapshot export/restore, and snapshot persistence through its JSON collaborator, not lower-store records or algorithms. It owns no traffic ledger, generic history/replay, runtime trace/cursor, authentication/authorization, UI or transport, storage-engine mechanics, replication/deployment topology, distributed lock, online distributed rollback, or distributed transaction guarantee. Curated discovery-view state remains outside v1. */
         }
     }
 
@@ -669,7 +647,7 @@ library package BibliotekRtgController {
     requirement <'invariant.rtg.controller.cutover_restores_on_failure'> cutoverRestoresOnFailure {
         subject controller : RtgController;
         require constraint {
-            doc /* Failed cutover restores the pre-cutover visible state when compensation completes; compensation failure is explicitly recovery-indeterminate and never reported as an ordinary restored cutover failure. */
+            doc /* failureRestore=restore_pre_cutover_snapshot names the required logical pre-cutover recovery outcome; it does not require materializing a full preimage. A known rejection before owner commit leaves state unchanged. Unresolved cross-owner effects are recovery-indeterminate until reconstruction verifies the logical outcome. */
         }
     }
 
@@ -711,7 +689,21 @@ library package BibliotekRtgController {
     requirement <'invariant.rtg.controller.write_atomicity_scoped'> writeAtomicityScoped {
         subject controller : RtgController;
         require constraint {
-            doc /* Failed normalized apply restores touched component state within the controller scope. */
+            doc /* Each owner batch is locally atomic. The controller does not promise an online distributed rollback across owners; uncertainty after an earlier owner commit is recovery-indeterminate. */
+        }
+    }
+
+    requirement <'invariant.rtg.controller.routine_work_is_delta_scaled'> controllerRoutineWorkBounded {
+        subject controller : RtgController;
+        require constraint {
+            doc /* Non-state-transfer mutation and validation orchestration does not capture, copy, serialize, hash, or retain complete owner state for rollback or projection. Its scaffolding and transient recovery data may grow with the requested change and declared cascade closure, but not unrelated canonical state. Explicit snapshot export, persistence, restore, checkpoint, and reconstruction are exceptions. */
+        }
+    }
+
+    requirement <'contract.rtg.controller.validation_skip_scope'> validationSkipScope {
+        subject controller : RtgController;
+        require constraint {
+            doc /* validationMode=skip bypasses cross-component change validation only. Every state owner still enforces local structural invariants and local batch atomicity, and the operation result leaves validationReport absent to identify that validation was skipped. */
         }
     }
 
@@ -739,7 +731,7 @@ library package BibliotekRtgController {
     requirement <'contract.rtg.controller.apply_live_graph_changes.failures'> applyLiveGraphChangesFailureSemantics {
         subject operation : ApplyLiveGraphChanges;
         require constraint {
-            doc /* Strict rejection has no graph effect; apply failure restores touched component state and remains visible in the domain outcome. */
+            doc /* Strict rejection has no graph effect. The graph-local batch either applies completely or leaves graph state unchanged. */
         }
     }
 
@@ -753,14 +745,14 @@ library package BibliotekRtgController {
     requirement <'contract.rtg.controller.stage_knowledge_changes.failures'> stageKnowledgeChangesFailureSemantics {
         subject operation : StageKnowledgeChanges;
         require constraint {
-            doc /* Rejected staging has no effect; failed apply restores touched state and returns the visible domain outcome. */
+            doc /* Rejected staging before owner commit has no effect. A local batch failure leaves that owner unchanged; unresolved failure after another owner commits is recovery-indeterminate. */
         }
     }
 
     requirement <'contract.rtg.controller.apply_migration_cutover.failures'> applyMigrationCutoverFailureSemantics {
         subject operation : ApplyMigrationCutover;
         require constraint {
-            doc /* A failed cutover with completed compensation restores the pre-cutover visible state, preserves the documented failed-migration status when safe, and returns a legible failed outcome. If compensation fails, RtgControllerRecoveryIndeterminate identifies unconfirmed coordinated state; a runtime binding assigns an indeterminate trace disposition so reconstruction excludes the trace. */
+            doc /* A rejected cutover before owner commit leaves coordinated state unchanged and may record a legible failed migration. An unresolved failure after any owner commit raises RtgControllerRecoveryIndeterminate; the runtime assigns an indeterminate disposition, closes ordinary traffic, and requires reconstruction before a coherent outcome is claimed. */
         }
     }
 
@@ -840,6 +832,10 @@ library package BibliotekRtgController {
             doc /* Listing is storage-scoped and has no state effect. */
         }
     }
+    requirement <'contract.rtg.controller.list_schema_definitions_by_type_key.failures'> listSchemaDefinitionsByTypeKeyFailureSemantics {
+        subject operation : ListSchemaDefinitionsByTypeKey;
+        require constraint { doc /* Invalid selection or collaborator failure leaves schema and controller state unchanged and returns a modeled controller failure. */ }
+    }
 
     requirement <'contract.rtg.controller.load_persisted_snapshot.failures'> loadPersistedSnapshotFailureSemantics {
         subject operation : LoadPersistedSnapshot;
@@ -851,14 +847,14 @@ library package BibliotekRtgController {
     requirement <'contract.rtg.controller.abandon_migration.failures'> abandonMigrationFailureSemantics {
         subject operation : AbandonMigration;
         require constraint {
-            doc /* Abandonment never deletes live records; failure restores touched state and returns the outcome. */
+            doc /* Abandonment never deletes live records. Each owner batch is locally atomic; uncertainty after a prior owner commit is recovery-indeterminate rather than silently compensated. */
         }
     }
 
     requirement <'contract.rtg.controller.restore_from_snapshot.failures'> restoreFromSnapshotFailureSemantics {
         subject operation : RestoreFromSnapshot;
         require constraint {
-            doc /* Invalid restoration and replacement failure with completed compensation leave the prior coordinated state visible. If compensation fails, RtgControllerRecoveryIndeterminate identifies unconfirmed coordinated state; a runtime binding assigns an indeterminate trace disposition so reconstruction excludes the trace rather than claiming rollback. */
+            doc /* Invalid restoration before replacement leaves current state unchanged. The controller captures no full safety snapshot. Unresolved partial replacement raises RtgControllerRecoveryIndeterminate and requires reconstruction from the explicit restore target before ordinary traffic reopens. */
         }
     }
 
@@ -910,6 +906,8 @@ library package BibliotekRtgController {
         satisfy oneWriteAtATime by controller;
         satisfy resolvedUuidsBeforeMutation by controller;
         satisfy writeAtomicityScoped by controller;
+        satisfy controllerRoutineWorkBounded by controller;
+        satisfy validationSkipScope by controller;
         satisfy readsMediated by controller;
         satisfy liveFlipsViaFullRecordWrite by controller;
         satisfy graphTypeIsSchemaTypeKey by controller;
@@ -932,6 +930,7 @@ library package BibliotekRtgController {
         satisfy exportSystemSnapshotFailureSemantics by controller.exportSystemSnapshot;
         satisfy persistSystemSnapshotFailureSemantics by controller.persistSystemSnapshot;
         satisfy listPersistedSnapshotsFailureSemantics by controller.listPersistedSnapshots;
+        satisfy listSchemaDefinitionsByTypeKeyFailureSemantics by controller.listSchemaDefinitionsByTypeKey;
         satisfy loadPersistedSnapshotFailureSemantics by controller.loadPersistedSnapshot;
         satisfy abandonMigrationFailureSemantics by controller.abandonMigration;
         satisfy restoreFromSnapshotFailureSemantics by controller.restoreFromSnapshot;
@@ -949,7 +948,7 @@ library package BibliotekRtgController {
         }
         @EvidenceBinding {
             evidenceId = "components/rtg/controller/tests/test_rtg_controller_contract.py#ApplyLiveGraphChangesContractVerification";
-            implementationScope = "InProcessRtgController";
+            implementationScope = "RtgControllerCoordinator";
         }
     }
 
@@ -962,7 +961,7 @@ library package BibliotekRtgController {
         }
         @EvidenceBinding {
             evidenceId = "components/rtg/controller/tests/test_rtg_controller_contract.py#StageKnowledgeChangesContractVerification";
-            implementationScope = "InProcessRtgController";
+            implementationScope = "RtgControllerCoordinator";
         }
     }
 
@@ -975,7 +974,7 @@ library package BibliotekRtgController {
         }
         @EvidenceBinding {
             evidenceId = "components/rtg/controller/tests/test_rtg_controller_contract.py#ValidateLiveGraphChangesContractVerification";
-            implementationScope = "InProcessRtgController";
+            implementationScope = "RtgControllerCoordinator";
         }
     }
 
@@ -989,7 +988,7 @@ library package BibliotekRtgController {
         }
         @EvidenceBinding {
             evidenceId = "components/rtg/controller/tests/test_rtg_controller_contract.py#ApplyMigrationCutoverContractVerification";
-            implementationScope = "InProcessRtgController";
+            implementationScope = "RtgControllerCoordinator";
         }
     }
 
@@ -1002,7 +1001,7 @@ library package BibliotekRtgController {
         }
         @EvidenceBinding {
             evidenceId = "components/rtg/controller/tests/test_rtg_controller_contract.py#AbandonMigrationContractVerification";
-            implementationScope = "InProcessRtgController";
+            implementationScope = "RtgControllerCoordinator";
         }
     }
 
@@ -1015,7 +1014,7 @@ library package BibliotekRtgController {
         }
         @EvidenceBinding {
             evidenceId = "components/rtg/controller/tests/test_rtg_controller_contract.py#ExecuteControllerQueryContractVerification";
-            implementationScope = "InProcessRtgController";
+            implementationScope = "RtgControllerCoordinator";
         }
     }
 
@@ -1028,7 +1027,7 @@ library package BibliotekRtgController {
         }
         @EvidenceBinding {
             evidenceId = "components/rtg/controller/tests/test_rtg_controller_contract.py#GetSystemStateContractVerification";
-            implementationScope = "InProcessRtgController";
+            implementationScope = "RtgControllerCoordinator";
         }
     }
 
@@ -1041,7 +1040,7 @@ library package BibliotekRtgController {
         }
         @EvidenceBinding {
             evidenceId = "components/rtg/controller/tests/test_rtg_controller_contract.py#ExportSystemSnapshotContractVerification";
-            implementationScope = "InProcessRtgController";
+            implementationScope = "RtgControllerCoordinator";
         }
     }
 
@@ -1054,68 +1053,74 @@ library package BibliotekRtgController {
         }
         @EvidenceBinding {
             evidenceId = "components/rtg/controller/tests/test_rtg_controller_contract.py#RestoreFromSnapshotContractVerification";
-            implementationScope = "InProcessRtgController";
+            implementationScope = "RtgControllerCoordinator";
         }
     }
 
     verification def ControllerGetObjectContractVerification {
         subject operation : ControllerGetObject;
         objective { verify controllerGetObjectFailureSemantics; }
-        @EvidenceBinding { evidenceId = "components/rtg/controller/tests/test_rtg_controller_contract.py#ControllerGetObjectContractVerification"; implementationScope = "InProcessRtgController"; }
+        @EvidenceBinding { evidenceId = "components/rtg/controller/tests/test_rtg_controller_contract.py#ControllerGetObjectContractVerification"; implementationScope = "RtgControllerCoordinator"; }
     }
 
     verification def ControllerListMigrationsContractVerification {
         subject operation : ControllerListMigrations;
         objective { verify controllerListMigrationsFailureSemantics; }
-        @EvidenceBinding { evidenceId = "components/rtg/controller/tests/test_rtg_controller_contract.py#ControllerListMigrationsContractVerification"; implementationScope = "InProcessRtgController"; }
+        @EvidenceBinding { evidenceId = "components/rtg/controller/tests/test_rtg_controller_contract.py#ControllerListMigrationsContractVerification"; implementationScope = "RtgControllerCoordinator"; }
     }
 
     verification def ControllerGetMigrationContractVerification {
         subject operation : ControllerGetMigration;
         objective { verify controllerGetMigrationFailureSemantics; }
-        @EvidenceBinding { evidenceId = "components/rtg/controller/tests/test_rtg_controller_contract.py#ControllerGetMigrationContractVerification"; implementationScope = "InProcessRtgController"; }
+        @EvidenceBinding { evidenceId = "components/rtg/controller/tests/test_rtg_controller_contract.py#ControllerGetMigrationContractVerification"; implementationScope = "RtgControllerCoordinator"; }
     }
 
     verification def ValidateGraphContractVerification {
         subject operation : ValidateGraph;
         objective { verify validateGraphFailureSemantics; }
-        @EvidenceBinding { evidenceId = "components/rtg/controller/tests/test_rtg_controller_contract.py#ValidateGraphContractVerification"; implementationScope = "InProcessRtgController"; }
+        @EvidenceBinding { evidenceId = "components/rtg/controller/tests/test_rtg_controller_contract.py#ValidateGraphContractVerification"; implementationScope = "RtgControllerCoordinator"; }
     }
 
     verification def DiscoverAnchorTypesContractVerification {
         subject operation : DiscoverAnchorTypes;
         objective { verify discoverAnchorTypesFailureSemantics; }
-        @EvidenceBinding { evidenceId = "components/rtg/controller/tests/test_rtg_controller_contract.py#DiscoverAnchorTypesContractVerification"; implementationScope = "InProcessRtgController"; }
+        @EvidenceBinding { evidenceId = "components/rtg/controller/tests/test_rtg_controller_contract.py#DiscoverAnchorTypesContractVerification"; implementationScope = "RtgControllerCoordinator"; }
     }
 
     verification def GetControllerSchemaPackContractVerification {
         subject operation : GetControllerSchemaPack;
         objective { verify getControllerSchemaPackFailureSemantics; }
-        @EvidenceBinding { evidenceId = "components/rtg/controller/tests/test_rtg_controller_contract.py#GetControllerSchemaPackContractVerification"; implementationScope = "InProcessRtgController"; }
+        @EvidenceBinding { evidenceId = "components/rtg/controller/tests/test_rtg_controller_contract.py#GetControllerSchemaPackContractVerification"; implementationScope = "RtgControllerCoordinator"; }
     }
 
     verification def PersistSystemSnapshotContractVerification {
         subject operation : PersistSystemSnapshot;
         objective { verify persistSystemSnapshotFailureSemantics; }
-        @EvidenceBinding { evidenceId = "components/rtg/controller/tests/test_rtg_controller_contract.py#PersistSystemSnapshotContractVerification"; implementationScope = "InProcessRtgController"; }
+        @EvidenceBinding { evidenceId = "components/rtg/controller/tests/test_rtg_controller_contract.py#PersistSystemSnapshotContractVerification"; implementationScope = "RtgControllerCoordinator"; }
     }
 
     verification def ListPersistedSnapshotsContractVerification {
         subject operation : ListPersistedSnapshots;
         objective { verify listPersistedSnapshotsFailureSemantics; }
-        @EvidenceBinding { evidenceId = "components/rtg/controller/tests/test_rtg_controller_contract.py#ListPersistedSnapshotsContractVerification"; implementationScope = "InProcessRtgController"; }
+        @EvidenceBinding { evidenceId = "components/rtg/controller/tests/test_rtg_controller_contract.py#ListPersistedSnapshotsContractVerification"; implementationScope = "RtgControllerCoordinator"; }
+    }
+
+    verification def ListSchemaDefinitionsByTypeKeyContractVerification {
+        subject operation : ListSchemaDefinitionsByTypeKey;
+        objective { verify listSchemaDefinitionsByTypeKeyFailureSemantics; }
+        @EvidenceBinding { evidenceId = "components/rtg/controller/tests/test_rtg_controller_contract.py#ListSchemaDefinitionsByTypeKeyContractVerification"; implementationScope = "RtgControllerCoordinator"; }
     }
 
     verification def LoadPersistedSnapshotContractVerification {
         subject operation : LoadPersistedSnapshot;
         objective { verify loadPersistedSnapshotFailureSemantics; }
-        @EvidenceBinding { evidenceId = "components/rtg/controller/tests/test_rtg_controller_contract.py#LoadPersistedSnapshotContractVerification"; implementationScope = "InProcessRtgController"; }
+        @EvidenceBinding { evidenceId = "components/rtg/controller/tests/test_rtg_controller_contract.py#LoadPersistedSnapshotContractVerification"; implementationScope = "RtgControllerCoordinator"; }
     }
 
     verification def OpenRtgControllerContractVerification {
         subject operation : OpenRtgController;
         objective { verify openRtgControllerFailureSemantics; }
-        @EvidenceBinding { evidenceId = "components/rtg/controller/tests/test_rtg_controller_contract.py#OpenRtgControllerContractVerification"; implementationScope = "InProcessRtgController"; }
+        @EvidenceBinding { evidenceId = "components/rtg/controller/tests/test_rtg_controller_contract.py#OpenRtgControllerContractVerification"; implementationScope = "RtgControllerCoordinator"; }
     }
 
 
@@ -1154,10 +1159,17 @@ library package BibliotekRtgController {
             verify oneWriteAtATime;
             verify resolvedUuidsBeforeMutation;
             verify writeAtomicityScoped;
+            verify validationSkipScope;
             verify readsMediated;
             verify liveFlipsViaFullRecordWrite;
             verify graphTypeIsSchemaTypeKey;
         }
-        @EvidenceBinding { evidenceId = "components/rtg/controller/tests/test_rtg_controller_contract.py#RtgControllerBoundaryVerification"; implementationScope = "InProcessRtgController"; }
+        @EvidenceBinding { evidenceId = "components/rtg/controller/tests/test_rtg_controller_contract.py#RtgControllerBoundaryVerification"; implementationScope = "RtgControllerCoordinator"; }
+    }
+
+    verification def RtgControllerRoutineWorkScalingVerification {
+        subject controller : RtgController;
+        objective { verify controllerRoutineWorkBounded; }
+        @EvidenceBinding { evidenceId = "components/rtg/controller/tests/test_message_native_controller.py#RtgControllerRoutineWorkScalingVerification"; implementationScope = "RtgControllerCoordinator"; }
     }
 }

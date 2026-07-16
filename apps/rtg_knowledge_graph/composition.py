@@ -2,454 +2,279 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any, cast
+from typing import Any
 
 from apps.rtg_knowledge_graph.config import RtgKnowledgeGraphConfig
+from apps.rtg_knowledge_graph.facade import VellisFacadeComponent
 from apps.rtg_knowledge_graph.gateway_registration import (
     model_mcp_gateway_registrations,
     model_runtime_topology_manifest,
 )
-from apps.rtg_knowledge_graph.mcp_toolset import RtgMcpToolset
 from apps.rtg_knowledge_graph.runner import (
+    RUNNER_ACTIONS,
     RtgKnowledgeGraphRunner,
     RtgKnowledgeGraphRunStatus,
 )
-from apps.rtg_knowledge_graph.runtime_binding import (
-    create_vellis_facade_adapter,
-    create_vellis_facade_proxy,
-)
 from apps.rtg_knowledge_graph.runtime_services import VellisRuntimeServices
 from apps.rtg_knowledge_graph.starter_schema import (
+    STARTER_INSTALLER_ACTIONS,
+    EverydayLifeOntologyInstaller,
     StarterSchemaStatus,
-    prepare_controller,
+    VellisStartupFailed,
     unreconstructed_starter_schema_status,
 )
-from components.interface.mcp_gateway import RuntimeMcpGateway
-from components.rtg.change_validation import DeterministicRtgChangeValidator
-from components.rtg.change_validation.runtime_binding import (
+from components.interface.mcp_gateway import McpGatewayEndpoint, RuntimeMcpGateway
+from components.rtg.change_validation import (
+    DeterministicRtgChangeValidator,
     create_rtg_change_validator_adapter,
-    create_rtg_change_validator_proxy,
 )
-from components.rtg.constraints import InMemoryRtgConstraints
-from components.rtg.constraints.runtime_binding import (
-    create_rtg_constraints_adapter,
-    create_rtg_constraints_proxy,
-)
-from components.rtg.controller import (
-    InProcessRtgController,
-    RtgController,
-    RtgSystemSnapshot,
-)
-from components.rtg.controller.runtime_binding import (
-    create_rtg_controller_adapter,
-    create_rtg_controller_proxy,
-)
-from components.rtg.graph import InMemoryRtgGraph
-from components.rtg.graph.runtime_binding import (
-    create_rtg_graph_adapter,
-    create_rtg_graph_proxy,
-)
-from components.rtg.migration import InMemoryRtgMigration
-from components.rtg.migration.runtime_binding import (
-    create_rtg_migration_adapter,
-    create_rtg_migration_proxy,
-)
-from components.rtg.query import SimpleRtgQueryEngine
-from components.rtg.query.runtime_binding import create_rtg_query_adapter, create_rtg_query_proxy
-from components.rtg.schema import InMemoryRtgSchema
-from components.rtg.schema.runtime_binding import (
-    create_rtg_schema_adapter,
-    create_rtg_schema_proxy,
-)
+from components.rtg.constraints import InMemoryRtgConstraints, create_rtg_constraints_adapter
+from components.rtg.controller import RtgControllerCoordinator, create_rtg_controller_adapter
+from components.rtg.graph import InMemoryRtgGraph, create_rtg_graph_adapter
+from components.rtg.migration import InMemoryRtgMigration, create_rtg_migration_adapter
+from components.rtg.query import SimpleRtgQueryEngine, create_rtg_query_adapter
+from components.rtg.schema import InMemoryRtgSchema, create_rtg_schema_adapter
 from components.runtime.component_adapter import (
-    MutableAdapterHost,
+    ComponentAdapter,
+    ComponentEndpoint,
     ReplayStateBinding,
     RuntimeBindingInvalid,
+    decode_typed,
+    encode_json,
 )
-from components.runtime.component_adapter.implementation import encode_json
 from components.runtime.message_runtime import (
     ComponentOccurrenceRegistration,
-    RuntimeHistoryQuery,
+    RuntimeHealth,
+    RuntimeMessageKind,
+    RuntimeReconstructionRequest,
     RuntimeTopologyManifest,
+    SqliteMessageRuntime,
 )
-from components.runtime.message_runtime.implementation import SqliteMessageRuntime
-from components.storage.json_file.implementation import LocalJsonFileStorage
-from components.storage.json_file.runtime_binding import (
-    create_json_file_storage_adapter,
-    create_json_file_storage_proxy,
-)
-
-_SOURCE_OCCURRENCES = {
-    "vellis.interface.mcp",
-    "vellis.starter_ontology.installer",
-    "vellis.runner.local",
-}
+from components.storage.json_file import LocalJsonFileStorage, create_json_file_storage_adapter
 
 
 @dataclass(slots=True)
 class RtgKnowledgeGraphComposition:
+    """The Vellis app: one runtime, ordinary attached occurrences, and curated ingress."""
+
     config: RtgKnowledgeGraphConfig
     runtime: SqliteMessageRuntime
-    controller: RtgController
-    runner: RtgKnowledgeGraphRunner
     runtime_services: VellisRuntimeServices
-    _starter_controller: RtgController
-    _facade_host: MutableAdapterHost[RtgMcpToolset]
-    _facade_proxy: RtgMcpToolset
-    _gateway_registration: ComponentOccurrenceRegistration
+    gateway: McpGatewayEndpoint
+    _runner_endpoint: ComponentEndpoint
+    _installer_endpoint: ComponentEndpoint
     _manual_recovery_required: bool = False
     _starter_schema: StarterSchemaStatus | None = None
-    _mcp_gateway: RuntimeMcpGateway | None = None
 
-    def prepare(self) -> StarterSchemaStatus:
+    async def prepare(self) -> StarterSchemaStatus:
         if self._starter_schema is not None:
             return self._starter_schema
+        if self._manual_recovery_required:
+            self._starter_schema = unreconstructed_starter_schema_status()
+            return self._starter_schema
         recovery = (
-            "manual_recovery_required"
-            if self._manual_recovery_required
-            else (
-                "runtime_reconstructed"
-                if self.runtime_services.startup_reconstruction is not None
-                and self.runtime_services.startup_reconstruction.applied_effects > 0
-                else "not_needed"
-            )
+            "runtime_reconstructed"
+            if self.runtime_services.startup_reconstruction is not None
+            and self.runtime_services.startup_reconstruction.applied_effects > 0
+            else "not_needed"
         )
-        status = (
-            unreconstructed_starter_schema_status()
-            if self._manual_recovery_required and self.runtime.health == "recovery_required"
-            else prepare_controller(
-                self._starter_controller,
-                install_starter_schema=self.config.install_starter_schema,
-                automatic_recovery=self.config.automatic_recovery,
-                recovery=recovery,
-            )
+        outcome = await self._installer_endpoint.request(
+            STARTER_INSTALLER_ACTIONS["install"],
+            {"recovery": recovery},
+            target=self.runtime.address_for("vellis.starter_ontology.installer"),
         )
-        self._facade_host.replace(
-            RtgMcpToolset(self._controller_for_facade(), status, self.runtime_services)
+        if outcome.response.kind is RuntimeMessageKind.FAULT:
+            raise VellisStartupFailed(str(outcome.response.payload.value))
+        status_outcome = await self._installer_endpoint.request(
+            STARTER_INSTALLER_ACTIONS["get_status"],
+            {"recovery": recovery},
+            target=self.runtime.address_for("vellis.starter_ontology.installer"),
         )
-        self._starter_schema = status
-        return status
+        if status_outcome.response.kind is RuntimeMessageKind.FAULT:
+            raise VellisStartupFailed(str(status_outcome.response.payload.value))
+        payload = status_outcome.response.payload.value
+        if not isinstance(payload, dict):
+            raise VellisStartupFailed("starter status returned a non-object response")
+        self._starter_schema = decode_typed(payload.get("result"), StarterSchemaStatus)
+        return self._starter_schema
 
-    def run(self) -> RtgKnowledgeGraphRunStatus:
-        """Run ready startup work or defer it until explicit recovery completes."""
-
-        if self.runtime.health == "recovery_required":
-            return self.runner.recovery_pending_status()
-        return self.runner.run()
-
-    def build_facade(self, starter_schema: StarterSchemaStatus) -> RtgMcpToolset:
-        if self._starter_schema != starter_schema:
-            self._facade_host.replace(
-                RtgMcpToolset(
-                    self._controller_for_facade(),
-                    starter_schema,
-                    self.runtime_services,
-                )
-            )
-            self._starter_schema = starter_schema
-        return self._facade_proxy
-
-    def build_mcp_gateway(self, starter_schema: StarterSchemaStatus) -> RuntimeMcpGateway:
-        if self._mcp_gateway is not None:
-            return self._mcp_gateway
-        self.build_facade(starter_schema)
-        gateway = RuntimeMcpGateway(
-            self.runtime,
-            source_instance_key=self._gateway_registration.instance_key,
+    async def run(self) -> RtgKnowledgeGraphRunStatus:
+        if (
+            self._manual_recovery_required
+            or self.runtime.health is RuntimeHealth.RECOVERY_REQUIRED
+        ):
+            return _recovery_pending_status(self.config)
+        await self.prepare()
+        outcome = await self._runner_endpoint.request(
+            RUNNER_ACTIONS["run"],
+            {},
+            target=self.runtime.address_for("vellis.runner.local"),
         )
-        gateway.register_tools(model_mcp_gateway_registrations())
-        self._mcp_gateway = gateway
-        return gateway
+        if outcome.response.kind is RuntimeMessageKind.FAULT:
+            raise RuntimeError(str(outcome.response.payload.value))
+        payload = outcome.response.payload.value
+        if not isinstance(payload, dict):
+            raise RuntimeError("runner returned a non-object response")
+        return decode_typed(payload.get("result"), RtgKnowledgeGraphRunStatus)
 
-    def close(self) -> None:
-        self.runtime.close()
+    async def build_mcp_gateway(self) -> McpGatewayEndpoint:
+        await self.prepare()
+        return self.gateway
 
-    def __enter__(self) -> RtgKnowledgeGraphComposition:
+    async def close(self) -> None:
+        await self.runtime.aclose()
+
+    async def __aenter__(self) -> RtgKnowledgeGraphComposition:
         return self
 
-    def __exit__(self, *_: object) -> None:
-        self.close()
-
-    def _controller_for_facade(self) -> RtgController:
-        facade_address = self.runtime.address_for("vellis.facade.primary")
-        controller_address = self.runtime.address_for("vellis.controller.primary")
-        return create_rtg_controller_proxy(self.runtime, facade_address, controller_address)
+    async def __aexit__(self, *_: object) -> None:
+        await self.close()
 
 
-def build_app(config: RtgKnowledgeGraphConfig) -> RtgKnowledgeGraphComposition:
+async def build_app(config: RtgKnowledgeGraphConfig) -> RtgKnowledgeGraphComposition:
     topology = model_runtime_topology_manifest()
     runtime = SqliteMessageRuntime.open(
         config.runtime_database_path,
         runtime_key=topology.runtime_key,
     )
-    runtime.prepare_static_topology_sync(topology)
-    registrations = _register_topology(runtime, topology)
+    try:
+        await runtime.prepare_static_topology(topology)
+        registrations = await _register_topology(runtime, topology)
 
-    graph_host = MutableAdapterHost(InMemoryRtgGraph.empty())
-    schema_host = MutableAdapterHost(InMemoryRtgSchema.empty())
-    constraints_host = MutableAdapterHost(InMemoryRtgConstraints.empty())
-    migration_host = MutableAdapterHost(InMemoryRtgMigration.empty())
-    document_storage = LocalJsonFileStorage.open(config.storage_root)
-    query = SimpleRtgQueryEngine()
-    validator = DeterministicRtgChangeValidator()
+        graph = InMemoryRtgGraph.empty()
+        schema = InMemoryRtgSchema.empty()
+        constraints = InMemoryRtgConstraints.empty()
+        migration = InMemoryRtgMigration.empty()
+        document_storage = LocalJsonFileStorage.open(config.storage_root)
 
-    _attach(
-        runtime,
-        registrations,
-        "vellis.graph.primary",
-        create_rtg_graph_adapter(
-            graph_host,
-            replay_state=_state_replay_binding(graph_host, InMemoryRtgGraph.empty),
-        ),
-    )
-    _attach(
-        runtime,
-        registrations,
-        "vellis.schema.primary",
-        create_rtg_schema_adapter(
-            schema_host,
-            replay_state=_state_replay_binding(schema_host, InMemoryRtgSchema.empty),
-        ),
-    )
-    _attach(
-        runtime,
-        registrations,
-        "vellis.constraints.primary",
-        create_rtg_constraints_adapter(
-            constraints_host,
-            replay_state=_state_replay_binding(constraints_host, InMemoryRtgConstraints.empty),
-        ),
-    )
-    _attach(
-        runtime,
-        registrations,
-        "vellis.migration.primary",
-        create_rtg_migration_adapter(
-            migration_host,
-            replay_state=_state_replay_binding(migration_host, InMemoryRtgMigration.empty),
-        ),
-    )
-    _attach(
-        runtime,
-        registrations,
-        "vellis.storage.json.primary",
-        create_json_file_storage_adapter(document_storage),
-    )
-    _attach(
-        runtime,
-        registrations,
-        "vellis.query.primary",
-        create_rtg_query_adapter(query),
-    )
-
-    validator_address = runtime.address_for("vellis.validation.primary")
-    query_address = runtime.address_for("vellis.query.primary")
-    validation_query = create_rtg_query_proxy(runtime, validator_address, query_address)
-    _attach(
-        runtime,
-        registrations,
-        "vellis.validation.primary",
-        create_rtg_change_validator_adapter(validator, query=validation_query),
-    )
-
-    controller_address = runtime.address_for("vellis.controller.primary")
-    graph_proxy = create_rtg_graph_proxy(
-        runtime, controller_address, runtime.address_for("vellis.graph.primary")
-    )
-    schema_proxy = create_rtg_schema_proxy(
-        runtime, controller_address, runtime.address_for("vellis.schema.primary")
-    )
-    constraints_proxy = create_rtg_constraints_proxy(
-        runtime, controller_address, runtime.address_for("vellis.constraints.primary")
-    )
-    migration_proxy = create_rtg_migration_proxy(
-        runtime, controller_address, runtime.address_for("vellis.migration.primary")
-    )
-    validator_proxy = create_rtg_change_validator_proxy(
-        runtime, controller_address, validator_address
-    )
-    query_proxy = create_rtg_query_proxy(runtime, controller_address, query_address)
-    json_proxy = create_json_file_storage_proxy(
-        runtime,
-        controller_address,
-        runtime.address_for("vellis.storage.json.primary"),
-    )
-
-    direct_controller = InProcessRtgController.open(
-        graph_proxy,
-        schema_proxy,
-        constraints_proxy,
-        migration_proxy,
-        validator_proxy,
-        query_proxy,
-        json_proxy,
-    )
-    _attach(
-        runtime,
-        registrations,
-        "vellis.controller.primary",
-        create_rtg_controller_adapter(
-            direct_controller,
-            replay_state=_controller_replay_binding(
-                graph_proxy,
-                schema_proxy,
-                constraints_proxy,
-                migration_proxy,
-                validator_proxy,
-                query_proxy,
+        participants: dict[str, ComponentAdapter] = {
+            "vellis.graph.primary": create_rtg_graph_adapter(
+                graph,
+                replay_state=_state_replay_binding(graph, InMemoryRtgGraph.empty),
             ),
-        ),
-    )
+            "vellis.schema.primary": create_rtg_schema_adapter(
+                schema,
+                replay_state=_state_replay_binding(schema, InMemoryRtgSchema.empty),
+            ),
+            "vellis.constraints.primary": create_rtg_constraints_adapter(
+                constraints,
+                replay_state=_state_replay_binding(
+                    constraints,
+                    InMemoryRtgConstraints.empty,
+                ),
+            ),
+            "vellis.migration.primary": create_rtg_migration_adapter(
+                migration,
+                replay_state=_state_replay_binding(migration, InMemoryRtgMigration.empty),
+            ),
+            "vellis.storage.json.primary": create_json_file_storage_adapter(document_storage),
+            "vellis.query.primary": create_rtg_query_adapter(SimpleRtgQueryEngine()),
+            "vellis.validation.primary": create_rtg_change_validator_adapter(
+                DeterministicRtgChangeValidator()
+            ),
+            "vellis.controller.primary": create_rtg_controller_adapter(RtgControllerCoordinator()),
+        }
 
-    runtime_services = VellisRuntimeServices(runtime)
-    facade_address = runtime.address_for("vellis.facade.primary")
-    facade_controller = create_rtg_controller_proxy(runtime, facade_address, controller_address)
-    facade_host = MutableAdapterHost(
-        RtgMcpToolset(facade_controller, runtime_services=runtime_services)
-    )
-    _attach(
-        runtime,
-        registrations,
-        "vellis.facade.primary",
-        create_vellis_facade_adapter(facade_host),
-    )
+        runtime_services = VellisRuntimeServices(runtime)
+        facade = VellisFacadeComponent(runtime_services)
+        participants["vellis.facade.primary"] = facade.create_adapter()
 
-    runtime.confirm_static_topology_sync(topology)
-    has_effects = bool(
-        runtime.query_history_sync(RuntimeHistoryQuery(fact_type="canonical_effect", limit=1)).facts
-    )
-    manual_recovery_required = has_effects and not config.automatic_recovery
-    if config.automatic_recovery:
-        runtime_services.startup_reconstruction = runtime.reconstruct_sync(
-            _latest_reconstruction_request()
-        )
-
-    gateway_registration = registrations["vellis.interface.mcp"]
-    starter_registration = registrations["vellis.starter_ontology.installer"]
-    starter_controller = create_rtg_controller_proxy(
-        runtime,
-        runtime.address_for(starter_registration.instance_key),
-        controller_address,
-    )
-    runner_source = runtime.address_for("vellis.runner.local")
-    runner = RtgKnowledgeGraphRunner(
-        document_storage=create_json_file_storage_proxy(
-            runtime,
-            runner_source,
-            runtime.address_for("vellis.storage.json.primary"),
-        ),
-        controller=create_rtg_controller_proxy(runtime, runner_source, controller_address),
-        storage_root=config.storage_root,
-        runtime_database_path=config.runtime_database_path,
-        install_starter_schema=config.install_starter_schema,
-        automatic_recovery=config.automatic_recovery,
-    )
-    return RtgKnowledgeGraphComposition(
-        config=config,
-        runtime=runtime,
-        controller=starter_controller,
-        runner=runner,
-        runtime_services=runtime_services,
-        _starter_controller=starter_controller,
-        _facade_host=facade_host,
-        _facade_proxy=create_vellis_facade_proxy(
-            runtime,
-            runtime.address_for(gateway_registration.instance_key),
-            facade_address,
-        ),
-        _gateway_registration=gateway_registration,
-        _manual_recovery_required=manual_recovery_required,
-    )
-
-
-def _register_topology(
-    runtime: SqliteMessageRuntime, topology: RuntimeTopologyManifest
-) -> dict[str, ComponentOccurrenceRegistration]:
-    registrations: dict[str, ComponentOccurrenceRegistration] = {}
-    for declaration in topology.occurrences:
-        if declaration.instance_key in _SOURCE_OCCURRENCES:
-            registration = runtime.register_source_occurrence(
-                instance_key=declaration.instance_key,
-                component_contract_id=declaration.component_contract_id,
-                binding_id=declaration.binding_id,
-                binding_version=declaration.binding_version,
-                replay_authority=declaration.replay_authority,
-                configuration_references=declaration.configuration_references,
+        gateway_component = RuntimeMcpGateway(model_mcp_gateway_registrations())
+        gateway_digest = gateway_component.seal()
+        if topology.curated_registration_digest != gateway_digest:
+            raise RuntimeBindingInvalid(
+                "sealed MCP registration digest differs from the projected topology"
             )
-        else:
-            registration = runtime.register_occurrence_sync(declaration)
-        registrations[declaration.instance_key] = registration
-    return registrations
+        participants["vellis.interface.mcp"] = gateway_component.create_adapter()
+
+        installer = EverydayLifeOntologyInstaller(
+            install_starter_schema=config.install_starter_schema,
+            automatic_recovery=config.automatic_recovery,
+        )
+        participants["vellis.starter_ontology.installer"] = installer.create_adapter()
+
+        runner = RtgKnowledgeGraphRunner(
+            storage_root=config.storage_root,
+            runtime_database_path=config.runtime_database_path,
+            install_starter_schema=config.install_starter_schema,
+            automatic_recovery=config.automatic_recovery,
+        )
+        participants["vellis.runner.local"] = runner.create_adapter()
+
+        for instance_key, participant in participants.items():
+            registration = registrations[instance_key]
+            await runtime.attach_participant(
+                registration,
+                participant,
+                participant.describe().actions,
+            )
+        await runtime.confirm_static_topology(topology)
+
+        recovery_required = runtime.health is RuntimeHealth.RECOVERY_REQUIRED
+        manual_recovery_required = recovery_required and not config.automatic_recovery
+        if config.automatic_recovery and recovery_required:
+            runtime_services.startup_reconstruction = await runtime.reconstruct(
+                RuntimeReconstructionRequest()
+            )
+
+        gateway_adapter = participants["vellis.interface.mcp"]
+        gateway_endpoint = ComponentEndpoint(
+            runtime,
+            gateway_adapter,
+            source=runtime.address_for("vellis.interface.mcp"),
+        )
+        return RtgKnowledgeGraphComposition(
+            config=config,
+            runtime=runtime,
+            runtime_services=runtime_services,
+            gateway=McpGatewayEndpoint(
+                gateway_endpoint,
+                runtime.address_for,
+                gateway_component,
+                timeout_seconds=gateway_component.timeout_seconds,
+            ),
+            _runner_endpoint=ComponentEndpoint(
+                runtime,
+                participants["vellis.runner.local"],
+                source=runtime.address_for("vellis.runner.local"),
+            ),
+            _installer_endpoint=ComponentEndpoint(
+                runtime,
+                participants["vellis.starter_ontology.installer"],
+                source=runtime.address_for("vellis.starter_ontology.installer"),
+            ),
+            _manual_recovery_required=manual_recovery_required,
+        )
+    except Exception:
+        await runtime.aclose()
+        raise
 
 
-def _attach(
+async def _register_topology(
     runtime: SqliteMessageRuntime,
-    registrations: dict[str, ComponentOccurrenceRegistration],
-    instance_key: str,
-    adapter: Any,
-) -> None:
-    runtime.attach_adapter(registrations[instance_key], adapter)
+    topology: RuntimeTopologyManifest,
+) -> dict[str, ComponentOccurrenceRegistration]:
+    return {
+        declaration.instance_key: await runtime.register_occurrence(declaration)
+        for declaration in topology.occurrences
+    }
 
 
 def _state_replay_binding(
-    host: MutableAdapterHost[Any],
+    component: Any,
     empty_factory: Callable[[], Any],
 ) -> ReplayStateBinding:
-    empty_state = cast(Any, encode_json(empty_factory().export_snapshot()))
+    empty_snapshot = empty_factory().export_snapshot()
+    empty_state = encode_json(empty_snapshot)
 
     def export_state() -> Any:
-        return encode_json(host.resolve().export_snapshot())
+        return encode_json(component.export_snapshot())
 
     return ReplayStateBinding(
         is_empty=lambda: export_state() == empty_state,
-        reset=lambda: host.replace(empty_factory()),
+        reset=lambda: component.replace_snapshot(empty_snapshot),
         import_checkpoint=_unsupported_checkpoint,
         export_state=export_state,
-    )
-
-
-def _controller_replay_binding(
-    graph_proxy: Any,
-    schema_proxy: Any,
-    constraints_proxy: Any,
-    migration_proxy: Any,
-    validator_proxy: Any,
-    query_proxy: Any,
-) -> ReplayStateBinding:
-    def export_state() -> Any:
-        return encode_json(
-            RtgSystemSnapshot(
-                graph=graph_proxy.export_snapshot(),
-                schema=schema_proxy.export_snapshot(),
-                constraints=constraints_proxy.export_snapshot(),
-                migration=migration_proxy.export_snapshot(),
-            )
-        )
-
-    def verify() -> tuple[str, ...]:
-        report = validator_proxy.validate_graph_state(
-            graph_proxy,
-            schema_proxy,
-            constraints_proxy,
-            migration_proxy,
-            query_proxy,
-        )
-        return tuple(
-            sorted(
-                {
-                    f"{finding.track}:{finding.code}"
-                    for finding in report.findings
-                    if finding.severity == "blocking"
-                }
-            )
-        )
-
-    return ReplayStateBinding(
-        is_empty=lambda: True,
-        reset=lambda: None,
-        import_checkpoint=_unsupported_checkpoint,
-        export_state=export_state,
-        verify=verify,
     )
 
 
@@ -459,7 +284,16 @@ def _unsupported_checkpoint(_reference: str) -> int:
     )
 
 
-def _latest_reconstruction_request():
-    from components.runtime.message_runtime import RuntimeReconstructionRequest
+def _recovery_pending_status(config: RtgKnowledgeGraphConfig) -> RtgKnowledgeGraphRunStatus:
+    return RtgKnowledgeGraphRunStatus(
+        app_name="rtg_knowledge_graph",
+        storage_root=str(config.storage_root),
+        runtime_database_path=str(config.runtime_database_path),
+        manifest_path="system/app_manifest.json",
+        manifest_size_bytes=None,
+        json_document_count=None,
+        rtg_controller_ready=False,
+    )
 
-    return RuntimeReconstructionRequest()
+
+__all__ = ["RtgKnowledgeGraphComposition", "build_app"]

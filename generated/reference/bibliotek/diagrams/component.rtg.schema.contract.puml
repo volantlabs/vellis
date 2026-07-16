@@ -1,0 +1,12 @@
+@startuml
+skin sysmlc
+skinparam wrapWidth 380
+hide circle
+  
+comp usage "applyBatch: ApplyRtgSchemaBatch[*]" as E1  << perform action>>  {
+}
+comp usage "countSummary: CountRtgSchemaSummary[*]" as E2  << perform action>>  {
+}
+comp usage "listDefinitionsByTypeKey: ListDefinitionsByTypeKey[*]" as E3  << perform action>>  {
+}
+@enduml

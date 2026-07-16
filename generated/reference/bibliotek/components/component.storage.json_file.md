@@ -13,7 +13,7 @@ Generated from textual SysML v2 by `just model-render` as a non-normative readin
 | `write` | `WriteJsonDocument` | in `relativePath: JsonRelativePath`; in `jsonValue: JsonValue`; out `metadata: JsonDocumentMetadata` | `StoragePathInvalid`, `JsonValueNotSerializable`, `StoragePermissionDenied`, `StorageWriteFailed` | Create or fully replace one JSON document atomically within the configured root. |
 | `read` | `ReadJsonDocument` | in `relativePath: JsonRelativePath`; out `document: JsonDocument` | `StoragePathInvalid`, `JsonDocumentNotFound`, `JsonDocumentInvalid`, `StoragePermissionDenied`, `StorageReadFailed` | Read and parse one regular JSON document within the configured root. |
 | `delete` | `DeleteJsonDocument` | in `relativePath: JsonRelativePath`; out `metadata: JsonDocumentMetadata` | `StoragePathInvalid`, `JsonDocumentNotFound`, `StoragePermissionDenied`, `StorageDeleteFailed` | Delete one JSON document and optionally remove empty parent directories. |
-| `list` | `ListJsonDocuments` | in `relativeDirectoryPath: JsonRelativePath` = `"."`; out `result: JsonDocumentList` | `StoragePathInvalid`, `StorageDirectoryNotFound`, `StoragePermissionDenied`, `StorageReadFailed` | Recursively list JSON document metadata below a relative directory. |
+| `list` | `ListJsonDocuments` | in `relativeDirectoryPath: JsonRelativePath` = `"."`; in `offset: Integer` = `0`; in `limit: Integer` = `100`; out `result: JsonDocumentList` | `StoragePathInvalid`, `StorageDirectoryNotFound`, `StoragePermissionDenied`, `StorageReadFailed` | Return a stable bounded page of JSON document metadata below a relative directory. |
 
 ## Construction actions
 
@@ -79,7 +79,7 @@ Generated from textual SysML v2 by `just model-render` as a non-normative readin
 | `JsonRelativePath` | `attribute` | `value: String` | A normalized component-relative path. Document paths name regular .json files; directory paths name locations below the root. Absolute paths, parent traversal, symlink escape, and platform aliases that escape the root are invalid. |
 | `JsonDocumentMetadata` | `attribute` | `relativePath: JsonRelativePath`, `sizeBytes: Integer`, `modifiedAt: Timestamp` | Filesystem-derived metadata: normalized root-relative path, serialized byte size, and filesystem modification time. |
 | `JsonDocument` | `attribute` | `value: JsonValue`, `metadata: JsonDocumentMetadata` | Defined by its typed fields and action requirements. |
-| `JsonDocumentList` | `attribute` | `documents[0..*]: JsonDocumentMetadata` | Defined by its typed fields and action requirements. |
+| `JsonDocumentList` | `attribute` | `documents[0..*]: JsonDocumentMetadata`, `total: Integer`, `nextOffset: Integer` | Defined by its typed fields and action requirements. |
 | `StorageRootInvalid` | `attribute` | `message: String` | Defined by its typed fields and action requirements. |
 | `StorageRootUnavailable` | `attribute` | `message: String` | Defined by its typed fields and action requirements. |
 | `StoragePermissionDenied` | `attribute` | `message: String` | Defined by its typed fields and action requirements. |
@@ -109,5 +109,11 @@ Generated from textual SysML v2 by `just model-render` as a non-normative readin
 | `ListJsonDocumentsContractVerification` | `ListJsonDocuments` | `listEffect`, `listJsonDocumentsFailureSemantics` | `components/storage/json_file/tests/test_storage_json_file_contract.py#ListJsonDocumentsContractVerification` |
 | `OpenJsonFileStorageContractVerification` | `OpenJsonFileStorage` | `openJsonFileStorageFailureSemantics` | `components/storage/json_file/tests/test_storage_json_file_contract.py#OpenJsonFileStorageContractVerification` |
 | `JsonFileStorageBoundaryVerification` | `JsonFileStorage` | `rootContainment`, `jsonOnlyDocuments`, `validJsonAtRest`, `atomicFullDocumentWrites`, `callerSchemaNeutrality`, `noImplicitRootChange`, `pathSemantics`, `directorySemantics`, `metadataSemantics`, `intentionalBoundary` | `components/storage/json_file/tests/test_storage_json_file_contract.py#JsonFileStorageBoundaryVerification` |
+
+## Diagram
+
+![component.storage.json_file contract diagram](../diagrams/component.storage.json_file.contract.svg)
+
+[PlantUML source](../diagrams/component.storage.json_file.contract.puml)
 
 Equivalent private algorithms, helpers, storage layouts, and implementation-language inheritance remain implementation choices.

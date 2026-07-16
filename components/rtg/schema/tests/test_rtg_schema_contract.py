@@ -5,14 +5,17 @@ from uuid import UUID, uuid4
 
 import pytest
 
+from components.rtg.change import RtgChangeReference
 from components.rtg.schema import (
     InMemoryRtgSchema,
     RtgAnchorSchemaPayload,
     RtgDataObjectSchemaPayload,
     RtgLinkSchemaPayload,
+    RtgSchemaChangeSet,
     RtgSchemaDefinition,
     RtgSchemaDefinitionInvalid,
     RtgSchemaDefinitionKindInvalid,
+    RtgSchemaDefinitionWrite,
     RtgSchemaDirectionInvalid,
     RtgSchemaField,
     RtgSchemaLiveTypeConflict,
@@ -30,7 +33,46 @@ def concrete_uuid(value: UUID | None) -> UUID:
     return value
 
 
+def test_schema_batch_is_atomic_and_never_uses_snapshots(monkeypatch: pytest.MonkeyPatch) -> None:
+    schema = InMemoryRtgSchema.empty()
+    first_id, second_id = uuid4(), uuid4()
+    monkeypatch.setattr(
+        InMemoryRtgSchema,
+        "export_snapshot",
+        lambda _self: pytest.fail("routine batches must not export snapshots"),
+    )
+    with pytest.raises(RtgSchemaLiveTypeConflict):
+        schema.apply_batch(
+            RtgSchemaChangeSet(
+                definition_writes=tuple(
+                    RtgSchemaDefinitionWrite(
+                        RtgChangeReference(resource_id=value),
+                        RtgSchemaDefinition(
+                            uuid=value,
+                            kind="anchor",
+                            type_key="Person",
+                            description="Person",
+                            payload=RtgAnchorSchemaPayload(),
+                        ),
+                    )
+                    for value in (first_id, second_id)
+                )
+            )
+        )
+    summary = schema.count_summary()
+    assert summary.live_total + summary.non_live_total == 0
+
+
 MODEL_EVIDENCE = {
+    "SchemaBatchAtomicityContractVerification": (
+        "test_schema_batch_is_atomic_and_never_uses_snapshots",
+    ),
+    "SchemaRoutineWorkScalingVerification": (
+        "test_schema_batch_is_atomic_and_never_uses_snapshots",
+    ),
+    "CountSchemaSummaryContractVerification": (
+        "test_schema_batch_is_atomic_and_never_uses_snapshots",
+    ),
     "PutSchemaDefinitionContractVerification": (
         "test_schema_stores_definitions_snapshots_and_schema_packs",
         "test_live_type_key_uniqueness_allows_non_live_candidates",

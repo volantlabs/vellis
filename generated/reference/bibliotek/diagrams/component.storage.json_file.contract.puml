@@ -1,0 +1,18 @@
+@startuml
+skin sysmlc
+skinparam wrapWidth 380
+hide circle
+  
+comp def "~<component.storage.json_file> JsonFileStorage" as E1  <<(T,blue) part def>>  {
+Own a durable namespace of JSON documents beneath one authoritative filesystem root.
+--
+##//items//##
+storageRoot: JsonStorageRoot
+--
+##//perform actions//##
+delete: DeleteJsonDocument
+list: ListJsonDocuments
+read: ReadJsonDocument
+write: WriteJsonDocument
+}
+@enduml

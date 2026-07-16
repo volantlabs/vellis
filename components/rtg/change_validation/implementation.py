@@ -30,6 +30,7 @@ from components.rtg.constraints.protocol import (
     RtgConstraintCardinalityPayload,
     RtgConstraintDefinition,
     RtgConstraintError,
+    RtgConstraintLiveStatusChange,
     RtgConstraintQueryPatternPayload,
     RtgConstraints,
 )
@@ -49,6 +50,7 @@ from components.rtg.migration.protocol import (
     RtgMigrationError,
     RtgMigrationReplacement,
     RtgMigrationStatusTransitionInvalid,
+    migration_status_transition_allowed,
 )
 from components.rtg.query.protocol import (
     RtgQueryEngine,
@@ -226,6 +228,15 @@ class DeterministicRtgChangeValidator(RtgChangeValidator):
         return _report(findings, options)
 
 
+def _clone_for_validation(value: object) -> object:
+    clone = getattr(value, "clone_for_validation", None)
+    if callable(clone):
+        return clone()
+    raise RtgValidationInputInvalid(
+        "validation collaborator must provide an invocation-local projection"
+    )
+
+
 def _project_batch(
     graph: object,
     schema: object,
@@ -243,29 +254,15 @@ def _project_batch(
         _require_constraints(constraints)
     if uses_migration and migration is not None:
         _require_migration(migration)
-    graph_type = cast(Any, type(graph))
-    schema_type = cast(Any, type(schema))
-    graph_view = cast(
-        RtgGraph,
-        graph_type.import_snapshot(cast(RtgGraph, graph).export_snapshot()),
-    )
-    schema_view = cast(
-        RtgSchema,
-        schema_type.import_snapshot(cast(RtgSchema, schema).export_snapshot()),
-    )
+    graph_view = cast(RtgGraph, _clone_for_validation(graph))
+    schema_view = cast(RtgSchema, _clone_for_validation(schema))
     constraints_view = cast(RtgConstraints, constraints)
     if uses_constraints:
-        constraints_type = cast(Any, type(constraints))
-        constraints_view = cast(
-            RtgConstraints,
-            constraints_type.import_snapshot(cast(RtgConstraints, constraints).export_snapshot()),
-        )
+        constraints_view = cast(RtgConstraints, _clone_for_validation(constraints))
     migration_view = (
         cast(
             RtgMigration,
-            cast(Any, type(migration)).import_snapshot(
-                cast(RtgMigration, migration).export_snapshot()
-            ),
+            _clone_for_validation(migration),
         )
         if uses_migration and migration is not None
         else None
@@ -438,7 +435,7 @@ def _change_batch_from_cutover_plans(
         ),
         constraint_changes=RtgConstraintChangeSet(
             set_live=tuple(
-                RtgLiveStatusChange(
+                RtgConstraintLiveStatusChange(
                     target_ref=RtgChangeReference(resource_id=uuid_value),
                     live=live,
                 )
@@ -993,12 +990,18 @@ def _validate_migration_batch(
     _require_migration(migration)
     migration = cast(RtgMigration, migration)
     findings: list[RtgValidationFinding] = []
+    projected_statuses: dict[str, str] = {}
     for status_change in change_batch.migration_changes.status_changes:
         migration_id = _reference_text(status_change.migration_ref)
         try:
-            current = migration.get_migration(migration_id)
-            shadow = type(migration).import_snapshot(migration.export_snapshot())
-            shadow.set_status(_concrete_migration_id(current.migration_id), status_change.status)
+            current_status = projected_statuses.get(migration_id)
+            if current_status is None:
+                current_status = migration.get_migration(migration_id).status
+            if not migration_status_transition_allowed(current_status, status_change.status):
+                raise RtgMigrationStatusTransitionInvalid(
+                    f"{current_status} -> {status_change.status}"
+                )
+            projected_statuses[migration_id] = status_change.status
         except RtgMigrationStatusTransitionInvalid:
             findings.append(
                 _finding(
@@ -1526,7 +1529,7 @@ def _require_constraints(value: object) -> None:
 
 
 def _require_migration(value: object) -> None:
-    if not all(hasattr(value, name) for name in ("get_migration", "export_snapshot")):
+    if not hasattr(value, "get_migration") or not hasattr(value, "clone_for_validation"):
         raise RtgValidationInputInvalid("migration read view is missing required contracts")
 
 

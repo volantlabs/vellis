@@ -60,9 +60,9 @@ Generated from textual SysML v2 by `just model-render` as a non-normative readin
 
 | Public definition | Kind | Fields | Meaning |
 |---|---|---|---|
-| `McpGatewayToolRegistration` | `attribute` | `toolName: String`, `description: String`, `parameterSchema: JsonObject`, `annotations: JsonObject`, `targetInstanceKey: String`, `componentContractId: String`, `actionId: String`, `schemaVersion: Integer`, `codecId: String`, `codecVersion: Integer` | Defined by its typed fields and action requirements. |
+| `McpGatewayToolRegistration` | `attribute` | `toolName: String`, `description: String`, `parameterSchema: JsonObject`, `annotations: JsonObject`, `targetInstanceKey: String`, `componentContractId: String`, `actionId: String`, `schemaVersion: Integer`, `bindingId: String`, `bindingVersion: Integer`, `requestCodecId: String`, `requestCodecVersion: Integer`, `requestPayloadDisposition: RuntimePayloadDisposition`, `resultPayloadDisposition: RuntimePayloadDisposition`, `faultPayloadDisposition: RuntimePayloadDisposition`, `effectPayloadDisposition[0..1]: RuntimePayloadDisposition` | Defined by its typed fields and action requirements. |
 | `McpGatewayInvocation` | `attribute` | `toolName: String`, `arguments: JsonObject` | Defined by its typed fields and action requirements. |
-| `McpGatewayOutcome` | `attribute` | `toolName: String`, `result: JsonObject`, `messageId: Uuid`, `traceId: Uuid` | Defined by its typed fields and action requirements. |
+| `McpGatewayOutcome` | `attribute` | `toolName: String`, `result: JsonObject`, `messageId: Uuid`, `traceId: Uuid`, `terminalPosition: Integer`, `traceDisposition: RuntimeTraceDisposition` | Defined by its typed fields and action requirements. |
 | `McpGatewayRegistrationInvalid` | `attribute` | `message: String` | Defined by its typed fields and action requirements. |
 | `McpGatewayToolUnknown` | `attribute` | `message: String` | Defined by its typed fields and action requirements. |
 | `McpGatewayInvocationInvalid` | `attribute` | `message: String` | Defined by its typed fields and action requirements. |

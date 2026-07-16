@@ -1,0 +1,24 @@
+@startuml
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+skinparam shadowing false
+skinparam roundCorner 12
+skinparam linetype ortho
+skinparam ArrowThickness 1.2
+skinparam ArrowFontSize 11
+skinparam rectangleBorderThickness 1
+skinparam nodesep 35
+skinparam ranksep 45
+title Vellis runtime topology
+top to bottom direction
+rectangle "runtime\n«SqliteMessageRuntime»" as n_073ccfc87962 #E8F8F5
+rectangle "Interface adapters (2)\nfacadeAdapter\ngatewayAdapter" as n_d15b300ba6ed #E8F8F5
+rectangle "RTG component adapters (7)\nconstraintsAdapter\ncontrollerAdapter\ngraphAdapter\nmigrationAdapter\nqueryAdapter\nschemaAdapter\nvalidationAdapter" as n_6b9fa1dbe942 #E8F8F5
+rectangle "Storage adapters (1)\njsonStorageAdapter" as n_0aa351c512dd #E8F8F5
+rectangle "Application service adapters (2)\ninstallerAdapter\nrunnerAdapter" as n_5d2cd0621f48 #E8F8F5
+n_d15b300ba6ed -[#117864]-> n_073ccfc87962 : runtime
+n_6b9fa1dbe942 -[#117864]-> n_073ccfc87962 : runtime
+n_0aa351c512dd -[#117864]-> n_073ccfc87962 : runtime
+n_5d2cd0621f48 -[#117864]-> n_073ccfc87962 : runtime
+@enduml

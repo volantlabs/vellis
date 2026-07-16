@@ -22,7 +22,11 @@ from components.rtg.migration.protocol import (
     RtgMigrationSnapshot,
 )
 from components.rtg.query.protocol import RtgQueryOptions, RtgQueryResult, RtgQuerySpec
-from components.rtg.schema.protocol import RtgSchemaPack, RtgSchemaSnapshot
+from components.rtg.schema.protocol import (
+    RtgSchemaDefinitionList,
+    RtgSchemaPack,
+    RtgSchemaSnapshot,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -121,19 +125,39 @@ class RtgControllerLiveGraphValidationResult:
     mutation_state: str
     accepted: bool
     generated_ids: dict[str, UUID]
-    resolved_graph_changes: RtgGraphChangeSet
     validation_report: RtgValidationReport
 
 
 @dataclass(frozen=True, slots=True)
 class RtgPersistedSnapshotList:
     snapshots: tuple[JsonObject, ...]
+    total: int
+    next_offset: int | None = None
 
 
 @dataclass(frozen=True, slots=True)
 class RtgPersistedSnapshotDocument:
     relative_path: str
     snapshot: RtgSystemSnapshot
+
+
+@dataclass(frozen=True, slots=True)
+class RtgSnapshotStateCounts:
+    anchors: int
+    data_objects: int
+    links: int
+    schema_definitions: int
+    constraints: int
+    migrations: int
+
+
+@dataclass(frozen=True, slots=True)
+class RtgSnapshotPersistenceResult:
+    status: str
+    relative_path: str
+    size_bytes: int
+    digest: str
+    state_counts: RtgSnapshotStateCounts
 
 
 @dataclass(frozen=True, slots=True)
@@ -154,7 +178,6 @@ class RtgControllerOperationResult:
         default_factory=RtgControllerAppliedChanges
     )
     validation_report: RtgValidationReport | None = None
-    snapshot: RtgSystemSnapshot | None = None
     details: JsonObject = field(default_factory=dict)
 
 
@@ -267,7 +290,12 @@ class RtgController(Protocol):
         """Read a graph object by UUID."""
         ...
 
-    def list_migrations(self, status: str | None = None) -> RtgMigrationRecordList:
+    def list_migrations(
+        self,
+        status: str | None = None,
+        offset: int = 0,
+        limit: int = 100,
+    ) -> RtgMigrationRecordList:
         """List migration records."""
         ...
 
@@ -298,6 +326,17 @@ class RtgController(Protocol):
         """Return schema details plus live counts."""
         ...
 
+    def list_schema_definitions_by_type_key(
+        self,
+        type_key: str,
+        kind: str | None = None,
+        live: bool | None = None,
+        offset: int = 0,
+        limit: int | None = None,
+    ) -> RtgSchemaDefinitionList:
+        """Return a bounded schema-definition page for one type key."""
+        ...
+
     def get_system_state(self) -> RtgControllerSystemState:
         """Return read-only domain state and recommended next steps."""
         ...
@@ -306,11 +345,13 @@ class RtgController(Protocol):
         """Export a coordinated RTG domain snapshot."""
         ...
 
-    def persist_system_snapshot(self, relative_path: str) -> RtgControllerOperationResult:
+    def persist_system_snapshot(self, relative_path: str) -> RtgSnapshotPersistenceResult:
         """Persist a coordinated RTG domain snapshot."""
         ...
 
-    def list_persisted_snapshots(self) -> RtgPersistedSnapshotList:
+    def list_persisted_snapshots(
+        self, offset: int = 0, limit: int = 100
+    ) -> RtgPersistedSnapshotList:
         """List persisted domain snapshots visible through JSON File Storage."""
         ...
 

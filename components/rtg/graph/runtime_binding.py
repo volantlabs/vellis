@@ -1,19 +1,18 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from typing import Any, cast
+from typing import cast
 from uuid import UUID
 
 from components.rtg.graph.protocol import (
     JsonObject,
     JsonValue,
     RtgAnchor,
-    RtgAnchorList,
     RtgDataObject,
-    RtgDataObjectList,
     RtgGraph,
     RtgGraphAnchorDataIndexEntryNotFound,
     RtgGraphAnchorNotFound,
+    RtgGraphChangeSet,
     RtgGraphDataObjectNotFound,
     RtgGraphDeleteResult,
     RtgGraphEndpointNotFound,
@@ -30,22 +29,16 @@ from components.rtg.graph.protocol import (
     RtgGraphUuidConflict,
     RtgGraphUuidInvalid,
     RtgLink,
-    RtgLinkList,
     RtgObject,
-    RtgObjectList,
-    RtgTypeCount,
-    RtgTypeCountList,
-    UuidInput,
 )
 from components.runtime.component_adapter import (
     ActionBinding,
-    ExplicitComponentAdapter,
-    MutableAdapterHost,
+    ComponentAdapter,
     ReplayStateBinding,
-    RuntimeActionBindingDescriptor,
-    RuntimeActionIdempotency,
     RuntimeBindingInvalid,
-    RuntimeClient,
+    create_action_catalog,
+    load_runtime_binding_resource,
+    runtime_binding_descriptor,
 )
 from components.runtime.component_adapter.implementation import (
     ReplayEffectApplier,
@@ -53,12 +46,7 @@ from components.runtime.component_adapter.implementation import (
     RequestDecoder,
     encode_json,
 )
-from components.runtime.message_runtime import (
-    MessageRuntime,
-    RuntimeAddress,
-    RuntimeMessageKind,
-    RuntimeReplayMode,
-)
+from components.runtime.component_adapter.typed_binding import decode_typed
 
 _CONTRACT_ID = "component.rtg.graph"
 _BINDING_ID = "binding.python.rtg.graph.v1"
@@ -96,6 +84,21 @@ _ACTION_FAILURES: dict[str, tuple[type[RtgGraphError], ...]] = {
         RtgGraphTypeKindConflict,
         RtgGraphJsonValueInvalid,
         RtgGraphSystemValueInvalid,
+    ),
+    "apply_batch": (
+        RtgGraphUuidInvalid,
+        RtgGraphUuidConflict,
+        RtgGraphReferenceInvalid,
+        RtgGraphTypeInvalid,
+        RtgGraphTypeKindConflict,
+        RtgGraphJsonValueInvalid,
+        RtgGraphSystemValueInvalid,
+        RtgGraphAnchorNotFound,
+        RtgGraphDataObjectNotFound,
+        RtgGraphLinkNotFound,
+        RtgGraphEndpointNotFound,
+        RtgGraphAnchorDataIndexEntryNotFound,
+        RtgGraphObjectNotFound,
     ),
     "put_anchor": (
         RtgGraphUuidInvalid,
@@ -147,22 +150,39 @@ _ACTION_FAILURES: dict[str, tuple[type[RtgGraphError], ...]] = {
         RtgGraphAnchorDataIndexEntryNotFound,
     ),
     "get_object": (RtgGraphUuidInvalid, RtgGraphObjectNotFound),
-    "list_by_type": (RtgGraphTypeInvalid,),
-    "list_anchor_data": (RtgGraphUuidInvalid, RtgGraphAnchorNotFound),
-    "list_data_anchors": (RtgGraphUuidInvalid, RtgGraphDataObjectNotFound),
-    "list_incident_links": (RtgGraphUuidInvalid, RtgGraphObjectNotFound),
+    "list_by_type": (RtgGraphTypeInvalid, RtgGraphReferenceInvalid),
+    "list_anchor_data": (
+        RtgGraphUuidInvalid,
+        RtgGraphAnchorNotFound,
+        RtgGraphReferenceInvalid,
+    ),
+    "list_data_anchors": (
+        RtgGraphUuidInvalid,
+        RtgGraphDataObjectNotFound,
+        RtgGraphReferenceInvalid,
+    ),
+    "list_incident_links": (
+        RtgGraphUuidInvalid,
+        RtgGraphObjectNotFound,
+        RtgGraphReferenceInvalid,
+    ),
     "count_by_type": (RtgGraphTypeInvalid,),
 }
+_RUNTIME_BINDING = load_runtime_binding_resource(
+    __package__,
+    failure_types=_ACTION_FAILURES,
+)
+RTG_GRAPH_ACTIONS = create_action_catalog(_RUNTIME_BINDING)
 
 
 def create_rtg_graph_adapter(
-    graph: RtgGraph | MutableAdapterHost[Any],
+    graph: RtgGraph,
     *,
     replay_state: ReplayStateBinding | None = None,
-) -> ExplicitComponentAdapter:
+) -> ComponentAdapter:
     """Create the standard explicit message binding for one RTG graph occurrence."""
-    host = graph if isinstance(graph, MutableAdapterHost) else MutableAdapterHost(graph)
-    return ExplicitComponentAdapter(
+    host = graph
+    return ComponentAdapter(
         (
             _read_binding(
                 "export_snapshot", _host_method(host, "export_snapshot"), lambda _: ((), {})
@@ -172,15 +192,23 @@ def create_rtg_graph_adapter(
                 _host_method(host, "replace_snapshot"),
                 lambda payload: ((_snapshot(payload["snapshot"]),), {}),
                 lambda args, _kwargs, _result: {"snapshot": encode_json(args[0])},
-                lambda payload: host.resolve().replace_snapshot(_snapshot(payload["snapshot"])),
-                idempotency=RuntimeActionIdempotency.IDEMPOTENT,
+                lambda payload: host.replace_snapshot(_snapshot(payload["snapshot"])),
+            ),
+            _mutation_binding(
+                "apply_batch",
+                _host_method(host, "apply_batch"),
+                lambda payload: ((decode_typed(payload["changes"], RtgGraphChangeSet),), {}),
+                lambda args, _kwargs, _result: {"changes": encode_json(args[0])},
+                lambda payload: host.apply_batch(
+                    decode_typed(payload["changes"], RtgGraphChangeSet)
+                ),
             ),
             _mutation_binding(
                 "put_anchor",
                 _host_method(host, "put_anchor"),
                 lambda payload: ((_anchor(payload["anchor"]),), {}),
                 lambda _args, _kwargs, result: {"anchor": encode_json(result)},
-                lambda payload: host.resolve().put_anchor(_anchor(payload["anchor"])),
+                lambda payload: host.put_anchor(_anchor(payload["anchor"])),
             ),
             _mutation_binding(
                 "put_data_object",
@@ -196,7 +224,7 @@ def create_rtg_graph_adapter(
                     "data_object": encode_json(result),
                     "anchor_uuids": encode_json(args[1]),
                 },
-                lambda payload: host.resolve().put_data_object(
+                lambda payload: host.put_data_object(
                     _data_object(payload["data_object"]),
                     tuple(_uuid(value) for value in _list(payload["anchor_uuids"])),
                 ),
@@ -206,7 +234,7 @@ def create_rtg_graph_adapter(
                 _host_method(host, "put_link"),
                 lambda payload: ((_link(payload["link"]),), {}),
                 lambda _args, _kwargs, result: {"link": encode_json(result)},
-                lambda payload: host.resolve().put_link(_link(payload["link"])),
+                lambda payload: host.put_link(_link(payload["link"])),
             ),
             _mutation_binding(
                 "associate_data",
@@ -216,10 +244,9 @@ def create_rtg_graph_adapter(
                     "anchor_uuid": str(args[0]),
                     "data_uuid": str(args[1]),
                 },
-                lambda payload: host.resolve().associate_data(
+                lambda payload: host.associate_data(
                     _uuid(payload["anchor_uuid"]), _uuid(payload["data_uuid"])
                 ),
-                idempotency=RuntimeActionIdempotency.IDEMPOTENT,
             ),
             _simple_mutation(
                 "dissociate_data",
@@ -241,7 +268,10 @@ def create_rtg_graph_adapter(
             _read_binding(
                 "preview_delete_data_object",
                 _host_method(host, "preview_delete_data_object"),
-                lambda payload: ((_uuid(payload["data_uuid"]),), {}),
+                lambda payload: (
+                    (_uuid(payload["data_uuid"]),),
+                    {"offset": int(payload.get("offset", 0)), "limit": payload.get("limit")},
+                ),
             ),
             _read_binding(
                 "preview_dissociate_data",
@@ -259,12 +289,18 @@ def create_rtg_graph_adapter(
             _read_binding(
                 "list_by_type",
                 _host_method(host, "list_by_type"),
-                lambda payload: ((str(payload["object_type"]),), {}),
+                lambda payload: (
+                    (str(payload["object_type"]),),
+                    {"offset": int(payload.get("offset", 0)), "limit": payload.get("limit")},
+                ),
             ),
             _read_binding(
                 "list_anchor_data",
                 _host_method(host, "list_anchor_data"),
-                lambda payload: ((_uuid(payload["anchor_uuid"]),), {}),
+                lambda payload: (
+                    (_uuid(payload["anchor_uuid"]),),
+                    {"offset": int(payload.get("offset", 0)), "limit": payload.get("limit")},
+                ),
             ),
             _read_binding(
                 "list_data_anchors",
@@ -275,8 +311,12 @@ def create_rtg_graph_adapter(
                 "list_incident_links",
                 _host_method(host, "list_incident_links"),
                 lambda payload: (
-                    (_uuid(payload["object_uuid"]), str(payload.get("direction", "both"))),
-                    {},
+                    (_uuid(payload["object_uuid"]),),
+                    {
+                        "direction": str(payload.get("direction", "both")),
+                        "offset": int(payload.get("offset", 0)),
+                        "limit": payload.get("limit"),
+                    },
                 ),
             ),
             _read_binding(
@@ -292,162 +332,9 @@ def create_rtg_graph_adapter(
     )
 
 
-class RtgGraphMessageProxy:
-    """Synchronous RTG graph protocol proxy backed by runtime messages."""
-
-    def __init__(
-        self,
-        runtime: MessageRuntime,
-        source: RuntimeAddress,
-        target: RuntimeAddress,
-    ) -> None:
-        self._client = RuntimeClient(
-            runtime,
-            source=source,
-            target=target,
-            component_contract_id=_CONTRACT_ID,
-            request_codec_id=_REQUEST_CODEC,
-        )
-
-    def export_snapshot(self) -> RtgGraphSnapshot:
-        value = self._request("export_snapshot", {})
-        return _snapshot(value)
-
-    def replace_snapshot(self, snapshot: RtgGraphSnapshot) -> None:
-        self._request("replace_snapshot", {"snapshot": encode_json(snapshot)})
-
-    def put_anchor(self, anchor: RtgAnchor) -> RtgAnchor:
-        return _anchor(self._request("put_anchor", {"anchor": encode_json(anchor)}))
-
-    def put_data_object(
-        self, data_object: RtgDataObject, anchor_uuids: tuple[UuidInput, ...]
-    ) -> RtgDataObject:
-        return _data_object(
-            self._request(
-                "put_data_object",
-                {
-                    "data_object": encode_json(data_object),
-                    "anchor_uuids": [str(_uuid(value)) for value in anchor_uuids],
-                },
-            )
-        )
-
-    def put_link(self, link: RtgLink) -> RtgLink:
-        return _link(self._request("put_link", {"link": encode_json(link)}))
-
-    def associate_data(self, anchor_uuid: UuidInput, data_uuid: UuidInput) -> None:
-        self._request(
-            "associate_data",
-            {"anchor_uuid": str(_uuid(anchor_uuid)), "data_uuid": str(_uuid(data_uuid))},
-        )
-
-    def dissociate_data(self, anchor_uuid: UuidInput, data_uuid: UuidInput) -> RtgGraphDeleteResult:
-        return _delete_result(
-            self._request(
-                "dissociate_data",
-                {"anchor_uuid": str(_uuid(anchor_uuid)), "data_uuid": str(_uuid(data_uuid))},
-            )
-        )
-
-    def delete_anchor(self, anchor_uuid: UuidInput) -> RtgGraphDeleteResult:
-        return _delete_result(
-            self._request("delete_anchor", {"anchor_uuid": str(_uuid(anchor_uuid))})
-        )
-
-    def delete_data_object(self, data_uuid: UuidInput) -> RtgGraphDeleteResult:
-        return _delete_result(
-            self._request("delete_data_object", {"data_uuid": str(_uuid(data_uuid))})
-        )
-
-    def delete_link(self, link_uuid: UuidInput) -> RtgGraphDeleteResult:
-        return _delete_result(self._request("delete_link", {"link_uuid": str(_uuid(link_uuid))}))
-
-    def preview_delete_anchor(self, anchor_uuid: UuidInput) -> RtgGraphDeleteResult:
-        return _delete_result(
-            self._request("preview_delete_anchor", {"anchor_uuid": str(_uuid(anchor_uuid))})
-        )
-
-    def preview_delete_data_object(self, data_uuid: UuidInput) -> RtgGraphDeleteResult:
-        return _delete_result(
-            self._request("preview_delete_data_object", {"data_uuid": str(_uuid(data_uuid))})
-        )
-
-    def preview_dissociate_data(
-        self, anchor_uuid: UuidInput, data_uuid: UuidInput
-    ) -> RtgGraphDeleteResult:
-        return _delete_result(
-            self._request(
-                "preview_dissociate_data",
-                {"anchor_uuid": str(_uuid(anchor_uuid)), "data_uuid": str(_uuid(data_uuid))},
-            )
-        )
-
-    def get_object(self, object_uuid: UuidInput) -> RtgObject:
-        return _object(self._request("get_object", {"object_uuid": str(_uuid(object_uuid))}))
-
-    def list_by_type(self, object_type: str) -> RtgObjectList:
-        value = _object_value(self._request("list_by_type", {"object_type": object_type}))
-        return RtgObjectList(tuple(_object(item) for item in _list(value["objects"])))
-
-    def list_anchor_data(self, anchor_uuid: UuidInput) -> RtgDataObjectList:
-        value = _object_value(
-            self._request("list_anchor_data", {"anchor_uuid": str(_uuid(anchor_uuid))})
-        )
-        return RtgDataObjectList(tuple(_data_object(item) for item in _list(value["data_objects"])))
-
-    def list_data_anchors(self, data_uuid: UuidInput) -> RtgAnchorList:
-        value = _object_value(
-            self._request("list_data_anchors", {"data_uuid": str(_uuid(data_uuid))})
-        )
-        return RtgAnchorList(tuple(_anchor(item) for item in _list(value["anchors"])))
-
-    def list_incident_links(self, object_uuid: UuidInput, direction: str = "both") -> RtgLinkList:
-        value = _object_value(
-            self._request(
-                "list_incident_links",
-                {"object_uuid": str(_uuid(object_uuid)), "direction": direction},
-            )
-        )
-        return RtgLinkList(tuple(_link(item) for item in _list(value["links"])))
-
-    def count_by_type(self, kind: str | None = None, live: bool | None = None) -> RtgTypeCountList:
-        value = _object_value(self._request("count_by_type", {"kind": kind, "live": live}))
-        return RtgTypeCountList(
-            tuple(
-                RtgTypeCount(
-                    type=str(record["type"]),
-                    kind=str(record["kind"]),
-                    live=cast(bool | None, record.get("live")),
-                    count=int(cast(int | str, record["count"])),
-                )
-                for item in _list(value["counts"])
-                if (record := _object_value(item))
-            )
-        )
-
-    def _request(self, action: str, payload: JsonObject) -> JsonValue:
-        outcome = self._client.request_sync(_action_id(action), payload)
-        response_payload = outcome.response.payload.value
-        if not isinstance(response_payload, dict):
-            raise RuntimeBindingInvalid("graph response payload is not an object")
-        if outcome.response.kind is RuntimeMessageKind.FAULT:
-            fault_type = str(response_payload.get("type", "RtgGraphError"))
-            error = _FAILURES.get(fault_type, RtgGraphError)
-            raise error(str(response_payload.get("message", fault_type)))
-        return cast(JsonValue, response_payload.get("result"))
-
-
-def create_rtg_graph_proxy(
-    runtime: MessageRuntime,
-    source: RuntimeAddress,
-    target: RuntimeAddress,
-) -> RtgGraphMessageProxy:
-    return RtgGraphMessageProxy(runtime, source, target)
-
-
-def _host_method(host: MutableAdapterHost[Any], name: str) -> Callable[..., object]:
+def _host_method(host: object, name: str) -> Callable[..., object]:
     def invoke(*args: object, **kwargs: object) -> object:
-        method = getattr(host.resolve(), name)
+        method = getattr(host, name)
         if not callable(method):
             raise RuntimeBindingInvalid(f"graph host member is not callable: {name}")
         return method(*args, **kwargs)
@@ -457,33 +344,15 @@ def _host_method(host: MutableAdapterHost[Any], name: str) -> Callable[..., obje
 
 def _descriptor(
     action: str,
-    *,
-    replay_mode: RuntimeReplayMode,
-    idempotency: RuntimeActionIdempotency,
-) -> RuntimeActionBindingDescriptor:
-    return RuntimeActionBindingDescriptor(
-        component_contract_id=_CONTRACT_ID,
-        action_id=_action_id(action),
-        binding_id=_BINDING_ID,
-        binding_version=1,
-        schema_version=1,
-        request_codec_id=_REQUEST_CODEC,
-        result_codec_id=_RESULT_CODEC,
-        failure_codec_id=_FAILURE_CODEC,
-        idempotency=idempotency,
-        replay_mode=replay_mode,
-    )
+):
+    return runtime_binding_descriptor(_RUNTIME_BINDING, action)
 
 
 def _read_binding(
     action: str, invoke: Callable[..., object], decoder: RequestDecoder
 ) -> ActionBinding:
     return ActionBinding(
-        descriptor=_descriptor(
-            action,
-            replay_mode=RuntimeReplayMode.NO_STATE_EFFECT,
-            idempotency=RuntimeActionIdempotency.IDEMPOTENT,
-        ),
+        descriptor=_descriptor(action),
         invoke=invoke,
         decode_request=decoder,
         encode_result=encode_json,
@@ -497,15 +366,9 @@ def _mutation_binding(
     decoder: RequestDecoder,
     effect_builder: ReplayEffectBuilder,
     effect_applier: ReplayEffectApplier,
-    *,
-    idempotency: RuntimeActionIdempotency = RuntimeActionIdempotency.NON_IDEMPOTENT,
 ) -> ActionBinding:
     return ActionBinding(
-        descriptor=_descriptor(
-            action,
-            replay_mode=RuntimeReplayMode.CANONICAL_EFFECT,
-            idempotency=idempotency,
-        ),
+        descriptor=_descriptor(action),
         invoke=invoke,
         decode_request=decoder,
         encode_result=encode_json,

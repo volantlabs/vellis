@@ -1,0 +1,17 @@
+{
+  "artifacts": [
+    "bibliotek-component-context.puml",
+    "bibliotek-component-context.svg",
+    "operation-ownership.md",
+    "package-layers.puml",
+    "package-layers.svg",
+    "state-transfer-boundaries.md",
+    "vellis-logical-composition.puml",
+    "vellis-logical-composition.svg",
+    "vellis-runtime-topology.puml",
+    "vellis-runtime-topology.svg",
+    "verification-coverage.md"
+  ],
+  "schema_version": 1,
+  "source_digest": "941db7a140e95514ab99eea1667775fc044720c0d0f07b3890881cbae1a6973c"
+}

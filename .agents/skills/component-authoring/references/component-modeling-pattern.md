@@ -5,6 +5,9 @@ add metadata only for governance or traceability that SysML does not already exp
 
 ## Component shape
 
+This is the one ordinary component archetype used throughout the library. A component's purpose,
+amount of state, or use of coordination does not create another component metatype.
+
 1. Give the component `part def` a stable SysML short name such as
    `part def <'component.domain.name'> Name`.
 2. Model immutable records, requests, results, options, and failure data with `attribute def`.

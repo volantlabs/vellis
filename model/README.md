@@ -16,8 +16,20 @@ The modeling-pattern fixture lives under `tests/model/fixtures/`. It is validate
 packaged Foundation but is not part of any authored product, formal product index, or KPAR.
 
 Run `just model-render` to refresh human references under `generated/reference/` and machine
-projections under `generated/model/`. Do not edit those projections by hand. Run `just model-check` to validate
-the packaged products, repository profile, architecture, realizations, and generated artifacts.
+projections under `generated/model/`. Canonical view usages remain here; committed PlantUML and SVG
+files under `generated/reference/<product>/diagrams/` are generated and must not be edited by hand.
+The typed parser-backed architecture graph lives at `generated/model/architecture-graph.json`; its
+stable dashboard lives under `generated/reference/architecture/`. Run `just model-diagrams` for
+canonical graphical projections or `just model-dashboard` for the cross-model dashboard. Use
+`just model-view-presets` and `just model-view` for ignored on-demand projections. Run
+`just model-check` to validate the packaged products, repository profile, architecture,
+realizations, and generated artifacts.
+
+Model routine mutations as owner-local atomic batches whose observable preparation and transient
+recovery footprint follows the requested delta and required cascade closure. Snapshot, restore,
+checkpoint, and reconstruction actions are explicit whole-state exceptions. The generated
+architecture state-transfer matrix reviews that boundary without duplicating component contracts
+in Markdown.
 
 Vellis application content belongs under `model/vellis/`. `EverydayLifeOntology.sysml` is the
 authored starter schema; `model-render` derives the packaged

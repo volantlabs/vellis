@@ -19,7 +19,9 @@ obligations.
 1. Locate the component by stable ID in the repository's canonical model package.
 2. Resolve the accepted library package version and read its public values, actions, retained
    collaborator roles, state, required constraints, asserted satisfiers, failures, and verification
-   cases. Treat top-level documentation as explanation, not as an unmodeled obligation.
+   cases. Use `architecture-projection` for the component contract and any operation or impact slice
+   needed by the handoff. Treat top-level documentation as explanation, not as an unmodeled
+   obligation.
 3. Locate the matching concrete realization and confirm its code root and symbol from
    `@ImplementationBinding`; do not expect language bindings on the reusable logical component.
 4. Implement or revise the consumer-facing Python protocol.
@@ -43,6 +45,15 @@ obligations.
   same modeled collaborator roles; the mechanism does not redefine the logical contract.
 - Keep application composition and runtime adapters outside the reusable component implementation
   unless the accepted model assigns that behavior to the component.
+- For runtime-native modeled components, load generated package-local
+  `resources/runtime_binding.json` metadata and register explicit callable or handler mappings.
+  Do not recreate action IDs, defaults, failures, lanes, consistency, deadline, idempotency, or
+  replay semantics in hand-authored `_SPECS` tables. Reflection may validate an explicit mapping;
+  it must not discover routable methods.
+- Do not introduce store, controller, coordinator, facade, gateway, actor, saga, leaf, or edge base
+  classes solely to encode an implementation role. Use the same component boundary and compose
+  action handlers, messaging, admission, and replay helpers. Inheritance must realize a genuine
+  substitutable public contract rather than an orchestration style.
 - Do not change accepted contracts, ownership, dependencies, lifecycle, or invariants for implementation convenience.
 
 ## Drift Handling
@@ -72,6 +83,17 @@ components/<domain>/<name>/
 `protocol.py` contains only boundary-crossing protocols, values, and concrete public failures.
 Implementation modules own state and behavior. Reference compositions demonstrate the boundary but
 never become the semantic source of truth.
+
+For runtime participation kits, treat complete state as an explicit transfer contract, not ordinary
+message plumbing. Query, validation, mutation, fault, effect, and history payloads should use
+targeted reads, deltas, summaries, bounded findings, digests, or durable references. Only modeled
+snapshot/import/restore/checkpoint or external-document actions may encode complete state. Keep
+payload-disposition metadata model-owned and add codec tests that prove the boundary recursively.
+For every non-state-transfer mutation, prevalidate the complete local batch, apply it atomically,
+and retain at most invocation-local data for touched records and documented cascade closure.
+Never obtain atomicity or validation by exporting, cloning, hashing, or retaining the complete
+canonical store. Test the same small delta over small and large unrelated state using read and
+allocation counts; wall time is supporting evidence only.
 
 ## Verification
 

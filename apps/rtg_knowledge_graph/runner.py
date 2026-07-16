@@ -6,13 +6,31 @@ from importlib.resources import files
 from pathlib import Path
 from typing import cast
 
+from apps.rtg_knowledge_graph.application_binding import load_application_binding
 from apps.rtg_knowledge_graph.config import RtgKnowledgeGraphConfig
 from apps.rtg_knowledge_graph.mcp_launch import MCP_SERVER_NAME, mcp_launch_metadata
-from components.rtg.controller import RtgController
-from components.storage.json_file.protocol import JsonFileStorage, JsonValue
+from components.rtg.controller import RTG_CONTROLLER_ACTIONS
+from components.runtime.component_adapter import (
+    ActionBinding,
+    ComponentAdapter,
+    ComponentExecution,
+    decode_typed,
+    encode_json,
+)
+from components.storage.json_file import (
+    JSON_FILE_STORAGE_ACTIONS,
+    JsonDocumentList,
+    JsonDocumentMetadata,
+    JsonValue,
+)
 
 APP_NAME = "rtg_knowledge_graph"
 APP_MANIFEST_PATH = "system/app_manifest.json"
+_RUNNER_CONTRACT = "application.vellis.runner"
+_RUNNER_DESCRIPTORS = load_application_binding(_RUNNER_CONTRACT)
+RUNNER_ACTIONS = {
+    name: descriptor.action_ref() for name, descriptor in _RUNNER_DESCRIPTORS.items()
+}
 
 
 @dataclass(frozen=True, slots=True)
@@ -40,25 +58,65 @@ class RtgKnowledgeGraphRunStatus:
 class RtgKnowledgeGraphRunner:
     def __init__(
         self,
-        document_storage: JsonFileStorage,
-        controller: RtgController,
         storage_root: Path,
         runtime_database_path: Path,
         install_starter_schema: bool = True,
         automatic_recovery: bool = True,
+        *,
+        controller_key: str = "vellis.controller.primary",
+        json_storage_key: str = "vellis.storage.json.primary",
     ) -> None:
-        self._document_storage = document_storage
-        self._controller = controller
         self._storage_root = storage_root
         self._runtime_database_path = runtime_database_path
         self._install_starter_schema = install_starter_schema
         self._automatic_recovery = automatic_recovery
+        self._controller_key = controller_key
+        self._json_storage_key = json_storage_key
 
-    def run(self) -> RtgKnowledgeGraphRunStatus:
-        self._controller.export_system_snapshot()
-        manifest = self._manifest_document()
-        manifest_metadata = self._document_storage.write(APP_MANIFEST_PATH, manifest)
-        documents = self._document_storage.list(".")
+    def create_adapter(self) -> ComponentAdapter:
+        async def run(
+            _args: tuple[object, ...],
+            _kwargs: dict[str, object],
+            execution: ComponentExecution,
+        ) -> None:
+            result = await self._run(execution)
+            await execution.complete(result)
+
+        return ComponentAdapter(
+            (
+                ActionBinding(
+                    descriptor=_RUNNER_DESCRIPTORS["run"],
+                    decode_request=lambda _payload: ((), {}),
+                    encode_result=encode_json,
+                    handler=run,
+                ),
+            )
+        )
+
+    async def _run(self, execution: ComponentExecution) -> RtgKnowledgeGraphRunStatus:
+        await execution.call(
+            "controller-ready",
+            RTG_CONTROLLER_ACTIONS["get_system_state"],
+            {},
+            target=execution.address_for(self._controller_key),
+        )
+        metadata_value = await execution.call(
+            "write-manifest",
+            JSON_FILE_STORAGE_ACTIONS["write"],
+            {
+                "relative_path": APP_MANIFEST_PATH,
+                "json_value": self._manifest_document(),
+            },
+            target=execution.address_for(self._json_storage_key),
+        )
+        documents_value = await execution.call(
+            "list-documents",
+            JSON_FILE_STORAGE_ACTIONS["list"],
+            {"relative_directory_path": "."},
+            target=execution.address_for(self._json_storage_key),
+        )
+        manifest_metadata = decode_typed(metadata_value, JsonDocumentMetadata)
+        documents = decode_typed(documents_value, JsonDocumentList)
 
         return RtgKnowledgeGraphRunStatus(
             app_name=APP_NAME,
@@ -68,19 +126,6 @@ class RtgKnowledgeGraphRunner:
             manifest_size_bytes=manifest_metadata.size_bytes,
             json_document_count=len(documents.documents),
             rtg_controller_ready=True,
-        )
-
-    def recovery_pending_status(self) -> RtgKnowledgeGraphRunStatus:
-        """Describe deferred startup without crossing a recovery-closed boundary."""
-
-        return RtgKnowledgeGraphRunStatus(
-            app_name=APP_NAME,
-            storage_root=str(self._storage_root),
-            runtime_database_path=str(self._runtime_database_path),
-            manifest_path=APP_MANIFEST_PATH,
-            manifest_size_bytes=None,
-            json_document_count=None,
-            rtg_controller_ready=False,
         )
 
     def _manifest_document(self) -> dict[str, JsonValue]:

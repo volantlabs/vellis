@@ -1,6 +1,7 @@
 library package BibliotekRtgSchema {
     private import SoftwareComponentModeling::*;
     private import BibliotekSoftwareValues::*;
+    private import BibliotekRtgChangeValues::*;
     private import ScalarValues::*;
 
     enum def RtgSchemaDefinitionKind {
@@ -68,6 +69,11 @@ library package BibliotekRtgSchema {
         doc /* UUID may be absent on write only. Description is non-empty human-readable semantic text. Stored definitions have concrete UUID and Boolean system.live, defaulting missing live to true. */
     }
     attribute def RtgSchemaSnapshot { item definitions[0..*] ordered : RtgSchemaDefinition; }
+    attribute def RtgSchemaDefinitionWrite { attribute 'ref' : RtgChangeReference; item definition : RtgSchemaDefinition; }
+    attribute def RtgSchemaLiveStatusChange { attribute targetRef : RtgChangeReference; attribute live : Boolean; }
+    attribute def RtgSchemaChangeSet { attribute definitionWrites[0..*] : RtgSchemaDefinitionWrite; attribute deleteDefinitions[0..*] : RtgChangeReference; attribute setLive[0..*] : RtgSchemaLiveStatusChange; }
+    attribute def RtgSchemaBatchResult { attribute writes : Integer; attribute deletes : Integer; attribute liveChanges : Integer; }
+    attribute def RtgSchemaCountSummary { attribute anchorLive : Integer; attribute dataObjectLive : Integer; attribute linkLive : Integer; attribute liveTotal : Integer; attribute nonLiveTotal : Integer; }
     attribute def RtgSchemaDefinitionList { item definitions[0..*] ordered : RtgSchemaDefinition; }
     attribute def RtgSchemaAssociatedDataTypeList { attribute requiredDataTypes[0..*] ordered : String; attribute optionalDataTypes[0..*] ordered : String; }
     attribute def RtgSchemaLinkParticipation { attribute definitionUuid : Uuid; attribute typeKey : String; attribute direction : RtgSchemaParticipationDirection; attribute allowedSourceTypes[0..*] ordered : String; attribute allowedTargetTypes[0..*] ordered : String; attribute live : Boolean; }
@@ -91,10 +97,12 @@ library package BibliotekRtgSchema {
 
     action def ExportSchemaSnapshot { out 'snapshot' : RtgSchemaSnapshot; doc /* Export every full definition with normalized live metadata without mutation or filtering. */ @FailureContract { errorIds = (); } }
     action def ReplaceSchemaSnapshot { in 'snapshot' : RtgSchemaSnapshot; doc /* Validate the complete candidate, then atomically replace all definitions and rebuild derived indexes. */ @FailureContract { errorIds = ("RtgSchemaSnapshotInvalid", "RtgSchemaUuidInvalid", "RtgSchemaUuidConflict", "RtgSchemaDefinitionKindInvalid", "RtgSchemaTypeKeyInvalid", "RtgSchemaDefinitionInvalid", "RtgSchemaPayloadInvalid", "RtgSchemaSystemValueInvalid", "RtgSchemaLiveTypeConflict"); } }
+    action def ApplyRtgSchemaBatch { in changes : RtgSchemaChangeSet; out result : RtgSchemaBatchResult; doc /* Apply one resolved schema-local change set atomically. */ @FailureContract { errorIds = ("RtgSchemaUuidInvalid", "RtgSchemaUuidConflict", "RtgSchemaDefinitionKindInvalid", "RtgSchemaTypeKeyInvalid", "RtgSchemaDefinitionInvalid", "RtgSchemaPayloadInvalid", "RtgSchemaSystemValueInvalid", "RtgSchemaLiveTypeConflict", "RtgSchemaDefinitionNotFound"); } }
+    action def CountRtgSchemaSummary { out result : RtgSchemaCountSummary; doc /* Return bounded live and non-live definition counts without returning definitions. */ @FailureContract { errorIds = (); } }
     action def PutSchemaDefinition { in definition : RtgSchemaDefinition; out stored : RtgSchemaDefinition; doc /* Generate or preserve identity, validate definition structure and the selected payload, and atomically create or fully replace one definition. */ @FailureContract { errorIds = ("RtgSchemaUuidInvalid", "RtgSchemaDefinitionKindInvalid", "RtgSchemaTypeKeyInvalid", "RtgSchemaDefinitionInvalid", "RtgSchemaPayloadInvalid", "RtgSchemaSystemValueInvalid", "RtgSchemaLiveTypeConflict"); } }
     action def GetSchemaDefinition { in definitionUuid : Uuid; out definition : RtgSchemaDefinition; doc /* Return one definition by UUID. */ @FailureContract { errorIds = ("RtgSchemaDefinitionNotFound"); } }
-    action def ListSchemaDefinitions { in kind[0..1] : RtgSchemaDefinitionKind; in live[0..1] : Boolean; out result : RtgSchemaDefinitionList; doc /* List definitions with optional kind and live filters in deterministic order. */ @FailureContract { errorIds = ("RtgSchemaDefinitionKindInvalid"); } }
-    action def ListDefinitionsByTypeKey { in schemaTypeKey : String; in kind[0..1] : RtgSchemaDefinitionKind; in live[0..1] : Boolean; out result : RtgSchemaDefinitionList; doc /* List every definition for one type key with optional kind/live filters, including multiple non-live candidates. */ @FailureContract { errorIds = ("RtgSchemaTypeKeyInvalid", "RtgSchemaDefinitionKindInvalid"); } }
+    action def ListSchemaDefinitions { in kind[0..1] : RtgSchemaDefinitionKind; in live[0..1] : Boolean; in offset : Integer default = 0; in limit[0..1] : Integer; out result : RtgSchemaDefinitionList; doc /* List one stable page of definitions with optional kind and live filters. */ @FailureContract { errorIds = ("RtgSchemaDefinitionKindInvalid", "RtgSchemaPayloadInvalid"); } }
+    action def ListDefinitionsByTypeKey { in schemaTypeKey : String; in kind[0..1] : RtgSchemaDefinitionKind; in live[0..1] : Boolean; in offset : Integer default = 0; in limit[0..1] : Integer; out result : RtgSchemaDefinitionList; doc /* List a deterministic bounded page for one type key with optional kind/live filters, including multiple non-live candidates. */ @FailureContract { errorIds = ("RtgSchemaTypeKeyInvalid", "RtgSchemaDefinitionKindInvalid", "RtgSchemaPayloadInvalid"); } }
     action def ListAnchorDataTypeKeys { in anchorTypeKey : String; in live[0..1] : Boolean default = true; out result : RtgSchemaAssociatedDataTypeList; doc /* Return required and optional associated data type keys declared by one anchor schema. */ @FailureContract { errorIds = ("RtgSchemaTypeKeyInvalid", "RtgSchemaDefinitionNotFound"); } }
     action def ListLinkParticipation { in typeKey : String; in direction : RtgSchemaParticipationQueryDirection default = RtgSchemaParticipationQueryDirection::either; in live[0..1] : Boolean default = true; out result : RtgSchemaLinkParticipationList; doc /* Return link schemas that admit the type as source, target, or either endpoint. Each result reports source, target, or both relative to the queried type. */ @FailureContract { errorIds = ("RtgSchemaTypeKeyInvalid", "RtgSchemaDirectionInvalid"); } }
     action def ListAnchorTypeSummaries { in live[0..1] : Boolean default = true; out result : RtgSchemaAnchorTypeSummaryList; doc /* Return anchor type identities and descriptions only, never graph counts. */ @FailureContract { errorIds = (); } }
@@ -107,11 +115,14 @@ library package BibliotekRtgSchema {
         item definitions[0..*] : RtgSchemaDefinition { doc /* Canonical component-owned schema-definition occurrences. */ }
         derived attribute navigationIndexes : JsonObject { doc /* Ephemeral navigation indexes derived from canonical schema definitions. */ }
         perform action exportSnapshot[0..*] : ExportSchemaSnapshot; perform action replaceSnapshot[0..*] : ReplaceSchemaSnapshot; perform action putDefinition[0..*] : PutSchemaDefinition; perform action getDefinition[0..*] : GetSchemaDefinition;
+        perform action applyBatch[0..*] : ApplyRtgSchemaBatch; perform action countSummary[0..*] : CountRtgSchemaSummary;
         perform action listDefinitions[0..*] : ListSchemaDefinitions; perform action listDefinitionsByTypeKey[0..*] : ListDefinitionsByTypeKey;
         perform action listAnchorDataTypeKeys[0..*] : ListAnchorDataTypeKeys; perform action listLinkParticipation[0..*] : ListLinkParticipation;
         perform action listAnchorTypeSummaries[0..*] : ListAnchorTypeSummaries; perform action getSchemaPack[0..*] : GetSchemaPack; perform action deleteDefinition[0..*] : DeleteSchemaDefinition;
         dependency snapshotState from exportSnapshot to definitions { @StateAccess { kind = StateAccessKind::read; } doc /* read all canonical definitions. */ }
         dependency replaceSnapshotState from replaceSnapshot to definitions { @StateAccess { kind = StateAccessKind::write; } doc /* validate before visibility, atomically replace every definition, and rebuild indexes. */ }
+        dependency applyBatchState from applyBatch to definitions { @StateAccess { kind = StateAccessKind::write; } doc /* expose the complete resolved schema change set or leave canonical schema state unchanged. */ }
+        dependency countSummaryState from countSummary to navigationIndexes { @StateAccess { kind = StateAccessKind::read; } doc /* return only bounded aggregate counts. */ }
         dependency putState from putDefinition to definitions { @StateAccess { kind = StateAccessKind::write; } doc /* atomically create/replace definition and rebuild affected indexes. */ }
         dependency getState from getDefinition to definitions { @StateAccess { kind = StateAccessKind::read; } doc /* read one canonical definition. */ }
         dependency listState from listDefinitions to navigationIndexes { @StateAccess { kind = StateAccessKind::read; } doc /* read kind/live indexes. */ }
@@ -369,6 +380,9 @@ library package BibliotekRtgSchema {
         satisfy navigationIndexesMatchPayloads by schema;
         satisfy deterministicListOrdering by schema;
         satisfy schemaDeleteEffect by schema.deleteDefinition;
+        satisfy schemaBatchAtomicity by schema.applyBatch;
+        satisfy schemaRoutineWorkBounded by schema;
+        satisfy countSchemaSummaryFailureSemantics by schema.countSummary;
 
         satisfy exportSchemaSnapshotFailureSemantics by schema.exportSnapshot;
         satisfy replaceSchemaSnapshotFailureSemantics by schema.replaceSnapshot;
@@ -381,6 +395,7 @@ library package BibliotekRtgSchema {
         satisfy listAnchorTypeSummariesFailureSemantics by schema.listAnchorTypeSummaries;
         satisfy getSchemaPackFailureSemantics by schema.getSchemaPack;
         satisfy deleteSchemaDefinitionFailureSemantics by schema.deleteDefinition;
+        satisfy applyRtgSchemaBatchFailureSemantics by schema.applyBatch;
         action createEmptyRtgSchemaSubject : CreateEmptyRtgSchema;
         satisfy createEmptyRtgSchemaFailureSemantics by createEmptyRtgSchemaSubject;
         action importRtgSchemaSnapshotSubject : ImportRtgSchemaSnapshot;
@@ -479,6 +494,14 @@ library package BibliotekRtgSchema {
     }
 
 
+
+    requirement <'contract.rtg.schema.batch_atomicity'> schemaBatchAtomicity { subject operation : ApplyRtgSchemaBatch; require constraint { doc /* Success exposes the complete requested schema-local batch; rejection or failure exposes the exact prior schema state. */ } }
+    requirement <'invariant.rtg.schema.routine_work_is_delta_scaled'> schemaRoutineWorkBounded { subject schema : RtgSchema; require constraint { doc /* A non-state-transfer action does not copy, serialize, hash, or retain complete schema state solely for validation, atomicity, or recovery. Transient work may grow with the requested mutation and affected uniqueness/index closure, but not unrelated definitions. Explicit state-transfer and reconstruction actions are exceptions. */ } }
+    requirement <'contract.rtg.schema.apply_batch.failures'> applyRtgSchemaBatchFailureSemantics { subject operation : ApplyRtgSchemaBatch; require constraint { doc /* Any invalid reference, definition, uniqueness conflict, live conflict, or deletion rejects the whole batch without observable schema state effect. */ } }
+    requirement <'contract.rtg.schema.count_summary.failures'> countSchemaSummaryFailureSemantics { subject operation : CountRtgSchemaSummary; require constraint { doc /* Summary reads expose bounded counts and do not change schema state. */ } }
+    verification def SchemaBatchAtomicityContractVerification { subject operation : ApplyRtgSchemaBatch; objective { verify schemaBatchAtomicity; verify applyRtgSchemaBatchFailureSemantics; } @EvidenceBinding { evidenceId = "components/rtg/schema/tests/test_rtg_schema_contract.py#SchemaBatchAtomicityContractVerification"; implementationScope = "InMemoryRtgSchema"; } }
+    verification def SchemaRoutineWorkScalingVerification { subject schema : RtgSchema; objective { verify schemaRoutineWorkBounded; } @EvidenceBinding { evidenceId = "components/rtg/schema/tests/test_rtg_schema_contract.py#SchemaRoutineWorkScalingVerification"; implementationScope = "InMemoryRtgSchema"; } }
+    verification def CountSchemaSummaryContractVerification { subject operation : CountRtgSchemaSummary; objective { verify countSchemaSummaryFailureSemantics; } @EvidenceBinding { evidenceId = "components/rtg/schema/tests/test_rtg_schema_contract.py#CountSchemaSummaryContractVerification"; implementationScope = "InMemoryRtgSchema"; } }
 
     verification def RtgSchemaBoundaryVerification {
         subject schema : RtgSchema;

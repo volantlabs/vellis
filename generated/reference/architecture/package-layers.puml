@@ -1,0 +1,21 @@
+@startuml
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+skinparam shadowing false
+skinparam roundCorner 12
+skinparam linetype ortho
+skinparam ArrowThickness 1.2
+skinparam ArrowFontSize 11
+skinparam rectangleBorderThickness 1
+skinparam nodesep 35
+skinparam ranksep 45
+title Model product and package layers
+top to bottom direction
+rectangle "Foundation\n1 authored packages" as n_69ff011007d4 #EAF2F8
+rectangle "Bibliotek\n20 authored packages" as n_c5d00c1a8ce3 #EAF2F8
+rectangle "Vellis\n8 authored packages" as n_f1128d4b0645 #EAF2F8
+n_c5d00c1a8ce3 -[#5D6D7E]-> n_69ff011007d4
+n_f1128d4b0645 -[#5D6D7E]-> n_c5d00c1a8ce3
+n_f1128d4b0645 -[#5D6D7E]-> n_69ff011007d4
+@enduml

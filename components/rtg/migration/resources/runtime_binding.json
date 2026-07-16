@@ -1,0 +1,3537 @@
+{
+  "actions": [
+    {
+      "action_id": "component.rtg.migration.export_snapshot",
+      "binding_id": "binding.python.rtg.migration.v1",
+      "binding_version": 1,
+      "canonical_effect_codec_id": null,
+      "canonical_effect_codec_version": null,
+      "canonical_effect_schema_version": null,
+      "concurrency_lane": "serialized",
+      "consistency_access": "independent",
+      "consistency_group": null,
+      "deadline_seconds": null,
+      "effect_payload_disposition": null,
+      "externally_effectful": false,
+      "failure_codec_id": "codec.python.component.rtg.migration.failure.json",
+      "failure_codec_version": 1,
+      "failure_dispositions": {},
+      "failure_names": [],
+      "fault_payload_disposition": "diagnostic",
+      "fault_schema": {
+        "oneOf": []
+      },
+      "idempotency": "idempotent",
+      "method_name": "export_snapshot",
+      "modeled_fault_trace_disposition": "aborted",
+      "recovery_authorized": false,
+      "replay_mode": "no_state_effect",
+      "request_arguments": [],
+      "request_codec_id": "codec.python.component.rtg.migration.request.json",
+      "request_codec_version": 1,
+      "request_payload_disposition": "command",
+      "request_schema": {
+        "additionalProperties": false,
+        "properties": {},
+        "required": [],
+        "type": "object"
+      },
+      "resolved_argument_from_result": null,
+      "result_codec_id": "codec.python.component.rtg.migration.result.json",
+      "result_codec_version": 1,
+      "result_payload_disposition": "state_transfer",
+      "result_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "migrations": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "constraint_make_live": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "constraint_make_non_live": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "constraint_replacements": {
+                  "items": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "new_resource_id": {
+                        "type": "string"
+                      },
+                      "old_resource_id": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "old_resource_id",
+                      "new_resource_id"
+                    ],
+                    "type": "object"
+                  },
+                  "type": "array"
+                },
+                "description": {
+                  "type": "string"
+                },
+                "evidence": {
+                  "items": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "evidence_id": {
+                        "type": "string"
+                      },
+                      "kind": {
+                        "type": "string"
+                      },
+                      "metadata": {
+                        "type": "object"
+                      },
+                      "reference": {
+                        "type": "string"
+                      },
+                      "summary": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "evidence_id",
+                      "kind",
+                      "reference",
+                      "summary"
+                    ],
+                    "type": "object"
+                  },
+                  "type": "array"
+                },
+                "graph_make_live": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "graph_make_non_live": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "graph_replacements": {
+                  "items": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "new_resource_id": {
+                        "type": "string"
+                      },
+                      "old_resource_id": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "old_resource_id",
+                      "new_resource_id"
+                    ],
+                    "type": "object"
+                  },
+                  "type": "array"
+                },
+                "metadata": {
+                  "type": "object"
+                },
+                "migration_id": {
+                  "type": "string"
+                },
+                "schema_make_live": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "schema_make_non_live": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "schema_replacements": {
+                  "items": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "new_resource_id": {
+                        "type": "string"
+                      },
+                      "old_resource_id": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "old_resource_id",
+                      "new_resource_id"
+                    ],
+                    "type": "object"
+                  },
+                  "type": "array"
+                },
+                "status": {
+                  "enum": [
+                    "draft",
+                    "ready",
+                    "applied",
+                    "failed",
+                    "abandoned"
+                  ],
+                  "type": "string"
+                }
+              },
+              "required": [
+                "description"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "schema_version": 1
+    },
+    {
+      "action_id": "component.rtg.migration.replace_snapshot",
+      "binding_id": "binding.python.rtg.migration.v1",
+      "binding_version": 1,
+      "canonical_effect_codec_id": "binding.python.rtg.migration.v1.component.rtg.migration.replace_snapshot.effect.json",
+      "canonical_effect_codec_version": 1,
+      "canonical_effect_schema_version": 1,
+      "concurrency_lane": "serialized",
+      "consistency_access": "independent",
+      "consistency_group": null,
+      "deadline_seconds": null,
+      "effect_payload_disposition": "state_transfer",
+      "externally_effectful": false,
+      "failure_codec_id": "codec.python.component.rtg.migration.failure.json",
+      "failure_codec_version": 1,
+      "failure_dispositions": {},
+      "failure_names": [
+        "RtgMigrationSnapshotInvalid",
+        "RtgMigrationIdInvalid",
+        "RtgMigrationIdConflict",
+        "RtgMigrationRecordInvalid",
+        "RtgMigrationStatusInvalid",
+        "RtgMigrationEvidenceInvalid"
+      ],
+      "fault_payload_disposition": "diagnostic",
+      "fault_schema": {
+        "oneOf": [
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          }
+        ]
+      },
+      "idempotency": "idempotent",
+      "method_name": "replace_snapshot",
+      "modeled_fault_trace_disposition": "aborted",
+      "recovery_authorized": false,
+      "replay_mode": "canonical_effect",
+      "request_arguments": [
+        {
+          "default": null,
+          "name": "snapshot",
+          "required": true,
+          "schema": {
+            "additionalProperties": false,
+            "properties": {
+              "migrations": {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "constraint_make_live": {
+                      "items": {
+                        "type": "string"
+                      },
+                      "type": "array"
+                    },
+                    "constraint_make_non_live": {
+                      "items": {
+                        "type": "string"
+                      },
+                      "type": "array"
+                    },
+                    "constraint_replacements": {
+                      "items": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "new_resource_id": {
+                            "type": "string"
+                          },
+                          "old_resource_id": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "old_resource_id",
+                          "new_resource_id"
+                        ],
+                        "type": "object"
+                      },
+                      "type": "array"
+                    },
+                    "description": {
+                      "type": "string"
+                    },
+                    "evidence": {
+                      "items": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "evidence_id": {
+                            "type": "string"
+                          },
+                          "kind": {
+                            "type": "string"
+                          },
+                          "metadata": {
+                            "type": "object"
+                          },
+                          "reference": {
+                            "type": "string"
+                          },
+                          "summary": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "evidence_id",
+                          "kind",
+                          "reference",
+                          "summary"
+                        ],
+                        "type": "object"
+                      },
+                      "type": "array"
+                    },
+                    "graph_make_live": {
+                      "items": {
+                        "type": "string"
+                      },
+                      "type": "array"
+                    },
+                    "graph_make_non_live": {
+                      "items": {
+                        "type": "string"
+                      },
+                      "type": "array"
+                    },
+                    "graph_replacements": {
+                      "items": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "new_resource_id": {
+                            "type": "string"
+                          },
+                          "old_resource_id": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "old_resource_id",
+                          "new_resource_id"
+                        ],
+                        "type": "object"
+                      },
+                      "type": "array"
+                    },
+                    "metadata": {
+                      "type": "object"
+                    },
+                    "migration_id": {
+                      "type": "string"
+                    },
+                    "schema_make_live": {
+                      "items": {
+                        "type": "string"
+                      },
+                      "type": "array"
+                    },
+                    "schema_make_non_live": {
+                      "items": {
+                        "type": "string"
+                      },
+                      "type": "array"
+                    },
+                    "schema_replacements": {
+                      "items": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "new_resource_id": {
+                            "type": "string"
+                          },
+                          "old_resource_id": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "old_resource_id",
+                          "new_resource_id"
+                        ],
+                        "type": "object"
+                      },
+                      "type": "array"
+                    },
+                    "status": {
+                      "enum": [
+                        "draft",
+                        "ready",
+                        "applied",
+                        "failed",
+                        "abandoned"
+                      ],
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "description"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              }
+            },
+            "type": "object"
+          }
+        }
+      ],
+      "request_codec_id": "codec.python.component.rtg.migration.request.json",
+      "request_codec_version": 1,
+      "request_payload_disposition": "state_transfer",
+      "request_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "snapshot": {
+            "additionalProperties": false,
+            "properties": {
+              "migrations": {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "constraint_make_live": {
+                      "items": {
+                        "type": "string"
+                      },
+                      "type": "array"
+                    },
+                    "constraint_make_non_live": {
+                      "items": {
+                        "type": "string"
+                      },
+                      "type": "array"
+                    },
+                    "constraint_replacements": {
+                      "items": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "new_resource_id": {
+                            "type": "string"
+                          },
+                          "old_resource_id": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "old_resource_id",
+                          "new_resource_id"
+                        ],
+                        "type": "object"
+                      },
+                      "type": "array"
+                    },
+                    "description": {
+                      "type": "string"
+                    },
+                    "evidence": {
+                      "items": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "evidence_id": {
+                            "type": "string"
+                          },
+                          "kind": {
+                            "type": "string"
+                          },
+                          "metadata": {
+                            "type": "object"
+                          },
+                          "reference": {
+                            "type": "string"
+                          },
+                          "summary": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "evidence_id",
+                          "kind",
+                          "reference",
+                          "summary"
+                        ],
+                        "type": "object"
+                      },
+                      "type": "array"
+                    },
+                    "graph_make_live": {
+                      "items": {
+                        "type": "string"
+                      },
+                      "type": "array"
+                    },
+                    "graph_make_non_live": {
+                      "items": {
+                        "type": "string"
+                      },
+                      "type": "array"
+                    },
+                    "graph_replacements": {
+                      "items": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "new_resource_id": {
+                            "type": "string"
+                          },
+                          "old_resource_id": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "old_resource_id",
+                          "new_resource_id"
+                        ],
+                        "type": "object"
+                      },
+                      "type": "array"
+                    },
+                    "metadata": {
+                      "type": "object"
+                    },
+                    "migration_id": {
+                      "type": "string"
+                    },
+                    "schema_make_live": {
+                      "items": {
+                        "type": "string"
+                      },
+                      "type": "array"
+                    },
+                    "schema_make_non_live": {
+                      "items": {
+                        "type": "string"
+                      },
+                      "type": "array"
+                    },
+                    "schema_replacements": {
+                      "items": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "new_resource_id": {
+                            "type": "string"
+                          },
+                          "old_resource_id": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "old_resource_id",
+                          "new_resource_id"
+                        ],
+                        "type": "object"
+                      },
+                      "type": "array"
+                    },
+                    "status": {
+                      "enum": [
+                        "draft",
+                        "ready",
+                        "applied",
+                        "failed",
+                        "abandoned"
+                      ],
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "description"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              }
+            },
+            "type": "object"
+          }
+        },
+        "required": [
+          "snapshot"
+        ],
+        "type": "object"
+      },
+      "resolved_argument_from_result": null,
+      "result_codec_id": "codec.python.component.rtg.migration.result.json",
+      "result_codec_version": 1,
+      "result_payload_disposition": "query_result",
+      "result_schema": {
+        "type": "null"
+      },
+      "schema_version": 1
+    },
+    {
+      "action_id": "component.rtg.migration.apply_batch",
+      "binding_id": "binding.python.rtg.migration.v1",
+      "binding_version": 1,
+      "canonical_effect_codec_id": "binding.python.rtg.migration.v1.component.rtg.migration.apply_batch.effect.json",
+      "canonical_effect_codec_version": 1,
+      "canonical_effect_schema_version": 1,
+      "concurrency_lane": "serialized",
+      "consistency_access": "independent",
+      "consistency_group": null,
+      "deadline_seconds": null,
+      "effect_payload_disposition": "canonical_delta",
+      "externally_effectful": false,
+      "failure_codec_id": "codec.python.component.rtg.migration.failure.json",
+      "failure_codec_version": 1,
+      "failure_dispositions": {},
+      "failure_names": [
+        "RtgMigrationIdInvalid",
+        "RtgMigrationIdConflict",
+        "RtgMigrationNotFound",
+        "RtgMigrationRecordInvalid",
+        "RtgMigrationStatusInvalid",
+        "RtgMigrationStatusTransitionInvalid",
+        "RtgMigrationEvidenceInvalid",
+        "RtgMigrationDeleteNotAllowed"
+      ],
+      "fault_payload_disposition": "diagnostic",
+      "fault_schema": {
+        "oneOf": [
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          }
+        ]
+      },
+      "idempotency": "non_idempotent",
+      "method_name": "apply_batch",
+      "modeled_fault_trace_disposition": "aborted",
+      "recovery_authorized": false,
+      "replay_mode": "canonical_effect",
+      "request_arguments": [
+        {
+          "default": null,
+          "name": "changes",
+          "required": true,
+          "schema": {
+            "additionalProperties": false,
+            "properties": {
+              "delete_migrations": {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "local_ref": {
+                      "type": "string"
+                    },
+                    "resource_id": {
+                      "type": "string"
+                    }
+                  },
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "evidence_additions": {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "evidence": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "evidence_id": {
+                          "type": "string"
+                        },
+                        "kind": {
+                          "type": "string"
+                        },
+                        "metadata": {
+                          "type": "object"
+                        },
+                        "reference": {
+                          "type": "string"
+                        },
+                        "summary": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "evidence_id",
+                        "kind",
+                        "reference",
+                        "summary"
+                      ],
+                      "type": "object"
+                    },
+                    "migration_ref": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "local_ref": {
+                          "type": "string"
+                        },
+                        "resource_id": {
+                          "type": "string"
+                        }
+                      },
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "migration_ref",
+                    "evidence"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "migration_writes": {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "migration": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "constraint_make_live": {
+                          "items": {
+                            "type": "string"
+                          },
+                          "type": "array"
+                        },
+                        "constraint_make_non_live": {
+                          "items": {
+                            "type": "string"
+                          },
+                          "type": "array"
+                        },
+                        "constraint_replacements": {
+                          "items": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "new_resource_id": {
+                                "type": "string"
+                              },
+                              "old_resource_id": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "old_resource_id",
+                              "new_resource_id"
+                            ],
+                            "type": "object"
+                          },
+                          "type": "array"
+                        },
+                        "description": {
+                          "type": "string"
+                        },
+                        "evidence": {
+                          "items": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "evidence_id": {
+                                "type": "string"
+                              },
+                              "kind": {
+                                "type": "string"
+                              },
+                              "metadata": {
+                                "type": "object"
+                              },
+                              "reference": {
+                                "type": "string"
+                              },
+                              "summary": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "evidence_id",
+                              "kind",
+                              "reference",
+                              "summary"
+                            ],
+                            "type": "object"
+                          },
+                          "type": "array"
+                        },
+                        "graph_make_live": {
+                          "items": {
+                            "type": "string"
+                          },
+                          "type": "array"
+                        },
+                        "graph_make_non_live": {
+                          "items": {
+                            "type": "string"
+                          },
+                          "type": "array"
+                        },
+                        "graph_replacements": {
+                          "items": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "new_resource_id": {
+                                "type": "string"
+                              },
+                              "old_resource_id": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "old_resource_id",
+                              "new_resource_id"
+                            ],
+                            "type": "object"
+                          },
+                          "type": "array"
+                        },
+                        "metadata": {
+                          "type": "object"
+                        },
+                        "migration_id": {
+                          "type": "string"
+                        },
+                        "schema_make_live": {
+                          "items": {
+                            "type": "string"
+                          },
+                          "type": "array"
+                        },
+                        "schema_make_non_live": {
+                          "items": {
+                            "type": "string"
+                          },
+                          "type": "array"
+                        },
+                        "schema_replacements": {
+                          "items": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "new_resource_id": {
+                                "type": "string"
+                              },
+                              "old_resource_id": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "old_resource_id",
+                              "new_resource_id"
+                            ],
+                            "type": "object"
+                          },
+                          "type": "array"
+                        },
+                        "status": {
+                          "enum": [
+                            "draft",
+                            "ready",
+                            "applied",
+                            "failed",
+                            "abandoned"
+                          ],
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "description"
+                      ],
+                      "type": "object"
+                    },
+                    "ref": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "local_ref": {
+                          "type": "string"
+                        },
+                        "resource_id": {
+                          "type": "string"
+                        }
+                      },
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "ref",
+                    "migration"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "status_changes": {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "migration_ref": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "local_ref": {
+                          "type": "string"
+                        },
+                        "resource_id": {
+                          "type": "string"
+                        }
+                      },
+                      "type": "object"
+                    },
+                    "status": {
+                      "enum": [
+                        "draft",
+                        "ready",
+                        "applied",
+                        "failed",
+                        "abandoned"
+                      ],
+                      "type": "string"
+                    },
+                    "status_metadata": {
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "migration_ref",
+                    "status",
+                    "status_metadata"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              }
+            },
+            "type": "object"
+          }
+        }
+      ],
+      "request_codec_id": "codec.python.component.rtg.migration.request.json",
+      "request_codec_version": 1,
+      "request_payload_disposition": "command",
+      "request_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "changes": {
+            "additionalProperties": false,
+            "properties": {
+              "delete_migrations": {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "local_ref": {
+                      "type": "string"
+                    },
+                    "resource_id": {
+                      "type": "string"
+                    }
+                  },
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "evidence_additions": {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "evidence": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "evidence_id": {
+                          "type": "string"
+                        },
+                        "kind": {
+                          "type": "string"
+                        },
+                        "metadata": {
+                          "type": "object"
+                        },
+                        "reference": {
+                          "type": "string"
+                        },
+                        "summary": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "evidence_id",
+                        "kind",
+                        "reference",
+                        "summary"
+                      ],
+                      "type": "object"
+                    },
+                    "migration_ref": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "local_ref": {
+                          "type": "string"
+                        },
+                        "resource_id": {
+                          "type": "string"
+                        }
+                      },
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "migration_ref",
+                    "evidence"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "migration_writes": {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "migration": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "constraint_make_live": {
+                          "items": {
+                            "type": "string"
+                          },
+                          "type": "array"
+                        },
+                        "constraint_make_non_live": {
+                          "items": {
+                            "type": "string"
+                          },
+                          "type": "array"
+                        },
+                        "constraint_replacements": {
+                          "items": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "new_resource_id": {
+                                "type": "string"
+                              },
+                              "old_resource_id": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "old_resource_id",
+                              "new_resource_id"
+                            ],
+                            "type": "object"
+                          },
+                          "type": "array"
+                        },
+                        "description": {
+                          "type": "string"
+                        },
+                        "evidence": {
+                          "items": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "evidence_id": {
+                                "type": "string"
+                              },
+                              "kind": {
+                                "type": "string"
+                              },
+                              "metadata": {
+                                "type": "object"
+                              },
+                              "reference": {
+                                "type": "string"
+                              },
+                              "summary": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "evidence_id",
+                              "kind",
+                              "reference",
+                              "summary"
+                            ],
+                            "type": "object"
+                          },
+                          "type": "array"
+                        },
+                        "graph_make_live": {
+                          "items": {
+                            "type": "string"
+                          },
+                          "type": "array"
+                        },
+                        "graph_make_non_live": {
+                          "items": {
+                            "type": "string"
+                          },
+                          "type": "array"
+                        },
+                        "graph_replacements": {
+                          "items": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "new_resource_id": {
+                                "type": "string"
+                              },
+                              "old_resource_id": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "old_resource_id",
+                              "new_resource_id"
+                            ],
+                            "type": "object"
+                          },
+                          "type": "array"
+                        },
+                        "metadata": {
+                          "type": "object"
+                        },
+                        "migration_id": {
+                          "type": "string"
+                        },
+                        "schema_make_live": {
+                          "items": {
+                            "type": "string"
+                          },
+                          "type": "array"
+                        },
+                        "schema_make_non_live": {
+                          "items": {
+                            "type": "string"
+                          },
+                          "type": "array"
+                        },
+                        "schema_replacements": {
+                          "items": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "new_resource_id": {
+                                "type": "string"
+                              },
+                              "old_resource_id": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "old_resource_id",
+                              "new_resource_id"
+                            ],
+                            "type": "object"
+                          },
+                          "type": "array"
+                        },
+                        "status": {
+                          "enum": [
+                            "draft",
+                            "ready",
+                            "applied",
+                            "failed",
+                            "abandoned"
+                          ],
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "description"
+                      ],
+                      "type": "object"
+                    },
+                    "ref": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "local_ref": {
+                          "type": "string"
+                        },
+                        "resource_id": {
+                          "type": "string"
+                        }
+                      },
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "ref",
+                    "migration"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "status_changes": {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "migration_ref": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "local_ref": {
+                          "type": "string"
+                        },
+                        "resource_id": {
+                          "type": "string"
+                        }
+                      },
+                      "type": "object"
+                    },
+                    "status": {
+                      "enum": [
+                        "draft",
+                        "ready",
+                        "applied",
+                        "failed",
+                        "abandoned"
+                      ],
+                      "type": "string"
+                    },
+                    "status_metadata": {
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "migration_ref",
+                    "status",
+                    "status_metadata"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              }
+            },
+            "type": "object"
+          }
+        },
+        "required": [
+          "changes"
+        ],
+        "type": "object"
+      },
+      "resolved_argument_from_result": null,
+      "result_codec_id": "codec.python.component.rtg.migration.result.json",
+      "result_codec_version": 1,
+      "result_payload_disposition": "query_result",
+      "result_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "deletes": {
+            "type": "integer"
+          },
+          "evidence_additions": {
+            "type": "integer"
+          },
+          "status_changes": {
+            "type": "integer"
+          },
+          "writes": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "writes",
+          "deletes",
+          "status_changes",
+          "evidence_additions"
+        ],
+        "type": "object"
+      },
+      "schema_version": 1
+    },
+    {
+      "action_id": "component.rtg.migration.count_summary",
+      "binding_id": "binding.python.rtg.migration.v1",
+      "binding_version": 1,
+      "canonical_effect_codec_id": null,
+      "canonical_effect_codec_version": null,
+      "canonical_effect_schema_version": null,
+      "concurrency_lane": "serialized",
+      "consistency_access": "independent",
+      "consistency_group": null,
+      "deadline_seconds": null,
+      "effect_payload_disposition": null,
+      "externally_effectful": false,
+      "failure_codec_id": "codec.python.component.rtg.migration.failure.json",
+      "failure_codec_version": 1,
+      "failure_dispositions": {},
+      "failure_names": [],
+      "fault_payload_disposition": "diagnostic",
+      "fault_schema": {
+        "oneOf": []
+      },
+      "idempotency": "idempotent",
+      "method_name": "count_summary",
+      "modeled_fault_trace_disposition": "aborted",
+      "recovery_authorized": false,
+      "replay_mode": "no_state_effect",
+      "request_arguments": [],
+      "request_codec_id": "codec.python.component.rtg.migration.request.json",
+      "request_codec_version": 1,
+      "request_payload_disposition": "command",
+      "request_schema": {
+        "additionalProperties": false,
+        "properties": {},
+        "required": [],
+        "type": "object"
+      },
+      "resolved_argument_from_result": null,
+      "result_codec_id": "codec.python.component.rtg.migration.result.json",
+      "result_codec_version": 1,
+      "result_payload_disposition": "query_result",
+      "result_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "abandoned": {
+            "type": "integer"
+          },
+          "applied": {
+            "type": "integer"
+          },
+          "draft": {
+            "type": "integer"
+          },
+          "failed": {
+            "type": "integer"
+          },
+          "ready": {
+            "type": "integer"
+          },
+          "total": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "draft",
+          "ready",
+          "failed",
+          "applied",
+          "abandoned",
+          "total"
+        ],
+        "type": "object"
+      },
+      "schema_version": 1
+    },
+    {
+      "action_id": "component.rtg.migration.find_candidate_owners",
+      "binding_id": "binding.python.rtg.migration.v1",
+      "binding_version": 1,
+      "canonical_effect_codec_id": null,
+      "canonical_effect_codec_version": null,
+      "canonical_effect_schema_version": null,
+      "concurrency_lane": "serialized",
+      "consistency_access": "independent",
+      "consistency_group": null,
+      "deadline_seconds": null,
+      "effect_payload_disposition": null,
+      "externally_effectful": false,
+      "failure_codec_id": "codec.python.component.rtg.migration.failure.json",
+      "failure_codec_version": 1,
+      "failure_dispositions": {},
+      "failure_names": [
+        "RtgMigrationRecordInvalid"
+      ],
+      "fault_payload_disposition": "diagnostic",
+      "fault_schema": {
+        "oneOf": [
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          }
+        ]
+      },
+      "idempotency": "idempotent",
+      "method_name": "find_candidate_owners",
+      "modeled_fault_trace_disposition": "aborted",
+      "recovery_authorized": false,
+      "replay_mode": "no_state_effect",
+      "request_arguments": [
+        {
+          "default": null,
+          "name": "kind",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "default": null,
+          "name": "resource_id",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "request_codec_id": "codec.python.component.rtg.migration.request.json",
+      "request_codec_version": 1,
+      "request_payload_disposition": "command",
+      "request_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "type": "string"
+          },
+          "resource_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "resource_id"
+        ],
+        "type": "object"
+      },
+      "resolved_argument_from_result": null,
+      "result_codec_id": "codec.python.component.rtg.migration.result.json",
+      "result_codec_version": 1,
+      "result_payload_disposition": "query_result",
+      "result_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "migration_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "schema_version": 1
+    },
+    {
+      "action_id": "component.rtg.migration.put_migration",
+      "binding_id": "binding.python.rtg.migration.v1",
+      "binding_version": 1,
+      "canonical_effect_codec_id": "binding.python.rtg.migration.v1.component.rtg.migration.put_migration.effect.json",
+      "canonical_effect_codec_version": 1,
+      "canonical_effect_schema_version": 1,
+      "concurrency_lane": "serialized",
+      "consistency_access": "independent",
+      "consistency_group": null,
+      "deadline_seconds": null,
+      "effect_payload_disposition": "canonical_delta",
+      "externally_effectful": false,
+      "failure_codec_id": "codec.python.component.rtg.migration.failure.json",
+      "failure_codec_version": 1,
+      "failure_dispositions": {},
+      "failure_names": [
+        "RtgMigrationIdInvalid",
+        "RtgMigrationRecordInvalid",
+        "RtgMigrationStatusInvalid",
+        "RtgMigrationStatusTransitionInvalid",
+        "RtgMigrationEvidenceInvalid"
+      ],
+      "fault_payload_disposition": "diagnostic",
+      "fault_schema": {
+        "oneOf": [
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          }
+        ]
+      },
+      "idempotency": "non_idempotent",
+      "method_name": "put_migration",
+      "modeled_fault_trace_disposition": "aborted",
+      "recovery_authorized": false,
+      "replay_mode": "canonical_effect",
+      "request_arguments": [
+        {
+          "default": null,
+          "name": "migration",
+          "required": true,
+          "schema": {
+            "additionalProperties": false,
+            "properties": {
+              "constraint_make_live": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "constraint_make_non_live": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "constraint_replacements": {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "new_resource_id": {
+                      "type": "string"
+                    },
+                    "old_resource_id": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "old_resource_id",
+                    "new_resource_id"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "description": {
+                "type": "string"
+              },
+              "evidence": {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "evidence_id": {
+                      "type": "string"
+                    },
+                    "kind": {
+                      "type": "string"
+                    },
+                    "metadata": {
+                      "type": "object"
+                    },
+                    "reference": {
+                      "type": "string"
+                    },
+                    "summary": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "evidence_id",
+                    "kind",
+                    "reference",
+                    "summary"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "graph_make_live": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "graph_make_non_live": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "graph_replacements": {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "new_resource_id": {
+                      "type": "string"
+                    },
+                    "old_resource_id": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "old_resource_id",
+                    "new_resource_id"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "metadata": {
+                "type": "object"
+              },
+              "migration_id": {
+                "type": "string"
+              },
+              "schema_make_live": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "schema_make_non_live": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "schema_replacements": {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "new_resource_id": {
+                      "type": "string"
+                    },
+                    "old_resource_id": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "old_resource_id",
+                    "new_resource_id"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "status": {
+                "enum": [
+                  "draft",
+                  "ready",
+                  "applied",
+                  "failed",
+                  "abandoned"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "description"
+            ],
+            "type": "object"
+          }
+        }
+      ],
+      "request_codec_id": "codec.python.component.rtg.migration.request.json",
+      "request_codec_version": 1,
+      "request_payload_disposition": "command",
+      "request_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "migration": {
+            "additionalProperties": false,
+            "properties": {
+              "constraint_make_live": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "constraint_make_non_live": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "constraint_replacements": {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "new_resource_id": {
+                      "type": "string"
+                    },
+                    "old_resource_id": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "old_resource_id",
+                    "new_resource_id"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "description": {
+                "type": "string"
+              },
+              "evidence": {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "evidence_id": {
+                      "type": "string"
+                    },
+                    "kind": {
+                      "type": "string"
+                    },
+                    "metadata": {
+                      "type": "object"
+                    },
+                    "reference": {
+                      "type": "string"
+                    },
+                    "summary": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "evidence_id",
+                    "kind",
+                    "reference",
+                    "summary"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "graph_make_live": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "graph_make_non_live": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "graph_replacements": {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "new_resource_id": {
+                      "type": "string"
+                    },
+                    "old_resource_id": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "old_resource_id",
+                    "new_resource_id"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "metadata": {
+                "type": "object"
+              },
+              "migration_id": {
+                "type": "string"
+              },
+              "schema_make_live": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "schema_make_non_live": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "schema_replacements": {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "new_resource_id": {
+                      "type": "string"
+                    },
+                    "old_resource_id": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "old_resource_id",
+                    "new_resource_id"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "status": {
+                "enum": [
+                  "draft",
+                  "ready",
+                  "applied",
+                  "failed",
+                  "abandoned"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "description"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "migration"
+        ],
+        "type": "object"
+      },
+      "resolved_argument_from_result": "migration",
+      "result_codec_id": "codec.python.component.rtg.migration.result.json",
+      "result_codec_version": 1,
+      "result_payload_disposition": "query_result",
+      "result_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "constraint_make_live": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "constraint_make_non_live": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "constraint_replacements": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "new_resource_id": {
+                  "type": "string"
+                },
+                "old_resource_id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "old_resource_id",
+                "new_resource_id"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "description": {
+            "type": "string"
+          },
+          "evidence": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "evidence_id": {
+                  "type": "string"
+                },
+                "kind": {
+                  "type": "string"
+                },
+                "metadata": {
+                  "type": "object"
+                },
+                "reference": {
+                  "type": "string"
+                },
+                "summary": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "evidence_id",
+                "kind",
+                "reference",
+                "summary"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "graph_make_live": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "graph_make_non_live": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "graph_replacements": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "new_resource_id": {
+                  "type": "string"
+                },
+                "old_resource_id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "old_resource_id",
+                "new_resource_id"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "metadata": {
+            "type": "object"
+          },
+          "migration_id": {
+            "type": "string"
+          },
+          "schema_make_live": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "schema_make_non_live": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "schema_replacements": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "new_resource_id": {
+                  "type": "string"
+                },
+                "old_resource_id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "old_resource_id",
+                "new_resource_id"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "status": {
+            "enum": [
+              "draft",
+              "ready",
+              "applied",
+              "failed",
+              "abandoned"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "description"
+        ],
+        "type": "object"
+      },
+      "schema_version": 1
+    },
+    {
+      "action_id": "component.rtg.migration.get_migration",
+      "binding_id": "binding.python.rtg.migration.v1",
+      "binding_version": 1,
+      "canonical_effect_codec_id": null,
+      "canonical_effect_codec_version": null,
+      "canonical_effect_schema_version": null,
+      "concurrency_lane": "serialized",
+      "consistency_access": "independent",
+      "consistency_group": null,
+      "deadline_seconds": null,
+      "effect_payload_disposition": null,
+      "externally_effectful": false,
+      "failure_codec_id": "codec.python.component.rtg.migration.failure.json",
+      "failure_codec_version": 1,
+      "failure_dispositions": {},
+      "failure_names": [
+        "RtgMigrationNotFound"
+      ],
+      "fault_payload_disposition": "diagnostic",
+      "fault_schema": {
+        "oneOf": [
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          }
+        ]
+      },
+      "idempotency": "idempotent",
+      "method_name": "get_migration",
+      "modeled_fault_trace_disposition": "aborted",
+      "recovery_authorized": false,
+      "replay_mode": "no_state_effect",
+      "request_arguments": [
+        {
+          "default": null,
+          "name": "migration_id",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "request_codec_id": "codec.python.component.rtg.migration.request.json",
+      "request_codec_version": 1,
+      "request_payload_disposition": "command",
+      "request_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "migration_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "migration_id"
+        ],
+        "type": "object"
+      },
+      "resolved_argument_from_result": null,
+      "result_codec_id": "codec.python.component.rtg.migration.result.json",
+      "result_codec_version": 1,
+      "result_payload_disposition": "query_result",
+      "result_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "constraint_make_live": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "constraint_make_non_live": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "constraint_replacements": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "new_resource_id": {
+                  "type": "string"
+                },
+                "old_resource_id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "old_resource_id",
+                "new_resource_id"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "description": {
+            "type": "string"
+          },
+          "evidence": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "evidence_id": {
+                  "type": "string"
+                },
+                "kind": {
+                  "type": "string"
+                },
+                "metadata": {
+                  "type": "object"
+                },
+                "reference": {
+                  "type": "string"
+                },
+                "summary": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "evidence_id",
+                "kind",
+                "reference",
+                "summary"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "graph_make_live": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "graph_make_non_live": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "graph_replacements": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "new_resource_id": {
+                  "type": "string"
+                },
+                "old_resource_id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "old_resource_id",
+                "new_resource_id"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "metadata": {
+            "type": "object"
+          },
+          "migration_id": {
+            "type": "string"
+          },
+          "schema_make_live": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "schema_make_non_live": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "schema_replacements": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "new_resource_id": {
+                  "type": "string"
+                },
+                "old_resource_id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "old_resource_id",
+                "new_resource_id"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "status": {
+            "enum": [
+              "draft",
+              "ready",
+              "applied",
+              "failed",
+              "abandoned"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "description"
+        ],
+        "type": "object"
+      },
+      "schema_version": 1
+    },
+    {
+      "action_id": "component.rtg.migration.list_migrations",
+      "binding_id": "binding.python.rtg.migration.v1",
+      "binding_version": 1,
+      "canonical_effect_codec_id": null,
+      "canonical_effect_codec_version": null,
+      "canonical_effect_schema_version": null,
+      "concurrency_lane": "serialized",
+      "consistency_access": "independent",
+      "consistency_group": null,
+      "deadline_seconds": null,
+      "effect_payload_disposition": null,
+      "externally_effectful": false,
+      "failure_codec_id": "codec.python.component.rtg.migration.failure.json",
+      "failure_codec_version": 1,
+      "failure_dispositions": {},
+      "failure_names": [
+        "RtgMigrationStatusInvalid",
+        "RtgMigrationRecordInvalid"
+      ],
+      "fault_payload_disposition": "diagnostic",
+      "fault_schema": {
+        "oneOf": [
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          }
+        ]
+      },
+      "idempotency": "idempotent",
+      "method_name": "list_migrations",
+      "modeled_fault_trace_disposition": "aborted",
+      "recovery_authorized": false,
+      "replay_mode": "no_state_effect",
+      "request_arguments": [
+        {
+          "default": null,
+          "name": "status",
+          "required": false,
+          "schema": {
+            "enum": [
+              "draft",
+              "ready",
+              "applied",
+              "failed",
+              "abandoned"
+            ],
+            "type": "string"
+          }
+        },
+        {
+          "default": 0,
+          "name": "offset",
+          "required": false,
+          "schema": {
+            "type": "integer"
+          }
+        },
+        {
+          "default": null,
+          "name": "limit",
+          "required": false,
+          "schema": {
+            "type": "integer"
+          }
+        }
+      ],
+      "request_codec_id": "codec.python.component.rtg.migration.request.json",
+      "request_codec_version": 1,
+      "request_payload_disposition": "command",
+      "request_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "limit": {
+            "type": "integer"
+          },
+          "offset": {
+            "type": "integer"
+          },
+          "status": {
+            "enum": [
+              "draft",
+              "ready",
+              "applied",
+              "failed",
+              "abandoned"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [],
+        "type": "object"
+      },
+      "resolved_argument_from_result": null,
+      "result_codec_id": "codec.python.component.rtg.migration.result.json",
+      "result_codec_version": 1,
+      "result_payload_disposition": "query_result",
+      "result_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "migrations": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "constraint_make_live": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "constraint_make_non_live": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "constraint_replacements": {
+                  "items": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "new_resource_id": {
+                        "type": "string"
+                      },
+                      "old_resource_id": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "old_resource_id",
+                      "new_resource_id"
+                    ],
+                    "type": "object"
+                  },
+                  "type": "array"
+                },
+                "description": {
+                  "type": "string"
+                },
+                "evidence": {
+                  "items": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "evidence_id": {
+                        "type": "string"
+                      },
+                      "kind": {
+                        "type": "string"
+                      },
+                      "metadata": {
+                        "type": "object"
+                      },
+                      "reference": {
+                        "type": "string"
+                      },
+                      "summary": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "evidence_id",
+                      "kind",
+                      "reference",
+                      "summary"
+                    ],
+                    "type": "object"
+                  },
+                  "type": "array"
+                },
+                "graph_make_live": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "graph_make_non_live": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "graph_replacements": {
+                  "items": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "new_resource_id": {
+                        "type": "string"
+                      },
+                      "old_resource_id": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "old_resource_id",
+                      "new_resource_id"
+                    ],
+                    "type": "object"
+                  },
+                  "type": "array"
+                },
+                "metadata": {
+                  "type": "object"
+                },
+                "migration_id": {
+                  "type": "string"
+                },
+                "schema_make_live": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "schema_make_non_live": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "schema_replacements": {
+                  "items": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "new_resource_id": {
+                        "type": "string"
+                      },
+                      "old_resource_id": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "old_resource_id",
+                      "new_resource_id"
+                    ],
+                    "type": "object"
+                  },
+                  "type": "array"
+                },
+                "status": {
+                  "enum": [
+                    "draft",
+                    "ready",
+                    "applied",
+                    "failed",
+                    "abandoned"
+                  ],
+                  "type": "string"
+                }
+              },
+              "required": [
+                "description"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "next_offset": {
+            "type": "integer"
+          },
+          "total": {
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "schema_version": 1
+    },
+    {
+      "action_id": "component.rtg.migration.set_status",
+      "binding_id": "binding.python.rtg.migration.v1",
+      "binding_version": 1,
+      "canonical_effect_codec_id": "binding.python.rtg.migration.v1.component.rtg.migration.set_status.effect.json",
+      "canonical_effect_codec_version": 1,
+      "canonical_effect_schema_version": 1,
+      "concurrency_lane": "serialized",
+      "consistency_access": "independent",
+      "consistency_group": null,
+      "deadline_seconds": null,
+      "effect_payload_disposition": "canonical_delta",
+      "externally_effectful": false,
+      "failure_codec_id": "codec.python.component.rtg.migration.failure.json",
+      "failure_codec_version": 1,
+      "failure_dispositions": {},
+      "failure_names": [
+        "RtgMigrationIdInvalid",
+        "RtgMigrationNotFound",
+        "RtgMigrationRecordInvalid",
+        "RtgMigrationStatusInvalid",
+        "RtgMigrationStatusTransitionInvalid"
+      ],
+      "fault_payload_disposition": "diagnostic",
+      "fault_schema": {
+        "oneOf": [
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          }
+        ]
+      },
+      "idempotency": "non_idempotent",
+      "method_name": "set_status",
+      "modeled_fault_trace_disposition": "aborted",
+      "recovery_authorized": false,
+      "replay_mode": "canonical_effect",
+      "request_arguments": [
+        {
+          "default": null,
+          "name": "migration_id",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "default": null,
+          "name": "status",
+          "required": true,
+          "schema": {
+            "enum": [
+              "draft",
+              "ready",
+              "applied",
+              "failed",
+              "abandoned"
+            ],
+            "type": "string"
+          }
+        },
+        {
+          "default": null,
+          "name": "status_metadata",
+          "required": false,
+          "schema": {
+            "type": "object"
+          }
+        }
+      ],
+      "request_codec_id": "codec.python.component.rtg.migration.request.json",
+      "request_codec_version": 1,
+      "request_payload_disposition": "command",
+      "request_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "migration_id": {
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "draft",
+              "ready",
+              "applied",
+              "failed",
+              "abandoned"
+            ],
+            "type": "string"
+          },
+          "status_metadata": {
+            "type": "object"
+          }
+        },
+        "required": [
+          "migration_id",
+          "status"
+        ],
+        "type": "object"
+      },
+      "resolved_argument_from_result": null,
+      "result_codec_id": "codec.python.component.rtg.migration.result.json",
+      "result_codec_version": 1,
+      "result_payload_disposition": "query_result",
+      "result_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "constraint_make_live": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "constraint_make_non_live": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "constraint_replacements": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "new_resource_id": {
+                  "type": "string"
+                },
+                "old_resource_id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "old_resource_id",
+                "new_resource_id"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "description": {
+            "type": "string"
+          },
+          "evidence": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "evidence_id": {
+                  "type": "string"
+                },
+                "kind": {
+                  "type": "string"
+                },
+                "metadata": {
+                  "type": "object"
+                },
+                "reference": {
+                  "type": "string"
+                },
+                "summary": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "evidence_id",
+                "kind",
+                "reference",
+                "summary"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "graph_make_live": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "graph_make_non_live": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "graph_replacements": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "new_resource_id": {
+                  "type": "string"
+                },
+                "old_resource_id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "old_resource_id",
+                "new_resource_id"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "metadata": {
+            "type": "object"
+          },
+          "migration_id": {
+            "type": "string"
+          },
+          "schema_make_live": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "schema_make_non_live": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "schema_replacements": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "new_resource_id": {
+                  "type": "string"
+                },
+                "old_resource_id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "old_resource_id",
+                "new_resource_id"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "status": {
+            "enum": [
+              "draft",
+              "ready",
+              "applied",
+              "failed",
+              "abandoned"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "description"
+        ],
+        "type": "object"
+      },
+      "schema_version": 1
+    },
+    {
+      "action_id": "component.rtg.migration.add_evidence",
+      "binding_id": "binding.python.rtg.migration.v1",
+      "binding_version": 1,
+      "canonical_effect_codec_id": "binding.python.rtg.migration.v1.component.rtg.migration.add_evidence.effect.json",
+      "canonical_effect_codec_version": 1,
+      "canonical_effect_schema_version": 1,
+      "concurrency_lane": "serialized",
+      "consistency_access": "independent",
+      "consistency_group": null,
+      "deadline_seconds": null,
+      "effect_payload_disposition": "canonical_delta",
+      "externally_effectful": false,
+      "failure_codec_id": "codec.python.component.rtg.migration.failure.json",
+      "failure_codec_version": 1,
+      "failure_dispositions": {},
+      "failure_names": [
+        "RtgMigrationNotFound",
+        "RtgMigrationEvidenceInvalid"
+      ],
+      "fault_payload_disposition": "diagnostic",
+      "fault_schema": {
+        "oneOf": [
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          }
+        ]
+      },
+      "idempotency": "non_idempotent",
+      "method_name": "add_evidence",
+      "modeled_fault_trace_disposition": "aborted",
+      "recovery_authorized": false,
+      "replay_mode": "canonical_effect",
+      "request_arguments": [
+        {
+          "default": null,
+          "name": "migration_id",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "default": null,
+          "name": "evidence",
+          "required": true,
+          "schema": {
+            "additionalProperties": false,
+            "properties": {
+              "evidence_id": {
+                "type": "string"
+              },
+              "kind": {
+                "type": "string"
+              },
+              "metadata": {
+                "type": "object"
+              },
+              "reference": {
+                "type": "string"
+              },
+              "summary": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "evidence_id",
+              "kind",
+              "reference",
+              "summary"
+            ],
+            "type": "object"
+          }
+        }
+      ],
+      "request_codec_id": "codec.python.component.rtg.migration.request.json",
+      "request_codec_version": 1,
+      "request_payload_disposition": "command",
+      "request_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "evidence": {
+            "additionalProperties": false,
+            "properties": {
+              "evidence_id": {
+                "type": "string"
+              },
+              "kind": {
+                "type": "string"
+              },
+              "metadata": {
+                "type": "object"
+              },
+              "reference": {
+                "type": "string"
+              },
+              "summary": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "evidence_id",
+              "kind",
+              "reference",
+              "summary"
+            ],
+            "type": "object"
+          },
+          "migration_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "migration_id",
+          "evidence"
+        ],
+        "type": "object"
+      },
+      "resolved_argument_from_result": null,
+      "result_codec_id": "codec.python.component.rtg.migration.result.json",
+      "result_codec_version": 1,
+      "result_payload_disposition": "query_result",
+      "result_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "constraint_make_live": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "constraint_make_non_live": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "constraint_replacements": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "new_resource_id": {
+                  "type": "string"
+                },
+                "old_resource_id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "old_resource_id",
+                "new_resource_id"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "description": {
+            "type": "string"
+          },
+          "evidence": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "evidence_id": {
+                  "type": "string"
+                },
+                "kind": {
+                  "type": "string"
+                },
+                "metadata": {
+                  "type": "object"
+                },
+                "reference": {
+                  "type": "string"
+                },
+                "summary": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "evidence_id",
+                "kind",
+                "reference",
+                "summary"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "graph_make_live": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "graph_make_non_live": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "graph_replacements": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "new_resource_id": {
+                  "type": "string"
+                },
+                "old_resource_id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "old_resource_id",
+                "new_resource_id"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "metadata": {
+            "type": "object"
+          },
+          "migration_id": {
+            "type": "string"
+          },
+          "schema_make_live": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "schema_make_non_live": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "schema_replacements": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "new_resource_id": {
+                  "type": "string"
+                },
+                "old_resource_id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "old_resource_id",
+                "new_resource_id"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "status": {
+            "enum": [
+              "draft",
+              "ready",
+              "applied",
+              "failed",
+              "abandoned"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "description"
+        ],
+        "type": "object"
+      },
+      "schema_version": 1
+    },
+    {
+      "action_id": "component.rtg.migration.delete_migration",
+      "binding_id": "binding.python.rtg.migration.v1",
+      "binding_version": 1,
+      "canonical_effect_codec_id": "binding.python.rtg.migration.v1.component.rtg.migration.delete_migration.effect.json",
+      "canonical_effect_codec_version": 1,
+      "canonical_effect_schema_version": 1,
+      "concurrency_lane": "serialized",
+      "consistency_access": "independent",
+      "consistency_group": null,
+      "deadline_seconds": null,
+      "effect_payload_disposition": "canonical_delta",
+      "externally_effectful": false,
+      "failure_codec_id": "codec.python.component.rtg.migration.failure.json",
+      "failure_codec_version": 1,
+      "failure_dispositions": {},
+      "failure_names": [
+        "RtgMigrationIdInvalid",
+        "RtgMigrationNotFound",
+        "RtgMigrationDeleteNotAllowed"
+      ],
+      "fault_payload_disposition": "diagnostic",
+      "fault_schema": {
+        "oneOf": [
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          }
+        ]
+      },
+      "idempotency": "non_idempotent",
+      "method_name": "delete_migration",
+      "modeled_fault_trace_disposition": "aborted",
+      "recovery_authorized": false,
+      "replay_mode": "canonical_effect",
+      "request_arguments": [
+        {
+          "default": null,
+          "name": "migration_id",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "request_codec_id": "codec.python.component.rtg.migration.request.json",
+      "request_codec_version": 1,
+      "request_payload_disposition": "command",
+      "request_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "migration_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "migration_id"
+        ],
+        "type": "object"
+      },
+      "resolved_argument_from_result": null,
+      "result_codec_id": "codec.python.component.rtg.migration.result.json",
+      "result_codec_version": 1,
+      "result_payload_disposition": "query_result",
+      "result_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "deleted_migration": {
+            "additionalProperties": false,
+            "properties": {
+              "constraint_make_live": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "constraint_make_non_live": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "constraint_replacements": {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "new_resource_id": {
+                      "type": "string"
+                    },
+                    "old_resource_id": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "old_resource_id",
+                    "new_resource_id"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "description": {
+                "type": "string"
+              },
+              "evidence": {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "evidence_id": {
+                      "type": "string"
+                    },
+                    "kind": {
+                      "type": "string"
+                    },
+                    "metadata": {
+                      "type": "object"
+                    },
+                    "reference": {
+                      "type": "string"
+                    },
+                    "summary": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "evidence_id",
+                    "kind",
+                    "reference",
+                    "summary"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "graph_make_live": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "graph_make_non_live": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "graph_replacements": {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "new_resource_id": {
+                      "type": "string"
+                    },
+                    "old_resource_id": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "old_resource_id",
+                    "new_resource_id"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "metadata": {
+                "type": "object"
+              },
+              "migration_id": {
+                "type": "string"
+              },
+              "schema_make_live": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "schema_make_non_live": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "schema_replacements": {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "new_resource_id": {
+                      "type": "string"
+                    },
+                    "old_resource_id": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "old_resource_id",
+                    "new_resource_id"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "status": {
+                "enum": [
+                  "draft",
+                  "ready",
+                  "applied",
+                  "failed",
+                  "abandoned"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "description"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "deleted_migration"
+        ],
+        "type": "object"
+      },
+      "schema_version": 1
+    }
+  ],
+  "binding_id": "binding.python.rtg.migration.v1",
+  "binding_version": 1,
+  "component_contract_id": "component.rtg.migration",
+  "schema_version": 1,
+  "source_contract_id": "component.rtg.migration"
+}

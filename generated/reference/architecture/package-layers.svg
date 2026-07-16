@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" contentStyleType="text/css" height="256px" preserveAspectRatio="none" style="width:265px;height:256px;background:#FFFFFF;" version="1.1" viewBox="0 0 265 256" width="265px" zoomAndPan="magnify"><defs/><g><rect fill="#FFFFFF" height="24" id="_title" rx="6" ry="6" style="stroke:none;stroke-width:1.0;" width="247" x="5" y="5"/><text fill="#000000" font-family="Helvetica" font-size="14" font-weight="bold" x="10" y="20.7803">Model product and package layers</text><!--MD5=[48cbe66ced391663b91614e4cb866680]
+entity n_69ff011007d4--><g id="elem_n_69ff011007d4"><rect fill="#EAF2F8" height="46" rx="6" ry="6" style="stroke:#181818;stroke-width:1.0;" width="141" x="38.25" y="204"/><text fill="#000000" font-family="Helvetica" font-size="13" x="48.25" y="224.0103">Foundation</text><text fill="#000000" font-family="Helvetica" font-size="13" x="48.25" y="237.0103">1 authored packages</text></g><!--MD5=[639f9e0bd0b973544700754695ca7666]
+entity n_c5d00c1a8ce3--><g id="elem_n_c5d00c1a8ce3"><rect fill="#EAF2F8" height="46" rx="6" ry="6" style="stroke:#181818;stroke-width:1.0;" width="148" x="85.75" y="122"/><text fill="#000000" font-family="Helvetica" font-size="13" x="95.75" y="142.0103">Bibliotek</text><text fill="#000000" font-family="Helvetica" font-size="13" x="95.75" y="155.0103">20 authored packages</text></g><!--MD5=[be08df642666022aa287a1698411a6cb]
+entity n_f1128d4b0645--><g id="elem_n_f1128d4b0645"><rect fill="#EAF2F8" height="46" rx="6" ry="6" style="stroke:#181818;stroke-width:1.0;" width="141" x="38.25" y="40"/><text fill="#000000" font-family="Helvetica" font-size="13" x="48.25" y="60.0103">Vellis</text><text fill="#000000" font-family="Helvetica" font-size="13" x="48.25" y="73.0103">8 authored packages</text></g><path d="M145.5437,168.2845 C138.47,179.3804 129.9433,192.7555 122.8802,203.835 " fill="none" style="stroke:#5D6D7E;stroke-width:1.2;"/><polygon fill="#5D6D7E" points="122.8802,203.835,131.0911,198.3962,125.5679,199.6189,124.3453,194.0958,122.8802,203.835" style="stroke:#5D6D7E;stroke-width:1.0;"/><path d="M122.9563,86.2845 C130.03,97.3804 138.5567,110.7555 145.6198,121.835 " fill="none" style="stroke:#5D6D7E;stroke-width:1.2;"/><polygon fill="#5D6D7E" points="145.6198,121.835,144.1547,112.0958,142.9321,117.6189,137.4089,116.3962,145.6198,121.835" style="stroke:#5D6D7E;stroke-width:1.0;"/><path d="M93.1538,86.02 C86.7234,96.4137 80.02,109.304 76.75,122 C71.6507,141.7983 71.6507,148.2017 76.75,168 C80.02,180.696 86.7234,193.5863 93.1538,203.98 " fill="none" style="stroke:#5D6D7E;stroke-width:1.2;"/><polygon fill="#5D6D7E" points="93.1538,203.98,91.8203,194.2219,90.5232,199.728,85.017,198.4309,93.1538,203.98" style="stroke:#5D6D7E;stroke-width:1.0;"/><!--MD5=[11951e96aa95457b946637fd4f206a89]
+@startuml
+!pragma layout smetana
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+skinparam shadowing false
+skinparam roundCorner 12
+skinparam linetype ortho
+skinparam ArrowThickness 1.2
+skinparam ArrowFontSize 11
+skinparam rectangleBorderThickness 1
+skinparam nodesep 35
+skinparam ranksep 45
+title Model product and package layers
+top to bottom direction
+rectangle "Foundation\n1 authored packages" as n_69ff011007d4 #EAF2F8
+rectangle "Bibliotek\n20 authored packages" as n_c5d00c1a8ce3 #EAF2F8
+rectangle "Vellis\n8 authored packages" as n_f1128d4b0645 #EAF2F8
+n_c5d00c1a8ce3 -[#5D6D7E]-> n_69ff011007d4
+n_f1128d4b0645 -[#5D6D7E]-> n_c5d00c1a8ce3
+n_f1128d4b0645 -[#5D6D7E]-> n_69ff011007d4
+@enduml
+
+PlantUML version 1.2022.7(Mon Aug 22 10:01:30 PDT 2022)
+(EPL source distribution)
+Java Runtime: OpenJDK Runtime Environment
+JVM: OpenJDK 64-Bit Server VM
+Default Encoding: UTF-8
+Language: en
+Country: US
+--></g></svg>

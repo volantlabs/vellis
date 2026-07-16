@@ -1,224 +1,272 @@
-# Bibliotek component runtime architecture
+# Bibliotek message-native component runtime
 
-Status: accepted local-first architecture and snapshot-transfer rule. The normative black-box contracts are the accepted
-SysML components `component.runtime.message_runtime`, `component.runtime.component_adapter`, and
-`component.interface.mcp_gateway`. The accepted logical RTG components remain runtime-neutral.
+Status: accepted local-first architecture. The normative contracts are the accepted SysML
+packages for the messaging kernel, `component.runtime.message_runtime`,
+`component.runtime.component_adapter`, and `component.interface.mcp_gateway`. Logical component
+contracts remain runtime- and language-neutral.
 
-This document records the cross-component rules that cannot be expressed in one component model.
-Review it when dynamic supervision is introduced or distribution becomes an active delivery target.
+Review this rule when supervision, retry, federation, or another transport becomes an active
+requirement.
 
-## Current architecture rule
+## One component primitive
 
-A first-party Bibliotek application is composed as one runtime, named component occurrences,
-explicit runtime bindings, and curated external operations. A component continues to expose its
-ordinary runtime-independent protocol. A runtime binding maps only modeled public actions to
-versioned messages; it does not turn arbitrary object methods into remote calls.
+Bibliotek uses one black-box software-component archetype. Components differ through their public
+contracts, state, invariants, collaborators, and composed behavior. Store, controller,
+coordinator, facade, gateway, actor, and saga describe responsibilities or behavior; they are not
+SysML specializations, runtime registration kinds, or implementation base classes.
 
-Vellis is the first runtime-native reference realization. Its MCP gateway, application façade,
-controller, and lower component boundaries are runtime-managed. The RTG controller is constructed
-only with runtime proxies in the application composition; it retains saga sequencing, compensation,
-and coordinated snapshot/restore behavior but owns no traffic ledger, generic replay engine, or SQL
-ledger schema. Direct construction with conforming collaborators remains supported for library use.
+Any ordinary component action may perform local work, send messages, await responses, compensate,
+or combine those behaviors. One occurrence may expose both local and coordinating actions through
+the same adapter. The runtime never branches on a component's purpose.
+
+Every runtime-native occurrence has three layers:
+
+1. A logical component contract defining public actions, values, failures, state, invariants, and
+   collaborator roles independently of runtime wiring.
+2. A participation kit defining action references, codecs, explicit handlers, canonical effects,
+   replay functions, and scheduling metadata.
+3. An application occurrence binding one concrete implementation and participation kit to a
+   persistent runtime address and configured collaborator addresses.
+
+Bibliotek's `ComponentAdapter` is the standard composable participation implementation, not a
+required superclass. A non-Bibliotek object may use it or attach any implementation of the same
+minimal participant protocol.
 
 ```mermaid
 flowchart LR
-    Client["MCP client"] --> Transport["FastMCP transport mapping"]
-    Transport --> Gateway["Curated MCP gateway"]
-    Gateway <--> Runtime["Message runtime"]
+    External["MCP / CLI / other ingress"] --> Endpoint["Occurrence endpoint"]
+    Endpoint --> Runtime["Message runtime"]
     Runtime --> Ledger[("Runtime ledger")]
-    Runtime <--> Facade["Vellis façade occurrence"]
-    Runtime <--> Controller["RTG controller occurrence"]
-    Runtime <--> Bindings["Explicit component bindings"]
-    Bindings <--> Components["Component occurrences"]
+    Runtime <--> Gateway["Gateway occurrence"]
+    Runtime <--> Facade["Facade occurrence"]
+    Runtime <--> Controller["Controller occurrence"]
+    Runtime <--> Leaves["State and logic occurrences"]
 ```
 
-FastMCP owns MCP-specific function signatures and protocol I/O. The generic gateway loads generated
-tool descriptions, parameter schemas, annotations, target occurrence/action IDs, and codec versions,
-then validates and dispatches a runtime request. It imports no RTG controller or implementation.
-The façade retains Vellis input compilation, validation policy, usage guidance, and response shaping.
-The controller retains RTG saga sequencing and cross-component invariants.
+## Shared messaging language
 
-## Identity and topology
+`components/runtime/messaging/` owns the stable, serializable vocabulary shared by runtimes and
+participation kits:
 
-- A data root has one persistent UUID `runtimeId` and readable `runtimeKey`.
-- Every occurrence has an application-scoped `instanceKey` and immutable incarnation UUID
+- runtime addresses and persistent occurrence declarations;
+- request, response, fault, and signal envelopes;
+- message, trace, correlation, causation, and idempotency identities;
+- action references, canonical JSON payload codecs, receipts, and outcomes;
+- binding, failure, lane, consistency, delivery, trace, and replay descriptors; and
+- the minimal async participant and participant-context protocols.
+
+The kernel contains no controller, saga, store, facade, edge, or gateway category. Envelopes never
+carry live objects, callables, connections, credentials, or process-local handles.
+
+### Disclosure boundary
+
+Complete component state is exceptional message data. It crosses an occurrence boundary only for
+an explicitly modeled state-transfer operation such as snapshot export/import, restore, checkpoint,
+or external document transfer. Ordinary actions carry commands, projections, paginated targeted
+reads, canonical deltas, bounded diagnostics, summaries, and opaque references. Query and validation
+requests do not contain source snapshots; coordinating participation handlers read the records they
+need through public collaborator actions. Faults never echo the request or arbitrary exception
+details.
+
+Each state owner applies one prevalidated local batch atomically. Its transient recovery footprint
+is limited to touched records and required cascade closure, and is released before the action
+returns. A later-owner communication failure after an earlier owner committed is not disguised as
+online distributed rollback: the root becomes indeterminate, ordinary ingress quiesces, and the
+runtime resolves committed effects through reconstruction.
+
+Binding descriptors classify request, result, fault, and effect payloads as `command`,
+`query_result`, `diagnostic`, `canonical_delta`, `state_transfer`, or `external_document`. This is
+disclosure and codec metadata, not a component kind. The ledger retains canonical payloads
+losslessly in content-addressed storage, while history APIs return envelope and routing metadata
+unless a trusted operator explicitly hydrates payloads.
+
+## Participation and action execution
+
+Every occurrence attaches one participant with the same runtime-facing operation:
+
+```python
+async def deliver(envelope, context) -> None: ...
+```
+
+The standard adapter composes explicit `ActionBinding` registrations, codecs, a bounded
+continuation table, replay-state functions, and action metadata. It exposes one uniform handler
+shape through `ComponentExecution`. A handler completes its inbound request only through
+`complete` or `fault`; it does not return a second runtime result.
+
+Reusable participation metadata is model-owned. `just model-render` projects each Bibliotek
+component's action IDs, schemas, codecs, failures, dispositions, lanes, consistency access,
+idempotency, deadlines, and replay behavior into its package-local
+`resources/runtime_binding.json`. Python participation kits load that resource and supply only
+explicit callable/handler mappings, codecs, canonical-effect functions, and replay-state
+functions. Reflection may validate a mapped callable, but it does not discover routable methods
+or manufacture contract metadata.
+
+The generated Vellis application manifest provides the same authority for façade, runner,
+starter-installer, and response-only gateway bindings. Installed-wheel verification loads every
+descriptor outside the repository and builds then closes a fresh application, preventing local
+source-tree fallback from hiding missing package resources.
+
+Trusted runtime reads are bounded and metadata-first. Counts use database aggregation; terminal
+trace summaries paginate without hydrating full causal traces; payload hydration remains an
+explicit operator operation. Application outcome lookup accepts only curated MCP root requests.
+Internal component messages are not exposed, and state-transfer results remain withheld unless
+the original curated transfer is explicitly requested with full inclusion.
+
+Generated handlers for runtime-neutral leaf implementations decode, invoke, and complete. A
+coordinating handler uses `send` or `call(step_key, action, arguments, target)`, then completes or
+faults the original request. `call` is visibly message-oriented and derives its outbound message
+ID deterministically from the inbound request and step key. It is an adapter convenience, not a
+runtime `request` operation or a typed business-object proxy.
+
+Application code passes collaborator occurrence keys and action catalogs into coordinating
+components. It never injects another business component object. Private calls within one
+component implementation are not runtime traffic.
+
+## Runtime identity and topology
+
+- A data root owns one persistent `runtimeId` and readable `runtimeKey`.
+- Every occurrence owns an application-scoped `instanceKey` and immutable incarnation
   `instanceId`.
-- Runtime addresses always contain `runtimeId` and `instanceId`, including in the local-only v1.
-- Local v1 accepts traffic only when both source and target resolve to registered occurrences in
-  that runtime. A future federation transport must resolve and authenticate a non-local source
-  before local acceptance.
-- Ordinary restart preserves both IDs. A future destroy/recreate operation must allocate a new
-  `instanceId`, even if it reuses the key.
-- The accepted `VellisRuntimePython` occurrence part usages and their realization-local runtime
-  binding annotations are the authored static-topology source. Model tooling projects them, in
-  declaration order, into the generated application manifest; no Python occurrence table is a
-  second authority.
-- The generated manifest enumerates static occurrences, implementation/runtime bindings,
-  configuration references, replay authority, curated operations, schema version, and a canonical
-  manifest hash.
-- The topology hash covers runtime identity, occurrence declarations, curated operations, and the
-  manifest schema version. A changed topology requires migration; the full manifest hash may
-  advance for non-topological generated metadata such as tool prose or parameter schemas after the
-  unchanged topology is confirmed.
-- Static startup first durably prepares the complete normalized occurrence plan, then registers and
-  attaches its occurrences, and finally confirms their action bindings. Once a plan exists, a
-  changed or additional occurrence is rejected before insertion; an interrupted first start may
-  resume only the same plan.
-- Changing the static occurrence inventory requires an explicit topology migration. Startup may
-  restore an existing identical registration but may not silently reinterpret one.
-- Multiple occurrences of one contract are valid and isolated; routing is always to the exact UUID.
+- Addresses always contain `runtimeId` and `instanceId`, including in local v1.
+- Restart preserves identities. A future explicit destroy/recreate operation must allocate a new
+  incarnation UUID even when it reuses the key.
+- Duplicate keys or identities and changed static topology fail startup.
+- Static startup durably prepares the complete manifest, registers and attaches every occurrence,
+  then confirms the topology atomically.
+- Confirmation validates every curated operation's unique ID, target occurrence, target contract,
+  action and schema version, and participant attachment before the runtime becomes ready.
+- Multiple occurrences of the same contract are valid and remain isolated by exact address.
 
-The runtime SQLite database is an internal bootstrap dependency. It is deliberately not registered
-as an occurrence in the runtime whose facts it persists, avoiding recursive ledger traffic.
+The application manifest is projected from the Vellis realization model. It records occurrence,
+implementation and binding identities, lane declarations, configuration references, replay
+authority, curated operations, schema version, and canonical hash. It contains no component-role
+or handler-kind discriminator.
 
-## Messages, routing, and delivery
+The SQLite ledger backend is a bootstrap dependency of the runtime, not an occurrence inside the
+runtime whose facts it records.
 
-The immutable envelope identifies its message, kind, exact source/target, component contract,
-action, message schema, trace, optional correlation/causation/idempotency identities, creation time,
-and canonical versioned payload codec. V1 payloads are canonical JSON-compatible values. Live
-objects, callables, handles, credentials, and connections never cross the boundary.
+## Uniform durable delivery
 
-The v1 delivery contract is intentionally small:
+The runtime accepts and routes messages but does not coordinate component behavior. Its central
+invariant is: no envelope is delivered before that envelope is durably recorded.
 
-- asynchronous `send` and `request` are primary; synchronous Python proxies preserve current
-  protocols;
-- durable acceptance precedes dispatch;
-- each occurrence has a bounded FIFO queue and one worker by default;
-- no global execution order is promised;
-- there is no automatic retry or cancellation guarantee;
-- a caller timeout leaves the accepted handler running and identifies the message to query later;
-- a root trace is terminal only after the root and every accepted causal descendant has a recorded
-  response or fault;
-- new causal children are rejected after the trace is terminal;
-- message identity is independent of a future delivery-attempt identity;
-- identical reuse of a `messageId` observes the current or recorded outcome without re-execution;
-- changed content under an existing ID is rejected;
-- terminal encoding or persistence failure after an in-memory effect fail-stops the runtime and
-  quiesces already accepted traffic;
-- an indeterminate trace closes ordinary ingress until verified reconstruction succeeds;
-- while recovery is required, the only message admitted is a sole root action explicitly declared
-  as a non-effectful recovery coordinator by its binding.
+- Requests deliver to the target action lane.
+- Responses and faults deliver to the requesting occurrence's always-open response lane.
+- Signals deliver to their declared action lane and require acknowledgement.
+- A request delivery remains open until exactly one `complete` or `fault`.
+- A signal, response, or fault remains open until exactly one `ack`.
+- Duplicate, unknown, wrong-kind, or second terminal operations raise
+  `RuntimeDeliveryUnknown`.
+- A response continuation is owned by the requesting adapter, not a runtime futures map.
+- Late responses are recorded, delivered, and acknowledged even after a caller timeout. Completed
+  continuations are removed from adapter memory; trusted `lookup_message_outcome(message_id)` reads
+  the durable request and terminal outcome without appending traffic.
+- A trace becomes terminal only after its root and every causal descendant are terminal.
 
-Component faults are fault messages with their modeled type, message, diagnostic, transaction, and
-validation evidence when present. Runtime failures remain a separate family.
+The runtime hosts participant delivery on its own event-loop thread. Async handlers execute on that
+loop; sync leaf methods execute off-loop. A `ComponentEndpoint` lets another loop originate a root
+request from an attached occurrence and await its adapter continuation. Caller timeout raises a
+failure containing the original message ID and never implies handler cancellation. Resubmitting
+the identical message ID observes the current or recorded outcome without re-execution; changing
+content under that ID is rejected.
 
-## Binding contract
+Initial persistence failure prevents dispatch. Terminal persistence failure after an in-memory
+effect puts the runtime in fail-stop health and quiesces further work. Restart marks open
+deliveries indeterminate and requires reconstruction before ordinary ingress resumes.
 
-Each first-party binding supplies an explicit descriptor, request/result/failure codecs, server-side
-adapter, and client proxy. Every action declares schema and binding versions, idempotency,
-concurrency lane, replay disposition, exact concrete failures, whether it is externally effectful,
-and whether it is the exceptional recovery ingress. Recovery authorization defaults false and is
-valid only for a non-effectful coordinator action. Direct and mediated calls must preserve inputs,
-defaults, multiplicities, ordering, public results, concrete failures, and state effects. Generated
-identities are included in canonical replay effects.
+Runtime lifecycle uses the modeled `RuntimeHealth` values: `starting`, `ready`, `quiescing`,
+`reconstructing`, `recovery_required`, `branch_pending`, `fail_stopped`, `closing`, and `closed`.
+Only `ready` accepts ordinary roots. Quiescing accepts descendants of already-open traces so
+coordination can settle; recovery-required accepts one authorized recovery root
+and its descendants. Reconstruction, branch-pending, fail-stop, and shutdown states reject
+ordinary business roots. Persistable transitions are themselves ledger facts.
 
-Bindings do not use reflection to publish methods. Runtime validation rejects an unregistered
-action, contract mismatch, codec mismatch, or schema mismatch before component invocation.
-Third-party objects may join by implementing the same descriptor/handler SPI; their bindings need
-not originate in Bibliotek models.
+Caller timeout and action deadline are distinct. The caller may stop waiting without cancelling
+the action. The runtime owns delivery deadlines: expiry quiesces new roots and cancels the handler;
+off-loop synchronous work must settle before the delivery can become terminal. An ambiguous child
+delivery is resolved by deterministic outcome lookup or replay. Confirmed partial multi-owner work
+is indeterminate and requires reconstruction rather than a distributed compensation protocol.
 
-## Ledger, audit, and trace reads
+## Scheduling and consistency
 
-The append-only runtime ledger records runtime lifecycle, occurrence lifecycle, accepted messages,
-delivery attempts, responses/faults, canonical effects, terminal trace disposition, reconstruction,
-and branch provenance. `runtimePosition` is a monotonic order of recorded facts, not a distributed
-transaction order.
+Each action declares a named bounded FIFO lane, and each occurrence declares each lane's capacity
+and worker limit. FIFO applies within a lane; independent lanes may overlap; no cross-lane or global
+execution order is promised. A lane worker remains occupied while its handler awaits collaborator
+messages, while response delivery remains independently available to resolve the wait.
 
-Trusted history reads are cursor-paginated and filter by position/time, runtime, occurrence key or
-UUID, component contract, message/trace/correlation/causation identity, action, message kind,
-schema version, fact type, delivery status, and trace disposition. A separate trusted operation
-returns a complete causal trace. These diagnostics are library/developer operations, not universal
-production MCP tools.
+Actions may also declare a consistency group with `independent`, `shared`, or `exclusive` access.
+Admission is writer-preferring: shared actions overlap, an exclusive waiter blocks later shared
+admission, and exclusive access lasts through action completion. Response delivery bypasses these
+gates. Admission does not reorder a lane. Arbitrary state-dependent admission is not part of v1.
 
-The runtime ledger is the authority for cross-component chronology. Component-private ledgers and
-checkpoints remain black-box state. Vellis has no second controller ledger and never treats an
-earlier Vellis controller ledger as part of the current runtime chronology.
+## Operator surface, chronology, and replay
 
-## Replay and reconstruction
+The participant surface contains messaging, delivery, completion, and acknowledgement. The trusted
+async operator surface contains health, history, causal traces, reconstruction, and branch
+provenance. Components never use the operator surface as an integration shortcut; Vellis exposes
+selected projections through `VellisRuntimeServices`.
 
-Recording messages is not permission to re-deliver every command. State-owning bindings emit a
-canonical effect after nondeterministic values are resolved. Reads emit no state effect.
-Coordinators contribute trace structure but normally no replay effect. External exchanges are never
-repeated during playback.
+The append-only runtime ledger is the authority for cross-component chronology. It records runtime
+and occurrence lifecycle, accepted/rejected messages, delivery attempts and terminals, canonical
+effects, terminal trace disposition, reconstruction, and provenance under monotonic
+`runtimePosition` values. Trusted history queries are cursor-paginated and filterable by runtime,
+occurrence, contract, action, schema, message identities, status, disposition, position, and time.
 
-Only effects in a terminally committed trace are reconstructed. Aborted and indeterminate traces
-are excluded. When a coordinator owns the confirmed aggregate outcome of a saga, its binding may
-emit one explicitly marked final aggregate effect; the latest such effect replaces lower-level
-effects derived earlier in that same trace. Controllers still own saga rollback and compensation;
-the runtime does not claim a distributed transaction. Reconstruction starts with empty compatible
-occurrences or an explicit checkpoint, applies the selected effects by runtime position while
-preserving occurrence/causal order, and reports applied/skipped/incompatible effects and
-limitations. Final invariant verification and its nested component reads run as derived playback.
-Playback and verification do not append new business traffic.
+Replay never blindly re-delivers recorded commands. State-owning participation kits emit canonical
+effects after generated values are resolved and register effect appliers and state-digest
+functions. Reads and ordinary coordinating messages contribute no state effect. When a
+coordinating action owns the confirmed final outcome, it may emit an aggregate effect that
+supersedes derived lower-level effects in that trace. Aggregate effects contain only ordered child
+request IDs and immutable effect digests. Reconstruction rejects missing, duplicated, cross-trace,
+non-causal, out-of-order, or digest-mismatched references; it never copies a child's state payload
+into the coordinator effect.
 
-Replay-state digest/export callbacks are trusted adapter SPI, not canonical business traffic.
-Vellis derives the controller aggregate digest through the same graph, schema, constraint, and
-migration proxies used by live coordination, while the runtime marks those reads as derived
-playback. The helper receives no concrete lower-component host. Digesting and invariant
-verification therefore preserve the component boundary and append neither accepted-message facts
-nor canonical effects; the snapshot-transfer restart test proves that property.
+Reconstruction starts with compatible empty state or a complete set of same-cursor checkpoints,
+selects an effect only when both the effect and its trace's committed terminal fact are at or
+before the requested cursor, applies selected effects in recorded order, and verifies state
+through attached participants. Aborted, indeterminate, and not-yet-committed trace effects are
+excluded. A failure after reset or import leaves health recovery-required, never ready with partial
+state. Playback does not append new business traffic and never invokes external collaborators;
+external dispositions describe post-reconstruction availability and are reported as limitations.
+A historical reconstruction enters branch-pending and records verified source provenance before
+accepting new traffic.
 
-The ordinary SQL binding is an explicit durable external boundary: the runtime records its
-requests and outcomes but never re-executes arbitrary SQL during reconstruction. Each SQL
-occurrence retains state in its own database file; backup, checkpoint, and historical database
-reconstruction remain outside the accepted generic SQL contract until a dedicated binding earns
-those semantics.
+Component-private ledgers and checkpoints remain black-box state. They may supply replay or digest
+functions, but they do not compete with the runtime ledger for cross-component chronology.
 
-Vellis snapshot restore is an ordinary message-mediated saga. The controller validates the
-candidate through the validation occurrence, invokes each state owner's full-snapshot replacement
-action, and compensates through those same actions on a modeled failure. The trace retains those
-component messages and effects for audit, while the successful controller restore emits the final
-coordinated effect that supersedes its derived lower-level effects for reconstruction.
+## Vellis composition and ingress
 
-Historical exploration is isolated in v1: copy the data root, attach compatible empty occurrences,
-and reconstruct through a selected cursor. Any explicit cursor behind the source runtime head
-durably enters `branch_pending`, which survives restart and rejects ordinary traffic. The trusted
-branch operation rechecks every represented occurrence digest and records the exact source runtime,
-cursor, and combined verified digest before opening new traffic. The runtime reconstructs managed
-component state, never the external world; recorded inbound results may be played back, but old
-outbound effects are not repeated.
-External boundary IDs are occurrence keys. Reconstruction defaults encountered boundaries to
-`playback_only`; an operator may instead report them as `live`, `simulated`, or `unavailable` for
-continuation after the selected cursor. Historical evaluation still uses recorded responses and
-never invokes the old outbound effect.
+Vellis attaches graph, schema, constraint, migration, query, validation, storage, controller,
+facade, gateway, runner, and installer occurrences through the same participant mechanism.
+Validation assembles invocation-local projections from paginated public reads and delegates
+constraint queries to the configured query occurrence, including projected-query evaluation over
+the requested delta. It neither imports another component implementation nor sends snapshots.
 
-## Vellis data transfer rule
+The RTG controller is an ordinary component whose handlers coordinate collaborators by action
+catalog and address. Shared actions preserve coherent reads; exclusive actions protect destructive
+coordination. Its unfinished in-memory coordination becomes indeterminate on restart. It owns RTG
+sequencing, owner-batch invocation, invariants, and coordinated snapshots, while the runtime owns traffic
+chronology, health, and reconstruction.
 
-The runtime cutover is complete for new Vellis data roots. Earlier data roots are never upgraded by
-importing, merging, or projecting their controller ledger. Transfer is deliberately state-based:
+The facade is an ordinary component retaining Vellis compilation, policy, guidance, and response
+shaping. FastMCP passes a tool invocation to the generic gateway mapping. For every invocation the
+gateway resolves the registration's target occurrence key and uses its attached occurrence
+endpoint to originate that registered action as the root runtime request; translation is not a
+redundant gateway-message hop. The same registration set may target several occurrences. The same
+endpoint mechanism serves the runner and installer. Composition seals gateway registrations before
+topology confirmation; the registration digest is part of the confirmed topology and cannot be
+mutated afterward. Production exposes only curated operations.
 
-1. Open the source with the Vellis version that created it, validate the graph, and export one full
-   coordinated snapshot.
-2. Initialize a separate empty current Vellis data root.
-3. Load and restore the snapshot through the current application façade.
-4. Treat the complete restore trace and its final coordinated canonical effect as the destination
-   runtime's first authoritative state-changing chronology.
-5. Validate domain counts/digests and one destination restart before retiring the source.
+## Data transfer and v1 limits
 
-The operational procedure lives in `docs/guides/vellis/snapshot-transfer.md`. The legacy-named
-replay, verification, migration-history, and ledger-flush MCP operations remain temporarily as
-curated façade projections over runtime reconstruction, trace history, and fail-stop health; none
-delegate to or import an earlier controller ledger.
+Earlier Vellis databases are not upgraded or interpreted. Transfer is state-based: use the source
+version to export one coordinated snapshot, initialize a fresh empty current data root, restore
+through the facade, validate state and digests, then restart and verify reconstruction. The new
+runtime begins a fresh chronology. See
+[`docs/guides/vellis/snapshot-transfer.md`](../guides/vellis/snapshot-transfer.md).
 
-## Deliberate v1 exclusions and future seams
-
-V1 has no network broker, pub/sub, automatic retries, authentication layer, dynamic factories,
-federation, or in-place rewind. A later `component.runtime.component_supervisor` may add allowlisted
-factory profiles and create/ready/drain/stop/destroy/recreate lifecycle operations. A managed
-multi-RTG subsystem is the intended first dynamic consumer.
-
-Distribution remains deferred, but addresses retain runtime identity, APIs are asynchronous,
-payloads and bindings are versioned/serializable, routing and ledger persistence sit behind narrow
-boundaries, and components may not assume shared memory, threads, files, or process identity.
-
-## Verification gate
-
-Runtime work must keep the following evidence green: append-before-dispatch, fail-stop,
-deduplication, FIFO/concurrency, nested causal identity, timeout behavior, address/schema rejection,
-history determinism, restart identity, same-type isolation, direct/message binding equivalence,
-generated-ID replay, private-method rejection, exact reconstruction, external-effect suppression,
-manifest completeness, MCP inventory/codec/protocol compatibility, and snapshot-transfer/restart
-fixtures.
-
-For each accepted slice run model rendering/diff/formal checks, narrow boundary tests, lint,
-type checking, the full test suite, and the aggregate repository check.
+V1 deliberately excludes dynamic supervision, occurrence factories, federation, automatic retry,
+durable resumption of in-flight actions, pub/sub, arbitrary admission policies, authentication,
+distributed consistency, in-place rewind, and runtime-ledger migration. Future features must
+compose with the same ordinary component primitive and messaging language rather than introduce
+privileged component kinds.

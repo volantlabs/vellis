@@ -19,8 +19,8 @@ from components.storage.sql.protocol import (
     SqlTransactionResult,
 )
 from components.storage.sql.runtime_binding import (
+    SQL_STORAGE_ACTIONS,
     create_sql_storage_adapter,
-    create_sql_storage_proxy,
 )
 
 __all__ = [
@@ -34,6 +34,7 @@ __all__ = [
     "SqlScalar",
     "SqlStatementInvalid",
     "SqlStorage",
+    "SQL_STORAGE_ACTIONS",
     "SqlStorageError",
     "SqlStoragePathInvalid",
     "SqlStoragePermissionDenied",
@@ -41,5 +42,4 @@ __all__ = [
     "SqlTransactionFailed",
     "SqlTransactionResult",
     "create_sql_storage_adapter",
-    "create_sql_storage_proxy",
 ]

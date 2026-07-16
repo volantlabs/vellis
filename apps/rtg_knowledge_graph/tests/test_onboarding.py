@@ -23,6 +23,7 @@ class TtyStringIO(StringIO):
         return True
 
 
+@pytest.mark.integration
 def test_setup_json_is_single_document_and_repeated_setup_is_noop(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
@@ -144,6 +145,7 @@ def test_client_selection_reports_eof_cleanly(monkeypatch: pytest.MonkeyPatch) -
         )
 
 
+@pytest.mark.integration
 def test_setup_remains_interactive_with_injected_streams(tmp_path: Path) -> None:
     data_dir = tmp_path / "interactive"
     output_stream = StringIO()
@@ -161,6 +163,7 @@ def test_setup_remains_interactive_with_injected_streams(tmp_path: Path) -> None
     assert output_stream.getvalue().endswith("Continue? [y/N] ")
 
 
+@pytest.mark.integration
 def test_setup_accepts_explicit_storage_and_runtime_paths(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:

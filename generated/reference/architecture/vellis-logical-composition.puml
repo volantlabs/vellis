@@ -1,0 +1,36 @@
+@startuml
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+skinparam shadowing false
+skinparam roundCorner 12
+skinparam linetype ortho
+skinparam ArrowThickness 1.2
+skinparam ArrowFontSize 11
+skinparam rectangleBorderThickness 1
+skinparam nodesep 35
+skinparam ranksep 45
+title Vellis logical composition
+top to bottom direction
+rectangle "changeValidator\n«RtgChangeValidator»" as n_daec737f4f90 #E8F8F5
+rectangle "constraintRegistry\n«RtgConstraints»" as n_7c207eae36e4 #E8F8F5
+rectangle "controller\n«RtgController»" as n_32f465b9bcd8 #E8F8F5
+rectangle "documentStorage\n«JsonFileStorage»" as n_a7b24f902d1a #E8F8F5
+rectangle "facade\n«VellisApplicationFacade»" as n_18be0d01d269 #E8F8F5
+rectangle "graphStore\n«RtgGraph»" as n_29ce1505af65 #E8F8F5
+rectangle "migrationStore\n«RtgMigration»" as n_a0c7f6ed0cf7 #E8F8F5
+rectangle "queryEngine\n«RtgQueryEngine»" as n_9a7b97ee8232 #E8F8F5
+rectangle "runner\n«RtgKnowledgeGraphRunner»" as n_082748246d64 #E8F8F5
+rectangle "runtime\n«MessageRuntime»" as n_1da6fb9bb4ce #E8F8F5
+rectangle "schemaRegistry\n«RtgSchema»" as n_c638a443ea53 #E8F8F5
+rectangle "starterOntologyInstaller\n«EverydayLifeOntologyInstaller»" as n_a8091608bd18 #E8F8F5
+n_32f465b9bcd8 -[#117864]-> n_daec737f4f90 : changeValidator
+n_32f465b9bcd8 -[#117864]-> n_7c207eae36e4 : constraints
+n_32f465b9bcd8 -[#117864]-> n_a7b24f902d1a : jsonStorage
+n_32f465b9bcd8 -[#117864]-> n_29ce1505af65 : graph
+n_32f465b9bcd8 -[#117864]-> n_a0c7f6ed0cf7 : migration
+n_32f465b9bcd8 -[#117864]-> n_9a7b97ee8232 : queryEngine
+n_32f465b9bcd8 -[#117864]-> n_c638a443ea53 : schema
+n_18be0d01d269 -[#117864]-> n_32f465b9bcd8 : controller
+n_18be0d01d269 -[#117864]-> n_1da6fb9bb4ce : runtime
+@enduml

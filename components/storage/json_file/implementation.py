@@ -63,7 +63,7 @@ class LocalJsonFileStorage:
         temporary_path: Path | None = None
 
         try:
-            target.parent.mkdir(parents=True, exist_ok=True)
+            target.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
             self._ensure_contained_resolved(target.parent)
 
             with tempfile.NamedTemporaryFile(
@@ -120,7 +120,14 @@ class LocalJsonFileStorage:
         except OSError as error:
             raise StorageDeleteFailed(str(error)) from error
 
-    def list(self, relative_directory_path: str | PathLike[str] = ".") -> JsonDocumentList:
+    def list(
+        self,
+        relative_directory_path: str | PathLike[str] = ".",
+        offset: int = 0,
+        limit: int = 100,
+    ) -> JsonDocumentList:
+        if offset < 0 or not 1 <= limit <= 500:
+            raise StoragePathInvalid("offset must be non-negative and limit must be 1-500")
         directory = self._resolve_directory_path(relative_directory_path)
 
         if not directory.exists():
@@ -140,7 +147,10 @@ class LocalJsonFileStorage:
         except OSError as error:
             raise StorageReadFailed(str(error)) from error
 
-        return JsonDocumentList(documents=tuple(documents))
+        total = len(documents)
+        page = tuple(documents[offset : offset + limit])
+        next_offset = offset + len(page) if offset + len(page) < total else None
+        return JsonDocumentList(documents=page, total=total, next_offset=next_offset)
 
     @staticmethod
     def _open_root(root_path: str | PathLike[str]) -> Path:
@@ -152,7 +162,10 @@ class LocalJsonFileStorage:
         try:
             if root.exists() and not root.is_dir():
                 raise StorageRootInvalid(f"storage root is not a directory: {root}")
-            root.mkdir(parents=True, exist_ok=True)
+            created = not root.exists()
+            root.mkdir(parents=True, exist_ok=True, mode=0o700)
+            if created:
+                root.chmod(0o700)
             return root.resolve(strict=True)
         except StorageRootInvalid:
             raise

@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from typing import Any
-
 from components.rtg.constraints.protocol import (
     RtgConstraintDefinitionInvalid,
     RtgConstraintError,
@@ -16,17 +14,14 @@ from components.rtg.constraints.protocol import (
     RtgConstraintUuidInvalid,
 )
 from components.runtime.component_adapter import (
-    MethodBindingSpec,
-    MutableAdapterHost,
+    ComponentAdapter,
     ReplayStateBinding,
-    RuntimeActionIdempotency,
+    create_action_catalog,
     create_typed_component_adapter,
-    create_typed_proxy,
+    load_runtime_binding_resource,
 )
-from components.runtime.message_runtime import MessageRuntime, RuntimeAddress, RuntimeReplayMode
 
 _CONTRACT = "component.rtg.constraints"
-_READ = RuntimeReplayMode.NO_STATE_EFFECT
 _FAILURES: dict[str, tuple[type[RtgConstraintError], ...]] = {
     "export_snapshot": (),
     "replace_snapshot": (
@@ -38,6 +33,16 @@ _FAILURES: dict[str, tuple[type[RtgConstraintError], ...]] = {
         RtgConstraintPayloadInvalid,
         RtgConstraintSystemValueInvalid,
     ),
+    "apply_batch": (
+        RtgConstraintUuidInvalid,
+        RtgConstraintUuidConflict,
+        RtgConstraintKindInvalid,
+        RtgConstraintDefinitionInvalid,
+        RtgConstraintPayloadInvalid,
+        RtgConstraintSystemValueInvalid,
+        RtgConstraintNotFound,
+    ),
+    "count_summary": (),
     "put_constraint": (
         RtgConstraintUuidInvalid,
         RtgConstraintUuidConflict,
@@ -47,85 +52,26 @@ _FAILURES: dict[str, tuple[type[RtgConstraintError], ...]] = {
         RtgConstraintSystemValueInvalid,
     ),
     "get_constraint": (RtgConstraintNotFound,),
-    "list_constraints": (RtgConstraintKindInvalid,),
+    "list_constraints": (RtgConstraintKindInvalid, RtgConstraintPayloadInvalid),
     "list_constraints_by_target": (
         RtgConstraintTargetInvalid,
         RtgConstraintKindInvalid,
     ),
     "delete_constraint": (RtgConstraintNotFound,),
 }
-_SPECS = (
-    MethodBindingSpec(
-        "export_snapshot",
-        _READ,
-        RuntimeActionIdempotency.IDEMPOTENT,
-        failure_types=_FAILURES["export_snapshot"],
-    ),
-    MethodBindingSpec(
-        "replace_snapshot",
-        RuntimeReplayMode.CANONICAL_EFFECT,
-        RuntimeActionIdempotency.IDEMPOTENT,
-        failure_types=_FAILURES["replace_snapshot"],
-    ),
-    MethodBindingSpec(
-        "put_constraint",
-        RuntimeReplayMode.CANONICAL_EFFECT,
-        RuntimeActionIdempotency.NON_IDEMPOTENT,
-        resolved_argument_from_result="constraint",
-        failure_types=_FAILURES["put_constraint"],
-    ),
-    MethodBindingSpec(
-        "get_constraint",
-        _READ,
-        RuntimeActionIdempotency.IDEMPOTENT,
-        failure_types=_FAILURES["get_constraint"],
-    ),
-    MethodBindingSpec(
-        "list_constraints",
-        _READ,
-        RuntimeActionIdempotency.IDEMPOTENT,
-        failure_types=_FAILURES["list_constraints"],
-    ),
-    MethodBindingSpec(
-        "list_constraints_by_target",
-        _READ,
-        RuntimeActionIdempotency.IDEMPOTENT,
-        failure_types=_FAILURES["list_constraints_by_target"],
-    ),
-    MethodBindingSpec(
-        "delete_constraint",
-        RuntimeReplayMode.CANONICAL_EFFECT,
-        RuntimeActionIdempotency.NON_IDEMPOTENT,
-        failure_types=_FAILURES["delete_constraint"],
-    ),
-)
+_RUNTIME_BINDING = load_runtime_binding_resource(__package__, failure_types=_FAILURES)
+RTG_CONSTRAINTS_ACTIONS = create_action_catalog(_RUNTIME_BINDING)
 
 
 def create_rtg_constraints_adapter(
-    constraints: RtgConstraints | MutableAdapterHost[Any],
+    constraints: RtgConstraints,
     *,
     replay_state: ReplayStateBinding | None = None,
-):
+) -> ComponentAdapter:
     return create_typed_component_adapter(
         constraints,
         RtgConstraints,
-        component_contract_id=_CONTRACT,
-        binding_id="binding.python.rtg.constraints.v1",
-        specs=_SPECS,
+        binding=_RUNTIME_BINDING,
         failure_types=(RtgConstraintError,),
         replay_state=replay_state,
-    )
-
-
-def create_rtg_constraints_proxy(
-    runtime: MessageRuntime, source: RuntimeAddress, target: RuntimeAddress
-) -> RtgConstraints:
-    return create_typed_proxy(
-        runtime,
-        source,
-        target,
-        RtgConstraints,
-        component_contract_id=_CONTRACT,
-        specs=_SPECS,
-        failure_types=(RtgConstraintError,),
     )

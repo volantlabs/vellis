@@ -13,8 +13,14 @@ library package BibliotekInterfaceMcpGateway {
         attribute componentContractId : String;
         attribute actionId : String;
         attribute schemaVersion : Integer;
-        attribute codecId : String;
-        attribute codecVersion : Integer;
+        attribute bindingId : String;
+        attribute bindingVersion : Integer;
+        attribute requestCodecId : String;
+        attribute requestCodecVersion : Integer;
+        attribute requestPayloadDisposition : RuntimePayloadDisposition;
+        attribute resultPayloadDisposition : RuntimePayloadDisposition;
+        attribute faultPayloadDisposition : RuntimePayloadDisposition;
+        attribute effectPayloadDisposition[0..1] : RuntimePayloadDisposition;
     }
     attribute def McpGatewayInvocation {
         attribute toolName : String;
@@ -25,6 +31,8 @@ library package BibliotekInterfaceMcpGateway {
         attribute result : JsonObject;
         attribute messageId : Uuid;
         attribute traceId : Uuid;
+        attribute terminalPosition : Integer;
+        attribute traceDisposition : RuntimeTraceDisposition;
     }
     attribute def McpGatewayRegistrationInvalid { attribute 'message' : String; }
     attribute def McpGatewayToolUnknown { attribute 'message' : String; }

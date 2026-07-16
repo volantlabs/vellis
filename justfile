@@ -7,6 +7,12 @@ setup:
     @uv sync --dev
 
 test:
+    @if find apps components tests -path '*/test_*.py' -print -quit 2>/dev/null | grep -q .; then uv run pytest -m "not integration"; else echo "No tests found."; fi
+
+test-integration:
+    @if find apps components tests -path '*/test_*.py' -print -quit 2>/dev/null | grep -q .; then uv run pytest -m integration; else echo "No tests found."; fi
+
+test-full:
     @if find apps components tests -path '*/test_*.py' -print -quit 2>/dev/null | grep -q .; then uv run pytest; else echo "No tests found."; fi
 
 lint:
@@ -28,6 +34,11 @@ typecheck:
 build:
     @uv build
 
+package-check:
+    @rm -rf dist
+    @uv build
+    @uv run python tools/package_check.py
+
 # Fetch and verify pinned SysML/KerML assets, then inspect the validator gate.
 model-setup:
     @uv run python tools/model_tool.py setup
@@ -45,6 +56,8 @@ model-check-vellis:
 model-check:
     @uv run python tools/model_tool.py package
     @uv run python tools/model_tool.py check --scope all --require-external
+    @uv run python tools/sysml_diagrams.py check --backend pilot
+    @uv run python tools/model_views.py architecture check
     @uv run python tools/model_tool.py check-generated
     @uv run python tools/sysml_reference.py check
 
@@ -52,9 +65,36 @@ model-check-formal:
     @uv run python tools/model_tool.py package
     @uv run python tools/sysml_validator.py validate-products --self-test
 
+model-diagrams:
+    @uv run python tools/sysml_validator.py export-index --output generated/model/formal-model-index.json
+    @uv run python tools/sysml_diagrams.py render --backend pilot
+
 model-render:
     @uv run python tools/sysml_validator.py export-index --output generated/model/formal-model-index.json
+    @uv run python tools/sysml_diagrams.py render --backend pilot
+    @uv run python tools/model_views.py architecture render
     @uv run python tools/model_tool.py render
+
+# Regenerate only the parser-backed architecture graph and stable dashboard.
+model-dashboard:
+    @uv run python tools/sysml_validator.py export-index --output generated/model/formal-model-index.json
+    @uv run python tools/model_views.py architecture render
+
+# Discover and render ephemeral architecture projections under build/model-views/.
+model-view-presets:
+    @uv run python tools/model_views.py presets
+
+model-view-targets *args:
+    @uv run python tools/model_views.py targets {{args}}
+
+model-view *args:
+    @uv run python tools/model_views.py render {{args}}
+
+model-view-changed BASE="main":
+    @uv run python tools/model_views.py changed --base "{{BASE}}"
+
+model-view-promote *args:
+    @uv run python tools/model_views.py promote {{args}}
 
 model-reference-render:
     @uv run python tools/sysml_reference.py render
@@ -115,4 +155,4 @@ run-rtg-knowledge-graph-mcp *args:
 run-rtg-knowledge-graph-mcp-info *args:
     @uv run python -m apps.rtg_knowledge_graph serve-mcp --dry-run --json {{args}}
 
-check: lint typecheck skills-check model-check test
+check: lint typecheck skills-check model-check test package-check

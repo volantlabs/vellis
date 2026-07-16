@@ -28,6 +28,8 @@ library package BibliotekStorageJsonFile {
 
     attribute def JsonDocumentList {
         attribute documents[0..*] : JsonDocumentMetadata;
+        attribute total : Integer;
+        attribute nextOffset : Integer[0..1];
     }
 
     attribute def StorageRootInvalid { attribute 'message' : String; }
@@ -81,8 +83,10 @@ library package BibliotekStorageJsonFile {
 
     action def ListJsonDocuments {
         in relativeDirectoryPath : JsonRelativePath default = ".";
+        in offset : Integer default = 0;
+        in limit : Integer default = 100;
         out result : JsonDocumentList;
-        doc /* Recursively list JSON document metadata below a relative directory. */
+        doc /* Return a stable bounded page of JSON document metadata below a relative directory. */
         @FailureContract {
             errorIds = ("StoragePathInvalid", "StorageDirectoryNotFound",
                 "StoragePermissionDenied", "StorageReadFailed");

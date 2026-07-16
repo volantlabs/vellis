@@ -174,7 +174,7 @@ package VellisMcpPythonRealization {
         perform action listMigrationHistory[0..*] : RtgListMigrationHistory { @McpToolBinding { toolName = "rtg_list_migration_history"; implementationSymbol = "apps.rtg_knowledge_graph.mcp_server._RuntimeGatewayTool.run"; transport = (McpTransportKind::stdio, McpTransportKind::http); lane = McpOperationalLane::migration; audience = McpAudienceKind::everyday; ledgers = false; readOnlyHint = true; destructiveHint = false; idempotentHint = true; openWorldHint = false; }
             doc /* Read migration-related runtime traces in terminal-position order; Lane: migration. */
         }
-        perform action flushLedgerFailures[0..*] : RtgFlushLedgerFailures { @McpToolBinding { toolName = "rtg_flush_ledger_failures"; implementationSymbol = "apps.rtg_knowledge_graph.mcp_server._RuntimeGatewayTool.run"; transport = (McpTransportKind::stdio, McpTransportKind::http); lane = McpOperationalLane::recovery_and_audit; audience = McpAudienceKind::operator; ledgers = false; recommendedPredecessors = ("rtg_get_system_state"); readOnlyHint = true; destructiveHint = false; idempotentHint = true; openWorldHint = false; }
+        perform action getOperationOutcome[0..*] : RtgGetOperationOutcome { @McpToolBinding { toolName = "rtg_get_operation_outcome"; implementationSymbol = "apps.rtg_knowledge_graph.mcp_server._RuntimeGatewayTool.run"; transport = (McpTransportKind::stdio, McpTransportKind::http); lane = McpOperationalLane::recovery_and_audit; audience = McpAudienceKind::everyday; ledgers = false; readOnlyHint = true; destructiveHint = false; idempotentHint = true; openWorldHint = false; }
             doc /* Deprecated health-only status for callers that still know the old tool name; Lane: recovery_and_audit; operator use. */
         }
         perform action restoreFromSnapshot[0..*] : RtgRestoreFromSnapshot { @McpToolBinding { toolName = "rtg_restore_from_snapshot"; implementationSymbol = "apps.rtg_knowledge_graph.mcp_server._RuntimeGatewayTool.run"; transport = (McpTransportKind::stdio, McpTransportKind::http); lane = McpOperationalLane::recovery_and_audit; audience = McpAudienceKind::operator; ledgers = true; recommendedPredecessors = ("rtg_load_persisted_snapshot"); readOnlyHint = false; destructiveHint = true; idempotentHint = false; openWorldHint = false; }
@@ -214,7 +214,7 @@ package VellisMcpPythonRealization {
         allocate adapter.replayLedger to application.gateway.invokeTool;
         allocate adapter.verifyReplay to application.gateway.invokeTool;
         allocate adapter.listMigrationHistory to application.gateway.invokeTool;
-        allocate adapter.flushLedgerFailures to application.gateway.invokeTool;
+        allocate adapter.getOperationOutcome to application.gateway.invokeTool;
         allocate adapter.restoreFromSnapshot to application.gateway.invokeTool;
     }
 

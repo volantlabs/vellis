@@ -1,0 +1,8 @@
+{
+  "actions": [],
+  "binding_id": "binding.python.interface.mcp_gateway.v2",
+  "binding_version": 1,
+  "component_contract_id": "component.interface.mcp_gateway",
+  "schema_version": 1,
+  "source_contract_id": "component.interface.mcp_gateway"
+}

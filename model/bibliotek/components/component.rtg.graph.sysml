@@ -1,6 +1,7 @@
 library package BibliotekRtgGraph {
     private import SoftwareComponentModeling::*;
     private import BibliotekSoftwareValues::*;
+    private import BibliotekRtgChangeValues::*;
     private import ScalarValues::*;
 
     enum def RtgObjectKind {
@@ -48,6 +49,13 @@ library package BibliotekRtgGraph {
         attribute anchorDataIndex : JsonObject;
         doc /* JSON-safe canonical records and direct anchor-to-data index sufficient for equivalent reconstruction. */
     }
+    attribute def RtgGraphAnchorWrite { attribute 'ref' : RtgChangeReference; attribute type : String; attribute displayName[0..1] : String; attribute system[0..1] : JsonObject; }
+    attribute def RtgGraphDataObjectWrite { attribute 'ref' : RtgChangeReference; attribute type : String; attribute properties : JsonObject; attribute system[0..1] : JsonObject; attribute anchorRefs[1..*] : RtgChangeReference; }
+    attribute def RtgGraphLinkWrite { attribute 'ref' : RtgChangeReference; attribute type : String; attribute sourceRef : RtgChangeReference; attribute targetRef : RtgChangeReference; attribute system[0..1] : JsonObject; }
+    attribute def RtgGraphAssociationChange { attribute anchorRef : RtgChangeReference; attribute dataRef : RtgChangeReference; }
+    attribute def RtgGraphLiveStatusChange { attribute objectRef : RtgChangeReference; attribute live : Boolean; }
+    attribute def RtgGraphChangeSet { attribute anchorWrites[0..*] : RtgGraphAnchorWrite; attribute dataObjectWrites[0..*] : RtgGraphDataObjectWrite; attribute linkWrites[0..*] : RtgGraphLinkWrite; attribute associateData[0..*] : RtgGraphAssociationChange; attribute dissociateData[0..*] : RtgGraphAssociationChange; attribute deleteAnchors[0..*] : RtgChangeReference; attribute deleteDataObjects[0..*] : RtgChangeReference; attribute deleteLinks[0..*] : RtgChangeReference; attribute setLive[0..*] : RtgGraphLiveStatusChange; }
+    attribute def RtgGraphBatchResult { attribute writes : Integer; attribute deletes : Integer; attribute liveChanges : Integer; }
     attribute def RtgObjectList { ref item objects[0..*] : RtgObject; }
     attribute def RtgAnchorList { ref item anchors[0..*] : RtgAnchor; }
     attribute def RtgDataObjectList { ref item dataObjects[0..*] : RtgDataObject; }
@@ -85,6 +93,7 @@ library package BibliotekRtgGraph {
         doc /* Validate the complete candidate, then atomically replace all canonical graph state and rebuild every derived index. */
         @FailureContract { errorIds = ("RtgGraphSnapshotInvalid", "RtgGraphUuidInvalid", "RtgGraphUuidConflict", "RtgGraphReferenceInvalid", "RtgGraphTypeInvalid", "RtgGraphTypeKindConflict", "RtgGraphJsonValueInvalid", "RtgGraphSystemValueInvalid"); }
     }
+    action def ApplyRtgGraphBatch { in changes : RtgGraphChangeSet; out result : RtgGraphBatchResult; doc /* Apply one resolved graph-local change set atomically. */ @FailureContract { errorIds = ("RtgGraphUuidInvalid", "RtgGraphUuidConflict", "RtgGraphReferenceInvalid", "RtgGraphTypeInvalid", "RtgGraphTypeKindConflict", "RtgGraphJsonValueInvalid", "RtgGraphSystemValueInvalid", "RtgGraphAnchorNotFound", "RtgGraphDataObjectNotFound", "RtgGraphLinkNotFound", "RtgGraphEndpointNotFound", "RtgGraphAnchorDataIndexEntryNotFound", "RtgGraphObjectNotFound"); } }
     action def PutAnchor {
         in anchor : RtgAnchor; out stored : RtgAnchor;
         doc /* Create or fully replace one anchor while preserving its associations and incident links. */
@@ -146,24 +155,24 @@ library package BibliotekRtgGraph {
         @FailureContract { errorIds = ("RtgGraphUuidInvalid", "RtgGraphObjectNotFound"); }
     }
     action def ListGraphObjectsByType {
-        in objectType : String; out result : RtgObjectList;
-        doc /* Return all objects in the global type namespace for one type in stable component order, without lifecycle filtering. */
-        @FailureContract { errorIds = ("RtgGraphTypeInvalid"); }
+        in objectType : String; in offset : Integer default = 0; in limit[0..1] : Integer; out result : RtgObjectList;
+        doc /* Return a stable page of objects in the global type namespace for one type, without lifecycle filtering. limit absent returns the remaining objects. */
+        @FailureContract { errorIds = ("RtgGraphTypeInvalid", "RtgGraphReferenceInvalid"); }
     }
     action def ListAnchorData {
-        in anchorUuid : Uuid; out result : RtgDataObjectList;
-        doc /* Return directly associated data without lifecycle filtering. */
-        @FailureContract { errorIds = ("RtgGraphUuidInvalid", "RtgGraphAnchorNotFound"); }
+        in anchorUuid : Uuid; in offset : Integer default = 0; in limit[0..1] : Integer; out result : RtgDataObjectList;
+        doc /* Return one stable page of directly associated data without lifecycle filtering. */
+        @FailureContract { errorIds = ("RtgGraphUuidInvalid", "RtgGraphAnchorNotFound", "RtgGraphReferenceInvalid"); }
     }
     action def ListDataAnchors {
-        in dataUuid : Uuid; out result : RtgAnchorList;
-        doc /* Return directly associated anchors without lifecycle filtering. */
-        @FailureContract { errorIds = ("RtgGraphUuidInvalid", "RtgGraphDataObjectNotFound"); }
+        in dataUuid : Uuid; in offset : Integer default = 0; in limit[0..1] : Integer; out result : RtgAnchorList;
+        doc /* Return one stable page of directly associated anchors without lifecycle filtering. */
+        @FailureContract { errorIds = ("RtgGraphUuidInvalid", "RtgGraphDataObjectNotFound", "RtgGraphReferenceInvalid"); }
     }
     action def ListIncidentLinks {
-        in objectUuid : Uuid; in direction : RtgLinkDirection default = RtgLinkDirection::both; out result : RtgLinkList;
-        doc /* Return source, target, or all incident links without lifecycle filtering. */
-        @FailureContract { errorIds = ("RtgGraphUuidInvalid", "RtgGraphObjectNotFound"); }
+        in objectUuid : Uuid; in direction : RtgLinkDirection default = RtgLinkDirection::both; in offset : Integer default = 0; in limit[0..1] : Integer; out result : RtgLinkList;
+        doc /* Return one stable page of source, target, or all incident links without lifecycle filtering. */
+        @FailureContract { errorIds = ("RtgGraphUuidInvalid", "RtgGraphObjectNotFound", "RtgGraphReferenceInvalid"); }
     }
     action def CountGraphObjectsByType {
         in kind[0..1] : RtgObjectKind; in live[0..1] : Boolean; out result : RtgTypeCountList;
@@ -190,6 +199,7 @@ library package BibliotekRtgGraph {
         attribute anchorDataAssociations : JsonObject { doc /* Canonical identity-free direct associations. */ }
         derived attribute derivedIndexes : JsonObject { doc /* Ephemeral navigation indexes derived from canonical graph state. */ }
         perform action replaceSnapshot[0..*] : ReplaceGraphSnapshot;
+        perform action applyBatch[0..*] : ApplyRtgGraphBatch;
         perform action putAnchor[0..*] : PutAnchor; perform action putDataObject[0..*] : PutDataObject; perform action putLink[0..*] : PutLink;
         perform action associateData[0..*] : AssociateData; perform action dissociateData[0..*] : DissociateData;
         perform action deleteAnchor[0..*] : DeleteAnchor; perform action deleteDataObject[0..*] : DeleteDataObject; perform action deleteLink[0..*] : DeleteLink;
@@ -206,6 +216,7 @@ library package BibliotekRtgGraph {
         dependency deleteLinkState from deleteLink to links { @StateAccess { kind = StateAccessKind::delete; } doc /* remove exactly one link and index entries. */ }
         dependency exportSnapshotState from exportSnapshot to anchors { @StateAccess { kind = StateAccessKind::read; } doc /* read all canonical records, associations, and their stable identities without mutation. */ }
         dependency replaceSnapshotState from replaceSnapshot to anchors { @StateAccess { kind = StateAccessKind::write; } doc /* validate before visibility, atomically replace all canonical records and associations, and rebuild derived indexes. */ }
+        dependency applyBatchState from applyBatch to anchors { @StateAccess { kind = StateAccessKind::write; } doc /* expose the entire resolved graph change set or leave canonical graph state unchanged. */ }
         dependency getObjectState from getObject to anchors { @StateAccess { kind = StateAccessKind::read; } doc /* read the one global object namespace across anchors, data objects, and links. */ }
         dependency listByTypeState from listByType to derivedIndexes { @StateAccess { kind = StateAccessKind::read; } doc /* read the derived type index and canonical records without mutation. */ }
         dependency listAnchorDataState from listAnchorData to anchorDataAssociations { @StateAccess { kind = StateAccessKind::read; } doc /* read direct anchor-to-data associations without mutation. */ }
@@ -618,6 +629,8 @@ library package BibliotekRtgGraph {
         satisfy typeCountsMatchCanonicalMaps by graph;
         satisfy mutationAtomicity by graph;
         satisfy previewMatchesDelete by graph;
+        satisfy graphBatchAtomicity by graph.applyBatch;
+        satisfy graphRoutineWorkBounded by graph;
 
         satisfy exportGraphSnapshotFailureSemantics by graph.exportSnapshot;
         satisfy replaceGraphSnapshotFailureSemantics by graph.replaceSnapshot;
@@ -638,6 +651,7 @@ library package BibliotekRtgGraph {
         satisfy listDataAnchorsFailureSemantics by graph.listDataAnchors;
         satisfy listIncidentLinksFailureSemantics by graph.listIncidentLinks;
         satisfy countGraphObjectsByTypeFailureSemantics by graph.countByType;
+        satisfy applyRtgGraphBatchFailureSemantics by graph.applyBatch;
         action createEmptyRtgGraphSubject : CreateEmptyRtgGraph;
         satisfy createEmptyRtgGraphFailureSemantics by createEmptyRtgGraphSubject;
         action importRtgGraphSnapshotSubject : ImportRtgGraphSnapshot;
@@ -770,6 +784,12 @@ library package BibliotekRtgGraph {
     }
 
 
+
+    requirement <'contract.rtg.graph.batch_atomicity'> graphBatchAtomicity { subject operation : ApplyRtgGraphBatch; require constraint { doc /* Success exposes the complete requested graph-local batch and every required cascade; rejection or failure exposes the exact prior graph state. */ } }
+    requirement <'invariant.rtg.graph.routine_work_is_delta_scaled'> graphRoutineWorkBounded { subject graph : RtgGraph; require constraint { doc /* A non-state-transfer action does not copy, serialize, hash, or retain complete graph state solely for validation, atomicity, or recovery. Transient work may grow with the requested mutation and its graph cascade closure, but not unrelated graph state. Snapshot export, import, replacement, checkpoint, and reconstruction are explicit exceptions. */ } }
+    requirement <'contract.rtg.graph.apply_batch.failures'> applyRtgGraphBatchFailureSemantics { subject operation : ApplyRtgGraphBatch; require constraint { doc /* Any invalid reference, record, type, association, endpoint, or cascade rejects the whole batch without observable graph state effect. */ } }
+    verification def GraphBatchAtomicityContractVerification { subject operation : ApplyRtgGraphBatch; objective { verify graphBatchAtomicity; verify applyRtgGraphBatchFailureSemantics; } @EvidenceBinding { evidenceId = "components/rtg/graph/tests/test_rtg_graph_contract.py#GraphBatchAtomicityContractVerification"; implementationScope = "InMemoryRtgGraph"; } }
+    verification def GraphRoutineWorkScalingVerification { subject graph : RtgGraph; objective { verify graphRoutineWorkBounded; } @EvidenceBinding { evidenceId = "components/rtg/graph/tests/test_rtg_graph_contract.py#GraphRoutineWorkScalingVerification"; implementationScope = "InMemoryRtgGraph"; } }
 
     verification def RtgGraphBoundaryVerification {
         subject graph : RtgGraph;

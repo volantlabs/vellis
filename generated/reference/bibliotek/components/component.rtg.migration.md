@@ -12,9 +12,12 @@ Generated from textual SysML v2 by `just model-render` as a non-normative readin
 |---|---|---|---|---|
 | `exportSnapshot` | `ExportMigrationSnapshot` | out `snapshot: RtgMigrationSnapshot` | None | Export all records without inspecting referenced component state. |
 | `replaceSnapshot` | `ReplaceMigrationSnapshot` | in `snapshot: RtgMigrationSnapshot` | `RtgMigrationSnapshotInvalid`, `RtgMigrationIdInvalid`, `RtgMigrationIdConflict`, `RtgMigrationRecordInvalid`, `RtgMigrationStatusInvalid`, `RtgMigrationEvidenceInvalid` | Validate the complete candidate, then atomically replace every migration record and rebuild the status index without applying lifecycle transitions against prior state. |
+| `applyBatch` | `ApplyRtgMigrationBatch` | in `changes: RtgMigrationChangeSet`; out `result: RtgMigrationBatchResult` | `RtgMigrationIdInvalid`, `RtgMigrationIdConflict`, `RtgMigrationNotFound`, `RtgMigrationRecordInvalid`, `RtgMigrationStatusInvalid`, `RtgMigrationStatusTransitionInvalid`, `RtgMigrationEvidenceInvalid`, `RtgMigrationDeleteNotAllowed` | Apply one resolved migration-local change set atomically. |
+| `countSummary` | `CountRtgMigrationSummary` | out `result: RtgMigrationCountSummary` | None | Return bounded counts by migration status without returning records. |
+| `findCandidateOwners` | `FindMigrationCandidateOwners` | in `kind: String`; in `resourceId: Uuid`; out `result: RtgMigrationCandidateOwners` | `RtgMigrationRecordInvalid` | Return migration IDs whose make-live membership references one resource. |
 | `putMigration` | `PutMigration` | in `migration: RtgMigrationRecord`; out `stored: RtgMigrationRecord` | `RtgMigrationIdInvalid`, `RtgMigrationRecordInvalid`, `RtgMigrationStatusInvalid`, `RtgMigrationStatusTransitionInvalid`, `RtgMigrationEvidenceInvalid` | Generate or preserve migration identity and create or lifecycle-safe fully replace one structurally valid record. |
 | `getMigration` | `GetMigration` | in `migrationId: String`; out `migration: RtgMigrationRecord` | `RtgMigrationNotFound` | Return one migration tracking record by ID. |
-| `listMigrations` | `ListMigrations` | in `status: RtgMigrationStatus[0..1]`; out `result: RtgMigrationRecordList` | `RtgMigrationStatusInvalid` | Return all records or records in one status in deterministic migration-ID order. |
+| `listMigrations` | `ListMigrations` | in `status: RtgMigrationStatus[0..1]`; in `offset: Integer` = `0`; in `limit: Integer[0..1]`; out `result: RtgMigrationRecordList` | `RtgMigrationStatusInvalid`, `RtgMigrationRecordInvalid` | Return one stable page of all records or records in one status in migration-ID order. |
 | `setStatus` | `SetMigrationStatus` | in `migrationId: String`; in `status: RtgMigrationStatus`; in `statusMetadata: JsonObject[0..1]`; out `migration: RtgMigrationRecord` | `RtgMigrationIdInvalid`, `RtgMigrationNotFound`, `RtgMigrationRecordInvalid`, `RtgMigrationStatusInvalid`, `RtgMigrationStatusTransitionInvalid` | Apply only a permitted lifecycle transition and replace status metadata with the supplied object or an empty object. |
 | `addEvidence` | `AddMigrationEvidence` | in `migrationId: String`; in `evidence: RtgMigrationEvidence`; out `migration: RtgMigrationRecord` | `RtgMigrationNotFound`, `RtgMigrationEvidenceInvalid` | Append one evidence identity without interpreting or fetching its referenced artifact. |
 | `deleteMigration` | `DeleteMigration` | in `migrationId: String`; out `result: RtgMigrationDeleteResult` | `RtgMigrationIdInvalid`, `RtgMigrationNotFound`, `RtgMigrationDeleteNotAllowed` | Delete one applied or abandoned record only; referenced resources and durable controller history remain unchanged. |
@@ -46,6 +49,9 @@ Generated from textual SysML v2 by `just model-render` as a non-normative readin
 |---|---|---|---|
 | `exportSnapshot` | `migrationRecords` | `read` | return all migration records in migration-ID order. |
 | `replaceSnapshot` | `migrationRecords` | `write` | validate before visibility and atomically replace every record and derived status entry. |
+| `applyBatch` | `migrationRecords` | `write` | expose the complete resolved migration change set or leave canonical migration state unchanged. |
+| `countSummary` | `statusIndex` | `read` | return only bounded aggregate counts. |
+| `findCandidateOwners` | `migrationRecords` | `read` | resolve ownership for one candidate without returning unrelated records. |
 | `putMigration` | `migrationRecords` | `write` | create or lifecycle-safe replace one complete record. |
 | `setStatus` | `migrationRecords` | `write` | apply one allowed lifecycle transition or same-status metadata update. |
 | `addEvidence` | `migrationRecords` | `write` | append one evidence identity not already present. |
@@ -93,16 +99,28 @@ Generated from textual SysML v2 by `just model-render` as a non-normative readin
 | `contract.rtg.migration.build_migration_cutover_plan.failures` | `BuildMigrationCutoverPlan` | `migration.buildCutoverPlan` | Plan construction reads and mutates no component store. |
 | `contract.rtg.migration.create_empty_rtg_migration.failures` | `CreateEmptyRtgMigration` | `createEmptyRtgMigrationSubject` | Construction has no declared domain failure. |
 | `contract.rtg.migration.import_rtg_migration_snapshot.failures` | `ImportRtgMigrationSnapshot` | `importRtgMigrationSnapshotSubject` | Failure returns no partially imported store. |
+| `contract.rtg.migration.batch_atomicity` | `ApplyRtgMigrationBatch` | `migration.applyBatch` | Success exposes the complete requested migration-local batch; rejection or failure exposes the exact prior migration state. |
+| `invariant.rtg.migration.routine_work_is_delta_scaled` | `RtgMigration` | `migration` | A non-state-transfer action does not copy, serialize, hash, or retain complete migration state solely for validation, atomicity, or recovery. Transient work may grow with the requested mutation and affected membership/index closure, but not unrelated migrations. Explicit state-transfer and reconstruction actions are exceptions. |
+| `contract.rtg.migration.apply_batch.failures` | `ApplyRtgMigrationBatch` | `migration.applyBatch` | Any invalid identity, record, transition, evidence, or deletion rejects the whole batch without observable migration state effect. |
+| `contract.rtg.migration.count_summary.failures` | `CountRtgMigrationSummary` | `migration.countSummary` | Summary reads expose bounded status counts and do not change migration state. |
+| `contract.rtg.migration.find_candidate_owners.failures` | `FindMigrationCandidateOwners` | `migration.findCandidateOwners` | A valid kind and resource identity return only matching migration owners; invalid inputs fail without changing migration state. |
 
 ## Public values and items
 
 | Public definition | Kind | Fields | Meaning |
 |---|---|---|---|
 | `RtgMigrationReplacement` | `attribute` | `oldResourceId: Uuid`, `newResourceId: Uuid` | Defined by its typed fields and action requirements. |
-| `RtgMigrationEvidence` | `attribute` | `evidenceId: String`, `kind: String`, `reference: String`, `summary: String`, `metadata: JsonObject` | Defined by its typed fields and action requirements. |
-| `RtgMigrationRecord` | `item` | `migrationId[0..1]: String`, `description: String`, `status: RtgMigrationStatus` = `RtgMigrationStatus::draft`, `schemaMakeLive[0..*]: Uuid`, `schemaMakeNonLive[0..*]: Uuid`, `constraintMakeLive[0..*]: Uuid`, `constraintMakeNonLive[0..*]: Uuid`, `graphMakeLive[0..*]: Uuid`, `graphMakeNonLive[0..*]: Uuid`, `schemaReplacements[0..*]: RtgMigrationReplacement`, `constraintReplacements[0..*]: RtgMigrationReplacement`, `graphReplacements[0..*]: RtgMigrationReplacement`, `evidence[0..*] ordered: RtgMigrationEvidence`, `metadata: JsonObject` | Identity may be absent only on write. Stored records have a concrete generated or caller-supplied ID. The record stores references and intent, never referenced resources or executable transforms. |
-| `RtgMigrationRecordList` | `attribute` | `migrations[0..*] ordered: RtgMigrationRecord` | Defined by its typed fields and action requirements. |
+| `RtgMigrationEvidence` | `attribute` | `evidenceId: String`, `kind: String`, `reference: String`, `summary: String`, `metadata[0..1]: JsonObject` | Defined by its typed fields and action requirements. |
+| `RtgMigrationRecord` | `item` | `migrationId[0..1]: String`, `description: String`, `status: RtgMigrationStatus` = `RtgMigrationStatus::draft`, `schemaMakeLive[0..*]: Uuid`, `schemaMakeNonLive[0..*]: Uuid`, `constraintMakeLive[0..*]: Uuid`, `constraintMakeNonLive[0..*]: Uuid`, `graphMakeLive[0..*]: Uuid`, `graphMakeNonLive[0..*]: Uuid`, `schemaReplacements[0..*]: RtgMigrationReplacement`, `constraintReplacements[0..*]: RtgMigrationReplacement`, `graphReplacements[0..*]: RtgMigrationReplacement`, `evidence[0..*] ordered: RtgMigrationEvidence`, `metadata[0..1]: JsonObject` | Identity may be absent only on write. Stored records have a concrete generated or caller-supplied ID. The record stores references and intent, never referenced resources or executable transforms. |
+| `RtgMigrationRecordList` | `attribute` | `migrations[0..*] ordered: RtgMigrationRecord`, `total: Integer` = `0`, `nextOffset[0..1]: Integer` | Defined by its typed fields and action requirements. |
 | `RtgMigrationSnapshot` | `attribute` | `migrations[0..*] ordered: RtgMigrationRecord` | Defined by its typed fields and action requirements. |
+| `RtgMigrationRecordWrite` | `attribute` | `ref: RtgChangeReference`, `migration: RtgMigrationRecord` | Defined by its typed fields and action requirements. |
+| `RtgMigrationStatusChange` | `attribute` | `migrationRef: RtgChangeReference`, `status: RtgMigrationStatus`, `statusMetadata: JsonObject` | Defined by its typed fields and action requirements. |
+| `RtgMigrationEvidenceAddition` | `attribute` | `migrationRef: RtgChangeReference`, `evidence: RtgMigrationEvidence` | Defined by its typed fields and action requirements. |
+| `RtgMigrationChangeSet` | `attribute` | `migrationWrites[0..*]: RtgMigrationRecordWrite`, `deleteMigrations[0..*]: RtgChangeReference`, `statusChanges[0..*]: RtgMigrationStatusChange`, `evidenceAdditions[0..*]: RtgMigrationEvidenceAddition` | Defined by its typed fields and action requirements. |
+| `RtgMigrationBatchResult` | `attribute` | `writes: Integer`, `deletes: Integer`, `statusChanges: Integer`, `evidenceAdditions: Integer` | Defined by its typed fields and action requirements. |
+| `RtgMigrationCountSummary` | `attribute` | `draft: Integer`, `ready: Integer`, `failed: Integer`, `applied: Integer`, `abandoned: Integer`, `total: Integer` | Defined by its typed fields and action requirements. |
+| `RtgMigrationCandidateOwners` | `attribute` | `migrationIds[0..*] ordered: String` | Defined by its typed fields and action requirements. |
 | `RtgMigrationDeleteResult` | `attribute` | `deletedMigration: RtgMigrationRecord` | Defined by its typed fields and action requirements. |
 | `RtgMigrationCutoverPlan` | `attribute` | `migrationId: String`, `schemaMakeLive[0..*] ordered: Uuid`, `schemaMakeNonLive[0..*] ordered: Uuid`, `constraintMakeLive[0..*] ordered: Uuid`, `constraintMakeNonLive[0..*] ordered: Uuid`, `graphMakeLive[0..*] ordered: Uuid`, `graphMakeNonLive[0..*] ordered: Uuid`, `schemaReplacements[0..*] ordered: RtgMigrationReplacement`, `constraintReplacements[0..*] ordered: RtgMigrationReplacement`, `graphReplacements[0..*] ordered: RtgMigrationReplacement` | Defined by its typed fields and action requirements. |
 | `RtgMigrationNotFound` | `attribute` | `message: String` | Defined by its typed fields and action requirements. |
@@ -136,6 +154,16 @@ Generated from textual SysML v2 by `just model-render` as a non-normative readin
 | `ListMigrationsContractVerification` | `ListMigrations` | `listMigrationsFailureSemantics` | `components/rtg/migration/tests/test_rtg_migration_contract.py#ListMigrationsContractVerification` |
 | `CreateEmptyRtgMigrationContractVerification` | `CreateEmptyRtgMigration` | `createEmptyRtgMigrationFailureSemantics` | `components/rtg/migration/tests/test_rtg_migration_contract.py#CreateEmptyRtgMigrationContractVerification` |
 | `ImportRtgMigrationSnapshotContractVerification` | `ImportRtgMigrationSnapshot` | `importRtgMigrationSnapshotFailureSemantics` | `components/rtg/migration/tests/test_rtg_migration_contract.py#ImportRtgMigrationSnapshotContractVerification` |
+| `MigrationBatchAtomicityContractVerification` | `ApplyRtgMigrationBatch` | `migrationBatchAtomicity`, `applyRtgMigrationBatchFailureSemantics` | `components/rtg/migration/tests/test_rtg_migration_contract.py#MigrationBatchAtomicityContractVerification` |
+| `MigrationRoutineWorkScalingVerification` | `RtgMigration` | `migrationRoutineWorkBounded` | `components/rtg/migration/tests/test_rtg_migration_contract.py#MigrationRoutineWorkScalingVerification` |
+| `CountMigrationSummaryContractVerification` | `CountRtgMigrationSummary` | `countMigrationSummaryFailureSemantics` | `components/rtg/migration/tests/test_rtg_migration_contract.py#CountMigrationSummaryContractVerification` |
+| `FindMigrationCandidateOwnersContractVerification` | `FindMigrationCandidateOwners` | `findMigrationCandidateOwnersFailureSemantics` | `components/rtg/migration/tests/test_rtg_migration_contract.py#FindMigrationCandidateOwnersContractVerification` |
 | `RtgMigrationBoundaryVerification` | `RtgMigration` | `intentionalBoundary`, `idUnique`, `cutoverSetsDisjoint`, `notNormalCrud`, `candidatesMaterialized`, `referencesAreData`, `noStoreMutation`, `statusTransitionControlled`, `statusTrackingNotProof`, `completedHistoryExternal`, `rollbackForwardChange` | `components/rtg/migration/tests/test_rtg_migration_contract.py#RtgMigrationBoundaryVerification` |
+
+## Diagram
+
+![component.rtg.migration contract diagram](../diagrams/component.rtg.migration.contract.svg)
+
+[PlantUML source](../diagrams/component.rtg.migration.contract.puml)
 
 Equivalent private algorithms, helpers, storage layouts, and implementation-language inheritance remain implementation choices.

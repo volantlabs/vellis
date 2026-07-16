@@ -1,0 +1,37 @@
+@startuml
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+skinparam shadowing false
+skinparam roundCorner 12
+skinparam linetype ortho
+skinparam ArrowThickness 1.2
+skinparam ArrowFontSize 11
+skinparam rectangleBorderThickness 1
+skinparam nodesep 35
+skinparam ranksep 45
+title Bibliotek component dependency context
+left to right direction
+rectangle "McpGateway" as n_e4909d33b499 #D6EAF8
+rectangle "RtgChangeValidator" as n_87bb3f8f081e #D6EAF8
+rectangle "RtgConstraints" as n_9fb7b295fe59 #D6EAF8
+rectangle "RtgController" as n_ef03ec0a7ac3 #D6EAF8
+rectangle "RtgDiscovery" as n_c74a57049a70 #D6EAF8
+rectangle "RtgGraph" as n_7f6b1b9bcea6 #D6EAF8
+rectangle "RtgMigration" as n_9b016ecc9280 #D6EAF8
+rectangle "RtgQueryEngine" as n_9d716862a8fb #D6EAF8
+rectangle "RtgSchema" as n_edd3978c7600 #D6EAF8
+rectangle "ComponentRuntimeAdapter" as n_f898d42cd8af #D6EAF8
+rectangle "MessageRuntime" as n_e7086a080846 #D6EAF8
+rectangle "JsonFileStorage" as n_e43ae848505b #D6EAF8
+rectangle "SqlStorage" as n_f6c8c67bcd48 #D6EAF8
+n_e4909d33b499 -[#884EA0]-> n_e7086a080846 : runtime
+n_ef03ec0a7ac3 -[#884EA0]-> n_87bb3f8f081e : changeValidator
+n_ef03ec0a7ac3 -[#884EA0]-> n_9fb7b295fe59 : constraints
+n_ef03ec0a7ac3 -[#884EA0]-> n_7f6b1b9bcea6 : graph
+n_ef03ec0a7ac3 -[#884EA0]-> n_9b016ecc9280 : migration
+n_ef03ec0a7ac3 -[#884EA0]-> n_9d716862a8fb : queryEngine
+n_ef03ec0a7ac3 -[#884EA0]-> n_edd3978c7600 : schema
+n_ef03ec0a7ac3 -[#884EA0]-> n_e43ae848505b : jsonStorage
+n_f898d42cd8af -[#884EA0]-> n_e7086a080846 : runtime
+@enduml

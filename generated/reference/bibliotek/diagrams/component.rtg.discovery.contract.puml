@@ -1,0 +1,17 @@
+@startuml
+skin sysmlc
+skinparam wrapWidth 380
+hide circle
+  
+comp def "~<component.rtg.discovery> RtgDiscovery" as E1  <<(T,blue) part def>>  {
+Own curated navigation metadata while remaining independent of schema contents, graph population, query execution, and transports.
+--
+##//items//##
+curatedViews: RtgDiscoveryView
+--
+##//perform actions//##
+listViews: ListDiscoveryViews
+putView: PutDiscoveryView
+selectAnchorTypes: SelectDiscoveryAnchorTypes
+}
+@enduml

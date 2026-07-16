@@ -11,6 +11,7 @@ Generated from textual SysML v2 by `just model-render` as a non-normative readin
 | Feature | Contract | Signature | Principal failures | Meaning |
 |---|---|---|---|---|
 | `execute` | `ExecuteRtgQuery` | in `graph: RtgGraphReadView`; in `querySpec: RtgQuerySpec`; in `queryOptions: RtgQueryOptions[0..1]`; out `result: RtgQueryResult` | `RtgQuerySpecInvalid`, `RtgQueryUnsupported` | Validate and evaluate the declarative specification over one coherent graph read view, then shape deterministic bindings, returns, and diagnostics without mutation. |
+| `executeProjected` | `ExecuteProjectedRtgQuery` | in `querySpec: RtgQuerySpec`; in `queryOptions: RtgQueryOptions[0..1]`; in `graphChanges: JsonObject`; out `result: RtgQueryResult` | `RtgQuerySpecInvalid`, `RtgQueryUnsupported` | Evaluate over an invocation-local projection formed by targeted paginated graph reads plus one canonical graph delta. Neither the request nor result carries a graph snapshot. |
 
 ## Construction actions
 
@@ -47,6 +48,7 @@ Generated from textual SysML v2 by `just model-render` as a non-normative readin
 | Stable ID | Subject | Satisfier | Required constraint |
 |---|---|---|---|
 | `contract.rtg.query.valid_spec` | `ExecuteRtgQuery` | `query.execute` | Anchor-bucket, link-requirement, and data-requirement names share one globally unique binding namespace so aggregation and constraint references are unambiguous. Every return selection, returned property, group-by, aggregation, and ordering reference resolves to its declared query element. Predicate paths and operators are structurally well formed, while a resolved runtime value of an incompatible JSON kind is a non-match under predicateSemantics rather than an invalid query. order_by refers only to returned properties, aggregation names cannot use the reserved result fields row_index or group_by, a present limit is a positive Integer, offset is a nonnegative Integer, and distinct_rows cannot be combined with aggregation. |
+| `contract.rtg.query.execute_projected.failures` | `ExecuteProjectedRtgQuery` | `query.executeProjected` | Invalid query or projection inputs fail with a modeled query failure and leave every graph occurrence unchanged. |
 | `contract.rtg.query.defaults` | `ExecuteRtgQuery` | `query.execute` | Link and data requirements default required=true; predicate case sensitivity defaults false; diagnostic inclusion defaults true with suggest-discovery guidance; absent query options mean all live states, empty overlay, no order_by, no limit, offset zero, and no distinct-row projection; absent order direction means ascending. |
 | `contract.rtg.query.coherent_read_view` | `ExecuteRtgQuery` | `query.execute` | The supplied graph capability presents one coherent logical view for the invocation. |
 | `contract.rtg.query.matching` | `ExecuteRtgQuery` | `query.execute` | Anchor buckets select matching anchor types; required link requirements match directed typed links between bound buckets, while an optional link preserves exactly one unbound row for a source context only when no target in that bucket matches. A later optional link also preserves that row when its source bucket was left unbound by an earlier optional link. Data requirements match directly associated typed data objects. Predicates on one data requirement must hold on the same object. |
@@ -109,6 +111,7 @@ Generated from textual SysML v2 by `just model-render` as a non-normative readin
 | Verification | Subject | Objectives | Evidence |
 |---|---|---|---|
 | `ExecuteRtgQueryContractVerification` | `ExecuteRtgQuery` | `validQuerySpec`, `defaultSemantics`, `coherentReadView`, `matchingSemantics`, `bindingExpansion`, `predicateSemantics`, `lifecycleFiltering`, `deterministicResult`, `returnShaping`, `diagnosticSemantics`, `executeRtgQueryFailureSemantics` | `components/rtg/query/tests/test_rtg_query_contract.py#ExecuteRtgQueryContractVerification` |
+| `ExecuteProjectedRtgQueryContractVerification` | `ExecuteProjectedRtgQuery` | `executeProjectedFailureSemantics` | `components/rtg/query/tests/test_rtg_query_contract.py#ExecuteProjectedRtgQueryContractVerification` |
 | `RtgQueryBoundaryVerification` | `RtgQueryEngine` | `queryNoMutation`, `diagnosticsAreNonMutating`, `deterministicResults`, `deterministicStringMatching`, `publicGraphReadsOnly`, `operatesOverReadView`, `noHiddenLifecycleFilter`, `overlayFiltersOnly`, `defaultIncludesNonLive`, `discoveryIndependent`, `intentionalBoundary` | `components/rtg/query/tests/test_rtg_query_contract.py#RtgQueryBoundaryVerification` |
 
 Equivalent private algorithms, helpers, storage layouts, and implementation-language inheritance remain implementation choices.

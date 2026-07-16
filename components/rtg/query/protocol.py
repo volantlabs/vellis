@@ -27,6 +27,16 @@ type RtgQueryDiagnosticSeverity = Literal["warning", "info"]
 type RtgQueryAggregationFunction = Literal["count"]
 
 
+class RtgQueryValueAbsent:
+    """Python codec sentinel distinguishing an omitted predicate value from JSON null."""
+
+    __slots__ = ()
+    __vellis_codec_absent__ = True
+
+
+RTG_QUERY_VALUE_ABSENT = RtgQueryValueAbsent()
+
+
 @dataclass(frozen=True, slots=True)
 class RtgQueryAnchorBucket:
     name: str
@@ -53,7 +63,10 @@ class RtgQueryAggregation:
 class RtgQueryPropertyPredicate:
     path: tuple[str, ...]
     operator: RtgQueryOperator
-    value: JsonValue = None
+    value: JsonValue | RtgQueryValueAbsent = field(
+        default=RTG_QUERY_VALUE_ABSENT,
+        metadata={"vellis_codec": "omit_when_absent"},
+    )
     values: tuple[JsonScalar, ...] = ()
     case_sensitive: bool = False
     regex_flags: tuple[str, ...] = ()

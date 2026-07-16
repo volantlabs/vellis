@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import asyncio
+import tracemalloc
 from typing import cast
 from uuid import UUID, uuid4
 
@@ -18,13 +20,27 @@ from components.rtg.change_validation import (
     RtgSchemaDefinitionWrite,
     RtgValidationOptions,
 )
+from components.rtg.change_validation.projection import (
+    ValidationConstraintProjection,
+    ValidationGraphProjection,
+    ValidationMigrationProjection,
+    ValidationSchemaProjection,
+)
+from components.rtg.change_validation.runtime_binding import _sparse_batch_sources
 from components.rtg.constraints import (
     InMemoryRtgConstraints,
     RtgConstraintCardinalityPayload,
     RtgConstraintDefinition,
+    RtgConstraintDefinitionList,
     RtgConstraintQueryPatternPayload,
 )
-from components.rtg.graph import InMemoryRtgGraph, RtgAnchor, RtgDataObject, RtgLink
+from components.rtg.graph import (
+    InMemoryRtgGraph,
+    RtgAnchor,
+    RtgDataObject,
+    RtgLink,
+    RtgObjectList,
+)
 from components.rtg.migration import (
     InMemoryRtgMigration,
     RtgMigrationRecord,
@@ -43,13 +59,118 @@ from components.rtg.schema import (
     RtgDataObjectSchemaPayload,
     RtgLinkSchemaPayload,
     RtgSchemaDefinition,
+    RtgSchemaDefinitionList,
     RtgSchemaField,
 )
+from components.runtime.component_adapter import ComponentExecution, encode_json
+from components.runtime.messaging import ActionRef
 
 
 def concrete_uuid(value: UUID | None) -> UUID:
     assert value is not None
     return value
+
+
+def projected_empty_graph_sources(
+    schema: InMemoryRtgSchema,
+    constraints: InMemoryRtgConstraints,
+    migration: InMemoryRtgMigration,
+) -> tuple[
+    ValidationGraphProjection,
+    ValidationSchemaProjection,
+    ValidationConstraintProjection,
+    ValidationMigrationProjection,
+]:
+    """Build explicit invocation-local fixtures for tests that project mutations."""
+    return (
+        ValidationGraphProjection((), {}),
+        ValidationSchemaProjection(schema.list_definitions().definitions),
+        ValidationConstraintProjection(constraints.list_constraints().constraints),
+        ValidationMigrationProjection(migration.list_migrations().migrations),
+    )
+
+
+def test_sparse_batch_projection_does_not_read_unrelated_state() -> None:
+    class RecordingExecution:
+        def __init__(self, unrelated_records: int) -> None:
+            # Model a canonical store that already contains unrelated state. The
+            # invocation must not copy or enumerate this state.
+            self.unrelated_state = tuple(range(unrelated_records))
+            self.action_ids: list[str] = []
+
+        def address_for(self, instance_key: str) -> str:
+            return instance_key
+
+        async def call(
+            self,
+            _step_key: str,
+            action: object,
+            _arguments: dict[str, object],
+            *,
+            target: object,
+        ) -> object:
+            del target
+            action_id = cast(ActionRef, action).action_id
+            self.action_ids.append(action_id)
+            if action_id.endswith("list_definitions_by_type_key"):
+                return encode_json(
+                    RtgSchemaDefinitionList(
+                        (
+                            RtgSchemaDefinition(
+                                uuid=UUID("10000000-0000-0000-0000-000000000001"),
+                                kind="anchor",
+                                type_key="Task",
+                                description="Task.",
+                                payload=RtgAnchorSchemaPayload(),
+                            ),
+                        )
+                    )
+                )
+            if action_id.endswith("list_constraints_by_target"):
+                return encode_json(RtgConstraintDefinitionList(()))
+            if action_id.endswith("list_by_type"):
+                return encode_json(RtgObjectList(()))
+            raise AssertionError(f"unexpected non-targeted read: {action_id}")
+
+    batch = RtgChangeBatch(
+        graph_changes=RtgGraphChangeSet(
+            anchor_writes=(
+                RtgGraphAnchorWrite(
+                    RtgChangeReference(resource_id=UUID("20000000-0000-0000-0000-000000000001")),
+                    "Task",
+                ),
+            )
+        )
+    )
+
+    def measure(unrelated_records: int) -> tuple[tuple[str, ...], int]:
+        execution = RecordingExecution(unrelated_records)
+        tracemalloc.start()
+        try:
+            asyncio.run(
+                _sparse_batch_sources(
+                    cast(ComponentExecution, execution),
+                    batch,
+                    graph_instance_key="graph",
+                    schema_instance_key="schema",
+                    constraints_instance_key="constraints",
+                    migration_instance_key="migration",
+                )
+            )
+            _, peak_bytes = tracemalloc.get_traced_memory()
+        finally:
+            tracemalloc.stop()
+        return tuple(execution.action_ids), peak_bytes
+
+    small, small_peak_bytes = measure(1)
+    large, large_peak_bytes = measure(100_000)
+    assert small == large
+    assert len(small) == 3
+    assert large_peak_bytes <= small_peak_bytes * 3 + 100_000
+    assert all("snapshot" not in action_id for action_id in small)
+    assert all(not action_id.endswith(".list_definitions") for action_id in small)
+    assert all(not action_id.endswith(".list_constraints") for action_id in small)
+    assert all(not action_id.endswith(".list_migrations") for action_id in small)
 
 
 def _validate_refined_value(value: str | int | float | bool | None, field: RtgSchemaField) -> bool:
@@ -92,6 +213,9 @@ def _validate_refined_value(value: str | int | float | bool | None, field: RtgSc
 
 
 MODEL_EVIDENCE = {
+    "RtgChangeValidationScalingVerification": (
+        "test_sparse_batch_projection_does_not_read_unrelated_state",
+    ),
     "ValidateRtgChangeBatchContractVerification": (
         "test_validation_rejects_malformed_proposed_data_batch",
         "test_validation_reports_an_unprojectable_delete_as_a_blocking_finding",
@@ -464,11 +588,11 @@ def test_validation_rejects_malformed_proposed_data_batch() -> None:
 
 def test_validation_reports_an_unprojectable_delete_as_a_blocking_finding() -> None:
     missing = uuid4()
+    schema = build_schema()
     report = DeterministicRtgChangeValidator().validate_batch(
-        InMemoryRtgGraph.empty(),
-        build_schema(),
-        InMemoryRtgConstraints.empty(),
-        InMemoryRtgMigration.empty(),
+        *projected_empty_graph_sources(
+            schema, InMemoryRtgConstraints.empty(), InMemoryRtgMigration.empty()
+        ),
         SimpleRtgQueryEngine(),
         RtgChangeBatch(
             graph_changes=RtgGraphChangeSet(
@@ -484,9 +608,10 @@ def test_validation_reports_an_unprojectable_delete_as_a_blocking_finding() -> N
 
 
 def test_unselected_malformed_sections_do_not_affect_selected_track() -> None:
+    schema = build_schema()
     report = DeterministicRtgChangeValidator().validate_batch(
-        InMemoryRtgGraph.empty(),
-        build_schema(),
+        ValidationGraphProjection((), {}),
+        ValidationSchemaProjection(schema.list_definitions().definitions),
         object(),
         None,
         object(),
@@ -609,10 +734,7 @@ def test_migration_projection_reports_wrong_live_state() -> None:
     )
 
     report = DeterministicRtgChangeValidator().validate_graph_state(
-        InMemoryRtgGraph.empty(),
-        schema,
-        InMemoryRtgConstraints.empty(),
-        migration,
+        *projected_empty_graph_sources(schema, InMemoryRtgConstraints.empty(), migration),
         SimpleRtgQueryEngine(),
         migration_ids=("already-live",),
     )
@@ -651,10 +773,7 @@ def test_migration_projection_reports_replacement_type_mismatch_as_warning() -> 
     )
 
     report = DeterministicRtgChangeValidator().validate_graph_state(
-        InMemoryRtgGraph.empty(),
-        schema,
-        InMemoryRtgConstraints.empty(),
-        migration,
+        *projected_empty_graph_sources(schema, InMemoryRtgConstraints.empty(), migration),
         SimpleRtgQueryEngine(),
         migration_ids=("person-to-project",),
     )
@@ -702,10 +821,7 @@ def test_finding_limit_does_not_hide_blocking_acceptance() -> None:
     )
 
     report = DeterministicRtgChangeValidator().validate_graph_state(
-        InMemoryRtgGraph.empty(),
-        schema,
-        InMemoryRtgConstraints.empty(),
-        migration,
+        *projected_empty_graph_sources(schema, InMemoryRtgConstraints.empty(), migration),
         SimpleRtgQueryEngine(),
         migration_ids=("limited-findings",),
         validation_options=RtgValidationOptions(finding_limit=1),
@@ -783,10 +899,9 @@ def test_staged_migration_batch_validates_projected_cutover_state() -> None:
     )
 
     report = DeterministicRtgChangeValidator().validate_batch(
-        InMemoryRtgGraph.empty(),
-        schema,
-        InMemoryRtgConstraints.empty(),
-        InMemoryRtgMigration.empty(),
+        *projected_empty_graph_sources(
+            schema, InMemoryRtgConstraints.empty(), InMemoryRtgMigration.empty()
+        ),
         SimpleRtgQueryEngine(),
         batch,
     )

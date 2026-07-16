@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import ast
 import json
 import zipfile
 from pathlib import Path
+from typing import cast
 
 import pytest
 
@@ -14,6 +16,29 @@ ROOT = Path(__file__).resolve().parents[1]
 def test_repository_model_profile_and_generated_artifacts_are_current() -> None:
     assert model_tool.check("all") == []
     assert model_tool.check_generated() == []
+
+
+def test_resource_scaling_guard_rejects_routine_snapshot_and_store_copy(
+    tmp_path: Path,
+) -> None:
+    forbidden = tmp_path / "routine.py"
+    forbidden.write_text(
+        "import copy\n"
+        "def apply_batch(self):\n"
+        "    before = self.export_snapshot()\n"
+        "    duplicate = copy.deepcopy(self._definitions)\n"
+        "    return before, duplicate\n",
+        encoding="utf-8",
+    )
+
+    messages = [
+        finding.message for finding in model_tool._check_resource_scaling_antipatterns((forbidden,))
+    ]
+
+    assert any("whole-state export_snapshot" in message for message in messages)
+    assert any(
+        "deep-copies complete canonical store _definitions" in message for message in messages
+    )
 
 
 def test_bibliotek_model_has_all_thirteen_component_identities() -> None:
@@ -32,7 +57,7 @@ def test_vellis_has_nine_bibliotek_roles_and_exact_mcp_surface() -> None:
     manifest = json.loads(model_layout.GENERATED_MANIFEST.read_text(encoding="utf-8"))
     assert model_descriptions == {tool["name"]: tool["description"] for tool in manifest["tools"]}
     assert len(set(model_tool._model_operation_ids())) == 27
-    assert manifest["schema_version"] == 3
+    assert manifest["schema_version"] == 4
     assert manifest["runtime"]["runtime_key"] == "vellis.rtg_knowledge_graph"
     assert "compatibility" not in manifest
     assert len(manifest["occurrences"]) == 12
@@ -43,8 +68,7 @@ def test_vellis_has_nine_bibliotek_roles_and_exact_mcp_surface() -> None:
             "implementation_binding",
             "runtime_binding_id",
             "binding_version",
-            "queue_capacity",
-            "max_in_flight",
+            "lanes",
             "configuration_references",
             "replay_authority",
         }
@@ -53,13 +77,17 @@ def test_vellis_has_nine_bibliotek_roles_and_exact_mcp_surface() -> None:
     )
     occurrences = {item["instance_key"]: item for item in manifest["occurrences"]}
     assert "vellis.storage.sql.primary" not in occurrences
-    assert occurrences["vellis.controller.primary"]["replay_authority"] == "canonical_effect"
-    for source_key in (
-        "vellis.interface.mcp",
-        "vellis.starter_ontology.installer",
-        "vellis.runner.local",
+    assert occurrences["vellis.controller.primary"]["replay_authority"] == "coordinator_trace"
+    assert occurrences["vellis.interface.mcp"]["lanes"] == [
+        {"name": "ingress", "queue_capacity": 128, "worker_limit": 8}
+    ]
+    for source_key, lane_name in (
+        ("vellis.starter_ontology.installer", "installer"),
+        ("vellis.runner.local", "runner"),
     ):
-        assert occurrences[source_key]["queue_capacity"] == 1
+        assert occurrences[source_key]["lanes"] == [
+            {"name": lane_name, "queue_capacity": 8, "worker_limit": 1}
+        ]
 
 
 def test_vellis_runtime_manifest_occurrences_are_model_authored() -> None:
@@ -94,8 +122,10 @@ def test_vellis_runtime_occurrence_projection_fails_on_missing_model_field(
     contract_path = (
         model_root / "bibliotek" / "components" / "component.runtime.message_runtime.sysml"
     )
+    messaging_path = model_root / "bibliotek" / "shared-values" / "RuntimeMessaging.sysml"
     runtime_path.parent.mkdir(parents=True)
     contract_path.parent.mkdir(parents=True)
+    messaging_path.parent.mkdir(parents=True)
     runtime_source = (
         ROOT / "model" / "vellis" / "realizations" / "VellisRuntimePython.sysml"
     ).read_text(encoding="utf-8")
@@ -109,12 +139,14 @@ def test_vellis_runtime_occurrence_projection_fails_on_missing_model_field(
     )
     contract_path.write_text(
         (
-            ROOT
-            / "model"
-            / "bibliotek"
-            / "components"
-            / "component.runtime.message_runtime.sysml"
+            ROOT / "model" / "bibliotek" / "components" / "component.runtime.message_runtime.sysml"
         ).read_text(encoding="utf-8"),
+        encoding="utf-8",
+    )
+    messaging_path.write_text(
+        (ROOT / "model" / "bibliotek" / "shared-values" / "RuntimeMessaging.sysml").read_text(
+            encoding="utf-8"
+        ),
         encoding="utf-8",
     )
     monkeypatch.setattr(model_tool, "MODEL_ROOT", model_root)
@@ -142,7 +174,7 @@ def test_formal_validator_is_pinned_and_covers_every_authored_model() -> None:
         ]
         == "required"
     )
-    assert len(sysml_validator._model_files("all")) == 26
+    assert len(sysml_validator._model_files("all")) == 29
     assert all(path.exists() for path in sysml_validator._model_files("all"))
     assert model_layout.SOFTWARE_COMPONENT_PATTERN_PATH not in sysml_validator._model_files("all")
 
@@ -235,7 +267,7 @@ def test_generated_conformance_objectives_resolve_model_requirements_and_evidenc
 def test_official_parser_index_covers_authored_packages_and_public_definitions() -> None:
     index = json.loads(model_layout.GENERATED_FORMAL_INDEX.read_text(encoding="utf-8"))
 
-    assert len(index["authored_packages"]) == 26
+    assert len(index["authored_packages"]) == 29
     assert "SoftwareComponentPattern" not in index["authored_packages"]
     assert set(index["packages"]) == set(index["authored_packages"])
     assert {
@@ -420,6 +452,55 @@ def test_evidence_groups_reject_duplicate_missing_and_non_test_symbols(
     assert model_tool._evidence_test_nodes("test_evidence.py::helper#ExplicitVerification") == []
 
 
+def test_evidence_helpers_parse_each_test_file_version_once(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    evidence = tmp_path / "test_evidence.py"
+    evidence.write_text(
+        "MODEL_EVIDENCE = {'ExampleVerification': ('test_example',)}\n"
+        "def test_example() -> None:\n    assert True\n",
+        encoding="utf-8",
+    )
+    parse = ast.parse
+    parse_calls = 0
+
+    def counted_parse(source: str) -> ast.Module:
+        nonlocal parse_calls
+        parse_calls += 1
+        return parse(source)
+
+    monkeypatch.setattr(model_tool.ast, "parse", counted_parse)
+
+    assert model_tool._test_functions(evidence) == ["test_example"]
+    assert model_tool._evidence_group_map(evidence) == {"ExampleVerification": ("test_example",)}
+    assert not model_tool._is_evidence_wrapper(evidence, "test_example")
+    assert parse_calls == 1
+
+    evidence.write_text("def test_replaced() -> None:\n    assert True\n", encoding="utf-8")
+
+    assert model_tool._test_functions(evidence) == ["test_replaced"]
+    assert parse_calls == 2
+
+
+def test_evidence_resolution_rejects_tests_that_only_call_other_tests(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    evidence = tmp_path / "test_evidence.py"
+    evidence.write_text(
+        "MODEL_EVIDENCE = {'WrapperVerification': ('test_wrapper',)}\n"
+        "def test_substantive() -> None:\n    assert 1 + 1 == 2\n"
+        "def test_wrapper() -> None:\n    test_substantive()\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(model_tool, "ROOT", tmp_path)
+
+    assert model_tool._evidence_test_nodes("test_evidence.py#WrapperVerification") == []
+    assert model_tool._evidence_test_nodes("test_evidence.py::test_wrapper") == []
+    assert model_tool._evidence_test_nodes("test_evidence.py::test_substantive") == [
+        "test_evidence.py::test_substantive"
+    ]
+
+
 def test_generated_evidence_status_reports_resolution_not_execution(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -438,7 +519,10 @@ def test_generated_evidence_status_reports_resolution_not_execution(
     monkeypatch.setattr(model_tool, "ROOT", tmp_path)
     monkeypatch.setattr(model_tool, "_sysml_files", lambda _scope: [model])
 
-    groups = model_tool._verification_evidence_data()["groups"]
+    groups = cast(
+        dict[str, dict[str, object]],
+        model_tool._verification_evidence_data()["groups"],
+    )
 
     assert groups["test_evidence.py#KnownVerification"]["status"] == "resolved"
     assert groups["test_evidence.py#MissingVerification"]["status"] == "unresolved"
@@ -484,8 +568,9 @@ def test_model_audit_flattens_inherited_sysml_boundary_fields(tmp_path: Path) ->
     )
 
     boundary = model_tool._audit_model_boundary(model)
+    records = cast(dict[str, dict[str, object]], boundary["records"])
 
-    assert set(boundary["records"]["Child"]) == {"identity", "detail"}
+    assert set(records["Child"]) == {"identity", "detail"}
 
 
 def test_requirement_checker_rejects_documentation_only_and_incompatible_verification(
@@ -621,12 +706,14 @@ def test_native_view_packages_cover_library_and_application_concerns() -> None:
 
     assert "viewpoint def" not in bibliotek_views
     assert "view bibliotekComponentStructure" in bibliotek_views
-    assert "filter @SysML::SatisfyRequirementUsage" in bibliotek_views
+    assert "@SysML::SatisfyRequirementUsage or" in bibliotek_views
+    assert "diagram.bibliotek.component.rtg.schema.contract" in bibliotek_views
     assert "viewpoint def" not in vellis_views
     assert "view vellisUseCases" in vellis_views
-    assert "filter @SysML::BindingConnectorAsUsage" in vellis_views
+    assert "@SysML::BindingConnectorAsUsage or @SysML::AllocationUsage" in vellis_views
     assert "expose VellisLocalPythonRealization::**;" in vellis_views
     assert "expose VellisMcpPythonRealization::**;" in vellis_views
+    assert model_tool._check_view_semantics() == []
 
 
 def test_generated_artifact_checker_detects_staleness(
@@ -767,7 +854,7 @@ def test_model_handoff_names_complete_products_and_application_sources(
     ):
         assert source in application_output
     assert "apps/rtg_knowledge_graph/resources/everyday_life_schema.json" in application_output
-    assert "Verification: 33 structured objective(s)" in application_output
+    assert "Verification: 34 structured objective(s)" in application_output
 
 
 def test_model_packages_exclude_fixture_configuration_and_migration(

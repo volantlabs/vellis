@@ -33,6 +33,15 @@ package VellisEverydayLifeOntology {
         attribute ontology : EverydayLifeOntologyIdentity;
         attribute schemaDefinitionCount : Integer;
     }
+    enum def EverydayLifeOntologyState { enum empty; enum installed; enum custom; }
+    attribute def EverydayLifeOntologyStatus {
+        attribute ontologyId : String;
+        attribute version : String;
+        attribute status : EverydayLifeOntologyState;
+        attribute anchorTypeKeys[0..*] ordered : String;
+        attribute linkTypeKeys[0..*] ordered : String;
+        attribute recovery : String;
+    }
 
     attribute def PersonFacts { attribute name : String; attribute relationship[0..1] : String; attribute preferredContact[0..1] : String; attribute notes[0..1] : String; }
     attribute def GroupFacts { attribute name : String; attribute kind[0..1] : String; attribute description[0..1] : String; }
@@ -70,9 +79,11 @@ package VellisEverydayLifeOntology {
     item def Mentions { attribute typeKey : String = "mentions"; @StarterLinkDefinition { typeKey = "mentions"; description = "A note mentions another starter-schema anchor."; sourceTypes = ("Note"); targetTypes = ("Person", "Group", "Area", "Goal", "Project", "Task", "Event", "Routine", "Decision", "Note", "Resource", "Place"); } }
     item def DependsOn { attribute typeKey : String = "depends_on"; @StarterLinkDefinition { typeKey = "depends_on"; description = "An outcome or work item depends on another outcome or work item."; sourceTypes = ("Goal", "Project", "Task"); targetTypes = ("Goal", "Project", "Task"); } }
 
-    action def InstallEverydayLifeOntology { out result : EverydayLifeInstallationResult; doc /* Recover durable state first; on a genuinely empty graph, stage and strictly cut over the generated schema bundle as one atomic, ledgered bootstrap migration. */ }
+    action def InstallEverydayLifeOntology { in recovery : String default = "not_needed"; out result : EverydayLifeInstallationResult; doc /* Recover durable state first; on a genuinely empty graph, stage and strictly cut over the generated schema bundle as one atomic, ledgered bootstrap migration. */ }
+    action def GetEverydayLifeOntologyStatus { in recovery : String default = "not_checked"; out result : EverydayLifeOntologyStatus; doc /* Inspect installation status through targeted controller and schema reads without exporting a system snapshot. */ }
     part def EverydayLifeOntologyInstaller {
         perform action install[0..*] : InstallEverydayLifeOntology;
+        perform action getStatus[0..*] : GetEverydayLifeOntologyStatus;
     }
 
     requirement <'contract.vellis.everyday_life.schema_only'> schemaOnly { subject installation : InstallEverydayLifeOntology; require constraint { doc /* Installation creates schema definitions only and creates no user graph objects. */ } }

@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from typing import Any
-
 from components.rtg.schema.protocol import (
     RtgSchema,
     RtgSchemaDefinitionInvalid,
@@ -18,17 +16,14 @@ from components.rtg.schema.protocol import (
     RtgSchemaUuidInvalid,
 )
 from components.runtime.component_adapter import (
-    MethodBindingSpec,
-    MutableAdapterHost,
+    ComponentAdapter,
     ReplayStateBinding,
-    RuntimeActionIdempotency,
+    create_action_catalog,
     create_typed_component_adapter,
-    create_typed_proxy,
+    load_runtime_binding_resource,
 )
-from components.runtime.message_runtime import MessageRuntime, RuntimeAddress, RuntimeReplayMode
 
 _CONTRACT = "component.rtg.schema"
-_READ = RuntimeReplayMode.NO_STATE_EFFECT
 _FAILURES: dict[str, tuple[type[RtgSchemaError], ...]] = {
     "export_snapshot": (),
     "replace_snapshot": (
@@ -42,6 +37,18 @@ _FAILURES: dict[str, tuple[type[RtgSchemaError], ...]] = {
         RtgSchemaSystemValueInvalid,
         RtgSchemaLiveTypeConflict,
     ),
+    "apply_batch": (
+        RtgSchemaUuidInvalid,
+        RtgSchemaUuidConflict,
+        RtgSchemaDefinitionKindInvalid,
+        RtgSchemaTypeKeyInvalid,
+        RtgSchemaDefinitionInvalid,
+        RtgSchemaPayloadInvalid,
+        RtgSchemaSystemValueInvalid,
+        RtgSchemaLiveTypeConflict,
+        RtgSchemaDefinitionNotFound,
+    ),
+    "count_summary": (),
     "put_definition": (
         RtgSchemaUuidInvalid,
         RtgSchemaDefinitionKindInvalid,
@@ -52,10 +59,11 @@ _FAILURES: dict[str, tuple[type[RtgSchemaError], ...]] = {
         RtgSchemaLiveTypeConflict,
     ),
     "get_definition": (RtgSchemaDefinitionNotFound,),
-    "list_definitions": (RtgSchemaDefinitionKindInvalid,),
+    "list_definitions": (RtgSchemaDefinitionKindInvalid, RtgSchemaPayloadInvalid),
     "list_definitions_by_type_key": (
         RtgSchemaTypeKeyInvalid,
         RtgSchemaDefinitionKindInvalid,
+        RtgSchemaPayloadInvalid,
     ),
     "list_anchor_data_type_keys": (
         RtgSchemaTypeKeyInvalid,
@@ -69,102 +77,19 @@ _FAILURES: dict[str, tuple[type[RtgSchemaError], ...]] = {
     "get_schema_pack": (RtgSchemaTypeKeyInvalid, RtgSchemaDefinitionNotFound),
     "delete_definition": (RtgSchemaDefinitionNotFound,),
 }
-_SPECS = (
-    MethodBindingSpec(
-        "export_snapshot",
-        _READ,
-        RuntimeActionIdempotency.IDEMPOTENT,
-        failure_types=_FAILURES["export_snapshot"],
-    ),
-    MethodBindingSpec(
-        "replace_snapshot",
-        RuntimeReplayMode.CANONICAL_EFFECT,
-        RuntimeActionIdempotency.IDEMPOTENT,
-        failure_types=_FAILURES["replace_snapshot"],
-    ),
-    MethodBindingSpec(
-        "put_definition",
-        RuntimeReplayMode.CANONICAL_EFFECT,
-        RuntimeActionIdempotency.NON_IDEMPOTENT,
-        resolved_argument_from_result="definition",
-        failure_types=_FAILURES["put_definition"],
-    ),
-    MethodBindingSpec(
-        "get_definition",
-        _READ,
-        RuntimeActionIdempotency.IDEMPOTENT,
-        failure_types=_FAILURES["get_definition"],
-    ),
-    MethodBindingSpec(
-        "list_definitions",
-        _READ,
-        RuntimeActionIdempotency.IDEMPOTENT,
-        failure_types=_FAILURES["list_definitions"],
-    ),
-    MethodBindingSpec(
-        "list_definitions_by_type_key",
-        _READ,
-        RuntimeActionIdempotency.IDEMPOTENT,
-        failure_types=_FAILURES["list_definitions_by_type_key"],
-    ),
-    MethodBindingSpec(
-        "list_anchor_data_type_keys",
-        _READ,
-        RuntimeActionIdempotency.IDEMPOTENT,
-        failure_types=_FAILURES["list_anchor_data_type_keys"],
-    ),
-    MethodBindingSpec(
-        "list_link_participation",
-        _READ,
-        RuntimeActionIdempotency.IDEMPOTENT,
-        failure_types=_FAILURES["list_link_participation"],
-    ),
-    MethodBindingSpec(
-        "list_anchor_type_summaries",
-        _READ,
-        RuntimeActionIdempotency.IDEMPOTENT,
-        failure_types=_FAILURES["list_anchor_type_summaries"],
-    ),
-    MethodBindingSpec(
-        "get_schema_pack",
-        _READ,
-        RuntimeActionIdempotency.IDEMPOTENT,
-        failure_types=_FAILURES["get_schema_pack"],
-    ),
-    MethodBindingSpec(
-        "delete_definition",
-        RuntimeReplayMode.CANONICAL_EFFECT,
-        RuntimeActionIdempotency.NON_IDEMPOTENT,
-        failure_types=_FAILURES["delete_definition"],
-    ),
-)
+_RUNTIME_BINDING = load_runtime_binding_resource(__package__, failure_types=_FAILURES)
+RTG_SCHEMA_ACTIONS = create_action_catalog(_RUNTIME_BINDING)
 
 
 def create_rtg_schema_adapter(
-    schema: RtgSchema | MutableAdapterHost[Any],
+    schema: RtgSchema,
     *,
     replay_state: ReplayStateBinding | None = None,
-):
+) -> ComponentAdapter:
     return create_typed_component_adapter(
         schema,
         RtgSchema,
-        component_contract_id=_CONTRACT,
-        binding_id="binding.python.rtg.schema.v1",
-        specs=_SPECS,
+        binding=_RUNTIME_BINDING,
         failure_types=(RtgSchemaError,),
         replay_state=replay_state,
-    )
-
-
-def create_rtg_schema_proxy(
-    runtime: MessageRuntime, source: RuntimeAddress, target: RuntimeAddress
-) -> RtgSchema:
-    return create_typed_proxy(
-        runtime,
-        source,
-        target,
-        RtgSchema,
-        component_contract_id=_CONTRACT,
-        specs=_SPECS,
-        failure_types=(RtgSchemaError,),
     )

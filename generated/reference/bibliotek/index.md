@@ -4,6 +4,8 @@ Generated from textual SysML v2 by `just model-render` as a non-normative readin
 
 Bibliotek is a reusable SysML library package. It imports the generic modeling foundation privately and publicly exposes its supported component and shared-value packages. It has no dependency on Vellis or its realizations.
 
+Review the cross-model [architecture projections](../architecture/index.md) for package layers, component context, application composition, runtime topology, and traceability matrices.
+
 ## Components
 
 | Component | Status | Generated view |
@@ -21,6 +23,17 @@ Bibliotek is a reusable SysML library package. It imports the generic modeling f
 | `component.runtime.message_runtime` | `accepted` | [component view](components/component.runtime.message_runtime.md) |
 | `component.storage.json_file` | `accepted` | [component view](components/component.storage.json_file.md) |
 | `component.storage.sql` | `accepted` | [component view](components/component.storage.sql.md) |
+
+## Diagrams
+
+| Diagram ID | SVG | PlantUML |
+|---|---|---|
+| `diagram.bibliotek.component.rtg.constraints.contract` | [diagram](diagrams/component.rtg.constraints.contract.svg) | [source](diagrams/component.rtg.constraints.contract.puml) |
+| `diagram.bibliotek.component.rtg.discovery.contract` | [diagram](diagrams/component.rtg.discovery.contract.svg) | [source](diagrams/component.rtg.discovery.contract.puml) |
+| `diagram.bibliotek.component.rtg.migration.contract` | [diagram](diagrams/component.rtg.migration.contract.svg) | [source](diagrams/component.rtg.migration.contract.puml) |
+| `diagram.bibliotek.component.rtg.schema.contract` | [diagram](diagrams/component.rtg.schema.contract.svg) | [source](diagrams/component.rtg.schema.contract.puml) |
+| `diagram.bibliotek.component.storage.json_file.contract` | [diagram](diagrams/component.storage.json_file.contract.svg) | [source](diagrams/component.storage.json_file.contract.puml) |
+| `diagram.bibliotek.component.storage.sql.contract` | [diagram](diagrams/component.storage.sql.contract.svg) | [source](diagrams/component.storage.sql.contract.puml) |
 
 ## Shared public packages
 

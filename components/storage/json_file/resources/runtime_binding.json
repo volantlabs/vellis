@@ -1,0 +1,604 @@
+{
+  "actions": [
+    {
+      "action_id": "component.storage.json_file.write",
+      "binding_id": "binding.python.storage.json_file.v1",
+      "binding_version": 1,
+      "canonical_effect_codec_id": null,
+      "canonical_effect_codec_version": null,
+      "canonical_effect_schema_version": null,
+      "concurrency_lane": "serialized",
+      "consistency_access": "independent",
+      "consistency_group": null,
+      "deadline_seconds": null,
+      "effect_payload_disposition": null,
+      "externally_effectful": true,
+      "failure_codec_id": "codec.python.component.storage.json_file.failure.json",
+      "failure_codec_version": 1,
+      "failure_dispositions": {},
+      "failure_names": [
+        "StoragePathInvalid",
+        "JsonValueNotSerializable",
+        "StoragePermissionDenied",
+        "StorageWriteFailed"
+      ],
+      "fault_payload_disposition": "diagnostic",
+      "fault_schema": {
+        "oneOf": [
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          }
+        ]
+      },
+      "idempotency": "non_idempotent",
+      "method_name": "write",
+      "modeled_fault_trace_disposition": "aborted",
+      "recovery_authorized": false,
+      "replay_mode": "external_exchange",
+      "request_arguments": [
+        {
+          "default": null,
+          "name": "relative_path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "default": null,
+          "name": "json_value",
+          "required": true,
+          "schema": {}
+        }
+      ],
+      "request_codec_id": "codec.python.component.storage.json_file.request.json",
+      "request_codec_version": 1,
+      "request_payload_disposition": "external_document",
+      "request_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "json_value": {},
+          "relative_path": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "relative_path",
+          "json_value"
+        ],
+        "type": "object"
+      },
+      "resolved_argument_from_result": null,
+      "result_codec_id": "codec.python.component.storage.json_file.result.json",
+      "result_codec_version": 1,
+      "result_payload_disposition": "query_result",
+      "result_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "modified_at": {
+            "type": "string"
+          },
+          "relative_path": {
+            "type": "string"
+          },
+          "size_bytes": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "relative_path",
+          "size_bytes",
+          "modified_at"
+        ],
+        "type": "object"
+      },
+      "schema_version": 1
+    },
+    {
+      "action_id": "component.storage.json_file.read",
+      "binding_id": "binding.python.storage.json_file.v1",
+      "binding_version": 1,
+      "canonical_effect_codec_id": null,
+      "canonical_effect_codec_version": null,
+      "canonical_effect_schema_version": null,
+      "concurrency_lane": "serialized",
+      "consistency_access": "independent",
+      "consistency_group": null,
+      "deadline_seconds": null,
+      "effect_payload_disposition": null,
+      "externally_effectful": false,
+      "failure_codec_id": "codec.python.component.storage.json_file.failure.json",
+      "failure_codec_version": 1,
+      "failure_dispositions": {},
+      "failure_names": [
+        "StoragePathInvalid",
+        "JsonDocumentNotFound",
+        "JsonDocumentInvalid",
+        "StoragePermissionDenied",
+        "StorageReadFailed"
+      ],
+      "fault_payload_disposition": "diagnostic",
+      "fault_schema": {
+        "oneOf": [
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          }
+        ]
+      },
+      "idempotency": "idempotent",
+      "method_name": "read",
+      "modeled_fault_trace_disposition": "aborted",
+      "recovery_authorized": false,
+      "replay_mode": "external_exchange",
+      "request_arguments": [
+        {
+          "default": null,
+          "name": "relative_path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "request_codec_id": "codec.python.component.storage.json_file.request.json",
+      "request_codec_version": 1,
+      "request_payload_disposition": "command",
+      "request_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "relative_path": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "relative_path"
+        ],
+        "type": "object"
+      },
+      "resolved_argument_from_result": null,
+      "result_codec_id": "codec.python.component.storage.json_file.result.json",
+      "result_codec_version": 1,
+      "result_payload_disposition": "external_document",
+      "result_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "metadata": {
+            "additionalProperties": false,
+            "properties": {
+              "modified_at": {
+                "type": "string"
+              },
+              "relative_path": {
+                "type": "string"
+              },
+              "size_bytes": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "relative_path",
+              "size_bytes",
+              "modified_at"
+            ],
+            "type": "object"
+          },
+          "value": {}
+        },
+        "required": [
+          "value",
+          "metadata"
+        ],
+        "type": "object"
+      },
+      "schema_version": 1
+    },
+    {
+      "action_id": "component.storage.json_file.delete",
+      "binding_id": "binding.python.storage.json_file.v1",
+      "binding_version": 1,
+      "canonical_effect_codec_id": null,
+      "canonical_effect_codec_version": null,
+      "canonical_effect_schema_version": null,
+      "concurrency_lane": "serialized",
+      "consistency_access": "independent",
+      "consistency_group": null,
+      "deadline_seconds": null,
+      "effect_payload_disposition": null,
+      "externally_effectful": true,
+      "failure_codec_id": "codec.python.component.storage.json_file.failure.json",
+      "failure_codec_version": 1,
+      "failure_dispositions": {},
+      "failure_names": [
+        "StoragePathInvalid",
+        "JsonDocumentNotFound",
+        "StoragePermissionDenied",
+        "StorageDeleteFailed"
+      ],
+      "fault_payload_disposition": "diagnostic",
+      "fault_schema": {
+        "oneOf": [
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          }
+        ]
+      },
+      "idempotency": "non_idempotent",
+      "method_name": "delete",
+      "modeled_fault_trace_disposition": "aborted",
+      "recovery_authorized": false,
+      "replay_mode": "external_exchange",
+      "request_arguments": [
+        {
+          "default": null,
+          "name": "relative_path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "request_codec_id": "codec.python.component.storage.json_file.request.json",
+      "request_codec_version": 1,
+      "request_payload_disposition": "command",
+      "request_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "relative_path": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "relative_path"
+        ],
+        "type": "object"
+      },
+      "resolved_argument_from_result": null,
+      "result_codec_id": "codec.python.component.storage.json_file.result.json",
+      "result_codec_version": 1,
+      "result_payload_disposition": "query_result",
+      "result_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "modified_at": {
+            "type": "string"
+          },
+          "relative_path": {
+            "type": "string"
+          },
+          "size_bytes": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "relative_path",
+          "size_bytes",
+          "modified_at"
+        ],
+        "type": "object"
+      },
+      "schema_version": 1
+    },
+    {
+      "action_id": "component.storage.json_file.list",
+      "binding_id": "binding.python.storage.json_file.v1",
+      "binding_version": 1,
+      "canonical_effect_codec_id": null,
+      "canonical_effect_codec_version": null,
+      "canonical_effect_schema_version": null,
+      "concurrency_lane": "serialized",
+      "consistency_access": "independent",
+      "consistency_group": null,
+      "deadline_seconds": null,
+      "effect_payload_disposition": null,
+      "externally_effectful": false,
+      "failure_codec_id": "codec.python.component.storage.json_file.failure.json",
+      "failure_codec_version": 1,
+      "failure_dispositions": {},
+      "failure_names": [
+        "StoragePathInvalid",
+        "StorageDirectoryNotFound",
+        "StoragePermissionDenied",
+        "StorageReadFailed"
+      ],
+      "fault_payload_disposition": "diagnostic",
+      "fault_schema": {
+        "oneOf": [
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          }
+        ]
+      },
+      "idempotency": "idempotent",
+      "method_name": "list",
+      "modeled_fault_trace_disposition": "aborted",
+      "recovery_authorized": false,
+      "replay_mode": "external_exchange",
+      "request_arguments": [
+        {
+          "default": ".",
+          "name": "relative_directory_path",
+          "required": false,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "default": 0,
+          "name": "offset",
+          "required": false,
+          "schema": {
+            "type": "integer"
+          }
+        },
+        {
+          "default": 100,
+          "name": "limit",
+          "required": false,
+          "schema": {
+            "type": "integer"
+          }
+        }
+      ],
+      "request_codec_id": "codec.python.component.storage.json_file.request.json",
+      "request_codec_version": 1,
+      "request_payload_disposition": "command",
+      "request_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "limit": {
+            "type": "integer"
+          },
+          "offset": {
+            "type": "integer"
+          },
+          "relative_directory_path": {
+            "type": "string"
+          }
+        },
+        "required": [],
+        "type": "object"
+      },
+      "resolved_argument_from_result": null,
+      "result_codec_id": "codec.python.component.storage.json_file.result.json",
+      "result_codec_version": 1,
+      "result_payload_disposition": "query_result",
+      "result_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "documents": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "modified_at": {
+                  "type": "string"
+                },
+                "relative_path": {
+                  "type": "string"
+                },
+                "size_bytes": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "relative_path",
+                "size_bytes",
+                "modified_at"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "next_offset": {
+            "type": "integer"
+          },
+          "total": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "total",
+          "next_offset"
+        ],
+        "type": "object"
+      },
+      "schema_version": 1
+    }
+  ],
+  "binding_id": "binding.python.storage.json_file.v1",
+  "binding_version": 1,
+  "component_contract_id": "component.storage.json_file",
+  "schema_version": 1,
+  "source_contract_id": "component.storage.json_file"
+}

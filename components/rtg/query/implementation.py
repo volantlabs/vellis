@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import itertools
-from typing import Any
+from typing import Any, cast
 from uuid import UUID
 
 import re2
@@ -465,12 +465,13 @@ def _predicate_matches(properties: JsonObject, predicate: RtgQueryPropertyPredic
         return found
     if not found:
         return False
+    expected_value = cast(JsonValue, predicate.value)
     if predicate.operator == "equals":
-        return _json_equal(actual, predicate.value)
+        return _json_equal(actual, expected_value)
     if predicate.operator == "not_equals":
-        return not _json_equal(actual, predicate.value)
+        return not _json_equal(actual, expected_value)
     if predicate.operator in {"lt", "lte", "gt", "gte"}:
-        expected = predicate.value
+        expected = expected_value
         if isinstance(actual, bool) or isinstance(expected, bool):
             return False
         if isinstance(actual, str) and isinstance(expected, str):
@@ -480,7 +481,7 @@ def _predicate_matches(properties: JsonObject, predicate: RtgQueryPropertyPredic
         return False
     if predicate.operator == "contains":
         return isinstance(actual, list) and any(
-            _json_equal(item, predicate.value) for item in actual
+            _json_equal(item, expected_value) for item in actual
         )
     if predicate.operator == "in":
         return any(_json_equal(actual, item) for item in predicate.values)
@@ -928,6 +929,15 @@ def _validate_spec(query_spec: RtgQuerySpec) -> None:
                         },
                         guide_topics=("workflow_patterns", "query_examples"),
                     ),
+                )
+            if (
+                predicate.operator not in {"exists", "in"}
+                and getattr(predicate.value, "__vellis_codec_absent__", False) is True
+            ):
+                raise _invalid(
+                    f"predicate operator {predicate.operator!r} requires value",
+                    path="query_spec.data_requirements.predicates.value",
+                    remedy="Provide value explicitly; use JSON null when null is intended.",
                 )
     if query_spec.diagnostic_options.unknown_term_guidance not in {
         "none",

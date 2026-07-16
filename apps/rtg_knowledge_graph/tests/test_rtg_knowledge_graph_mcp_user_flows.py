@@ -2,13 +2,18 @@ from __future__ import annotations
 
 import asyncio
 import json
+import sqlite3
+import sys
 from collections.abc import Awaitable, Callable
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any, cast
 
+import pytest
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
+
+pytestmark = pytest.mark.integration
 
 JsonObject = dict[str, Any]
 
@@ -38,7 +43,7 @@ EXPECTED_TOOLS = {
     "rtg_replay_ledger",
     "rtg_verify_replay_from_ledger",
     "rtg_list_migration_history",
-    "rtg_flush_ledger_failures",
+    "rtg_get_operation_outcome",
     "rtg_restore_from_snapshot",
 }
 
@@ -82,7 +87,6 @@ PROJECT_TITLES_BY_REF = {
 MODEL_EVIDENCE = {
     "RtgGetUsageGuideContractVerification": (
         "test_individual_rtg_mcp_suite_manages_multi_domain_life_graph",
-        "test_individual_rtg_mcp_suite_recovers_from_realistic_agent_mistakes",
     ),
     "RtgStageSchemaMigrationContractVerification": (
         "test_individual_rtg_mcp_suite_recovers_from_realistic_agent_mistakes",
@@ -110,9 +114,7 @@ MODEL_EVIDENCE = {
         "test_individual_rtg_mcp_suite_recovers_from_realistic_agent_mistakes",
     ),
     "RtgAbandonMigrationContractVerification": (
-        "test_individual_rtg_mcp_suite_manages_multi_domain_life_graph",
         "test_individual_rtg_mcp_suite_recovers_from_realistic_agent_mistakes",
-        "test_individual_rtg_mcp_suite_reconstructs_automatically_after_server_restart",
     ),
     "RtgExecuteQueryContractVerification": (
         "test_individual_rtg_mcp_suite_manages_multi_domain_life_graph",
@@ -165,7 +167,7 @@ MODEL_EVIDENCE = {
     "RtgListMigrationHistoryContractVerification": (
         "test_individual_rtg_mcp_suite_recovers_from_realistic_agent_mistakes",
     ),
-    "RtgFlushLedgerFailuresContractVerification": (
+    "RtgGetOperationOutcomeContractVerification": (
         "test_individual_rtg_mcp_suite_manages_multi_domain_life_graph",
     ),
     "RtgRestoreFromSnapshotContractVerification": (
@@ -182,6 +184,14 @@ MODEL_EVIDENCE = {
 def test_individual_rtg_mcp_suite_manages_multi_domain_life_graph(tmp_path: Path) -> None:
     async def run_flow(session: ClientSession, storage_root: Path) -> None:
         assert EXPECTED_TOOLS <= await _tool_names(session)
+
+        guide = await _call_tool(
+            session,
+            "rtg_get_usage_guide",
+            {"topic": "workflow_patterns"},
+        )
+        assert guide["ok"] is True
+        assert guide["result"]["topic"] == "workflow_patterns"
 
         await _bootstrap_individual_schema(session)
         await _ingest_individual_graph(session)
@@ -281,6 +291,7 @@ def test_individual_rtg_mcp_suite_manages_multi_domain_life_graph(tmp_path: Path
                     },
                 },
                 "query_options": {"live_filter": "live"},
+                "response_options": {"format": "full"},
             },
         )
         assert _returned_property_values(vellis_project_support, "task_facts", "title") == {
@@ -333,6 +344,7 @@ def test_individual_rtg_mcp_suite_manages_multi_domain_life_graph(tmp_path: Path
                     },
                 },
                 "query_options": {"live_filter": "live"},
+                "response_options": {"format": "full"},
             },
         )
         assert len(cross_domain_summary["result"]["bindings"]) == 4
@@ -358,7 +370,28 @@ def test_individual_rtg_mcp_suite_manages_multi_domain_life_graph(tmp_path: Path
         assert persisted["result"]["status"] == "snapshot_persisted"
         assert (storage_root / "snapshots" / "individual-rtg-open-source.json").is_file()
 
-        await _add_valid_task(
+        snapshot_listing = await _call_tool(session, "rtg_list_persisted_snapshots", {})
+        assert snapshot_listing["ok"] is True
+        assert {item["relative_path"] for item in snapshot_listing["result"]["snapshots"]} >= {
+            "snapshots/individual-rtg-open-source.json"
+        }
+
+        loaded_snapshot = await _call_tool(
+            session,
+            "rtg_load_persisted_snapshot",
+            {
+                "relative_path": "snapshots/individual-rtg-open-source.json",
+                "return_snapshot": False,
+            },
+        )
+        assert loaded_snapshot["ok"] is True
+        assert loaded_snapshot["result"]["relative_path"] == (
+            "snapshots/individual-rtg-open-source.json"
+        )
+        assert "snapshot" not in loaded_snapshot["result"]
+        assert sum(loaded_snapshot["result"]["summary"]["graph_counts"]["anchor"].values()) == 29
+
+        sudden_task = await _add_valid_task(
             session,
             task_ref="task-sudden-purchase",
             fact_ref="task-sudden-purchase-facts",
@@ -370,6 +403,7 @@ def test_individual_rtg_mcp_suite_manages_multi_domain_life_graph(tmp_path: Path
             context="desk",
             project_ref="project-vellis-beta",
         )
+        assert sudden_task["ok"] is True, sudden_task
         assert await _task_count(session) == 9
 
         restored = await _call_tool(
@@ -401,12 +435,17 @@ def test_individual_rtg_mcp_suite_manages_multi_domain_life_graph(tmp_path: Path
         assert replay_verification["result"]["status"] == "isolated_reconstruction_required"
         assert replay_verification["result"]["verified"] is False
 
-        flush = await _call_tool(session, "rtg_flush_ledger_failures", {})
-        assert flush["ok"] is True
-        assert flush["result"]["status"] == "runtime_healthy"
-        assert flush["result"]["details"]["queued_degraded_records"] == 0
+        outcome = await _call_tool(
+            session,
+            "rtg_get_operation_outcome",
+            {"message_id": "00000000-0000-0000-0000-000000000001"},
+        )
+        assert outcome["ok"] is True
+        assert outcome["result"]["status"] == "unknown"
 
-    asyncio.run(_run_with_mcp_server(tmp_path, run_flow))
+    runtime_database_path = asyncio.run(_run_with_mcp_server(tmp_path, run_flow))
+    _assert_runtime_trace_integrity(runtime_database_path)
+    assert runtime_database_path.stat().st_size <= 5 * 1024 * 1024
 
 
 def test_individual_rtg_mcp_suite_recovers_from_realistic_agent_mistakes(
@@ -538,7 +577,7 @@ def test_individual_rtg_mcp_suite_recovers_from_realistic_agent_mistakes(
             context="laptop",
             project_ref="project-vellis-beta",
         )
-        assert repaired["ok"] is True
+        assert repaired["ok"] is True, json.dumps(repaired, indent=2, sort_keys=True)
         assert await _task_count(session) == baseline_task_count + 1
 
         old_project_facts_uuid = await _schema_uuid_for_data_type(
@@ -610,11 +649,48 @@ def test_individual_rtg_mcp_suite_recovers_from_realistic_agent_mistakes(
         )
         assert current_project_facts_uuid == old_project_facts_uuid
 
+        history_before_abandon = await _call_tool(session, "rtg_list_migration_history", {})
+        assert history_before_abandon["ok"] is True
+        migration_events = [
+            event
+            for event in history_before_abandon["result"]["events"]
+            if event["migration_id"] == migration_uuid
+        ]
+        assert [event["event_type"] for event in migration_events] == [
+            "knowledge_staged",
+            "cutover_requested",
+        ]
+
+        abandoned = await _call_tool(
+            session,
+            "rtg_abandon_migration",
+            {
+                "migration_id": migration_uuid,
+                "reason": "Controlled failed migration exercise complete.",
+            },
+        )
+        assert abandoned["ok"] is True
+        assert abandoned["result"]["status"] == "migration_abandoned"
+
+        history_after_abandon = await _call_tool(session, "rtg_list_migration_history", {})
+        assert history_after_abandon["ok"] is True
+        migration_events = [
+            event
+            for event in history_after_abandon["result"]["events"]
+            if event["migration_id"] == migration_uuid
+        ]
+        assert [event["event_type"] for event in migration_events] == [
+            "knowledge_staged",
+            "cutover_requested",
+            "migration_abandoned",
+        ]
+
         validation = await _call_tool(session, "rtg_validate_graph", {})
         assert validation["ok"] is True
         assert validation["result"]["accepted"] is True
 
-    asyncio.run(_run_with_mcp_server(tmp_path, run_flow))
+    runtime_database_path = asyncio.run(_run_with_mcp_server(tmp_path, run_flow))
+    _assert_runtime_trace_integrity(runtime_database_path)
 
 
 def test_individual_rtg_mcp_suite_reconstructs_automatically_after_server_restart(
@@ -653,6 +729,7 @@ def test_individual_rtg_mcp_suite_reconstructs_automatically_after_server_restar
             assert state["result"]["starter_schema"]["recovery"] == "runtime_reconstructed"
 
     asyncio.run(run_flow())
+    _assert_runtime_trace_integrity(tmp_path / "restart-runtime.sqlite")
 
 
 def test_manual_recovery_restart_accepts_replay_through_mcp(tmp_path: Path) -> None:
@@ -712,18 +789,89 @@ def test_manual_recovery_restart_accepts_replay_through_mcp(tmp_path: Path) -> N
             assert validation["result"]["accepted"] is True
 
     asyncio.run(run_flow())
+    _assert_runtime_trace_integrity(tmp_path / "manual-recovery-runtime.sqlite")
 
 
 async def _run_with_mcp_server(
     tmp_path: Path,
     flow: Callable[[ClientSession, Path], Awaitable[None]],
-) -> None:
+) -> Path:
     storage_root = tmp_path / "mcp-storage"
     runtime_database_path = tmp_path / "runtime.sqlite"
     async with _mcp_session(
         _server_params(tmp_path, storage_root, runtime_database_path)
     ) as session:
         await flow(session, storage_root)
+    return runtime_database_path
+
+
+def _assert_runtime_trace_integrity(runtime_database_path: Path) -> None:
+    with sqlite3.connect(runtime_database_path) as connection:
+        open_deliveries = connection.execute(
+            "SELECT COUNT(*) FROM runtime_messages "
+            "WHERE status NOT IN ('completed', 'faulted', 'indeterminate')"
+        ).fetchone()[0]
+        roots_without_terminal_trace = connection.execute(
+            "SELECT COUNT(*) FROM runtime_messages AS root "
+            "WHERE root.causation_id IS NULL AND NOT EXISTS ("
+            "SELECT 1 FROM runtime_ledger AS fact "
+            "WHERE fact.trace_id = root.trace_id AND fact.fact_type IN "
+            "('trace_committed', 'trace_aborted', 'trace_indeterminate'))"
+        ).fetchone()[0]
+        orphan_causation = connection.execute(
+            "SELECT COUNT(*) FROM runtime_messages AS child "
+            "WHERE child.causation_id IS NOT NULL AND NOT EXISTS ("
+            "SELECT 1 FROM runtime_messages AS parent "
+            "WHERE parent.message_id = child.causation_id)"
+        ).fetchone()[0]
+        orphan_correlation = connection.execute(
+            "SELECT COUNT(*) FROM runtime_messages AS terminal "
+            "WHERE terminal.kind IN ('response', 'fault') AND NOT EXISTS ("
+            "SELECT 1 FROM runtime_messages AS request "
+            "WHERE request.message_id = terminal.correlation_id "
+            "AND request.kind = 'request')"
+        ).fetchone()[0]
+        delivery_before_acceptance = connection.execute(
+            "SELECT COUNT(*) FROM runtime_ledger AS delivery "
+            "JOIN runtime_messages AS message ON message.message_id = delivery.message_id "
+            "WHERE delivery.fact_type = 'delivery_started' "
+            "AND delivery.runtime_position <= message.accepted_position"
+        ).fetchone()[0]
+        effects_without_terminal_trace = connection.execute(
+            "SELECT COUNT(*) FROM runtime_ledger AS effect "
+            "WHERE effect.fact_type = 'canonical_effect' AND NOT EXISTS ("
+            "SELECT 1 FROM runtime_ledger AS terminal "
+            "WHERE terminal.trace_id = effect.trace_id AND terminal.fact_type IN "
+            "('trace_committed', 'trace_aborted', 'trace_indeterminate'))"
+        ).fetchone()[0]
+        state_transfer_under_ordinary_root = connection.execute(
+            "WITH roots AS ("
+            "SELECT message.trace_id, json_extract(envelope.envelope_metadata_json, "
+            "'$.action_id') AS action_id FROM runtime_messages AS message "
+            "JOIN runtime_envelopes AS envelope USING (message_id) "
+            "WHERE message.kind = 'request' AND message.causation_id IS NULL), "
+            "transfers AS ("
+            "SELECT message.trace_id FROM runtime_messages AS message "
+            "JOIN runtime_envelopes AS envelope USING (message_id) "
+            "WHERE message.kind = 'request' AND ("
+            "json_extract(envelope.envelope_metadata_json, '$.action_id') LIKE "
+            "'%export_snapshot%' OR json_extract(envelope.envelope_metadata_json, "
+            "'$.action_id') LIKE '%replace_snapshot%')) "
+            "SELECT COUNT(*) FROM transfers JOIN roots USING (trace_id) "
+            "WHERE roots.action_id NOT IN ("
+            "'application.vellis.facade.rtg_export_system_snapshot', "
+            "'application.vellis.facade.rtg_persist_system_snapshot', "
+            "'application.vellis.facade.rtg_load_persisted_snapshot', "
+            "'application.vellis.facade.rtg_restore_from_snapshot')"
+        ).fetchone()[0]
+
+    assert open_deliveries == 0
+    assert roots_without_terminal_trace == 0
+    assert orphan_causation == 0
+    assert orphan_correlation == 0
+    assert delivery_before_acceptance == 0
+    assert effects_without_terminal_trace == 0
+    assert state_transfer_under_ordinary_root == 0
 
 
 def _server_params(
@@ -735,10 +883,6 @@ def _server_params(
 ) -> StdioServerParameters:
     repo_root = Path(__file__).resolve().parents[3]
     args = [
-        "--directory",
-        str(repo_root),
-        "run",
-        "python",
         "-m",
         "apps.rtg_knowledge_graph",
         "serve-mcp",
@@ -753,9 +897,9 @@ def _server_params(
     if manual_recovery:
         args.append("--manual-recovery")
     return StdioServerParameters(
-        command="uv",
+        command=sys.executable,
         args=args,
-        cwd=cwd,
+        cwd=repo_root,
     )
 
 
@@ -1451,7 +1595,7 @@ async def _task_count(session: ClientSession) -> int:
             "query_options": {"live_filter": "live"},
         },
     )
-    return len(result["result"]["bindings"])
+    return int(result["result"]["row_count"])
 
 
 async def _anchor_uuid_by_fact(
@@ -1479,6 +1623,7 @@ async def _anchor_uuid_by_fact(
                 ],
             },
             "query_options": {"live_filter": "live"},
+            "response_options": {"format": "full"},
         },
     )
     assert len(result["result"]["bindings"]) == 1
@@ -1514,7 +1659,8 @@ def _associated_schema_types(schema_pack: JsonObject) -> set[str]:
 
 
 def _returned_property_values(result: JsonObject, data_name: str, property_name: str) -> set[str]:
-    return {row["properties"][data_name][property_name] for row in result["result"]["returns"]}
+    rows = result["result"].get("returns", result["result"].get("rows", []))
+    return {row["properties"][data_name][property_name] for row in rows}
 
 
 def _finding_codes(result: JsonObject) -> set[str]:

@@ -1,0 +1,12 @@
+@startuml
+skin sysmlc
+skinparam wrapWidth 380
+hide circle
+  
+comp usage "applyBatch: ApplyRtgConstraintBatch[*]" as E1  << perform action>>  {
+}
+comp usage "countSummary: CountRtgConstraintSummary[*]" as E2  << perform action>>  {
+}
+comp usage "listConstraintsByTarget: ListConstraintsByTarget[*]" as E3  << perform action>>  {
+}
+@enduml

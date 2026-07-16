@@ -14,8 +14,10 @@ Generated from textual SysML v2 by `just model-render` as a non-normative readin
 | `replaceSnapshot` | `ReplaceSchemaSnapshot` | in `snapshot: RtgSchemaSnapshot` | `RtgSchemaSnapshotInvalid`, `RtgSchemaUuidInvalid`, `RtgSchemaUuidConflict`, `RtgSchemaDefinitionKindInvalid`, `RtgSchemaTypeKeyInvalid`, `RtgSchemaDefinitionInvalid`, `RtgSchemaPayloadInvalid`, `RtgSchemaSystemValueInvalid`, `RtgSchemaLiveTypeConflict` | Validate the complete candidate, then atomically replace all definitions and rebuild derived indexes. |
 | `putDefinition` | `PutSchemaDefinition` | in `definition: RtgSchemaDefinition`; out `stored: RtgSchemaDefinition` | `RtgSchemaUuidInvalid`, `RtgSchemaDefinitionKindInvalid`, `RtgSchemaTypeKeyInvalid`, `RtgSchemaDefinitionInvalid`, `RtgSchemaPayloadInvalid`, `RtgSchemaSystemValueInvalid`, `RtgSchemaLiveTypeConflict` | Generate or preserve identity, validate definition structure and the selected payload, and atomically create or fully replace one definition. |
 | `getDefinition` | `GetSchemaDefinition` | in `definitionUuid: Uuid`; out `definition: RtgSchemaDefinition` | `RtgSchemaDefinitionNotFound` | Return one definition by UUID. |
-| `listDefinitions` | `ListSchemaDefinitions` | in `kind: RtgSchemaDefinitionKind[0..1]`; in `live: Boolean[0..1]`; out `result: RtgSchemaDefinitionList` | `RtgSchemaDefinitionKindInvalid` | List definitions with optional kind and live filters in deterministic order. |
-| `listDefinitionsByTypeKey` | `ListDefinitionsByTypeKey` | in `schemaTypeKey: String`; in `kind: RtgSchemaDefinitionKind[0..1]`; in `live: Boolean[0..1]`; out `result: RtgSchemaDefinitionList` | `RtgSchemaTypeKeyInvalid`, `RtgSchemaDefinitionKindInvalid` | List every definition for one type key with optional kind/live filters, including multiple non-live candidates. |
+| `applyBatch` | `ApplyRtgSchemaBatch` | in `changes: RtgSchemaChangeSet`; out `result: RtgSchemaBatchResult` | `RtgSchemaUuidInvalid`, `RtgSchemaUuidConflict`, `RtgSchemaDefinitionKindInvalid`, `RtgSchemaTypeKeyInvalid`, `RtgSchemaDefinitionInvalid`, `RtgSchemaPayloadInvalid`, `RtgSchemaSystemValueInvalid`, `RtgSchemaLiveTypeConflict`, `RtgSchemaDefinitionNotFound` | Apply one resolved schema-local change set atomically. |
+| `countSummary` | `CountRtgSchemaSummary` | out `result: RtgSchemaCountSummary` | None | Return bounded live and non-live definition counts without returning definitions. |
+| `listDefinitions` | `ListSchemaDefinitions` | in `kind: RtgSchemaDefinitionKind[0..1]`; in `live: Boolean[0..1]`; in `offset: Integer` = `0`; in `limit: Integer[0..1]`; out `result: RtgSchemaDefinitionList` | `RtgSchemaDefinitionKindInvalid`, `RtgSchemaPayloadInvalid` | List one stable page of definitions with optional kind and live filters. |
+| `listDefinitionsByTypeKey` | `ListDefinitionsByTypeKey` | in `schemaTypeKey: String`; in `kind: RtgSchemaDefinitionKind[0..1]`; in `live: Boolean[0..1]`; in `offset: Integer` = `0`; in `limit: Integer[0..1]`; out `result: RtgSchemaDefinitionList` | `RtgSchemaTypeKeyInvalid`, `RtgSchemaDefinitionKindInvalid`, `RtgSchemaPayloadInvalid` | List a deterministic bounded page for one type key with optional kind/live filters, including multiple non-live candidates. |
 | `listAnchorDataTypeKeys` | `ListAnchorDataTypeKeys` | in `anchorTypeKey: String`; in `live: Boolean[0..1]` = `true`; out `result: RtgSchemaAssociatedDataTypeList` | `RtgSchemaTypeKeyInvalid`, `RtgSchemaDefinitionNotFound` | Return required and optional associated data type keys declared by one anchor schema. |
 | `listLinkParticipation` | `ListLinkParticipation` | in `typeKey: String`; in `direction: RtgSchemaParticipationQueryDirection` = `RtgSchemaParticipationQueryDirection::either`; in `live: Boolean[0..1]` = `true`; out `result: RtgSchemaLinkParticipationList` | `RtgSchemaTypeKeyInvalid`, `RtgSchemaDirectionInvalid` | Return link schemas that admit the type as source, target, or either endpoint. Each result reports source, target, or both relative to the queried type. |
 | `listAnchorTypeSummaries` | `ListAnchorTypeSummaries` | in `live: Boolean[0..1]` = `true`; out `result: RtgSchemaAnchorTypeSummaryList` | None | Return anchor type identities and descriptions only, never graph counts. |
@@ -48,6 +50,8 @@ Generated from textual SysML v2 by `just model-render` as a non-normative readin
 |---|---|---|---|
 | `exportSnapshot` | `definitions` | `read` | read all canonical definitions. |
 | `replaceSnapshot` | `definitions` | `write` | validate before visibility, atomically replace every definition, and rebuild indexes. |
+| `applyBatch` | `definitions` | `write` | expose the complete resolved schema change set or leave canonical schema state unchanged. |
+| `countSummary` | `navigationIndexes` | `read` | return only bounded aggregate counts. |
 | `putDefinition` | `definitions` | `write` | atomically create/replace definition and rebuild affected indexes. |
 | `getDefinition` | `definitions` | `read` | read one canonical definition. |
 | `listDefinitions` | `navigationIndexes` | `read` | read kind/live indexes. |
@@ -100,6 +104,10 @@ Generated from textual SysML v2 by `just model-render` as a non-normative readin
 | `contract.rtg.schema.delete_schema_definition.failures` | `DeleteSchemaDefinition` | `schema.deleteDefinition` | Rejected delete has no effect. |
 | `contract.rtg.schema.create_empty_rtg_schema.failures` | `CreateEmptyRtgSchema` | `createEmptyRtgSchemaSubject` | Construction has no declared domain failure. |
 | `contract.rtg.schema.import_rtg_schema_snapshot.failures` | `ImportRtgSchemaSnapshot` | `importRtgSchemaSnapshotSubject` | Failure returns no partially imported registry. |
+| `contract.rtg.schema.batch_atomicity` | `ApplyRtgSchemaBatch` | `schema.applyBatch` | Success exposes the complete requested schema-local batch; rejection or failure exposes the exact prior schema state. |
+| `invariant.rtg.schema.routine_work_is_delta_scaled` | `RtgSchema` | `schema` | A non-state-transfer action does not copy, serialize, hash, or retain complete schema state solely for validation, atomicity, or recovery. Transient work may grow with the requested mutation and affected uniqueness/index closure, but not unrelated definitions. Explicit state-transfer and reconstruction actions are exceptions. |
+| `contract.rtg.schema.apply_batch.failures` | `ApplyRtgSchemaBatch` | `schema.applyBatch` | Any invalid reference, definition, uniqueness conflict, live conflict, or deletion rejects the whole batch without observable schema state effect. |
+| `contract.rtg.schema.count_summary.failures` | `CountRtgSchemaSummary` | `schema.countSummary` | Summary reads expose bounded counts and do not change schema state. |
 
 ## Public values and items
 
@@ -113,6 +121,11 @@ Generated from textual SysML v2 by `just model-render` as a non-normative readin
 | `RtgLinkSchemaPayload` | `attribute` | `allowedSourceTypes[1..*]: String`, `allowedTargetTypes[1..*]: String` | Each endpoint set is unique and unordered. One type may occur in both sets. |
 | `RtgSchemaDefinition` | `item` | `uuid[0..1]: Uuid`, `kind: RtgSchemaDefinitionKind`, `typeKey: String`, `description: String`, `payload: RtgSchemaPayload`, `system: JsonObject` | UUID may be absent on write only. Description is non-empty human-readable semantic text. Stored definitions have concrete UUID and Boolean system.live, defaulting missing live to true. |
 | `RtgSchemaSnapshot` | `attribute` | `definitions[0..*] ordered: RtgSchemaDefinition` | Defined by its typed fields and action requirements. |
+| `RtgSchemaDefinitionWrite` | `attribute` | `ref: RtgChangeReference`, `definition: RtgSchemaDefinition` | Defined by its typed fields and action requirements. |
+| `RtgSchemaLiveStatusChange` | `attribute` | `targetRef: RtgChangeReference`, `live: Boolean` | Defined by its typed fields and action requirements. |
+| `RtgSchemaChangeSet` | `attribute` | `definitionWrites[0..*]: RtgSchemaDefinitionWrite`, `deleteDefinitions[0..*]: RtgChangeReference`, `setLive[0..*]: RtgSchemaLiveStatusChange` | Defined by its typed fields and action requirements. |
+| `RtgSchemaBatchResult` | `attribute` | `writes: Integer`, `deletes: Integer`, `liveChanges: Integer` | Defined by its typed fields and action requirements. |
+| `RtgSchemaCountSummary` | `attribute` | `anchorLive: Integer`, `dataObjectLive: Integer`, `linkLive: Integer`, `liveTotal: Integer`, `nonLiveTotal: Integer` | Defined by its typed fields and action requirements. |
 | `RtgSchemaDefinitionList` | `attribute` | `definitions[0..*] ordered: RtgSchemaDefinition` | Defined by its typed fields and action requirements. |
 | `RtgSchemaAssociatedDataTypeList` | `attribute` | `requiredDataTypes[0..*] ordered: String`, `optionalDataTypes[0..*] ordered: String` | Defined by its typed fields and action requirements. |
 | `RtgSchemaLinkParticipation` | `attribute` | `definitionUuid: Uuid`, `typeKey: String`, `direction: RtgSchemaParticipationDirection`, `allowedSourceTypes[0..*] ordered: String`, `allowedTargetTypes[0..*] ordered: String`, `live: Boolean` | Defined by its typed fields and action requirements. |
@@ -160,6 +173,15 @@ Generated from textual SysML v2 by `just model-render` as a non-normative readin
 | `GetSchemaPackContractVerification` | `GetSchemaPack` | `getSchemaPackFailureSemantics` | `components/rtg/schema/tests/test_rtg_schema_contract.py#GetSchemaPackContractVerification` |
 | `CreateEmptyRtgSchemaContractVerification` | `CreateEmptyRtgSchema` | `createEmptyRtgSchemaFailureSemantics` | `components/rtg/schema/tests/test_rtg_schema_contract.py#CreateEmptyRtgSchemaContractVerification` |
 | `ImportRtgSchemaSnapshotContractVerification` | `ImportRtgSchemaSnapshot` | `importRtgSchemaSnapshotFailureSemantics` | `components/rtg/schema/tests/test_rtg_schema_contract.py#ImportRtgSchemaSnapshotContractVerification` |
+| `SchemaBatchAtomicityContractVerification` | `ApplyRtgSchemaBatch` | `schemaBatchAtomicity`, `applyRtgSchemaBatchFailureSemantics` | `components/rtg/schema/tests/test_rtg_schema_contract.py#SchemaBatchAtomicityContractVerification` |
+| `SchemaRoutineWorkScalingVerification` | `RtgSchema` | `schemaRoutineWorkBounded` | `components/rtg/schema/tests/test_rtg_schema_contract.py#SchemaRoutineWorkScalingVerification` |
+| `CountSchemaSummaryContractVerification` | `CountRtgSchemaSummary` | `countSchemaSummaryFailureSemantics` | `components/rtg/schema/tests/test_rtg_schema_contract.py#CountSchemaSummaryContractVerification` |
 | `RtgSchemaBoundaryVerification` | `RtgSchema` | `fieldSemantics`, `payloadSemantics`, `schemaReadEffect`, `canonicalOrdering`, `intentionalBoundary`, `schemaSnapshotEffect`, `uuidUnique`, `liveTypeUnique`, `liveStatusBoolean`, `noChangeSetOwnership`, `noObjectValidation`, `nativePayloads`, `noInheritanceCompositionV1`, `typeKeyChangesAreMigrationConcerns`, `navigationIndexesMatchPayloads`, `deterministicListOrdering` | `components/rtg/schema/tests/test_rtg_schema_contract.py#RtgSchemaBoundaryVerification` |
+
+## Diagram
+
+![component.rtg.schema contract diagram](../diagrams/component.rtg.schema.contract.svg)
+
+[PlantUML source](../diagrams/component.rtg.schema.contract.puml)
 
 Equivalent private algorithms, helpers, storage layouts, and implementation-language inheritance remain implementation choices.

@@ -3,6 +3,7 @@ from __future__ import annotations
 import copy
 import json
 from collections.abc import Iterable
+from dataclasses import replace
 from uuid import UUID, uuid4
 
 from components.rtg.graph.protocol import (
@@ -14,6 +15,8 @@ from components.rtg.graph.protocol import (
     RtgDataObjectList,
     RtgGraphAnchorDataIndexEntryNotFound,
     RtgGraphAnchorNotFound,
+    RtgGraphBatchResult,
+    RtgGraphChangeSet,
     RtgGraphDataObjectNotFound,
     RtgGraphDeleteResult,
     RtgGraphEndpointNotFound,
@@ -134,6 +137,102 @@ class InMemoryRtgGraph:
     def replace_snapshot(self, snapshot: RtgGraphSnapshot) -> None:
         candidate = type(self).import_snapshot(snapshot)
         self.__dict__ = candidate.__dict__
+
+    def apply_batch(self, changes: RtgGraphChangeSet) -> RtgGraphBatchResult:
+        if not isinstance(changes, RtgGraphChangeSet):
+            raise RtgGraphReferenceInvalid("changes must be an RtgGraphChangeSet")
+        journal = _GraphBatchJournal(self)
+        writes = deletes = live_changes = 0
+        try:
+            for write in changes.anchor_writes:
+                anchor = RtgAnchor(
+                    _resolved_uuid(write.ref.resource_id),
+                    write.type,
+                    write.display_name,
+                    write.system,
+                )
+                journal.capture_anchor_put(anchor)
+                self.put_anchor(anchor)
+                writes += 1
+            for write in changes.data_object_writes:
+                data_object = RtgDataObject(
+                    _resolved_uuid(write.ref.resource_id),
+                    write.type,
+                    write.properties,
+                    write.system,
+                )
+                anchors = tuple(_resolved_uuid(ref.resource_id) for ref in write.anchor_refs)
+                journal.capture_data_put(data_object, anchors)
+                self.put_data_object(data_object, anchors)
+                writes += 1
+            for write in changes.link_writes:
+                link = RtgLink(
+                    _resolved_uuid(write.ref.resource_id),
+                    write.type,
+                    _resolved_uuid(write.source_ref.resource_id),
+                    _resolved_uuid(write.target_ref.resource_id),
+                    write.system,
+                )
+                journal.capture_link_put(link)
+                self.put_link(link)
+                writes += 1
+            for change in changes.associate_data:
+                anchor = _resolved_uuid(change.anchor_ref.resource_id)
+                data = _resolved_uuid(change.data_ref.resource_id)
+                journal.capture_association(anchor, data)
+                self.associate_data(anchor, data)
+            for change in changes.dissociate_data:
+                anchor = _resolved_uuid(change.anchor_ref.resource_id)
+                data = _resolved_uuid(change.data_ref.resource_id)
+                journal.capture_delete_result(self.preview_dissociate_data(anchor, data))
+                self.dissociate_data(anchor, data)
+            for ref in changes.delete_links:
+                link = _resolved_uuid(ref.resource_id)
+                journal.capture_delete_result(self._preview_delete_link(link))
+                self.delete_link(link)
+                deletes += 1
+            for ref in changes.delete_data_objects:
+                data = _resolved_uuid(ref.resource_id)
+                journal.capture_delete_result(self.preview_delete_data_object(data))
+                self.delete_data_object(data)
+                deletes += 1
+            for ref in changes.delete_anchors:
+                anchor = _resolved_uuid(ref.resource_id)
+                journal.capture_delete_result(self.preview_delete_anchor(anchor))
+                self.delete_anchor(anchor)
+                deletes += 1
+            for change in changes.set_live:
+                object_uuid = _resolved_uuid(change.object_ref.resource_id)
+                obj = self.get_object(object_uuid)
+                system = {**obj.system, "live": change.live}
+                if isinstance(obj, RtgAnchor):
+                    updated = replace(obj, system=system)
+                    journal.capture_anchor_put(updated)
+                    self.put_anchor(updated)
+                elif isinstance(obj, RtgDataObject):
+                    anchors = tuple(
+                        anchor.uuid
+                        for anchor in self.list_data_anchors(object_uuid).anchors
+                        if anchor.uuid is not None
+                    )
+                    updated = replace(obj, system=system)
+                    journal.capture_data_put(updated, anchors)
+                    self.put_data_object(updated, anchors)
+                else:
+                    updated = replace(obj, system=system)
+                    journal.capture_link_put(updated)
+                    self.put_link(updated)
+                live_changes += 1
+        except BaseException:
+            journal.rollback()
+            raise
+        return RtgGraphBatchResult(writes, deletes, live_changes)
+
+    def _preview_delete_link(self, link_uuid: UuidInput) -> RtgGraphDeleteResult:
+        link = _parse_uuid(link_uuid)
+        if link not in self._links:
+            raise RtgGraphLinkNotFound(str(link))
+        return _delete_result(deleted_links=[self._links[link]])
 
     def put_anchor(self, anchor: RtgAnchor) -> RtgAnchor:
         normalized = self._normalize_anchor(anchor)
@@ -322,15 +421,24 @@ class InMemoryRtgGraph:
             return _copy_link(self._links[uuid_value])
         raise RtgGraphObjectNotFound(str(uuid_value))
 
-    def list_by_type(self, object_type: str) -> RtgObjectList:
+    def list_by_type(
+        self, object_type: str, offset: int = 0, limit: int | None = None
+    ) -> RtgObjectList:
         normalized_type = _validate_type(object_type)
         objects = [
             self._object_for_uuid(uuid_value)
             for uuid_value in self._type_to_uuids.get(normalized_type, set())
         ]
-        return RtgObjectList(objects=tuple(self._copy_object(obj) for obj in self._sorted(objects)))
+        return RtgObjectList(
+            objects=tuple(
+                self._copy_object(obj)
+                for obj in _page(self._sorted(objects), offset=offset, limit=limit)
+            )
+        )
 
-    def list_anchor_data(self, anchor_uuid: UuidInput) -> RtgDataObjectList:
+    def list_anchor_data(
+        self, anchor_uuid: UuidInput, offset: int = 0, limit: int | None = None
+    ) -> RtgDataObjectList:
         anchor = _parse_uuid(anchor_uuid)
         if anchor not in self._anchors:
             raise RtgGraphAnchorNotFound(str(anchor))
@@ -338,19 +446,35 @@ class InMemoryRtgGraph:
             self._data_objects[data_uuid] for data_uuid in self._anchor_to_data.get(anchor, set())
         ]
         return RtgDataObjectList(
-            data_objects=tuple(_copy_data_object(item) for item in self._sorted(data))
+            data_objects=tuple(
+                _copy_data_object(item)
+                for item in _page(self._sorted(data), offset=offset, limit=limit)
+            )
         )
 
-    def list_data_anchors(self, data_uuid: UuidInput) -> RtgAnchorList:
+    def list_data_anchors(
+        self, data_uuid: UuidInput, offset: int = 0, limit: int | None = None
+    ) -> RtgAnchorList:
         data = _parse_uuid(data_uuid)
         if data not in self._data_objects:
             raise RtgGraphDataObjectNotFound(str(data))
         anchors = [
             self._anchors[anchor_uuid] for anchor_uuid in self._data_to_anchors.get(data, set())
         ]
-        return RtgAnchorList(anchors=tuple(_copy_anchor(item) for item in self._sorted(anchors)))
+        return RtgAnchorList(
+            anchors=tuple(
+                _copy_anchor(item)
+                for item in _page(self._sorted(anchors), offset=offset, limit=limit)
+            )
+        )
 
-    def list_incident_links(self, object_uuid: UuidInput, direction: str = "both") -> RtgLinkList:
+    def list_incident_links(
+        self,
+        object_uuid: UuidInput,
+        direction: str = "both",
+        offset: int = 0,
+        limit: int | None = None,
+    ) -> RtgLinkList:
         uuid_value = _parse_uuid(object_uuid)
         if uuid_value not in self._anchors and uuid_value not in self._data_objects:
             raise RtgGraphObjectNotFound(str(uuid_value))
@@ -365,7 +489,11 @@ class InMemoryRtgGraph:
             if direction == "target" and link.target_uuid != uuid_value:
                 continue
             links.append(link)
-        return RtgLinkList(links=tuple(_copy_link(link) for link in self._sorted(links)))
+        return RtgLinkList(
+            links=tuple(
+                _copy_link(link) for link in _page(self._sorted(links), offset=offset, limit=limit)
+            )
+        )
 
     def count_by_type(self, kind: str | None = None, live: bool | None = None) -> RtgTypeCountList:
         if kind is not None and kind not in _VALID_KINDS:
@@ -577,6 +705,105 @@ class InMemoryRtgGraph:
     @staticmethod
     def _sorted[T: RtgObject](objects: Iterable[T]) -> tuple[T, ...]:
         return tuple(sorted(objects, key=lambda obj: str(_record_uuid(obj))))
+
+
+_MISSING = object()
+
+
+class _GraphBatchJournal:
+    """Touched-entry journal for one invocation; it never copies complete graph state."""
+
+    _MAP_NAMES = (
+        "_anchors",
+        "_data_objects",
+        "_links",
+        "_type_to_uuids",
+        "_type_to_kind",
+        "_data_to_anchors",
+        "_anchor_to_data",
+        "_incident_links",
+    )
+
+    def __init__(self, graph: InMemoryRtgGraph) -> None:
+        self._graph = graph
+        self._saved: dict[str, dict[object, object]] = {name: {} for name in self._MAP_NAMES}
+
+    def _capture(self, name: str, key: object) -> None:
+        saved = self._saved[name]
+        if key in saved:
+            return
+        mapping = getattr(self._graph, name)
+        saved[key] = copy.deepcopy(mapping[key]) if key in mapping else _MISSING
+
+    def _capture_type(self, type_key: str) -> None:
+        self._capture("_type_to_uuids", type_key)
+        self._capture("_type_to_kind", type_key)
+
+    def capture_anchor_put(self, anchor: RtgAnchor) -> None:
+        anchor_uuid = _record_uuid(anchor)
+        self._capture("_anchors", anchor_uuid)
+        self._capture("_anchor_to_data", anchor_uuid)
+        self._capture("_incident_links", anchor_uuid)
+        current = self._graph._anchors.get(anchor_uuid)
+        if current is not None:
+            self._capture_type(current.type)
+        self._capture_type(anchor.type)
+
+    def capture_data_put(self, data_object: RtgDataObject, anchor_uuids: tuple[UUID, ...]) -> None:
+        data_uuid = _record_uuid(data_object)
+        self._capture("_data_objects", data_uuid)
+        self._capture("_data_to_anchors", data_uuid)
+        self._capture("_incident_links", data_uuid)
+        current = self._graph._data_objects.get(data_uuid)
+        if current is not None:
+            self._capture_type(current.type)
+        self._capture_type(data_object.type)
+        old_anchors = self._graph._data_to_anchors.get(data_uuid, set())
+        for anchor_uuid in {*old_anchors, *anchor_uuids}:
+            self._capture("_anchor_to_data", anchor_uuid)
+
+    def capture_link_put(self, link: RtgLink) -> None:
+        link_uuid = _record_uuid(link)
+        self._capture("_links", link_uuid)
+        current = self._graph._links.get(link_uuid)
+        if current is not None:
+            self._capture_type(current.type)
+            self._capture("_incident_links", current.source_uuid)
+            self._capture("_incident_links", current.target_uuid)
+        self._capture_type(link.type)
+        self._capture("_incident_links", link.source_uuid)
+        self._capture("_incident_links", link.target_uuid)
+
+    def capture_association(self, anchor_uuid: UUID, data_uuid: UUID) -> None:
+        self._capture("_anchor_to_data", anchor_uuid)
+        self._capture("_data_to_anchors", data_uuid)
+
+    def capture_delete_result(self, result: RtgGraphDeleteResult) -> None:
+        for anchor in result.deleted_anchors:
+            self.capture_anchor_put(anchor)
+        for data_object in result.deleted_data_objects:
+            data_uuid = _record_uuid(data_object)
+            anchors = tuple(self._graph._data_to_anchors.get(data_uuid, set()))
+            self.capture_data_put(data_object, anchors)
+        for link in result.deleted_links:
+            self.capture_link_put(link)
+        for anchor_uuid, data_uuid in result.removed_anchor_data_pairs:
+            self.capture_association(anchor_uuid, data_uuid)
+
+    def rollback(self) -> None:
+        for name in reversed(self._MAP_NAMES):
+            mapping = getattr(self._graph, name)
+            for key, value in self._saved[name].items():
+                if value is _MISSING:
+                    mapping.pop(key, None)
+                else:
+                    mapping[key] = value
+
+
+def _resolved_uuid(value: UUID | str | None) -> UUID:
+    if value is None:
+        raise RtgGraphReferenceInvalid("batch references must be resolved")
+    return _parse_uuid(value)
 
 
 def _parse_uuid(value: UuidInput) -> UUID:
@@ -817,3 +1044,11 @@ def _record_uuid(obj: RtgObject) -> UUID:
     if obj.uuid is None:
         raise RtgGraphUuidInvalid("object UUID is absent")
     return obj.uuid
+
+
+def _page[T](values: tuple[T, ...], *, offset: int, limit: int | None) -> tuple[T, ...]:
+    if offset < 0:
+        raise RtgGraphReferenceInvalid("offset must be nonnegative")
+    if limit is not None and limit < 1:
+        raise RtgGraphReferenceInvalid("limit must be positive when supplied")
+    return values[offset:] if limit is None else values[offset : offset + limit]

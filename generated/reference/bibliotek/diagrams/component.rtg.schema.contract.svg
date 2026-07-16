@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" contentStyleType="text/css" height="71px" preserveAspectRatio="none" style="width:994px;height:71px;background:#FFFFFF;" version="1.1" viewBox="0 0 994 71" width="994px" zoomAndPan="magnify"><defs><filter height="300%" id="f1xrrdyxybk4xq" width="300%" x="-1" y="-1"><feGaussianBlur result="blurOut" stdDeviation="2.0"/><feColorMatrix in="blurOut" result="blurOut2" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 .4 0"/><feOffset dx="4.0" dy="4.0" in="blurOut2" result="blurOut3"/><feBlend in="SourceGraphic" in2="blurOut3" mode="normal"/></filter></defs><g><!--MD5=[43c9051892ef23e1a46a86907403d788]
+class E1--><g id="elem_E1"><rect fill="#FFFACD" filter="url(#f1xrrdyxybk4xq)" height="48.6211" id="E1" rx="10" ry="10" style="stroke:#181818;stroke-width:0.5;" width="257" x="7" y="10.6211"/><text fill="#000000" font-family="sans-serif" font-size="12" font-style="italic" x="87" y="27.2227">«perform action»</text><text fill="#000000" font-family="sans-serif" font-size="14" x="10" y="43.2891">applyBatch: ApplyRtgSchemaBatch[*]</text><line style="stroke:#181818;stroke-width:0.5;" x1="8" x2="263" y1="51.2422" y2="51.2422"/></g><!--MD5=[b4997ac47864f28c2f74865a473b2911]
+class E2--><g id="elem_E2"><rect fill="#FFFACD" filter="url(#f1xrrdyxybk4xq)" height="48.6211" id="E2" rx="10" ry="10" style="stroke:#181818;stroke-width:0.5;" width="316" x="282.5" y="10.6211"/><text fill="#000000" font-family="sans-serif" font-size="12" font-style="italic" x="392" y="27.2227">«perform action»</text><text fill="#000000" font-family="sans-serif" font-size="14" x="285.5" y="43.2891">countSummary: CountRtgSchemaSummary[*]</text><line style="stroke:#181818;stroke-width:0.5;" x1="283.5" x2="597.5" y1="51.2422" y2="51.2422"/></g><!--MD5=[09b614a08d8cba4a07c9adeb5e0fee81]
+class E3--><g id="elem_E3"><rect fill="#FFFACD" filter="url(#f1xrrdyxybk4xq)" height="48.6211" id="E3" rx="10" ry="10" style="stroke:#181818;stroke-width:0.5;" width="366" x="616.5" y="10.6211"/><text fill="#000000" font-family="sans-serif" font-size="12" font-style="italic" x="751" y="27.2227">«perform action»</text><text fill="#000000" font-family="sans-serif" font-size="14" x="619.5" y="43.2891">listDefinitionsByTypeKey: ListDefinitionsByTypeKey[*]</text><line style="stroke:#181818;stroke-width:0.5;" x1="617.5" x2="981.5" y1="51.2422" y2="51.2422"/></g><!--MD5=[df5ee2a824a45946bdc536cbd63bd104]
+@startuml
+!pragma layout smetana
+skin sysmlc
+skinparam wrapWidth 380
+hide circle
+  
+comp usage "applyBatch: ApplyRtgSchemaBatch[*]" as E1  << perform action>>  {
+}
+comp usage "countSummary: CountRtgSchemaSummary[*]" as E2  << perform action>>  {
+}
+comp usage "listDefinitionsByTypeKey: ListDefinitionsByTypeKey[*]" as E3  << perform action>>  {
+}
+@enduml
+
+PlantUML version 1.2022.7(Mon Aug 22 10:01:30 PDT 2022)
+(EPL source distribution)
+Java Runtime: OpenJDK Runtime Environment
+JVM: OpenJDK 64-Bit Server VM
+Default Encoding: UTF-8
+Language: en
+Country: US
+--></g></svg>

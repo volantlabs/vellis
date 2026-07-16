@@ -15,7 +15,6 @@ from components.rtg.change_validation import (
     RtgGraphDataObjectWrite,
     RtgGraphLinkWrite,
     RtgGraphLiveStatusChange,
-    RtgLiveStatusChange,
     RtgMigrationChangeSet,
     RtgMigrationEvidenceAddition,
     RtgMigrationRecordWrite,
@@ -26,6 +25,7 @@ from components.rtg.change_validation import (
 from components.rtg.constraints import (
     RtgConstraintCardinalityPayload,
     RtgConstraintDefinition,
+    RtgConstraintLiveStatusChange,
     RtgConstraintQueryPatternPayload,
     RtgConstraintSnapshot,
 )
@@ -68,6 +68,7 @@ from components.rtg.schema import (
     RtgLinkSchemaPayload,
     RtgSchemaDefinition,
     RtgSchemaField,
+    RtgSchemaLiveStatusChange,
     RtgSchemaSnapshot,
 )
 from components.runtime.message_runtime import (
@@ -306,7 +307,7 @@ def decode_schema_changes(value: object) -> RtgSchemaChangeSet:
             for item in _list(data.get("delete_definitions", []))
         ),
         set_live=tuple(
-            RtgLiveStatusChange(
+            RtgSchemaLiveStatusChange(
                 target_ref=_uuid_ref(
                     _required_value(item, "target_ref", "schema.set_live.target_ref"),
                     "schema.set_live.target_ref",
@@ -352,7 +353,7 @@ def decode_constraint_changes(value: object) -> RtgConstraintChangeSet:
             for item in _list(data.get("delete_constraints", []))
         ),
         set_live=tuple(
-            RtgLiveStatusChange(
+            RtgConstraintLiveStatusChange(
                 target_ref=_uuid_ref(
                     _required_value(item, "target_ref", "constraint.set_live.target_ref"),
                     "constraint.set_live.target_ref",

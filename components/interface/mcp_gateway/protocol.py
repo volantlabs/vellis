@@ -5,6 +5,7 @@ from typing import Protocol
 from uuid import UUID
 
 from components.runtime.message_runtime.protocol import JsonObject
+from components.runtime.messaging import RuntimePayloadDisposition, RuntimeTraceDisposition
 
 
 @dataclass(frozen=True, slots=True)
@@ -17,8 +18,14 @@ class McpGatewayToolRegistration:
     component_contract_id: str
     action_id: str
     schema_version: int
-    codec_id: str
-    codec_version: int
+    binding_id: str
+    binding_version: int
+    request_codec_id: str
+    request_codec_version: int
+    request_payload_disposition: RuntimePayloadDisposition
+    result_payload_disposition: RuntimePayloadDisposition
+    fault_payload_disposition: RuntimePayloadDisposition
+    effect_payload_disposition: RuntimePayloadDisposition | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -33,6 +40,8 @@ class McpGatewayOutcome:
     result: JsonObject
     message_id: UUID
     trace_id: UUID
+    terminal_position: int
+    trace_disposition: RuntimeTraceDisposition
 
 
 class McpGatewayRegistrationInvalid(Exception):
@@ -53,10 +62,12 @@ class McpGateway(Protocol):
         """Return the current curated tool inventory."""
         ...
 
-    def register_tools(self, registrations: tuple[McpGatewayToolRegistration, ...]) -> None:
-        """Replace the curated tool registration inventory."""
-        ...
-
     async def invoke_tool(self, invocation: McpGatewayInvocation) -> McpGatewayOutcome:
         """Validate and dispatch one curated tool invocation."""
+        ...
+
+
+class ConfigurableMcpGateway(McpGateway, Protocol):
+    def register_tools(self, registrations: tuple[McpGatewayToolRegistration, ...]) -> None:
+        """Replace the curated inventory before the gateway is sealed and attached."""
         ...

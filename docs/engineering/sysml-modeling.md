@@ -64,7 +64,7 @@ not repair it by editing generated files.
 | `model/config/` | Pinned language, profile, library, and validator policy | yes | deliberately |
 | `reference/specifications/` | Generated searchable SysML/KerML page corpus, outlines, and manifests | yes | no |
 | `tests/model/fixtures/` | Modeling-pattern fixture validated separately from products | yes | yes |
-| `generated/reference/` | Generated human-readable model views | yes | no |
+| `generated/reference/` | Generated human-readable model views, normalized PlantUML, and SVG | yes | no |
 | `generated/model/` | Generated parser inventory, conformance objectives, and evidence index | yes | no |
 | `apps/rtg_knowledge_graph/resources/model_app_manifest.json` | Generated runtime MCP metadata | yes | no |
 | `apps/rtg_knowledge_graph/resources/everyday_life_schema.json` | Generated Vellis starter-schema bootstrap bundle | yes | no |
@@ -79,7 +79,7 @@ It must not restate component signatures, state, invariants, or behavior as a pa
 - `model/foundation/SoftwareComponentModeling.sysml` defines minimal lifecycle, failure,
   realization, and evidence traceability vocabulary. Logical semantics stay in native SysML.
 - `model/bibliotek/shared-values/` contains the deliberately narrow language-neutral value layer.
-- `model/bibliotek/components/` contains ten reusable black-box component models.
+- `model/bibliotek/components/` contains thirteen reusable black-box component models.
 - `model/bibliotek/views/` contains native reusable views for structure, behavior, requirements,
   satisfaction, and verification.
 - `model/vellis/` contains the Vellis application composition, façade, use cases, and current
@@ -202,6 +202,10 @@ default mode.
   not generic software API notation.
 - Use view definitions for reusable projections. Define a viewpoint only when explicit stakeholders
   and concerns constrain the view; generated prose and diagrams remain projections.
+- Author graphical view usages in the model with targeted exposure and a unique
+  `diagram.<product>.<name>` short name. A registered view renders exactly once as a tree or
+  interconnection diagram. Express alternative type filters in one `or` expression because
+  separate filter conditions are conjunctive. Keep element-table views out of the graphical catalog.
 - SysML names identify logical model features and literals; they do not implicitly define a wire
   encoding. When an external spelling is contract-significant, model it as an explicit logical
   literal or in a realization codec rather than deriving it from identifier style.
@@ -267,12 +271,70 @@ side and do not gate CI.
 
 `just model-render` produces one page per Bibliotek component, Bibliotek and Vellis indexes,
 action/state/requirement/satisfaction/verification tables, composition and use-case projections,
-the formal parser inventory, structured conformance objectives, and the static Vellis application
-manifest. `just model-check` rejects stale outputs, empty or semantically hollow public actions,
+the formal parser inventory, registered PlantUML/SVG diagrams, structured conformance objectives,
+and the static Vellis application manifest. Registered diagrams are discovered from parser-resolved
+`ViewUsage` elements whose native short names begin with `diagram.`. The remaining identity maps
+directly to `generated/reference/<product>/diagrams/<name>.puml` and `.svg`.
+
+The only selectable backend is `pilot`: it uses the checksum-pinned official kernel's PlantUML
+projection and PlantUML's embedded Smetana layout. Component contract overviews use the pilot's
+`COMPMOST` compartment layout and standard color skin; relationship-heavy concerns belong in
+separate focused views. Generation removes volatile `psysml:` links, normalizes wrapping, and
+removes SVG text-metric overrides that macOS Quick Look renders incorrectly. It replaces committed
+artifacts only after every registered view succeeds. Empty output, renderer errors, unsupported
+renderings, and `EXCEEDS THE LIMIT` fail closed. The traversal ceiling is a
+correctness boundary: split an oversized view into focused concerns rather than publishing a
+truncated image. Broad composition views may remain useful authored or table projections without
+being registered graphically.
+
+Both the official kernel and PlantUML subprocess are launched with
+`-Djava.awt.headless=true` before the Java classpath arguments. This prevents AWT initialization
+from creating a Dock application or stealing keyboard focus on macOS. Keep the property local to
+these subprocesses; do not set a repository-wide `JAVA_TOOL_OPTIONS` value.
+
+Component pages embed a diagram only when a complete registered projection exists; the Bibliotek
+index catalogs the available SVG and PlantUML sources. Use the `sysml-view-authoring` skill for view
+authoring and visual completeness review. The underlying CLI is
+`uv run python tools/sysml_diagrams.py render|check --backend pilot`. `just model-check` rejects
+stale outputs, empty or semantically hollow public actions,
 missing or signature-incompatible protocol operations and public values, requirements without
 required constraints, satisfiers, or subject-compatible verification objectives, untyped state access, unresolved
 implementation bindings, invalid referential-role bindings, the wrong Vellis role/tool surface, and
 unrecorded drift.
+
+### Architecture projections
+
+`just model-render` also exports `generated/model/architecture-graph.json` from the official
+kernel's JSON abstract syntax tree. Nodes use stable short names for public package members and
+qualified names for nested occurrences; typed edges retain ownership, typing, performance,
+dependency, binding, allocation, succession, flow, satisfaction, and verification facts. The graph
+contains no kernel UUIDs and every edge endpoint must resolve to a generated node.
+
+The stable dashboard under `generated/reference/architecture/` regenerates on every model render:
+package layers, Bibliotek component dependencies, Vellis logical composition, Vellis runtime
+topology, operation ownership, and requirement/verification coverage. Graphs are normalized
+PlantUML/Smetana SVGs; dense traceability uses generated Markdown matrices. These are review
+projections, not additional contracts.
+
+Architects and agents can ask model-based questions without authoring a persistent view:
+
+```text
+just model-view-presets
+just model-view-targets --kind PartDefinition
+just model-view context component.rtg.schema
+just model-view impact component.rtg.schema --direction inbound --depth 2
+just model-view operation operation.vellis.rtg_apply_live_graph_changes
+just model-view requirements component.rtg.schema
+just model-view-changed BASE=main
+```
+
+The preset registry is the parameter source of truth. On-demand output is cached by model digest
+under `build/model-views/`; changed-model review bundles live under `build/model-review/`. Both are
+ignored. Every bundle includes provenance and completeness in `manifest.json`. Exceeding
+`--max-nodes` fails rather than truncates. `model-view-promote` prints a candidate SysML view usage,
+but adding it to `model/` still requires `sysml-reference` and `sysml-view-authoring`, formal
+validation, completeness checks, and visual review. The projection service never invents sequence
+or state-transition semantics absent from the model.
 
 | Command | Purpose |
 |---|---|
@@ -280,7 +342,12 @@ unrecorded drift.
 | `just model-reference-render` | Regenerate committed page Markdown, outline indexes, and manifests from the pinned PDFs. |
 | `just model-reference-check` | Regenerate temporarily and reject stale, missing, extra, or hand-edited reference files. |
 | `just model-reference-find "<question>"` | Rank relevant sections and page snippets without loading whole specifications. |
-| `just model-render` | Regenerate committed human references, parser inventory, conformance/evidence projections, and runtime manifest. |
+| `just model-diagrams` | Refresh the parser inventory and generate normalized PlantUML/SVG with the pinned pilot and Smetana. |
+| `just model-dashboard` | Refresh the parser inventory, typed architecture graph, and stable architecture dashboard. |
+| `just model-view-presets` | List architectural questions, supported targets, and default parameters. |
+| `just model-view <preset> [target] [options]` | Generate an ignored on-demand projection and provenance manifest. |
+| `just model-view-changed BASE=<git-ref>` | Generate an ignored change-relative architecture review bundle. |
+| `just model-render` | Regenerate diagrams, committed human references, parser inventory, conformance/evidence projections, and runtime manifest. |
 | `just model-diff` | Show authored model, generated reference/machine projection, and runtime-manifest changes together. |
 | `just model-check-foundation` | Run fast repository-profile checks over Foundation sources. |
 | `just model-check-bibliotek` | Run fast repository-profile and component checks over Foundation plus Bibliotek sources. |
@@ -294,6 +361,14 @@ unrecorded drift.
 
 Scoped checks are useful feedback while editing, but they do not replace `just model-check` or
 `just check` before review.
+
+Routine mutation modeling uses component-local atomic batches. Non-state-transfer actions state
+observable all-or-none behavior and bound preparation, projection, targeted reads, and transient
+recovery data to the requested delta plus documented cascade closure. They do not prescribe a
+private undo algorithm and do not authorize complete-state export, cloning, hashing, or retention.
+Cross-owner uncertainty is modeled as an indeterminate operation resolved by runtime quiescence and
+reconstruction. The generated architecture dashboard's state-transfer boundary matrix shows the
+small set of actions whose request, result, or effect may carry complete component state.
 
 The repository profile checker is not a substitute for formal validation. `just model-setup`
 downloads checksum-pinned copies of the official 2025-06 Java pilot, its SysML 2.0/KerML 1.0
@@ -319,6 +394,14 @@ second active reference version or repair generated pages manually.
 
 - **Generated artifact is stale:** run `just model-render`, inspect `just model-diff`, and rerun the
   check. Never hand-edit the generated artifact.
+- **Diagram exceeds the pilot traversal limit:** narrow the exposed root or split the concern into
+  independently complete views. Do not register or commit the partial rendering.
+- **Diagram is unreadable or incomplete:** fix the canonical view exposure/filter or split it, run
+  `just model-diagrams`, and visually inspect the SVG. Never repair the PlantUML or SVG directly.
+- **On-demand view exceeds its node limit:** reduce depth, select one direction, or narrow the
+  relationship kinds. Do not raise the limit merely to publish an unreadable or partial graph.
+- **On-demand view has no edges:** verify that the selected relationship is actually modeled. Do
+  not add an inferred architecture fact solely to improve the picture.
 - **Validator or library asset is missing:** run `just model-setup`. Downloads are checksum-pinned
   under `.cache/sysml/` and may be safely recreated.
 - **Specification reference is stale or its source PDF is missing:** run `just model-setup`, then

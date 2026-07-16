@@ -4,13 +4,18 @@ from components.rtg.constraints.implementation import InMemoryRtgConstraints
 from components.rtg.constraints.protocol import (
     JsonObject,
     JsonValue,
+    RtgConstraintBatchResult,
     RtgConstraintCardinalityPayload,
+    RtgConstraintChangeSet,
+    RtgConstraintCountSummary,
     RtgConstraintDefinition,
     RtgConstraintDefinitionInvalid,
     RtgConstraintDefinitionList,
+    RtgConstraintDefinitionWrite,
     RtgConstraintDeleteResult,
     RtgConstraintError,
     RtgConstraintKindInvalid,
+    RtgConstraintLiveStatusChange,
     RtgConstraintNotFound,
     RtgConstraintPayload,
     RtgConstraintPayloadInvalid,
@@ -25,15 +30,20 @@ from components.rtg.constraints.protocol import (
     UuidInput,
 )
 from components.rtg.constraints.runtime_binding import (
+    RTG_CONSTRAINTS_ACTIONS,
     create_rtg_constraints_adapter,
-    create_rtg_constraints_proxy,
 )
 
 __all__ = [
     "InMemoryRtgConstraints",
     "JsonObject",
     "JsonValue",
+    "RtgConstraintBatchResult",
     "RtgConstraintCardinalityPayload",
+    "RtgConstraintChangeSet",
+    "RtgConstraintDefinitionWrite",
+    "RtgConstraintLiveStatusChange",
+    "RtgConstraintCountSummary",
     "RtgConstraintDefinition",
     "RtgConstraintDefinitionInvalid",
     "RtgConstraintDefinitionList",
@@ -51,7 +61,7 @@ __all__ = [
     "RtgConstraintTargetInvalid",
     "RtgConstraintUuidConflict",
     "RtgConstraintUuidInvalid",
+    "RTG_CONSTRAINTS_ACTIONS",
     "UuidInput",
     "create_rtg_constraints_adapter",
-    "create_rtg_constraints_proxy",
 ]

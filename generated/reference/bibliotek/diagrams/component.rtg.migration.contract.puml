@@ -1,0 +1,12 @@
+@startuml
+skin sysmlc
+skinparam wrapWidth 380
+hide circle
+  
+comp usage "applyBatch: ApplyRtgMigrationBatch[*]" as E1  << perform action>>  {
+}
+comp usage "countSummary: CountRtgMigrationSummary[*]" as E2  << perform action>>  {
+}
+comp usage "findCandidateOwners: FindMigrationCandidateOwners[*]" as E3  << perform action>>  {
+}
+@enduml

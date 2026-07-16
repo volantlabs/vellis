@@ -1,15 +1,40 @@
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 from importlib.resources import files
 from typing import Any, cast
 from uuid import NAMESPACE_URL, UUID, uuid5
 
+from apps.rtg_knowledge_graph.application_binding import load_application_binding
 from apps.rtg_knowledge_graph.mcp_codec import decode_change_batch
-from components.rtg.controller import RtgController
+from components.rtg.change_validation import RtgValidationReport
+from components.rtg.controller import (
+    RTG_CONTROLLER_ACTIONS,
+    RtgControllerSystemState,
+)
+from components.rtg.migration import RtgMigrationRecord
+from components.rtg.schema import (
+    RTG_SCHEMA_ACTIONS,
+    RtgSchemaDefinition,
+)
+from components.runtime.component_adapter import (
+    ActionBinding,
+    ComponentAdapter,
+    ComponentExecution,
+    RuntimeRemoteFault,
+    decode_typed,
+    encode_json,
+)
+from components.runtime.message_runtime import JsonObject as RuntimeJsonObject
+from components.runtime.message_runtime import RuntimeTraceDisposition
 
 JsonObject = dict[str, Any]
+_INSTALLER_CONTRACT = "application.vellis.starter_ontology_installer"
+_INSTALLER_DESCRIPTORS = load_application_binding(_INSTALLER_CONTRACT)
+STARTER_INSTALLER_ACTIONS = {
+    name: descriptor.action_ref() for name, descriptor in _INSTALLER_DESCRIPTORS.items()
+}
 
 
 class VellisStartupFailed(RuntimeError):
@@ -50,6 +75,288 @@ class EverydayLifeInstallationResult:
     schema_definition_count: int
 
 
+class EverydayLifeOntologyInstaller:
+    """Ordinary component that coordinates starter-ontology installation by messages."""
+
+    def __init__(
+        self,
+        *,
+        install_starter_schema: bool = True,
+        automatic_recovery: bool = True,
+        controller_key: str = "vellis.controller.primary",
+        schema_key: str = "vellis.schema.primary",
+    ) -> None:
+        self._install = install_starter_schema
+        self._automatic_recovery = automatic_recovery
+        self._controller_key = controller_key
+        self._schema_key = schema_key
+        self._last_recovery = "not_checked"
+
+    def create_adapter(self) -> ComponentAdapter:
+        async def install(
+            _args: tuple[object, ...],
+            kwargs: dict[str, object],
+            execution: ComponentExecution,
+        ) -> None:
+            try:
+                recovery = str(kwargs.get("recovery", "not_needed"))
+                self._last_recovery = recovery
+                bundle = load_starter_schema_bundle()
+                before, _ = await self._runtime_status(
+                    bundle, recovery, execution, phase="install-before"
+                )
+                status = await self._prepare(recovery, execution)
+            except RuntimeRemoteFault as error:
+                await execution.forward_fault(
+                    error.payload,
+                    disposition=RuntimeTraceDisposition.ABORTED,
+                )
+                return
+            if before.status == "installed":
+                installation_status = "alreadyInstalled"
+            elif status.status == "installed":
+                installation_status = "installed"
+            else:
+                installation_status = "customPreserved"
+            writes = bundle["knowledge_changes"]["schema_changes"]["definition_writes"]
+            await execution.complete(
+                EverydayLifeInstallationResult(
+                    status=installation_status,
+                    ontology=EverydayLifeOntologyIdentity(
+                        ontology_id=str(bundle["ontology_id"]),
+                        version=str(bundle["version"]),
+                        bootstrap_migration_id=str(bundle["bootstrap_migration_id"]),
+                    ),
+                    schema_definition_count=(
+                        len(writes) if status.status == "installed" else 0
+                    ),
+                )
+            )
+
+        async def get_status(
+            _args: tuple[object, ...],
+            kwargs: dict[str, object],
+            execution: ComponentExecution,
+        ) -> None:
+            bundle = load_starter_schema_bundle()
+            recovery = str(kwargs.get("recovery", "not_checked"))
+            if recovery == "not_checked":
+                recovery = self._last_recovery
+            status, _ = await self._runtime_status(
+                bundle,
+                recovery,
+                execution,
+                phase="status",
+            )
+            await execution.complete(status)
+
+        def binding(
+            name: str,
+            handler: object,
+        ) -> ActionBinding:
+            return ActionBinding(
+                descriptor=_INSTALLER_DESCRIPTORS[name],
+                decode_request=lambda payload: ((), {"recovery": payload.get("recovery")}),
+                encode_result=encode_json,
+                handler=cast(Any, handler),
+                failure_types=(VellisStartupFailed,),
+            )
+
+        return ComponentAdapter(
+            (
+                binding(
+                    "install",
+                    install,
+                ),
+                binding(
+                    "get_status",
+                    get_status,
+                ),
+            )
+        )
+
+    async def _prepare(
+        self,
+        recovery: str,
+        execution: ComponentExecution,
+    ) -> StarterSchemaStatus:
+        bundle = load_starter_schema_bundle()
+        status, interrupted = await self._runtime_status(
+            bundle, recovery, execution, phase="before"
+        )
+        if not self._automatic_recovery and recovery == "manual_recovery_required":
+            return status
+
+        if interrupted:
+            if self._install:
+                await self._call(
+                    "apply_migration_cutover",
+                    {
+                        "migration_id": str(bundle["bootstrap_migration_id"]),
+                        "cutover_options": None,
+                    },
+                    execution,
+                    "recover-cutover",
+                )
+                recovery = "starter_install_completed"
+            else:
+                await self._call(
+                    "abandon_migration",
+                    {
+                        "migration_id": str(bundle["bootstrap_migration_id"]),
+                        "reason": "starter schema installation disabled after interrupted staging",
+                    },
+                    execution,
+                    "recover-abandon",
+                )
+                recovery = "starter_install_abandoned"
+            status, _ = await self._runtime_status(
+                bundle, recovery, execution, phase="after-recovery"
+            )
+
+        if not self._install or status.status != "empty":
+            return status
+        await self._call(
+            "stage_knowledge_changes",
+            {
+                "knowledge_changes": decode_change_batch(bundle["knowledge_changes"]),
+                "validation_mode": "strict",
+            },
+            execution,
+            "stage-starter",
+        )
+        await self._call(
+            "apply_migration_cutover",
+            {"migration_id": str(bundle["bootstrap_migration_id"]), "cutover_options": None},
+            execution,
+            "cutover-starter",
+        )
+        validation = decode_typed(
+            await self._call(
+                "validate_graph",
+                {"migration_ids": None, "validation_options": None},
+                execution,
+                "validate-starter",
+            ),
+            RtgValidationReport,
+        )
+        if not validation.accepted:
+            raise VellisStartupFailed("starter schema validation was not accepted")
+        status, _ = await self._runtime_status(
+            bundle, recovery, execution, phase="after-install"
+        )
+        if status.status != "installed":
+            raise VellisStartupFailed(
+                f"Everyday Life ontology installation did not become live: {status.status}"
+            )
+        return status
+
+    async def _runtime_status(
+        self,
+        bundle: JsonObject,
+        recovery: str,
+        execution: ComponentExecution,
+        *,
+        phase: str,
+    ) -> tuple[StarterSchemaStatus, bool]:
+        state = decode_typed(
+            await self._call("get_system_state", {}, execution, f"starter-state-{phase}"),
+            RtgControllerSystemState,
+        )
+        writes = bundle["knowledge_changes"]["schema_changes"]["definition_writes"]
+        expected = {str(item["definition"]["uuid"]): item["definition"] for item in writes}
+        installed: dict[str, JsonObject] = {}
+        for index, definition_id in enumerate(expected):
+            try:
+                value = await execution.call(
+                    f"starter-definition-{phase}-{index}",
+                    RTG_SCHEMA_ACTIONS["get_definition"],
+                    {"definition_uuid": definition_id},
+                    target=execution.address_for(self._schema_key),
+                )
+            except RuntimeRemoteFault as error:
+                if error.payload.get("type") == "RtgSchemaDefinitionNotFound":
+                    continue
+                raise
+            definition = decode_typed(value, RtgSchemaDefinition)
+            installed[definition_id] = cast(RuntimeJsonObject, encode_json(definition))
+
+        fully_installed = all(
+            definition_id in installed
+            and _definition_is_live(installed[definition_id])
+            and _definitions_are_compatible(installed[definition_id], expected_definition)
+            for definition_id, expected_definition in expected.items()
+        )
+        candidate_counts = state.non_live_candidate_counts
+        has_state = bool(
+            state.live_schema_counts.total
+            or any(item.count for item in state.live_object_counts.counts)
+            or candidate_counts.schema
+            or candidate_counts.constraints
+            or candidate_counts.graph
+            or state.migration_counts_by_status.total
+        )
+        status_name = "installed" if fully_installed else ("custom" if has_state else "empty")
+        anchor_types, link_types = _bundle_type_keys(bundle)
+        status = StarterSchemaStatus(
+            ontology_id=str(bundle["ontology_id"]),
+            version=str(bundle["version"]),
+            status=status_name,
+            anchor_type_keys=anchor_types,
+            link_type_keys=link_types,
+            recovery=recovery,
+        )
+
+        staged_shape = (
+            not fully_installed
+            and state.live_schema_counts.total == 0
+            and not any(item.count for item in state.live_object_counts.counts)
+            and candidate_counts.schema == len(expected)
+            and candidate_counts.constraints == 0
+            and candidate_counts.graph == 0
+            and state.migration_counts_by_status.total == 1
+            and state.migration_counts_by_status.ready == 1
+            and set(installed) == set(expected)
+            and all(
+                _definition_is_non_live(definition)
+                and _definitions_are_compatible(definition, expected[definition_id])
+                for definition_id, definition in installed.items()
+            )
+        )
+        if not staged_shape:
+            return status, False
+        try:
+            migration = decode_typed(
+                await self._call(
+                    "get_migration",
+                    {"migration_id": str(bundle["bootstrap_migration_id"])},
+                    execution,
+                    f"starter-migration-{phase}",
+                ),
+                RtgMigrationRecord,
+            )
+        except RuntimeRemoteFault:
+            return status, False
+        return status, migration.status == "ready"
+
+    async def _call(
+        self,
+        action: str,
+        arguments: dict[str, object],
+        execution: ComponentExecution,
+        step: str,
+    ) -> RuntimeJsonObject:
+        value = await execution.call(
+            step,
+            RTG_CONTROLLER_ACTIONS[action],
+            arguments,
+            target=execution.address_for(self._controller_key),
+        )
+        if not isinstance(value, dict):
+            raise VellisStartupFailed(f"controller {action} result was not an object")
+        return cast(RuntimeJsonObject, value)
+
+
 def load_starter_schema_bundle() -> JsonObject:
     resource = files("apps.rtg_knowledge_graph.resources").joinpath("everyday_life_schema.json")
     value = json.loads(resource.read_text(encoding="utf-8"))
@@ -60,171 +367,6 @@ def load_starter_schema_bundle() -> JsonObject:
     bundle = cast(JsonObject, value)
     _validate_bundle_integrity(bundle)
     return bundle
-
-
-def prepare_controller(
-    controller: RtgController,
-    *,
-    install_starter_schema: bool = True,
-    automatic_recovery: bool = True,
-    recovery: str = "not_needed",
-) -> StarterSchemaStatus:
-    bundle = load_starter_schema_bundle()
-    if not automatic_recovery and recovery == "manual_recovery_required":
-        return starter_schema_status(controller, bundle=bundle, recovery=recovery)
-
-    status = starter_schema_status(controller, bundle=bundle, recovery=recovery)
-    if _is_recoverable_staged_installation(controller, bundle):
-        try:
-            if install_starter_schema:
-                controller.apply_migration_cutover(str(bundle["bootstrap_migration_id"]))
-                report = controller.validate_graph()
-                if not report.accepted:
-                    raise VellisStartupFailed(
-                        "completed starter schema cutover did not pass validation"
-                    )
-                recovery = "starter_install_completed"
-            else:
-                controller.abandon_migration(
-                    str(bundle["bootstrap_migration_id"]),
-                    "starter schema installation disabled after interrupted staging",
-                )
-                recovery = "starter_install_abandoned"
-        except Exception as error:  # noqa: BLE001 - startup recovery must fail closed
-            raise VellisStartupFailed(
-                f"interrupted Everyday Life ontology installation could not be recovered: {error}"
-            ) from error
-        status = starter_schema_status(controller, bundle=bundle, recovery=recovery)
-    integrity_issue = _starter_schema_integrity_issue(controller, bundle)
-    if integrity_issue is not None:
-        raise VellisStartupFailed(
-            f"{integrity_issue}; the existing graph was preserved without changes. "
-            "Run `uv run vellis doctor` with the same storage arguments for diagnostics"
-        )
-    if install_starter_schema and status.status == "empty":
-        snapshot = controller.export_system_snapshot()
-        has_staged_or_graph_state = bool(
-            snapshot.graph.anchors
-            or snapshot.graph.data_objects
-            or snapshot.graph.links
-            or snapshot.constraints.constraints
-            or snapshot.migration.migrations
-            or any(
-                _definition_is_non_live(definition) for definition in snapshot.schema.definitions
-            )
-        )
-        if has_staged_or_graph_state:
-            return starter_schema_status(controller, bundle=bundle, recovery=recovery)
-        try:
-            changes = decode_change_batch(bundle["knowledge_changes"])
-            staged = controller.stage_knowledge_changes(changes, "strict")
-            if staged.status != "applied":
-                raise VellisStartupFailed(
-                    f"starter schema staging returned unexpected status {staged.status}"
-                )
-            controller.apply_migration_cutover(str(bundle["bootstrap_migration_id"]))
-            report = controller.validate_graph()
-            if not report.accepted:
-                raise VellisStartupFailed("starter schema validation was not accepted")
-        except Exception as error:  # noqa: BLE001 - convert all setup failures consistently
-            try:
-                controller.abandon_migration(
-                    str(bundle["bootstrap_migration_id"]),
-                    "starter ontology installation did not complete",
-                )
-            except Exception:  # noqa: BLE001 - fall back to coordinated restoration
-                try:
-                    controller.restore_from_snapshot(snapshot)
-                except Exception as cleanup_error:  # noqa: BLE001 - report unsafe cleanup
-                    raise VellisStartupFailed(
-                        "Everyday Life ontology installation failed and pre-installation state "
-                        f"could not be restored: {cleanup_error}"
-                    ) from error
-            if not _same_domain_state(controller.export_system_snapshot(), snapshot):
-                try:
-                    controller.restore_from_snapshot(snapshot)
-                except Exception as cleanup_error:  # noqa: BLE001 - report unsafe cleanup
-                    raise VellisStartupFailed(
-                        "Everyday Life ontology installation failed and left unexpected state: "
-                        f"{cleanup_error}"
-                    ) from error
-            if isinstance(error, VellisStartupFailed):
-                raise
-            raise VellisStartupFailed(
-                f"Everyday Life ontology installation failed: {error}"
-            ) from error
-        status = starter_schema_status(controller, bundle=bundle, recovery=recovery)
-        if status.status != "installed":
-            raise VellisStartupFailed("Everyday Life ontology installation did not become live")
-    return status
-
-
-def install_everyday_life_ontology(
-    controller: RtgController,
-) -> EverydayLifeInstallationResult:
-    """Realize the modeled ontology installation action over one controller."""
-    bundle = load_starter_schema_bundle()
-    before = starter_schema_status(controller, bundle=bundle)
-    after = prepare_controller(controller)
-    if before.status == "installed":
-        installation_status = "alreadyInstalled"
-    elif after.status == "installed":
-        installation_status = "installed"
-    else:
-        installation_status = "customPreserved"
-    writes = bundle["knowledge_changes"]["schema_changes"]["definition_writes"]
-    return EverydayLifeInstallationResult(
-        status=installation_status,
-        ontology=EverydayLifeOntologyIdentity(
-            ontology_id=str(bundle["ontology_id"]),
-            version=str(bundle["version"]),
-            bootstrap_migration_id=str(bundle["bootstrap_migration_key"]),
-        ),
-        schema_definition_count=(len(writes) if after.status == "installed" else 0),
-    )
-
-
-def starter_schema_status(
-    controller: RtgController,
-    *,
-    bundle: JsonObject | None = None,
-    recovery: str = "not_checked",
-) -> StarterSchemaStatus:
-    value = bundle or load_starter_schema_bundle()
-    writes = value["knowledge_changes"]["schema_changes"]["definition_writes"]
-    expected = {str(item["definition"]["uuid"]): item["definition"] for item in writes}
-    anchor_types, link_types = _bundle_type_keys(value)
-    snapshot = controller.export_system_snapshot()
-    live_by_id = {
-        str(item.get("uuid")): item
-        for item in snapshot.schema.definitions
-        if isinstance(item, dict) and _definition_is_live(item)
-    }
-    if all(
-        definition_id in live_by_id
-        and _definitions_are_compatible(live_by_id[definition_id], expected_definition)
-        for definition_id, expected_definition in expected.items()
-    ):
-        status = "installed"
-    elif (
-        snapshot.schema.definitions
-        or snapshot.constraints.constraints
-        or snapshot.migration.migrations
-        or snapshot.graph.anchors
-        or snapshot.graph.data_objects
-        or snapshot.graph.links
-    ):
-        status = "custom"
-    else:
-        status = "empty"
-    return StarterSchemaStatus(
-        ontology_id=str(value["ontology_id"]),
-        version=str(value["version"]),
-        status=status,
-        anchor_type_keys=anchor_types,
-        link_type_keys=link_types,
-        recovery=recovery,
-    )
 
 
 def unreconstructed_starter_schema_status() -> StarterSchemaStatus:
@@ -260,72 +402,6 @@ def _bundle_type_keys(bundle: JsonObject) -> tuple[tuple[str, ...], tuple[str, .
     return anchor_types, link_types
 
 
-def _starter_schema_integrity_issue(
-    controller: RtgController,
-    bundle: JsonObject,
-) -> str | None:
-    writes = bundle["knowledge_changes"]["schema_changes"]["definition_writes"]
-    expected = {str(item["definition"]["uuid"]): item["definition"] for item in writes}
-    snapshot = controller.export_system_snapshot()
-    installed_by_id = {
-        str(definition.get("uuid")): definition
-        for definition in snapshot.schema.definitions
-        if isinstance(definition, dict) and str(definition.get("uuid")) in expected
-    }
-    if not installed_by_id:
-        return None
-    for definition_id, definition in installed_by_id.items():
-        if not _definitions_are_compatible(definition, expected[definition_id]):
-            return (
-                "existing schema reuses an Everyday Life deterministic definition UUID "
-                "for an incompatible definition"
-            )
-    if len(installed_by_id) != len(expected) or any(
-        not _definition_is_live(definition) for definition in installed_by_id.values()
-    ):
-        return "existing schema contains a partial Everyday Life ontology installation"
-    return None
-
-
-def _is_recoverable_staged_installation(
-    controller: RtgController,
-    bundle: JsonObject,
-) -> bool:
-    snapshot = controller.export_system_snapshot()
-    if (
-        snapshot.graph.anchors
-        or snapshot.graph.data_objects
-        or snapshot.graph.links
-        or snapshot.constraints.constraints
-    ):
-        return False
-    writes = bundle["knowledge_changes"]["schema_changes"]["definition_writes"]
-    expected = {str(item["definition"]["uuid"]): item["definition"] for item in writes}
-    installed = {
-        str(definition.get("uuid")): definition
-        for definition in snapshot.schema.definitions
-        if isinstance(definition, dict)
-    }
-    if set(installed) != set(expected) or any(
-        not _definition_is_non_live(definition)
-        or not _definitions_are_compatible(definition, expected[definition_id])
-        for definition_id, definition in installed.items()
-    ):
-        return False
-    changes = decode_change_batch(bundle["knowledge_changes"])
-    expected_migrations = tuple(
-        write.migration for write in changes.migration_changes.migration_writes
-    )
-    if len(snapshot.migration.migrations) != 1 or len(expected_migrations) != 1:
-        return False
-    actual_migration = snapshot.migration.migrations[0]
-    expected_migration = expected_migrations[0]
-    return actual_migration == replace(
-        expected_migration,
-        schema_make_live=actual_migration.schema_make_live,
-    ) and set(actual_migration.schema_make_live) == set(expected_migration.schema_make_live)
-
-
 def _definitions_are_compatible(
     installed: JsonObject,
     expected: JsonObject,
@@ -355,7 +431,34 @@ def _definitions_are_compatible(
                 cast(list[str], installed_payload.get("allowed_target_types", []))
             ),
         }
-    return installed_payload == normalized_payload
+    return _without_schema_codec_defaults(installed_payload) == _without_schema_codec_defaults(
+        normalized_payload
+    )
+
+
+def _without_schema_codec_defaults(value: object) -> object:
+    if isinstance(value, list):
+        return [_without_schema_codec_defaults(item) for item in value]
+    if not isinstance(value, dict):
+        return value
+    normalized = {
+        key: _without_schema_codec_defaults(item)
+        for key, item in value.items()
+    }
+    defaults: dict[str, object] = {
+        "properties": {},
+        "items": None,
+        "allowed_values": [],
+        "format": None,
+        "minimum": None,
+        "maximum": None,
+        "pattern": None,
+    }
+    return {
+        key: item
+        for key, item in normalized.items()
+        if key not in defaults or item != defaults[key]
+    }
 
 
 def _definition_is_live(definition: object) -> bool:
@@ -416,10 +519,3 @@ def _validate_bundle_integrity(bundle: JsonObject) -> None:
     )
     if bundle.get("bootstrap_migration_id") != expected_migration:
         raise VellisStartupFailed("starter ontology migration UUID is not deterministic")
-
-
-def _same_domain_state(left: object, right: object) -> bool:
-    return all(
-        getattr(left, feature, None) == getattr(right, feature, None)
-        for feature in ("graph", "schema", "constraints", "migration")
-    )

@@ -1,26 +1,36 @@
 from __future__ import annotations
 
+import hashlib
+import re
 from dataclasses import dataclass
 from typing import Any, Protocol, cast
-from uuid import UUID
+from uuid import UUID, uuid5
 
+from apps.rtg_knowledge_graph.mcp_toolset import TOOL_NAMES
 from components.runtime.component_adapter.implementation import encode_json
 from components.runtime.message_runtime import (
     JsonObject,
+    RuntimeAddress,
     RuntimeCausalTrace,
+    RuntimeHealth,
     RuntimeHistoryPage,
     RuntimeHistoryQuery,
     RuntimeLedgerFact,
+    RuntimeMessageEnvelope,
+    RuntimeMessageKind,
+    RuntimeMessageOutcome,
     RuntimeReconstructionReport,
     RuntimeReconstructionRequest,
-    RuntimeTraceDisposition,
+    RuntimeTraceSummaryPage,
 )
+from components.runtime.messaging import canonical_json
 
 _MIGRATION_ACTIONS = {
-    "component.rtg.controller.stage_knowledge_changes": "knowledge_staged",
-    "component.rtg.controller.apply_migration_cutover": "cutover_requested",
-    "component.rtg.controller.abandon_migration": "migration_abandoned",
+    "application.vellis.facade.rtg_stage_knowledge_changes": "knowledge_staged",
+    "application.vellis.facade.rtg_apply_migration_cutover": "cutover_requested",
+    "application.vellis.facade.rtg_abandon_migration": "migration_abandoned",
 }
+_REQUEST_KEY = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:-]{0,127}\Z")
 
 
 class VellisRuntime(Protocol):
@@ -33,16 +43,34 @@ class VellisRuntime(Protocol):
     def runtime_key(self) -> str: ...
 
     @property
-    def health(self) -> str: ...
+    def health(self) -> RuntimeHealth: ...
 
-    @property
-    def current_position(self) -> int: ...
+    async def current_position(self) -> int: ...
 
-    def query_history_sync(self, query: RuntimeHistoryQuery) -> RuntimeHistoryPage: ...
+    async def query_history(self, query: RuntimeHistoryQuery) -> RuntimeHistoryPage: ...
 
-    def get_trace_sync(self, trace_id: UUID) -> RuntimeCausalTrace: ...
+    async def count_history(self, query: RuntimeHistoryQuery) -> int: ...
 
-    def reconstruct_sync(
+    async def query_trace_summaries(
+        self,
+        *,
+        after_position: int | None = None,
+        limit: int = 100,
+        newest_first: bool = False,
+        root_action_ids: tuple[str, ...] = (),
+    ) -> RuntimeTraceSummaryPage: ...
+
+    async def get_trace(self, trace_id: UUID) -> RuntimeCausalTrace: ...
+
+    async def get_envelope(self, message_id: UUID) -> RuntimeMessageEnvelope | None: ...
+
+    async def lookup_message_outcome(
+        self, message_id: UUID
+    ) -> RuntimeMessageOutcome | None: ...
+
+    def address_for(self, instance_key: str) -> RuntimeAddress: ...
+
+    async def reconstruct(
         self,
         request: RuntimeReconstructionRequest,
     ) -> RuntimeReconstructionReport: ...
@@ -55,27 +83,30 @@ class VellisRuntimeServices:
     runtime: VellisRuntime
     startup_reconstruction: RuntimeReconstructionReport | None = None
 
-    def status(self) -> JsonObject:
-        messages = self._facts(RuntimeHistoryQuery(fact_type="message_accepted", limit=1000))
-        terminals = self._terminal_trace_facts()
-        latest = terminals[-1] if terminals else None
+    async def status(self) -> JsonObject:
+        message_count = await self.runtime.count_history(
+            RuntimeHistoryQuery(fact_type="message_accepted")
+        )
+        latest_page = await self.runtime.query_trace_summaries(limit=1, newest_first=True)
+        latest = latest_page.summaries[0] if latest_page.summaries else None
+        current_position = await self.runtime.current_position()
         return {
             "runtime_id": str(self.runtime.runtime_id),
             "runtime_key": self.runtime.runtime_key,
-            "health": self.runtime.health,
-            "current_position": self.runtime.current_position,
-            "message_count": len(messages),
-            "last_trace_id": str(latest.trace_id) if latest and latest.trace_id else None,
-            "last_trace_position": latest.runtime_position if latest else None,
-            "last_trace_disposition": (latest.fact_type.removeprefix("trace_") if latest else None),
+            "health": self.runtime.health.value,
+            "current_position": current_position,
+            "message_count": message_count,
+            "last_trace_id": str(latest.trace_id) if latest else None,
+            "last_trace_position": latest.terminal_position if latest else None,
+            "last_trace_disposition": latest.disposition.value if latest else None,
         }
 
-    def reconstruct(self, request: RuntimeReconstructionRequest) -> JsonObject:
-        report = self.runtime.reconstruct_sync(request)
+    async def reconstruct(self, request: RuntimeReconstructionRequest) -> JsonObject:
+        report = await self.runtime.reconstruct(request)
         self.startup_reconstruction = report
         return cast(JsonObject, encode_json(report))
 
-    def verify_reconstruction(self, request: RuntimeReconstructionRequest) -> JsonObject:
+    async def verify_reconstruction(self, request: RuntimeReconstructionRequest) -> JsonObject:
         requested_cursor = request.through_position
         report = self.startup_reconstruction
         if report is None:
@@ -109,31 +140,35 @@ class VellisRuntimeServices:
             },
         }
 
-    def migration_history(self) -> JsonObject:
-        accepted = self._facts(
-            RuntimeHistoryQuery(
-                component_contract_id="component.rtg.controller",
-                fact_type="message_accepted",
-                limit=1000,
-            )
+    async def migration_history(
+        self,
+        *,
+        after_runtime_position: int | None = None,
+        limit: int = 100,
+    ) -> JsonObject:
+        page = await self.runtime.query_trace_summaries(
+            after_position=after_runtime_position,
+            limit=limit,
+            root_action_ids=tuple(_MIGRATION_ACTIONS),
         )
         events: list[dict[str, Any]] = []
-        for fact in accepted:
-            event_type = _MIGRATION_ACTIONS.get(fact.action_id or "")
-            if event_type is None:
-                continue
-            trace = self.runtime.get_trace_sync(fact.trace_id) if fact.trace_id else None
-            disposition = trace.disposition if trace else None
-            terminal = trace.facts[-1] if trace and trace.facts else fact
-            arguments = _fact_arguments(fact)
+        for summary in page.summaries:
+            event_type = _MIGRATION_ACTIONS[summary.root_action_id]
+            envelope = await self.runtime.get_envelope(summary.root_message_id)
+            arguments = (
+                cast(JsonObject, envelope.payload.value)
+                if envelope is not None and isinstance(envelope.payload.value, dict)
+                else {}
+            )
+            migration_id = _migration_id(summary.root_action_id, arguments)
             events.append(
                 {
                     "event_type": event_type,
-                    "runtime_position": terminal.runtime_position,
-                    "trace_id": str(fact.trace_id) if fact.trace_id else None,
-                    "disposition": disposition.value if disposition else None,
-                    "migration_id": _migration_id(fact.action_id or "", arguments),
-                    "arguments": arguments,
+                    "runtime_position": summary.terminal_position,
+                    "trace_id": str(summary.trace_id),
+                    "disposition": summary.disposition.value,
+                    "migration_id": migration_id,
+                    "summary": _migration_event_summary(event_type, migration_id),
                 }
             )
         return cast(
@@ -142,41 +177,97 @@ class VellisRuntimeServices:
                 {
                     "events": events,
                     "source": "runtime_ledger",
-                    "through_runtime_position": self.runtime.current_position,
+                    "next_runtime_position": page.next_position,
+                    "through_runtime_position": await self.runtime.current_position(),
                 }
             ),
         )
 
-    def deprecated_ledger_flush_status(self) -> JsonObject:
-        healthy = self.runtime.health == "ready"
-        return {
-            "status": "runtime_healthy" if healthy else "runtime_unavailable",
-            "details": {
-                "runtime_health": self.runtime.health,
-                "queued_degraded_records": 0,
-                "deprecated": True,
-                "replacement": "runtime fail-stop health and reconstruction",
-            },
-        }
-
-    def _terminal_trace_facts(self) -> tuple[RuntimeLedgerFact, ...]:
-        facts: list[RuntimeLedgerFact] = []
-        for disposition in RuntimeTraceDisposition:
-            facts.extend(
-                self._facts(
-                    RuntimeHistoryQuery(
-                        fact_type=f"trace_{disposition.value}",
-                        limit=1000,
-                    )
+    async def operation_outcome(
+        self,
+        *,
+        message_id: str | None,
+        request_key: str | None,
+        include_state_transfer: bool = False,
+    ) -> JsonObject:
+        if (message_id is None) == (request_key is None):
+            raise ValueError("provide exactly one of message_id or request_key")
+        if request_key is not None:
+            if _REQUEST_KEY.fullmatch(request_key) is None:
+                raise ValueError(
+                    "request_key must be 1-128 characters and use letters, digits, "
+                    "'.', '_', ':', or '-'"
                 )
-            )
-        return tuple(sorted(facts, key=lambda fact: fact.runtime_position))
+            gateway = self.runtime.address_for("vellis.interface.mcp")
+            resolved_id = uuid5(gateway.instance_id, request_key)
+        else:
+            resolved_id = UUID(str(message_id))
+        outcome = await self.runtime.lookup_message_outcome(resolved_id)
+        if outcome is None:
+            return {
+                "status": "unknown",
+                "message_id": str(resolved_id),
+                "guidance": "Verify the request key or message ID before retrying the operation.",
+            }
+        request = outcome.request_envelope
+        gateway = self.runtime.address_for("vellis.interface.mcp")
+        facade = self.runtime.address_for("vellis.facade.primary")
+        curated_actions = {f"application.vellis.facade.{name}" for name in TOOL_NAMES}
+        if (
+            request.kind is not RuntimeMessageKind.REQUEST
+            or request.causation_id is not None
+            or request.source != gateway
+            or request.target != facade
+            or request.action_id not in curated_actions
+        ):
+            raise ValueError("operation outcome is not a curated MCP root request")
+        terminal = outcome.terminal_envelope
+        terminal_receipt = outcome.terminal_receipt
+        result: JsonObject = {
+            "status": "pending" if terminal is None else terminal.kind.value,
+            "message_id": str(resolved_id),
+            "trace_id": str(outcome.request_receipt.trace_id),
+            "accepted_position": outcome.request_receipt.accepted_position,
+            "terminal_position": (
+                terminal_receipt.terminal_position if terminal_receipt is not None else None
+            ),
+            "disposition": (
+                terminal_receipt.trace_disposition.value
+                if terminal_receipt is not None
+                and terminal_receipt.trace_disposition is not None
+                else None
+            ),
+            "guidance": (
+                "The operation is still executing; observe this same identity again without "
+                "submitting the mutation again."
+                if terminal is None
+                else "This is the durable terminal outcome; do not resubmit the mutation."
+            ),
+        }
+        if terminal is not None:
+            encoded = cast(JsonObject, encode_json(terminal.payload.value))
+            state_transfer = request.action_id in {
+                "application.vellis.facade.rtg_export_system_snapshot",
+                "application.vellis.facade.rtg_load_persisted_snapshot",
+            }
+            if state_transfer and not include_state_transfer:
+                canonical = canonical_json(encoded).encode()
+                result.update(
+                    {
+                        "payload_withheld": True,
+                        "payload_digest": hashlib.sha256(canonical).hexdigest(),
+                        "encoded_size_bytes": len(canonical),
+                    }
+                )
+            else:
+                result["outcome"] = encoded
+        return result
 
-    def _facts(self, query: RuntimeHistoryQuery) -> tuple[RuntimeLedgerFact, ...]:
+    async def _facts(self, query: RuntimeHistoryQuery) -> tuple[RuntimeLedgerFact, ...]:
         facts: list[RuntimeLedgerFact] = []
         after = query.after_position
         while True:
-            page = self.runtime.query_history_sync(
+            page = await self.runtime.query_history(
                 RuntimeHistoryQuery(
                     after_position=after,
                     through_position=query.through_position,
@@ -205,13 +296,6 @@ class VellisRuntimeServices:
             after = page.next_position
 
 
-def _fact_arguments(fact: RuntimeLedgerFact) -> JsonObject:
-    envelope = getattr(fact, "envelope", None)
-    if envelope is None or not isinstance(envelope.payload.value, dict):
-        return {}
-    return cast(JsonObject, envelope.payload.value)
-
-
 def _migration_id(action_id: str, arguments: JsonObject) -> str | None:
     if action_id.endswith(("apply_migration_cutover", "abandon_migration")):
         value = arguments.get("migration_id")
@@ -230,3 +314,12 @@ def _migration_id(action_id: str, arguments: JsonObject) -> str | None:
         return None
     value = migration.get("migration_id")
     return str(value) if value is not None else None
+
+
+def _migration_event_summary(event_type: str, migration_id: str | None) -> str:
+    subject = f"migration {migration_id}" if migration_id else "migration operation"
+    return {
+        "knowledge_staged": f"Staged knowledge for {subject}.",
+        "cutover_requested": f"Requested cutover for {subject}.",
+        "migration_abandoned": f"Abandoned {subject}.",
+    }.get(event_type, subject)

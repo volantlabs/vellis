@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import ast
 import re
 import subprocess
 from pathlib import Path
@@ -88,9 +89,13 @@ def test_authored_products_generated_outputs_and_fixture_are_separated() -> None
     assert authored == under_model
     assert model_layout.SOFTWARE_COMPONENT_PATTERN_PATH.exists()
     assert model_layout.SOFTWARE_COMPONENT_PATTERN_PATH.resolve() not in authored
-    assert not list(model_layout.REFERENCE_DOC_ROOT.rglob("*.json"))
+    reference_json = {path.resolve() for path in model_layout.REFERENCE_DOC_ROOT.rglob("*.json")}
+    assert reference_json == {
+        (model_layout.ARCHITECTURE_REFERENCE_ROOT / "manifest.json").resolve()
+    }
     assert {path.name for path in model_layout.GENERATED_MODEL_ROOT.glob("*.json")} == {
         "conformance-objectives.json",
+        "architecture-graph.json",
         "formal-model-index.json",
         "verification-evidence.json",
     }
@@ -121,3 +126,46 @@ def test_local_vellis_data_readme_is_tracked_and_runtime_state_is_ignored() -> N
         check=False,
     )
     assert ignored.returncode == 0
+
+
+def test_participation_kits_do_not_import_other_component_implementations() -> None:
+    violations: list[str] = []
+    for path in (ROOT / "components").glob("**/runtime_binding.py"):
+        own_component = ".".join(path.relative_to(ROOT).parts[:-1])
+        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+        for node in ast.walk(tree):
+            if not isinstance(node, (ast.Import, ast.ImportFrom)):
+                continue
+            modules = (
+                [node.module or ""]
+                if isinstance(node, ast.ImportFrom)
+                else [alias.name for alias in node.names]
+            )
+            for module in modules:
+                if (
+                    module.startswith("components.")
+                    and module.endswith(".implementation")
+                    and not module.startswith(own_component)
+                    and not module.startswith("components.runtime.component_adapter")
+                ):
+                    violations.append(f"{path.relative_to(ROOT)}:{node.lineno}: {module}")
+    assert violations == []
+
+
+def test_runtime_native_cutover_has_no_removed_side_channels_or_semantic_tables() -> None:
+    forbidden = {
+        "MethodBindingSpec": "hand-authored binding metadata",
+        "set_starter_schema": "attached facade mutation",
+        "TypedMessageProxy": "proxy-era integration",
+        "MutableAdapterHost": "proxy-era replay host",
+        "request_sync": "sync-over-message API",
+    }
+    violations: list[str] = []
+    for path in [*(ROOT / "components").glob("**/*.py"), *(ROOT / "apps").glob("**/*.py")]:
+        if "/tests/" in path.as_posix():
+            continue
+        text = path.read_text(encoding="utf-8")
+        for token, reason in forbidden.items():
+            if token in text:
+                violations.append(f"{path.relative_to(ROOT)}: {reason} ({token})")
+    assert violations == []

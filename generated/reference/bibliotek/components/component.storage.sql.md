@@ -101,4 +101,10 @@ Generated from textual SysML v2 by `just model-render` as a non-normative readin
 | `OpenSqlStorageContractVerification` | `OpenSqlStorage` | `openSqlStorageFailureSemantics` | `components/storage/sql/tests/test_storage_sql_contract.py#OpenSqlStorageContractVerification` |
 | `SqlStorageBoundaryVerification` | `SqlStorage` | `serializedHandleAccess`, `noImplicitDatabaseChange`, `transactionAtomicity`, `genericStorage`, `jsonCompatibleRows`, `intentionalBoundary` | `components/storage/sql/tests/test_storage_sql_contract.py#SqlStorageBoundaryVerification` |
 
+## Diagram
+
+![component.storage.sql contract diagram](../diagrams/component.storage.sql.contract.svg)
+
+[PlantUML source](../diagrams/component.storage.sql.contract.puml)
+
 Equivalent private algorithms, helpers, storage layouts, and implementation-language inheritance remain implementation choices.

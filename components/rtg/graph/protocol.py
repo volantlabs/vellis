@@ -4,6 +4,8 @@ from dataclasses import dataclass, field
 from typing import Protocol
 from uuid import UUID
 
+from components.rtg.change import RtgChangeReference
+
 type JsonScalar = str | int | float | bool | None
 type JsonValue = JsonScalar | list[JsonValue] | dict[str, JsonValue]
 type JsonObject = dict[str, JsonValue]
@@ -72,6 +74,64 @@ class RtgGraphSnapshot:
     data_objects: tuple[JsonObject, ...]
     links: tuple[JsonObject, ...]
     anchor_data_index: dict[str, tuple[str, ...]]
+
+
+@dataclass(frozen=True, slots=True)
+class RtgGraphAnchorWrite:
+    ref: RtgChangeReference
+    type: str
+    display_name: str | None = None
+    system: JsonObject = field(default_factory=dict)
+
+
+@dataclass(frozen=True, slots=True)
+class RtgGraphDataObjectWrite:
+    ref: RtgChangeReference
+    type: str
+    properties: JsonObject = field(default_factory=dict)
+    system: JsonObject = field(default_factory=dict)
+    anchor_refs: tuple[RtgChangeReference, ...] = ()
+
+
+@dataclass(frozen=True, slots=True)
+class RtgGraphLinkWrite:
+    ref: RtgChangeReference
+    type: str
+    source_ref: RtgChangeReference
+    target_ref: RtgChangeReference
+    system: JsonObject = field(default_factory=dict)
+
+
+@dataclass(frozen=True, slots=True)
+class RtgGraphAssociationChange:
+    anchor_ref: RtgChangeReference
+    data_ref: RtgChangeReference
+
+
+@dataclass(frozen=True, slots=True)
+class RtgGraphLiveStatusChange:
+    object_ref: RtgChangeReference
+    live: bool
+
+
+@dataclass(frozen=True, slots=True)
+class RtgGraphChangeSet:
+    anchor_writes: tuple[RtgGraphAnchorWrite, ...] = ()
+    data_object_writes: tuple[RtgGraphDataObjectWrite, ...] = ()
+    link_writes: tuple[RtgGraphLinkWrite, ...] = ()
+    associate_data: tuple[RtgGraphAssociationChange, ...] = ()
+    dissociate_data: tuple[RtgGraphAssociationChange, ...] = ()
+    delete_anchors: tuple[RtgChangeReference, ...] = ()
+    delete_data_objects: tuple[RtgChangeReference, ...] = ()
+    delete_links: tuple[RtgChangeReference, ...] = ()
+    set_live: tuple[RtgGraphLiveStatusChange, ...] = ()
+
+
+@dataclass(frozen=True, slots=True)
+class RtgGraphBatchResult:
+    writes: int = 0
+    deletes: int = 0
+    live_changes: int = 0
 
 
 @dataclass(frozen=True, slots=True)
@@ -152,15 +212,25 @@ class RtgGraphReadView(Protocol):
         """Get an anchor, data object, or link by UUID."""
         ...
 
-    def list_by_type(self, object_type: str) -> RtgObjectList:
+    def list_by_type(
+        self, object_type: str, offset: int = 0, limit: int | None = None
+    ) -> RtgObjectList:
         """List RTG objects by type across the global type namespace."""
         ...
 
-    def list_anchor_data(self, anchor_uuid: UuidInput) -> RtgDataObjectList:
+    def list_anchor_data(
+        self, anchor_uuid: UuidInput, offset: int = 0, limit: int | None = None
+    ) -> RtgDataObjectList:
         """List data objects indexed to an anchor."""
         ...
 
-    def list_incident_links(self, object_uuid: UuidInput, direction: str = "both") -> RtgLinkList:
+    def list_incident_links(
+        self,
+        object_uuid: UuidInput,
+        direction: str = "both",
+        offset: int = 0,
+        limit: int | None = None,
+    ) -> RtgLinkList:
         """List incident links for an anchor or data object."""
         ...
 
@@ -182,6 +252,10 @@ class RtgGraph(RtgGraphReadView, Protocol):
 
     def replace_snapshot(self, snapshot: RtgGraphSnapshot) -> None:
         """Atomically replace all graph state from a validated snapshot."""
+        ...
+
+    def apply_batch(self, changes: RtgGraphChangeSet) -> RtgGraphBatchResult:
+        """Apply one graph-local change set atomically."""
         ...
 
     def put_anchor(self, anchor: RtgAnchor) -> RtgAnchor:
@@ -234,7 +308,9 @@ class RtgGraph(RtgGraphReadView, Protocol):
         """Preview a data dissociation without mutating graph state."""
         ...
 
-    def list_data_anchors(self, data_uuid: UuidInput) -> RtgAnchorList:
+    def list_data_anchors(
+        self, data_uuid: UuidInput, offset: int = 0, limit: int | None = None
+    ) -> RtgAnchorList:
         """List anchors indexed to a data object."""
         ...
 

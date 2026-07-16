@@ -1,0 +1,4313 @@
+{
+  "actions": [
+    {
+      "action_id": "component.rtg.graph.export_snapshot",
+      "binding_id": "binding.python.rtg.graph.v1",
+      "binding_version": 1,
+      "canonical_effect_codec_id": null,
+      "canonical_effect_codec_version": null,
+      "canonical_effect_schema_version": null,
+      "concurrency_lane": "serialized",
+      "consistency_access": "independent",
+      "consistency_group": null,
+      "deadline_seconds": null,
+      "effect_payload_disposition": null,
+      "externally_effectful": false,
+      "failure_codec_id": "codec.python.component.rtg.graph.failure.json",
+      "failure_codec_version": 1,
+      "failure_dispositions": {},
+      "failure_names": [],
+      "fault_payload_disposition": "diagnostic",
+      "fault_schema": {
+        "oneOf": []
+      },
+      "idempotency": "idempotent",
+      "method_name": "export_snapshot",
+      "modeled_fault_trace_disposition": "aborted",
+      "recovery_authorized": false,
+      "replay_mode": "no_state_effect",
+      "request_arguments": [],
+      "request_codec_id": "codec.python.component.rtg.graph.request.json",
+      "request_codec_version": 1,
+      "request_payload_disposition": "command",
+      "request_schema": {
+        "additionalProperties": false,
+        "properties": {},
+        "required": [],
+        "type": "object"
+      },
+      "resolved_argument_from_result": null,
+      "result_codec_id": "codec.python.component.rtg.graph.result.json",
+      "result_codec_version": 1,
+      "result_payload_disposition": "state_transfer",
+      "result_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "anchor_data_index": {
+            "type": "object"
+          },
+          "anchors": {
+            "items": {
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "data_objects": {
+            "items": {
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "links": {
+            "items": {
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "anchor_data_index"
+        ],
+        "type": "object"
+      },
+      "schema_version": 1
+    },
+    {
+      "action_id": "component.rtg.graph.replace_snapshot",
+      "binding_id": "binding.python.rtg.graph.v1",
+      "binding_version": 1,
+      "canonical_effect_codec_id": "binding.python.rtg.graph.v1.component.rtg.graph.replace_snapshot.effect.json",
+      "canonical_effect_codec_version": 1,
+      "canonical_effect_schema_version": 1,
+      "concurrency_lane": "serialized",
+      "consistency_access": "independent",
+      "consistency_group": null,
+      "deadline_seconds": null,
+      "effect_payload_disposition": "state_transfer",
+      "externally_effectful": false,
+      "failure_codec_id": "codec.python.component.rtg.graph.failure.json",
+      "failure_codec_version": 1,
+      "failure_dispositions": {},
+      "failure_names": [
+        "RtgGraphSnapshotInvalid",
+        "RtgGraphUuidInvalid",
+        "RtgGraphUuidConflict",
+        "RtgGraphReferenceInvalid",
+        "RtgGraphTypeInvalid",
+        "RtgGraphTypeKindConflict",
+        "RtgGraphJsonValueInvalid",
+        "RtgGraphSystemValueInvalid"
+      ],
+      "fault_payload_disposition": "diagnostic",
+      "fault_schema": {
+        "oneOf": [
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          }
+        ]
+      },
+      "idempotency": "idempotent",
+      "method_name": "replace_snapshot",
+      "modeled_fault_trace_disposition": "aborted",
+      "recovery_authorized": false,
+      "replay_mode": "canonical_effect",
+      "request_arguments": [
+        {
+          "default": null,
+          "name": "snapshot",
+          "required": true,
+          "schema": {
+            "additionalProperties": false,
+            "properties": {
+              "anchor_data_index": {
+                "type": "object"
+              },
+              "anchors": {
+                "items": {
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "data_objects": {
+                "items": {
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "links": {
+                "items": {
+                  "type": "object"
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "anchor_data_index"
+            ],
+            "type": "object"
+          }
+        }
+      ],
+      "request_codec_id": "codec.python.component.rtg.graph.request.json",
+      "request_codec_version": 1,
+      "request_payload_disposition": "state_transfer",
+      "request_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "snapshot": {
+            "additionalProperties": false,
+            "properties": {
+              "anchor_data_index": {
+                "type": "object"
+              },
+              "anchors": {
+                "items": {
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "data_objects": {
+                "items": {
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "links": {
+                "items": {
+                  "type": "object"
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "anchor_data_index"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "snapshot"
+        ],
+        "type": "object"
+      },
+      "resolved_argument_from_result": null,
+      "result_codec_id": "codec.python.component.rtg.graph.result.json",
+      "result_codec_version": 1,
+      "result_payload_disposition": "query_result",
+      "result_schema": {
+        "type": "null"
+      },
+      "schema_version": 1
+    },
+    {
+      "action_id": "component.rtg.graph.apply_batch",
+      "binding_id": "binding.python.rtg.graph.v1",
+      "binding_version": 1,
+      "canonical_effect_codec_id": "binding.python.rtg.graph.v1.component.rtg.graph.apply_batch.effect.json",
+      "canonical_effect_codec_version": 1,
+      "canonical_effect_schema_version": 1,
+      "concurrency_lane": "serialized",
+      "consistency_access": "independent",
+      "consistency_group": null,
+      "deadline_seconds": null,
+      "effect_payload_disposition": "canonical_delta",
+      "externally_effectful": false,
+      "failure_codec_id": "codec.python.component.rtg.graph.failure.json",
+      "failure_codec_version": 1,
+      "failure_dispositions": {},
+      "failure_names": [
+        "RtgGraphUuidInvalid",
+        "RtgGraphUuidConflict",
+        "RtgGraphReferenceInvalid",
+        "RtgGraphTypeInvalid",
+        "RtgGraphTypeKindConflict",
+        "RtgGraphJsonValueInvalid",
+        "RtgGraphSystemValueInvalid",
+        "RtgGraphAnchorNotFound",
+        "RtgGraphDataObjectNotFound",
+        "RtgGraphLinkNotFound",
+        "RtgGraphEndpointNotFound",
+        "RtgGraphAnchorDataIndexEntryNotFound",
+        "RtgGraphObjectNotFound"
+      ],
+      "fault_payload_disposition": "diagnostic",
+      "fault_schema": {
+        "oneOf": [
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          }
+        ]
+      },
+      "idempotency": "non_idempotent",
+      "method_name": "apply_batch",
+      "modeled_fault_trace_disposition": "aborted",
+      "recovery_authorized": false,
+      "replay_mode": "canonical_effect",
+      "request_arguments": [
+        {
+          "default": null,
+          "name": "changes",
+          "required": true,
+          "schema": {
+            "additionalProperties": false,
+            "properties": {
+              "anchor_writes": {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "display_name": {
+                      "type": "string"
+                    },
+                    "ref": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "local_ref": {
+                          "type": "string"
+                        },
+                        "resource_id": {
+                          "type": "string"
+                        }
+                      },
+                      "type": "object"
+                    },
+                    "system": {
+                      "type": "object"
+                    },
+                    "type": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "ref",
+                    "type"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "associate_data": {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "anchor_ref": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "local_ref": {
+                          "type": "string"
+                        },
+                        "resource_id": {
+                          "type": "string"
+                        }
+                      },
+                      "type": "object"
+                    },
+                    "data_ref": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "local_ref": {
+                          "type": "string"
+                        },
+                        "resource_id": {
+                          "type": "string"
+                        }
+                      },
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "anchor_ref",
+                    "data_ref"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "data_object_writes": {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "anchor_refs": {
+                      "items": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "local_ref": {
+                            "type": "string"
+                          },
+                          "resource_id": {
+                            "type": "string"
+                          }
+                        },
+                        "type": "object"
+                      },
+                      "type": "array"
+                    },
+                    "properties": {
+                      "type": "object"
+                    },
+                    "ref": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "local_ref": {
+                          "type": "string"
+                        },
+                        "resource_id": {
+                          "type": "string"
+                        }
+                      },
+                      "type": "object"
+                    },
+                    "system": {
+                      "type": "object"
+                    },
+                    "type": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "ref",
+                    "type",
+                    "properties",
+                    "anchor_refs"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "delete_anchors": {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "local_ref": {
+                      "type": "string"
+                    },
+                    "resource_id": {
+                      "type": "string"
+                    }
+                  },
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "delete_data_objects": {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "local_ref": {
+                      "type": "string"
+                    },
+                    "resource_id": {
+                      "type": "string"
+                    }
+                  },
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "delete_links": {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "local_ref": {
+                      "type": "string"
+                    },
+                    "resource_id": {
+                      "type": "string"
+                    }
+                  },
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "dissociate_data": {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "anchor_ref": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "local_ref": {
+                          "type": "string"
+                        },
+                        "resource_id": {
+                          "type": "string"
+                        }
+                      },
+                      "type": "object"
+                    },
+                    "data_ref": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "local_ref": {
+                          "type": "string"
+                        },
+                        "resource_id": {
+                          "type": "string"
+                        }
+                      },
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "anchor_ref",
+                    "data_ref"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "link_writes": {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "ref": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "local_ref": {
+                          "type": "string"
+                        },
+                        "resource_id": {
+                          "type": "string"
+                        }
+                      },
+                      "type": "object"
+                    },
+                    "source_ref": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "local_ref": {
+                          "type": "string"
+                        },
+                        "resource_id": {
+                          "type": "string"
+                        }
+                      },
+                      "type": "object"
+                    },
+                    "system": {
+                      "type": "object"
+                    },
+                    "target_ref": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "local_ref": {
+                          "type": "string"
+                        },
+                        "resource_id": {
+                          "type": "string"
+                        }
+                      },
+                      "type": "object"
+                    },
+                    "type": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "ref",
+                    "type",
+                    "source_ref",
+                    "target_ref"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "set_live": {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "live": {
+                      "type": "boolean"
+                    },
+                    "object_ref": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "local_ref": {
+                          "type": "string"
+                        },
+                        "resource_id": {
+                          "type": "string"
+                        }
+                      },
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "object_ref",
+                    "live"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              }
+            },
+            "type": "object"
+          }
+        }
+      ],
+      "request_codec_id": "codec.python.component.rtg.graph.request.json",
+      "request_codec_version": 1,
+      "request_payload_disposition": "command",
+      "request_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "changes": {
+            "additionalProperties": false,
+            "properties": {
+              "anchor_writes": {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "display_name": {
+                      "type": "string"
+                    },
+                    "ref": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "local_ref": {
+                          "type": "string"
+                        },
+                        "resource_id": {
+                          "type": "string"
+                        }
+                      },
+                      "type": "object"
+                    },
+                    "system": {
+                      "type": "object"
+                    },
+                    "type": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "ref",
+                    "type"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "associate_data": {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "anchor_ref": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "local_ref": {
+                          "type": "string"
+                        },
+                        "resource_id": {
+                          "type": "string"
+                        }
+                      },
+                      "type": "object"
+                    },
+                    "data_ref": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "local_ref": {
+                          "type": "string"
+                        },
+                        "resource_id": {
+                          "type": "string"
+                        }
+                      },
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "anchor_ref",
+                    "data_ref"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "data_object_writes": {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "anchor_refs": {
+                      "items": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "local_ref": {
+                            "type": "string"
+                          },
+                          "resource_id": {
+                            "type": "string"
+                          }
+                        },
+                        "type": "object"
+                      },
+                      "type": "array"
+                    },
+                    "properties": {
+                      "type": "object"
+                    },
+                    "ref": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "local_ref": {
+                          "type": "string"
+                        },
+                        "resource_id": {
+                          "type": "string"
+                        }
+                      },
+                      "type": "object"
+                    },
+                    "system": {
+                      "type": "object"
+                    },
+                    "type": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "ref",
+                    "type",
+                    "properties",
+                    "anchor_refs"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "delete_anchors": {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "local_ref": {
+                      "type": "string"
+                    },
+                    "resource_id": {
+                      "type": "string"
+                    }
+                  },
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "delete_data_objects": {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "local_ref": {
+                      "type": "string"
+                    },
+                    "resource_id": {
+                      "type": "string"
+                    }
+                  },
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "delete_links": {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "local_ref": {
+                      "type": "string"
+                    },
+                    "resource_id": {
+                      "type": "string"
+                    }
+                  },
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "dissociate_data": {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "anchor_ref": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "local_ref": {
+                          "type": "string"
+                        },
+                        "resource_id": {
+                          "type": "string"
+                        }
+                      },
+                      "type": "object"
+                    },
+                    "data_ref": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "local_ref": {
+                          "type": "string"
+                        },
+                        "resource_id": {
+                          "type": "string"
+                        }
+                      },
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "anchor_ref",
+                    "data_ref"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "link_writes": {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "ref": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "local_ref": {
+                          "type": "string"
+                        },
+                        "resource_id": {
+                          "type": "string"
+                        }
+                      },
+                      "type": "object"
+                    },
+                    "source_ref": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "local_ref": {
+                          "type": "string"
+                        },
+                        "resource_id": {
+                          "type": "string"
+                        }
+                      },
+                      "type": "object"
+                    },
+                    "system": {
+                      "type": "object"
+                    },
+                    "target_ref": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "local_ref": {
+                          "type": "string"
+                        },
+                        "resource_id": {
+                          "type": "string"
+                        }
+                      },
+                      "type": "object"
+                    },
+                    "type": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "ref",
+                    "type",
+                    "source_ref",
+                    "target_ref"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "set_live": {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "live": {
+                      "type": "boolean"
+                    },
+                    "object_ref": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "local_ref": {
+                          "type": "string"
+                        },
+                        "resource_id": {
+                          "type": "string"
+                        }
+                      },
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "object_ref",
+                    "live"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              }
+            },
+            "type": "object"
+          }
+        },
+        "required": [
+          "changes"
+        ],
+        "type": "object"
+      },
+      "resolved_argument_from_result": null,
+      "result_codec_id": "codec.python.component.rtg.graph.result.json",
+      "result_codec_version": 1,
+      "result_payload_disposition": "query_result",
+      "result_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "deletes": {
+            "type": "integer"
+          },
+          "live_changes": {
+            "type": "integer"
+          },
+          "writes": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "writes",
+          "deletes",
+          "live_changes"
+        ],
+        "type": "object"
+      },
+      "schema_version": 1
+    },
+    {
+      "action_id": "component.rtg.graph.put_anchor",
+      "binding_id": "binding.python.rtg.graph.v1",
+      "binding_version": 1,
+      "canonical_effect_codec_id": "binding.python.rtg.graph.v1.component.rtg.graph.put_anchor.effect.json",
+      "canonical_effect_codec_version": 1,
+      "canonical_effect_schema_version": 1,
+      "concurrency_lane": "serialized",
+      "consistency_access": "independent",
+      "consistency_group": null,
+      "deadline_seconds": null,
+      "effect_payload_disposition": "canonical_delta",
+      "externally_effectful": false,
+      "failure_codec_id": "codec.python.component.rtg.graph.failure.json",
+      "failure_codec_version": 1,
+      "failure_dispositions": {},
+      "failure_names": [
+        "RtgGraphUuidInvalid",
+        "RtgGraphUuidConflict",
+        "RtgGraphTypeInvalid",
+        "RtgGraphTypeKindConflict",
+        "RtgGraphSystemValueInvalid"
+      ],
+      "fault_payload_disposition": "diagnostic",
+      "fault_schema": {
+        "oneOf": [
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          }
+        ]
+      },
+      "idempotency": "non_idempotent",
+      "method_name": "put_anchor",
+      "modeled_fault_trace_disposition": "aborted",
+      "recovery_authorized": false,
+      "replay_mode": "canonical_effect",
+      "request_arguments": [
+        {
+          "default": null,
+          "name": "anchor",
+          "required": true,
+          "schema": {
+            "additionalProperties": false,
+            "properties": {
+              "display_name": {
+                "type": "string"
+              },
+              "system": {
+                "additionalProperties": false,
+                "properties": {
+                  "live": {
+                    "type": "boolean"
+                  }
+                },
+                "type": "object"
+              },
+              "type": {
+                "type": "string"
+              },
+              "uuid": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "type",
+              "system"
+            ],
+            "type": "object"
+          }
+        }
+      ],
+      "request_codec_id": "codec.python.component.rtg.graph.request.json",
+      "request_codec_version": 1,
+      "request_payload_disposition": "command",
+      "request_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "anchor": {
+            "additionalProperties": false,
+            "properties": {
+              "display_name": {
+                "type": "string"
+              },
+              "system": {
+                "additionalProperties": false,
+                "properties": {
+                  "live": {
+                    "type": "boolean"
+                  }
+                },
+                "type": "object"
+              },
+              "type": {
+                "type": "string"
+              },
+              "uuid": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "type",
+              "system"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "anchor"
+        ],
+        "type": "object"
+      },
+      "resolved_argument_from_result": "anchor",
+      "result_codec_id": "codec.python.component.rtg.graph.result.json",
+      "result_codec_version": 1,
+      "result_payload_disposition": "query_result",
+      "result_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "display_name": {
+            "type": "string"
+          },
+          "system": {
+            "additionalProperties": false,
+            "properties": {
+              "live": {
+                "type": "boolean"
+              }
+            },
+            "type": "object"
+          },
+          "type": {
+            "type": "string"
+          },
+          "uuid": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "system"
+        ],
+        "type": "object"
+      },
+      "schema_version": 1
+    },
+    {
+      "action_id": "component.rtg.graph.put_data_object",
+      "binding_id": "binding.python.rtg.graph.v1",
+      "binding_version": 1,
+      "canonical_effect_codec_id": "binding.python.rtg.graph.v1.component.rtg.graph.put_data_object.effect.json",
+      "canonical_effect_codec_version": 1,
+      "canonical_effect_schema_version": 1,
+      "concurrency_lane": "serialized",
+      "consistency_access": "independent",
+      "consistency_group": null,
+      "deadline_seconds": null,
+      "effect_payload_disposition": "canonical_delta",
+      "externally_effectful": false,
+      "failure_codec_id": "codec.python.component.rtg.graph.failure.json",
+      "failure_codec_version": 1,
+      "failure_dispositions": {},
+      "failure_names": [
+        "RtgGraphUuidInvalid",
+        "RtgGraphUuidConflict",
+        "RtgGraphAnchorNotFound",
+        "RtgGraphTypeInvalid",
+        "RtgGraphTypeKindConflict",
+        "RtgGraphJsonValueInvalid",
+        "RtgGraphSystemValueInvalid"
+      ],
+      "fault_payload_disposition": "diagnostic",
+      "fault_schema": {
+        "oneOf": [
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          }
+        ]
+      },
+      "idempotency": "non_idempotent",
+      "method_name": "put_data_object",
+      "modeled_fault_trace_disposition": "aborted",
+      "recovery_authorized": false,
+      "replay_mode": "canonical_effect",
+      "request_arguments": [
+        {
+          "default": null,
+          "name": "data_object",
+          "required": true,
+          "schema": {
+            "additionalProperties": false,
+            "properties": {
+              "properties": {
+                "type": "object"
+              },
+              "system": {
+                "additionalProperties": false,
+                "properties": {
+                  "live": {
+                    "type": "boolean"
+                  }
+                },
+                "type": "object"
+              },
+              "type": {
+                "type": "string"
+              },
+              "uuid": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "type",
+              "system",
+              "properties"
+            ],
+            "type": "object"
+          }
+        },
+        {
+          "default": null,
+          "name": "anchor_uuids",
+          "required": true,
+          "schema": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        }
+      ],
+      "request_codec_id": "codec.python.component.rtg.graph.request.json",
+      "request_codec_version": 1,
+      "request_payload_disposition": "command",
+      "request_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "anchor_uuids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "data_object": {
+            "additionalProperties": false,
+            "properties": {
+              "properties": {
+                "type": "object"
+              },
+              "system": {
+                "additionalProperties": false,
+                "properties": {
+                  "live": {
+                    "type": "boolean"
+                  }
+                },
+                "type": "object"
+              },
+              "type": {
+                "type": "string"
+              },
+              "uuid": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "type",
+              "system",
+              "properties"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data_object",
+          "anchor_uuids"
+        ],
+        "type": "object"
+      },
+      "resolved_argument_from_result": "data_object",
+      "result_codec_id": "codec.python.component.rtg.graph.result.json",
+      "result_codec_version": 1,
+      "result_payload_disposition": "query_result",
+      "result_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "properties": {
+            "type": "object"
+          },
+          "system": {
+            "additionalProperties": false,
+            "properties": {
+              "live": {
+                "type": "boolean"
+              }
+            },
+            "type": "object"
+          },
+          "type": {
+            "type": "string"
+          },
+          "uuid": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "system",
+          "properties"
+        ],
+        "type": "object"
+      },
+      "schema_version": 1
+    },
+    {
+      "action_id": "component.rtg.graph.put_link",
+      "binding_id": "binding.python.rtg.graph.v1",
+      "binding_version": 1,
+      "canonical_effect_codec_id": "binding.python.rtg.graph.v1.component.rtg.graph.put_link.effect.json",
+      "canonical_effect_codec_version": 1,
+      "canonical_effect_schema_version": 1,
+      "concurrency_lane": "serialized",
+      "consistency_access": "independent",
+      "consistency_group": null,
+      "deadline_seconds": null,
+      "effect_payload_disposition": "canonical_delta",
+      "externally_effectful": false,
+      "failure_codec_id": "codec.python.component.rtg.graph.failure.json",
+      "failure_codec_version": 1,
+      "failure_dispositions": {},
+      "failure_names": [
+        "RtgGraphUuidInvalid",
+        "RtgGraphUuidConflict",
+        "RtgGraphEndpointNotFound",
+        "RtgGraphTypeInvalid",
+        "RtgGraphTypeKindConflict",
+        "RtgGraphSystemValueInvalid"
+      ],
+      "fault_payload_disposition": "diagnostic",
+      "fault_schema": {
+        "oneOf": [
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          }
+        ]
+      },
+      "idempotency": "non_idempotent",
+      "method_name": "put_link",
+      "modeled_fault_trace_disposition": "aborted",
+      "recovery_authorized": false,
+      "replay_mode": "canonical_effect",
+      "request_arguments": [
+        {
+          "default": null,
+          "name": "link",
+          "required": true,
+          "schema": {
+            "additionalProperties": false,
+            "properties": {
+              "source_uuid": {
+                "type": "string"
+              },
+              "system": {
+                "additionalProperties": false,
+                "properties": {
+                  "live": {
+                    "type": "boolean"
+                  }
+                },
+                "type": "object"
+              },
+              "target_uuid": {
+                "type": "string"
+              },
+              "type": {
+                "type": "string"
+              },
+              "uuid": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "type",
+              "system",
+              "source_uuid",
+              "target_uuid"
+            ],
+            "type": "object"
+          }
+        }
+      ],
+      "request_codec_id": "codec.python.component.rtg.graph.request.json",
+      "request_codec_version": 1,
+      "request_payload_disposition": "command",
+      "request_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "link": {
+            "additionalProperties": false,
+            "properties": {
+              "source_uuid": {
+                "type": "string"
+              },
+              "system": {
+                "additionalProperties": false,
+                "properties": {
+                  "live": {
+                    "type": "boolean"
+                  }
+                },
+                "type": "object"
+              },
+              "target_uuid": {
+                "type": "string"
+              },
+              "type": {
+                "type": "string"
+              },
+              "uuid": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "type",
+              "system",
+              "source_uuid",
+              "target_uuid"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "link"
+        ],
+        "type": "object"
+      },
+      "resolved_argument_from_result": "link",
+      "result_codec_id": "codec.python.component.rtg.graph.result.json",
+      "result_codec_version": 1,
+      "result_payload_disposition": "query_result",
+      "result_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "source_uuid": {
+            "type": "string"
+          },
+          "system": {
+            "additionalProperties": false,
+            "properties": {
+              "live": {
+                "type": "boolean"
+              }
+            },
+            "type": "object"
+          },
+          "target_uuid": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "uuid": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "system",
+          "source_uuid",
+          "target_uuid"
+        ],
+        "type": "object"
+      },
+      "schema_version": 1
+    },
+    {
+      "action_id": "component.rtg.graph.associate_data",
+      "binding_id": "binding.python.rtg.graph.v1",
+      "binding_version": 1,
+      "canonical_effect_codec_id": "binding.python.rtg.graph.v1.component.rtg.graph.associate_data.effect.json",
+      "canonical_effect_codec_version": 1,
+      "canonical_effect_schema_version": 1,
+      "concurrency_lane": "serialized",
+      "consistency_access": "independent",
+      "consistency_group": null,
+      "deadline_seconds": null,
+      "effect_payload_disposition": "canonical_delta",
+      "externally_effectful": false,
+      "failure_codec_id": "codec.python.component.rtg.graph.failure.json",
+      "failure_codec_version": 1,
+      "failure_dispositions": {},
+      "failure_names": [
+        "RtgGraphUuidInvalid",
+        "RtgGraphAnchorNotFound",
+        "RtgGraphDataObjectNotFound"
+      ],
+      "fault_payload_disposition": "diagnostic",
+      "fault_schema": {
+        "oneOf": [
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          }
+        ]
+      },
+      "idempotency": "idempotent",
+      "method_name": "associate_data",
+      "modeled_fault_trace_disposition": "aborted",
+      "recovery_authorized": false,
+      "replay_mode": "canonical_effect",
+      "request_arguments": [
+        {
+          "default": null,
+          "name": "anchor_uuid",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "default": null,
+          "name": "data_uuid",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "request_codec_id": "codec.python.component.rtg.graph.request.json",
+      "request_codec_version": 1,
+      "request_payload_disposition": "command",
+      "request_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "anchor_uuid": {
+            "type": "string"
+          },
+          "data_uuid": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "anchor_uuid",
+          "data_uuid"
+        ],
+        "type": "object"
+      },
+      "resolved_argument_from_result": null,
+      "result_codec_id": "codec.python.component.rtg.graph.result.json",
+      "result_codec_version": 1,
+      "result_payload_disposition": "query_result",
+      "result_schema": {
+        "type": "null"
+      },
+      "schema_version": 1
+    },
+    {
+      "action_id": "component.rtg.graph.dissociate_data",
+      "binding_id": "binding.python.rtg.graph.v1",
+      "binding_version": 1,
+      "canonical_effect_codec_id": "binding.python.rtg.graph.v1.component.rtg.graph.dissociate_data.effect.json",
+      "canonical_effect_codec_version": 1,
+      "canonical_effect_schema_version": 1,
+      "concurrency_lane": "serialized",
+      "consistency_access": "independent",
+      "consistency_group": null,
+      "deadline_seconds": null,
+      "effect_payload_disposition": "canonical_delta",
+      "externally_effectful": false,
+      "failure_codec_id": "codec.python.component.rtg.graph.failure.json",
+      "failure_codec_version": 1,
+      "failure_dispositions": {},
+      "failure_names": [
+        "RtgGraphUuidInvalid",
+        "RtgGraphAnchorNotFound",
+        "RtgGraphDataObjectNotFound",
+        "RtgGraphAnchorDataIndexEntryNotFound"
+      ],
+      "fault_payload_disposition": "diagnostic",
+      "fault_schema": {
+        "oneOf": [
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          }
+        ]
+      },
+      "idempotency": "non_idempotent",
+      "method_name": "dissociate_data",
+      "modeled_fault_trace_disposition": "aborted",
+      "recovery_authorized": false,
+      "replay_mode": "canonical_effect",
+      "request_arguments": [
+        {
+          "default": null,
+          "name": "anchor_uuid",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "default": null,
+          "name": "data_uuid",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "request_codec_id": "codec.python.component.rtg.graph.request.json",
+      "request_codec_version": 1,
+      "request_payload_disposition": "command",
+      "request_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "anchor_uuid": {
+            "type": "string"
+          },
+          "data_uuid": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "anchor_uuid",
+          "data_uuid"
+        ],
+        "type": "object"
+      },
+      "resolved_argument_from_result": null,
+      "result_codec_id": "codec.python.component.rtg.graph.result.json",
+      "result_codec_version": 1,
+      "result_payload_disposition": "query_result",
+      "result_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "deleted_anchors": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "display_name": {
+                  "type": "string"
+                },
+                "system": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "live": {
+                      "type": "boolean"
+                    }
+                  },
+                  "type": "object"
+                },
+                "type": {
+                  "type": "string"
+                },
+                "uuid": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "system"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "deleted_data_objects": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "properties": {
+                  "type": "object"
+                },
+                "system": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "live": {
+                      "type": "boolean"
+                    }
+                  },
+                  "type": "object"
+                },
+                "type": {
+                  "type": "string"
+                },
+                "uuid": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "system",
+                "properties"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "deleted_links": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "source_uuid": {
+                  "type": "string"
+                },
+                "system": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "live": {
+                      "type": "boolean"
+                    }
+                  },
+                  "type": "object"
+                },
+                "target_uuid": {
+                  "type": "string"
+                },
+                "type": {
+                  "type": "string"
+                },
+                "uuid": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "system",
+                "source_uuid",
+                "target_uuid"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "removed_anchor_data_pairs": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "anchor_uuid": {
+                  "type": "string"
+                },
+                "data_uuid": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "anchor_uuid",
+                "data_uuid"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "schema_version": 1
+    },
+    {
+      "action_id": "component.rtg.graph.delete_anchor",
+      "binding_id": "binding.python.rtg.graph.v1",
+      "binding_version": 1,
+      "canonical_effect_codec_id": "binding.python.rtg.graph.v1.component.rtg.graph.delete_anchor.effect.json",
+      "canonical_effect_codec_version": 1,
+      "canonical_effect_schema_version": 1,
+      "concurrency_lane": "serialized",
+      "consistency_access": "independent",
+      "consistency_group": null,
+      "deadline_seconds": null,
+      "effect_payload_disposition": "canonical_delta",
+      "externally_effectful": false,
+      "failure_codec_id": "codec.python.component.rtg.graph.failure.json",
+      "failure_codec_version": 1,
+      "failure_dispositions": {},
+      "failure_names": [
+        "RtgGraphUuidInvalid",
+        "RtgGraphAnchorNotFound"
+      ],
+      "fault_payload_disposition": "diagnostic",
+      "fault_schema": {
+        "oneOf": [
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          }
+        ]
+      },
+      "idempotency": "non_idempotent",
+      "method_name": "delete_anchor",
+      "modeled_fault_trace_disposition": "aborted",
+      "recovery_authorized": false,
+      "replay_mode": "canonical_effect",
+      "request_arguments": [
+        {
+          "default": null,
+          "name": "anchor_uuid",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "request_codec_id": "codec.python.component.rtg.graph.request.json",
+      "request_codec_version": 1,
+      "request_payload_disposition": "command",
+      "request_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "anchor_uuid": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "anchor_uuid"
+        ],
+        "type": "object"
+      },
+      "resolved_argument_from_result": null,
+      "result_codec_id": "codec.python.component.rtg.graph.result.json",
+      "result_codec_version": 1,
+      "result_payload_disposition": "query_result",
+      "result_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "deleted_anchors": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "display_name": {
+                  "type": "string"
+                },
+                "system": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "live": {
+                      "type": "boolean"
+                    }
+                  },
+                  "type": "object"
+                },
+                "type": {
+                  "type": "string"
+                },
+                "uuid": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "system"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "deleted_data_objects": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "properties": {
+                  "type": "object"
+                },
+                "system": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "live": {
+                      "type": "boolean"
+                    }
+                  },
+                  "type": "object"
+                },
+                "type": {
+                  "type": "string"
+                },
+                "uuid": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "system",
+                "properties"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "deleted_links": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "source_uuid": {
+                  "type": "string"
+                },
+                "system": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "live": {
+                      "type": "boolean"
+                    }
+                  },
+                  "type": "object"
+                },
+                "target_uuid": {
+                  "type": "string"
+                },
+                "type": {
+                  "type": "string"
+                },
+                "uuid": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "system",
+                "source_uuid",
+                "target_uuid"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "removed_anchor_data_pairs": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "anchor_uuid": {
+                  "type": "string"
+                },
+                "data_uuid": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "anchor_uuid",
+                "data_uuid"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "schema_version": 1
+    },
+    {
+      "action_id": "component.rtg.graph.delete_data_object",
+      "binding_id": "binding.python.rtg.graph.v1",
+      "binding_version": 1,
+      "canonical_effect_codec_id": "binding.python.rtg.graph.v1.component.rtg.graph.delete_data_object.effect.json",
+      "canonical_effect_codec_version": 1,
+      "canonical_effect_schema_version": 1,
+      "concurrency_lane": "serialized",
+      "consistency_access": "independent",
+      "consistency_group": null,
+      "deadline_seconds": null,
+      "effect_payload_disposition": "canonical_delta",
+      "externally_effectful": false,
+      "failure_codec_id": "codec.python.component.rtg.graph.failure.json",
+      "failure_codec_version": 1,
+      "failure_dispositions": {},
+      "failure_names": [
+        "RtgGraphUuidInvalid",
+        "RtgGraphDataObjectNotFound"
+      ],
+      "fault_payload_disposition": "diagnostic",
+      "fault_schema": {
+        "oneOf": [
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          }
+        ]
+      },
+      "idempotency": "non_idempotent",
+      "method_name": "delete_data_object",
+      "modeled_fault_trace_disposition": "aborted",
+      "recovery_authorized": false,
+      "replay_mode": "canonical_effect",
+      "request_arguments": [
+        {
+          "default": null,
+          "name": "data_uuid",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "request_codec_id": "codec.python.component.rtg.graph.request.json",
+      "request_codec_version": 1,
+      "request_payload_disposition": "command",
+      "request_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "data_uuid": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "data_uuid"
+        ],
+        "type": "object"
+      },
+      "resolved_argument_from_result": null,
+      "result_codec_id": "codec.python.component.rtg.graph.result.json",
+      "result_codec_version": 1,
+      "result_payload_disposition": "query_result",
+      "result_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "deleted_anchors": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "display_name": {
+                  "type": "string"
+                },
+                "system": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "live": {
+                      "type": "boolean"
+                    }
+                  },
+                  "type": "object"
+                },
+                "type": {
+                  "type": "string"
+                },
+                "uuid": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "system"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "deleted_data_objects": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "properties": {
+                  "type": "object"
+                },
+                "system": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "live": {
+                      "type": "boolean"
+                    }
+                  },
+                  "type": "object"
+                },
+                "type": {
+                  "type": "string"
+                },
+                "uuid": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "system",
+                "properties"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "deleted_links": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "source_uuid": {
+                  "type": "string"
+                },
+                "system": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "live": {
+                      "type": "boolean"
+                    }
+                  },
+                  "type": "object"
+                },
+                "target_uuid": {
+                  "type": "string"
+                },
+                "type": {
+                  "type": "string"
+                },
+                "uuid": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "system",
+                "source_uuid",
+                "target_uuid"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "removed_anchor_data_pairs": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "anchor_uuid": {
+                  "type": "string"
+                },
+                "data_uuid": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "anchor_uuid",
+                "data_uuid"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "schema_version": 1
+    },
+    {
+      "action_id": "component.rtg.graph.delete_link",
+      "binding_id": "binding.python.rtg.graph.v1",
+      "binding_version": 1,
+      "canonical_effect_codec_id": "binding.python.rtg.graph.v1.component.rtg.graph.delete_link.effect.json",
+      "canonical_effect_codec_version": 1,
+      "canonical_effect_schema_version": 1,
+      "concurrency_lane": "serialized",
+      "consistency_access": "independent",
+      "consistency_group": null,
+      "deadline_seconds": null,
+      "effect_payload_disposition": "canonical_delta",
+      "externally_effectful": false,
+      "failure_codec_id": "codec.python.component.rtg.graph.failure.json",
+      "failure_codec_version": 1,
+      "failure_dispositions": {},
+      "failure_names": [
+        "RtgGraphUuidInvalid",
+        "RtgGraphLinkNotFound"
+      ],
+      "fault_payload_disposition": "diagnostic",
+      "fault_schema": {
+        "oneOf": [
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          }
+        ]
+      },
+      "idempotency": "non_idempotent",
+      "method_name": "delete_link",
+      "modeled_fault_trace_disposition": "aborted",
+      "recovery_authorized": false,
+      "replay_mode": "canonical_effect",
+      "request_arguments": [
+        {
+          "default": null,
+          "name": "link_uuid",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "request_codec_id": "codec.python.component.rtg.graph.request.json",
+      "request_codec_version": 1,
+      "request_payload_disposition": "command",
+      "request_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "link_uuid": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "link_uuid"
+        ],
+        "type": "object"
+      },
+      "resolved_argument_from_result": null,
+      "result_codec_id": "codec.python.component.rtg.graph.result.json",
+      "result_codec_version": 1,
+      "result_payload_disposition": "query_result",
+      "result_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "deleted_anchors": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "display_name": {
+                  "type": "string"
+                },
+                "system": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "live": {
+                      "type": "boolean"
+                    }
+                  },
+                  "type": "object"
+                },
+                "type": {
+                  "type": "string"
+                },
+                "uuid": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "system"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "deleted_data_objects": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "properties": {
+                  "type": "object"
+                },
+                "system": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "live": {
+                      "type": "boolean"
+                    }
+                  },
+                  "type": "object"
+                },
+                "type": {
+                  "type": "string"
+                },
+                "uuid": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "system",
+                "properties"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "deleted_links": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "source_uuid": {
+                  "type": "string"
+                },
+                "system": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "live": {
+                      "type": "boolean"
+                    }
+                  },
+                  "type": "object"
+                },
+                "target_uuid": {
+                  "type": "string"
+                },
+                "type": {
+                  "type": "string"
+                },
+                "uuid": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "system",
+                "source_uuid",
+                "target_uuid"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "removed_anchor_data_pairs": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "anchor_uuid": {
+                  "type": "string"
+                },
+                "data_uuid": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "anchor_uuid",
+                "data_uuid"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "schema_version": 1
+    },
+    {
+      "action_id": "component.rtg.graph.preview_delete_anchor",
+      "binding_id": "binding.python.rtg.graph.v1",
+      "binding_version": 1,
+      "canonical_effect_codec_id": null,
+      "canonical_effect_codec_version": null,
+      "canonical_effect_schema_version": null,
+      "concurrency_lane": "serialized",
+      "consistency_access": "independent",
+      "consistency_group": null,
+      "deadline_seconds": null,
+      "effect_payload_disposition": null,
+      "externally_effectful": false,
+      "failure_codec_id": "codec.python.component.rtg.graph.failure.json",
+      "failure_codec_version": 1,
+      "failure_dispositions": {},
+      "failure_names": [
+        "RtgGraphUuidInvalid",
+        "RtgGraphAnchorNotFound"
+      ],
+      "fault_payload_disposition": "diagnostic",
+      "fault_schema": {
+        "oneOf": [
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          }
+        ]
+      },
+      "idempotency": "idempotent",
+      "method_name": "preview_delete_anchor",
+      "modeled_fault_trace_disposition": "aborted",
+      "recovery_authorized": false,
+      "replay_mode": "no_state_effect",
+      "request_arguments": [
+        {
+          "default": null,
+          "name": "anchor_uuid",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "request_codec_id": "codec.python.component.rtg.graph.request.json",
+      "request_codec_version": 1,
+      "request_payload_disposition": "command",
+      "request_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "anchor_uuid": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "anchor_uuid"
+        ],
+        "type": "object"
+      },
+      "resolved_argument_from_result": null,
+      "result_codec_id": "codec.python.component.rtg.graph.result.json",
+      "result_codec_version": 1,
+      "result_payload_disposition": "query_result",
+      "result_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "deleted_anchors": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "display_name": {
+                  "type": "string"
+                },
+                "system": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "live": {
+                      "type": "boolean"
+                    }
+                  },
+                  "type": "object"
+                },
+                "type": {
+                  "type": "string"
+                },
+                "uuid": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "system"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "deleted_data_objects": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "properties": {
+                  "type": "object"
+                },
+                "system": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "live": {
+                      "type": "boolean"
+                    }
+                  },
+                  "type": "object"
+                },
+                "type": {
+                  "type": "string"
+                },
+                "uuid": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "system",
+                "properties"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "deleted_links": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "source_uuid": {
+                  "type": "string"
+                },
+                "system": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "live": {
+                      "type": "boolean"
+                    }
+                  },
+                  "type": "object"
+                },
+                "target_uuid": {
+                  "type": "string"
+                },
+                "type": {
+                  "type": "string"
+                },
+                "uuid": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "system",
+                "source_uuid",
+                "target_uuid"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "removed_anchor_data_pairs": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "anchor_uuid": {
+                  "type": "string"
+                },
+                "data_uuid": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "anchor_uuid",
+                "data_uuid"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "schema_version": 1
+    },
+    {
+      "action_id": "component.rtg.graph.preview_delete_data_object",
+      "binding_id": "binding.python.rtg.graph.v1",
+      "binding_version": 1,
+      "canonical_effect_codec_id": null,
+      "canonical_effect_codec_version": null,
+      "canonical_effect_schema_version": null,
+      "concurrency_lane": "serialized",
+      "consistency_access": "independent",
+      "consistency_group": null,
+      "deadline_seconds": null,
+      "effect_payload_disposition": null,
+      "externally_effectful": false,
+      "failure_codec_id": "codec.python.component.rtg.graph.failure.json",
+      "failure_codec_version": 1,
+      "failure_dispositions": {},
+      "failure_names": [
+        "RtgGraphUuidInvalid",
+        "RtgGraphDataObjectNotFound"
+      ],
+      "fault_payload_disposition": "diagnostic",
+      "fault_schema": {
+        "oneOf": [
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          }
+        ]
+      },
+      "idempotency": "idempotent",
+      "method_name": "preview_delete_data_object",
+      "modeled_fault_trace_disposition": "aborted",
+      "recovery_authorized": false,
+      "replay_mode": "no_state_effect",
+      "request_arguments": [
+        {
+          "default": null,
+          "name": "data_uuid",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "request_codec_id": "codec.python.component.rtg.graph.request.json",
+      "request_codec_version": 1,
+      "request_payload_disposition": "command",
+      "request_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "data_uuid": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "data_uuid"
+        ],
+        "type": "object"
+      },
+      "resolved_argument_from_result": null,
+      "result_codec_id": "codec.python.component.rtg.graph.result.json",
+      "result_codec_version": 1,
+      "result_payload_disposition": "query_result",
+      "result_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "deleted_anchors": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "display_name": {
+                  "type": "string"
+                },
+                "system": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "live": {
+                      "type": "boolean"
+                    }
+                  },
+                  "type": "object"
+                },
+                "type": {
+                  "type": "string"
+                },
+                "uuid": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "system"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "deleted_data_objects": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "properties": {
+                  "type": "object"
+                },
+                "system": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "live": {
+                      "type": "boolean"
+                    }
+                  },
+                  "type": "object"
+                },
+                "type": {
+                  "type": "string"
+                },
+                "uuid": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "system",
+                "properties"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "deleted_links": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "source_uuid": {
+                  "type": "string"
+                },
+                "system": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "live": {
+                      "type": "boolean"
+                    }
+                  },
+                  "type": "object"
+                },
+                "target_uuid": {
+                  "type": "string"
+                },
+                "type": {
+                  "type": "string"
+                },
+                "uuid": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "system",
+                "source_uuid",
+                "target_uuid"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "removed_anchor_data_pairs": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "anchor_uuid": {
+                  "type": "string"
+                },
+                "data_uuid": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "anchor_uuid",
+                "data_uuid"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "schema_version": 1
+    },
+    {
+      "action_id": "component.rtg.graph.preview_dissociate_data",
+      "binding_id": "binding.python.rtg.graph.v1",
+      "binding_version": 1,
+      "canonical_effect_codec_id": null,
+      "canonical_effect_codec_version": null,
+      "canonical_effect_schema_version": null,
+      "concurrency_lane": "serialized",
+      "consistency_access": "independent",
+      "consistency_group": null,
+      "deadline_seconds": null,
+      "effect_payload_disposition": null,
+      "externally_effectful": false,
+      "failure_codec_id": "codec.python.component.rtg.graph.failure.json",
+      "failure_codec_version": 1,
+      "failure_dispositions": {},
+      "failure_names": [
+        "RtgGraphUuidInvalid",
+        "RtgGraphAnchorNotFound",
+        "RtgGraphDataObjectNotFound",
+        "RtgGraphAnchorDataIndexEntryNotFound"
+      ],
+      "fault_payload_disposition": "diagnostic",
+      "fault_schema": {
+        "oneOf": [
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          }
+        ]
+      },
+      "idempotency": "idempotent",
+      "method_name": "preview_dissociate_data",
+      "modeled_fault_trace_disposition": "aborted",
+      "recovery_authorized": false,
+      "replay_mode": "no_state_effect",
+      "request_arguments": [
+        {
+          "default": null,
+          "name": "anchor_uuid",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "default": null,
+          "name": "data_uuid",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "request_codec_id": "codec.python.component.rtg.graph.request.json",
+      "request_codec_version": 1,
+      "request_payload_disposition": "command",
+      "request_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "anchor_uuid": {
+            "type": "string"
+          },
+          "data_uuid": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "anchor_uuid",
+          "data_uuid"
+        ],
+        "type": "object"
+      },
+      "resolved_argument_from_result": null,
+      "result_codec_id": "codec.python.component.rtg.graph.result.json",
+      "result_codec_version": 1,
+      "result_payload_disposition": "query_result",
+      "result_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "deleted_anchors": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "display_name": {
+                  "type": "string"
+                },
+                "system": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "live": {
+                      "type": "boolean"
+                    }
+                  },
+                  "type": "object"
+                },
+                "type": {
+                  "type": "string"
+                },
+                "uuid": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "system"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "deleted_data_objects": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "properties": {
+                  "type": "object"
+                },
+                "system": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "live": {
+                      "type": "boolean"
+                    }
+                  },
+                  "type": "object"
+                },
+                "type": {
+                  "type": "string"
+                },
+                "uuid": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "system",
+                "properties"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "deleted_links": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "source_uuid": {
+                  "type": "string"
+                },
+                "system": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "live": {
+                      "type": "boolean"
+                    }
+                  },
+                  "type": "object"
+                },
+                "target_uuid": {
+                  "type": "string"
+                },
+                "type": {
+                  "type": "string"
+                },
+                "uuid": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "system",
+                "source_uuid",
+                "target_uuid"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "removed_anchor_data_pairs": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "anchor_uuid": {
+                  "type": "string"
+                },
+                "data_uuid": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "anchor_uuid",
+                "data_uuid"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "schema_version": 1
+    },
+    {
+      "action_id": "component.rtg.graph.get_object",
+      "binding_id": "binding.python.rtg.graph.v1",
+      "binding_version": 1,
+      "canonical_effect_codec_id": null,
+      "canonical_effect_codec_version": null,
+      "canonical_effect_schema_version": null,
+      "concurrency_lane": "serialized",
+      "consistency_access": "independent",
+      "consistency_group": null,
+      "deadline_seconds": null,
+      "effect_payload_disposition": null,
+      "externally_effectful": false,
+      "failure_codec_id": "codec.python.component.rtg.graph.failure.json",
+      "failure_codec_version": 1,
+      "failure_dispositions": {},
+      "failure_names": [
+        "RtgGraphUuidInvalid",
+        "RtgGraphObjectNotFound"
+      ],
+      "fault_payload_disposition": "diagnostic",
+      "fault_schema": {
+        "oneOf": [
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          }
+        ]
+      },
+      "idempotency": "idempotent",
+      "method_name": "get_object",
+      "modeled_fault_trace_disposition": "aborted",
+      "recovery_authorized": false,
+      "replay_mode": "no_state_effect",
+      "request_arguments": [
+        {
+          "default": null,
+          "name": "object_uuid",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "request_codec_id": "codec.python.component.rtg.graph.request.json",
+      "request_codec_version": 1,
+      "request_payload_disposition": "command",
+      "request_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "object_uuid": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "object_uuid"
+        ],
+        "type": "object"
+      },
+      "resolved_argument_from_result": null,
+      "result_codec_id": "codec.python.component.rtg.graph.result.json",
+      "result_codec_version": 1,
+      "result_payload_disposition": "query_result",
+      "result_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "system": {
+            "additionalProperties": false,
+            "properties": {
+              "live": {
+                "type": "boolean"
+              }
+            },
+            "type": "object"
+          },
+          "type": {
+            "type": "string"
+          },
+          "uuid": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "system"
+        ],
+        "type": "object"
+      },
+      "schema_version": 1
+    },
+    {
+      "action_id": "component.rtg.graph.list_by_type",
+      "binding_id": "binding.python.rtg.graph.v1",
+      "binding_version": 1,
+      "canonical_effect_codec_id": null,
+      "canonical_effect_codec_version": null,
+      "canonical_effect_schema_version": null,
+      "concurrency_lane": "serialized",
+      "consistency_access": "independent",
+      "consistency_group": null,
+      "deadline_seconds": null,
+      "effect_payload_disposition": null,
+      "externally_effectful": false,
+      "failure_codec_id": "codec.python.component.rtg.graph.failure.json",
+      "failure_codec_version": 1,
+      "failure_dispositions": {},
+      "failure_names": [
+        "RtgGraphTypeInvalid",
+        "RtgGraphReferenceInvalid"
+      ],
+      "fault_payload_disposition": "diagnostic",
+      "fault_schema": {
+        "oneOf": [
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          }
+        ]
+      },
+      "idempotency": "idempotent",
+      "method_name": "list_by_type",
+      "modeled_fault_trace_disposition": "aborted",
+      "recovery_authorized": false,
+      "replay_mode": "no_state_effect",
+      "request_arguments": [
+        {
+          "default": null,
+          "name": "object_type",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "default": 0,
+          "name": "offset",
+          "required": false,
+          "schema": {
+            "type": "integer"
+          }
+        },
+        {
+          "default": null,
+          "name": "limit",
+          "required": false,
+          "schema": {
+            "type": "integer"
+          }
+        }
+      ],
+      "request_codec_id": "codec.python.component.rtg.graph.request.json",
+      "request_codec_version": 1,
+      "request_payload_disposition": "command",
+      "request_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "limit": {
+            "type": "integer"
+          },
+          "object_type": {
+            "type": "string"
+          },
+          "offset": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "object_type"
+        ],
+        "type": "object"
+      },
+      "resolved_argument_from_result": null,
+      "result_codec_id": "codec.python.component.rtg.graph.result.json",
+      "result_codec_version": 1,
+      "result_payload_disposition": "query_result",
+      "result_schema": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "system": {
+              "additionalProperties": false,
+              "properties": {
+                "live": {
+                  "type": "boolean"
+                }
+              },
+              "type": "object"
+            },
+            "type": {
+              "type": "string"
+            },
+            "uuid": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "system"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "schema_version": 1
+    },
+    {
+      "action_id": "component.rtg.graph.list_anchor_data",
+      "binding_id": "binding.python.rtg.graph.v1",
+      "binding_version": 1,
+      "canonical_effect_codec_id": null,
+      "canonical_effect_codec_version": null,
+      "canonical_effect_schema_version": null,
+      "concurrency_lane": "serialized",
+      "consistency_access": "independent",
+      "consistency_group": null,
+      "deadline_seconds": null,
+      "effect_payload_disposition": null,
+      "externally_effectful": false,
+      "failure_codec_id": "codec.python.component.rtg.graph.failure.json",
+      "failure_codec_version": 1,
+      "failure_dispositions": {},
+      "failure_names": [
+        "RtgGraphUuidInvalid",
+        "RtgGraphAnchorNotFound",
+        "RtgGraphReferenceInvalid"
+      ],
+      "fault_payload_disposition": "diagnostic",
+      "fault_schema": {
+        "oneOf": [
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          }
+        ]
+      },
+      "idempotency": "idempotent",
+      "method_name": "list_anchor_data",
+      "modeled_fault_trace_disposition": "aborted",
+      "recovery_authorized": false,
+      "replay_mode": "no_state_effect",
+      "request_arguments": [
+        {
+          "default": null,
+          "name": "anchor_uuid",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "default": 0,
+          "name": "offset",
+          "required": false,
+          "schema": {
+            "type": "integer"
+          }
+        },
+        {
+          "default": null,
+          "name": "limit",
+          "required": false,
+          "schema": {
+            "type": "integer"
+          }
+        }
+      ],
+      "request_codec_id": "codec.python.component.rtg.graph.request.json",
+      "request_codec_version": 1,
+      "request_payload_disposition": "command",
+      "request_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "anchor_uuid": {
+            "type": "string"
+          },
+          "limit": {
+            "type": "integer"
+          },
+          "offset": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "anchor_uuid"
+        ],
+        "type": "object"
+      },
+      "resolved_argument_from_result": null,
+      "result_codec_id": "codec.python.component.rtg.graph.result.json",
+      "result_codec_version": 1,
+      "result_payload_disposition": "query_result",
+      "result_schema": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "properties": {
+              "type": "object"
+            },
+            "system": {
+              "additionalProperties": false,
+              "properties": {
+                "live": {
+                  "type": "boolean"
+                }
+              },
+              "type": "object"
+            },
+            "type": {
+              "type": "string"
+            },
+            "uuid": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "system",
+            "properties"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "schema_version": 1
+    },
+    {
+      "action_id": "component.rtg.graph.list_data_anchors",
+      "binding_id": "binding.python.rtg.graph.v1",
+      "binding_version": 1,
+      "canonical_effect_codec_id": null,
+      "canonical_effect_codec_version": null,
+      "canonical_effect_schema_version": null,
+      "concurrency_lane": "serialized",
+      "consistency_access": "independent",
+      "consistency_group": null,
+      "deadline_seconds": null,
+      "effect_payload_disposition": null,
+      "externally_effectful": false,
+      "failure_codec_id": "codec.python.component.rtg.graph.failure.json",
+      "failure_codec_version": 1,
+      "failure_dispositions": {},
+      "failure_names": [
+        "RtgGraphUuidInvalid",
+        "RtgGraphDataObjectNotFound",
+        "RtgGraphReferenceInvalid"
+      ],
+      "fault_payload_disposition": "diagnostic",
+      "fault_schema": {
+        "oneOf": [
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          }
+        ]
+      },
+      "idempotency": "idempotent",
+      "method_name": "list_data_anchors",
+      "modeled_fault_trace_disposition": "aborted",
+      "recovery_authorized": false,
+      "replay_mode": "no_state_effect",
+      "request_arguments": [
+        {
+          "default": null,
+          "name": "data_uuid",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "default": 0,
+          "name": "offset",
+          "required": false,
+          "schema": {
+            "type": "integer"
+          }
+        },
+        {
+          "default": null,
+          "name": "limit",
+          "required": false,
+          "schema": {
+            "type": "integer"
+          }
+        }
+      ],
+      "request_codec_id": "codec.python.component.rtg.graph.request.json",
+      "request_codec_version": 1,
+      "request_payload_disposition": "command",
+      "request_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "data_uuid": {
+            "type": "string"
+          },
+          "limit": {
+            "type": "integer"
+          },
+          "offset": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "data_uuid"
+        ],
+        "type": "object"
+      },
+      "resolved_argument_from_result": null,
+      "result_codec_id": "codec.python.component.rtg.graph.result.json",
+      "result_codec_version": 1,
+      "result_payload_disposition": "query_result",
+      "result_schema": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "display_name": {
+              "type": "string"
+            },
+            "system": {
+              "additionalProperties": false,
+              "properties": {
+                "live": {
+                  "type": "boolean"
+                }
+              },
+              "type": "object"
+            },
+            "type": {
+              "type": "string"
+            },
+            "uuid": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "system"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "schema_version": 1
+    },
+    {
+      "action_id": "component.rtg.graph.list_incident_links",
+      "binding_id": "binding.python.rtg.graph.v1",
+      "binding_version": 1,
+      "canonical_effect_codec_id": null,
+      "canonical_effect_codec_version": null,
+      "canonical_effect_schema_version": null,
+      "concurrency_lane": "serialized",
+      "consistency_access": "independent",
+      "consistency_group": null,
+      "deadline_seconds": null,
+      "effect_payload_disposition": null,
+      "externally_effectful": false,
+      "failure_codec_id": "codec.python.component.rtg.graph.failure.json",
+      "failure_codec_version": 1,
+      "failure_dispositions": {},
+      "failure_names": [
+        "RtgGraphUuidInvalid",
+        "RtgGraphObjectNotFound",
+        "RtgGraphReferenceInvalid"
+      ],
+      "fault_payload_disposition": "diagnostic",
+      "fault_schema": {
+        "oneOf": [
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          }
+        ]
+      },
+      "idempotency": "idempotent",
+      "method_name": "list_incident_links",
+      "modeled_fault_trace_disposition": "aborted",
+      "recovery_authorized": false,
+      "replay_mode": "no_state_effect",
+      "request_arguments": [
+        {
+          "default": null,
+          "name": "object_uuid",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "default": "both",
+          "name": "direction",
+          "required": false,
+          "schema": {
+            "enum": [
+              "source",
+              "target",
+              "both"
+            ],
+            "type": "string"
+          }
+        },
+        {
+          "default": 0,
+          "name": "offset",
+          "required": false,
+          "schema": {
+            "type": "integer"
+          }
+        },
+        {
+          "default": null,
+          "name": "limit",
+          "required": false,
+          "schema": {
+            "type": "integer"
+          }
+        }
+      ],
+      "request_codec_id": "codec.python.component.rtg.graph.request.json",
+      "request_codec_version": 1,
+      "request_payload_disposition": "command",
+      "request_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "direction": {
+            "enum": [
+              "source",
+              "target",
+              "both"
+            ],
+            "type": "string"
+          },
+          "limit": {
+            "type": "integer"
+          },
+          "object_uuid": {
+            "type": "string"
+          },
+          "offset": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "object_uuid"
+        ],
+        "type": "object"
+      },
+      "resolved_argument_from_result": null,
+      "result_codec_id": "codec.python.component.rtg.graph.result.json",
+      "result_codec_version": 1,
+      "result_payload_disposition": "query_result",
+      "result_schema": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "source_uuid": {
+              "type": "string"
+            },
+            "system": {
+              "additionalProperties": false,
+              "properties": {
+                "live": {
+                  "type": "boolean"
+                }
+              },
+              "type": "object"
+            },
+            "target_uuid": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string"
+            },
+            "uuid": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "system",
+            "source_uuid",
+            "target_uuid"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "schema_version": 1
+    },
+    {
+      "action_id": "component.rtg.graph.count_by_type",
+      "binding_id": "binding.python.rtg.graph.v1",
+      "binding_version": 1,
+      "canonical_effect_codec_id": null,
+      "canonical_effect_codec_version": null,
+      "canonical_effect_schema_version": null,
+      "concurrency_lane": "serialized",
+      "consistency_access": "independent",
+      "consistency_group": null,
+      "deadline_seconds": null,
+      "effect_payload_disposition": null,
+      "externally_effectful": false,
+      "failure_codec_id": "codec.python.component.rtg.graph.failure.json",
+      "failure_codec_version": 1,
+      "failure_dispositions": {},
+      "failure_names": [
+        "RtgGraphTypeInvalid"
+      ],
+      "fault_payload_disposition": "diagnostic",
+      "fault_schema": {
+        "oneOf": [
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          }
+        ]
+      },
+      "idempotency": "idempotent",
+      "method_name": "count_by_type",
+      "modeled_fault_trace_disposition": "aborted",
+      "recovery_authorized": false,
+      "replay_mode": "no_state_effect",
+      "request_arguments": [
+        {
+          "default": null,
+          "name": "kind",
+          "required": false,
+          "schema": {
+            "enum": [
+              "anchor",
+              "data_object",
+              "link"
+            ],
+            "type": "string"
+          }
+        },
+        {
+          "default": null,
+          "name": "live",
+          "required": false,
+          "schema": {
+            "type": "boolean"
+          }
+        }
+      ],
+      "request_codec_id": "codec.python.component.rtg.graph.request.json",
+      "request_codec_version": 1,
+      "request_payload_disposition": "command",
+      "request_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "enum": [
+              "anchor",
+              "data_object",
+              "link"
+            ],
+            "type": "string"
+          },
+          "live": {
+            "type": "boolean"
+          }
+        },
+        "required": [],
+        "type": "object"
+      },
+      "resolved_argument_from_result": null,
+      "result_codec_id": "codec.python.component.rtg.graph.result.json",
+      "result_codec_version": 1,
+      "result_payload_disposition": "query_result",
+      "result_schema": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "count": {
+              "type": "integer"
+            },
+            "kind": {
+              "enum": [
+                "anchor",
+                "data_object",
+                "link"
+              ],
+              "type": "string"
+            },
+            "live": {
+              "type": "boolean"
+            },
+            "type": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "kind",
+            "count"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "schema_version": 1
+    }
+  ],
+  "binding_id": "binding.python.rtg.graph.v1",
+  "binding_version": 1,
+  "component_contract_id": "component.rtg.graph",
+  "schema_version": 1,
+  "source_contract_id": "component.rtg.graph"
+}

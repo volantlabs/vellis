@@ -3,6 +3,7 @@ from __future__ import annotations
 import copy
 import json
 import math
+from dataclasses import replace
 from decimal import Decimal
 from typing import cast
 from uuid import UUID, uuid4
@@ -19,6 +20,9 @@ from components.rtg.schema.protocol import (
     RtgSchemaAnchorTypeSummary,
     RtgSchemaAnchorTypeSummaryList,
     RtgSchemaAssociatedDataTypeList,
+    RtgSchemaBatchResult,
+    RtgSchemaChangeSet,
+    RtgSchemaCountSummary,
     RtgSchemaDefinition,
     RtgSchemaDefinitionInvalid,
     RtgSchemaDefinitionKindInvalid,
@@ -92,6 +96,70 @@ class InMemoryRtgSchema:
         candidate = type(self).import_snapshot(snapshot)
         self._definitions = candidate._definitions
 
+    def apply_batch(self, changes: RtgSchemaChangeSet) -> RtgSchemaBatchResult:
+        if not isinstance(changes, RtgSchemaChangeSet):
+            raise RtgSchemaPayloadInvalid("changes must be an RtgSchemaChangeSet")
+        missing = object()
+        saved: dict[UUID, RtgSchemaDefinition | object] = {}
+
+        def remember(definition_uuid: UUID) -> None:
+            if definition_uuid not in saved:
+                saved[definition_uuid] = (
+                    copy.deepcopy(self._definitions[definition_uuid])
+                    if definition_uuid in self._definitions
+                    else missing
+                )
+
+        writes = deletes = live_changes = 0
+        try:
+            for write in changes.definition_writes:
+                definition_uuid = _resolved_uuid(write.ref.resource_id)
+                remember(definition_uuid)
+                if write.definition.uuid not in {None, definition_uuid}:
+                    raise RtgSchemaUuidConflict(str(definition_uuid))
+                self.put_definition(replace(write.definition, uuid=definition_uuid))
+                writes += 1
+            for ref in changes.delete_definitions:
+                definition_uuid = _resolved_uuid(ref.resource_id)
+                remember(definition_uuid)
+                self.delete_definition(definition_uuid)
+                deletes += 1
+            for change in changes.set_live:
+                definition_uuid = _resolved_uuid(change.target_ref.resource_id)
+                remember(definition_uuid)
+                definition = self.get_definition(definition_uuid)
+                self.put_definition(
+                    replace(
+                        definition,
+                        system={**definition.system, "live": change.live},
+                    )
+                )
+                live_changes += 1
+        except BaseException:
+            for definition_uuid, value in saved.items():
+                if value is missing:
+                    self._definitions.pop(definition_uuid, None)
+                else:
+                    self._definitions[definition_uuid] = value  # type: ignore[assignment]
+            raise
+        return RtgSchemaBatchResult(writes, deletes, live_changes)
+
+    def count_summary(self) -> RtgSchemaCountSummary:
+        counts = {"anchor": 0, "data_object": 0, "link": 0}
+        non_live = 0
+        for definition in self._definitions.values():
+            if definition.system.get("live", True) is True:
+                counts[definition.kind] += 1
+            else:
+                non_live += 1
+        return RtgSchemaCountSummary(
+            counts["anchor"],
+            counts["data_object"],
+            counts["link"],
+            sum(counts.values()),
+            non_live,
+        )
+
     def put_definition(self, definition: RtgSchemaDefinition) -> RtgSchemaDefinition:
         normalized = self._normalize_definition(definition)
         definition_uuid = _definition_uuid(normalized)
@@ -110,16 +178,20 @@ class InMemoryRtgSchema:
         self,
         kind: str | None = None,
         live: bool | None = None,
+        offset: int = 0,
+        limit: int | None = None,
     ) -> RtgSchemaDefinitionList:
         if kind is not None:
             _validate_kind(kind)
+        values = tuple(
+            _copy_definition(item)
+            for item in self._sorted()
+            if (kind is None or item.kind == kind) and (live is None or item.system["live"] == live)
+        )
+        if offset < 0 or (limit is not None and limit < 1):
+            raise RtgSchemaPayloadInvalid("offset must be nonnegative and limit positive")
         return RtgSchemaDefinitionList(
-            definitions=tuple(
-                _copy_definition(item)
-                for item in self._sorted()
-                if (kind is None or item.kind == kind)
-                and (live is None or item.system["live"] == live)
-            )
+            definitions=values[offset:] if limit is None else values[offset : offset + limit]
         )
 
     def list_definitions_by_type_key(
@@ -127,13 +199,20 @@ class InMemoryRtgSchema:
         schema_type_key: str,
         kind: str | None = None,
         live: bool | None = None,
+        offset: int = 0,
+        limit: int | None = None,
     ) -> RtgSchemaDefinitionList:
         type_key = _validate_type_key(schema_type_key)
+        if offset < 0 or (limit is not None and limit < 1):
+            raise RtgSchemaPayloadInvalid("offset must be nonnegative and limit positive")
+        definitions = tuple(
+            _copy_definition(item)
+            for item in self.list_definitions(kind=kind, live=live).definitions
+            if item.type_key == type_key
+        )
         return RtgSchemaDefinitionList(
-            definitions=tuple(
-                _copy_definition(item)
-                for item in self.list_definitions(kind=kind, live=live).definitions
-                if item.type_key == type_key
+            definitions=(
+                definitions[offset:] if limit is None else definitions[offset : offset + limit]
             )
         )
 
@@ -298,6 +377,12 @@ class InMemoryRtgSchema:
         return tuple(
             sorted(self._definitions.values(), key=lambda item: str(_definition_uuid(item)))
         )
+
+
+def _resolved_uuid(value: UUID | str | None) -> UUID:
+    if value is None:
+        raise RtgSchemaPayloadInvalid("batch references must be resolved")
+    return _parse_uuid(value)
 
 
 def _parse_uuid(value: UuidInput) -> UUID:

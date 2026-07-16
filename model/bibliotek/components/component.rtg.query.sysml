@@ -145,6 +145,14 @@ library package BibliotekRtgQuery {
             errorIds = ("RtgQuerySpecInvalid", "RtgQueryUnsupported");
         }
     }
+    action def ExecuteProjectedRtgQuery {
+        in querySpec : RtgQuerySpec;
+        in queryOptions[0..1] : RtgQueryOptions;
+        in graphChanges : JsonObject;
+        out result : RtgQueryResult;
+        doc /* Evaluate over an invocation-local projection formed by targeted paginated graph reads plus one canonical graph delta. Neither the request nor result carries a graph snapshot. */
+        @FailureContract { errorIds = ("RtgQuerySpecInvalid", "RtgQueryUnsupported"); }
+    }
 
     calc def RtgQueryJsonEqual {
         in left : JsonValue;
@@ -167,9 +175,14 @@ library package BibliotekRtgQuery {
         perform action execute[0..*] : ExecuteRtgQuery {
             doc /* read only; the supplied graph view is unchanged. */
         }
+        perform action executeProjected[0..*] : ExecuteProjectedRtgQuery;
         dependency executeReadsGraph from execute to execute::graph {
             @StateAccess { kind = StateAccessKind::read; }
             doc /* Every read in the invocation observes the supplied coherent view. */
+        }
+        dependency executeProjectedReadsDelta from executeProjected to executeProjected::graphChanges {
+            @StateAccess { kind = StateAccessKind::read; }
+            doc /* The invocation-local projection consumes but does not mutate its canonical delta input. */
         }
     }
 
@@ -179,6 +192,10 @@ library package BibliotekRtgQuery {
         require constraint {
             doc /* Anchor-bucket, link-requirement, and data-requirement names share one globally unique binding namespace so aggregation and constraint references are unambiguous. Every return selection, returned property, group-by, aggregation, and ordering reference resolves to its declared query element. Predicate paths and operators are structurally well formed, while a resolved runtime value of an incompatible JSON kind is a non-match under predicateSemantics rather than an invalid query. order_by refers only to returned properties, aggregation names cannot use the reserved result fields row_index or group_by, a present limit is a positive Integer, offset is a nonnegative Integer, and distinct_rows cannot be combined with aggregation. */
         }
+    }
+    requirement <'contract.rtg.query.execute_projected.failures'> executeProjectedFailureSemantics {
+        subject operation : ExecuteProjectedRtgQuery;
+        require constraint { doc /* Invalid query or projection inputs fail with a modeled query failure and leave every graph occurrence unchanged. */ }
     }
 
     requirement <'contract.rtg.query.defaults'> defaultSemantics {
@@ -354,6 +371,7 @@ library package BibliotekRtgQuery {
         satisfy discoveryIndependent by query;
 
         satisfy executeRtgQueryFailureSemantics by query.execute;
+        satisfy executeProjectedFailureSemantics by query.executeProjected;
     }
 
     verification def ExecuteRtgQueryContractVerification {
@@ -376,6 +394,11 @@ library package BibliotekRtgQuery {
             evidenceId = "components/rtg/query/tests/test_rtg_query_contract.py#ExecuteRtgQueryContractVerification";
             implementationScope = "SimpleRtgQueryEngine";
         }
+    }
+    verification def ExecuteProjectedRtgQueryContractVerification {
+        subject operation : ExecuteProjectedRtgQuery;
+        objective { verify executeProjectedFailureSemantics; }
+        @EvidenceBinding { evidenceId = "components/rtg/query/tests/test_rtg_query_contract.py#ExecuteProjectedRtgQueryContractVerification"; implementationScope = "BibliotekRuntimePython"; }
     }
 
 

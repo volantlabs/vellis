@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" contentStyleType="text/css" height="282px" preserveAspectRatio="none" style="width:1125px;height:282px;background:#FFFFFF;" version="1.1" viewBox="0 0 1125 282" width="1125px" zoomAndPan="magnify"><defs/><g><rect fill="#FFFFFF" height="24" id="_title" rx="6" ry="6" style="stroke:none;stroke-width:1.0;" width="187" x="462.25" y="5"/><text fill="#000000" font-family="Helvetica" font-size="14" font-weight="bold" x="467.25" y="20.7803">Vellis logical composition</text><!--MD5=[9331c34c8cf9a496536739fe86fd7ca0]
+entity n_daec737f4f90--><g id="elem_n_daec737f4f90"><rect fill="#E8F8F5" height="46" rx="6" ry="6" style="stroke:#181818;stroke-width:1.0;" width="149" x="7" y="230"/><text fill="#000000" font-family="Helvetica" font-size="13" x="17" y="250.0103">changeValidator</text><text fill="#000000" font-family="Helvetica" font-size="13" x="17" y="263.0103">«RtgChangeValidator»</text></g><!--MD5=[dc077b10b3dd6f6a63d2dde3c8808c32]
+entity n_7c207eae36e4--><g id="elem_n_7c207eae36e4"><rect fill="#E8F8F5" height="46" rx="6" ry="6" style="stroke:#181818;stroke-width:1.0;" width="125" x="174" y="230"/><text fill="#000000" font-family="Helvetica" font-size="13" x="184" y="250.0103">constraintRegistry</text><text fill="#000000" font-family="Helvetica" font-size="13" x="184" y="263.0103">«RtgConstraints»</text></g><!--MD5=[1b9775225a58ff3ab5c23bfbd1d8534c]
+entity n_32f465b9bcd8--><g id="elem_n_32f465b9bcd8"><rect fill="#E8F8F5" height="46" rx="6" ry="6" style="stroke:#181818;stroke-width:1.0;" width="109" x="454" y="135"/><text fill="#000000" font-family="Helvetica" font-size="13" x="464" y="155.0103">controller</text><text fill="#000000" font-family="Helvetica" font-size="13" x="464" y="168.0103">«RtgController»</text></g><!--MD5=[8b304ee55518c26f18d2ebad1665c489]
+entity n_a7b24f902d1a--><g id="elem_n_a7b24f902d1a"><rect fill="#E8F8F5" height="46" rx="6" ry="6" style="stroke:#181818;stroke-width:1.0;" width="128" x="317.5" y="230"/><text fill="#000000" font-family="Helvetica" font-size="13" x="327.5" y="250.0103">documentStorage</text><text fill="#000000" font-family="Helvetica" font-size="13" x="327.5" y="263.0103">«JsonFileStorage»</text></g><!--MD5=[1bda356c980c246af7f56865b3afafdd]
+entity n_18be0d01d269--><g id="elem_n_18be0d01d269"><rect fill="#E8F8F5" height="46" rx="6" ry="6" style="stroke:#181818;stroke-width:1.0;" width="173" x="509" y="40"/><text fill="#000000" font-family="Helvetica" font-size="13" x="519" y="60.0103">facade</text><text fill="#000000" font-family="Helvetica" font-size="13" x="519" y="73.0103">«VellisApplicationFacade»</text></g><!--MD5=[885c15e1412b785b93ada30542278d8b]
+entity n_29ce1505af65--><g id="elem_n_29ce1505af65"><rect fill="#E8F8F5" height="46" rx="6" ry="6" style="stroke:#181818;stroke-width:1.0;" width="89" x="464" y="230"/><text fill="#000000" font-family="Helvetica" font-size="13" x="474" y="250.0103">graphStore</text><text fill="#000000" font-family="Helvetica" font-size="13" x="474" y="263.0103">«RtgGraph»</text></g><!--MD5=[859d44026287d4b009cb030a90793b00]
+entity n_a0c7f6ed0cf7--><g id="elem_n_a0c7f6ed0cf7"><rect fill="#E8F8F5" height="46" rx="6" ry="6" style="stroke:#181818;stroke-width:1.0;" width="107" x="571" y="230"/><text fill="#000000" font-family="Helvetica" font-size="13" x="581" y="250.0103">migrationStore</text><text fill="#000000" font-family="Helvetica" font-size="13" x="581" y="263.0103">«RtgMigration»</text></g><!--MD5=[0620a82e8bbf00ab7601379acda66d6d]
+entity n_9a7b97ee8232--><g id="elem_n_9a7b97ee8232"><rect fill="#E8F8F5" height="46" rx="6" ry="6" style="stroke:#181818;stroke-width:1.0;" width="129" x="696" y="230"/><text fill="#000000" font-family="Helvetica" font-size="13" x="706" y="250.0103">queryEngine</text><text fill="#000000" font-family="Helvetica" font-size="13" x="706" y="263.0103">«RtgQueryEngine»</text></g><!--MD5=[407fac062da31dd4d38a98ae529daf64]
+entity n_082748246d64--><g id="elem_n_082748246d64"><rect fill="#E8F8F5" height="46" rx="6" ry="6" style="stroke:#181818;stroke-width:1.0;" width="193" x="700" y="40"/><text fill="#000000" font-family="Helvetica" font-size="13" x="710" y="60.0103">runner</text><text fill="#000000" font-family="Helvetica" font-size="13" x="710" y="73.0103">«RtgKnowledgeGraphRunner»</text></g><!--MD5=[1cf9676c6398dcd9c6757181133cebc6]
+entity n_1da6fb9bb4ce--><g id="elem_n_1da6fb9bb4ce"><rect fill="#E8F8F5" height="46" rx="6" ry="6" style="stroke:#181818;stroke-width:1.0;" width="135" x="581" y="135"/><text fill="#000000" font-family="Helvetica" font-size="13" x="591" y="155.0103">runtime</text><text fill="#000000" font-family="Helvetica" font-size="13" x="591" y="168.0103">«MessageRuntime»</text></g><!--MD5=[19d3c6c65fedef18d7c53c4031ee9ee4]
+entity n_c638a443ea53--><g id="elem_n_c638a443ea53"><rect fill="#E8F8F5" height="46" rx="6" ry="6" style="stroke:#181818;stroke-width:1.0;" width="114" x="843.5" y="230"/><text fill="#000000" font-family="Helvetica" font-size="13" x="853.5" y="250.0103">schemaRegistry</text><text fill="#000000" font-family="Helvetica" font-size="13" x="853.5" y="263.0103">«RtgSchema»</text></g><!--MD5=[0e6c875b5abb11e012a616d4bc529939]
+entity n_a8091608bd18--><g id="elem_n_a8091608bd18"><rect fill="#E8F8F5" height="46" rx="6" ry="6" style="stroke:#181818;stroke-width:1.0;" width="208" x="911.5" y="40"/><text fill="#000000" font-family="Helvetica" font-size="13" x="921.5" y="60.0103">starterOntologyInstaller</text><text fill="#000000" font-family="Helvetica" font-size="13" x="921.5" y="73.0103">«EverydayLifeOntologyInstaller»</text></g><path d="M453.9041,165.1206 C401.5703,171.5453 320.5541,182.9546 251.5,199 C215.5153,207.3614 176.0828,219.4653 144.2624,229.9958 " fill="none" style="stroke:#117864;stroke-width:1.2;"/><polygon fill="#117864" points="144.2624,229.9958,154.0634,230.9657,149.0092,228.4249,151.5499,223.3708,144.2624,229.9958" style="stroke:#117864;stroke-width:1.0;"/><text fill="#000000" font-family="Helvetica" font-size="11" x="252.5" y="208.4702">changeValidator</text><path d="M453.9096,173.1858 C427.856,180.3143 396.3595,189.4557 368.5,199 C341.5169,208.2441 312.0124,219.9353 287.7543,229.9838 " fill="none" style="stroke:#117864;stroke-width:1.2;"/><polygon fill="#117864" points="287.7543,229.9838,297.6,230.235,292.3737,228.0703,294.5384,222.844,287.7543,229.9838" style="stroke:#117864;stroke-width:1.0;"/><text fill="#000000" font-family="Helvetica" font-size="11" x="369.5" y="208.4702">constraints</text><path d="M471.0264,181.1896 C462.169,186.7695 452.8701,192.91 444.5,199 C431.4398,208.5024 417.6345,219.9425 406.2864,229.7581 " fill="none" style="stroke:#117864;stroke-width:1.2;"/><polygon fill="#117864" points="406.2864,229.7581,415.7101,226.8957,410.068,226.4872,410.4765,220.8451,406.2864,229.7581" style="stroke:#117864;stroke-width:1.0;"/><text fill="#000000" font-family="Helvetica" font-size="11" x="445.5" y="208.4702">jsonStorage</text><path d="M508.5,181.0397 C508.5,195.7572 508.5,215.0449 508.5,229.7962 " fill="none" style="stroke:#117864;stroke-width:1.2;"/><polygon fill="#117864" points="508.5,229.7962,512.5,220.7962,508.5,224.7962,504.5,220.7962,508.5,229.7962" style="stroke:#117864;stroke-width:1.0;"/><text fill="#000000" font-family="Helvetica" font-size="11" x="509.5" y="208.4702">graph</text><path d="M535.9904,181.0397 C554.3477,195.7572 578.4054,215.0449 596.8049,229.7962 " fill="none" style="stroke:#117864;stroke-width:1.2;"/><polygon fill="#117864" points="596.8049,229.7962,592.2851,221.0457,592.9039,226.6686,587.281,227.2874,596.8049,229.7962" style="stroke:#117864;stroke-width:1.0;"/><text fill="#000000" font-family="Helvetica" font-size="11" x="574.5" y="208.4702">migration</text><path d="M563.1325,178.0882 C565.9622,179.0737 568.7643,180.0489 571.5,181 C594.6002,189.0315 600.5361,190.5866 623.5,199 C650.3195,208.826 679.8946,220.1987 704.6807,229.8841 " fill="none" style="stroke:#117864;stroke-width:1.2;"/><polygon fill="#117864" points="704.6807,229.8841,697.7538,222.8828,700.0236,228.0643,694.8421,230.3342,704.6807,229.8841" style="stroke:#117864;stroke-width:1.0;"/><text fill="#000000" font-family="Helvetica" font-size="11" x="658.5" y="208.4702">queryEngine</text><path d="M563.2671,178.9175 C566.0355,179.6747 568.7906,180.3755 571.5,181 C638.2196,196.3785 657.3567,185.5921 724.5,199 C773.8904,208.8628 785.3421,215.2518 833.5,230 C836.6607,230.968 839.9,231.9764 843.1661,233.0062 " fill="none" style="stroke:#117864;stroke-width:1.2;"/><polygon fill="#117864" points="843.1661,233.0062,835.7853,226.4851,838.3975,231.5028,833.3799,234.1149,843.1661,233.0062" style="stroke:#117864;stroke-width:1.0;"/><text fill="#000000" font-family="Helvetica" font-size="11" x="777.5" y="208.4702">schema</text><path d="M574.8822,86.0397 C561.1142,100.7572 543.0709,120.0449 529.2713,134.7962 " fill="none" style="stroke:#117864;stroke-width:1.2;"/><polygon fill="#117864" points="529.2713,134.7962,538.3408,130.9564,532.6871,131.1448,532.4986,125.4911,529.2713,134.7962" style="stroke:#117864;stroke-width:1.0;"/><text fill="#000000" font-family="Helvetica" font-size="11" x="558.5" y="113.4702">controller</text><path d="M608.0603,86.0397 C616.4477,100.7572 627.4396,120.0449 635.8462,134.7962 " fill="none" style="stroke:#117864;stroke-width:1.2;"/><polygon fill="#117864" points="635.8462,134.7962,634.8653,124.9963,633.3706,130.4521,627.9148,128.9574,635.8462,134.7962" style="stroke:#117864;stroke-width:1.0;"/><text fill="#000000" font-family="Helvetica" font-size="11" x="626.5" y="113.4702">runtime</text><!--MD5=[73e253a0b728f11a7750c55dcecf10f9]
+@startuml
+!pragma layout smetana
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+skinparam shadowing false
+skinparam roundCorner 12
+skinparam linetype ortho
+skinparam ArrowThickness 1.2
+skinparam ArrowFontSize 11
+skinparam rectangleBorderThickness 1
+skinparam nodesep 35
+skinparam ranksep 45
+title Vellis logical composition
+top to bottom direction
+rectangle "changeValidator\n«RtgChangeValidator»" as n_daec737f4f90 #E8F8F5
+rectangle "constraintRegistry\n«RtgConstraints»" as n_7c207eae36e4 #E8F8F5
+rectangle "controller\n«RtgController»" as n_32f465b9bcd8 #E8F8F5
+rectangle "documentStorage\n«JsonFileStorage»" as n_a7b24f902d1a #E8F8F5
+rectangle "facade\n«VellisApplicationFacade»" as n_18be0d01d269 #E8F8F5
+rectangle "graphStore\n«RtgGraph»" as n_29ce1505af65 #E8F8F5
+rectangle "migrationStore\n«RtgMigration»" as n_a0c7f6ed0cf7 #E8F8F5
+rectangle "queryEngine\n«RtgQueryEngine»" as n_9a7b97ee8232 #E8F8F5
+rectangle "runner\n«RtgKnowledgeGraphRunner»" as n_082748246d64 #E8F8F5
+rectangle "runtime\n«MessageRuntime»" as n_1da6fb9bb4ce #E8F8F5
+rectangle "schemaRegistry\n«RtgSchema»" as n_c638a443ea53 #E8F8F5
+rectangle "starterOntologyInstaller\n«EverydayLifeOntologyInstaller»" as n_a8091608bd18 #E8F8F5
+n_32f465b9bcd8 -[#117864]-> n_daec737f4f90 : changeValidator
+n_32f465b9bcd8 -[#117864]-> n_7c207eae36e4 : constraints
+n_32f465b9bcd8 -[#117864]-> n_a7b24f902d1a : jsonStorage
+n_32f465b9bcd8 -[#117864]-> n_29ce1505af65 : graph
+n_32f465b9bcd8 -[#117864]-> n_a0c7f6ed0cf7 : migration
+n_32f465b9bcd8 -[#117864]-> n_9a7b97ee8232 : queryEngine
+n_32f465b9bcd8 -[#117864]-> n_c638a443ea53 : schema
+n_18be0d01d269 -[#117864]-> n_32f465b9bcd8 : controller
+n_18be0d01d269 -[#117864]-> n_1da6fb9bb4ce : runtime
+@enduml
+
+PlantUML version 1.2022.7(Mon Aug 22 10:01:30 PDT 2022)
+(EPL source distribution)
+Java Runtime: OpenJDK Runtime Environment
+JVM: OpenJDK 64-Bit Server VM
+Default Encoding: UTF-8
+Language: en
+Country: US
+--></g></svg>

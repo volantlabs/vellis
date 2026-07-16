@@ -1,12 +1,11 @@
 from __future__ import annotations
 
 from components.runtime.component_adapter import (
-    MethodBindingSpec,
-    RuntimeActionIdempotency,
+    ComponentAdapter,
+    create_action_catalog,
     create_typed_component_adapter,
-    create_typed_proxy,
+    load_runtime_binding_resource,
 )
-from components.runtime.message_runtime import MessageRuntime, RuntimeAddress, RuntimeReplayMode
 from components.storage.json_file.protocol import (
     JsonDocumentInvalid,
     JsonDocumentNotFound,
@@ -49,56 +48,14 @@ _FAILURES: dict[str, tuple[type[StorageError], ...]] = {
         StorageReadFailed,
     ),
 }
-_SPECS = (
-    MethodBindingSpec(
-        "write",
-        RuntimeReplayMode.EXTERNAL_EXCHANGE,
-        RuntimeActionIdempotency.NON_IDEMPOTENT,
-        externally_effectful=True,
-        failure_types=_FAILURES["write"],
-    ),
-    MethodBindingSpec(
-        "read",
-        RuntimeReplayMode.EXTERNAL_EXCHANGE,
-        RuntimeActionIdempotency.IDEMPOTENT,
-        failure_types=_FAILURES["read"],
-    ),
-    MethodBindingSpec(
-        "delete",
-        RuntimeReplayMode.EXTERNAL_EXCHANGE,
-        RuntimeActionIdempotency.NON_IDEMPOTENT,
-        externally_effectful=True,
-        failure_types=_FAILURES["delete"],
-    ),
-    MethodBindingSpec(
-        "list",
-        RuntimeReplayMode.EXTERNAL_EXCHANGE,
-        RuntimeActionIdempotency.IDEMPOTENT,
-        failure_types=_FAILURES["list"],
-    ),
-)
+_RUNTIME_BINDING = load_runtime_binding_resource(__package__, failure_types=_FAILURES)
+JSON_FILE_STORAGE_ACTIONS = create_action_catalog(_RUNTIME_BINDING)
 
 
-def create_json_file_storage_adapter(storage: JsonFileStorage):
+def create_json_file_storage_adapter(storage: JsonFileStorage) -> ComponentAdapter:
     return create_typed_component_adapter(
         storage,
         JsonFileStorage,
-        component_contract_id=_CONTRACT,
-        binding_id="binding.python.storage.json_file.v1",
-        specs=_SPECS,
-        failure_types=(StorageError,),
-    )
-
-
-def create_json_file_storage_proxy(
-    runtime: MessageRuntime, source: RuntimeAddress, target: RuntimeAddress
-) -> JsonFileStorage:
-    return create_typed_proxy(
-        runtime,
-        source,
-        target,
-        JsonFileStorage,
-        component_contract_id=_CONTRACT,
-        specs=_SPECS,
+        binding=_RUNTIME_BINDING,
         failure_types=(StorageError,),
     )

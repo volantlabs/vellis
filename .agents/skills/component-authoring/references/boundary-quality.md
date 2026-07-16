@@ -18,6 +18,39 @@ Use these values as review pressure:
 
 These values make systems easier to maintain, understand, test, and extend. A design that weakens one value should do so deliberately because another current component requirement needs it.
 
+## One Component Archetype
+
+Use the same ordinary black-box component shape for every responsibility. Components may own
+records, calculations, validation, coordination, transport mapping, or combinations of local work
+and collaborator invocation. Those differences belong in their contracts, state, invariants, and
+actions.
+
+Names such as store, controller, coordinator, facade, gateway, actor, and saga describe purpose,
+composition role, or behavior. They do not justify a component metatype, runtime registration
+kind, framework base class, or lifecycle branch. Introduce specialization only when consumers need
+a genuine substitutable public contract that cannot be expressed by composing ordinary component
+capabilities.
+
+Watch for role-derived complexity when:
+
+- runtime code branches because an occurrence is called a controller, saga, leaf, or edge;
+- a model creates a component superclass only to group workflow styles;
+- an implementation inherits orchestration machinery instead of composing message and policy
+  helpers;
+- a component must be reclassified before one of its actions can invoke a collaborator;
+- local work and coordination cannot coexist in the same ordinary component occurrence.
+
+Also reject disclosure-shaped coupling: an ordinary query, validation, mutation, fault, or effect
+should not require a collaborator's complete snapshot. Model targeted reads, projections, deltas,
+bounded diagnostics, digests, or opaque references instead. Reserve complete state for visibly
+named state-transfer and external-document actions.
+Ordinary mutation contracts should require component-local all-or-none batches whose preparation,
+projection, and transient recovery footprint follow the requested delta and its documented cascade
+closure, not unrelated canonical state. State observable atomicity and resource boundaries without
+prescribing undo logs, copy-on-write structures, database transactions, or another private
+algorithm. Cross-owner uncertainty should name the recovery outcome instead of promising online
+distributed rollback unless that promise is intentionally part of the public boundary.
+
 ## Good Boundaries
 
 A good component boundary usually has:
@@ -188,6 +221,10 @@ Good replay and recovery boundaries:
 - keep replay ledger-silent unless recording replay itself is part of the audit contract
 - use recorded, resolved request data rather than current mutable store lookups when reconstructing historical mutations
 - reject partial or ambiguous recovery inputs with clear failure semantics
+- select effects only when both their record and the owning trace's committed terminal record are
+  within the requested cursor
+- require a complete, common-cursor checkpoint set for every canonical-state owner
+- report external-boundary availability without contacting the external collaborator during replay
 
 When audit, ledger, or observability is part of a component invariant, failures in that subsystem must be visible to callers. If the primary state mutation succeeds but audit persistence degrades, the operation result should report degraded audit state and preserve enough detail for a human or operator to understand what applied without durable confirmation.
 

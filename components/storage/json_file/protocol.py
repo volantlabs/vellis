@@ -25,6 +25,8 @@ class JsonDocument:
 @dataclass(frozen=True, slots=True)
 class JsonDocumentList:
     documents: tuple[JsonDocumentMetadata, ...]
+    total: int
+    next_offset: int | None = None
 
 
 class StorageError(Exception):
@@ -97,6 +99,11 @@ class JsonFileStorage(Protocol):
         """Delete a JSON document."""
         ...
 
-    def list(self, relative_directory_path: str | PathLike[str] = ".") -> JsonDocumentList:
+    def list(
+        self,
+        relative_directory_path: str | PathLike[str] = ".",
+        offset: int = 0,
+        limit: int = 100,
+    ) -> JsonDocumentList:
         """Recursively list JSON documents under a storage directory."""
         ...

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Architecture Projection"
+  short_description: "Render model-driven architecture questions"
+  default_prompt: "Use $architecture-projection to render the architectural impact and context of a model change."

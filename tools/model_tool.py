@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import ast
+import functools
 import hashlib
 import json
 import re
@@ -12,8 +13,13 @@ import urllib.request
 import zipfile
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 from uuid import NAMESPACE_URL, uuid5
+
+try:
+    from .sysml_diagrams import DiagramSpec, discover_diagrams
+except ImportError:  # pragma: no cover - direct script execution
+    from sysml_diagrams import DiagramSpec, discover_diagrams  # type: ignore[no-redef]
 
 try:
     from .model_layout import (
@@ -69,6 +75,29 @@ EXPECTED_VELLIS_ROLES: dict[str, str] = {
     "queryEngine": "component.rtg.query",
     "changeValidator": "component.rtg.change_validation",
     "controller": "component.rtg.controller",
+}
+
+STATE_TRANSFER_METHODS = {"export_snapshot", "import_snapshot", "replace_snapshot"}
+STATE_TRANSFER_ALLOWLIST: dict[str, frozenset[str]] = {
+    "components/rtg/graph/implementation.py": frozenset(
+        {"import_snapshot", "export_snapshot", "replace_snapshot"}
+    ),
+    "components/rtg/schema/implementation.py": frozenset(
+        {"import_snapshot", "export_snapshot", "replace_snapshot"}
+    ),
+    "components/rtg/constraints/implementation.py": frozenset(
+        {"import_snapshot", "export_snapshot", "replace_snapshot"}
+    ),
+    "components/rtg/migration/implementation.py": frozenset(
+        {"import_snapshot", "export_snapshot", "replace_snapshot"}
+    ),
+    "components/rtg/controller/coordinator.py": frozenset(
+        {"_snapshot", "_replace_snapshot", "_restore", "_persist_snapshot"}
+    ),
+    "components/rtg/graph/runtime_binding.py": frozenset({"create_rtg_graph_adapter"}),
+    "apps/rtg_knowledge_graph/composition.py": frozenset(
+        {"_state_replay_binding", "export_state", "replace_state"}
+    ),
 }
 
 RUNTIME_ROLE_NAMES: dict[str, str] = {
@@ -148,8 +177,7 @@ def _satisfier_map(text: str) -> dict[str, str]:
         text,
     ):
         satisfiers[requirement] = ".".join(
-            _identifier_value(segment)
-            for segment in re.findall(SYSML_IDENTIFIER, target)
+            _identifier_value(segment) for segment in re.findall(SYSML_IDENTIFIER, target)
         )
     return satisfiers
 
@@ -523,13 +551,16 @@ def _check_protocol_action_signatures() -> list[Finding]:
             if return_type is None or return_type == "None":
                 expected_outputs: tuple[str, ...] = ()
             else:
-                repeated_return = re.fullmatch(r"tuple\[([^,]+), \.\.\.\]", return_type)
-                normalized_return = normalized_return_types.get(return_type)
+                normalized_protocol_return = re.sub(r"\s*\|\s*None$", "", return_type)
+                repeated_return = re.fullmatch(
+                    r"tuple\[([^,]+), \.\.\.\]", normalized_protocol_return
+                )
+                normalized_return = normalized_return_types.get(normalized_protocol_return)
                 if normalized_return is None:
                     normalized_return = (
                         repeated_return.group(1)
                         if repeated_return is not None
-                        else return_type
+                        else normalized_protocol_return
                     )
                 expected_outputs = (normalized_return,)
             if tuple(model_outputs) != expected_outputs:
@@ -1135,6 +1166,7 @@ def _check_view_semantics() -> list[Finding]:
             "SysML::PartDefinition",
             "SysML::PartUsage",
             "SysML::BindingConnectorAsUsage",
+            "SysML::AllocationUsage",
             "SysML::ActionDefinition",
             "SysML::ActionUsage",
             "SysML::Dependency",
@@ -1146,6 +1178,11 @@ def _check_view_semantics() -> list[Finding]:
         MODEL_ROOT / "vellis" / "views" / "VellisViews.sysml": {
             "SysML::PartDefinition",
             "SysML::PartUsage",
+            "SysML::PortDefinition",
+            "SysML::PortUsage",
+            "SysML::InterfaceDefinition",
+            "SysML::InterfaceUsage",
+            "SysML::FlowUsage",
             "SysML::BindingConnectorAsUsage",
             "SysML::AllocationUsage",
             "SysML::UseCaseDefinition",
@@ -1161,10 +1198,31 @@ def _check_view_semantics() -> list[Finding]:
         text = path.read_text(encoding="utf-8")
         if "viewpoint def" in text:
             findings.append(Finding(path, "projection-only concerns must use view definitions"))
-        filters = set(re.findall(r"\bfilter\s+@([\w:]+)\s*;", text))
+        filter_statements = re.findall(r"\bfilter\s+([^;]+);", text)
+        filters = {
+            name for statement in filter_statements for name in re.findall(r"@([\w:]+)", statement)
+        }
         missing = sorted(required_filters - filters)
         if missing:
             findings.append(Finding(path, f"view projections omit filters: {missing}"))
+        for definition in re.finditer(r"\bview def\s+\w+\s*\{", text):
+            block = _extract_braced_block(text, definition.start())
+            definition_filters = re.findall(r"\bfilter\s+([^;]+);", block)
+            if len(definition_filters) != 1 or " or " not in definition_filters[0]:
+                findings.append(
+                    Finding(path, "each multi-type view definition needs one disjunctive filter")
+                )
+        for statement in filter_statements:
+            if len(re.findall(r"@[\w:]+", statement)) > 1 and " or " not in statement:
+                findings.append(Finding(path, "multi-type view filters must be disjunctive"))
+    try:
+        diagram_specs = discover_diagrams(_read_json(GENERATED_FORMAL_INDEX))
+    except (OSError, ValueError, json.JSONDecodeError) as error:
+        findings.append(Finding(GENERATED_FORMAL_INDEX, f"invalid diagram inventory: {error}"))
+        diagram_specs = ()
+    diagram_ids = [spec.diagram_id for spec in diagram_specs]
+    if len(diagram_ids) != len(set(diagram_ids)):
+        findings.append(Finding(GENERATED_FORMAL_INDEX, "registered diagram IDs must be unique"))
     vellis_path = MODEL_ROOT / "vellis" / "views" / "VellisViews.sysml"
     vellis_text = vellis_path.read_text(encoding="utf-8")
     for package in (
@@ -1250,10 +1308,27 @@ def _check_verification_closure() -> list[Finding]:
     return findings
 
 
-def _test_functions(path: Path) -> list[str]:
+@functools.cache
+def _test_module(path: Path, modified_ns: int, size: int) -> ast.Module | None:
+    """Parse one stable test-file version for evidence lookup helpers."""
+    del modified_ns, size
     try:
-        tree = ast.parse(path.read_text(encoding="utf-8"))
+        return ast.parse(path.read_text(encoding="utf-8"))
     except OSError, SyntaxError:
+        return None
+
+
+def _current_test_module(path: Path) -> ast.Module | None:
+    try:
+        stat = path.stat()
+    except OSError:
+        return None
+    return _test_module(path, stat.st_mtime_ns, stat.st_size)
+
+
+def _test_functions(path: Path) -> list[str]:
+    tree = _current_test_module(path)
+    if tree is None:
         return []
     return sorted(
         node.name
@@ -1263,10 +1338,46 @@ def _test_functions(path: Path) -> list[str]:
     )
 
 
+def _is_evidence_wrapper(path: Path, symbol: str) -> bool:
+    """Return whether a test merely delegates its proof to another test function."""
+    tree = _current_test_module(path)
+    if tree is None:
+        return False
+    function = next(
+        (
+            node
+            for node in tree.body
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name == symbol
+        ),
+        None,
+    )
+    if function is None:
+        return False
+    statements = [
+        statement
+        for statement in function.body
+        if not isinstance(statement, (ast.Import, ast.ImportFrom))
+        and not (
+            isinstance(statement, ast.Expr)
+            and isinstance(statement.value, ast.Constant)
+            and isinstance(statement.value.value, str)
+        )
+    ]
+    if len(statements) != 1:
+        return False
+    statement = statements[0]
+    value = statement.value if isinstance(statement, (ast.Expr, ast.Return)) else None
+    if not isinstance(value, ast.Call):
+        return False
+    callable_node = value.func
+    return (isinstance(callable_node, ast.Name) and callable_node.id.startswith("test_")) or (
+        isinstance(callable_node, ast.Attribute) and callable_node.attr.startswith("test_")
+    )
+
+
 def _evidence_group_map(path: Path) -> dict[str, tuple[str, ...]]:
-    try:
-        tree = ast.parse(path.read_text(encoding="utf-8"))
-    except OSError, SyntaxError:
+    tree = _current_test_module(path)
+    if tree is None:
         return {}
     for node in tree.body:
         if not isinstance(node, (ast.Assign, ast.AnnAssign)):
@@ -1305,12 +1416,18 @@ def _evidence_test_nodes(evidence_id: str) -> list[str]:
         return []
     if "::" in source:
         path_text, symbol = source.split("::", 1)
-        return [f"{path_text}::{symbol}"] if symbol in _test_functions(ROOT / path_text) else []
+        path = ROOT / path_text
+        return (
+            [f"{path_text}::{symbol}"]
+            if symbol in _test_functions(path) and not _is_evidence_wrapper(path, symbol)
+            else []
+        )
     if not group:
         return []
     tests = set(_test_functions(ROOT / source))
     symbols = _evidence_group_map(ROOT / source).get(group, ())
-    if any(symbol not in tests for symbol in symbols):
+    path = ROOT / source
+    if any(symbol not in tests or _is_evidence_wrapper(path, symbol) for symbol in symbols):
         return []
     return [f"{source}::{symbol}" for symbol in symbols]
 
@@ -1320,14 +1437,15 @@ def _verification_evidence_data() -> dict[str, object]:
     for path in _sysml_files("all"):
         text = path.read_text(encoding="utf-8")
         for evidence_id in re.findall(r'evidenceId\s*=\s*"([^"]+)"', text):
+            test_nodes = _evidence_test_nodes(evidence_id)
             groups[evidence_id] = {
                 "model_source": str(path.relative_to(ROOT)),
-                "test_nodes": _evidence_test_nodes(evidence_id),
+                "test_nodes": test_nodes,
                 "status": (
                     "pending"
                     if evidence_id.startswith("pending#")
                     else "resolved"
-                    if _evidence_test_nodes(evidence_id)
+                    if test_nodes
                     else "unresolved"
                 ),
             }
@@ -1607,6 +1725,31 @@ def _audit_component(component_id: str) -> dict[str, object]:
         for finding in _check_protocol_action_signatures()
         if finding.path == model_path
     ]
+    code_root = ROOT / "components" / Path(*component_id.removeprefix("component.").split("."))
+    production_paths = tuple(path for path in code_root.glob("*.py") if path.name != "reference.py")
+    resource_scaling_findings = [
+        {
+            "kind": "forbidden_whole_state_mechanic",
+            "candidate_classification": "implementation_drift",
+            "path": str(finding.path.relative_to(ROOT)),
+            "message": finding.message,
+        }
+        for finding in _check_resource_scaling_antipatterns(production_paths)
+    ]
+    for path in production_paths:
+        text = path.read_text(encoding="utf-8")
+        if re.search(r"compensation|before[_-]?image|preimage", text, re.IGNORECASE):
+            resource_scaling_findings.append(
+                {
+                    "kind": "retained_compensation_state_review",
+                    "candidate_classification": "human_decision_required",
+                    "path": str(path.relative_to(ROOT)),
+                    "message": (
+                        "Review whether compensation or before-image data survives beyond one "
+                        "owner invocation."
+                    ),
+                }
+            )
     return {
         "component_id": component_id,
         "lifecycle": _component_model_statuses().get(component_id),
@@ -1626,6 +1769,7 @@ def _audit_component(component_id: str) -> dict[str, object]:
             if path.removeprefix("./") != str(model_path.relative_to(ROOT))
         ),
         "action_signature_findings": action_signature_findings,
+        "resource_scaling_findings": resource_scaling_findings,
         "boundary_comparisons": comparisons,
         "candidate_findings": findings,
     }
@@ -2029,26 +2173,25 @@ def _generated_gateway_tools() -> tuple[dict[str, Any], ...]:
 
 
 def _python_tool_parameters() -> dict[str, tuple[tuple[str, bool, Any], ...]]:
-    source_path = ROOT / "apps" / "rtg_knowledge_graph" / "mcp_toolset.py"
-    tree = ast.parse(source_path.read_text(encoding="utf-8"))
+    """Return the generated facade catalog consumed by the message-native gateway."""
     parameters: dict[str, tuple[tuple[str, bool, Any], ...]] = {}
-    for node in tree.body:
-        if not isinstance(node, ast.ClassDef) or node.name != "RtgMcpToolset":
-            continue
-        for member in node.body:
-            if not isinstance(
-                member, (ast.FunctionDef, ast.AsyncFunctionDef)
-            ) or not member.name.startswith("rtg_"):
-                continue
-            arguments = member.args.args[1:]
-            required_count = len(arguments) - len(member.args.defaults)
-            defaults: list[Any] = [None] * required_count + [
-                ast.literal_eval(default) for default in member.args.defaults
-            ]
-            parameters[member.name] = tuple(
-                (argument.arg, index >= required_count, defaults[index])
-                for index, argument in enumerate(arguments)
+    for tool in _generated_gateway_tools():
+        raw_parameters = tool.get("parameters")
+        if not isinstance(raw_parameters, list):
+            raise ValueError(f"generated tool {tool['name']} lacks parameters")
+        decoded: list[tuple[str, bool, Any]] = []
+        for raw in raw_parameters:
+            if not isinstance(raw, dict) or not isinstance(raw.get("name"), str):
+                raise ValueError(f"generated tool {tool['name']} has an invalid parameter")
+            required = bool(raw.get("required", False))
+            decoded.append(
+                (
+                    str(raw["name"]),
+                    not required,
+                    raw.get("default"),
+                )
             )
+        parameters[str(tool["name"])] = tuple(decoded)
     return parameters
 
 
@@ -2098,7 +2241,7 @@ def _model_tool_parameters() -> dict[str, tuple[tuple[str, bool, Any], ...]]:
             action_parameters.append(
                 (
                     _identifier_value(parameter),
-                    multiplicity == "[0..1]",
+                    multiplicity == "[0..1]" or bool(default),
                     _model_default(default or None),
                 )
             )
@@ -2129,19 +2272,22 @@ def _model_tool_parameter_schemas() -> dict[str, dict[str, Any]]:
         properties: dict[str, Any] = {}
         required: list[str] = []
         block = text[match.start() : end]
-        for parameter, type_name, multiplicity in re.findall(
-            rf"\bin\s+({SYSML_IDENTIFIER})\s*:\s*({SYSML_IDENTIFIER})(\[[^]]+\])?",
+        for parameter, type_name, multiplicity, default in re.findall(
+            rf"\bin\s+({SYSML_IDENTIFIER})\s*:\s*({SYSML_IDENTIFIER})(\[[^]]+\])?"
+            r"(?:\s+(?:default\s*)?=\s*([^;{}]+))?",
             block,
         ):
             name = _identifier_value(parameter)
-            schema_type = _vellis_wire_schema_type(_identifier_value(type_name))
-            if schema_type is None:
-                properties[name] = {}
-            elif multiplicity == "[0..1]":
-                properties[name] = {"type": [schema_type, "null"]}
-            else:
-                properties[name] = {"type": schema_type}
-            if multiplicity != "[0..1]":
+            value_schema = _vellis_wire_schema(_identifier_value(type_name))
+            property_schema = (
+                {"anyOf": [value_schema, {"type": "null"}]}
+                if multiplicity == "[0..1]"
+                else value_schema
+            )
+            if default:
+                property_schema = {**property_schema, "default": _model_default(default)}
+            properties[name] = property_schema
+            if multiplicity != "[0..1]" and not default:
                 required.append(name)
         schemas[identity.removeprefix("operation.vellis.")] = {
             "type": "object",
@@ -2150,6 +2296,111 @@ def _model_tool_parameter_schemas() -> dict[str, dict[str, Any]]:
             "additionalProperties": False,
         }
     return schemas
+
+
+@functools.cache
+def _vellis_wire_inventory() -> tuple[dict[str, Any], dict[str, list[str]]]:
+    records: dict[str, Any] = {}
+    enums: dict[str, list[str]] = {}
+    roots = (MODEL_ROOT / "vellis", MODEL_ROOT / "bibliotek")
+    for root in roots:
+        for path in sorted(root.rglob("*.sysml")):
+            boundary = _audit_model_boundary(path)
+            records.update(cast(dict[str, Any], boundary["records"]))
+            enums.update(cast(dict[str, list[str]], boundary["enums"]))
+    return records, enums
+
+
+def _vellis_wire_schema(type_name: str, seen: frozenset[str] = frozenset()) -> dict[str, Any]:
+    records, enums = _vellis_wire_inventory()
+    # The accepted Python realization deliberately encodes this two-field logical
+    # record as a positional pair.  Keep that explicit codec visible in the MCP
+    # schema instead of projecting the logical record's object representation.
+    if type_name == "RtgQueryReturnProperty":
+        return {
+            "type": "array",
+            "prefixItems": [
+                {"type": "string"},
+                {"type": "array", "items": {"type": "string"}, "minItems": 1},
+            ],
+            "minItems": 2,
+            "maxItems": 2,
+        }
+    if type_name == "RuntimeReconstructionRequest":
+        return {
+            "type": "object",
+            "properties": {
+                "through_runtime_position": {"type": "integer"},
+                "checkpoint_references": {"type": "object"},
+                "reset_targets": {"type": "boolean", "default": False},
+                "external_boundaries": {
+                    "type": "array",
+                    "items": _vellis_wire_schema("RuntimeExternalBoundaryDisposition", seen),
+                },
+            },
+            "additionalProperties": False,
+        }
+    if type_name in enums:
+        return {
+            "type": "string",
+            "enum": [re.sub(r"(?<!^)(?=[A-Z])", "_", value).lower() for value in enums[type_name]],
+        }
+    if type_name in {"String", "Uuid", "JsonRelativePath", "Timestamp"}:
+        return {"type": "string"}
+    if type_name == "RtgResourceIdentifier":
+        return {"type": "string"}
+    if type_name == "Boolean":
+        return {"type": "boolean"}
+    if type_name == "Integer":
+        return {"type": "integer"}
+    if type_name == "Real":
+        return {"type": "number"}
+    scalar = _vellis_wire_schema_type(type_name)
+    if type_name not in records and scalar is not None and scalar != "object":
+        return {"type": scalar}
+    if type_name in {"JsonValue", "JsonObject", "JsonScalar"}:
+        if type_name == "JsonValue":
+            return {}
+        if type_name == "JsonScalar":
+            return {"type": ["string", "number", "integer", "boolean", "null"]}
+        return {"type": "object"}
+    fields = records.get(type_name)
+    if not isinstance(fields, dict) or type_name in seen:
+        return {"type": "object"}
+    if type_name.endswith("List") and len(fields) == 1:
+        field = next(iter(fields.values()))
+        if isinstance(field, dict):
+            return {
+                "type": "array",
+                "items": _vellis_wire_schema(str(field["type"]).rsplit("::", 1)[-1], seen),
+            }
+    properties: dict[str, Any] = {}
+    required: list[str] = []
+    for field_name, raw in fields.items():
+        if not isinstance(raw, dict):
+            continue
+        field_schema = _vellis_wire_schema(str(raw["type"]).rsplit("::", 1)[-1], seen | {type_name})
+        multiplicity = str(raw.get("multiplicity", "[1]"))
+        if "*" in multiplicity:
+            field_schema = {"type": "array", "items": field_schema}
+        model_name = str(raw.get("model_name", field_name))
+        wire_name = re.sub(r"(?<!^)(?=[A-Z])", "_", model_name).lower()
+        properties[wire_name] = field_schema
+        if multiplicity not in {"[0..1]", "[0..*]"} and raw.get("value_kind") != "default":
+            required.append(wire_name)
+    result: dict[str, Any] = {
+        "type": "object",
+        "properties": properties,
+        "additionalProperties": False,
+    }
+    if type_name == "RtgSystemSnapshot":
+        # A full Vellis snapshot export specializes the system snapshot with a
+        # fixed `kind=full` discriminator and is intentionally accepted directly
+        # by restore.
+        properties["kind"] = {"type": "string", "enum": ["full"]}
+    if required:
+        result["required"] = required
+    return result
 
 
 def _vellis_wire_schema_type(type_name: str) -> str | None:
@@ -2607,6 +2858,89 @@ def _check_forbidden_component_imports() -> list[Finding]:
     return findings
 
 
+def _check_resource_scaling_antipatterns(paths: tuple[Path, ...] | None = None) -> list[Finding]:
+    """Reject whole-state mechanics from ordinary production operations."""
+    candidates = paths or tuple(
+        path
+        for root in (ROOT / "components", ROOT / "apps")
+        for path in root.rglob("*.py")
+        if "tests" not in path.parts
+    )
+    findings: list[Finding] = []
+    canonical_store_names = {
+        "_anchors",
+        "_data_objects",
+        "_links",
+        "_anchor_data",
+        "_definitions",
+        "_constraints",
+        "_migrations",
+    }
+    for path in candidates:
+        try:
+            tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+        except (OSError, SyntaxError) as error:
+            findings.append(Finding(path, f"cannot inspect resource scaling: {error}"))
+            continue
+        try:
+            relative = path.relative_to(ROOT).as_posix()
+        except ValueError:
+            relative = path.as_posix()
+        allowed_functions = STATE_TRANSFER_ALLOWLIST.get(relative, frozenset())
+
+        class ScalingVisitor(ast.NodeVisitor):
+            def __init__(self, source_path: Path, permitted_functions: frozenset[str]) -> None:
+                self.functions: list[str] = []
+                self.source_path = source_path
+                self.allowed_functions = permitted_functions
+
+            def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
+                self.functions.append(node.name)
+                self.generic_visit(node)
+                self.functions.pop()
+
+            def visit_AsyncFunctionDef(self, node: ast.AsyncFunctionDef) -> None:
+                self.functions.append(node.name)
+                self.generic_visit(node)
+                self.functions.pop()
+
+            def visit_Call(self, node: ast.Call) -> None:
+                current = self.functions[-1] if self.functions else "<module>"
+                method = node.func.attr if isinstance(node.func, ast.Attribute) else None
+                if method in STATE_TRANSFER_METHODS and current not in self.allowed_functions:
+                    findings.append(
+                        Finding(
+                            self.source_path,
+                            f"line {node.lineno}: ordinary operation {current} calls "
+                            f"whole-state {method}; use a component-local batch or add a "
+                            "narrow explicit state-transfer rationale",
+                        )
+                    )
+                is_deepcopy = (
+                    isinstance(node.func, ast.Attribute)
+                    and isinstance(node.func.value, ast.Name)
+                    and node.func.value.id == "copy"
+                    and node.func.attr == "deepcopy"
+                )
+                if is_deepcopy and node.args:
+                    argument = node.args[0]
+                    if (
+                        isinstance(argument, ast.Attribute)
+                        and argument.attr in canonical_store_names
+                    ):
+                        findings.append(
+                            Finding(
+                                self.source_path,
+                                f"line {node.lineno}: {current} deep-copies complete canonical "
+                                f"store {argument.attr}",
+                            )
+                        )
+                self.generic_visit(node)
+
+        ScalingVisitor(path, allowed_functions).visit(tree)
+    return findings
+
+
 def check(scope: str = "all", *, require_external: bool = False) -> list[Finding]:
     findings: list[Finding] = []
     files = _sysml_files(scope)
@@ -2785,6 +3119,7 @@ def check(scope: str = "all", *, require_external: bool = False) -> list[Finding
 
     if scope == "all":
         findings.extend(_check_view_semantics())
+        findings.extend(_check_resource_scaling_antipatterns())
 
     if require_external:
         validator = _read_json(lock_path).get("validator", {})
@@ -2897,6 +3232,7 @@ def _component_page(path: Path) -> str:
     complete_component_contract = "\n".join(component_contract_blocks) or component_block
     status = _component_model_statuses().get(component_id, "unknown")
     purpose = _documentation(component_block) or "See the modeled contracts and invariants below."
+    diagram = _component_diagrams().get(component_id)
 
     action_definitions = {
         match.group(1): _extract_braced_block(text, match.start())
@@ -3123,62 +3459,91 @@ def _component_page(path: Path) -> str:
     if len(verification_rows) == 2:
         verification_rows.append("| — | — | — | No boundary verification modeled. |")
 
-    return "\n".join(
+    sections = [
+        f"# {component_id}",
+        "",
+        "Generated from textual SysML v2 by `just model-render` as a non-normative reading "
+        "projection; do not edit by hand.",
+        "",
+        f"- Model definition: `{component_name}`",
+        f"- Lifecycle: `{status}`",
+        f"- Purpose: {purpose}",
+        "",
+        "## Provided actions",
+        "",
+        *action_rows,
+        "",
+        "## Construction actions",
+        "",
+        *construction_rows,
+        "",
+        "## Retained collaborator roles",
+        "",
+        *required_rows,
+        "",
+        "## Owned state",
+        "",
+        *state_rows,
+        "",
+        "## Action and state effects",
+        "",
+        *effect_rows,
+        "",
+        "## Native action behavior",
+        "",
+        *behavior_rows,
+        "",
+        "## Invariants and behavioral obligations",
+        "",
+        *requirement_rows,
+        "",
+        "## Public values and items",
+        "",
+        *value_rows,
+        "",
+        "## Public enumerations",
+        "",
+        *enum_rows,
+        "",
+        "## Verification",
+        "",
+        *verification_rows,
+        "",
+    ]
+    if diagram is not None:
+        svg_path = f"../diagrams/{diagram.name}.svg"
+        puml_path = f"../diagrams/{diagram.name}.puml"
+        sections.extend(
+            [
+                "## Diagram",
+                "",
+                f"![{component_id} contract diagram]({svg_path})",
+                "",
+                f"[PlantUML source]({puml_path})",
+                "",
+            ]
+        )
+    sections.extend(
         [
-            f"# {component_id}",
-            "",
-            "Generated from textual SysML v2 by `just model-render` as a non-normative reading "
-            "projection; do not edit by hand.",
-            "",
-            f"- Model definition: `{component_name}`",
-            f"- Lifecycle: `{status}`",
-            f"- Purpose: {purpose}",
-            "",
-            "## Provided actions",
-            "",
-            *action_rows,
-            "",
-            "## Construction actions",
-            "",
-            *construction_rows,
-            "",
-            "## Retained collaborator roles",
-            "",
-            *required_rows,
-            "",
-            "## Owned state",
-            "",
-            *state_rows,
-            "",
-            "## Action and state effects",
-            "",
-            *effect_rows,
-            "",
-            "## Native action behavior",
-            "",
-            *behavior_rows,
-            "",
-            "## Invariants and behavioral obligations",
-            "",
-            *requirement_rows,
-            "",
-            "## Public values and items",
-            "",
-            *value_rows,
-            "",
-            "## Public enumerations",
-            "",
-            *enum_rows,
-            "",
-            "## Verification",
-            "",
-            *verification_rows,
-            "",
             "Equivalent private algorithms, helpers, storage layouts, and "
             "implementation-language inheritance remain implementation choices.",
             "",
         ]
     )
+    return "\n".join(sections)
+
+
+def _registered_diagrams() -> tuple[DiagramSpec, ...]:
+    return discover_diagrams(_read_json(GENERATED_FORMAL_INDEX))
+
+
+def _component_diagrams() -> dict[str, DiagramSpec]:
+    result: dict[str, DiagramSpec] = {}
+    for spec in _registered_diagrams():
+        suffix = ".contract"
+        if spec.product == "bibliotek" and spec.name.endswith(suffix):
+            result[spec.name.removesuffix(suffix)] = spec
+    return result
 
 
 def _component_pages() -> dict[Path, str]:
@@ -3195,6 +3560,13 @@ def _render_component_summary() -> str:
     for component_id, status in sorted(statuses.items()):
         rows.append(
             f"| `{component_id}` | `{status}` | [component view](components/{component_id}.md) |"
+        )
+
+    diagram_rows = ["| Diagram ID | SVG | PlantUML |", "|---|---|---|"]
+    for spec in _registered_diagrams():
+        diagram_rows.append(
+            f"| `{spec.diagram_id}` | [diagram](diagrams/{spec.name}.svg) | "
+            f"[source](diagrams/{spec.name}.puml) |"
         )
 
     component_models = {
@@ -3287,9 +3659,17 @@ def _render_component_summary() -> str:
             "foundation privately and publicly exposes its supported component and shared-value "
             "packages. It has no dependency on Vellis or its realizations.",
             "",
+            "Review the cross-model [architecture projections](../architecture/index.md) for "
+            "package layers, component context, application composition, runtime topology, and "
+            "traceability matrices.",
+            "",
             "## Components",
             "",
             *rows,
+            "",
+            "## Diagrams",
+            "",
+            *diagram_rows,
             "",
             "## Shared public packages",
             "",
@@ -3492,6 +3872,10 @@ def _render_operation_summary() -> str:
             "Generated from textual SysML v2 by `just model-render` as a non-normative reading "
             "projection; do not edit by hand.",
             "",
+            "Review the cross-model [architecture projections](../architecture/index.md) for "
+            "logical composition, runtime topology, operation ownership, and verification "
+            "coverage.",
+            "",
             "## Application composition",
             "",
             *role_rows,
@@ -3561,6 +3945,27 @@ def _runtime_binding_positive_integer(
     return int(value)
 
 
+def _runtime_binding_tuple_strings(
+    assignments: dict[str, str], role_name: str, name: str
+) -> list[str]:
+    value = assignments.get(name)
+    if value is None or re.fullmatch(r"\(\s*\"[^\"]+\"(?:\s*,\s*\"[^\"]+\")*\s*\)", value) is None:
+        raise ValueError(f"runtime occurrence {role_name} has invalid {name}")
+    return re.findall(r'"([^\"]+)"', value)
+
+
+def _runtime_binding_tuple_positive_integers(
+    assignments: dict[str, str], role_name: str, name: str
+) -> list[int]:
+    value = assignments.get(name)
+    if value is None or re.fullmatch(r"\(\s*\d+(?:\s*,\s*\d+)*\s*\)", value) is None:
+        raise ValueError(f"runtime occurrence {role_name} has invalid {name}")
+    result = [int(item) for item in re.findall(r"\d+", value)]
+    if any(item < 1 for item in result):
+        raise ValueError(f"runtime occurrence {role_name} has invalid {name}")
+    return result
+
+
 def _vellis_runtime_occurrences() -> tuple[dict[str, Any], ...]:
     path = MODEL_ROOT / "vellis" / "realizations" / "VellisRuntimePython.sysml"
     text = path.read_text(encoding="utf-8")
@@ -3586,8 +3991,9 @@ def _vellis_runtime_occurrences() -> tuple[dict[str, Any], ...]:
         "implementationBinding",
         "runtimeBindingId",
         "bindingVersion",
-        "queueCapacity",
-        "maxInFlight",
+        "laneNames",
+        "laneCapacities",
+        "laneWorkerLimits",
         "configurationReferences",
         "replayAuthority",
     }
@@ -3598,7 +4004,7 @@ def _vellis_runtime_occurrences() -> tuple[dict[str, Any], ...]:
         )
 
     runtime_contract = (
-        MODEL_ROOT / "bibliotek" / "components" / "component.runtime.message_runtime.sysml"
+        MODEL_ROOT / "bibliotek" / "shared-values" / "RuntimeMessaging.sysml"
     ).read_text(encoding="utf-8")
     replay_definition = _definition_block(runtime_contract, "enum def", "RuntimeReplayMode")
     replay_modes = set(re.findall(rf"\benum\s+({SYSML_IDENTIFIER})\s*;", replay_definition))
@@ -3672,6 +4078,18 @@ def _vellis_runtime_occurrences() -> tuple[dict[str, Any], ...]:
             raise ValueError(
                 f"runtime occurrence {role_name} implementation binding differs from its type"
             )
+        lane_names = _runtime_binding_tuple_strings(assignments, role_name, "laneNames")
+        lane_capacities = _runtime_binding_tuple_positive_integers(
+            assignments, role_name, "laneCapacities"
+        )
+        lane_worker_limits = _runtime_binding_tuple_positive_integers(
+            assignments, role_name, "laneWorkerLimits"
+        )
+        if not (
+            len(lane_names) == len(lane_capacities) == len(lane_worker_limits)
+            and len(lane_names) == len(set(lane_names))
+        ):
+            raise ValueError(f"runtime occurrence {role_name} lane declarations differ or repeat")
         occurrence = {
             "instance_key": _runtime_binding_string(
                 assignments, field_definitions, role_name, "instanceKey"
@@ -3686,21 +4104,28 @@ def _vellis_runtime_occurrences() -> tuple[dict[str, Any], ...]:
             "binding_version": _runtime_binding_positive_integer(
                 assignments, field_definitions, role_name, "bindingVersion"
             ),
-            "queue_capacity": _runtime_binding_positive_integer(
-                assignments, field_definitions, role_name, "queueCapacity"
-            ),
-            "max_in_flight": _runtime_binding_positive_integer(
-                assignments, field_definitions, role_name, "maxInFlight"
-            ),
+            "lanes": [
+                {
+                    "name": name,
+                    "queue_capacity": capacity,
+                    "worker_limit": worker_limit,
+                }
+                for name, capacity, worker_limit in zip(
+                    lane_names, lane_capacities, lane_worker_limits, strict=True
+                )
+            ],
             "configuration_references": configuration_references,
             "replay_authority": replay_match.group(1),
         }
-        if any(not str(occurrence[field]).strip() for field in (
-            "instance_key",
-            "component_contract_id",
-            "implementation_binding",
-            "runtime_binding_id",
-        )):
+        if any(
+            not str(occurrence[field]).strip()
+            for field in (
+                "instance_key",
+                "component_contract_id",
+                "implementation_binding",
+                "runtime_binding_id",
+            )
+        ):
             raise ValueError(f"runtime occurrence {role_name} contains an empty identity")
         occurrences.append(occurrence)
 
@@ -3728,9 +4153,173 @@ def _manifest_data() -> dict[str, Any]:
     parameter_schemas = _model_tool_parameter_schemas()
     tool_descriptions = _model_tool_descriptions()
     tool_capabilities = _model_tool_capabilities()
+    operation_text = (MODEL_ROOT / "vellis" / "VellisOperations.sysml").read_text(encoding="utf-8")
+
+    def runtime_tool_metadata(tool: str) -> dict[str, Any]:
+        action_name = "".join(part.capitalize() for part in tool.split("_"))
+        marker = re.search(
+            rf"\baction def\s+<'operation\.vellis\.{tool}'>\s+{action_name}",
+            operation_text,
+        )
+        if marker is None:
+            raise ValueError(f"Vellis tool has no logical action: {tool}")
+        block = _extract_braced_block(operation_text, marker.start())
+        arguments, _request_schema, result_schema = _runtime_action_signature(block)
+        failure = re.search(
+            r"@FailureContract\s*\{[^}]*errorIds\s*=\s*\(([^)]*)\)",
+            block,
+            re.DOTALL,
+        )
+        failure_names = re.findall(r'"([^"]+)"', failure.group(1)) if failure else []
+        operator = tool in {
+            "rtg_replay_ledger",
+            "rtg_verify_replay_from_ledger",
+            "rtg_list_migration_history",
+            "rtg_get_operation_outcome",
+        }
+        read_only = bool(tool_capabilities[tool]["annotations"]["readOnlyHint"])
+        lane = "operator" if operator else "read" if read_only else "mutation"
+        return {
+            "binding_id": "binding.python.vellis.facade.v2",
+            "binding_version": 1,
+            "request_codec_id": "codec.python.application.vellis.facade.request.json",
+            "request_codec_version": 1,
+            "result_codec_id": "codec.python.application.vellis.facade.result.json",
+            "result_codec_version": 1,
+            "failure_codec_id": "codec.python.application.vellis.facade.failure.json",
+            "failure_codec_version": 1,
+            "request_arguments": arguments,
+            "request_schema": parameter_schemas[tool],
+            "result_schema": result_schema,
+            "fault_schema": {"oneOf": [_vellis_wire_schema(name) for name in failure_names]},
+            "failure_names": failure_names,
+            "concurrency_lane": lane,
+            "consistency_group": ("vellis.facade.state" if lane in {"read", "mutation"} else None),
+            "consistency_access": (
+                "shared" if lane == "read" else "exclusive" if lane == "mutation" else "independent"
+            ),
+            "idempotency": "idempotent" if read_only else "non_idempotent",
+            "deadline_seconds": 120,
+            "replay_mode": "coordinator_trace",
+            "recovery_authorized": tool == "rtg_replay_ledger",
+            "request_payload_disposition": (
+                "state_transfer" if tool == "rtg_restore_from_snapshot" else "command"
+            ),
+            "result_payload_disposition": (
+                "state_transfer"
+                if tool in {"rtg_export_system_snapshot", "rtg_load_persisted_snapshot"}
+                else "query_result"
+            ),
+            "fault_payload_disposition": "diagnostic",
+            "effect_payload_disposition": None,
+        }
+
+    def application_action_metadata(
+        *,
+        contract_id: str,
+        binding_id: str,
+        method_name: str,
+        action_name: str,
+        source: Path,
+        lane: str,
+        replay_mode: str,
+        idempotency: str,
+        externally_effectful: bool = False,
+    ) -> dict[str, Any]:
+        source_text = source.read_text(encoding="utf-8")
+        marker = re.search(rf"\baction def\s+{action_name}\s*\{{", source_text)
+        if marker is None:
+            raise ValueError(f"application binding resolves no modeled action {action_name}")
+        block = _extract_braced_block(source_text, marker.start())
+        arguments, request_schema, result_schema = _runtime_action_signature(block)
+        failure = re.search(
+            r"@FailureContract\s*\{[^}]*errorIds\s*=\s*\(([^)]*)\)",
+            block,
+            re.DOTALL,
+        )
+        failure_names = re.findall(r'"([^"]+)"', failure.group(1)) if failure else []
+        return {
+            "action_id": f"{contract_id}.{method_name}",
+            "method_name": method_name,
+            "binding_id": binding_id,
+            "binding_version": 1,
+            "schema_version": 1,
+            "request_codec_id": f"codec.python.{contract_id}.request.json",
+            "request_codec_version": 1,
+            "result_codec_id": f"codec.python.{contract_id}.result.json",
+            "result_codec_version": 1,
+            "failure_codec_id": f"codec.python.{contract_id}.failure.json",
+            "failure_codec_version": 1,
+            "request_arguments": arguments,
+            "request_schema": request_schema,
+            "result_schema": result_schema,
+            "fault_schema": {"oneOf": [_vellis_wire_schema(name) for name in failure_names]},
+            "failure_names": failure_names,
+            "concurrency_lane": lane,
+            "consistency_group": None,
+            "consistency_access": "independent",
+            "deadline_seconds": 120,
+            "idempotency": idempotency,
+            "replay_mode": replay_mode,
+            "externally_effectful": externally_effectful,
+            "recovery_authorized": False,
+            "request_payload_disposition": "command",
+            "result_payload_disposition": "query_result",
+            "fault_payload_disposition": "diagnostic",
+            "effect_payload_disposition": None,
+        }
+
+    application_bindings = [
+        {
+            "component_contract_id": "application.vellis.runner",
+            "binding_id": "binding.python.vellis.runner.v2",
+            "binding_version": 1,
+            "actions": [
+                application_action_metadata(
+                    contract_id="application.vellis.runner",
+                    binding_id="binding.python.vellis.runner.v2",
+                    method_name="run",
+                    action_name="RunRtgKnowledgeGraph",
+                    source=MODEL_ROOT / "vellis" / "VellisOperations.sysml",
+                    lane="runner",
+                    replay_mode="external_exchange",
+                    idempotency="idempotent",
+                    externally_effectful=True,
+                )
+            ],
+        },
+        {
+            "component_contract_id": "application.vellis.starter_ontology_installer",
+            "binding_id": "binding.python.vellis.starter_ontology_installer.v2",
+            "binding_version": 1,
+            "actions": [
+                application_action_metadata(
+                    contract_id="application.vellis.starter_ontology_installer",
+                    binding_id="binding.python.vellis.starter_ontology_installer.v2",
+                    method_name=method_name,
+                    action_name=action_name,
+                    source=MODEL_ROOT / "vellis" / "EverydayLifeOntology.sysml",
+                    lane="installer",
+                    replay_mode="coordinator_trace",
+                    idempotency=idempotency,
+                )
+                for method_name, action_name, idempotency in (
+                    ("install", "InstallEverydayLifeOntology", "non_idempotent"),
+                    ("get_status", "GetEverydayLifeOntologyStatus", "idempotent"),
+                )
+            ],
+        },
+        {
+            "component_contract_id": "component.interface.mcp_gateway",
+            "binding_id": "binding.python.interface.mcp_gateway.v2",
+            "binding_version": 1,
+            "actions": [],
+        },
+    ]
+
     manifest = {
         "app_name": "rtg_knowledge_graph",
-        "schema_version": 3,
+        "schema_version": 4,
         "runtime": {
             "runtime_key": "vellis.rtg_knowledge_graph",
             "component_contract_id": "component.runtime.message_runtime",
@@ -3745,6 +4334,7 @@ def _manifest_data() -> dict[str, Any]:
             {"id": _vellis_roles()[role], "role": RUNTIME_ROLE_NAMES[role]}
             for role in RUNTIME_MANIFEST_ROLE_ORDER
         ],
+        "application_bindings": application_bindings,
         "tools": [
             {
                 "name": tool,
@@ -3755,6 +4345,7 @@ def _manifest_data() -> dict[str, Any]:
                 "message_schema_version": 1,
                 "codec_id": "codec.python.application.vellis.facade.request.json",
                 "codec_version": 1,
+                **runtime_tool_metadata(tool),
                 "description": tool_descriptions[tool],
                 **tool_capabilities[tool],
                 "parameter_schema": parameter_schemas[tool],
@@ -3913,6 +4504,341 @@ def _snake_case(value: str) -> str:
     return re.sub(r"(?<!^)(?=[A-Z])", "_", value).lower()
 
 
+def _runtime_json_schema(type_name: str, multiplicity: str | None) -> dict[str, Any]:
+    primitive = _vellis_wire_schema(type_name)
+    if multiplicity is not None and "*" in multiplicity:
+        return {"type": "array", "items": primitive}
+    return primitive
+
+
+def _runtime_default(value: str) -> Any:
+    value = value.strip()
+    if "::" in value:
+        return value.rsplit("::", 1)[1]
+    if value in {"true", "false"}:
+        return value == "true"
+    if re.fullmatch(r"-?\d+", value):
+        return int(value)
+    if re.fullmatch(r"-?\d+\.\d+", value):
+        return float(value)
+    if value.startswith('"') and value.endswith('"'):
+        return value[1:-1]
+    return None
+
+
+def _runtime_action_signature(
+    block: str,
+) -> tuple[list[dict[str, Any]], dict[str, Any], dict[str, Any]]:
+    pattern = re.compile(
+        r"\b(in|out)\s+(?:ref\s+)?(?:attribute\s+|item\s+)?"
+        r"('?\w+'?)\s*(\[[^]]+\])?\s*(?:ordered\s+)?\s*:\s*([\w:]+)"
+        r"\s*(\[[^]]+\])?"
+        r"(?:default\s*=\s*([^;}{]+))?"
+    )
+    arguments: list[dict[str, Any]] = []
+    result: dict[str, Any] = {"type": "null"}
+    for (
+        direction,
+        raw_name,
+        name_multiplicity,
+        type_name,
+        type_multiplicity,
+        raw_default,
+    ) in pattern.findall(block):
+        name = raw_name.strip("'")
+        multiplicity = name_multiplicity or type_multiplicity or None
+        schema = _runtime_json_schema(type_name.rsplit("::", 1)[-1], multiplicity or None)
+        if direction == "out":
+            result = schema
+            continue
+        optional = bool(multiplicity and multiplicity.startswith("[0")) or bool(raw_default)
+        arguments.append(
+            {
+                "name": _snake_case(name),
+                "required": not optional,
+                "default": _runtime_default(raw_default) if raw_default else None,
+                "schema": schema,
+            }
+        )
+    request_properties = {item["name"]: item["schema"] for item in arguments}
+    return (
+        arguments,
+        {
+            "type": "object",
+            "additionalProperties": False,
+            "properties": request_properties,
+            "required": [item["name"] for item in arguments if item["required"]],
+        },
+        result,
+    )
+
+
+def _runtime_binding_resource_data() -> dict[Path, dict[str, Any]]:
+    """Project reusable Python participation descriptors from the realization model."""
+
+    path = MODEL_ROOT / "bibliotek" / "realizations" / "BibliotekRuntimePython.sysml"
+    text = path.read_text(encoding="utf-8")
+    resources: dict[Path, dict[str, Any]] = {}
+    logical_actions: dict[
+        str,
+        tuple[tuple[str, ...], list[dict[str, Any]], dict[str, Any], dict[str, Any]],
+    ] = {}
+    for component_path in sorted(COMPONENT_MODEL_ROOT.glob("component.*.sysml")):
+        component_text = component_path.read_text(encoding="utf-8")
+        for match in re.finditer(r"\baction def\s+(\w+)", component_text):
+            name = match.group(1)
+            block = _extract_braced_block(component_text, match.start())
+            contract = re.search(
+                r"@FailureContract\s*\{[^}]*errorIds\s*=\s*\(([^)]*)\)",
+                block,
+                flags=re.DOTALL,
+            )
+            arguments, request_schema, result_schema = _runtime_action_signature(block)
+            projected = (
+                tuple(re.findall(r'"([^"]+)"', contract.group(1))) if contract else (),
+                arguments,
+                request_schema,
+                result_schema,
+            )
+            prior = logical_actions.get(name)
+            if prior is not None and prior != projected:
+                raise ValueError(
+                    f"ambiguous modeled runtime action name {name} in {component_path}"
+                )
+            logical_actions[name] = projected
+
+    for part_match in re.finditer(
+        r"\bpart def\s+(\w+)\s*:>\s*ComponentRuntimeAdapter\s*\{",
+        text,
+    ):
+        part_block = _extract_braced_block(text, part_match.start())
+        binding = re.search(r"@RuntimePythonBinding\s*\{([^}]*)\}", part_block, re.DOTALL)
+        if binding is None:
+            raise ValueError(f"{part_match.group(1)} lacks RuntimePythonBinding metadata")
+        binding_block = binding.group(1)
+        contract_id = _required_assignment(binding_block, "componentContractId")
+        binding_id = _required_assignment(binding_block, "bindingId")
+        resource_path = ROOT / _required_assignment(binding_block, "resourcePath")
+        version_match = re.search(r"\bbindingVersion\s*=\s*(\d+)", binding_block)
+        if version_match is None:
+            raise ValueError(f"{part_match.group(1)} lacks bindingVersion")
+        actions: list[dict[str, Any]] = []
+        for action_match in re.finditer(
+            r"\bperform action\s+(\w+)\s*(?:\[\s*0\.\.\*\s*\])?\s*:\s*(\w+)\s*\{",
+            part_block,
+        ):
+            method_name, logical_action = action_match.groups()
+            if logical_action not in logical_actions:
+                raise ValueError(
+                    f"runtime binding {method_name} resolves no modeled action {logical_action}"
+                )
+            action_block = _extract_braced_block(part_block, action_match.start())
+            metadata = re.search(
+                r"@RuntimePythonActionBinding\s*\{([^}]*)\}",
+                action_block,
+                re.DOTALL,
+            )
+            if metadata is None:
+                raise ValueError(f"runtime action {method_name} lacks binding metadata")
+            values = metadata.group(1)
+
+            def enum_value(
+                name: str,
+                enum_name: str,
+                *,
+                source: str = values,
+                action_name: str = method_name,
+            ) -> str:
+                match = re.search(rf"\b{name}\s*=\s*{enum_name}::(\w+)", source)
+                if match is None:
+                    raise ValueError(f"runtime action {action_name} lacks {name}")
+                return match.group(1)
+
+            def optional_enum_value(
+                name: str,
+                enum_name: str,
+                default: str | None = None,
+                *,
+                source: str = values,
+            ) -> str | None:
+                match = re.search(rf"\b{name}\s*=\s*{enum_name}::(\w+)", source)
+                return match.group(1) if match else default
+
+            def optional_string(name: str, *, source: str = values) -> str | None:
+                match = re.search(rf'\b{name}\s*=\s*"([^"]+)"', source)
+                return match.group(1) if match else None
+
+            def boolean_value(
+                name: str,
+                *,
+                source: str = values,
+                action_name: str = method_name,
+            ) -> bool:
+                match = re.search(rf"\b{name}\s*=\s*(true|false)", source)
+                if match is None:
+                    raise ValueError(f"runtime action {action_name} lacks {name}")
+                return match.group(1) == "true"
+
+            failure_names = _string_tuple_assignment(values, "failureNames")
+            logical_failures, request_arguments, request_schema, result_schema = logical_actions[
+                logical_action
+            ]
+            if tuple(failure_names) != logical_failures:
+                raise ValueError(
+                    f"runtime failures differ from {logical_action}: {failure_names} != "
+                    f"{list(logical_failures)}"
+                )
+            disposition_names = (
+                _string_tuple_assignment(values, "failureDispositionNames")
+                if "failureDispositionNames" in values
+                else []
+            )
+            disposition_match = re.search(r"\bfailureDispositionValues\s*=\s*\(([^)]*)\)", values)
+            disposition_values = (
+                re.findall(r"RuntimeTraceDisposition::(\w+)", disposition_match.group(1))
+                if disposition_match
+                else []
+            )
+            if len(disposition_names) != len(disposition_values):
+                raise ValueError(f"runtime failure dispositions differ for {method_name}")
+            deadline_match = re.search(r"\bdeadlineSeconds\s*=\s*([0-9.]+)", values)
+            action_id = _required_assignment(values, "actionId")
+            if action_id != f"{contract_id}.{method_name}":
+                raise ValueError(f"runtime action ID differs for {method_name}")
+            actions.append(
+                {
+                    "action_id": action_id,
+                    "binding_id": binding_id,
+                    "binding_version": int(version_match.group(1)),
+                    "schema_version": 1,
+                    "request_codec_id": f"codec.python.{contract_id}.request.json",
+                    "request_codec_version": 1,
+                    "result_codec_id": f"codec.python.{contract_id}.result.json",
+                    "result_codec_version": 1,
+                    "failure_codec_id": f"codec.python.{contract_id}.failure.json",
+                    "failure_codec_version": 1,
+                    "canonical_effect_schema_version": (
+                        1
+                        if enum_value("replayMode", "RuntimeReplayMode") == "canonical_effect"
+                        else None
+                    ),
+                    "canonical_effect_codec_id": (
+                        f"{binding_id}.{action_id}.effect.json"
+                        if enum_value("replayMode", "RuntimeReplayMode") == "canonical_effect"
+                        else None
+                    ),
+                    "canonical_effect_codec_version": (
+                        1
+                        if enum_value("replayMode", "RuntimeReplayMode") == "canonical_effect"
+                        else None
+                    ),
+                    "request_arguments": request_arguments,
+                    "request_schema": request_schema,
+                    "result_schema": result_schema,
+                    "fault_schema": {
+                        "oneOf": [
+                            _vellis_wire_schema(failure_name) for failure_name in failure_names
+                        ]
+                    },
+                    "concurrency_lane": _required_assignment(values, "concurrencyLane"),
+                    "consistency_access": enum_value(
+                        "consistencyAccess", "RuntimeConsistencyAccess"
+                    ),
+                    "consistency_group": optional_string("consistencyGroup"),
+                    "deadline_seconds": (
+                        float(deadline_match.group(1)) if deadline_match else None
+                    ),
+                    "externally_effectful": boolean_value("externallyEffectful"),
+                    "failure_dispositions": dict(
+                        zip(disposition_names, disposition_values, strict=True)
+                    ),
+                    "failure_names": failure_names,
+                    "idempotency": enum_value("idempotency", "RuntimeActionIdempotency"),
+                    "method_name": method_name,
+                    "modeled_fault_trace_disposition": enum_value(
+                        "modeledFaultTraceDisposition", "RuntimeTraceDisposition"
+                    ),
+                    "recovery_authorized": boolean_value("recoveryAuthorized"),
+                    "replay_mode": enum_value("replayMode", "RuntimeReplayMode"),
+                    "resolved_argument_from_result": optional_string("resolvedArgumentFromResult"),
+                    "request_payload_disposition": optional_enum_value(
+                        "requestPayloadDisposition", "RuntimePayloadDisposition", "command"
+                    ),
+                    "result_payload_disposition": optional_enum_value(
+                        "resultPayloadDisposition", "RuntimePayloadDisposition", "query_result"
+                    ),
+                    "fault_payload_disposition": optional_enum_value(
+                        "faultPayloadDisposition", "RuntimePayloadDisposition", "diagnostic"
+                    ),
+                    "effect_payload_disposition": optional_enum_value(
+                        "effectPayloadDisposition",
+                        "RuntimePayloadDisposition",
+                        "canonical_delta"
+                        if enum_value("replayMode", "RuntimeReplayMode") == "canonical_effect"
+                        else None,
+                    ),
+                }
+            )
+        resources[resource_path] = {
+            "actions": actions,
+            "binding_id": binding_id,
+            "binding_version": int(version_match.group(1)),
+            "component_contract_id": contract_id,
+            "schema_version": 1,
+            "source_contract_id": contract_id,
+        }
+    return resources
+
+
+def _runtime_binding_resource_text() -> dict[Path, str]:
+    return {
+        path: json.dumps(data, indent=2, sort_keys=True) + "\n"
+        for path, data in _runtime_binding_resource_data().items()
+    }
+
+
+def _check_runtime_payload_dispositions() -> list[Finding]:
+    findings: list[Finding] = []
+    for path, resource in _runtime_binding_resource_data().items():
+        for action in resource["actions"]:
+            name = str(action["method_name"])
+            if (
+                name == "export_snapshot"
+                and action["result_payload_disposition"] != "state_transfer"
+            ):
+                findings.append(Finding(path, f"{name} result must be state_transfer"))
+            if name in {"replace_snapshot", "restore_from_snapshot"}:
+                if action["request_payload_disposition"] != "state_transfer":
+                    findings.append(Finding(path, f"{name} request must be state_transfer"))
+            if action["effect_payload_disposition"] == "state_transfer" and name not in {
+                "replace_snapshot",
+                "restore_from_snapshot",
+            }:
+                findings.append(
+                    Finding(path, f"ordinary action {name} may not emit a state-transfer effect")
+                )
+    for source in (
+        ROOT / "components/rtg/query/runtime_binding.py",
+        ROOT / "components/rtg/change_validation/runtime_binding.py",
+    ):
+        text = source.read_text(encoding="utf-8")
+        for forbidden in (
+            'RuntimeArgumentDescriptor("graph_snapshot"',
+            '"graph_snapshot": snapshot',
+            '"schema_snapshot": snapshot',
+            '"constraint_snapshot": snapshot',
+            '"migration_snapshot": snapshot',
+        ):
+            if forbidden in text:
+                findings.append(
+                    Finding(
+                        source,
+                        f"ordinary request retains snapshot-shaped argument: {forbidden}",
+                    )
+                )
+    return findings
+
+
 def render() -> None:
     BIBLIOTEK_REFERENCE_ROOT.mkdir(parents=True, exist_ok=True)
     VELLIS_REFERENCE_ROOT.mkdir(parents=True, exist_ok=True)
@@ -3942,6 +4868,9 @@ def render() -> None:
         json.dumps(_conformance_objectives_data(), indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
     )
+    for path, content in _runtime_binding_resource_text().items():
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(content, encoding="utf-8")
 
 
 def check_generated() -> list[Finding]:
@@ -3960,6 +4889,7 @@ def check_generated() -> list[Finding]:
             _conformance_objectives_data(), indent=2, sort_keys=True
         )
         + "\n",
+        **_runtime_binding_resource_text(),
     }
     findings = [
         Finding(path, "generated artifact is missing or stale; run just model-render")
@@ -3973,6 +4903,7 @@ def check_generated() -> list[Finding]:
         if path not in expected_component_paths:
             findings.append(Finding(path, "stale generated component page; run just model-render"))
     findings.extend(_check_formal_model_index())
+    findings.extend(_check_runtime_payload_dispositions())
     return findings
 
 
@@ -4247,8 +5178,11 @@ def main() -> int:
             "justfile",
             "pyproject.toml",
             "tools/sysml_reference.py",
+            "tools/sysml_diagrams.py",
+            "tools/model_views.py",
             "tools/model_tool.py",
             "tests/test_sysml_reference.py",
+            "tests/test_model_views.py",
             "uv.lock",
             str(GENERATED_MANIFEST.relative_to(ROOT)),
         ],

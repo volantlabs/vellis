@@ -1,11 +1,15 @@
 from __future__ import annotations
 
 import copy
+from dataclasses import replace
 from uuid import UUID, uuid4
 
 from components.rtg.constraints.protocol import (
     JsonObject,
+    RtgConstraintBatchResult,
     RtgConstraintCardinalityPayload,
+    RtgConstraintChangeSet,
+    RtgConstraintCountSummary,
     RtgConstraintDefinition,
     RtgConstraintDefinitionInvalid,
     RtgConstraintDefinitionList,
@@ -71,6 +75,60 @@ class InMemoryRtgConstraints:
         candidate = type(self).import_snapshot(snapshot)
         self._constraints = candidate._constraints
 
+    def apply_batch(self, changes: RtgConstraintChangeSet) -> RtgConstraintBatchResult:
+        if not isinstance(changes, RtgConstraintChangeSet):
+            raise RtgConstraintPayloadInvalid("changes must be an RtgConstraintChangeSet")
+        missing = object()
+        saved: dict[UUID, RtgConstraintDefinition | object] = {}
+
+        def remember(constraint_uuid: UUID) -> None:
+            if constraint_uuid not in saved:
+                saved[constraint_uuid] = (
+                    copy.deepcopy(self._constraints[constraint_uuid])
+                    if constraint_uuid in self._constraints
+                    else missing
+                )
+
+        writes = deletes = live_changes = 0
+        try:
+            for write in changes.constraint_writes:
+                constraint_uuid = _resolved_uuid(write.ref.resource_id)
+                remember(constraint_uuid)
+                if write.constraint.uuid not in {None, constraint_uuid}:
+                    raise RtgConstraintUuidConflict(str(constraint_uuid))
+                self.put_constraint(replace(write.constraint, uuid=constraint_uuid))
+                writes += 1
+            for ref in changes.delete_constraints:
+                constraint_uuid = _resolved_uuid(ref.resource_id)
+                remember(constraint_uuid)
+                self.delete_constraint(constraint_uuid)
+                deletes += 1
+            for change in changes.set_live:
+                constraint_uuid = _resolved_uuid(change.target_ref.resource_id)
+                remember(constraint_uuid)
+                constraint = self.get_constraint(constraint_uuid)
+                self.put_constraint(
+                    replace(
+                        constraint,
+                        system={**constraint.system, "live": change.live},
+                    )
+                )
+                live_changes += 1
+        except BaseException:
+            for constraint_uuid, value in saved.items():
+                if value is missing:
+                    self._constraints.pop(constraint_uuid, None)
+                else:
+                    self._constraints[constraint_uuid] = value  # type: ignore[assignment]
+            raise
+        return RtgConstraintBatchResult(writes, deletes, live_changes)
+
+    def count_summary(self) -> RtgConstraintCountSummary:
+        live = sum(
+            constraint.system.get("live", True) is True for constraint in self._constraints.values()
+        )
+        return RtgConstraintCountSummary(live, len(self._constraints) - live)
+
     def put_constraint(self, constraint: RtgConstraintDefinition) -> RtgConstraintDefinition:
         normalized = self._normalize_constraint(constraint)
         uuid_value = _constraint_uuid(normalized)
@@ -88,16 +146,20 @@ class InMemoryRtgConstraints:
         self,
         kind: str | None = None,
         live: bool | None = None,
+        offset: int = 0,
+        limit: int | None = None,
     ) -> RtgConstraintDefinitionList:
         if kind is not None:
             _validate_kind(kind)
+        values = tuple(
+            _copy_constraint(item)
+            for item in self._sorted()
+            if (kind is None or item.kind == kind) and (live is None or item.system["live"] == live)
+        )
+        if offset < 0 or (limit is not None and limit < 1):
+            raise RtgConstraintPayloadInvalid("offset must be nonnegative and limit positive")
         return RtgConstraintDefinitionList(
-            constraints=tuple(
-                _copy_constraint(item)
-                for item in self._sorted()
-                if (kind is None or item.kind == kind)
-                and (live is None or item.system["live"] == live)
-            )
+            constraints=values[offset:] if limit is None else values[offset : offset + limit]
         )
 
     def list_constraints_by_target(
@@ -155,6 +217,12 @@ class InMemoryRtgConstraints:
         return tuple(
             sorted(self._constraints.values(), key=lambda item: str(_constraint_uuid(item)))
         )
+
+
+def _resolved_uuid(value: UUID | str | None) -> UUID:
+    if value is None:
+        raise RtgConstraintPayloadInvalid("batch references must be resolved")
+    return _parse_uuid(value)
 
 
 def _parse_uuid(value: UuidInput) -> UUID:

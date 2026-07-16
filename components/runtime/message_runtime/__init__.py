@@ -12,17 +12,21 @@ from components.runtime.message_runtime.protocol import (
     RuntimeCausalTrace,
     RuntimeCuratedOperationDeclaration,
     RuntimeDeliveryStatus,
+    RuntimeDeliveryUnknown,
     RuntimeError,
     RuntimeExternalBoundaryDisposition,
     RuntimeExternalBoundaryMode,
     RuntimeFailStopped,
+    RuntimeHealth,
     RuntimeHistoryPage,
     RuntimeHistoryQuery,
+    RuntimeLaneDeclaration,
     RuntimeLedgerFact,
     RuntimeLedgerUnavailable,
     RuntimeMessageConflict,
     RuntimeMessageEnvelope,
     RuntimeMessageKind,
+    RuntimeMessageOutcome,
     RuntimeMessageReceipt,
     RuntimePayload,
     RuntimeQueueFull,
@@ -32,21 +36,25 @@ from components.runtime.message_runtime.protocol import (
     RuntimeReplayIncompatible,
     RuntimeReplayMode,
     RuntimeReplayTargetNotPrepared,
+    RuntimeRequestIndeterminate,
     RuntimeRequestOutcome,
     RuntimeRequestTimedOut,
     RuntimeSchemaUnsupported,
+    RuntimeStorageVersionUnsupported,
     RuntimeTopologyConfirmation,
     RuntimeTopologyManifest,
     RuntimeTraceDisposition,
+    RuntimeTraceSummary,
+    RuntimeTraceSummaryPage,
 )
 
 if TYPE_CHECKING:
-    from components.runtime.message_runtime.implementation import SqliteMessageRuntime
+    from components.runtime.message_runtime.native import SqliteMessageRuntime
 
 
 def __getattr__(name: str) -> Any:
     if name == "SqliteMessageRuntime":
-        from components.runtime.message_runtime.implementation import SqliteMessageRuntime
+        from components.runtime.message_runtime.native import SqliteMessageRuntime
 
         return SqliteMessageRuntime
     raise AttributeError(name)
@@ -64,17 +72,21 @@ __all__ = [
     "RuntimeCausalTrace",
     "RuntimeCuratedOperationDeclaration",
     "RuntimeDeliveryStatus",
+    "RuntimeDeliveryUnknown",
     "RuntimeError",
     "RuntimeExternalBoundaryDisposition",
     "RuntimeExternalBoundaryMode",
     "RuntimeFailStopped",
     "RuntimeHistoryPage",
     "RuntimeHistoryQuery",
+    "RuntimeHealth",
     "RuntimeLedgerFact",
     "RuntimeLedgerUnavailable",
+    "RuntimeLaneDeclaration",
     "RuntimeMessageConflict",
     "RuntimeMessageEnvelope",
     "RuntimeMessageKind",
+    "RuntimeMessageOutcome",
     "RuntimeMessageReceipt",
     "RuntimePayload",
     "RuntimeQueueFull",
@@ -85,9 +97,13 @@ __all__ = [
     "RuntimeReplayTargetNotPrepared",
     "RuntimeReplayMode",
     "RuntimeRequestOutcome",
+    "RuntimeRequestIndeterminate",
     "RuntimeRequestTimedOut",
     "RuntimeSchemaUnsupported",
+    "RuntimeStorageVersionUnsupported",
     "RuntimeTraceDisposition",
+    "RuntimeTraceSummary",
+    "RuntimeTraceSummaryPage",
     "RuntimeTopologyConfirmation",
     "RuntimeTopologyManifest",
     "SqliteMessageRuntime",

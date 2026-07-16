@@ -5,22 +5,38 @@ from uuid import uuid4
 
 import pytest
 
+from components.rtg.change import RtgChangeReference
 from components.rtg.migration import (
     InMemoryRtgMigration,
+    RtgMigrationChangeSet,
     RtgMigrationCutoverPlan,
     RtgMigrationDeleteNotAllowed,
     RtgMigrationEvidence,
     RtgMigrationIdConflict,
     RtgMigrationRecord,
     RtgMigrationRecordInvalid,
+    RtgMigrationRecordWrite,
     RtgMigrationReplacement,
     RtgMigrationSnapshot,
     RtgMigrationSnapshotInvalid,
+    RtgMigrationStatusChange,
     RtgMigrationStatusTransitionInvalid,
 )
 from components.rtg.migration.reference import create_reference_component
 
 MODEL_EVIDENCE = {
+    "MigrationBatchAtomicityContractVerification": (
+        "test_migration_batch_is_atomic_and_never_uses_snapshots",
+    ),
+    "MigrationRoutineWorkScalingVerification": (
+        "test_migration_batch_is_atomic_and_never_uses_snapshots",
+    ),
+    "CountMigrationSummaryContractVerification": (
+        "test_migration_batch_is_atomic_and_never_uses_snapshots",
+    ),
+    "FindMigrationCandidateOwnersContractVerification": (
+        "test_migration_tracks_cutover_membership_and_evidence",
+    ),
     "PutMigrationContractVerification": (
         "test_migration_tracks_cutover_membership_and_evidence",
         "test_migration_status_and_delete_rules",
@@ -81,6 +97,34 @@ MODEL_EVIDENCE = {
 }
 
 
+def test_migration_batch_is_atomic_and_never_uses_snapshots(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    migration = InMemoryRtgMigration.empty()
+    monkeypatch.setattr(
+        InMemoryRtgMigration,
+        "export_snapshot",
+        lambda _self: pytest.fail("routine batches must not export snapshots"),
+    )
+    with pytest.raises(RtgMigrationStatusTransitionInvalid):
+        migration.apply_batch(
+            RtgMigrationChangeSet(
+                migration_writes=(
+                    RtgMigrationRecordWrite(
+                        RtgChangeReference(resource_id="migration-1"),
+                        RtgMigrationRecord("migration-1", "Temporary migration"),
+                    ),
+                ),
+                status_changes=(
+                    RtgMigrationStatusChange(
+                        RtgChangeReference(resource_id="migration-1"), "applied"
+                    ),
+                ),
+            )
+        )
+    assert migration.count_summary().total == 0
+
+
 def test_migration_tracks_cutover_membership_and_evidence() -> None:
     migration = create_reference_component()
     schema_candidate = uuid4()
@@ -107,6 +151,9 @@ def test_migration_tracks_cutover_membership_and_evidence() -> None:
 
     assert stored.migration_id == "migrate-component-schema"
     assert plan.schema_make_live == (schema_candidate,)
+    assert migration.find_candidate_owners("schema", schema_candidate).migration_ids == (
+        "migrate-component-schema",
+    )
     assert restored.get_migration("migrate-component-schema").status == "ready"
 
 

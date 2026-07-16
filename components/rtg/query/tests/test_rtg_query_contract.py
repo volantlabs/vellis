@@ -1,11 +1,15 @@
 from __future__ import annotations
 
+import asyncio
+from dataclasses import replace
+from pathlib import Path
 from typing import cast
 from uuid import UUID, uuid4
 
 import pytest
 
 from components.rtg.graph import (
+    RTG_GRAPH_ACTIONS,
     InMemoryRtgGraph,
     JsonObject,
     RtgAnchor,
@@ -17,8 +21,10 @@ from components.rtg.graph import (
     RtgObject,
     RtgObjectList,
     UuidInput,
+    create_rtg_graph_adapter,
 )
 from components.rtg.query import (
+    RTG_QUERY_ACTIONS,
     RtgQueryAggregation,
     RtgQueryAnchorBucket,
     RtgQueryDataRequirement,
@@ -27,14 +33,33 @@ from components.rtg.query import (
     RtgQueryOptions,
     RtgQueryOrderBy,
     RtgQueryPropertyPredicate,
+    RtgQueryResult,
     RtgQueryReturnSpec,
     RtgQuerySpec,
     RtgQuerySpecInvalid,
     RtgQueryUnsupported,
     SimpleRtgQueryEngine,
+    create_rtg_query_adapter,
+)
+from components.runtime.component_adapter import (
+    ComponentAdapter,
+    ComponentEndpoint,
+    decode_typed,
+    encode_json,
+)
+from components.runtime.message_runtime import SqliteMessageRuntime
+from components.runtime.messaging import (
+    ComponentOccurrenceDeclaration,
+    RuntimeLaneDeclaration,
+    RuntimeReplayMode,
+    RuntimeTopologyManifest,
+    topology_manifest_hash,
 )
 
 MODEL_EVIDENCE = {
+    "ExecuteProjectedRtgQueryContractVerification": (
+        "test_projected_query_does_not_mutate_canonical_graph",
+    ),
     "ExecuteRtgQueryContractVerification": (
         "test_query_matches_links_data_predicates_and_shapes_returns",
         "test_query_reports_return_property_diagnostics_for_unresolved_paths",
@@ -74,6 +99,78 @@ MODEL_EVIDENCE = {
 def concrete_uuid(value: UUID | None) -> UUID:
     assert value is not None
     return value
+
+
+def test_projected_query_does_not_mutate_canonical_graph(tmp_path: Path) -> None:
+    async def exercise() -> None:
+        graph = InMemoryRtgGraph.empty()
+        existing = graph.put_anchor(RtgAnchor(uuid=uuid4(), type="Person"))
+        participants = {
+            "vellis.graph.primary": create_rtg_graph_adapter(graph),
+            "vellis.query.primary": create_rtg_query_adapter(SimpleRtgQueryEngine()),
+            "ingress": ComponentAdapter(
+                binding_id="binding.test.ingress",
+                component_contract_id="component.test.ingress",
+            ),
+        }
+        declarations = tuple(
+            ComponentOccurrenceDeclaration(
+                key,
+                participant.describe().component_contract_id,
+                participant.describe().binding_id,
+                participant.describe().binding_version,
+                (RuntimeLaneDeclaration("serialized"),),
+                RuntimeReplayMode.NO_STATE_EFFECT,
+            )
+            for key, participant in participants.items()
+        )
+        manifest = RuntimeTopologyManifest("test.query.projected", 4, declarations, (), "")
+        manifest = replace(manifest, manifest_hash=topology_manifest_hash(manifest))
+        runtime = SqliteMessageRuntime(
+            tmp_path / "runtime.sqlite", runtime_key="test.query.projected"
+        )
+        await runtime.prepare_static_topology(manifest)
+        for declaration in declarations:
+            registration = await runtime.register_occurrence(declaration)
+            participant = participants[declaration.instance_key]
+            await runtime.attach_participant(
+                registration, participant, participant.describe().actions
+            )
+        await runtime.confirm_static_topology(manifest)
+        endpoint = ComponentEndpoint(
+            runtime, participants["ingress"], source=runtime.address_for("ingress")
+        )
+        projected_id = uuid4()
+        spec = RtgQuerySpec(anchor_buckets=(RtgQueryAnchorBucket("person", ("Person",)),))
+        outcome = await endpoint.request(
+            RTG_QUERY_ACTIONS["execute_projected"],
+            {
+                "query_spec": spec,
+                "query_options": None,
+                "graph_changes": {
+                    "anchor_writes": [
+                        {
+                            "ref": {"resource_id": str(projected_id)},
+                            "type": "Person",
+                        }
+                    ]
+                },
+            },
+            target=runtime.address_for("vellis.query.primary"),
+        )
+        result = decode_typed(outcome.response.payload.value["result"], RtgQueryResult)
+        assert result.total_row_count == 2
+        canonical = await endpoint.request(
+            RTG_GRAPH_ACTIONS["count_by_type"],
+            {"kind": None, "live": None},
+            target=runtime.address_for("vellis.graph.primary"),
+        )
+        counts = canonical.response.payload.value["result"]["counts"]
+        assert counts == [{"kind": "anchor", "type": "Person", "live": None, "count": 1}]
+        assert existing.uuid != projected_id
+        await runtime.aclose()
+
+    asyncio.run(exercise())
 
 
 def test_query_matches_links_data_predicates_and_shapes_returns() -> None:
@@ -194,16 +291,24 @@ def test_query_accepts_read_view_without_mutation_methods() -> None:
         def get_object(self, object_uuid: UuidInput) -> RtgObject:
             return graph.get_object(object_uuid)
 
-        def list_by_type(self, object_type: str) -> RtgObjectList:
-            return graph.list_by_type(object_type)
+        def list_by_type(
+            self, object_type: str, offset: int = 0, limit: int | None = None
+        ) -> RtgObjectList:
+            return graph.list_by_type(object_type, offset, limit)
 
-        def list_anchor_data(self, anchor_uuid: UuidInput) -> RtgDataObjectList:
-            return graph.list_anchor_data(anchor_uuid)
+        def list_anchor_data(
+            self, anchor_uuid: UuidInput, offset: int = 0, limit: int | None = None
+        ) -> RtgDataObjectList:
+            return graph.list_anchor_data(anchor_uuid, offset, limit)
 
         def list_incident_links(
-            self, object_uuid: UuidInput, direction: str = "both"
+            self,
+            object_uuid: UuidInput,
+            direction: str = "both",
+            offset: int = 0,
+            limit: int | None = None,
         ) -> RtgLinkList:
-            return graph.list_incident_links(object_uuid, direction)
+            return graph.list_incident_links(object_uuid, direction, offset, limit)
 
     read_view: RtgGraphReadView = ReadOnlyView()
     result = SimpleRtgQueryEngine().execute(
@@ -450,9 +555,7 @@ def test_query_paginates_aggregate_rows() -> None:
         ),
     )
 
-    result = SimpleRtgQueryEngine().execute(
-        graph, query, RtgQueryOptions(limit=1, offset=0)
-    )
+    result = SimpleRtgQueryEngine().execute(graph, query, RtgQueryOptions(limit=1, offset=0))
 
     assert result.total_row_count == 2
     assert result.returned_row_count == 1
@@ -716,9 +819,7 @@ def test_query_predicate_operator_table_and_case_sensitivity() -> None:
     assert matches(RtgQueryPropertyPredicate(("tags",), "contains", value="math"))
     assert matches(RtgQueryPropertyPredicate(("name",), "substring", value="ada"))
     assert not matches(
-        RtgQueryPropertyPredicate(
-            ("name",), "substring", value="ada", case_sensitive=True
-        )
+        RtgQueryPropertyPredicate(("name",), "substring", value="ada", case_sensitive=True)
     )
 
 
@@ -781,6 +882,19 @@ def test_query_regex_uses_re2_dialect_and_declared_flags() -> None:
             assert "unsupported regex pattern" in str(error)
         else:
             raise AssertionError(f"query should reject unsupported RE2 pattern {unsupported!r}")
+
+
+def test_query_predicate_codec_distinguishes_absent_value_from_json_null() -> None:
+    omitted = RtgQueryPropertyPredicate(("value",), "exists")
+    explicit_null = RtgQueryPropertyPredicate(("value",), "equals", value=None)
+
+    assert "value" not in cast(dict[str, object], encode_json(omitted))
+    assert cast(dict[str, object], encode_json(explicit_null))["value"] is None
+
+    decoded_omitted = decode_typed(encode_json(omitted), RtgQueryPropertyPredicate)
+    decoded_null = decode_typed(encode_json(explicit_null), RtgQueryPropertyPredicate)
+    assert getattr(decoded_omitted.value, "__vellis_codec_absent__", False) is True
+    assert decoded_null.value is None
 
 
 def _returned_title(properties: JsonObject) -> object:

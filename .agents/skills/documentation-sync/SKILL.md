@@ -22,8 +22,8 @@ invariants.
 1. Inventory canonical model, implementation, generated, documentation, and skill changes from
    version-control status and diffs. Include untracked files; an ordinary diff omits newly added
    documentation and can hide an incomplete sync.
-2. Run `just model-render` for parser-backed inventories, model-derived views, conformance
-   objectives, and manifests.
+2. Run `just model-render` for parser-backed inventories, the architecture graph and stable
+   dashboard, model-derived views, conformance objectives, and manifests.
 3. Review generated component pages for actions, signatures/defaults, typed failures, state access,
    required constraints, asserted satisfiers, native action calls, invariants, and subject-compatible
    verification objectives. A fresh but semantically incomplete projection fails sync.

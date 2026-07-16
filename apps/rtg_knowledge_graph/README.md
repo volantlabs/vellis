@@ -7,16 +7,18 @@ how Vellis components compose behind an explicit configuration and launch bounda
 The app starts the accepted local Bibliotek message runtime and registers named occurrences for:
 
 - `component.storage.json_file` as local JSON document storage.
-- `component.rtg.controller` as the runtime-neutral RTG saga and coordinated-snapshot API.
+- `component.rtg.controller` as the runtime-neutral RTG coordination and snapshot API.
 - RTG graph, schema, constraints, migration, validation, and query components.
 - the Vellis façade, curated MCP gateway, starter installer, and application runner.
 
 It exposes the modeled Vellis application façade through a curated generic MCP gateway. FastMCP
 maps stdio/HTTP protocol inputs to the generated registration inventory; the gateway validates and
-dispatches runtime messages to the façade, which delegates canonical operations to the controller
+resolves each registration's target occurrence and dispatches runtime messages, while the façade
+delegates canonical operations to the controller
 and owns application request shaping and response policy. The façade and controller boundaries are
-runtime-managed. In the application composition, the accepted controller receives only runtime
-proxies for its retained collaborators; direct construction remains available to library consumers.
+runtime-managed. In the application composition, the accepted controller receives only action
+catalogs and collaborator occurrence addresses; no business component or typed proxy crosses the
+boundary. Reusable leaf implementations remain directly constructible for library consumers.
 For beta and open-source evaluation, that MCP surface is the turnkey application interface: agents
 can create and evolve schema, write and query graph data, recover from validation failures, persist
 snapshots, and inspect runtime-backed reconstruction and history. RTG component internals and
@@ -31,11 +33,12 @@ automatically. Evaluation prompts deliberately opt into blank/manual-recovery mo
 apps/rtg_knowledge_graph/
   composition.py  # component wiring
   config.py       # app configuration
+  facade.py       # message-native Vellis façade handlers
   gateway_registration.py # generated MCP registration loader
   main.py         # CLI entry point
   mcp_codec.py    # JSON/dataclass adapter for MCP inputs and outputs
   mcp_server.py   # FastMCP server registration and launch
-  mcp_toolset.py  # directly testable Vellis façade handlers
+  mcp_toolset.py  # pure façade compilation and response-shaping functions
   runner.py       # application status and manifest launch behavior
   tests/          # full-app tests
 ```
@@ -167,7 +170,7 @@ The MCP surface includes low-level controller tools plus agent-facing response s
 - Use `rtg_validate_live_anchor_records` and `rtg_apply_live_anchor_records` for repeated
   anchor-with-required-facts ingestion; they compile to canonical `graph_changes`. Successful
   applies default to `response_options: {"format":"compact"}`, return durable UUIDs in
-  `generated_ids`, and retain generated fact-position mapping. Use `format:"full"` only when the
+  one `identity_resolutions` collection with anchor/fact positions. Use `format:"full"` only when the
   submitted canonical payload is needed for debugging.
 - Use `rtg_validate_live_graph_changes` or `rtg_validate_live_anchor_records` before risky
   writes. Their `validation_options` support `tracks` and `finding_limit`; mutation tools use
@@ -184,12 +187,34 @@ The MCP surface includes low-level controller tools plus agent-facing response s
 - Use `rtg_persist_system_snapshot(..., return_snapshot:false)` and
   `rtg_load_persisted_snapshot(..., return_snapshot:false)` to keep MCP transcripts compact.
   Direct snapshot exports identify their response as `kind:"full"` or `kind:"summary"`.
+- For mutations that may outlive a client wait, set
+  `runtime_options: {"request_key":"agent-stable-key"}`. Retry the exact request with the same
+  key to observe it without re-execution, or call `rtg_get_operation_outcome` with that key or the
+  returned message ID. Reusing a key with changed arguments is rejected.
 - Use `rtg_verify_replay_from_ledger` to inspect the verified latest-startup runtime reconstruction
   report. Verify an earlier cursor only in an isolated copy of the complete data root.
 - Use `rtg_list_migration_history` for successful, abandoned, rejected, and failed schema
   proposals even when current migration-store counts are zero.
+- Growing inventories are bounded at their owner. `rtg_list_migrations` and
+  `rtg_list_persisted_snapshots` use `offset`/`limit`; `rtg_list_migration_history` uses
+  `after_runtime_position`/`limit`. Pages default to 100 and allow at most 500 entries.
+- Constraint-query validation uses the configured query occurrence. Projected checks send a
+  canonical graph delta to `execute_projected`; neither the request nor result contains a graph
+  snapshot, and the invocation-local projection is discarded after evaluation.
 - Use `rtg_get_usage_guide(topic="capabilities")` for lanes, mutation/runtime behavior, dry-run
   predecessors, and audience metadata for all registered tools.
+
+The runtime ledger stores canonical payloads losslessly in content-addressed, compressed storage;
+history reads are metadata-first and hydrate payloads only through trusted explicit lookup. New
+runtime databases are mode `0600`, and newly created Vellis data directories are mode `0700`.
+Treat the data root as sensitive because explicit snapshots and document transfers remain fully
+recoverable by trusted operators.
+
+Ordinary controller mutations do not export coordinated preimages. Each state owner retains an
+opaque process-local compensation point and returns only its identity and digest; successful
+operations discard it, while failed operations restore and verify it before the trace aborts.
+Full component snapshots appear only in explicit export, persist/load, restore, and reconstruction
+flows.
 - Query options support deterministic `limit`/`offset` pagination and `distinct_rows`; return
   aggregation supports grouping returned property paths and distinct UUID `count`.
 - Cold agents can call `rtg_get_usage_guide` with `topic: "workflow_patterns"` for common RTG

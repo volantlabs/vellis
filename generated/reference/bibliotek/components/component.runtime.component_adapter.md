@@ -4,20 +4,20 @@ Generated from textual SysML v2 by `just model-render` as a non-normative readin
 
 - Model definition: `ComponentRuntimeAdapter`
 - Lifecycle: `accepted`
-- Purpose: Explicitly maps one reusable black-box component occurrence to runtime messages while preserving its direct protocol.
+- Purpose: Standard composable realization of the minimal runtime participant protocol. It adapts any ordinary component occurrence through explicit handlers, codecs, continuations, effects, and replay functions. It is not a framework superclass and alternative conforming participants remain valid.
 
 ## Provided actions
 
 | Feature | Contract | Signature | Principal failures | Meaning |
 |---|---|---|---|---|
-| `describe` | `DescribeRuntimeBinding` | out `description: RuntimeBindingDescription` | None | Return the explicit routable action inventory; arbitrary object methods are absent. |
-| `dispatch` | `DispatchRuntimeMessage` | in `request: RuntimeMessageEnvelope`; out `result: RuntimeDispatchResult` | `RuntimeBindingInvalid`, `RuntimePayloadInvalid`, `RuntimeComponentFault` | Decode one registered request, invoke the corresponding black-box action exactly once, and encode its public result or modeled failure. |
-| `applyReplayEffect` | `ApplyCanonicalReplayEffect` | in `effect: JsonObject` | `RuntimeBindingInvalid`, `RuntimePayloadInvalid`, `RuntimeReplayIncompatible` | Apply one compatible committed effect without recording new business traffic or repeating external effects. |
-| `replayStateStatus` | `ReplayStateStatus` | out `status: RuntimeReplayStateStatus` | `RuntimeBindingInvalid`, `RuntimeReplayIncompatible` | Report whether the adapted occurrence is empty, checkpoint-prepared, or unavailable for safe reconstruction. |
-| `resetReplayState` | `ResetReplayState` | — | `RuntimeBindingInvalid`, `RuntimeReplayIncompatible` | Replace the adapted occurrence state with its contract-defined empty state before reconstruction. |
-| `importReplayCheckpoint` | `ImportReplayCheckpoint` | in `reference: String`; out `throughPosition: Integer` | `RuntimeBindingInvalid`, `RuntimePayloadInvalid`, `RuntimeReplayIncompatible` | Atomically import one binding-compatible checkpoint and return the represented runtime position; the runtime verifies its digest before later effects. |
-| `replayStateDigest` | `ReplayStateDigest` | out `digest: String` | `RuntimeBindingInvalid`, `RuntimeReplayIncompatible` | Compute one deterministic canonical digest without changing adapted component state. |
-| `verifyReplayState` | `VerifyReplayState` | out `limitations: String[0..*]` | `RuntimeBindingInvalid`, `RuntimeReplayIncompatible` | Verify the adapted component's public invariants without changing its state; an empty limitation list means verified. |
+| `describe` | `DescribeRuntimeBinding` | out `description: RuntimeBindingDescription` | None | Return the explicit action inventory. Private methods and component-purpose labels are absent. |
+| `deliver` | `DeliverRuntimeEnvelope` | in `envelope: RuntimeMessageEnvelope` | `RuntimeBindingInvalid`, `RuntimePayloadInvalid`, `RuntimeTerminalEncodingFailed` | Accept one runtime delivery. A request handler terminates only through runtime complete or fault; a signal, response, or fault terminates only through acknowledgement. |
+| `applyReplayEffect` | `ApplyCanonicalReplayEffect` | in `effect: JsonObject` | `RuntimeBindingInvalid`, `RuntimePayloadInvalid`, `RuntimeReplayIncompatible` | Apply one compatible committed effect without creating new business traffic or repeating an external effect. |
+| `replayStateStatus` | `ReplayStateStatus` | out `status: RuntimeReplayStateStatus` | `RuntimeBindingInvalid`, `RuntimeReplayIncompatible` | Report whether the occurrence owns replay state and whether that state is empty or checkpoint-prepared. |
+| `resetReplayState` | `ResetReplayState` | — | `RuntimeBindingInvalid`, `RuntimeReplayIncompatible` | Replace supported replay-owned state with the component-defined empty state. |
+| `importReplayCheckpoint` | `ImportReplayCheckpoint` | in `reference: String`; out `throughPosition: Integer` | `RuntimeBindingInvalid`, `RuntimePayloadInvalid`, `RuntimeReplayIncompatible` | Atomically import a compatible checkpoint and return the represented runtime position. |
+| `replayStateDigest` | `ReplayStateDigest` | out `digest: String` | `RuntimeBindingInvalid`, `RuntimeReplayIncompatible` | Compute a deterministic digest of the replay-owned state without changing it. |
+| `verifyReplayState` | `VerifyReplayState` | out `limitations: String[0..*]` | `RuntimeBindingInvalid`, `RuntimeReplayIncompatible` | Verify public state invariants; an empty limitations list means verified. |
 
 ## Construction actions
 
@@ -37,19 +37,21 @@ Generated from textual SysML v2 by `just model-render` as a non-normative readin
 |---|---|---|---|
 | `occurrenceAddress` | `RuntimeAddress` | `owned` | Typed component state. |
 | `bindingDescription` | `RuntimeBindingDescription` | `owned` | Typed component state. |
+| `continuations` | `JsonObject` | `owned` | Typed component state. |
+| `outstandingExecutionLimit` | `Integer` | `owned` | Typed component state. |
 
 ## Action and state effects
 
 | Action | State / collaborator | Access | Modeled effect |
 |---|---|---|---|
-| `describe` | `bindingDescription` | `read` | Expose the immutable explicit binding inventory without component effects. |
-| `dispatch` | `bindingDescription` | `read` | Route only registered actions and preserve modeled defaults, results, failures, and effects. |
-| `applyReplayEffect` | `bindingDescription` | `read` | Validate effect compatibility before delegating replay to the state owner. |
-| `replayStateStatus` | `bindingDescription` | `read` | Inspect only the explicitly supported reconstruction status surface without mutation. |
-| `resetReplayState` | `bindingDescription` | `read` | Require explicit reset support before replacing adapted state with empty state. |
-| `importReplayCheckpoint` | `bindingDescription` | `read` | Require exact checkpoint and binding compatibility before state replacement. |
-| `replayStateDigest` | `bindingDescription` | `read` | Select the binding's deterministic canonical digest codec without mutation. |
-| `verifyReplayState` | `bindingDescription` | `read` | Invoke only the binding-declared invariant verification surface without mutation. |
+| `describe` | — | `declared` | Read the immutable binding inventory. |
+| `deliver` | — | `declared` | Decode, execute, continue, or acknowledge one envelope. |
+| `applyReplayEffect` | — | `declared` | Apply one explicitly registered effect. |
+| `replayStateStatus` | — | `declared` | Inspect replay readiness. |
+| `resetReplayState` | — | `declared` | Reset replay-owned state. |
+| `importReplayCheckpoint` | — | `declared` | Import one compatible checkpoint. |
+| `replayStateDigest` | — | `declared` | Read a deterministic state digest. |
+| `verifyReplayState` | — | `declared` | Verify replay-owned state invariants. |
 
 ## Native action behavior
 
@@ -61,52 +63,52 @@ Generated from textual SysML v2 by `just model-render` as a non-normative readin
 
 | Stable ID | Subject | Satisfier | Required constraint |
 |---|---|---|---|
-| `contract.runtime.component_adapter.explicit_mapping` | `ComponentRuntimeAdapter` | `adapter` | Every routable action declares request/result/failure schema and codec versions, request arguments and defaults, concrete supported failures and modeled-fault disposition, canonical-effect codec, idempotency, concurrency, replay mode, external-effect status, and whether the action alone is authorized while reconstruction is required; reflection never exposes private methods. |
-| `contract.runtime.component_adapter.equivalence` | `ComponentRuntimeAdapter` | `adapter` | Direct and message-mediated invocation preserve logical inputs, defaults, public results, concrete failures, ordering, and state effects. |
-| `contract.runtime.component_adapter.replay` | `ComponentRuntimeAdapter` | `adapter` | State-owning actions capture nondeterministic resolved values in canonical effects; reads and coordinators do not duplicate derived effects, while a coordinator that owns a confirmed aggregate state may emit an explicit final effect that supersedes its same-trace derived effects. |
-| `contract.runtime.component_adapter.reconstruction` | `ComponentRuntimeAdapter` | `adapter` | Reconstruction uses only explicitly supported reset, checkpoint import, deterministic digest, and invariant verification operations; checkpoint import is atomic and must match its expected digest. |
-| `contract.runtime.component_adapter.recovery_authorization` | `ComponentRuntimeAdapter` | `adapter` | Recovery authorization defaults false and may be declared only for a non-effectful coordinator action that is intentionally safe as the sole recovery ingress; it never grants arbitrary routing or replay authority. |
-| `contract.runtime.component_adapter.describe.failures` | `DescribeRuntimeBinding` | `adapter.describe` | Description has no declared domain failure and changes neither component nor adapter state. |
-| `contract.runtime.component_adapter.dispatch.failures` | `DispatchRuntimeMessage` | `adapter.dispatch` | Invalid bindings or payloads are rejected before component invocation; modeled component failures preserve their declared no-effect or documented effect semantics. |
-| `contract.runtime.component_adapter.replay.failures` | `ApplyCanonicalReplayEffect` | `adapter.applyReplayEffect` | An incompatible effect is rejected before invoking the state owner. |
-| `contract.runtime.component_adapter.replay_state_status.failures` | `ReplayStateStatus` | `adapter.replayStateStatus` | Status inspection success or failure has no adapted component state effect and never reports an unsafe target as prepared. |
-| `contract.runtime.component_adapter.reset.failures` | `ResetReplayState` | `adapter.resetReplayState` | Unsupported or failed reset does not expose a partially reset occurrence as reconstruction-ready. |
-| `contract.runtime.component_adapter.checkpoint.failures` | `ImportReplayCheckpoint` | `adapter.importReplayCheckpoint` | Incompatible, invalid, or digest-mismatched checkpoints do not expose partially imported state. |
-| `contract.runtime.component_adapter.digest.failures` | `ReplayStateDigest` | `adapter.replayStateDigest` | Digest success or failure has no adapted component state effect. |
-| `contract.runtime.component_adapter.invariants.failures` | `VerifyReplayState` | `adapter.verifyReplayState` | Invariant verification success or failure has no adapted component state effect. |
+| `contract.runtime.component_adapter.one_archetype` | `ComponentRuntimeAdapter` | `adapter` | The same participant and adapter contracts host local, coordinating, state-owning, stateless, external-interface, and mixed action behavior. Store, controller, coordinator, façade, gateway, actor, and saga labels create neither adapter subtypes nor runtime registration categories. |
+| `contract.runtime.component_adapter.minimal_participant` | `ComponentRuntimeAdapter` | `adapter` | The runtime-facing obligation is only asynchronous envelope delivery with its scoped participant context. Bibliotek's adapter is one conforming implementation; an equivalent hand-authored participant can replace it without changing runtime routing. |
+| `contract.runtime.component_adapter.uniform_handler` | `ComponentRuntimeAdapter` | `adapter` | Every action handler receives decoded arguments and one execution context. It may perform local work, send or await messages, compensate, and aggregate. It does not return a second runtime result path and must explicitly complete or fault its inbound request. |
+| `contract.runtime.component_adapter.explicit_mapping` | `ComponentRuntimeAdapter` | `adapter` | Every routable action explicitly declares schemas, codecs, arguments and defaults, failures, lane, consistency group and access, idempotency, deadline, replay mode, canonical effect, and external-effect status. The descriptor contains no component-role or handler-kind field and reflection exposes no unregistered method. |
+| `contract.runtime.component_adapter.continuations` | `ComponentRuntimeAdapter` | `adapter` | A coordinating handler calls collaborators by sending a request with a deterministic step message ID and waiting on a loop-neutral bounded continuation keyed by correlation. Reusing one step key with identical immutable content observes the same continuation; changed content is rejected. Response and fault delivery resolves and removes the continuation and is always acknowledged, including after caller timeout. Durable outcome lookup replaces terminal in-memory caches. |
+| `contract.runtime.component_adapter.execution_lifetime` | `ComponentRuntimeAdapter` | `adapter` | The adapter bounds outstanding outbound continuations and cooperates with runtime-hosted action deadlines. Caller wait timeout never cancels component execution. Cancellation of an off-loop synchronous invocation waits for that invocation to settle. A coordinating handler may compensate before faulting; otherwise deadline expiry renders the execution indeterminate. |
+| `contract.runtime.component_adapter.equivalence` | `ComponentRuntimeAdapter` | `adapter` | Generated local handlers preserve the logical component's defaults, ordering, results, failures, and state effects. Runtime messaging remains visible to coordinating handlers through action references, argument mappings, target addresses, and deterministic step keys rather than proxy objects. |
+| `contract.runtime.component_adapter.replay` | `ComponentRuntimeAdapter` | `adapter` | Optional canonical-effect application, empty/reset/checkpoint, deterministic digest, and invariant-verification functions compose into the same adapter. Their absence means the occurrence owns no replayed state, not that it belongs to a different participant type. |
+| `contract.runtime.component_adapter.failures` | `ComponentRuntimeAdapter` | `adapter` | Invalid action, payload, codec, effect, or terminal encoding is rejected without unmodeled component mutation. Modeled component faults retain their declared evidence and disposition; unexpected faults remain distinct and indeterminate. |
+| `contract.runtime.component_adapter.describe.failures` | `DescribeRuntimeBinding` | `adapter.describe` | Description changes neither adapted component nor continuation state. |
+| `contract.runtime.component_adapter.deliver.failures` | `DeliverRuntimeEnvelope` | `adapter.deliver` | Invalid binding or payload is rejected before component invocation; a started request is never silently left complete. |
+| `contract.runtime.component_adapter.effect.failures` | `ApplyCanonicalReplayEffect` | `adapter.applyReplayEffect` | Incompatible effects are rejected before invoking the state owner. |
+| `contract.runtime.component_adapter.status.failures` | `ReplayStateStatus` | `adapter.replayStateStatus` | Status failure never reports an unsafe target as prepared. |
+| `contract.runtime.component_adapter.reset.failures` | `ResetReplayState` | `adapter.resetReplayState` | Failed reset never reports partial state as reconstruction-ready. |
+| `contract.runtime.component_adapter.checkpoint.failures` | `ImportReplayCheckpoint` | `adapter.importReplayCheckpoint` | Invalid checkpoint never exposes partially imported state as prepared. |
+| `contract.runtime.component_adapter.digest.failures` | `ReplayStateDigest` | `adapter.replayStateDigest` | Digest failure has no state effect. |
+| `contract.runtime.component_adapter.verify.failures` | `VerifyReplayState` | `adapter.verifyReplayState` | Invariant verification failure has no state effect. |
 
 ## Public values and items
 
 | Public definition | Kind | Fields | Meaning |
 |---|---|---|---|
-| `RuntimeArgumentDescriptor` | `attribute` | `name: String`, `required: Boolean`, `default[0..1]: JsonValue` | Defined by its typed fields and action requirements. |
-| `RuntimeFailureBindingDescriptor` | `attribute` | `failureName: String`, `codecId: String`, `codecVersion: Integer`, `contentType: String` = `"application/json"`, `traceDisposition: RuntimeTraceDisposition`, `replayMode: RuntimeReplayMode` = `RuntimeReplayMode::no_state_effect` | Defined by its typed fields and action requirements. |
-| `RuntimeActionBindingDescriptor` | `attribute` | `componentContractId: String`, `actionId: String`, `bindingId: String`, `bindingVersion: Integer`, `schemaVersion: Integer`, `requestContentType: String` = `"application/json"`, `requestCodecId: String`, `requestCodecVersion: Integer`, `resultContentType: String` = `"application/json"`, `resultCodecId: String`, `resultCodecVersion: Integer`, `failureContentType: String` = `"application/json"`, `failureCodecId: String`, `failureCodecVersion: Integer`, `requestArguments[0..*]: RuntimeArgumentDescriptor`, `supportedFailureNames[0..*]: String`, `failureBindings[0..*]: RuntimeFailureBindingDescriptor`, `idempotency: RuntimeActionIdempotency`, `concurrencyLane: String` = `"serialized"`, `replayMode: RuntimeReplayMode`, `canonicalEffectSchemaVersion[0..1]: Integer`, `canonicalEffectCodecId[0..1]: String`, `canonicalEffectCodecVersion[0..1]: Integer`, `modeledFaultTraceDisposition: RuntimeTraceDisposition` = `RuntimeTraceDisposition::aborted`, `maxInFlight: Integer` = `1`, `externallyEffectful: Boolean` = `false`, `recoveryAuthorized: Boolean` = `false` | Defined by its typed fields and action requirements. |
-| `RuntimeDispatchResult` | `attribute` | `response: RuntimeMessageEnvelope`, `canonicalEffect[0..1]: JsonObject`, `effectDigest[0..1]: String`, `traceDisposition: RuntimeTraceDisposition` | Defined by its typed fields and action requirements. |
-| `RuntimeBindingDescription` | `attribute` | `bindingId: String`, `bindingVersion: Integer`, `actions[1..*]: RuntimeActionBindingDescriptor` | Defined by its typed fields and action requirements. |
 | `RuntimeReplayStateStatus` | `attribute` | `available: Boolean`, `empty: Boolean`, `prepared: Boolean`, `checkpointCursor: Integer`, `stateDigest[0..1]: String`, `limitations[0..*]: String` | Defined by its typed fields and action requirements. |
 | `RuntimeBindingInvalid` | `attribute` | `message: String` | Defined by its typed fields and action requirements. |
 | `RuntimePayloadInvalid` | `attribute` | `message: String` | Defined by its typed fields and action requirements. |
-| `RuntimeComponentFault` | `attribute` | `message: String`, `faultType: String`, `evidence: JsonObject` | Defined by its typed fields and action requirements. |
+| `RuntimeTerminalEncodingFailed` | `attribute` | `message: String` | Defined by its typed fields and action requirements. |
 
 ## Public enumerations
 
 | Enumeration | Logical literals |
 |---|---|
-| `RuntimeActionIdempotency` | `idempotent`, `non_idempotent`, `unspecified` |
+| — | No component-owned public enumerations. |
 
 ## Verification
 
 | Verification | Subject | Objectives | Evidence |
 |---|---|---|---|
-| `ComponentRuntimeAdapterBoundaryVerification` | `ComponentRuntimeAdapter` | `explicitMapping`, `directMessageEquivalence`, `resolvedReplayEffects`, `reconstructionStateControl`, `recoveryAuthorization` | `components/runtime/component_adapter/tests/test_component_adapter_contract.py#ComponentRuntimeAdapterBoundaryVerification` |
-| `DescribeRuntimeBindingContractVerification` | `DescribeRuntimeBinding` | `describeFailureSemantics` | `components/runtime/component_adapter/tests/test_component_adapter_contract.py#DescribeRuntimeBindingContractVerification` |
-| `DispatchRuntimeMessageContractVerification` | `DispatchRuntimeMessage` | `dispatchFailureSemantics` | `components/runtime/component_adapter/tests/test_component_adapter_contract.py#DispatchRuntimeMessageContractVerification` |
-| `ApplyCanonicalReplayEffectContractVerification` | `ApplyCanonicalReplayEffect` | `replayFailureSemantics` | `components/runtime/component_adapter/tests/test_component_adapter_contract.py#ApplyCanonicalReplayEffectContractVerification` |
-| `ReplayStateStatusContractVerification` | `ReplayStateStatus` | `replayStateStatusFailureSemantics` | `components/runtime/component_adapter/tests/test_component_adapter_contract.py#ReplayStateStatusContractVerification` |
-| `ResetReplayStateContractVerification` | `ResetReplayState` | `resetFailureSemantics` | `components/runtime/component_adapter/tests/test_component_adapter_contract.py#ResetReplayStateContractVerification` |
-| `ImportReplayCheckpointContractVerification` | `ImportReplayCheckpoint` | `checkpointFailureSemantics` | `components/runtime/component_adapter/tests/test_component_adapter_contract.py#ImportReplayCheckpointContractVerification` |
-| `ReplayStateDigestContractVerification` | `ReplayStateDigest` | `digestFailureSemantics` | `components/runtime/component_adapter/tests/test_component_adapter_contract.py#ReplayStateDigestContractVerification` |
-| `VerifyReplayStateContractVerification` | `VerifyReplayState` | `invariantVerificationFailureSemantics` | `components/runtime/component_adapter/tests/test_component_adapter_contract.py#VerifyReplayStateContractVerification` |
+| `ComponentRuntimeAdapterBoundaryVerification` | `ComponentRuntimeAdapter` | `oneComponentArchetype`, `minimalParticipantSubstitution`, `uniformActionHandler`, `explicitMapping`, `messageContinuations`, `boundedExecutionLifetime`, `directMessageEquivalence`, `replayStateComposition` | `components/runtime/component_adapter/tests/test_component_adapter_contract.py#ComponentRuntimeAdapterBoundaryVerification` |
+| `DeliverRuntimeEnvelopeContractVerification` | `DeliverRuntimeEnvelope` | `deliverEnvelopeFailureSemantics` | `components/runtime/component_adapter/tests/test_component_adapter_contract.py#DeliverRuntimeEnvelopeContractVerification` |
+| `ComponentRuntimeReplayVerification` | `ComponentRuntimeAdapter` | `replayStateComposition`, `adapterFailureSemantics` | `components/runtime/component_adapter/tests/test_component_adapter_contract.py#ComponentRuntimeReplayVerification` |
+| `DescribeRuntimeBindingContractVerification` | `DescribeRuntimeBinding` | `describeBindingFailureSemantics` | `components/runtime/component_adapter/tests/test_component_adapter_contract.py#DescribeRuntimeBindingContractVerification` |
+| `ApplyCanonicalReplayEffectContractVerification` | `ApplyCanonicalReplayEffect` | `applyReplayEffectFailureSemantics` | `components/runtime/component_adapter/tests/test_component_adapter_contract.py#ApplyCanonicalReplayEffectContractVerification` |
+| `ReplayStateStatusContractVerification` | `ReplayStateStatus` | `replayStatusFailureSemantics` | `components/runtime/component_adapter/tests/test_component_adapter_contract.py#ReplayStateStatusContractVerification` |
+| `ResetReplayStateContractVerification` | `ResetReplayState` | `resetReplayStateFailureSemantics` | `components/runtime/component_adapter/tests/test_component_adapter_contract.py#ResetReplayStateContractVerification` |
+| `ImportReplayCheckpointContractVerification` | `ImportReplayCheckpoint` | `importCheckpointFailureSemantics` | `components/runtime/component_adapter/tests/test_component_adapter_contract.py#ImportReplayCheckpointContractVerification` |
+| `ReplayStateDigestContractVerification` | `ReplayStateDigest` | `replayDigestFailureSemantics` | `components/runtime/component_adapter/tests/test_component_adapter_contract.py#ReplayStateDigestContractVerification` |
+| `VerifyReplayStateContractVerification` | `VerifyReplayState` | `verifyReplayStateFailureSemantics` | `components/runtime/component_adapter/tests/test_component_adapter_contract.py#VerifyReplayStateContractVerification` |
 
 Equivalent private algorithms, helpers, storage layouts, and implementation-language inheritance remain implementation choices.

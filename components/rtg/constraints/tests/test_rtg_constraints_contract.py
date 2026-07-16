@@ -5,11 +5,14 @@ from uuid import UUID, uuid4
 
 import pytest
 
+from components.rtg.change import RtgChangeReference
 from components.rtg.constraints import (
     InMemoryRtgConstraints,
     RtgConstraintCardinalityPayload,
+    RtgConstraintChangeSet,
     RtgConstraintDefinition,
     RtgConstraintDefinitionInvalid,
+    RtgConstraintDefinitionWrite,
     RtgConstraintKindInvalid,
     RtgConstraintPayloadInvalid,
     RtgConstraintQueryPatternPayload,
@@ -28,7 +31,60 @@ def concrete_uuid(value: UUID | None) -> UUID:
     return value
 
 
+def test_constraint_batch_is_atomic_and_never_uses_snapshots(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    constraints = InMemoryRtgConstraints.empty()
+    query_spec = RtgQuerySpec(anchor_buckets=(RtgQueryAnchorBucket("item", ("Item",)),))
+    valid_id, invalid_id = uuid4(), uuid4()
+    monkeypatch.setattr(
+        InMemoryRtgConstraints,
+        "export_snapshot",
+        lambda _self: pytest.fail("routine batches must not export snapshots"),
+    )
+    with pytest.raises(RtgConstraintKindInvalid):
+        constraints.apply_batch(
+            RtgConstraintChangeSet(
+                constraint_writes=(
+                    RtgConstraintDefinitionWrite(
+                        RtgChangeReference(resource_id=valid_id),
+                        RtgConstraintDefinition(
+                            uuid=valid_id,
+                            kind="cardinality",
+                            target_type_keys=("Item",),
+                            display_name="At least one",
+                            description="Require an item.",
+                            payload=RtgConstraintCardinalityPayload(query_spec, "item", minimum=1),
+                        ),
+                    ),
+                    RtgConstraintDefinitionWrite(
+                        RtgChangeReference(resource_id=invalid_id),
+                        RtgConstraintDefinition(
+                            uuid=invalid_id,
+                            kind="unsupported",
+                            target_type_keys=("Item",),
+                            display_name="Invalid",
+                            description="Invalid.",
+                            payload=RtgConstraintCardinalityPayload(query_spec, "item", minimum=1),
+                        ),
+                    ),
+                )
+            )
+        )
+    summary = constraints.count_summary()
+    assert summary.live_total + summary.non_live_total == 0
+
+
 MODEL_EVIDENCE = {
+    "ConstraintBatchAtomicityContractVerification": (
+        "test_constraint_batch_is_atomic_and_never_uses_snapshots",
+    ),
+    "ConstraintRoutineWorkScalingVerification": (
+        "test_constraint_batch_is_atomic_and_never_uses_snapshots",
+    ),
+    "CountConstraintSummaryContractVerification": (
+        "test_constraint_batch_is_atomic_and_never_uses_snapshots",
+    ),
     "PutConstraintContractVerification": (
         "test_constraints_store_payloads_without_executing_them",
         "test_constraints_by_target_supports_kind_and_live_filters",
@@ -299,9 +355,7 @@ def test_constraint_snapshot_rejects_malformed_and_duplicate_identities() -> Non
 
 
 def test_replace_constraint_snapshot_is_atomic_and_idempotent() -> None:
-    query_spec = RtgQuerySpec(
-        anchor_buckets=(RtgQueryAnchorBucket("component", ("Component",)),)
-    )
+    query_spec = RtgQuerySpec(anchor_buckets=(RtgQueryAnchorBucket("component", ("Component",)),))
 
     def record(identity: int, name: str) -> RtgConstraintDefinition:
         return RtgConstraintDefinition(

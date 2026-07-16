@@ -21,8 +21,8 @@ from components.storage.json_file.protocol import (
     StorageWriteFailed,
 )
 from components.storage.json_file.runtime_binding import (
+    JSON_FILE_STORAGE_ACTIONS,
     create_json_file_storage_adapter,
-    create_json_file_storage_proxy,
 )
 
 __all__ = [
@@ -32,6 +32,7 @@ __all__ = [
     "JsonDocumentMetadata",
     "JsonDocumentNotFound",
     "JsonFileStorage",
+    "JSON_FILE_STORAGE_ACTIONS",
     "JsonValue",
     "JsonValueNotSerializable",
     "LocalJsonFileStorage",
@@ -45,5 +46,4 @@ __all__ = [
     "StorageRootUnavailable",
     "StorageWriteFailed",
     "create_json_file_storage_adapter",
-    "create_json_file_storage_proxy",
 ]

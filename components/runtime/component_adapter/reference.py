@@ -1,65 +1,80 @@
 from __future__ import annotations
 
+import asyncio
+from dataclasses import replace
 from tempfile import TemporaryDirectory
 from typing import cast
 
-from components.runtime.component_adapter import (
-    ActionBinding,
-    ExplicitComponentAdapter,
+from components.runtime.component_adapter import ActionBinding, ComponentAdapter, ComponentEndpoint
+from components.runtime.message_runtime import SqliteMessageRuntime
+from components.runtime.messaging import (
+    ComponentOccurrenceDeclaration,
     RuntimeActionBindingDescriptor,
     RuntimeActionIdempotency,
-    RuntimeClient,
+    RuntimeReplayMode,
+    RuntimeTopologyManifest,
+    topology_manifest_hash,
 )
-from components.runtime.component_adapter.implementation import encode_json
-from components.runtime.message_runtime import RuntimeReplayMode, SqliteMessageRuntime
 
 
-def run_reference() -> int:
-    """Dispatch one explicitly registered action without exposing private methods."""
+async def _run() -> int:
     descriptor = RuntimeActionBindingDescriptor(
-        component_contract_id="component.reference.accumulator",
-        action_id="component.reference.accumulator.add",
-        binding_id="binding.reference.accumulator.v1",
-        binding_version=1,
-        schema_version=1,
-        request_codec_id="codec.reference.accumulator.request.json",
-        result_codec_id="codec.reference.accumulator.result.json",
-        failure_codec_id="codec.reference.accumulator.failure.json",
-        idempotency=RuntimeActionIdempotency.NON_IDEMPOTENT,
-        replay_mode=RuntimeReplayMode.NO_STATE_EFFECT,
+        "component.reference.accumulator",
+        "component.reference.accumulator.add",
+        "binding.reference.accumulator.v2",
+        1,
+        1,
+        "codec.reference.accumulator.request.json",
+        "codec.reference.accumulator.result.json",
+        "codec.reference.accumulator.failure.json",
+        RuntimeActionIdempotency.NON_IDEMPOTENT,
+        RuntimeReplayMode.NO_STATE_EFFECT,
     )
-    adapter = ExplicitComponentAdapter(
+    adapter = ComponentAdapter(
         (
             ActionBinding(
-                descriptor=descriptor,
+                descriptor,
+                lambda payload: ((cast(int, payload["value"]),), {}),
+                lambda result: cast(int, result),
                 invoke=lambda value: value + 1,
-                decode_request=lambda payload: ((cast(int, payload["value"]),), {}),
-                encode_result=encode_json,
             ),
         )
     )
     with TemporaryDirectory() as directory:
-        with SqliteMessageRuntime.open(
+        runtime = SqliteMessageRuntime(
             f"{directory}/runtime.sqlite", runtime_key="adapter.reference"
-        ) as runtime:
-            registration = runtime.register_adapter(
-                instance_key="reference.accumulator.primary",
-                component_contract_id="component.reference.accumulator",
-                adapter=adapter,
-            )
-            address = runtime.address_for(registration.instance_key)
-            client = RuntimeClient(
-                runtime,
-                source=address,
-                target=address,
-                component_contract_id="component.reference.accumulator",
-                request_codec_id="codec.reference.accumulator.request.json",
-            )
-            outcome = client.request_sync("component.reference.accumulator.add", {"value": 1})
-            payload = outcome.response.payload.value
-            if not isinstance(payload, dict):
-                raise RuntimeError("reference adapter returned a non-object payload")
-            return cast(int, payload["result"])
+        )
+        declaration = ComponentOccurrenceDeclaration(
+            "reference.accumulator.primary",
+            adapter.describe().component_contract_id,
+            adapter.describe().binding_id,
+            adapter.describe().binding_version,
+        )
+        manifest = RuntimeTopologyManifest("adapter.reference", 4, (declaration,), (), "")
+        manifest = replace(manifest, manifest_hash=topology_manifest_hash(manifest))
+        await runtime.prepare_static_topology(manifest)
+        registration = await runtime.register_occurrence(declaration)
+        await runtime.attach_participant(registration, adapter, adapter.describe().actions)
+        await runtime.confirm_static_topology(manifest)
+        endpoint = ComponentEndpoint(
+            runtime,
+            adapter,
+            source=runtime.address_for(declaration.instance_key),
+        )
+        outcome = await endpoint.request(
+            descriptor.action_ref(),
+            {"value": 1},
+            target=runtime.address_for(declaration.instance_key),
+        )
+        await runtime.aclose()
+        payload = outcome.response.payload.value
+        if not isinstance(payload, dict):
+            raise RuntimeError("reference adapter returned a non-object payload")
+        return cast(int, payload["result"])
+
+
+def run_reference() -> int:
+    return asyncio.run(_run())
 
 
 if __name__ == "__main__":

@@ -1,0 +1,1616 @@
+{
+  "actions": [
+    {
+      "action_id": "component.rtg.constraints.export_snapshot",
+      "binding_id": "binding.python.rtg.constraints.v1",
+      "binding_version": 1,
+      "canonical_effect_codec_id": null,
+      "canonical_effect_codec_version": null,
+      "canonical_effect_schema_version": null,
+      "concurrency_lane": "serialized",
+      "consistency_access": "independent",
+      "consistency_group": null,
+      "deadline_seconds": null,
+      "effect_payload_disposition": null,
+      "externally_effectful": false,
+      "failure_codec_id": "codec.python.component.rtg.constraints.failure.json",
+      "failure_codec_version": 1,
+      "failure_dispositions": {},
+      "failure_names": [],
+      "fault_payload_disposition": "diagnostic",
+      "fault_schema": {
+        "oneOf": []
+      },
+      "idempotency": "idempotent",
+      "method_name": "export_snapshot",
+      "modeled_fault_trace_disposition": "aborted",
+      "recovery_authorized": false,
+      "replay_mode": "no_state_effect",
+      "request_arguments": [],
+      "request_codec_id": "codec.python.component.rtg.constraints.request.json",
+      "request_codec_version": 1,
+      "request_payload_disposition": "command",
+      "request_schema": {
+        "additionalProperties": false,
+        "properties": {},
+        "required": [],
+        "type": "object"
+      },
+      "resolved_argument_from_result": null,
+      "result_codec_id": "codec.python.component.rtg.constraints.result.json",
+      "result_codec_version": 1,
+      "result_payload_disposition": "state_transfer",
+      "result_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "constraints": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "description": {
+                  "type": "string"
+                },
+                "display_name": {
+                  "type": "string"
+                },
+                "kind": {
+                  "enum": [
+                    "query_pattern",
+                    "cardinality"
+                  ],
+                  "type": "string"
+                },
+                "payload": {
+                  "type": "object"
+                },
+                "system": {
+                  "type": "object"
+                },
+                "target_type_keys": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "uuid": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "display_name",
+                "description",
+                "payload",
+                "system"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "schema_version": 1
+    },
+    {
+      "action_id": "component.rtg.constraints.replace_snapshot",
+      "binding_id": "binding.python.rtg.constraints.v1",
+      "binding_version": 1,
+      "canonical_effect_codec_id": "binding.python.rtg.constraints.v1.component.rtg.constraints.replace_snapshot.effect.json",
+      "canonical_effect_codec_version": 1,
+      "canonical_effect_schema_version": 1,
+      "concurrency_lane": "serialized",
+      "consistency_access": "independent",
+      "consistency_group": null,
+      "deadline_seconds": null,
+      "effect_payload_disposition": "state_transfer",
+      "externally_effectful": false,
+      "failure_codec_id": "codec.python.component.rtg.constraints.failure.json",
+      "failure_codec_version": 1,
+      "failure_dispositions": {},
+      "failure_names": [
+        "RtgConstraintSnapshotInvalid",
+        "RtgConstraintUuidInvalid",
+        "RtgConstraintUuidConflict",
+        "RtgConstraintKindInvalid",
+        "RtgConstraintDefinitionInvalid",
+        "RtgConstraintPayloadInvalid",
+        "RtgConstraintSystemValueInvalid"
+      ],
+      "fault_payload_disposition": "diagnostic",
+      "fault_schema": {
+        "oneOf": [
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          }
+        ]
+      },
+      "idempotency": "idempotent",
+      "method_name": "replace_snapshot",
+      "modeled_fault_trace_disposition": "aborted",
+      "recovery_authorized": false,
+      "replay_mode": "canonical_effect",
+      "request_arguments": [
+        {
+          "default": null,
+          "name": "snapshot",
+          "required": true,
+          "schema": {
+            "additionalProperties": false,
+            "properties": {
+              "constraints": {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "description": {
+                      "type": "string"
+                    },
+                    "display_name": {
+                      "type": "string"
+                    },
+                    "kind": {
+                      "enum": [
+                        "query_pattern",
+                        "cardinality"
+                      ],
+                      "type": "string"
+                    },
+                    "payload": {
+                      "type": "object"
+                    },
+                    "system": {
+                      "type": "object"
+                    },
+                    "target_type_keys": {
+                      "items": {
+                        "type": "string"
+                      },
+                      "type": "array"
+                    },
+                    "uuid": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "kind",
+                    "display_name",
+                    "description",
+                    "payload",
+                    "system"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              }
+            },
+            "type": "object"
+          }
+        }
+      ],
+      "request_codec_id": "codec.python.component.rtg.constraints.request.json",
+      "request_codec_version": 1,
+      "request_payload_disposition": "state_transfer",
+      "request_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "snapshot": {
+            "additionalProperties": false,
+            "properties": {
+              "constraints": {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "description": {
+                      "type": "string"
+                    },
+                    "display_name": {
+                      "type": "string"
+                    },
+                    "kind": {
+                      "enum": [
+                        "query_pattern",
+                        "cardinality"
+                      ],
+                      "type": "string"
+                    },
+                    "payload": {
+                      "type": "object"
+                    },
+                    "system": {
+                      "type": "object"
+                    },
+                    "target_type_keys": {
+                      "items": {
+                        "type": "string"
+                      },
+                      "type": "array"
+                    },
+                    "uuid": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "kind",
+                    "display_name",
+                    "description",
+                    "payload",
+                    "system"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              }
+            },
+            "type": "object"
+          }
+        },
+        "required": [
+          "snapshot"
+        ],
+        "type": "object"
+      },
+      "resolved_argument_from_result": null,
+      "result_codec_id": "codec.python.component.rtg.constraints.result.json",
+      "result_codec_version": 1,
+      "result_payload_disposition": "query_result",
+      "result_schema": {
+        "type": "null"
+      },
+      "schema_version": 1
+    },
+    {
+      "action_id": "component.rtg.constraints.apply_batch",
+      "binding_id": "binding.python.rtg.constraints.v1",
+      "binding_version": 1,
+      "canonical_effect_codec_id": "binding.python.rtg.constraints.v1.component.rtg.constraints.apply_batch.effect.json",
+      "canonical_effect_codec_version": 1,
+      "canonical_effect_schema_version": 1,
+      "concurrency_lane": "serialized",
+      "consistency_access": "independent",
+      "consistency_group": null,
+      "deadline_seconds": null,
+      "effect_payload_disposition": "canonical_delta",
+      "externally_effectful": false,
+      "failure_codec_id": "codec.python.component.rtg.constraints.failure.json",
+      "failure_codec_version": 1,
+      "failure_dispositions": {},
+      "failure_names": [
+        "RtgConstraintUuidInvalid",
+        "RtgConstraintUuidConflict",
+        "RtgConstraintKindInvalid",
+        "RtgConstraintDefinitionInvalid",
+        "RtgConstraintPayloadInvalid",
+        "RtgConstraintSystemValueInvalid",
+        "RtgConstraintNotFound"
+      ],
+      "fault_payload_disposition": "diagnostic",
+      "fault_schema": {
+        "oneOf": [
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          }
+        ]
+      },
+      "idempotency": "non_idempotent",
+      "method_name": "apply_batch",
+      "modeled_fault_trace_disposition": "aborted",
+      "recovery_authorized": false,
+      "replay_mode": "canonical_effect",
+      "request_arguments": [
+        {
+          "default": null,
+          "name": "changes",
+          "required": true,
+          "schema": {
+            "additionalProperties": false,
+            "properties": {
+              "constraint_writes": {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "constraint": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "description": {
+                          "type": "string"
+                        },
+                        "display_name": {
+                          "type": "string"
+                        },
+                        "kind": {
+                          "enum": [
+                            "query_pattern",
+                            "cardinality"
+                          ],
+                          "type": "string"
+                        },
+                        "payload": {
+                          "type": "object"
+                        },
+                        "system": {
+                          "type": "object"
+                        },
+                        "target_type_keys": {
+                          "items": {
+                            "type": "string"
+                          },
+                          "type": "array"
+                        },
+                        "uuid": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "display_name",
+                        "description",
+                        "payload",
+                        "system"
+                      ],
+                      "type": "object"
+                    },
+                    "ref": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "local_ref": {
+                          "type": "string"
+                        },
+                        "resource_id": {
+                          "type": "string"
+                        }
+                      },
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "ref",
+                    "constraint"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "delete_constraints": {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "local_ref": {
+                      "type": "string"
+                    },
+                    "resource_id": {
+                      "type": "string"
+                    }
+                  },
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "set_live": {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "live": {
+                      "type": "boolean"
+                    },
+                    "target_ref": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "local_ref": {
+                          "type": "string"
+                        },
+                        "resource_id": {
+                          "type": "string"
+                        }
+                      },
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "target_ref",
+                    "live"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              }
+            },
+            "type": "object"
+          }
+        }
+      ],
+      "request_codec_id": "codec.python.component.rtg.constraints.request.json",
+      "request_codec_version": 1,
+      "request_payload_disposition": "command",
+      "request_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "changes": {
+            "additionalProperties": false,
+            "properties": {
+              "constraint_writes": {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "constraint": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "description": {
+                          "type": "string"
+                        },
+                        "display_name": {
+                          "type": "string"
+                        },
+                        "kind": {
+                          "enum": [
+                            "query_pattern",
+                            "cardinality"
+                          ],
+                          "type": "string"
+                        },
+                        "payload": {
+                          "type": "object"
+                        },
+                        "system": {
+                          "type": "object"
+                        },
+                        "target_type_keys": {
+                          "items": {
+                            "type": "string"
+                          },
+                          "type": "array"
+                        },
+                        "uuid": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "display_name",
+                        "description",
+                        "payload",
+                        "system"
+                      ],
+                      "type": "object"
+                    },
+                    "ref": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "local_ref": {
+                          "type": "string"
+                        },
+                        "resource_id": {
+                          "type": "string"
+                        }
+                      },
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "ref",
+                    "constraint"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "delete_constraints": {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "local_ref": {
+                      "type": "string"
+                    },
+                    "resource_id": {
+                      "type": "string"
+                    }
+                  },
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "set_live": {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "live": {
+                      "type": "boolean"
+                    },
+                    "target_ref": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "local_ref": {
+                          "type": "string"
+                        },
+                        "resource_id": {
+                          "type": "string"
+                        }
+                      },
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "target_ref",
+                    "live"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              }
+            },
+            "type": "object"
+          }
+        },
+        "required": [
+          "changes"
+        ],
+        "type": "object"
+      },
+      "resolved_argument_from_result": null,
+      "result_codec_id": "codec.python.component.rtg.constraints.result.json",
+      "result_codec_version": 1,
+      "result_payload_disposition": "query_result",
+      "result_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "deletes": {
+            "type": "integer"
+          },
+          "live_changes": {
+            "type": "integer"
+          },
+          "writes": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "writes",
+          "deletes",
+          "live_changes"
+        ],
+        "type": "object"
+      },
+      "schema_version": 1
+    },
+    {
+      "action_id": "component.rtg.constraints.count_summary",
+      "binding_id": "binding.python.rtg.constraints.v1",
+      "binding_version": 1,
+      "canonical_effect_codec_id": null,
+      "canonical_effect_codec_version": null,
+      "canonical_effect_schema_version": null,
+      "concurrency_lane": "serialized",
+      "consistency_access": "independent",
+      "consistency_group": null,
+      "deadline_seconds": null,
+      "effect_payload_disposition": null,
+      "externally_effectful": false,
+      "failure_codec_id": "codec.python.component.rtg.constraints.failure.json",
+      "failure_codec_version": 1,
+      "failure_dispositions": {},
+      "failure_names": [],
+      "fault_payload_disposition": "diagnostic",
+      "fault_schema": {
+        "oneOf": []
+      },
+      "idempotency": "idempotent",
+      "method_name": "count_summary",
+      "modeled_fault_trace_disposition": "aborted",
+      "recovery_authorized": false,
+      "replay_mode": "no_state_effect",
+      "request_arguments": [],
+      "request_codec_id": "codec.python.component.rtg.constraints.request.json",
+      "request_codec_version": 1,
+      "request_payload_disposition": "command",
+      "request_schema": {
+        "additionalProperties": false,
+        "properties": {},
+        "required": [],
+        "type": "object"
+      },
+      "resolved_argument_from_result": null,
+      "result_codec_id": "codec.python.component.rtg.constraints.result.json",
+      "result_codec_version": 1,
+      "result_payload_disposition": "query_result",
+      "result_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "live_total": {
+            "type": "integer"
+          },
+          "non_live_total": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "live_total",
+          "non_live_total"
+        ],
+        "type": "object"
+      },
+      "schema_version": 1
+    },
+    {
+      "action_id": "component.rtg.constraints.put_constraint",
+      "binding_id": "binding.python.rtg.constraints.v1",
+      "binding_version": 1,
+      "canonical_effect_codec_id": "binding.python.rtg.constraints.v1.component.rtg.constraints.put_constraint.effect.json",
+      "canonical_effect_codec_version": 1,
+      "canonical_effect_schema_version": 1,
+      "concurrency_lane": "serialized",
+      "consistency_access": "independent",
+      "consistency_group": null,
+      "deadline_seconds": null,
+      "effect_payload_disposition": "canonical_delta",
+      "externally_effectful": false,
+      "failure_codec_id": "codec.python.component.rtg.constraints.failure.json",
+      "failure_codec_version": 1,
+      "failure_dispositions": {},
+      "failure_names": [
+        "RtgConstraintUuidInvalid",
+        "RtgConstraintUuidConflict",
+        "RtgConstraintKindInvalid",
+        "RtgConstraintDefinitionInvalid",
+        "RtgConstraintPayloadInvalid",
+        "RtgConstraintSystemValueInvalid"
+      ],
+      "fault_payload_disposition": "diagnostic",
+      "fault_schema": {
+        "oneOf": [
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          }
+        ]
+      },
+      "idempotency": "non_idempotent",
+      "method_name": "put_constraint",
+      "modeled_fault_trace_disposition": "aborted",
+      "recovery_authorized": false,
+      "replay_mode": "canonical_effect",
+      "request_arguments": [
+        {
+          "default": null,
+          "name": "constraint",
+          "required": true,
+          "schema": {
+            "additionalProperties": false,
+            "properties": {
+              "description": {
+                "type": "string"
+              },
+              "display_name": {
+                "type": "string"
+              },
+              "kind": {
+                "enum": [
+                  "query_pattern",
+                  "cardinality"
+                ],
+                "type": "string"
+              },
+              "payload": {
+                "type": "object"
+              },
+              "system": {
+                "type": "object"
+              },
+              "target_type_keys": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "uuid": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "kind",
+              "display_name",
+              "description",
+              "payload",
+              "system"
+            ],
+            "type": "object"
+          }
+        }
+      ],
+      "request_codec_id": "codec.python.component.rtg.constraints.request.json",
+      "request_codec_version": 1,
+      "request_payload_disposition": "command",
+      "request_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "constraint": {
+            "additionalProperties": false,
+            "properties": {
+              "description": {
+                "type": "string"
+              },
+              "display_name": {
+                "type": "string"
+              },
+              "kind": {
+                "enum": [
+                  "query_pattern",
+                  "cardinality"
+                ],
+                "type": "string"
+              },
+              "payload": {
+                "type": "object"
+              },
+              "system": {
+                "type": "object"
+              },
+              "target_type_keys": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "uuid": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "kind",
+              "display_name",
+              "description",
+              "payload",
+              "system"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "constraint"
+        ],
+        "type": "object"
+      },
+      "resolved_argument_from_result": "constraint",
+      "result_codec_id": "codec.python.component.rtg.constraints.result.json",
+      "result_codec_version": 1,
+      "result_payload_disposition": "query_result",
+      "result_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "description": {
+            "type": "string"
+          },
+          "display_name": {
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "query_pattern",
+              "cardinality"
+            ],
+            "type": "string"
+          },
+          "payload": {
+            "type": "object"
+          },
+          "system": {
+            "type": "object"
+          },
+          "target_type_keys": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "uuid": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "display_name",
+          "description",
+          "payload",
+          "system"
+        ],
+        "type": "object"
+      },
+      "schema_version": 1
+    },
+    {
+      "action_id": "component.rtg.constraints.get_constraint",
+      "binding_id": "binding.python.rtg.constraints.v1",
+      "binding_version": 1,
+      "canonical_effect_codec_id": null,
+      "canonical_effect_codec_version": null,
+      "canonical_effect_schema_version": null,
+      "concurrency_lane": "serialized",
+      "consistency_access": "independent",
+      "consistency_group": null,
+      "deadline_seconds": null,
+      "effect_payload_disposition": null,
+      "externally_effectful": false,
+      "failure_codec_id": "codec.python.component.rtg.constraints.failure.json",
+      "failure_codec_version": 1,
+      "failure_dispositions": {},
+      "failure_names": [
+        "RtgConstraintNotFound"
+      ],
+      "fault_payload_disposition": "diagnostic",
+      "fault_schema": {
+        "oneOf": [
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          }
+        ]
+      },
+      "idempotency": "idempotent",
+      "method_name": "get_constraint",
+      "modeled_fault_trace_disposition": "aborted",
+      "recovery_authorized": false,
+      "replay_mode": "no_state_effect",
+      "request_arguments": [
+        {
+          "default": null,
+          "name": "constraint_uuid",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "request_codec_id": "codec.python.component.rtg.constraints.request.json",
+      "request_codec_version": 1,
+      "request_payload_disposition": "command",
+      "request_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "constraint_uuid": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "constraint_uuid"
+        ],
+        "type": "object"
+      },
+      "resolved_argument_from_result": null,
+      "result_codec_id": "codec.python.component.rtg.constraints.result.json",
+      "result_codec_version": 1,
+      "result_payload_disposition": "query_result",
+      "result_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "description": {
+            "type": "string"
+          },
+          "display_name": {
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "query_pattern",
+              "cardinality"
+            ],
+            "type": "string"
+          },
+          "payload": {
+            "type": "object"
+          },
+          "system": {
+            "type": "object"
+          },
+          "target_type_keys": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "uuid": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "display_name",
+          "description",
+          "payload",
+          "system"
+        ],
+        "type": "object"
+      },
+      "schema_version": 1
+    },
+    {
+      "action_id": "component.rtg.constraints.list_constraints",
+      "binding_id": "binding.python.rtg.constraints.v1",
+      "binding_version": 1,
+      "canonical_effect_codec_id": null,
+      "canonical_effect_codec_version": null,
+      "canonical_effect_schema_version": null,
+      "concurrency_lane": "serialized",
+      "consistency_access": "independent",
+      "consistency_group": null,
+      "deadline_seconds": null,
+      "effect_payload_disposition": null,
+      "externally_effectful": false,
+      "failure_codec_id": "codec.python.component.rtg.constraints.failure.json",
+      "failure_codec_version": 1,
+      "failure_dispositions": {},
+      "failure_names": [
+        "RtgConstraintKindInvalid",
+        "RtgConstraintPayloadInvalid"
+      ],
+      "fault_payload_disposition": "diagnostic",
+      "fault_schema": {
+        "oneOf": [
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          }
+        ]
+      },
+      "idempotency": "idempotent",
+      "method_name": "list_constraints",
+      "modeled_fault_trace_disposition": "aborted",
+      "recovery_authorized": false,
+      "replay_mode": "no_state_effect",
+      "request_arguments": [
+        {
+          "default": null,
+          "name": "kind",
+          "required": false,
+          "schema": {
+            "enum": [
+              "query_pattern",
+              "cardinality"
+            ],
+            "type": "string"
+          }
+        },
+        {
+          "default": null,
+          "name": "live",
+          "required": false,
+          "schema": {
+            "type": "boolean"
+          }
+        },
+        {
+          "default": 0,
+          "name": "offset",
+          "required": false,
+          "schema": {
+            "type": "integer"
+          }
+        },
+        {
+          "default": null,
+          "name": "limit",
+          "required": false,
+          "schema": {
+            "type": "integer"
+          }
+        }
+      ],
+      "request_codec_id": "codec.python.component.rtg.constraints.request.json",
+      "request_codec_version": 1,
+      "request_payload_disposition": "command",
+      "request_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "enum": [
+              "query_pattern",
+              "cardinality"
+            ],
+            "type": "string"
+          },
+          "limit": {
+            "type": "integer"
+          },
+          "live": {
+            "type": "boolean"
+          },
+          "offset": {
+            "type": "integer"
+          }
+        },
+        "required": [],
+        "type": "object"
+      },
+      "resolved_argument_from_result": null,
+      "result_codec_id": "codec.python.component.rtg.constraints.result.json",
+      "result_codec_version": 1,
+      "result_payload_disposition": "query_result",
+      "result_schema": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "description": {
+              "type": "string"
+            },
+            "display_name": {
+              "type": "string"
+            },
+            "kind": {
+              "enum": [
+                "query_pattern",
+                "cardinality"
+              ],
+              "type": "string"
+            },
+            "payload": {
+              "type": "object"
+            },
+            "system": {
+              "type": "object"
+            },
+            "target_type_keys": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "uuid": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "display_name",
+            "description",
+            "payload",
+            "system"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "schema_version": 1
+    },
+    {
+      "action_id": "component.rtg.constraints.list_constraints_by_target",
+      "binding_id": "binding.python.rtg.constraints.v1",
+      "binding_version": 1,
+      "canonical_effect_codec_id": null,
+      "canonical_effect_codec_version": null,
+      "canonical_effect_schema_version": null,
+      "concurrency_lane": "serialized",
+      "consistency_access": "independent",
+      "consistency_group": null,
+      "deadline_seconds": null,
+      "effect_payload_disposition": null,
+      "externally_effectful": false,
+      "failure_codec_id": "codec.python.component.rtg.constraints.failure.json",
+      "failure_codec_version": 1,
+      "failure_dispositions": {},
+      "failure_names": [
+        "RtgConstraintTargetInvalid",
+        "RtgConstraintKindInvalid"
+      ],
+      "fault_payload_disposition": "diagnostic",
+      "fault_schema": {
+        "oneOf": [
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          }
+        ]
+      },
+      "idempotency": "idempotent",
+      "method_name": "list_constraints_by_target",
+      "modeled_fault_trace_disposition": "aborted",
+      "recovery_authorized": false,
+      "replay_mode": "no_state_effect",
+      "request_arguments": [
+        {
+          "default": null,
+          "name": "target_type_key",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "default": null,
+          "name": "kind",
+          "required": false,
+          "schema": {
+            "enum": [
+              "query_pattern",
+              "cardinality"
+            ],
+            "type": "string"
+          }
+        },
+        {
+          "default": null,
+          "name": "live",
+          "required": false,
+          "schema": {
+            "type": "boolean"
+          }
+        }
+      ],
+      "request_codec_id": "codec.python.component.rtg.constraints.request.json",
+      "request_codec_version": 1,
+      "request_payload_disposition": "command",
+      "request_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "enum": [
+              "query_pattern",
+              "cardinality"
+            ],
+            "type": "string"
+          },
+          "live": {
+            "type": "boolean"
+          },
+          "target_type_key": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "target_type_key"
+        ],
+        "type": "object"
+      },
+      "resolved_argument_from_result": null,
+      "result_codec_id": "codec.python.component.rtg.constraints.result.json",
+      "result_codec_version": 1,
+      "result_payload_disposition": "query_result",
+      "result_schema": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "description": {
+              "type": "string"
+            },
+            "display_name": {
+              "type": "string"
+            },
+            "kind": {
+              "enum": [
+                "query_pattern",
+                "cardinality"
+              ],
+              "type": "string"
+            },
+            "payload": {
+              "type": "object"
+            },
+            "system": {
+              "type": "object"
+            },
+            "target_type_keys": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "uuid": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "display_name",
+            "description",
+            "payload",
+            "system"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "schema_version": 1
+    },
+    {
+      "action_id": "component.rtg.constraints.delete_constraint",
+      "binding_id": "binding.python.rtg.constraints.v1",
+      "binding_version": 1,
+      "canonical_effect_codec_id": "binding.python.rtg.constraints.v1.component.rtg.constraints.delete_constraint.effect.json",
+      "canonical_effect_codec_version": 1,
+      "canonical_effect_schema_version": 1,
+      "concurrency_lane": "serialized",
+      "consistency_access": "independent",
+      "consistency_group": null,
+      "deadline_seconds": null,
+      "effect_payload_disposition": "canonical_delta",
+      "externally_effectful": false,
+      "failure_codec_id": "codec.python.component.rtg.constraints.failure.json",
+      "failure_codec_version": 1,
+      "failure_dispositions": {},
+      "failure_names": [
+        "RtgConstraintNotFound"
+      ],
+      "fault_payload_disposition": "diagnostic",
+      "fault_schema": {
+        "oneOf": [
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          }
+        ]
+      },
+      "idempotency": "non_idempotent",
+      "method_name": "delete_constraint",
+      "modeled_fault_trace_disposition": "aborted",
+      "recovery_authorized": false,
+      "replay_mode": "canonical_effect",
+      "request_arguments": [
+        {
+          "default": null,
+          "name": "constraint_uuid",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "request_codec_id": "codec.python.component.rtg.constraints.request.json",
+      "request_codec_version": 1,
+      "request_payload_disposition": "command",
+      "request_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "constraint_uuid": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "constraint_uuid"
+        ],
+        "type": "object"
+      },
+      "resolved_argument_from_result": null,
+      "result_codec_id": "codec.python.component.rtg.constraints.result.json",
+      "result_codec_version": 1,
+      "result_payload_disposition": "query_result",
+      "result_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "deleted_constraint": {
+            "additionalProperties": false,
+            "properties": {
+              "description": {
+                "type": "string"
+              },
+              "display_name": {
+                "type": "string"
+              },
+              "kind": {
+                "enum": [
+                  "query_pattern",
+                  "cardinality"
+                ],
+                "type": "string"
+              },
+              "payload": {
+                "type": "object"
+              },
+              "system": {
+                "type": "object"
+              },
+              "target_type_keys": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "uuid": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "kind",
+              "display_name",
+              "description",
+              "payload",
+              "system"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "deleted_constraint"
+        ],
+        "type": "object"
+      },
+      "schema_version": 1
+    }
+  ],
+  "binding_id": "binding.python.rtg.constraints.v1",
+  "binding_version": 1,
+  "component_contract_id": "component.rtg.constraints",
+  "schema_version": 1,
+  "source_contract_id": "component.rtg.constraints"
+}

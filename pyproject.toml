@@ -56,6 +56,9 @@ exclude = [
 ]
 
 [tool.setuptools.package-data]
+"*" = [
+    "resources/*.json",
+]
 "apps.rtg_knowledge_graph" = [
     "resources/*.json",
 ]
@@ -81,6 +84,9 @@ pythonVersion = "3.14"
 typeCheckingMode = "standard"
 
 [tool.pytest.ini_options]
+markers = [
+    "integration: exercises whole-system composition, subprocess/restart behavior, pinned external runtimes, or deterministic rendering",
+]
 pythonpath = [
     ".",
 ]

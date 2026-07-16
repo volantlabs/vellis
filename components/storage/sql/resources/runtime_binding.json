@@ -1,0 +1,747 @@
+{
+  "actions": [
+    {
+      "action_id": "component.storage.sql.execute",
+      "binding_id": "binding.python.storage.sql.v1",
+      "binding_version": 1,
+      "canonical_effect_codec_id": null,
+      "canonical_effect_codec_version": null,
+      "canonical_effect_schema_version": null,
+      "concurrency_lane": "serialized",
+      "consistency_access": "independent",
+      "consistency_group": null,
+      "deadline_seconds": null,
+      "effect_payload_disposition": null,
+      "externally_effectful": true,
+      "failure_codec_id": "codec.python.component.storage.sql.failure.json",
+      "failure_codec_version": 1,
+      "failure_dispositions": {},
+      "failure_names": [
+        "SqlStatementInvalid",
+        "SqlParameterInvalid",
+        "SqlExecutionFailed",
+        "SqlStoragePermissionDenied"
+      ],
+      "fault_payload_disposition": "diagnostic",
+      "fault_schema": {
+        "oneOf": [
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          }
+        ]
+      },
+      "idempotency": "unspecified",
+      "method_name": "execute",
+      "modeled_fault_trace_disposition": "aborted",
+      "recovery_authorized": false,
+      "replay_mode": "external_exchange",
+      "request_arguments": [
+        {
+          "default": null,
+          "name": "statement",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "default": null,
+          "name": "parameters",
+          "required": false,
+          "schema": {
+            "additionalProperties": false,
+            "properties": {
+              "kind": {
+                "enum": [
+                  "positional",
+                  "named"
+                ],
+                "type": "string"
+              },
+              "named": {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "name": {
+                      "type": "string"
+                    },
+                    "value": {
+                      "type": [
+                        "string",
+                        "number",
+                        "integer",
+                        "boolean",
+                        "null"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "name",
+                    "value"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "positional": {
+                "items": {
+                  "type": [
+                    "string",
+                    "number",
+                    "integer",
+                    "boolean",
+                    "null"
+                  ]
+                },
+                "type": "array"
+              }
+            },
+            "type": "object"
+          }
+        }
+      ],
+      "request_codec_id": "codec.python.component.storage.sql.request.json",
+      "request_codec_version": 1,
+      "request_payload_disposition": "command",
+      "request_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "parameters": {
+            "additionalProperties": false,
+            "properties": {
+              "kind": {
+                "enum": [
+                  "positional",
+                  "named"
+                ],
+                "type": "string"
+              },
+              "named": {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "name": {
+                      "type": "string"
+                    },
+                    "value": {
+                      "type": [
+                        "string",
+                        "number",
+                        "integer",
+                        "boolean",
+                        "null"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "name",
+                    "value"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "positional": {
+                "items": {
+                  "type": [
+                    "string",
+                    "number",
+                    "integer",
+                    "boolean",
+                    "null"
+                  ]
+                },
+                "type": "array"
+              }
+            },
+            "type": "object"
+          },
+          "statement": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "statement"
+        ],
+        "type": "object"
+      },
+      "resolved_argument_from_result": null,
+      "result_codec_id": "codec.python.component.storage.sql.result.json",
+      "result_codec_version": 1,
+      "result_payload_disposition": "query_result",
+      "result_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "affected_row_count": {
+            "type": "integer"
+          },
+          "last_inserted_row_id": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "affected_row_count"
+        ],
+        "type": "object"
+      },
+      "schema_version": 1
+    },
+    {
+      "action_id": "component.storage.sql.query",
+      "binding_id": "binding.python.storage.sql.v1",
+      "binding_version": 1,
+      "canonical_effect_codec_id": null,
+      "canonical_effect_codec_version": null,
+      "canonical_effect_schema_version": null,
+      "concurrency_lane": "serialized",
+      "consistency_access": "independent",
+      "consistency_group": null,
+      "deadline_seconds": null,
+      "effect_payload_disposition": null,
+      "externally_effectful": false,
+      "failure_codec_id": "codec.python.component.storage.sql.failure.json",
+      "failure_codec_version": 1,
+      "failure_dispositions": {},
+      "failure_names": [
+        "SqlStatementInvalid",
+        "SqlParameterInvalid",
+        "SqlExecutionFailed",
+        "SqlStoragePermissionDenied"
+      ],
+      "fault_payload_disposition": "diagnostic",
+      "fault_schema": {
+        "oneOf": [
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          }
+        ]
+      },
+      "idempotency": "idempotent",
+      "method_name": "query",
+      "modeled_fault_trace_disposition": "aborted",
+      "recovery_authorized": false,
+      "replay_mode": "external_exchange",
+      "request_arguments": [
+        {
+          "default": null,
+          "name": "statement",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "default": null,
+          "name": "parameters",
+          "required": false,
+          "schema": {
+            "additionalProperties": false,
+            "properties": {
+              "kind": {
+                "enum": [
+                  "positional",
+                  "named"
+                ],
+                "type": "string"
+              },
+              "named": {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "name": {
+                      "type": "string"
+                    },
+                    "value": {
+                      "type": [
+                        "string",
+                        "number",
+                        "integer",
+                        "boolean",
+                        "null"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "name",
+                    "value"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "positional": {
+                "items": {
+                  "type": [
+                    "string",
+                    "number",
+                    "integer",
+                    "boolean",
+                    "null"
+                  ]
+                },
+                "type": "array"
+              }
+            },
+            "type": "object"
+          }
+        }
+      ],
+      "request_codec_id": "codec.python.component.storage.sql.request.json",
+      "request_codec_version": 1,
+      "request_payload_disposition": "command",
+      "request_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "parameters": {
+            "additionalProperties": false,
+            "properties": {
+              "kind": {
+                "enum": [
+                  "positional",
+                  "named"
+                ],
+                "type": "string"
+              },
+              "named": {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "name": {
+                      "type": "string"
+                    },
+                    "value": {
+                      "type": [
+                        "string",
+                        "number",
+                        "integer",
+                        "boolean",
+                        "null"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "name",
+                    "value"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "positional": {
+                "items": {
+                  "type": [
+                    "string",
+                    "number",
+                    "integer",
+                    "boolean",
+                    "null"
+                  ]
+                },
+                "type": "array"
+              }
+            },
+            "type": "object"
+          },
+          "statement": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "statement"
+        ],
+        "type": "object"
+      },
+      "resolved_argument_from_result": null,
+      "result_codec_id": "codec.python.component.storage.sql.result.json",
+      "result_codec_version": 1,
+      "result_payload_disposition": "query_result",
+      "result_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "rows": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "columns": {
+                  "items": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "name": {
+                        "type": "string"
+                      },
+                      "value": {
+                        "type": [
+                          "string",
+                          "number",
+                          "integer",
+                          "boolean",
+                          "null"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "name",
+                      "value"
+                    ],
+                    "type": "object"
+                  },
+                  "type": "array"
+                }
+              },
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "schema_version": 1
+    },
+    {
+      "action_id": "component.storage.sql.transaction",
+      "binding_id": "binding.python.storage.sql.v1",
+      "binding_version": 1,
+      "canonical_effect_codec_id": null,
+      "canonical_effect_codec_version": null,
+      "canonical_effect_schema_version": null,
+      "concurrency_lane": "serialized",
+      "consistency_access": "independent",
+      "consistency_group": null,
+      "deadline_seconds": null,
+      "effect_payload_disposition": null,
+      "externally_effectful": true,
+      "failure_codec_id": "codec.python.component.storage.sql.failure.json",
+      "failure_codec_version": 1,
+      "failure_dispositions": {},
+      "failure_names": [
+        "SqlStatementInvalid",
+        "SqlParameterInvalid",
+        "SqlTransactionFailed",
+        "SqlStoragePermissionDenied"
+      ],
+      "fault_payload_disposition": "diagnostic",
+      "fault_schema": {
+        "oneOf": [
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          }
+        ]
+      },
+      "idempotency": "unspecified",
+      "method_name": "transaction",
+      "modeled_fault_trace_disposition": "aborted",
+      "recovery_authorized": false,
+      "replay_mode": "external_exchange",
+      "request_arguments": [
+        {
+          "default": null,
+          "name": "operations",
+          "required": false,
+          "schema": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "parameters": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "kind": {
+                      "enum": [
+                        "positional",
+                        "named"
+                      ],
+                      "type": "string"
+                    },
+                    "named": {
+                      "items": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "name": {
+                            "type": "string"
+                          },
+                          "value": {
+                            "type": [
+                              "string",
+                              "number",
+                              "integer",
+                              "boolean",
+                              "null"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "name",
+                          "value"
+                        ],
+                        "type": "object"
+                      },
+                      "type": "array"
+                    },
+                    "positional": {
+                      "items": {
+                        "type": [
+                          "string",
+                          "number",
+                          "integer",
+                          "boolean",
+                          "null"
+                        ]
+                      },
+                      "type": "array"
+                    }
+                  },
+                  "type": "object"
+                },
+                "returns_rows": {
+                  "type": "boolean"
+                },
+                "statement": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "statement"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        }
+      ],
+      "request_codec_id": "codec.python.component.storage.sql.request.json",
+      "request_codec_version": 1,
+      "request_payload_disposition": "command",
+      "request_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "operations": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "parameters": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "kind": {
+                      "enum": [
+                        "positional",
+                        "named"
+                      ],
+                      "type": "string"
+                    },
+                    "named": {
+                      "items": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "name": {
+                            "type": "string"
+                          },
+                          "value": {
+                            "type": [
+                              "string",
+                              "number",
+                              "integer",
+                              "boolean",
+                              "null"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "name",
+                          "value"
+                        ],
+                        "type": "object"
+                      },
+                      "type": "array"
+                    },
+                    "positional": {
+                      "items": {
+                        "type": [
+                          "string",
+                          "number",
+                          "integer",
+                          "boolean",
+                          "null"
+                        ]
+                      },
+                      "type": "array"
+                    }
+                  },
+                  "type": "object"
+                },
+                "returns_rows": {
+                  "type": "boolean"
+                },
+                "statement": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "statement"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "required": [],
+        "type": "object"
+      },
+      "resolved_argument_from_result": null,
+      "result_codec_id": "codec.python.component.storage.sql.result.json",
+      "result_codec_version": 1,
+      "result_payload_disposition": "query_result",
+      "result_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "results": {
+            "items": {
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "schema_version": 1
+    }
+  ],
+  "binding_id": "binding.python.storage.sql.v1",
+  "binding_version": 1,
+  "component_contract_id": "component.storage.sql",
+  "schema_version": 1,
+  "source_contract_id": "component.storage.sql"
+}

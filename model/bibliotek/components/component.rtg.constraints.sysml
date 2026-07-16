@@ -1,6 +1,7 @@
 library package BibliotekRtgConstraints {
     private import SoftwareComponentModeling::*;
     private import BibliotekSoftwareValues::*;
+    private import BibliotekRtgChangeValues::*;
     private import BibliotekRtgQuery::*;
     private import ScalarValues::*;
 
@@ -37,6 +38,11 @@ library package BibliotekRtgConstraints {
         doc /* UUID may be absent on write only. Stored definitions have concrete UUID and Boolean system.live, defaulting missing live to true. targetTypeKeys has native unique, unordered set semantics; duplicate inputs are invalid and realization encodings may use a canonical order. */
     }
     attribute def RtgConstraintSnapshot { item constraints[0..*] : RtgConstraintDefinition; }
+    attribute def RtgConstraintDefinitionWrite { attribute 'ref' : RtgChangeReference; item 'constraint' : RtgConstraintDefinition; }
+    attribute def RtgConstraintLiveStatusChange { attribute targetRef : RtgChangeReference; attribute live : Boolean; }
+    attribute def RtgConstraintChangeSet { attribute constraintWrites[0..*] : RtgConstraintDefinitionWrite; attribute deleteConstraints[0..*] : RtgChangeReference; attribute setLive[0..*] : RtgConstraintLiveStatusChange; }
+    attribute def RtgConstraintBatchResult { attribute writes : Integer; attribute deletes : Integer; attribute liveChanges : Integer; }
+    attribute def RtgConstraintCountSummary { attribute liveTotal : Integer; attribute nonLiveTotal : Integer; }
     attribute def RtgConstraintDefinitionList { item constraints[0..*] : RtgConstraintDefinition; }
     attribute def RtgConstraintDeleteResult { item deletedConstraint : RtgConstraintDefinition; }
 
@@ -52,9 +58,11 @@ library package BibliotekRtgConstraints {
 
     action def ExportConstraintSnapshot { out 'snapshot' : RtgConstraintSnapshot; doc /* Export every full constraint record without evaluating it or inspecting other components. */ @FailureContract { errorIds = (); } }
     action def ReplaceConstraintSnapshot { in 'snapshot' : RtgConstraintSnapshot; doc /* Validate the complete candidate, then atomically replace every constraint record and rebuild derived indexes. */ @FailureContract { errorIds = ("RtgConstraintSnapshotInvalid", "RtgConstraintUuidInvalid", "RtgConstraintUuidConflict", "RtgConstraintKindInvalid", "RtgConstraintDefinitionInvalid", "RtgConstraintPayloadInvalid", "RtgConstraintSystemValueInvalid"); } }
+    action def ApplyRtgConstraintBatch { in changes : RtgConstraintChangeSet; out result : RtgConstraintBatchResult; doc /* Apply one resolved constraint-local change set atomically. */ @FailureContract { errorIds = ("RtgConstraintUuidInvalid", "RtgConstraintUuidConflict", "RtgConstraintKindInvalid", "RtgConstraintDefinitionInvalid", "RtgConstraintPayloadInvalid", "RtgConstraintSystemValueInvalid", "RtgConstraintNotFound"); } }
+    action def CountRtgConstraintSummary { out result : RtgConstraintCountSummary; doc /* Return bounded live and non-live constraint counts without returning definitions. */ @FailureContract { errorIds = (); } }
     action def PutConstraint { in 'constraint' : RtgConstraintDefinition; out stored : RtgConstraintDefinition; doc /* Generate or preserve identity, validate kind-specific structure and bounds, and atomically create or fully replace one record. A kind/payload type mismatch is RtgConstraintDefinitionInvalid; malformed contents of the selected payload are RtgConstraintPayloadInvalid. */ @FailureContract { errorIds = ("RtgConstraintUuidInvalid", "RtgConstraintUuidConflict", "RtgConstraintKindInvalid", "RtgConstraintDefinitionInvalid", "RtgConstraintPayloadInvalid", "RtgConstraintSystemValueInvalid"); } }
     action def GetConstraint { in constraintUuid : Uuid; out 'constraint' : RtgConstraintDefinition; doc /* Return one full constraint definition by UUID without executing it. */ @FailureContract { errorIds = ("RtgConstraintNotFound"); } }
-    action def ListConstraints { in kind[0..1] : RtgConstraintKind; in live[0..1] : Boolean; out result : RtgConstraintDefinitionList; doc /* List definitions with optional kind/live filters in deterministic order. */ @FailureContract { errorIds = ("RtgConstraintKindInvalid"); } }
+    action def ListConstraints { in kind[0..1] : RtgConstraintKind; in live[0..1] : Boolean; in offset : Integer default = 0; in limit[0..1] : Integer; out result : RtgConstraintDefinitionList; doc /* List one stable page of definitions with optional kind/live filters. */ @FailureContract { errorIds = ("RtgConstraintKindInvalid", "RtgConstraintPayloadInvalid"); } }
     action def ListConstraintsByTarget { in targetTypeKey : String; in kind[0..1] : RtgConstraintKind; in live[0..1] : Boolean; out result : RtgConstraintDefinitionList; doc /* List definitions whose target metadata contains one type key, optionally filtered by constraint kind and live status. */ @FailureContract { errorIds = ("RtgConstraintTargetInvalid", "RtgConstraintKindInvalid"); } }
     action def DeleteConstraint { in constraintUuid : Uuid; out result : RtgConstraintDeleteResult; doc /* Delete exactly one definition without cascading into graph, schema, migration, or validation state. */ @FailureContract { errorIds = ("RtgConstraintNotFound"); } }
 
@@ -64,9 +72,12 @@ library package BibliotekRtgConstraints {
         item constraintRecords[0..*] : RtgConstraintDefinition { doc /* Canonical component-owned constraint-definition occurrences. */ }
         derived attribute derivedIndexes : JsonObject { doc /* Ephemeral indexes derived from canonical constraint definitions. */ }
         perform action exportSnapshot[0..*] : ExportConstraintSnapshot; perform action replaceSnapshot[0..*] : ReplaceConstraintSnapshot; perform action putConstraint[0..*] : PutConstraint; perform action getConstraint[0..*] : GetConstraint;
+        perform action applyBatch[0..*] : ApplyRtgConstraintBatch; perform action countSummary[0..*] : CountRtgConstraintSummary;
         perform action listConstraints[0..*] : ListConstraints; perform action listConstraintsByTarget[0..*] : ListConstraintsByTarget; perform action deleteConstraint[0..*] : DeleteConstraint;
         dependency snapshotState from exportSnapshot to constraintRecords { @StateAccess { kind = StateAccessKind::read; } doc /* read all canonical records. */ }
         dependency replaceSnapshotState from replaceSnapshot to constraintRecords { @StateAccess { kind = StateAccessKind::write; } doc /* validate before visibility, atomically replace every record, and rebuild indexes. */ }
+        dependency applyBatchState from applyBatch to constraintRecords { @StateAccess { kind = StateAccessKind::write; } doc /* expose the complete resolved constraint change set or leave canonical constraint state unchanged. */ }
+        dependency countSummaryState from countSummary to derivedIndexes { @StateAccess { kind = StateAccessKind::read; } doc /* return only bounded aggregate counts. */ }
         dependency putState from putConstraint to constraintRecords { @StateAccess { kind = StateAccessKind::write; } doc /* atomically create/replace one record and rebuild affected indexes. */ }
         dependency getState from getConstraint to constraintRecords { @StateAccess { kind = StateAccessKind::read; } doc /* read one canonical record. */ }
         dependency listState from listConstraints to derivedIndexes { @StateAccess { kind = StateAccessKind::read; } doc /* read kind/live indexes. */ }
@@ -252,6 +263,9 @@ library package BibliotekRtgConstraints {
         satisfy patternCompatibility by registry;
         satisfy indexesMatchRecords by registry;
         satisfy constraintDeleteEffect by registry.deleteConstraint;
+        satisfy constraintBatchAtomicity by registry.applyBatch;
+        satisfy constraintRoutineWorkBounded by registry;
+        satisfy countConstraintSummaryFailureSemantics by registry.countSummary;
 
         satisfy exportConstraintSnapshotFailureSemantics by registry.exportSnapshot;
         satisfy replaceConstraintSnapshotFailureSemantics by registry.replaceSnapshot;
@@ -260,6 +274,7 @@ library package BibliotekRtgConstraints {
         satisfy listConstraintsFailureSemantics by registry.listConstraints;
         satisfy listConstraintsByTargetFailureSemantics by registry.listConstraintsByTarget;
         satisfy deleteConstraintFailureSemantics by registry.deleteConstraint;
+        satisfy applyRtgConstraintBatchFailureSemantics by registry.applyBatch;
         action createEmptyRtgConstraintsSubject : CreateEmptyRtgConstraints;
         satisfy createEmptyRtgConstraintsFailureSemantics by createEmptyRtgConstraintsSubject;
         action importRtgConstraintSnapshotSubject : ImportRtgConstraintSnapshot;
@@ -334,6 +349,14 @@ library package BibliotekRtgConstraints {
     }
 
 
+
+    requirement <'contract.rtg.constraints.batch_atomicity'> constraintBatchAtomicity { subject operation : ApplyRtgConstraintBatch; require constraint { doc /* Success exposes the complete requested constraint-local batch; rejection or failure exposes the exact prior constraint state. */ } }
+    requirement <'invariant.rtg.constraints.routine_work_is_delta_scaled'> constraintRoutineWorkBounded { subject constraints : RtgConstraints; require constraint { doc /* A non-state-transfer action does not copy, serialize, hash, or retain complete constraint state solely for validation, atomicity, or recovery. Transient work may grow with the requested mutation and affected index closure, but not unrelated constraints. Explicit state-transfer and reconstruction actions are exceptions. */ } }
+    requirement <'contract.rtg.constraints.apply_batch.failures'> applyRtgConstraintBatchFailureSemantics { subject operation : ApplyRtgConstraintBatch; require constraint { doc /* Any invalid reference, definition, payload, uniqueness conflict, or deletion rejects the whole batch without observable constraint state effect. */ } }
+    requirement <'contract.rtg.constraints.count_summary.failures'> countConstraintSummaryFailureSemantics { subject operation : CountRtgConstraintSummary; require constraint { doc /* Summary reads expose bounded counts and do not change constraint state. */ } }
+    verification def ConstraintBatchAtomicityContractVerification { subject operation : ApplyRtgConstraintBatch; objective { verify constraintBatchAtomicity; verify applyRtgConstraintBatchFailureSemantics; } @EvidenceBinding { evidenceId = "components/rtg/constraints/tests/test_rtg_constraints_contract.py#ConstraintBatchAtomicityContractVerification"; implementationScope = "InMemoryRtgConstraints"; } }
+    verification def ConstraintRoutineWorkScalingVerification { subject constraints : RtgConstraints; objective { verify constraintRoutineWorkBounded; } @EvidenceBinding { evidenceId = "components/rtg/constraints/tests/test_rtg_constraints_contract.py#ConstraintRoutineWorkScalingVerification"; implementationScope = "InMemoryRtgConstraints"; } }
+    verification def CountConstraintSummaryContractVerification { subject operation : CountRtgConstraintSummary; objective { verify countConstraintSummaryFailureSemantics; } @EvidenceBinding { evidenceId = "components/rtg/constraints/tests/test_rtg_constraints_contract.py#CountConstraintSummaryContractVerification"; implementationScope = "InMemoryRtgConstraints"; } }
 
     verification def RtgConstraintsBoundaryVerification {
         subject constraints : RtgConstraints;

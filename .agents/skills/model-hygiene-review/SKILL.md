@@ -18,11 +18,17 @@ automatically correct. Produce an advisory authority assessment before changing 
    ```
 
    Read the JSON bundle under `build/model-audits/`. Treat comparisons as leads, not findings.
+   Use `architecture-projection` to add an ignored impact and verification-coverage projection when
+   dependency direction or traceability is part of the audit; treat it as evidence, not authority.
 2. Read `references/authority-triage.md` completely. Identify the model lifecycle, owner,
    requirements, satisfiers, realization binding, codecs, verification cases, and exact evidence
    nodes.
 3. Inspect the public implementation protocol, behavior, black-box tests, adapters, and consumers.
-   Do not infer a contract from private helpers.
+   Do not infer a contract from private helpers. Flag non-state-transfer operations that export,
+   clone, hash, scan, or retain complete canonical state for validation, atomicity, summaries, or
+   recovery; distinguish semantically required global traversal from scaffolding that duplicates
+   the traversed state. Check whether transient recovery data survives beyond one invocation and
+   whether tests observe read/allocation scaling rather than only action names.
 4. Inspect `git log --follow`, the introducing commits on both sides, and any predecessor accepted
    specification. Determine whether code predates the model, implements a later decision, or merely
    drifted.

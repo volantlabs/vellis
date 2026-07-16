@@ -14,7 +14,9 @@ Generated from textual SysML v2 by `just model-render` as a non-normative readin
 | `replaceSnapshot` | `ReplaceConstraintSnapshot` | in `snapshot: RtgConstraintSnapshot` | `RtgConstraintSnapshotInvalid`, `RtgConstraintUuidInvalid`, `RtgConstraintUuidConflict`, `RtgConstraintKindInvalid`, `RtgConstraintDefinitionInvalid`, `RtgConstraintPayloadInvalid`, `RtgConstraintSystemValueInvalid` | Validate the complete candidate, then atomically replace every constraint record and rebuild derived indexes. |
 | `putConstraint` | `PutConstraint` | in `constraint: RtgConstraintDefinition`; out `stored: RtgConstraintDefinition` | `RtgConstraintUuidInvalid`, `RtgConstraintUuidConflict`, `RtgConstraintKindInvalid`, `RtgConstraintDefinitionInvalid`, `RtgConstraintPayloadInvalid`, `RtgConstraintSystemValueInvalid` | Generate or preserve identity, validate kind-specific structure and bounds, and atomically create or fully replace one record. A kind/payload type mismatch is RtgConstraintDefinitionInvalid; malformed contents of the selected payload are RtgConstraintPayloadInvalid. |
 | `getConstraint` | `GetConstraint` | in `constraintUuid: Uuid`; out `constraint: RtgConstraintDefinition` | `RtgConstraintNotFound` | Return one full constraint definition by UUID without executing it. |
-| `listConstraints` | `ListConstraints` | in `kind: RtgConstraintKind[0..1]`; in `live: Boolean[0..1]`; out `result: RtgConstraintDefinitionList` | `RtgConstraintKindInvalid` | List definitions with optional kind/live filters in deterministic order. |
+| `applyBatch` | `ApplyRtgConstraintBatch` | in `changes: RtgConstraintChangeSet`; out `result: RtgConstraintBatchResult` | `RtgConstraintUuidInvalid`, `RtgConstraintUuidConflict`, `RtgConstraintKindInvalid`, `RtgConstraintDefinitionInvalid`, `RtgConstraintPayloadInvalid`, `RtgConstraintSystemValueInvalid`, `RtgConstraintNotFound` | Apply one resolved constraint-local change set atomically. |
+| `countSummary` | `CountRtgConstraintSummary` | out `result: RtgConstraintCountSummary` | None | Return bounded live and non-live constraint counts without returning definitions. |
+| `listConstraints` | `ListConstraints` | in `kind: RtgConstraintKind[0..1]`; in `live: Boolean[0..1]`; in `offset: Integer` = `0`; in `limit: Integer[0..1]`; out `result: RtgConstraintDefinitionList` | `RtgConstraintKindInvalid`, `RtgConstraintPayloadInvalid` | List one stable page of definitions with optional kind/live filters. |
 | `listConstraintsByTarget` | `ListConstraintsByTarget` | in `targetTypeKey: String`; in `kind: RtgConstraintKind[0..1]`; in `live: Boolean[0..1]`; out `result: RtgConstraintDefinitionList` | `RtgConstraintTargetInvalid`, `RtgConstraintKindInvalid` | List definitions whose target metadata contains one type key, optionally filtered by constraint kind and live status. |
 | `deleteConstraint` | `DeleteConstraint` | in `constraintUuid: Uuid`; out `result: RtgConstraintDeleteResult` | `RtgConstraintNotFound` | Delete exactly one definition without cascading into graph, schema, migration, or validation state. |
 
@@ -44,6 +46,8 @@ Generated from textual SysML v2 by `just model-render` as a non-normative readin
 |---|---|---|---|
 | `exportSnapshot` | `constraintRecords` | `read` | read all canonical records. |
 | `replaceSnapshot` | `constraintRecords` | `write` | validate before visibility, atomically replace every record, and rebuild indexes. |
+| `applyBatch` | `constraintRecords` | `write` | expose the complete resolved constraint change set or leave canonical constraint state unchanged. |
+| `countSummary` | `derivedIndexes` | `read` | return only bounded aggregate counts. |
 | `putConstraint` | `constraintRecords` | `write` | atomically create/replace one record and rebuild affected indexes. |
 | `getConstraint` | `constraintRecords` | `read` | read one canonical record. |
 | `listConstraints` | `derivedIndexes` | `read` | read kind/live indexes. |
@@ -83,6 +87,10 @@ Generated from textual SysML v2 by `just model-render` as a non-normative readin
 | `contract.rtg.constraints.delete_constraint.failures` | `DeleteConstraint` | `registry.deleteConstraint` | Rejected delete has no effect. |
 | `contract.rtg.constraints.create_empty_rtg_constraints.failures` | `CreateEmptyRtgConstraints` | `createEmptyRtgConstraintsSubject` | Construction has no declared domain failure. |
 | `contract.rtg.constraints.import_rtg_constraint_snapshot.failures` | `ImportRtgConstraintSnapshot` | `importRtgConstraintSnapshotSubject` | Failure returns no partially imported registry. |
+| `contract.rtg.constraints.batch_atomicity` | `ApplyRtgConstraintBatch` | `registry.applyBatch` | Success exposes the complete requested constraint-local batch; rejection or failure exposes the exact prior constraint state. |
+| `invariant.rtg.constraints.routine_work_is_delta_scaled` | `RtgConstraints` | `registry` | A non-state-transfer action does not copy, serialize, hash, or retain complete constraint state solely for validation, atomicity, or recovery. Transient work may grow with the requested mutation and affected index closure, but not unrelated constraints. Explicit state-transfer and reconstruction actions are exceptions. |
+| `contract.rtg.constraints.apply_batch.failures` | `ApplyRtgConstraintBatch` | `registry.applyBatch` | Any invalid reference, definition, payload, uniqueness conflict, or deletion rejects the whole batch without observable constraint state effect. |
+| `contract.rtg.constraints.count_summary.failures` | `CountRtgConstraintSummary` | `registry.countSummary` | Summary reads expose bounded counts and do not change constraint state. |
 
 ## Public values and items
 
@@ -93,6 +101,11 @@ Generated from textual SysML v2 by `just model-render` as a non-normative readin
 | `RtgConstraintCardinalityPayload` | `attribute` | `querySpec: RtgQuerySpec`, `countedBinding: String`, `minimum[0..1]: Integer`, `maximum[0..1]: Integer`, `groupByBindings[0..*]: String` | Bounds are non-negative and at least one is present. groupByBindings contains unique non-empty names from the query's global binding namespace. Empty groupByBindings preserves global cardinality; otherwise each unique group-binding UUID tuple counts distinct counted-binding UUIDs independently. |
 | `RtgConstraintDefinition` | `item` | `uuid[0..1]: Uuid`, `kind: RtgConstraintKind`, `targetTypeKeys[0..*]: String`, `displayName: String`, `description: String`, `payload: RtgConstraintPayload`, `system: JsonObject` | UUID may be absent on write only. Stored definitions have concrete UUID and Boolean system.live, defaulting missing live to true. targetTypeKeys has native unique, unordered set semantics; duplicate inputs are invalid and realization encodings may use a canonical order. |
 | `RtgConstraintSnapshot` | `attribute` | `constraints[0..*]: RtgConstraintDefinition` | Defined by its typed fields and action requirements. |
+| `RtgConstraintDefinitionWrite` | `attribute` | `ref: RtgChangeReference`, `constraint: RtgConstraintDefinition` | Defined by its typed fields and action requirements. |
+| `RtgConstraintLiveStatusChange` | `attribute` | `targetRef: RtgChangeReference`, `live: Boolean` | Defined by its typed fields and action requirements. |
+| `RtgConstraintChangeSet` | `attribute` | `constraintWrites[0..*]: RtgConstraintDefinitionWrite`, `deleteConstraints[0..*]: RtgChangeReference`, `setLive[0..*]: RtgConstraintLiveStatusChange` | Defined by its typed fields and action requirements. |
+| `RtgConstraintBatchResult` | `attribute` | `writes: Integer`, `deletes: Integer`, `liveChanges: Integer` | Defined by its typed fields and action requirements. |
+| `RtgConstraintCountSummary` | `attribute` | `liveTotal: Integer`, `nonLiveTotal: Integer` | Defined by its typed fields and action requirements. |
 | `RtgConstraintDefinitionList` | `attribute` | `constraints[0..*]: RtgConstraintDefinition` | Defined by its typed fields and action requirements. |
 | `RtgConstraintDeleteResult` | `attribute` | `deletedConstraint: RtgConstraintDefinition` | Defined by its typed fields and action requirements. |
 | `RtgConstraintNotFound` | `attribute` | `message: String` | Defined by its typed fields and action requirements. |
@@ -125,6 +138,15 @@ Generated from textual SysML v2 by `just model-render` as a non-normative readin
 | `ListConstraintsByTargetContractVerification` | `ListConstraintsByTarget` | `listConstraintsByTargetFailureSemantics` | `components/rtg/constraints/tests/test_rtg_constraints_contract.py#ListConstraintsByTargetContractVerification` |
 | `CreateEmptyRtgConstraintsContractVerification` | `CreateEmptyRtgConstraints` | `createEmptyRtgConstraintsFailureSemantics` | `components/rtg/constraints/tests/test_rtg_constraints_contract.py#CreateEmptyRtgConstraintsContractVerification` |
 | `ImportRtgConstraintSnapshotContractVerification` | `ImportRtgConstraintSnapshot` | `importRtgConstraintSnapshotFailureSemantics` | `components/rtg/constraints/tests/test_rtg_constraints_contract.py#ImportRtgConstraintSnapshotContractVerification` |
+| `ConstraintBatchAtomicityContractVerification` | `ApplyRtgConstraintBatch` | `constraintBatchAtomicity`, `applyRtgConstraintBatchFailureSemantics` | `components/rtg/constraints/tests/test_rtg_constraints_contract.py#ConstraintBatchAtomicityContractVerification` |
+| `ConstraintRoutineWorkScalingVerification` | `RtgConstraints` | `constraintRoutineWorkBounded` | `components/rtg/constraints/tests/test_rtg_constraints_contract.py#ConstraintRoutineWorkScalingVerification` |
+| `CountConstraintSummaryContractVerification` | `CountRtgConstraintSummary` | `countConstraintSummaryFailureSemantics` | `components/rtg/constraints/tests/test_rtg_constraints_contract.py#CountConstraintSummaryContractVerification` |
 | `RtgConstraintsBoundaryVerification` | `RtgConstraints` | `constraintReadEffect`, `snapshotEffect`, `intentionalBoundary`, `uuidUnique`, `displayNameNotIdentity`, `liveStatusBoolean`, `noValidationExecution`, `cardinalityRulesLiveHere`, `noSeverityPolicyV1`, `patternCompatibility`, `indexesMatchRecords` | `components/rtg/constraints/tests/test_rtg_constraints_contract.py#RtgConstraintsBoundaryVerification` |
+
+## Diagram
+
+![component.rtg.constraints contract diagram](../diagrams/component.rtg.constraints.contract.svg)
+
+[PlantUML source](../diagrams/component.rtg.constraints.contract.puml)
 
 Equivalent private algorithms, helpers, storage layouts, and implementation-language inheritance remain implementation choices.

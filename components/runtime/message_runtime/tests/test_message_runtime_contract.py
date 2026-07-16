@@ -1,2618 +1,1469 @@
 from __future__ import annotations
 
 import asyncio
-import hashlib
-import json
 import sqlite3
-import threading
-import time
 from dataclasses import replace
 from pathlib import Path
+from threading import Event
 from typing import cast
 from uuid import UUID, uuid4
 
 import pytest
 
-from components.rtg.graph import InMemoryRtgGraph, RtgAnchor, RtgGraphObjectNotFound
-from components.rtg.graph.runtime_binding import create_rtg_graph_adapter, create_rtg_graph_proxy
 from components.runtime.component_adapter import (
     ActionBinding,
-    ExplicitComponentAdapter,
+    ComponentAdapter,
+    ComponentEndpoint,
+    ComponentExecution,
     ReplayStateBinding,
-    RuntimeActionBindingDescriptor,
-    RuntimeActionIdempotency,
-    RuntimeClient,
+    RuntimeComponentDeadlineExceeded,
 )
-from components.runtime.component_adapter.implementation import encode_json
 from components.runtime.message_runtime import (
-    ComponentOccurrenceDeclaration,
-    JsonObject,
-    JsonValue,
-    RuntimeActionUnknown,
-    RuntimeAddress,
-    RuntimeAddressUnknown,
-    RuntimeCuratedOperationDeclaration,
-    RuntimeDeliveryStatus,
-    RuntimeExternalBoundaryDisposition,
-    RuntimeExternalBoundaryMode,
+    RuntimeDeliveryUnknown,
     RuntimeFailStopped,
     RuntimeHistoryQuery,
     RuntimeLedgerUnavailable,
     RuntimeMessageConflict,
-    RuntimeMessageKind,
-    RuntimeReconstructionRequest,
     RuntimeRegistrationInvalid,
     RuntimeReplayIncompatible,
-    RuntimeReplayMode,
     RuntimeReplayTargetNotPrepared,
-    RuntimeRequestOutcome,
     RuntimeRequestTimedOut,
-    RuntimeSchemaUnsupported,
-    RuntimeTopologyManifest,
     RuntimeTraceDisposition,
     SqliteMessageRuntime,
 )
+from components.runtime.messaging import (
+    ComponentOccurrenceDeclaration,
+    JsonObject,
+    RuntimeActionBindingDescriptor,
+    RuntimeActionIdempotency,
+    RuntimeCanonicalEffectReference,
+    RuntimeCuratedOperationDeclaration,
+    RuntimeExternalBoundaryDisposition,
+    RuntimeExternalBoundaryMode,
+    RuntimeHealth,
+    RuntimeLaneDeclaration,
+    RuntimePayloadDisposition,
+    RuntimeReconstructionRequest,
+    RuntimeReplayMode,
+    RuntimeStorageVersionUnsupported,
+    RuntimeTopologyManifest,
+    topology_manifest_hash,
+)
+
+_CONTRACT = "component.test.counter"
+_BINDING = "binding.test.counter.v2"
+
+
+def test_old_or_unrecognized_runtime_storage_fails_closed(tmp_path: Path) -> None:
+    database = tmp_path / "old.sqlite"
+    connection = sqlite3.connect(database)
+    connection.execute("CREATE TABLE legacy_ledger(position INTEGER PRIMARY KEY)")
+    connection.commit()
+    connection.close()
+
+    with pytest.raises(RuntimeStorageVersionUnsupported):
+        SqliteMessageRuntime(database, runtime_key="test.runtime")
+
 
 MODEL_EVIDENCE = {
     "MessageRuntimeBoundaryVerification": (
-        "test_runtime_creates_ledger_parent_for_a_fresh_data_root",
-        "test_durable_acceptance_duplicate_protection_and_history",
-        "test_same_type_occurrences_are_isolated",
-        "test_restart_preserves_identity_and_reconstructs_committed_effects",
-        "test_terminal_persistence_failure_enters_fail_stop",
-        "test_post_effect_terminal_encoding_failure_enters_fail_stop",
-        "test_fail_stop_quiesces_already_accepted_queued_deliveries",
-        "test_runtime_dispatches_the_durable_canonical_payload_copy",
-        "test_recorded_external_response_is_supplied_without_a_live_collaborator",
-        "test_final_aggregate_effect_supersedes_derived_effects_in_its_trace",
-        "test_root_trace_waits_for_nested_signal_before_committing",
-        "test_nested_signal_uncertainty_marks_trace_and_runtime_recovery_required",
-        "test_post_terminal_causal_signal_is_rejected_without_poisoning_replay",
-        "test_recovery_ingress_reserves_one_root_until_its_trace_finishes",
+        "test_uniform_delivery_is_durable_deduplicated_and_traceable",
+        "test_initial_append_failure_prevents_dispatch_and_terminal_failure_fail_stops",
+        "test_fail_stop_cancels_active_delivery_and_drains_queued_work",
+        "test_deadline_compensation_holds_quiescing_then_aborts_safely",
+        "test_failed_deadline_compensation_requires_recovery",
+        "test_lane_fifo_cross_lane_overlap_and_writer_preference",
+        "test_restart_marks_open_delivery_indeterminate",
     ),
-    "RegisterComponentOccurrenceContractVerification": (
-        "test_restart_preserves_identity_and_reconstructs_committed_effects",
-        "test_confirmed_topology_rejects_new_occurrence_without_durable_insertion",
+    "RuntimeParticipantClosureVerification": (
+        "test_uniform_delivery_is_durable_deduplicated_and_traceable",
     ),
-    "PrepareStaticRuntimeTopologyContractVerification": (
-        "test_confirmed_topology_rejects_new_occurrence_without_durable_insertion",
-        "test_interrupted_first_start_retries_only_the_prepared_topology",
+    "RuntimeTopologyVerification": ("test_topology_is_atomic_and_identity_is_durable",),
+    "RuntimeReconstructionVerification": (
+        "test_reconstruction_requires_effect_and_commit_within_cursor",
+        "test_checkpoint_reconstruction_requires_one_common_cursor",
+        "test_reconstruction_failure_after_partial_reset_requires_recovery",
+        "test_external_boundaries_are_reported_without_replay_invocation",
+        "test_replay_state_spi_is_available_to_runtime",
+        "test_superseding_aggregate_replays_referenced_child_effects_and_validates_digest",
     ),
-    "ConfirmStaticRuntimeTopologyContractVerification": (
-        "test_static_topology_requires_exact_manifest_inventory",
-        "test_static_topology_rejects_curated_operation_without_adapter_target",
-        "test_interrupted_first_start_retries_only_the_prepared_topology",
+    "AttachRuntimeParticipantContractVerification": (
+        "test_topology_is_atomic_and_identity_is_durable",
     ),
-    "SendRuntimeMessageContractVerification": ("test_initial_append_failure_prevents_dispatch",),
-    "RequestRuntimeMessageContractVerification": ("test_timeout_does_not_cancel_or_redeliver",),
-    "QueryRuntimeHistoryContractVerification": ("test_history_is_cursor_paginated_and_filterable",),
-    "GetRuntimeCausalTraceContractVerification": (
+    "CompleteRuntimeDeliveryContractVerification": (
+        "test_uniform_delivery_is_durable_deduplicated_and_traceable",
+    ),
+    "FaultRuntimeDeliveryContractVerification": ("test_faults_use_the_same_durable_response_lane",),
+    "AcknowledgeRuntimeDeliveryContractVerification": ("test_signals_close_by_acknowledgement",),
+    "GetRuntimeHealthContractVerification": (
+        "test_initial_append_failure_prevents_dispatch_and_terminal_failure_fail_stops",
+    ),
+    "AddressForRuntimeOccurrenceContractVerification": (
+        "test_topology_is_atomic_and_identity_is_durable",
+    ),
+    "GetCurrentRuntimePositionContractVerification": (
         "test_history_is_cursor_paginated_and_filterable",
     ),
+    "AcloseMessageRuntimeContractVerification": (
+        "test_topology_is_atomic_and_identity_is_durable",
+    ),
+    "RegisterComponentOccurrenceContractVerification": (
+        "test_topology_is_atomic_and_identity_is_durable",
+    ),
+    "PrepareStaticRuntimeTopologyContractVerification": (
+        "test_topology_is_atomic_and_identity_is_durable",
+    ),
+    "ConfirmStaticRuntimeTopologyContractVerification": (
+        "test_topology_is_atomic_and_identity_is_durable",
+    ),
+    "SendRuntimeMessageContractVerification": (
+        "test_initial_append_failure_prevents_dispatch_and_terminal_failure_fail_stops",
+    ),
+    "QueryRuntimeHistoryContractVerification": ("test_history_is_cursor_paginated_and_filterable",),
+    "CountRuntimeHistoryContractVerification": ("test_history_is_cursor_paginated_and_filterable",),
+    "QueryRuntimeTraceSummariesContractVerification": (
+        "test_history_is_cursor_paginated_and_filterable",
+    ),
+    "GetRuntimeCausalTraceContractVerification": (
+        "test_uniform_delivery_is_durable_deduplicated_and_traceable",
+        "test_get_trace_has_no_one_thousand_fact_cap",
+    ),
+    "GetRuntimeMessageEnvelopeContractVerification": (
+        "test_payload_storage_is_lossless_compressed_and_history_is_metadata_first",
+    ),
+    "LookupRuntimeMessageOutcomeContractVerification": (
+        "test_caller_timeout_does_not_cancel_execution_and_outcome_is_queryable",
+    ),
     "ReconstructRuntimeStateContractVerification": (
-        "test_restart_preserves_identity_and_reconstructs_committed_effects",
-        "test_reconstruction_requires_empty_reset_checkpoint_or_confirmed_state",
-        "test_reconstruction_rejects_a_canonical_effect_with_a_changed_digest",
-        "test_recorded_external_response_is_supplied_without_a_live_collaborator",
-        "test_final_aggregate_effect_supersedes_derived_effects_in_its_trace",
-        "test_checkpoint_digest_is_verified_before_later_effects",
-        "test_replay_verification_may_use_runtime_messages_without_growing_history",
-        "test_root_coordinator_may_initiate_reconstruction_as_only_pending_delivery",
-        "test_historical_reconstruction_requires_durable_branch_provenance_before_ingress",
+        "test_reconstruction_requires_effect_and_commit_within_cursor",
+        "test_checkpoint_reconstruction_requires_one_common_cursor",
+        "test_reconstruction_failure_after_partial_reset_requires_recovery",
+        "test_external_boundaries_are_reported_without_replay_invocation",
+        "test_superseding_aggregate_replays_referenced_child_effects_and_validates_digest",
     ),
     "RecordRuntimeBranchProvenanceContractVerification": (
-        "test_historical_reconstruction_requires_durable_branch_provenance_before_ingress",
+        "test_branch_provenance_requires_matching_reconstruction",
     ),
-    "ReplayStateStatusContractVerification": (
-        "test_reconstruction_requires_empty_reset_checkpoint_or_confirmed_state",
-    ),
-    "ResetReplayStateContractVerification": (
-        "test_reconstruction_requires_empty_reset_checkpoint_or_confirmed_state",
-    ),
+    "ReplayStateStatusContractVerification": ("test_replay_state_spi_is_available_to_runtime",),
+    "ResetReplayStateContractVerification": ("test_replay_state_spi_is_available_to_runtime",),
     "ImportReplayCheckpointContractVerification": (
-        "test_reconstruction_requires_empty_reset_checkpoint_or_confirmed_state",
-        "test_checkpoint_digest_is_verified_before_later_effects",
+        "test_replay_state_spi_is_available_to_runtime",
     ),
-    "ReplayStateDigestContractVerification": (
-        "test_reconstruction_requires_empty_reset_checkpoint_or_confirmed_state",
-        "test_checkpoint_digest_is_verified_before_later_effects",
-    ),
-    "VerifyReplayStateContractVerification": (
-        "test_reconstruction_requires_empty_reset_checkpoint_or_confirmed_state",
-        "test_replay_verification_may_use_runtime_messages_without_growing_history",
-    ),
+    "ReplayStateDigestContractVerification": ("test_replay_state_spi_is_available_to_runtime",),
+    "VerifyReplayStateContractVerification": ("test_replay_state_spi_is_available_to_runtime",),
 }
 
 
 class _Counter:
-    def __init__(self, *, delay: float = 0) -> None:
+    def __init__(self) -> None:
         self.value = 0
         self.calls = 0
-        self.delay = delay
-        self.call_order: list[int] = []
-        self.active = 0
-        self.max_active = 0
-        self._lock = threading.Lock()
 
-    def increment(self, amount: int) -> int:
-        with self._lock:
-            self.calls += 1
-            self.call_order.append(amount)
-            self.active += 1
-            self.max_active = max(self.max_active, self.active)
-        try:
-            if self.delay:
-                time.sleep(self.delay)
-            with self._lock:
-                self.value += amount
-                return self.value
-        finally:
-            with self._lock:
-                self.active -= 1
-
-    def reset(self) -> None:
-        with self._lock:
-            self.value = 0
-
-    def import_checkpoint(self, reference: str) -> int:
-        cursor, value = reference.split(":", maxsplit=1)
-        with self._lock:
-            self.value = int(value)
-        return int(cursor)
+    def add(self, amount: int) -> int:
+        self.calls += 1
+        self.value += amount
+        return self.value
 
 
-class _ExpectedFailure(Exception):
-    pass
-
-
-def _counter_adapter(
-    counter: _Counter,
+def _descriptor(
+    name: str,
     *,
-    max_in_flight: int = 1,
-    confirmed_cursor: int | None = None,
-    invalid_checkpoint_digest: bool = False,
-) -> ExplicitComponentAdapter:
-    confirmed = [confirmed_cursor]
-    confirmed_digest = [
-        _counter_state_digest(counter) if confirmed_cursor is not None else None
-    ]
+    lane: str = "serialized",
+    replay: RuntimeReplayMode = RuntimeReplayMode.NO_STATE_EFFECT,
+    group: str | None = None,
+    access="independent",
+    deadline_seconds: float | None = None,
+) -> RuntimeActionBindingDescriptor:
+    from components.runtime.messaging import RuntimeConsistencyAccess
 
-    def reset() -> None:
-        counter.reset()
-        confirmed[0] = None
-        confirmed_digest[0] = None
-
-    def import_checkpoint(reference: str) -> int:
-        cursor = counter.import_checkpoint(reference)
-        confirmed[0] = cursor
-        confirmed_digest[0] = (
-            "0" * 64 if invalid_checkpoint_digest else _counter_state_digest(counter)
-        )
-        return cursor
-
-    descriptor = RuntimeActionBindingDescriptor(
-        component_contract_id="component.test.counter",
-        action_id="component.test.counter.increment",
-        binding_id="binding.test.counter.v1",
-        binding_version=1,
-        schema_version=1,
-        request_codec_id="codec.test.counter.request.json",
-        result_codec_id="codec.test.counter.result.json",
-        failure_codec_id="codec.test.counter.failure.json",
-        idempotency=RuntimeActionIdempotency.NON_IDEMPOTENT,
-        replay_mode=RuntimeReplayMode.CANONICAL_EFFECT,
-        concurrency_lane="serialized" if max_in_flight == 1 else "parallel",
-        max_in_flight=max_in_flight,
+    return RuntimeActionBindingDescriptor(
+        _CONTRACT,
+        f"{_CONTRACT}.{name}",
+        _BINDING,
+        1,
+        1,
+        f"codec.test.{name}.request.json",
+        f"codec.test.{name}.result.json",
+        f"codec.test.{name}.failure.json",
+        RuntimeActionIdempotency.UNSPECIFIED,
+        replay,
+        concurrency_lane=lane,
+        consistency_group=group,
+        consistency_access=RuntimeConsistencyAccess(access),
+        deadline_seconds=deadline_seconds,
     )
-    return ExplicitComponentAdapter(
+
+
+def _counter_adapter(counter: _Counter) -> ComponentAdapter:
+    return ComponentAdapter(
         (
             ActionBinding(
-                descriptor=descriptor,
-                invoke=counter.increment,
-                decode_request=lambda payload: ((cast(int, payload["amount"]),), {}),
-                encode_result=encode_json,
-                build_replay_effect=lambda args, _kwargs, _result: {"amount": cast(int, args[0])},
-                apply_replay_effect=lambda payload: counter.increment(cast(int, payload["amount"])),
+                _descriptor("add"),
+                lambda payload: ((int(payload["amount"]),), {}),
+                lambda value: int(cast(int, value)),
+                invoke=counter.add,
+            ),
+        )
+    )
+
+
+def _replayable_counter_adapter(counter: _Counter) -> ComponentAdapter:
+    descriptor = _descriptor("add", replay=RuntimeReplayMode.CANONICAL_EFFECT)
+    return ComponentAdapter(
+        (
+            ActionBinding(
+                descriptor,
+                lambda payload: ((int(payload["amount"]),), {}),
+                lambda value: int(cast(int, value)),
+                invoke=counter.add,
+                build_replay_effect=lambda args, _kwargs, _result: {
+                    "amount": int(cast(int, args[0]))
+                },
+                apply_replay_effect=lambda effect: counter.add(int(effect["amount"])),
             ),
         ),
         replay_state=ReplayStateBinding(
             is_empty=lambda: counter.value == 0,
-            reset=reset,
-            import_checkpoint=import_checkpoint,
+            reset=lambda: setattr(counter, "value", 0),
+            import_checkpoint=lambda reference: int(reference.rsplit(":", 1)[-1]),
             export_state=lambda: {"value": counter.value},
-            confirmed_cursor=lambda: confirmed[0],
-            confirmed_digest=lambda: confirmed_digest[0],
         ),
     )
 
 
-def _counter_state_digest(counter: _Counter) -> str:
-    encoded = json.dumps({"value": counter.value}, sort_keys=True, separators=(",", ":")).encode()
-    return hashlib.sha256(encoded).hexdigest()
-
-
-def _runtime_and_counter(
-    database: Path, *, delay: float = 0
-) -> tuple[SqliteMessageRuntime, _Counter, RuntimeClient]:
-    runtime = SqliteMessageRuntime.open(database, runtime_key="test.runtime")
-    counter = _Counter(delay=delay)
-    registration = runtime.register_adapter(
-        instance_key="test.counter.primary",
-        component_contract_id="component.test.counter",
-        adapter=_counter_adapter(counter),
+async def _compose(
+    path: Path,
+    participant: ComponentAdapter,
+    *,
+    lanes: tuple[RuntimeLaneDeclaration, ...] = (RuntimeLaneDeclaration("serialized"),),
+    replay_authority: RuntimeReplayMode = RuntimeReplayMode.NO_STATE_EFFECT,
+) -> tuple[SqliteMessageRuntime, ComponentEndpoint, RuntimeTopologyManifest]:
+    runtime = SqliteMessageRuntime(path, runtime_key="test.runtime")
+    ingress = ComponentAdapter(
+        binding_id="binding.test.ingress", component_contract_id="component.test.ingress"
     )
-    address = runtime.address_for(registration.instance_key)
-    client = RuntimeClient(
+    declarations = (
+        ComponentOccurrenceDeclaration(
+            "target",
+            _CONTRACT,
+            _BINDING,
+            1,
+            lanes=lanes,
+            replay_authority=replay_authority,
+        ),
+        ComponentOccurrenceDeclaration(
+            "ingress", "component.test.ingress", "binding.test.ingress", 1
+        ),
+    )
+    manifest = RuntimeTopologyManifest("test.runtime", 4, declarations, (), "")
+    manifest = replace(manifest, manifest_hash=topology_manifest_hash(manifest))
+    await runtime.prepare_static_topology(manifest)
+    target = await runtime.register_occurrence(declarations[0])
+    source = await runtime.register_occurrence(declarations[1])
+    await runtime.attach_participant(target, participant, participant.describe().actions)
+    await runtime.attach_participant(source, ingress)
+    await runtime.confirm_static_topology(manifest)
+    return (
         runtime,
-        source=address,
-        target=address,
-        component_contract_id="component.test.counter",
-        request_codec_id="codec.test.counter.request.json",
+        ComponentEndpoint(runtime, ingress, source=runtime.address_for("ingress")),
+        manifest,
     )
-    return runtime, counter, client
 
 
-def test_durable_acceptance_duplicate_protection_and_history(tmp_path: Path) -> None:
-    runtime, counter, client = _runtime_and_counter(tmp_path / "runtime.sqlite")
-    try:
+def test_uniform_delivery_is_durable_deduplicated_and_traceable(tmp_path: Path) -> None:
+    async def exercise() -> None:
+        counter = _Counter()
+        runtime, endpoint, _ = await _compose(
+            tmp_path / "runtime.sqlite", _counter_adapter(counter)
+        )
         message_id = uuid4()
-        envelope = client.envelope(
-            "component.test.counter.increment", {"amount": 2}, message_id=message_id
+        first = await endpoint.request(
+            _descriptor("add").action_ref(),
+            {"amount": 3},
+            target=runtime.address_for("target"),
+            message_id=message_id,
         )
-        first = runtime.request_sync(envelope)
-        duplicate = runtime.request_sync(envelope)
-
-        assert first.response.payload.value == {"result": 2}
+        duplicate = await endpoint.request(
+            _descriptor("add").action_ref(),
+            {"amount": 3},
+            target=runtime.address_for("target"),
+            message_id=message_id,
+        )
+        assert counter.value == 3 and counter.calls == 1
+        assert duplicate.response == first.response
         assert duplicate.terminal_position == first.terminal_position
-        assert counter.calls == 1
-        facts = runtime.query_history_sync(RuntimeHistoryQuery(message_id=message_id)).facts
-        assert [fact.fact_type for fact in facts] == [
-            "message_accepted",
-            "delivery_started",
-            "canonical_effect",
-            "trace_committed",
-        ]
-
         with pytest.raises(RuntimeMessageConflict):
-            runtime.request_sync(replace(envelope, created_at="changed"))
-    finally:
-        runtime.close()
-
-
-def test_initial_append_failure_prevents_dispatch(tmp_path: Path) -> None:
-    runtime, counter, client = _runtime_and_counter(tmp_path / "runtime.sqlite")
-    try:
-        runtime.simulate_ledger_failure_once("message_accepted")
-        with pytest.raises(RuntimeLedgerUnavailable):
-            client.request_sync("component.test.counter.increment", {"amount": 1})
-        assert counter.calls == 0
-    finally:
-        runtime.close()
-
-
-def test_static_topology_requires_exact_manifest_inventory(tmp_path: Path) -> None:
-    runtime, _, _ = _runtime_and_counter(tmp_path / "runtime.sqlite")
-    try:
-        declaration = ComponentOccurrenceDeclaration(
-            instance_key="test.counter.primary",
-            component_contract_id="component.test.counter",
-            binding_id="binding.test.counter.v1",
-            binding_version=1,
-            replay_authority=RuntimeReplayMode.CANONICAL_EFFECT,
-        )
-        manifest = RuntimeTopologyManifest(
-            runtime_key="test.runtime",
-            manifest_schema_version=1,
-            occurrences=(declaration,),
-            curated_operations=(
-                RuntimeCuratedOperationDeclaration(
-                    operation_id="counter.increment",
-                    target_instance_key="test.counter.primary",
-                    component_contract_id="component.test.counter",
-                    action_id="component.test.counter.increment",
-                    schema_version=1,
-                ),
-            ),
-            manifest_hash="a" * 64,
-        )
-        confirmation = runtime.confirm_static_topology_sync(manifest)
-        assert confirmation.occurrence_count == 1
-        assert len(confirmation.topology_hash) == 64
-
-        refreshed = runtime.confirm_static_topology_sync(
-            replace(manifest, manifest_hash="b" * 64)
-        )
-        assert refreshed.manifest_hash == "b" * 64
-        assert refreshed.topology_hash == confirmation.topology_hash
-
-        with pytest.raises(RuntimeRegistrationInvalid, match="contract changed"):
-            runtime.confirm_static_topology_sync(
-                replace(
-                    manifest,
-                    occurrences=(replace(declaration, queue_capacity=64),),
-                )
+            await endpoint.request(
+                _descriptor("add").action_ref(),
+                {"amount": 4},
+                target=runtime.address_for("target"),
+                message_id=message_id,
             )
+        trace = await runtime.get_trace(first.request.trace_id, include_payload=True)
+        kinds = [
+            fact.envelope.kind.value
+            for fact in trace.facts
+            if fact.fact_type == "message_accepted" and fact.envelope is not None
+        ]
+        assert kinds == ["request", "response"]
+        assert trace.disposition is RuntimeTraceDisposition.COMMITTED
+        await runtime.aclose()
 
-        with pytest.raises(RuntimeRegistrationInvalid, match="without migration"):
-            runtime.register_source_occurrence(
-                instance_key="test.interface.extra",
-                component_contract_id="component.test.interface",
-                binding_id="binding.test.interface.source.v1",
-            )
-    finally:
-        runtime.close()
+    asyncio.run(exercise())
 
 
-def test_confirmed_topology_rejects_new_occurrence_without_durable_insertion(
+def test_payload_storage_is_lossless_compressed_and_history_is_metadata_first(
     tmp_path: Path,
 ) -> None:
     database = tmp_path / "runtime.sqlite"
-    runtime, _, _ = _runtime_and_counter(database)
-    declaration = ComponentOccurrenceDeclaration(
-        instance_key="test.counter.primary",
-        component_contract_id="component.test.counter",
-        binding_id="binding.test.counter.v1",
-        binding_version=1,
-        replay_authority=RuntimeReplayMode.CANONICAL_EFFECT,
-    )
-    manifest = RuntimeTopologyManifest(
-        runtime_key="test.runtime",
-        manifest_schema_version=1,
-        occurrences=(declaration,),
-        curated_operations=(),
-        manifest_hash="a" * 64,
-    )
-    runtime.confirm_static_topology_sync(manifest)
-    with pytest.raises(RuntimeRegistrationInvalid, match="without migration"):
-        runtime.declare_occurrence(
-            ComponentOccurrenceDeclaration(
-                instance_key="test.counter.secondary",
-                component_contract_id="component.test.counter",
-                binding_id="binding.test.counter.v1",
-                binding_version=1,
-                replay_authority=RuntimeReplayMode.CANONICAL_EFFECT,
-            )
+
+    async def exercise() -> None:
+        runtime, endpoint, _ = await _compose(database, _counter_adapter(_Counter()))
+        payload = {"amount": 1, "padding": "same-value-" * 300}
+        # The counter codec ignores the extra modeled-test fixture field while storage retains it.
+        outcome = await endpoint.request(
+            _descriptor("add").action_ref(), payload, target=runtime.address_for("target")
         )
-    with pytest.raises(RuntimeAddressUnknown):
-        runtime.address_for("test.counter.secondary")
-    runtime.close()
-
-    reopened, _, _ = _runtime_and_counter(database)
-    try:
-        reopened.confirm_static_topology_sync(manifest)
-        with pytest.raises(RuntimeAddressUnknown):
-            reopened.address_for("test.counter.secondary")
-    finally:
-        reopened.close()
-
-
-def test_interrupted_first_start_retries_only_the_prepared_topology(tmp_path: Path) -> None:
-    database = tmp_path / "runtime.sqlite"
-    first = ComponentOccurrenceDeclaration(
-        instance_key="test.source.first",
-        component_contract_id="component.test.source",
-        binding_id="binding.test.source.v1",
-        binding_version=1,
-    )
-    second = replace(first, instance_key="test.source.second")
-    original = RuntimeTopologyManifest(
-        runtime_key="test.partial",
-        manifest_schema_version=1,
-        occurrences=(first, second),
-        curated_operations=(),
-        manifest_hash="a" * 64,
-    )
-    runtime = SqliteMessageRuntime.open(database, runtime_key="test.partial")
-    runtime.prepare_static_topology_sync(original)
-    first_registration = runtime.declare_occurrence(first)
-    runtime.close()
-
-    reopened = SqliteMessageRuntime.open(database, runtime_key="test.partial")
-    try:
-        different = replace(
-            original,
-            occurrences=(first, replace(second, instance_key="test.source.other")),
-            manifest_hash="b" * 64,
+        await endpoint.request(
+            _descriptor("add").action_ref(), payload, target=runtime.address_for("target")
         )
-        with pytest.raises(RuntimeRegistrationInvalid, match="durable topology plan"):
-            reopened.prepare_static_topology_sync(different)
-        with pytest.raises(RuntimeAddressUnknown):
-            reopened.address_for("test.source.other")
-
-        reopened.prepare_static_topology_sync(original)
-        assert reopened.declare_occurrence(first).instance_id == first_registration.instance_id
-        reopened.declare_occurrence(second)
-        assert reopened.confirm_static_topology_sync(original).occurrence_count == 2
-    finally:
-        reopened.close()
-
-
-def test_static_topology_rejects_curated_operation_without_adapter_target(
-    tmp_path: Path,
-) -> None:
-    runtime = SqliteMessageRuntime.open(
-        tmp_path / "runtime.sqlite", runtime_key="test.source-only"
-    )
-    try:
-        runtime.register_source_occurrence(
-            instance_key="test.interface.source",
-            component_contract_id="component.test.interface",
-            binding_id="binding.test.interface.source.v1",
+        envelope = await runtime.get_envelope(outcome.request.message_id)
+        assert envelope is not None
+        assert envelope.payload.value == payload
+        page = await runtime.query_history(
+            RuntimeHistoryQuery(trace_id=outcome.request.trace_id, limit=1000)
         )
-        declaration = ComponentOccurrenceDeclaration(
-            instance_key="test.interface.source",
-            component_contract_id="component.test.interface",
-            binding_id="binding.test.interface.source.v1",
-            binding_version=1,
+        assert all(fact.envelope is None for fact in page.facts)
+        hydrated = await runtime.query_history(
+            RuntimeHistoryQuery(trace_id=outcome.request.trace_id, limit=1000, include_payload=True)
         )
-        manifest = RuntimeTopologyManifest(
-            runtime_key="test.source-only",
-            manifest_schema_version=1,
-            occurrences=(declaration,),
-            curated_operations=(
-                RuntimeCuratedOperationDeclaration(
-                    operation_id="source.invalid",
-                    target_instance_key="test.interface.source",
-                    component_contract_id="component.test.interface",
-                    action_id="component.test.interface.invalid",
-                    schema_version=1,
-                ),
-            ),
-            manifest_hash="a" * 64,
+        assert any(
+            fact.envelope is not None
+            and fact.envelope.payload.value.get("padding") == payload["padding"]
+            for fact in hydrated.facts
+            if isinstance(fact.envelope.payload.value if fact.envelope else None, dict)
         )
+        await runtime.aclose()
 
-        with pytest.raises(RuntimeRegistrationInvalid, match="no attached adapter"):
-            runtime.confirm_static_topology_sync(manifest)
-    finally:
-        runtime.close()
-
-
-def test_runtime_creates_ledger_parent_for_a_fresh_data_root(tmp_path: Path) -> None:
-    database = tmp_path / "fresh" / "nested" / "runtime.sqlite"
-
-    runtime = SqliteMessageRuntime.open(database, runtime_key="test.fresh-root")
-    try:
-        assert database.is_file()
-        assert runtime.health == "ready"
-    finally:
-        runtime.close()
+    asyncio.run(exercise())
+    connection = sqlite3.connect(database)
+    columns = {row[1] for row in connection.execute("PRAGMA table_info(runtime_ledger)").fetchall()}
+    assert "envelope_json" not in columns
+    payload_rows = connection.execute(
+        "SELECT canonical_size, length(payload_body), compression FROM runtime_payloads "
+        "WHERE canonical_size >= 1024"
+    ).fetchall()
+    assert payload_rows
+    assert all(mode == "zlib" and stored < canonical for canonical, stored, mode in payload_rows)
+    assert database.stat().st_mode & 0o777 == 0o600
 
 
-def test_runtime_allocates_and_preserves_first_start_occurrence_identity(
-    tmp_path: Path,
-) -> None:
-    database = tmp_path / "runtime.sqlite"
-    declaration = ComponentOccurrenceDeclaration(
-        instance_key="test.source.primary",
-        component_contract_id="component.test.source",
-        binding_id="binding.test.source.v1",
-        binding_version=1,
-        replay_authority=RuntimeReplayMode.EXTERNAL_EXCHANGE,
-        configuration_references=("config.source",),
-    )
-    runtime = SqliteMessageRuntime.open(database, runtime_key="test.identity")
-    first = runtime.declare_occurrence(declaration)
-    runtime.close()
-    restarted = SqliteMessageRuntime.open(database, runtime_key="test.identity")
-    try:
-        second = restarted.declare_occurrence(declaration)
-        assert first.instance_id == second.instance_id
-        assert second.configuration_references == ("config.source",)
-    finally:
-        restarted.close()
+def test_faults_use_the_same_durable_response_lane(tmp_path: Path) -> None:
+    async def exercise() -> None:
+        def fail(_amount: int) -> int:
+            raise ValueError("blocked")
 
-
-def test_terminal_persistence_failure_enters_fail_stop(tmp_path: Path) -> None:
-    runtime, counter, client = _runtime_and_counter(tmp_path / "runtime.sqlite")
-    try:
-        runtime.simulate_ledger_failure_once("response_recorded")
-        with pytest.raises(RuntimeFailStopped):
-            client.request_sync("component.test.counter.increment", {"amount": 1})
-        assert counter.value == 1
-        assert runtime.health == "fail_stopped"
-        with pytest.raises(RuntimeFailStopped):
-            client.request_sync("component.test.counter.increment", {"amount": 1})
-    finally:
-        runtime.close()
-
-
-def test_post_effect_terminal_encoding_failure_enters_fail_stop(tmp_path: Path) -> None:
-    runtime = SqliteMessageRuntime.open(
-        tmp_path / "runtime.sqlite", runtime_key="test.terminal.encoding"
-    )
-    counter = _Counter()
-
-    def fail_result_encoding(_result: object) -> JsonValue:
-        raise ValueError("result encoder exploded")
-
-    descriptor = RuntimeActionBindingDescriptor(
-        component_contract_id="component.test.invalid_result",
-        action_id="component.test.invalid_result.mutate",
-        binding_id="binding.test.invalid_result.v1",
-        binding_version=1,
-        schema_version=1,
-        request_codec_id="codec.test.invalid_result.request.json",
-        result_codec_id="codec.test.invalid_result.result.json",
-        failure_codec_id="codec.test.invalid_result.failure.json",
-        idempotency=RuntimeActionIdempotency.NON_IDEMPOTENT,
-        replay_mode=RuntimeReplayMode.NO_STATE_EFFECT,
-    )
-    registration = runtime.register_adapter(
-        instance_key="test.invalid_result.primary",
-        component_contract_id="component.test.invalid_result",
-        adapter=ExplicitComponentAdapter(
+        adapter = ComponentAdapter(
             (
                 ActionBinding(
-                    descriptor=descriptor,
-                    invoke=counter.increment,
-                    decode_request=lambda payload: ((cast(int, payload["amount"]),), {}),
-                    encode_result=fail_result_encoding,
+                    _descriptor("add"),
+                    lambda payload: ((int(payload["amount"]),), {}),
+                    lambda value: int(cast(int, value)),
+                    invoke=fail,
+                    failure_types=(ValueError,),
                 ),
             )
-        ),
-    )
-    address = runtime.address_for(registration.instance_key)
-    client = RuntimeClient(
-        runtime,
-        source=address,
-        target=address,
-        component_contract_id="component.test.invalid_result",
-        request_codec_id="codec.test.invalid_result.request.json",
-    )
-    envelope = client.envelope("component.test.invalid_result.mutate", {"amount": 2})
-    try:
-        with pytest.raises(RuntimeFailStopped, match="terminal encoding failed"):
-            runtime.request_sync(envelope)
-        assert counter.value == 2
-        assert runtime.health == "fail_stopped"
-        assert runtime.get_trace_sync(envelope.trace_id).disposition is (
-            RuntimeTraceDisposition.INDETERMINATE
         )
-        with pytest.raises(RuntimeFailStopped):
-            client.request_sync("component.test.invalid_result.mutate", {"amount": 1})
-        assert counter.value == 2
-    finally:
-        runtime.close()
-
-
-def test_fail_stop_quiesces_already_accepted_queued_deliveries(tmp_path: Path) -> None:
-    runtime, counter, client = _runtime_and_counter(
-        tmp_path / "runtime.sqlite", delay=0.05
-    )
-    first = client.envelope("component.test.counter.increment", {"amount": 1})
-    queued = client.envelope("component.test.counter.increment", {"amount": 10})
-
-    async def request_both() -> tuple[object, object]:
-        first_task = asyncio.create_task(runtime.request(first))
-        while counter.calls < 1:
-            await asyncio.sleep(0.001)
-        await runtime.send(queued)
-        queued_task = asyncio.create_task(runtime.request(queued))
-        first_result, queued_result = await asyncio.gather(
-            first_task, queued_task, return_exceptions=True
+        runtime, endpoint, _ = await _compose(tmp_path / "fault.sqlite", adapter)
+        outcome = await endpoint.request(
+            _descriptor("add").action_ref(), {"amount": 1}, target=runtime.address_for("target")
         )
-        return first_result, queued_result
+        assert outcome.response.kind.value == "fault"
+        assert outcome.trace_disposition is RuntimeTraceDisposition.ABORTED
+        await runtime.aclose()
 
-    try:
-        runtime.simulate_ledger_failure_once("response_recorded")
-        first_result, queued_result = asyncio.run(request_both())
-
-        assert isinstance(first_result, RuntimeFailStopped)
-        assert isinstance(queued_result, RuntimeFailStopped)
-        assert runtime.health == "fail_stopped"
-        assert counter.calls == 1
-        assert counter.value == 1
-        queued_facts = runtime.query_history_sync(
-            RuntimeHistoryQuery(message_id=queued.message_id)
-        ).facts
-        assert [fact.fact_type for fact in queued_facts] == ["message_accepted"]
-    finally:
-        runtime.close()
+    asyncio.run(exercise())
 
 
-def test_runtime_rejects_noncanonical_json_payloads_before_dispatch(tmp_path: Path) -> None:
-    runtime, counter, client = _runtime_and_counter(tmp_path / "runtime.sqlite")
-    envelope = client.envelope(
-        "component.test.counter.increment",
-        cast(JsonObject, {"amount": uuid4()}),
-    )
-    try:
-        with pytest.raises(RuntimeSchemaUnsupported, match="canonical JSON"):
-            runtime.request_sync(envelope)
+def test_initial_append_failure_prevents_dispatch_and_terminal_failure_fail_stops(
+    tmp_path: Path,
+) -> None:
+    async def exercise() -> None:
+        counter = _Counter()
+        runtime, endpoint, _ = await _compose(tmp_path / "fail.sqlite", _counter_adapter(counter))
+        runtime.simulate_ledger_failure_once("message_accepted")
+        with pytest.raises(RuntimeLedgerUnavailable):
+            await endpoint.request(
+                _descriptor("add").action_ref(), {"amount": 1}, target=runtime.address_for("target")
+            )
         assert counter.calls == 0
-        assert not runtime.query_history_sync(
-            RuntimeHistoryQuery(
-                message_id=envelope.message_id,
-                fact_type="message_accepted",
+        runtime.simulate_ledger_failure_once("delivery_completed")
+        with pytest.raises(RuntimeRequestTimedOut):
+            await endpoint.request(
+                _descriptor("add").action_ref(),
+                {"amount": 2},
+                target=runtime.address_for("target"),
+                timeout_seconds=0.05,
             )
-        ).facts
-    finally:
-        runtime.close()
+        assert counter.value == 2
+        assert runtime.health is RuntimeHealth.FAIL_STOPPED
+        await runtime.aclose()
+
+    asyncio.run(exercise())
 
 
-def test_runtime_dispatches_the_durable_canonical_payload_copy(tmp_path: Path) -> None:
-    runtime, counter, client = _runtime_and_counter(
-        tmp_path / "runtime.sqlite", delay=0.05
-    )
-    first = client.envelope("component.test.counter.increment", {"amount": 1})
-    mutable_arguments: JsonObject = {"amount": 2}
-    queued = client.envelope("component.test.counter.increment", mutable_arguments)
+def test_fail_stop_cancels_active_delivery_and_drains_queued_work(tmp_path: Path) -> None:
+    async def exercise() -> None:
+        started = Event()
+        release = Event()
+        counter = _Counter()
 
-    async def accept_then_mutate() -> None:
-        await runtime.send(first)
-        await runtime.send(queued)
-        mutable_arguments["amount"] = 99
-        while counter.calls < 2:
-            await asyncio.sleep(0.01)
+        def delayed_add(amount: int) -> int:
+            started.set()
+            release.wait()
+            return counter.add(amount)
 
-    try:
-        asyncio.run(accept_then_mutate())
-        assert counter.call_order == [1, 2]
-        accepted = runtime.query_history_sync(
-            RuntimeHistoryQuery(
-                message_id=queued.message_id,
-                fact_type="message_accepted",
+        descriptor = _descriptor("add")
+        adapter = ComponentAdapter(
+            (
+                ActionBinding(
+                    descriptor,
+                    lambda payload: ((int(payload["amount"]),), {}),
+                    lambda value: int(cast(int, value)),
+                    invoke=delayed_add,
+                ),
             )
-        ).facts
-        assert accepted[0].envelope is not None
-        assert accepted[0].envelope.payload.value == {"amount": 2}
-    finally:
-        runtime.close()
+        )
+        runtime, endpoint, _ = await _compose(tmp_path / "fail-stop.sqlite", adapter)
+        first_id, second_id = uuid4(), uuid4()
+        first = asyncio.create_task(
+            endpoint.request(
+                descriptor.action_ref(),
+                {"amount": 1},
+                target=runtime.address_for("target"),
+                timeout_seconds=0.2,
+                message_id=first_id,
+            )
+        )
+        assert await asyncio.to_thread(started.wait, 1)
+        second = asyncio.create_task(
+            endpoint.request(
+                descriptor.action_ref(),
+                {"amount": 10},
+                target=runtime.address_for("target"),
+                timeout_seconds=0.2,
+                message_id=second_id,
+            )
+        )
+        queued = None
+        for _ in range(100):
+            queued = await runtime.lookup_message_outcome(second_id)
+            if queued is not None:
+                break
+            await asyncio.sleep(0.005)
+        assert queued is not None
+        assert queued.request_receipt.status.value == "accepted"
 
+        runtime.simulate_ledger_failure_once("delivery_completed")
+        release.set()
+        await asyncio.gather(first, second, return_exceptions=True)
 
-def test_timeout_does_not_cancel_or_redeliver(tmp_path: Path) -> None:
-    runtime, counter, client = _runtime_and_counter(tmp_path / "runtime.sqlite", delay=0.05)
-    try:
-        envelope = client.envelope("component.test.counter.increment", {"amount": 3})
-        with pytest.raises(RuntimeRequestTimedOut) as captured:
-            runtime.request_sync(envelope, timeout_seconds=0.005)
-        assert captured.value.message_id == envelope.message_id
-
-        outcome = runtime.request_sync(envelope, timeout_seconds=1)
-        assert outcome.response.payload.value == {"result": 3}
         assert counter.calls == 1
-    finally:
-        runtime.close()
+        assert runtime.health is RuntimeHealth.FAIL_STOPPED
+        first_outcome = await runtime.lookup_message_outcome(first_id)
+        second_outcome = await runtime.lookup_message_outcome(second_id)
+        assert first_outcome is not None
+        assert second_outcome is not None
+        assert first_outcome.request_receipt.status.value == "indeterminate"
+        assert second_outcome.request_receipt.status.value == "indeterminate"
+        with pytest.raises(RuntimeFailStopped):
+            await endpoint.request(
+                descriptor.action_ref(),
+                {"amount": 100},
+                target=runtime.address_for("target"),
+            )
+        await runtime.aclose()
+
+    asyncio.run(exercise())
+
+
+def test_deadline_waits_for_synchronous_invocation_before_indeterminate(
+    tmp_path: Path,
+) -> None:
+    async def exercise() -> None:
+        started = Event()
+        release = Event()
+        counter = _Counter()
+
+        def delayed_add(amount: int) -> int:
+            started.set()
+            release.wait()
+            return counter.add(amount)
+
+        descriptor = _descriptor("add", deadline_seconds=0.02)
+        adapter = ComponentAdapter(
+            (
+                ActionBinding(
+                    descriptor,
+                    lambda payload: ((int(payload["amount"]),), {}),
+                    lambda value: int(cast(int, value)),
+                    invoke=delayed_add,
+                ),
+            )
+        )
+        runtime, endpoint, _ = await _compose(tmp_path / "deadline.sqlite", adapter)
+        message_id = uuid4()
+        request = asyncio.create_task(
+            endpoint.request(
+                descriptor.action_ref(),
+                {"amount": 2},
+                target=runtime.address_for("target"),
+                timeout_seconds=0.2,
+                message_id=message_id,
+            )
+        )
+        assert await asyncio.to_thread(started.wait, 1)
+        await asyncio.sleep(0.05)
+        before_release = await runtime.lookup_message_outcome(message_id)
+        assert before_release is not None
+        assert before_release.request_receipt.status.value == "delivering"
+        assert counter.value == 0
+        assert runtime.health is RuntimeHealth.QUIESCING
+        release.set()
+        with pytest.raises(RuntimeRequestTimedOut):
+            await request
+        after_release = None
+        for _ in range(100):
+            after_release = await runtime.lookup_message_outcome(message_id)
+            if (
+                after_release is not None
+                and after_release.request_receipt.status.value == "indeterminate"
+            ):
+                break
+            await asyncio.sleep(0.01)
+        assert counter.value == 2
+        assert after_release is not None
+        assert after_release.request_receipt.status.value == "indeterminate"
+        assert runtime.health is RuntimeHealth.RECOVERY_REQUIRED
+        await runtime.aclose()
+
+    asyncio.run(exercise())
+
+
+def test_deadline_compensation_holds_quiescing_then_aborts_safely(tmp_path: Path) -> None:
+    async def exercise() -> None:
+        compensation_started = Event()
+        release_compensation = Event()
+        descriptor = _descriptor("coordinate", deadline_seconds=0.02)
+
+        async def coordinate(
+            _args: tuple[object, ...],
+            _kwargs: dict[str, object],
+            _execution: ComponentExecution,
+        ) -> None:
+            try:
+                await asyncio.sleep(10)
+            except asyncio.CancelledError as error:
+                compensation_started.set()
+                await asyncio.to_thread(release_compensation.wait)
+                raise RuntimeComponentDeadlineExceeded("coordinate") from error
+
+        adapter = ComponentAdapter(
+            (
+                ActionBinding(
+                    descriptor,
+                    lambda _payload: ((), {}),
+                    lambda value: value,
+                    handler=coordinate,
+                ),
+            )
+        )
+        runtime, endpoint, _ = await _compose(tmp_path / "deadline-abort.sqlite", adapter)
+        request = asyncio.create_task(
+            endpoint.request(
+                descriptor.action_ref(),
+                {},
+                target=runtime.address_for("target"),
+                timeout_seconds=1,
+            )
+        )
+        assert await asyncio.to_thread(compensation_started.wait, 1)
+        assert runtime.health is RuntimeHealth.QUIESCING
+        assert not request.done()
+
+        release_compensation.set()
+        outcome = await request
+        assert outcome.response.kind.value == "fault"
+        assert outcome.response.payload.value["type"] == "RuntimeComponentDeadlineExceeded"
+        assert outcome.trace_disposition is RuntimeTraceDisposition.ABORTED
+        assert runtime.health is RuntimeHealth.READY
+        await runtime.aclose()
+
+    asyncio.run(exercise())
+
+
+def test_failed_deadline_compensation_requires_recovery(tmp_path: Path) -> None:
+    async def exercise() -> None:
+        descriptor = _descriptor("coordinate", deadline_seconds=0.02)
+
+        async def coordinate(
+            _args: tuple[object, ...],
+            _kwargs: dict[str, object],
+            _execution: ComponentExecution,
+        ) -> None:
+            try:
+                await asyncio.sleep(10)
+            except asyncio.CancelledError as error:
+                raise RuntimeError("compensation failed") from error
+
+        adapter = ComponentAdapter(
+            (
+                ActionBinding(
+                    descriptor,
+                    lambda _payload: ((), {}),
+                    lambda value: value,
+                    handler=coordinate,
+                ),
+            )
+        )
+        runtime, endpoint, _ = await _compose(tmp_path / "deadline-failed.sqlite", adapter)
+        outcome = await endpoint.request(
+            descriptor.action_ref(),
+            {},
+            target=runtime.address_for("target"),
+            timeout_seconds=1,
+        )
+        assert outcome.response.kind.value == "fault"
+        assert outcome.response.payload.value["type"] == "RuntimeError"
+        assert outcome.trace_disposition is RuntimeTraceDisposition.INDETERMINATE
+        assert runtime.health is RuntimeHealth.RECOVERY_REQUIRED
+        await runtime.aclose()
+
+    asyncio.run(exercise())
+
+
+def test_signals_close_by_acknowledgement(tmp_path: Path) -> None:
+    async def exercise() -> None:
+        seen = asyncio.Event()
+
+        async def signal(
+            _args: tuple[object, ...], _kwargs: dict[str, object], execution: ComponentExecution
+        ) -> None:
+            seen.set()
+            await execution.ack()
+
+        adapter = ComponentAdapter(
+            (
+                ActionBinding(
+                    _descriptor("add"),
+                    lambda _payload: ((), {}),
+                    lambda value: value,
+                    handler=signal,
+                ),
+            )
+        )
+        runtime, endpoint, _ = await _compose(tmp_path / "signal.sqlite", adapter)
+        receipt = await endpoint.signal(
+            _descriptor("add").action_ref(), {}, target=runtime.address_for("target")
+        )
+        await asyncio.wait_for(seen.wait(), 1)
+        facts = ()
+        for _ in range(100):
+            facts = (
+                await runtime.query_history(RuntimeHistoryQuery(message_id=receipt.message_id))
+            ).facts
+            if any(fact.fact_type == "trace_committed" for fact in facts):
+                break
+            await asyncio.sleep(0.01)
+        assert any(fact.fact_type == "trace_committed" for fact in facts)
+        await runtime.aclose()
+
+    asyncio.run(exercise())
 
 
 def test_history_is_cursor_paginated_and_filterable(tmp_path: Path) -> None:
-    runtime, _, client = _runtime_and_counter(tmp_path / "runtime.sqlite")
-    try:
-        outcome = client.request_sync("component.test.counter.increment", {"amount": 1})
-        first = runtime.query_history_sync(RuntimeHistoryQuery(limit=2))
-        assert len(first.facts) == 2
-        assert first.next_position == first.facts[-1].runtime_position
-        second = runtime.query_history_sync(
-            RuntimeHistoryQuery(after_position=first.next_position, limit=100)
+    async def exercise() -> None:
+        runtime, endpoint, _ = await _compose(
+            tmp_path / "history.sqlite", _counter_adapter(_Counter())
+        )
+        outcome = await endpoint.request(
+            _descriptor("add").action_ref(), {"amount": 1}, target=runtime.address_for("target")
+        )
+        first = await runtime.query_history(
+            RuntimeHistoryQuery(trace_id=outcome.request.trace_id, limit=2)
+        )
+        assert len(first.facts) == 2 and first.next_position is not None
+        second = await runtime.query_history(
+            RuntimeHistoryQuery(
+                trace_id=outcome.request.trace_id, after_position=first.next_position, limit=100
+            )
         )
         assert second.facts
-        assert second.facts[0].runtime_position > first.facts[-1].runtime_position
+        assert await runtime.count_history(
+            RuntimeHistoryQuery(trace_id=outcome.request.trace_id)
+        ) == len(first.facts) + len(second.facts)
+        summaries = await runtime.query_trace_summaries(
+            limit=1,
+            root_action_ids=("component.test.counter.add",),
+        )
+        assert len(summaries.summaries) == 1
+        assert summaries.summaries[0].trace_id == outcome.request.trace_id
+        assert summaries.summaries[0].terminal_position == outcome.terminal_position
+        assert await runtime.current_position() >= outcome.terminal_position
+        await runtime.aclose()
 
-        filtered = runtime.query_history_sync(
-            RuntimeHistoryQuery(
-                runtime_id=runtime.runtime_id,
-                action_id="component.test.counter.increment",
-                message_kind=RuntimeMessageKind.REQUEST,
-                schema_version=1,
-                delivery_status=RuntimeDeliveryStatus.COMPLETED,
-                trace_disposition=RuntimeTraceDisposition.COMMITTED,
-                limit=100,
+    asyncio.run(exercise())
+
+
+def test_topology_is_atomic_and_identity_is_durable(tmp_path: Path) -> None:
+    async def exercise() -> None:
+        path = tmp_path / "identity.sqlite"
+        runtime, _endpoint, manifest = await _compose(path, _counter_adapter(_Counter()))
+        identity = runtime.address_for("target")
+        await runtime.aclose()
+        reopened = SqliteMessageRuntime(path, runtime_key="test.runtime")
+        await reopened.prepare_static_topology(manifest)
+        assert reopened.address_for("target") == identity
+        changed = replace(manifest, occurrences=manifest.occurrences[:-1], manifest_hash="")
+        changed = replace(changed, manifest_hash=topology_manifest_hash(changed))
+        with pytest.raises(RuntimeRegistrationInvalid):
+            await reopened.prepare_static_topology(changed)
+        await reopened.aclose()
+
+    asyncio.run(exercise())
+
+
+def test_restart_marks_open_delivery_indeterminate(tmp_path: Path) -> None:
+    async def exercise() -> None:
+        started = asyncio.Event()
+
+        async def hang(
+            _args: tuple[object, ...], _kwargs: dict[str, object], _execution: ComponentExecution
+        ) -> None:
+            started.set()
+            await asyncio.Event().wait()
+
+        adapter = ComponentAdapter(
+            (
+                ActionBinding(
+                    _descriptor("add"), lambda _payload: ((), {}), lambda value: value, handler=hang
+                ),
             )
         )
-        assert filtered.facts
-        assert all(fact.action_id == "component.test.counter.increment" for fact in filtered.facts)
-        response_facts = runtime.query_history_sync(
-            RuntimeHistoryQuery(correlation_id=outcome.request.message_id)
+        path = tmp_path / "open.sqlite"
+        runtime, endpoint, _ = await _compose(path, adapter)
+        task = asyncio.create_task(
+            endpoint.request(
+                _descriptor("add").action_ref(), {}, target=runtime.address_for("target")
+            )
+        )
+        await asyncio.wait_for(started.wait(), 1)
+        await runtime.aclose()
+        task.cancel()
+        await asyncio.gather(task, return_exceptions=True)
+        reopened = SqliteMessageRuntime(path, runtime_key="test.runtime")
+        assert reopened.health is RuntimeHealth.RECOVERY_REQUIRED
+        facts = (
+            await reopened.query_history(RuntimeHistoryQuery(fact_type="delivery_indeterminate"))
         ).facts
-        assert [fact.fact_type for fact in response_facts] == ["response_recorded"]
+        assert facts
+        await reopened.aclose()
 
-        trace = runtime.get_trace_sync(outcome.request.trace_id)
-        assert trace.disposition is RuntimeTraceDisposition.COMMITTED
-        assert trace.facts[0].fact_type == "message_accepted"
-        assert trace.facts[-1].fact_type == "trace_committed"
-    finally:
-        runtime.close()
+    asyncio.run(exercise())
 
 
-def test_same_type_occurrences_are_isolated(tmp_path: Path) -> None:
-    runtime = SqliteMessageRuntime.open(tmp_path / "runtime.sqlite", runtime_key="test.runtime")
-    try:
-        left_graph = InMemoryRtgGraph.empty()
-        right_graph = InMemoryRtgGraph.empty()
-        left_registration = runtime.register_adapter(
-            instance_key="test.graph.left",
-            component_contract_id="component.rtg.graph",
-            adapter=create_rtg_graph_adapter(left_graph),
+def test_lane_fifo_cross_lane_overlap_and_writer_preference(tmp_path: Path) -> None:
+    async def exercise() -> None:
+        first_reader_started = Event()
+        second_reader_started = Event()
+        release_first_reader = Event()
+        writer_started = Event()
+        release_writer = Event()
+        independent_a_started = Event()
+        independent_b_started = Event()
+        release_independent = Event()
+        fifo_first_started = Event()
+        fifo_second_started = Event()
+        release_fifo_first = Event()
+
+        async def read(
+            args: tuple[object, ...],
+            _kwargs: dict[str, object],
+            execution: ComponentExecution,
+        ) -> None:
+            label = str(args[0])
+            if label == "first":
+                first_reader_started.set()
+                await asyncio.to_thread(release_first_reader.wait)
+            else:
+                second_reader_started.set()
+            await execution.complete(label)
+
+        async def write(
+            _args: tuple[object, ...],
+            _kwargs: dict[str, object],
+            execution: ComponentExecution,
+        ) -> None:
+            writer_started.set()
+            await asyncio.to_thread(release_writer.wait)
+            await execution.complete("written")
+
+        async def independent(
+            args: tuple[object, ...],
+            _kwargs: dict[str, object],
+            execution: ComponentExecution,
+        ) -> None:
+            (independent_a_started if args[0] == "a" else independent_b_started).set()
+            await asyncio.to_thread(release_independent.wait)
+            await execution.complete(args[0])
+
+        async def fifo(
+            args: tuple[object, ...],
+            _kwargs: dict[str, object],
+            execution: ComponentExecution,
+        ) -> None:
+            if args[0] == "first":
+                fifo_first_started.set()
+                await asyncio.to_thread(release_fifo_first.wait)
+            else:
+                fifo_second_started.set()
+            await execution.complete(args[0])
+
+        def decode_label(payload: JsonObject) -> tuple[tuple[object, ...], dict[str, object]]:
+            return (str(payload["label"]),), {}
+
+        read_descriptor = _descriptor("read", lane="read", group="state", access="shared")
+        write_descriptor = _descriptor("write", lane="write", group="state", access="exclusive")
+        independent_a = _descriptor("independent_a", lane="independent_a")
+        independent_b = _descriptor("independent_b", lane="independent_b")
+        fifo_descriptor = _descriptor("fifo", lane="fifo")
+        adapter = ComponentAdapter(
+            (
+                ActionBinding(read_descriptor, decode_label, lambda value: value, handler=read),
+                ActionBinding(
+                    write_descriptor,
+                    lambda _payload: ((), {}),
+                    lambda value: value,
+                    handler=write,
+                ),
+                ActionBinding(
+                    independent_a, decode_label, lambda value: value, handler=independent
+                ),
+                ActionBinding(
+                    independent_b, decode_label, lambda value: value, handler=independent
+                ),
+                ActionBinding(fifo_descriptor, decode_label, lambda value: value, handler=fifo),
+            )
         )
-        right_registration = runtime.register_adapter(
-            instance_key="test.graph.right",
-            component_contract_id="component.rtg.graph",
-            adapter=create_rtg_graph_adapter(right_graph),
+        runtime, endpoint, _ = await _compose(
+            tmp_path / "lanes.sqlite",
+            adapter,
+            lanes=(
+                RuntimeLaneDeclaration("read", worker_limit=2),
+                RuntimeLaneDeclaration("write"),
+                RuntimeLaneDeclaration("independent_a"),
+                RuntimeLaneDeclaration("independent_b"),
+                RuntimeLaneDeclaration("fifo"),
+            ),
         )
-        left = create_rtg_graph_proxy(
-            runtime,
-            runtime.address_for(right_registration.instance_key),
-            runtime.address_for(left_registration.instance_key),
+        target = runtime.address_for("target")
+
+        overlap_a = asyncio.create_task(
+            endpoint.request(independent_a.action_ref(), {"label": "a"}, target=target)
         )
-        right = create_rtg_graph_proxy(
-            runtime,
-            runtime.address_for(left_registration.instance_key),
-            runtime.address_for(right_registration.instance_key),
+        overlap_b = asyncio.create_task(
+            endpoint.request(independent_b.action_ref(), {"label": "b"}, target=target)
         )
+        assert await asyncio.to_thread(independent_a_started.wait, 1)
+        assert await asyncio.to_thread(independent_b_started.wait, 1)
+        release_independent.set()
+        await asyncio.wait_for(asyncio.gather(overlap_a, overlap_b), 1)
 
-        left_stored = left.put_anchor(RtgAnchor(None, "test.left"))
-        right_stored = right.put_anchor(RtgAnchor(None, "test.right"))
-        assert left.get_object(left_stored.uuid or UUID(int=0)) == left_stored
-        assert right.get_object(right_stored.uuid or UUID(int=0)) == right_stored
-        with pytest.raises(RtgGraphObjectNotFound):
-            left.get_object(right_stored.uuid or UUID(int=0))
-        with pytest.raises(RtgGraphObjectNotFound):
-            right.get_object(left_stored.uuid or UUID(int=0))
-        assert len(left_graph.export_snapshot().anchors) == 1
-        assert len(right_graph.export_snapshot().anchors) == 1
-        assert left_registration.instance_id != right_registration.instance_id
-    finally:
-        runtime.close()
+        fifo_first = asyncio.create_task(
+            endpoint.request(fifo_descriptor.action_ref(), {"label": "first"}, target=target)
+        )
+        assert await asyncio.to_thread(fifo_first_started.wait, 1)
+        fifo_second = asyncio.create_task(
+            endpoint.request(fifo_descriptor.action_ref(), {"label": "second"}, target=target)
+        )
+        await asyncio.sleep(0.02)
+        assert not fifo_second_started.is_set()
+        release_fifo_first.set()
+        await asyncio.wait_for(asyncio.gather(fifo_first, fifo_second), 1)
+        assert fifo_second_started.is_set()
+
+        first_reader = asyncio.create_task(
+            endpoint.request(read_descriptor.action_ref(), {"label": "first"}, target=target)
+        )
+        assert await asyncio.to_thread(first_reader_started.wait, 1)
+        writer = asyncio.create_task(
+            endpoint.request(write_descriptor.action_ref(), {}, target=target)
+        )
+        await asyncio.sleep(0.02)
+        second_reader = asyncio.create_task(
+            endpoint.request(read_descriptor.action_ref(), {"label": "second"}, target=target)
+        )
+        await asyncio.sleep(0.02)
+        assert not writer_started.is_set()
+        assert not second_reader_started.is_set()
+        release_first_reader.set()
+        assert await asyncio.to_thread(writer_started.wait, 1)
+        assert not second_reader_started.is_set()
+        release_writer.set()
+        await asyncio.wait_for(asyncio.gather(first_reader, writer, second_reader), 1)
+        assert second_reader_started.is_set()
+        await runtime.aclose()
+
+    asyncio.run(exercise())
 
 
-def test_restart_preserves_identity_and_reconstructs_committed_effects(tmp_path: Path) -> None:
-    database = tmp_path / "runtime.sqlite"
-    runtime, _, client = _runtime_and_counter(database)
-    first_registration = runtime.declare_occurrence(
-        ComponentOccurrenceDeclaration(
-            instance_key="test.counter.primary",
-            component_contract_id="component.test.counter",
-            binding_id="binding.test.counter.v1",
-            binding_version=1,
+def test_completion_and_acknowledgement_are_exactly_once(tmp_path: Path) -> None:
+    async def exercise() -> None:
+        duplicate_completion_rejected = Event()
+        duplicate_ack_rejected = Event()
+
+        async def handler(
+            _args: tuple[object, ...],
+            _kwargs: dict[str, object],
+            execution: ComponentExecution,
+        ) -> None:
+            if execution.request.kind.value == "signal":
+                await execution.ack()
+                with pytest.raises(RuntimeDeliveryUnknown):
+                    await execution.ack()
+                duplicate_ack_rejected.set()
+                return
+            await execution.complete("done")
+            with pytest.raises(RuntimeDeliveryUnknown):
+                await execution.complete("again")
+            duplicate_completion_rejected.set()
+
+        descriptor = _descriptor("add")
+        adapter = ComponentAdapter(
+            (
+                ActionBinding(
+                    descriptor,
+                    lambda _payload: ((), {}),
+                    lambda value: value,
+                    handler=handler,
+                ),
+            )
+        )
+        runtime, endpoint, _ = await _compose(tmp_path / "exactly-once.sqlite", adapter)
+        target = runtime.address_for("target")
+        await endpoint.request(descriptor.action_ref(), {}, target=target)
+        signal = await endpoint.signal(descriptor.action_ref(), {}, target=target)
+        assert await asyncio.to_thread(duplicate_completion_rejected.wait, 1)
+        assert await asyncio.to_thread(duplicate_ack_rejected.wait, 1)
+        facts = (
+            await runtime.query_history(RuntimeHistoryQuery(message_id=signal.message_id))
+        ).facts
+        assert sum(fact.fact_type == "delivery_completed" for fact in facts) == 1
+        await runtime.aclose()
+
+    asyncio.run(exercise())
+
+
+def test_caller_timeout_does_not_cancel_execution_and_outcome_is_queryable(
+    tmp_path: Path,
+) -> None:
+    async def exercise() -> None:
+        started = Event()
+        release = Event()
+        calls = 0
+
+        async def handler(
+            _args: tuple[object, ...],
+            _kwargs: dict[str, object],
+            execution: ComponentExecution,
+        ) -> None:
+            nonlocal calls
+            calls += 1
+            started.set()
+            await asyncio.to_thread(release.wait)
+            await execution.complete("eventual")
+
+        descriptor = _descriptor("add")
+        adapter = ComponentAdapter(
+            (
+                ActionBinding(
+                    descriptor,
+                    lambda _payload: ((), {}),
+                    lambda value: value,
+                    handler=handler,
+                ),
+            )
+        )
+        runtime, endpoint, _ = await _compose(tmp_path / "timeout.sqlite", adapter)
+        message_id = uuid4()
+        request = asyncio.create_task(
+            endpoint.request(
+                descriptor.action_ref(),
+                {},
+                target=runtime.address_for("target"),
+                timeout_seconds=0.02,
+                message_id=message_id,
+            )
+        )
+        assert await asyncio.to_thread(started.wait, 1)
+        with pytest.raises(RuntimeRequestTimedOut) as raised:
+            await request
+        assert raised.value.message_id == message_id
+        assert calls == 1
+        release.set()
+        durable = None
+        for _ in range(100):
+            durable = await runtime.lookup_message_outcome(message_id)
+            if durable is not None and durable.terminal_envelope is not None:
+                break
+            await asyncio.sleep(0.01)
+        assert durable is not None
+        assert durable.terminal_envelope is not None
+        assert durable.terminal_envelope.payload.value == {"result": "eventual"}
+        outcome = await endpoint.request(
+            descriptor.action_ref(),
+            {},
+            target=runtime.address_for("target"),
+            message_id=message_id,
+        )
+        assert outcome.response.payload.value == {"result": "eventual"}
+        assert calls == 1
+        await runtime.aclose()
+
+    asyncio.run(exercise())
+
+
+def test_reconstruction_requires_effect_and_commit_within_cursor(tmp_path: Path) -> None:
+    async def exercise() -> None:
+        counter = _Counter()
+        runtime, endpoint, _ = await _compose(
+            tmp_path / "cursor.sqlite",
+            _replayable_counter_adapter(counter),
             replay_authority=RuntimeReplayMode.CANONICAL_EFFECT,
         )
-    )
-    client.request_sync("component.test.counter.increment", {"amount": 4})
-    cursor = runtime.current_position
-    runtime_id = runtime.runtime_id
-    runtime.close()
-
-    restarted = SqliteMessageRuntime.open(database, runtime_key="test.runtime")
-    second_counter = _Counter()
-    second_registration = restarted.register_adapter(
-        instance_key="test.counter.primary",
-        component_contract_id="component.test.counter",
-        adapter=_counter_adapter(second_counter),
-    )
-    try:
-        report = restarted.reconstruct_sync(RuntimeReconstructionRequest(through_position=cursor))
-        assert restarted.runtime_id == runtime_id
-        assert second_registration.instance_id == first_registration.instance_id
-        assert report.applied_effects == 1
-        assert report.verified
-        assert len(cast(str, report.state_digests["test.counter.primary"])) == 64
-        assert second_counter.value == 4
-    finally:
-        restarted.close()
-
-
-def test_async_runtime_api_is_primary(tmp_path: Path) -> None:
-    runtime, _, client = _runtime_and_counter(tmp_path / "runtime.sqlite")
-    try:
-        outcome = asyncio.run(client.request("component.test.counter.increment", {"amount": 1}))
-        assert outcome.response.payload.value == {"result": 1}
-    finally:
-        runtime.close()
-
-
-def test_address_schema_content_type_and_codec_rejection_have_no_effect(
-    tmp_path: Path,
-) -> None:
-    runtime, counter, client = _runtime_and_counter(tmp_path / "runtime.sqlite")
-    try:
-        envelope = client.envelope("component.test.counter.increment", {"amount": 1})
-        wrong_runtime = replace(
-            envelope,
-            target=RuntimeAddress(uuid4(), envelope.target.instance_id),
+        outcome = await endpoint.request(
+            _descriptor("add", replay=RuntimeReplayMode.CANONICAL_EFFECT).action_ref(),
+            {"amount": 4},
+            target=runtime.address_for("target"),
         )
-        with pytest.raises(RuntimeAddressUnknown):
-            runtime.request_sync(wrong_runtime)
-        with pytest.raises(RuntimeAddressUnknown):
-            runtime.request_sync(
-                replace(
-                    envelope,
-                    message_id=uuid4(),
-                    source=RuntimeAddress(uuid4(), envelope.source.instance_id),
+        effects = (
+            await runtime.query_history(
+                RuntimeHistoryQuery(
+                    trace_id=outcome.request.trace_id,
+                    fact_type="canonical_effect",
                 )
             )
-        with pytest.raises(RuntimeAddressUnknown):
-            runtime.request_sync(
-                replace(
-                    envelope,
-                    message_id=uuid4(),
-                    source=RuntimeAddress(runtime.runtime_id, uuid4()),
-                )
+        ).facts
+        assert len(effects) == 1
+        effect_cursor = effects[0].runtime_position
+        assert effect_cursor < outcome.terminal_position
+
+        report = await runtime.reconstruct(
+            RuntimeReconstructionRequest(
+                through_position=effect_cursor,
+                reset_targets=True,
             )
-        with pytest.raises(RuntimeSchemaUnsupported):
-            runtime.request_sync(replace(envelope, message_id=uuid4(), schema_version=2))
-        with pytest.raises(RuntimeSchemaUnsupported):
-            runtime.request_sync(
-                replace(
-                    envelope,
-                    message_id=uuid4(),
-                    payload=replace(envelope.payload, content_type="text/plain"),
-                )
-            )
-        with pytest.raises(RuntimeSchemaUnsupported):
-            runtime.request_sync(
-                replace(
-                    envelope,
-                    message_id=uuid4(),
-                    payload=replace(envelope.payload, codec_version=2),
-                )
-            )
-        assert counter.calls == 0
-        assert (
-            len(runtime.query_history_sync(RuntimeHistoryQuery(fact_type="message_rejected")).facts)
-            == 6
         )
-    finally:
-        runtime.close()
-
-
-def test_serialized_fifo_and_declared_parallel_concurrency(tmp_path: Path) -> None:
-    serialized, counter, client = _runtime_and_counter(tmp_path / "serialized.sqlite", delay=0.01)
-    try:
-        envelopes = tuple(
-            client.envelope("component.test.counter.increment", {"amount": amount})
-            for amount in (1, 2, 3)
-        )
-
-        async def exercise_fifo() -> None:
-            for envelope in envelopes:
-                await serialized.send(envelope)
-            await asyncio.gather(*(serialized.request(envelope) for envelope in envelopes))
-
-        asyncio.run(exercise_fifo())
-        assert counter.call_order == [1, 2, 3]
-        assert counter.max_active == 1
-    finally:
-        serialized.close()
-
-    runtime = SqliteMessageRuntime.open(tmp_path / "parallel.sqlite", runtime_key="test.parallel")
-    parallel_counter = _Counter(delay=0.05)
-    try:
-        with pytest.raises(RuntimeRegistrationInvalid, match="concurrency exceeds"):
-            runtime.register_adapter(
-                instance_key="test.counter.invalid",
-                component_contract_id="component.test.counter",
-                adapter=_counter_adapter(parallel_counter),
-                max_in_flight=2,
-            )
-        registration = runtime.register_adapter(
-            instance_key="test.counter.parallel",
-            component_contract_id="component.test.counter",
-            adapter=_counter_adapter(parallel_counter, max_in_flight=2),
-            max_in_flight=2,
-        )
-        address = runtime.address_for(registration.instance_key)
-        parallel_client = RuntimeClient(
-            runtime,
-            source=address,
-            target=address,
-            component_contract_id="component.test.counter",
-            request_codec_id="codec.test.counter.request.json",
-        )
-
-        async def exercise_parallel() -> None:
-            await asyncio.gather(
-                parallel_client.request("component.test.counter.increment", {"amount": 1}),
-                parallel_client.request("component.test.counter.increment", {"amount": 1}),
-            )
-
-        asyncio.run(exercise_parallel())
-        assert parallel_counter.max_active == 2
-    finally:
-        runtime.close()
-
-
-def test_nested_calls_preserve_causation_and_root_trace_disposition(
-    tmp_path: Path,
-) -> None:
-    runtime = SqliteMessageRuntime.open(tmp_path / "runtime.sqlite", runtime_key="test.nested")
-    child_counter = _Counter()
-    child_registration = runtime.register_adapter(
-        instance_key="test.counter.child",
-        component_contract_id="component.test.counter",
-        adapter=_counter_adapter(child_counter),
-    )
-    child_address = runtime.address_for(child_registration.instance_key)
-    child_client = RuntimeClient(
-        runtime,
-        source=child_address,
-        target=child_address,
-        component_contract_id="component.test.counter",
-        request_codec_id="codec.test.counter.request.json",
-    )
-    parent_descriptor = RuntimeActionBindingDescriptor(
-        component_contract_id="component.test.parent",
-        action_id="component.test.parent.run",
-        binding_id="binding.test.parent.v1",
-        binding_version=1,
-        schema_version=1,
-        request_codec_id="codec.test.parent.request.json",
-        result_codec_id="codec.test.parent.result.json",
-        failure_codec_id="codec.test.parent.failure.json",
-        idempotency=RuntimeActionIdempotency.NON_IDEMPOTENT,
-        replay_mode=RuntimeReplayMode.COORDINATOR_TRACE,
-    )
-
-    def invoke_parent(amount: int) -> int:
-        outcome = child_client.request_sync("component.test.counter.increment", {"amount": amount})
-        payload = cast(dict[str, object], outcome.response.payload.value)
-        return cast(int, payload["result"])
-
-    parent_registration = runtime.register_adapter(
-        instance_key="test.parent.primary",
-        component_contract_id="component.test.parent",
-        adapter=ExplicitComponentAdapter(
-            (
-                ActionBinding(
-                    descriptor=parent_descriptor,
-                    invoke=invoke_parent,
-                    decode_request=lambda payload: ((cast(int, payload["amount"]),), {}),
-                    encode_result=encode_json,
-                ),
-            )
-        ),
-    )
-    parent_address = runtime.address_for(parent_registration.instance_key)
-    parent_client = RuntimeClient(
-        runtime,
-        source=parent_address,
-        target=parent_address,
-        component_contract_id="component.test.parent",
-        request_codec_id="codec.test.parent.request.json",
-    )
-    try:
-        outcome = parent_client.request_sync("component.test.parent.run", {"amount": 3})
-        trace = runtime.get_trace_sync(outcome.request.trace_id)
-        accepted = [fact for fact in trace.facts if fact.fact_type == "message_accepted"]
-        assert len(accepted) == 2
-        root = next(fact for fact in accepted if fact.causation_id is None)
-        nested = next(fact for fact in accepted if fact.causation_id is not None)
-        assert nested.causation_id == root.message_id
-        assert nested.envelope is not None
-        assert nested.envelope.payload.value == {"amount": 3}
-        assert trace.disposition is RuntimeTraceDisposition.COMMITTED
-
-        runtime.simulate_ledger_failure_once("response_recorded")
-        failed_request = parent_client.envelope("component.test.parent.run", {"amount": 1})
-        with pytest.raises(RuntimeFailStopped):
-            runtime.request_sync(failed_request)
-        failed_trace = runtime.get_trace_sync(failed_request.trace_id)
-        assert failed_trace.disposition is RuntimeTraceDisposition.INDETERMINATE
-        assert runtime.health == "fail_stopped"
-        assert not any(fact.fact_type == "trace_committed" for fact in failed_trace.facts)
-        assert runtime.health == "fail_stopped"
-    finally:
-        runtime.close()
-
-
-def test_root_trace_waits_for_nested_signal_before_committing(tmp_path: Path) -> None:
-    database = tmp_path / "runtime.sqlite"
-    runtime = SqliteMessageRuntime.open(database, runtime_key="test.signal.trace")
-    started = threading.Event()
-    release = threading.Event()
-
-    class _BlockingCounter(_Counter):
-        def increment(self, amount: int) -> int:
-            started.set()
-            if not release.wait(timeout=2):
-                raise TimeoutError("test did not release nested signal")
-            return super().increment(amount)
-
-    child = _BlockingCounter()
-    child_registration = runtime.register_adapter(
-        instance_key="test.signal.child",
-        component_contract_id="component.test.counter",
-        adapter=_counter_adapter(child),
-    )
-    parent_registration = runtime.declare_occurrence(
-        ComponentOccurrenceDeclaration(
-            instance_key="test.signal.parent",
-            component_contract_id="component.test.signal_parent",
-            binding_id="binding.test.signal_parent.v1",
-            binding_version=1,
-            replay_authority=RuntimeReplayMode.COORDINATOR_TRACE,
-        )
-    )
-    parent_address = runtime.address_for(parent_registration.instance_key)
-    child_client = RuntimeClient(
-        runtime,
-        source=parent_address,
-        target=runtime.address_for(child_registration.instance_key),
-        component_contract_id="component.test.counter",
-        request_codec_id="codec.test.counter.request.json",
-    )
-
-    async def coordinate(amount: int) -> str:
-        signal = replace(
-            child_client.envelope("component.test.counter.increment", {"amount": amount}),
-            kind=RuntimeMessageKind.SIGNAL,
-        )
-        receipt = await runtime.send(signal)
-        return str(receipt.message_id)
-
-    runtime.attach_adapter(
-        parent_registration,
-        ExplicitComponentAdapter(
-            (
-                ActionBinding(
-                    descriptor=RuntimeActionBindingDescriptor(
-                        component_contract_id="component.test.signal_parent",
-                        action_id="component.test.signal_parent.run",
-                        binding_id="binding.test.signal_parent.v1",
-                        binding_version=1,
-                        schema_version=1,
-                        request_codec_id="codec.test.signal_parent.request.json",
-                        result_codec_id="codec.test.signal_parent.result.json",
-                        failure_codec_id="codec.test.signal_parent.failure.json",
-                        idempotency=RuntimeActionIdempotency.NON_IDEMPOTENT,
-                        replay_mode=RuntimeReplayMode.COORDINATOR_TRACE,
-                    ),
-                    invoke=coordinate,
-                    decode_request=lambda payload: ((cast(int, payload["amount"]),), {}),
-                    encode_result=encode_json,
-                ),
-            )
-        ),
-    )
-    parent_client = RuntimeClient(
-        runtime,
-        source=parent_address,
-        target=parent_address,
-        component_contract_id="component.test.signal_parent",
-        request_codec_id="codec.test.signal_parent.request.json",
-    )
-    outcomes: list[RuntimeRequestOutcome] = []
-    failures: list[BaseException] = []
-
-    def invoke_root() -> None:
-        try:
-            outcomes.append(
-                parent_client.request_sync("component.test.signal_parent.run", {"amount": 3})
-            )
-        except BaseException as error:  # pragma: no cover - diagnostic collection
-            failures.append(error)
-
-    caller = threading.Thread(target=invoke_root)
-    caller.start()
-    try:
-        assert started.wait(timeout=2)
-        assert caller.is_alive()
-        assert not outcomes
-        release.set()
-        caller.join(timeout=2)
-        assert not caller.is_alive()
-        assert not failures
-        outcome = outcomes[0]
-        trace_id = outcome.request.trace_id
-        trace = runtime.get_trace_sync(trace_id)
-        fact_types = [fact.fact_type for fact in trace.facts]
-        assert fact_types[-1] == "trace_committed"
-        assert fact_types.index("delivery_completed") < fact_types.index("trace_committed")
-        assert child.value == 3
-        cursor = runtime.current_position
-    finally:
-        release.set()
-        caller.join(timeout=2)
-        runtime.close()
-
-    restarted = SqliteMessageRuntime.open(database, runtime_key="test.signal.trace")
-    restored = _Counter()
-    restarted.register_adapter(
-        instance_key="test.signal.child",
-        component_contract_id="component.test.counter",
-        adapter=_counter_adapter(restored),
-    )
-    try:
-        report = restarted.reconstruct_sync(
-            RuntimeReconstructionRequest(through_position=cursor)
-        )
-        assert report.verified
-        assert report.applied_effects == 1
-        assert restored.value == 3
-    finally:
-        restarted.close()
-
-
-def test_nested_signal_uncertainty_marks_trace_and_runtime_recovery_required(
-    tmp_path: Path,
-) -> None:
-    runtime = SqliteMessageRuntime.open(
-        tmp_path / "runtime.sqlite", runtime_key="test.signal.indeterminate"
-    )
-    calls = 0
-
-    def uncertain_child() -> None:
-        nonlocal calls
-        calls += 1
-        raise RuntimeError("uncertain signal failure")
-
-    child_registration = runtime.register_adapter(
-        instance_key="test.signal.uncertain_child",
-        component_contract_id="component.test.signal_child",
-        adapter=ExplicitComponentAdapter(
-            (
-                ActionBinding(
-                    descriptor=RuntimeActionBindingDescriptor(
-                        component_contract_id="component.test.signal_child",
-                        action_id="component.test.signal_child.run",
-                        binding_id="binding.test.signal_child.v1",
-                        binding_version=1,
-                        schema_version=1,
-                        request_codec_id="codec.test.signal_child.request.json",
-                        result_codec_id="codec.test.signal_child.result.json",
-                        failure_codec_id="codec.test.signal_child.failure.json",
-                        idempotency=RuntimeActionIdempotency.NON_IDEMPOTENT,
-                        replay_mode=RuntimeReplayMode.NO_STATE_EFFECT,
-                    ),
-                    invoke=uncertain_child,
-                    decode_request=lambda _payload: ((), {}),
-                    encode_result=encode_json,
-                ),
-            )
-        ),
-    )
-    parent_registration = runtime.declare_occurrence(
-        ComponentOccurrenceDeclaration(
-            instance_key="test.signal.uncertain_parent",
-            component_contract_id="component.test.signal_parent",
-            binding_id="binding.test.signal_parent.v1",
-            binding_version=1,
-            replay_authority=RuntimeReplayMode.COORDINATOR_TRACE,
-        )
-    )
-    parent_address = runtime.address_for(parent_registration.instance_key)
-    child_address = runtime.address_for(child_registration.instance_key)
-
-    async def coordinate() -> str:
-        current = runtime.current_envelope()
-        assert current is not None
-        signal = RuntimeClient(
-            runtime,
-            source=parent_address,
-            target=child_address,
-            component_contract_id="component.test.signal_child",
-            request_codec_id="codec.test.signal_child.request.json",
-        ).envelope("component.test.signal_child.run", {})
-        receipt = await runtime.send(replace(signal, kind=RuntimeMessageKind.SIGNAL))
-        return str(receipt.message_id)
-
-    parent_descriptor = RuntimeActionBindingDescriptor(
-        component_contract_id="component.test.signal_parent",
-        action_id="component.test.signal_parent.run",
-        binding_id="binding.test.signal_parent.v1",
-        binding_version=1,
-        schema_version=1,
-        request_codec_id="codec.test.signal_parent.request.json",
-        result_codec_id="codec.test.signal_parent.result.json",
-        failure_codec_id="codec.test.signal_parent.failure.json",
-        idempotency=RuntimeActionIdempotency.NON_IDEMPOTENT,
-        replay_mode=RuntimeReplayMode.COORDINATOR_TRACE,
-    )
-    runtime.attach_adapter(
-        parent_registration,
-        ExplicitComponentAdapter(
-            (
-                ActionBinding(
-                    descriptor=parent_descriptor,
-                    invoke=coordinate,
-                    decode_request=lambda _payload: ((), {}),
-                    encode_result=encode_json,
-                ),
-            )
-        ),
-    )
-    client = RuntimeClient(
-        runtime,
-        source=parent_address,
-        target=parent_address,
-        component_contract_id="component.test.signal_parent",
-        request_codec_id="codec.test.signal_parent.request.json",
-    )
-    try:
-        envelope = client.envelope("component.test.signal_parent.run", {})
-        outcome = runtime.request_sync(envelope)
-        assert outcome.trace_disposition is RuntimeTraceDisposition.INDETERMINATE
-        assert runtime.get_trace_sync(outcome.request.trace_id).disposition is (
-            RuntimeTraceDisposition.INDETERMINATE
-        )
-        assert runtime.health == "recovery_required"
-        assert calls == 1
-        duplicate = runtime.request_sync(envelope)
-        assert duplicate.terminal_position == outcome.terminal_position
-        assert duplicate.response == outcome.response
-        assert calls == 1
-        with pytest.raises(RuntimeFailStopped, match="recovery_required"):
-            client.request_sync("component.test.signal_parent.run", {})
-    finally:
-        runtime.close()
-
-
-def test_post_terminal_causal_signal_is_rejected_without_poisoning_replay(
-    tmp_path: Path,
-) -> None:
-    database = tmp_path / "runtime.sqlite"
-    runtime, counter, counter_client = _runtime_and_counter(database)
-    parent_registration = runtime.declare_occurrence(
-        ComponentOccurrenceDeclaration(
-            instance_key="test.late_signal.parent",
-            component_contract_id="component.test.late_signal_parent",
-            binding_id="binding.test.late_signal_parent.v1",
-            binding_version=1,
-            replay_authority=RuntimeReplayMode.COORDINATOR_TRACE,
-        )
-    )
-    parent_address = runtime.address_for(parent_registration.instance_key)
-    delayed_done = threading.Event()
-    delayed_errors: list[Exception] = []
-    child = RuntimeClient(
-        runtime,
-        source=parent_address,
-        target=runtime.address_for("test.counter.primary"),
-        component_contract_id="component.test.counter",
-        request_codec_id="codec.test.counter.request.json",
-    )
-
-    async def coordinate() -> str:
-        async def delayed_send() -> None:
-            await asyncio.sleep(0.05)
-            try:
-                signal = replace(
-                    child.envelope("component.test.counter.increment", {"amount": 7}),
-                    kind=RuntimeMessageKind.SIGNAL,
-                )
-                await runtime.send(signal)
-            except Exception as error:  # expected rejection is asserted below
-                delayed_errors.append(error)
-            finally:
-                delayed_done.set()
-
-        asyncio.create_task(delayed_send())
-        return "scheduled"
-
-    runtime.attach_adapter(
-        parent_registration,
-        ExplicitComponentAdapter(
-            (
-                ActionBinding(
-                    descriptor=RuntimeActionBindingDescriptor(
-                        component_contract_id="component.test.late_signal_parent",
-                        action_id="component.test.late_signal_parent.run",
-                        binding_id="binding.test.late_signal_parent.v1",
-                        binding_version=1,
-                        schema_version=1,
-                        request_codec_id="codec.test.late_signal_parent.request.json",
-                        result_codec_id="codec.test.late_signal_parent.result.json",
-                        failure_codec_id="codec.test.late_signal_parent.failure.json",
-                        idempotency=RuntimeActionIdempotency.IDEMPOTENT,
-                        replay_mode=RuntimeReplayMode.COORDINATOR_TRACE,
-                    ),
-                    invoke=coordinate,
-                    decode_request=lambda _payload: ((), {}),
-                    encode_result=encode_json,
-                ),
-            )
-        ),
-    )
-    parent_client = RuntimeClient(
-        runtime,
-        source=parent_address,
-        target=parent_address,
-        component_contract_id="component.test.late_signal_parent",
-        request_codec_id="codec.test.late_signal_parent.request.json",
-    )
-    try:
-        outcome = parent_client.request_sync("component.test.late_signal_parent.run", {})
-        assert outcome.trace_disposition is RuntimeTraceDisposition.COMMITTED
-        assert delayed_done.wait(timeout=2)
-        assert len(delayed_errors) == 1
-        assert isinstance(delayed_errors[0], RuntimeRegistrationInvalid)
-        assert counter.calls == 0
-        trace = runtime.get_trace_sync(outcome.request.trace_id)
-        assert trace.disposition is RuntimeTraceDisposition.COMMITTED
-        assert not any(fact.fact_type == "delivery_completed" for fact in trace.facts)
-        cursor = runtime.current_position
-    finally:
-        runtime.close()
-
-    restarted = SqliteMessageRuntime.open(database, runtime_key="test.runtime")
-    restored = _Counter()
-    restarted.register_adapter(
-        instance_key="test.counter.primary",
-        component_contract_id="component.test.counter",
-        adapter=_counter_adapter(restored),
-    )
-    try:
-        report = restarted.reconstruct_sync(
-            RuntimeReconstructionRequest(through_position=cursor)
-        )
-        assert report.verified
         assert report.applied_effects == 0
-        assert restored.value == 0
-    finally:
-        restarted.close()
+        assert counter.value == 0
+        assert runtime.health is RuntimeHealth.BRANCH_PENDING
+        await runtime.aclose()
+
+    asyncio.run(exercise())
 
 
-def test_root_trace_disposition_selects_effects_for_historical_replay(
+def test_superseding_aggregate_replays_referenced_child_effects_and_validates_digest(
     tmp_path: Path,
 ) -> None:
-    database = tmp_path / "runtime.sqlite"
-    runtime = SqliteMessageRuntime.open(database, runtime_key="test.replay.dispositions")
-    counter = _Counter()
-    counter_registration = runtime.register_adapter(
-        instance_key="test.counter.state",
-        component_contract_id="component.test.counter",
-        adapter=_counter_adapter(counter),
-    )
-    counter_address = runtime.address_for(counter_registration.instance_key)
-    counter_client = RuntimeClient(
-        runtime,
-        source=counter_address,
-        target=counter_address,
-        component_contract_id="component.test.counter",
-        request_codec_id="codec.test.counter.request.json",
-    )
+    async def exercise() -> None:
+        counter = _Counter()
+        child_descriptor = _descriptor("add", replay=RuntimeReplayMode.CANONICAL_EFFECT)
+        parent_descriptor = _descriptor("coordinate", replay=RuntimeReplayMode.COORDINATOR_TRACE)
 
-    def expected_failure() -> None:
-        raise _ExpectedFailure("modeled rejection")
-
-    def unexpected_failure() -> None:
-        raise RuntimeError("unconfirmed failure")
-
-    guard_bindings: list[ActionBinding] = []
-    for suffix, invoke, failure_types in (
-        ("abort", expected_failure, (_ExpectedFailure,)),
-        ("indeterminate", unexpected_failure, ()),
-    ):
-        guard_bindings.append(
-            ActionBinding(
-                descriptor=RuntimeActionBindingDescriptor(
-                    component_contract_id="component.test.guard",
-                    action_id=f"component.test.guard.{suffix}",
-                    binding_id="binding.test.guard.v1",
-                    binding_version=1,
-                    schema_version=1,
-                    request_codec_id="codec.test.guard.request.json",
-                    result_codec_id="codec.test.guard.result.json",
-                    failure_codec_id="codec.test.guard.failure.json",
-                    idempotency=RuntimeActionIdempotency.IDEMPOTENT,
-                    replay_mode=RuntimeReplayMode.NO_STATE_EFFECT,
-                ),
-                invoke=invoke,
-                decode_request=lambda _payload: ((), {}),
-                encode_result=encode_json,
-                failure_types=failure_types,
+        async def coordinate(
+            _args: tuple[object, ...],
+            kwargs: dict[str, object],
+            execution: ComponentExecution,
+        ) -> None:
+            await execution.call(
+                "child-add",
+                child_descriptor.action_ref(),
+                {"amount": int(cast(int, kwargs["amount"]))},
+                target=execution.address_for("child"),
             )
-        )
-    guard_registration = runtime.register_adapter(
-        instance_key="test.guard.primary",
-        component_contract_id="component.test.guard",
-        adapter=ExplicitComponentAdapter(tuple(guard_bindings)),
-    )
-    guard_address = runtime.address_for(guard_registration.instance_key)
-    guard_client = RuntimeClient(
-        runtime,
-        source=guard_address,
-        target=guard_address,
-        component_contract_id="component.test.guard",
-        request_codec_id="codec.test.guard.request.json",
-    )
-
-    def coordinate_handled_fault() -> int:
-        counter_client.request_sync("component.test.counter.increment", {"amount": 1})
-        # A coordinator may intentionally handle an expected collaborator miss.
-        guard_client.request_sync("component.test.guard.abort", {})
-        return counter.value
-
-    def coordinate_aborted() -> int:
-        counter_client.request_sync("component.test.counter.increment", {"amount": 1})
-        counter_client.request_sync("component.test.counter.increment", {"amount": -1})
-        raise _ExpectedFailure("root modeled rejection")
-
-    def coordinate_indeterminate() -> int:
-        counter_client.request_sync("component.test.counter.increment", {"amount": 1})
-        # A caught unmodeled collaborator failure still makes the trace uncertain.
-        guard_client.request_sync("component.test.guard.indeterminate", {})
-        return counter.value
-
-    parent_bindings = tuple(
-        ActionBinding(
-            descriptor=RuntimeActionBindingDescriptor(
-                component_contract_id="component.test.coordinator",
-                action_id=f"component.test.coordinator.{suffix}",
-                binding_id="binding.test.coordinator.v1",
-                binding_version=1,
-                schema_version=1,
-                request_codec_id="codec.test.coordinator.request.json",
-                result_codec_id="codec.test.coordinator.result.json",
-                failure_codec_id="codec.test.coordinator.failure.json",
-                idempotency=RuntimeActionIdempotency.NON_IDEMPOTENT,
-                replay_mode=RuntimeReplayMode.COORDINATOR_TRACE,
-            ),
-            invoke=invoke,
-            decode_request=lambda _payload: ((), {}),
-            encode_result=encode_json,
-            failure_types=failure_types,
-        )
-        for suffix, invoke, failure_types in (
-            ("handled", coordinate_handled_fault, ()),
-            ("aborted", coordinate_aborted, (_ExpectedFailure,)),
-            ("indeterminate", coordinate_indeterminate, ()),
-        )
-    )
-    parent_registration = runtime.register_adapter(
-        instance_key="test.coordinator.primary",
-        component_contract_id="component.test.coordinator",
-        adapter=ExplicitComponentAdapter(parent_bindings),
-    )
-    parent_address = runtime.address_for(parent_registration.instance_key)
-    parent_client = RuntimeClient(
-        runtime,
-        source=parent_address,
-        target=parent_address,
-        component_contract_id="component.test.coordinator",
-        request_codec_id="codec.test.coordinator.request.json",
-    )
-    handled = parent_client.request_sync("component.test.coordinator.handled", {})
-    handled_cursor = runtime.current_position
-    aborted = parent_client.request_sync("component.test.coordinator.aborted", {})
-    aborted_cursor = runtime.current_position
-    counter_client.request_sync("component.test.counter.increment", {"amount": 5})
-    final_cursor = runtime.current_position
-    indeterminate = parent_client.request_sync("component.test.coordinator.indeterminate", {})
-    indeterminate_cursor = runtime.current_position
-    assert runtime.health == "recovery_required"
-    assert runtime.get_trace_sync(handled.request.trace_id).disposition is (
-        RuntimeTraceDisposition.COMMITTED
-    )
-    assert runtime.get_trace_sync(aborted.request.trace_id).disposition is (
-        RuntimeTraceDisposition.ABORTED
-    )
-    assert runtime.get_trace_sync(indeterminate.request.trace_id).disposition is (
-        RuntimeTraceDisposition.INDETERMINATE
-    )
-    runtime.close()
-
-    restarted = SqliteMessageRuntime.open(database, runtime_key="test.replay.dispositions")
-    restored_counter = _Counter()
-    restarted.register_adapter(
-        instance_key="test.counter.state",
-        component_contract_id="component.test.counter",
-        adapter=_counter_adapter(restored_counter),
-    )
-    try:
-        handled_report = restarted.reconstruct_sync(
-            RuntimeReconstructionRequest(through_position=handled_cursor)
-        )
-        assert handled_report.applied_effects == 1
-        assert restored_counter.value == 1
-        assert restarted.health == "branch_pending"
-        assert handled_report.verified_digest is not None
-        restarted.record_branch_provenance_sync(
-            source_runtime_id=restarted.runtime_id,
-            source_cursor=handled_cursor,
-            verified_digest=handled_report.verified_digest,
-        )
-
-        aborted_report = restarted.reconstruct_sync(
-            RuntimeReconstructionRequest(
-                through_position=aborted_cursor,
-                reset_targets=True,
+            reference = await execution.effect_reference("child-add")
+            if bool(kwargs.get("corrupt_digest")):
+                reference = RuntimeCanonicalEffectReference(
+                    reference.request_message_id,
+                    "0" * 64,
+                )
+            await execution.complete(
+                counter.value,
+                canonical_effect=execution.superseding_aggregate_effect((reference,)),
             )
-        )
-        assert aborted_report.verified_digest is not None
-        restarted.record_branch_provenance_sync(
-            source_runtime_id=restarted.runtime_id,
-            source_cursor=aborted_cursor,
-            verified_digest=aborted_report.verified_digest,
-        )
-        committed_report = restarted.reconstruct_sync(
-            RuntimeReconstructionRequest(
-                through_position=final_cursor,
-                reset_targets=True,
-            )
-        )
-        assert aborted_report.applied_effects == 1
-        assert committed_report.applied_effects == 2
-        assert restored_counter.value == 6
-        assert committed_report.verified_digest is not None
-        restarted.record_branch_provenance_sync(
-            source_runtime_id=restarted.runtime_id,
-            source_cursor=final_cursor,
-            verified_digest=committed_report.verified_digest,
-        )
 
-        indeterminate_report = restarted.reconstruct_sync(
-            RuntimeReconstructionRequest(
-                through_position=indeterminate_cursor,
-                reset_targets=True,
-            )
-        )
-        assert indeterminate_report.applied_effects == 2
-        assert restored_counter.value == 6
-    finally:
-        restarted.close()
-
-
-def test_final_aggregate_effect_supersedes_derived_effects_in_its_trace(
-    tmp_path: Path,
-) -> None:
-    database = tmp_path / "runtime.sqlite"
-
-    def attach_aggregate(
-        runtime: SqliteMessageRuntime,
-        counter: _Counter,
-    ) -> RuntimeClient:
-        registration = runtime.declare_occurrence(
-            ComponentOccurrenceDeclaration(
-                instance_key="test.aggregate.primary",
-                component_contract_id="component.test.aggregate",
-                binding_id="binding.test.aggregate.v1",
-                binding_version=1,
-                replay_authority=RuntimeReplayMode.COORDINATOR_TRACE,
-            )
-        )
-        address = runtime.address_for(registration.instance_key)
-        child = RuntimeClient(
-            runtime,
-            source=address,
-            target=runtime.address_for("test.counter.primary"),
-            component_contract_id="component.test.counter",
-            request_codec_id="codec.test.counter.request.json",
-        )
-
-        def compensate_then_fail(amount: int) -> None:
-            child.request_sync("component.test.counter.increment", {"amount": amount})
-            child.request_sync("component.test.counter.increment", {"amount": -amount})
-            raise _ExpectedFailure("aggregate workflow restored its final state")
-
-        descriptor = RuntimeActionBindingDescriptor(
-            component_contract_id="component.test.aggregate",
-            action_id="component.test.aggregate.run",
-            binding_id="binding.test.aggregate.v1",
-            binding_version=1,
-            schema_version=1,
-            request_codec_id="codec.test.aggregate.request.json",
-            result_codec_id="codec.test.aggregate.result.json",
-            failure_codec_id="codec.test.aggregate.failure.json",
-            idempotency=RuntimeActionIdempotency.NON_IDEMPOTENT,
-            replay_mode=RuntimeReplayMode.COORDINATOR_TRACE,
-            modeled_fault_trace_disposition=RuntimeTraceDisposition.COMMITTED,
-        )
-        runtime.attach_adapter(
-            registration,
-            ExplicitComponentAdapter(
-                (
-                    ActionBinding(
-                        descriptor=descriptor,
-                        invoke=compensate_then_fail,
-                        decode_request=lambda payload: (
-                            (cast(int, payload["amount"]),),
-                            {},
-                        ),
-                        encode_result=encode_json,
-                        failure_types=(_ExpectedFailure,),
-                        build_failure_replay_effect=lambda _error: {
-                            "supersedes_trace_effects": True,
-                            "final_value": counter.value,
+        child = _replayable_counter_adapter(counter)
+        parent = ComponentAdapter(
+            (
+                ActionBinding(
+                    parent_descriptor,
+                    lambda payload: (
+                        (),
+                        {
+                            "amount": payload["amount"],
+                            "corrupt_digest": payload.get("corrupt_digest", False),
                         },
-                        apply_replay_effect=lambda payload: setattr(
-                            counter, "value", cast(int, payload["final_value"])
-                        ),
                     ),
-                )
-            ),
-        )
-        return RuntimeClient(
-            runtime,
-            source=address,
-            target=address,
-            component_contract_id="component.test.aggregate",
-            request_codec_id="codec.test.aggregate.request.json",
-        )
-
-    runtime, counter, counter_client = _runtime_and_counter(database)
-    counter_client.request_sync("component.test.counter.increment", {"amount": 10})
-    aggregate_client = attach_aggregate(runtime, counter)
-    failed = aggregate_client.request_sync("component.test.aggregate.run", {"amount": 3})
-    cursor = runtime.current_position
-    assert failed.response.kind is RuntimeMessageKind.FAULT
-    assert failed.trace_disposition is RuntimeTraceDisposition.COMMITTED
-    assert counter.value == 10
-    runtime.close()
-
-    restarted = SqliteMessageRuntime.open(database, runtime_key="test.runtime")
-    restored = _Counter()
-    restarted.register_adapter(
-        instance_key="test.counter.primary",
-        component_contract_id="component.test.counter",
-        adapter=_counter_adapter(restored),
-    )
-    attach_aggregate(restarted, restored)
-    try:
-        report = restarted.reconstruct_sync(RuntimeReconstructionRequest(through_position=cursor))
-        assert report.verified
-        assert report.applied_effects == 2
-        assert report.skipped_effects == 2
-        assert restored.value == 10
-    finally:
-        restarted.close()
-
-
-def test_historical_reconstruction_requires_durable_branch_provenance_before_ingress(
-    tmp_path: Path,
-) -> None:
-    database = tmp_path / "runtime.sqlite"
-    runtime, counter, client = _runtime_and_counter(database)
-    runtime_id = runtime.runtime_id
-    client.request_sync("component.test.counter.increment", {"amount": 1})
-    branch_cursor = runtime.current_position
-    with pytest.raises(RuntimeActionUnknown):
-        client.request_sync("component.test.counter.missing", {})
-    assert runtime.query_history_sync(
-        RuntimeHistoryQuery(
-            after_position=branch_cursor,
-            fact_type="canonical_effect",
-        )
-    ).facts == ()
-
-    report = runtime.reconstruct_sync(
-        RuntimeReconstructionRequest(
-            through_position=branch_cursor,
-            reset_targets=True,
-        )
-    )
-    assert report.verified
-    assert report.verified_digest is not None
-    assert counter.value == 1
-    assert runtime.health == "branch_pending"
-    with pytest.raises(RuntimeFailStopped, match="branch_pending"):
-        client.request_sync("component.test.counter.increment", {"amount": 1})
-    with pytest.raises(RuntimeReplayIncompatible, match="does not match"):
-        runtime.record_branch_provenance_sync(
-            source_runtime_id=runtime_id,
-            source_cursor=branch_cursor,
-            verified_digest="0" * 64,
-        )
-    required = runtime.query_history_sync(
-        RuntimeHistoryQuery(fact_type="branch_provenance_required")
-    ).facts
-    assert len(required) == 1
-    runtime.close()
-
-    restarted = SqliteMessageRuntime.open(database, runtime_key="test.runtime")
-    restored = _Counter()
-    restored.value = 1
-    registration = restarted.register_adapter(
-        instance_key="test.counter.primary",
-        component_contract_id="component.test.counter",
-        adapter=_counter_adapter(restored),
-    )
-    address = restarted.address_for(registration.instance_key)
-    restarted_client = RuntimeClient(
-        restarted,
-        source=address,
-        target=address,
-        component_contract_id="component.test.counter",
-        request_codec_id="codec.test.counter.request.json",
-    )
-    try:
-        assert restarted.health == "branch_pending"
-        with pytest.raises(RuntimeFailStopped, match="branch_pending"):
-            restarted_client.request_sync(
-                "component.test.counter.increment", {"amount": 1}
-            )
-        position = asyncio.run(
-            restarted.record_branch_provenance(
-                source_runtime_id=runtime_id,
-                source_cursor=branch_cursor,
-                verified_digest=report.verified_digest,
-            )
-        )
-        assert restarted.health == "ready"
-        provenance = restarted.query_history_sync(
-            RuntimeHistoryQuery(
-                after_position=position - 1,
-                fact_type="branch_provenance",
-            )
-        ).facts
-        assert len(provenance) == 1
-        restarted_client.request_sync(
-            "component.test.counter.increment", {"amount": 2}
-        )
-        assert restored.value == 3
-    finally:
-        restarted.close()
-
-
-def test_reconstruction_requires_empty_reset_checkpoint_or_confirmed_state(
-    tmp_path: Path,
-) -> None:
-    database = tmp_path / "runtime.sqlite"
-    runtime, _, client = _runtime_and_counter(database)
-    client.request_sync("component.test.counter.increment", {"amount": 4})
-    cursor = runtime.current_position
-    runtime.close()
-
-    restarted = SqliteMessageRuntime.open(database, runtime_key="test.runtime")
-    target = _Counter()
-    target.value = 99
-    restarted.register_adapter(
-        instance_key="test.counter.primary",
-        component_contract_id="component.test.counter",
-        adapter=_counter_adapter(target),
-    )
-    try:
-        with pytest.raises(RuntimeReplayTargetNotPrepared, match="not empty or confirmed"):
-            restarted.reconstruct_sync(RuntimeReconstructionRequest(through_position=cursor))
-        rejected = restarted.query_history_sync(
-            RuntimeHistoryQuery(fact_type="reconstruction_rejected")
-        )
-        assert len(rejected.facts) == 1
-
-        checkpoint = restarted.reconstruct_sync(
-            RuntimeReconstructionRequest(
-                through_position=cursor,
-                checkpoint_reference=f"{cursor}:4",
-                reset_targets=True,
-            )
-        )
-        assert checkpoint.applied_effects == 0
-        assert checkpoint.skipped_effects == 1
-        assert checkpoint.verified
-        assert target.value == 4
-
-        rebuilt = restarted.reconstruct_sync(
-            RuntimeReconstructionRequest(
-                through_position=cursor,
-                reset_targets=True,
-            )
-        )
-        assert rebuilt.applied_effects == 1
-        assert rebuilt.verified
-        assert target.value == 4
-        assert len(cast(str, rebuilt.state_digests["test.counter.primary"])) == 64
-    finally:
-        restarted.close()
-
-    durable = SqliteMessageRuntime.open(database, runtime_key="test.runtime")
-    durable_target = _Counter()
-    durable_target.value = 4
-    durable.register_adapter(
-        instance_key="test.counter.primary",
-        component_contract_id="component.test.counter",
-        adapter=_counter_adapter(durable_target, confirmed_cursor=cursor),
-    )
-    try:
-        report = durable.reconstruct_sync(RuntimeReconstructionRequest(through_position=cursor))
-        assert report.applied_effects == 0
-        assert report.skipped_effects == 1
-        assert report.verified
-        assert durable_target.value == 4
-    finally:
-        durable.close()
-
-
-def test_root_coordinator_may_initiate_reconstruction_as_only_pending_delivery(
-    tmp_path: Path,
-) -> None:
-    database = tmp_path / "runtime.sqlite"
-
-    def attach_coordinator(runtime: SqliteMessageRuntime) -> RuntimeClient:
-        descriptor = RuntimeActionBindingDescriptor(
-            component_contract_id="component.test.recovery_coordinator",
-            action_id="component.test.recovery_coordinator.reconstruct",
-            binding_id="binding.test.recovery_coordinator.v1",
-            binding_version=1,
-            schema_version=1,
-            request_codec_id="codec.test.recovery_coordinator.request.json",
-            result_codec_id="codec.test.recovery_coordinator.result.json",
-            failure_codec_id="codec.test.recovery_coordinator.failure.json",
-            idempotency=RuntimeActionIdempotency.IDEMPOTENT,
-            replay_mode=RuntimeReplayMode.COORDINATOR_TRACE,
-            recovery_authorized=True,
-        )
-
-        def reconstruct() -> object:
-            return runtime.reconstruct_sync(RuntimeReconstructionRequest())
-
-        registration = runtime.register_adapter(
-            instance_key="test.recovery_coordinator.primary",
-            component_contract_id="component.test.recovery_coordinator",
-            adapter=ExplicitComponentAdapter(
-                (
-                    ActionBinding(
-                        descriptor=descriptor,
-                        invoke=reconstruct,
-                        decode_request=lambda _payload: ((), {}),
-                        encode_result=encode_json,
-                    ),
-                )
-            ),
-        )
-        address = runtime.address_for(registration.instance_key)
-        return RuntimeClient(
-            runtime,
-            source=address,
-            target=address,
-            component_contract_id="component.test.recovery_coordinator",
-            request_codec_id="codec.test.recovery_coordinator.request.json",
-        )
-
-    initial, _counter, counter_client = _runtime_and_counter(database)
-    attach_coordinator(initial)
-    counter_client.request_sync("component.test.counter.increment", {"amount": 4})
-    initial.close()
-
-    restarted = SqliteMessageRuntime.open(database, runtime_key="test.runtime")
-    restored = _Counter()
-    restarted.register_adapter(
-        instance_key="test.counter.primary",
-        component_contract_id="component.test.counter",
-        adapter=_counter_adapter(restored),
-    )
-    coordinator = attach_coordinator(restarted)
-    effects_before = restarted.query_history_sync(
-        RuntimeHistoryQuery(fact_type="canonical_effect", limit=1000)
-    ).facts
-    messages_before = restarted.query_history_sync(
-        RuntimeHistoryQuery(fact_type="message_accepted", limit=1000)
-    ).facts
-    try:
-        outcome = coordinator.request_sync(
-            "component.test.recovery_coordinator.reconstruct", {}
-        )
-        payload = cast(dict[str, object], outcome.response.payload.value)
-        report = cast(dict[str, object], payload["result"])
-        effects_after = restarted.query_history_sync(
-            RuntimeHistoryQuery(fact_type="canonical_effect", limit=1000)
-        ).facts
-        messages_after = restarted.query_history_sync(
-            RuntimeHistoryQuery(fact_type="message_accepted", limit=1000)
-        ).facts
-        assert report["verified"] is True
-        assert report["applied_effects"] == 1
-        assert restored.value == 4
-        assert effects_after == effects_before
-        assert len(messages_after) == len(messages_before) + 1
-    finally:
-        restarted.close()
-
-
-def test_checkpoint_digest_is_verified_before_later_effects(tmp_path: Path) -> None:
-    database = tmp_path / "runtime.sqlite"
-    runtime, _, client = _runtime_and_counter(database)
-    client.request_sync("component.test.counter.increment", {"amount": 4})
-    cursor = runtime.current_position
-    runtime.close()
-
-    restarted = SqliteMessageRuntime.open(database, runtime_key="test.runtime")
-    target = _Counter()
-    restarted.register_adapter(
-        instance_key="test.counter.primary",
-        component_contract_id="component.test.counter",
-        adapter=_counter_adapter(target, invalid_checkpoint_digest=True),
-    )
-    try:
-        with pytest.raises(RuntimeReplayTargetNotPrepared, match="checkpoint digest differs"):
-            restarted.reconstruct_sync(
-                RuntimeReconstructionRequest(
-                    through_position=cursor,
-                    checkpoint_reference="0:2",
-                    reset_targets=True,
-                )
-            )
-        assert target.value == 2
-        assert target.calls == 0
-        assert restarted.health == "recovery_required"
-    finally:
-        restarted.close()
-
-
-def test_recovery_ingress_reserves_one_root_until_its_trace_finishes(
-    tmp_path: Path,
-) -> None:
-    runtime = SqliteMessageRuntime.open(
-        tmp_path / "runtime.sqlite", runtime_key="test.recovery.reservation"
-    )
-    started = threading.Event()
-    release = threading.Event()
-
-    def uncertain() -> None:
-        raise RuntimeError("unconfirmed effect")
-
-    uncertain_descriptor = RuntimeActionBindingDescriptor(
-        component_contract_id="component.test.uncertain",
-        action_id="component.test.uncertain.run",
-        binding_id="binding.test.uncertain.v1",
-        binding_version=1,
-        schema_version=1,
-        request_codec_id="codec.test.uncertain.request.json",
-        result_codec_id="codec.test.uncertain.result.json",
-        failure_codec_id="codec.test.uncertain.failure.json",
-        idempotency=RuntimeActionIdempotency.NON_IDEMPOTENT,
-        replay_mode=RuntimeReplayMode.NO_STATE_EFFECT,
-    )
-    uncertain_registration = runtime.register_adapter(
-        instance_key="test.uncertain.primary",
-        component_contract_id="component.test.uncertain",
-        adapter=ExplicitComponentAdapter(
-            (
-                ActionBinding(
-                    descriptor=uncertain_descriptor,
-                    invoke=uncertain,
-                    decode_request=lambda _payload: ((), {}),
-                    encode_result=encode_json,
+                    lambda value: value,
+                    handler=coordinate,
                 ),
             )
-        ),
-    )
-    uncertain_address = runtime.address_for(uncertain_registration.instance_key)
-    uncertain_client = RuntimeClient(
-        runtime,
-        source=uncertain_address,
-        target=uncertain_address,
-        component_contract_id="component.test.uncertain",
-        request_codec_id="codec.test.uncertain.request.json",
-    )
-
-    def recover() -> object:
-        started.set()
-        if not release.wait(timeout=3):
-            raise TimeoutError("test did not release recovery coordinator")
-        return runtime.reconstruct_sync(RuntimeReconstructionRequest())
-
-    recovery_descriptor = RuntimeActionBindingDescriptor(
-        component_contract_id="component.test.recovery",
-        action_id="component.test.recovery.run",
-        binding_id="binding.test.recovery.v1",
-        binding_version=1,
-        schema_version=1,
-        request_codec_id="codec.test.recovery.request.json",
-        result_codec_id="codec.test.recovery.result.json",
-        failure_codec_id="codec.test.recovery.failure.json",
-        idempotency=RuntimeActionIdempotency.IDEMPOTENT,
-        replay_mode=RuntimeReplayMode.COORDINATOR_TRACE,
-        recovery_authorized=True,
-    )
-    recovery_registration = runtime.register_adapter(
-        instance_key="test.recovery.primary",
-        component_contract_id="component.test.recovery",
-        adapter=ExplicitComponentAdapter(
-            (
-                ActionBinding(
-                    descriptor=recovery_descriptor,
-                    invoke=recover,
-                    decode_request=lambda _payload: ((), {}),
-                    encode_result=encode_json,
-                ),
-            )
-        ),
-    )
-    recovery_address = runtime.address_for(recovery_registration.instance_key)
-    recovery_client = RuntimeClient(
-        runtime,
-        source=recovery_address,
-        target=recovery_address,
-        component_contract_id="component.test.recovery",
-        request_codec_id="codec.test.recovery.request.json",
-    )
-
-    first_outcomes: list[RuntimeRequestOutcome] = []
-    first_failures: list[BaseException] = []
-
-    def request_recovery() -> None:
-        try:
-            first_outcomes.append(
-                recovery_client.request_sync("component.test.recovery.run", {})
-            )
-        except BaseException as error:
-            first_failures.append(error)
-
-    first_caller = threading.Thread(target=request_recovery)
-    try:
-        uncertain_outcome = uncertain_client.request_sync(
-            "component.test.uncertain.run", {}
         )
-        assert uncertain_outcome.trace_disposition is RuntimeTraceDisposition.INDETERMINATE
-        assert runtime.health == "recovery_required"
-
-        first_caller.start()
-        assert started.wait(timeout=2)
-        with pytest.raises(RuntimeFailStopped, match="recovery ingress"):
-            recovery_client.request_sync("component.test.recovery.run", {})
-        release.set()
-        first_caller.join(timeout=3)
-        assert not first_caller.is_alive()
-        assert first_failures == []
-        assert len(first_outcomes) == 1
-        assert first_outcomes[0].trace_disposition is RuntimeTraceDisposition.COMMITTED
-        assert runtime.health == "ready"
-    finally:
-        release.set()
-        first_caller.join(timeout=3)
-        runtime.close()
-
-
-def test_reconstruction_rejects_a_canonical_effect_with_a_changed_digest(
-    tmp_path: Path,
-) -> None:
-    database = tmp_path / "runtime.sqlite"
-    runtime, _, client = _runtime_and_counter(database)
-    try:
-        client.request_sync("component.test.counter.increment", {"amount": 2})
-    finally:
-        runtime.close()
-
-    with sqlite3.connect(database) as connection:
-        row = connection.execute(
-            "SELECT runtime_position, details_json FROM runtime_ledger "
-            "WHERE fact_type = 'canonical_effect'"
-        ).fetchone()
-        assert row is not None
-        details = json.loads(cast(str, row[1]))
-        details["effect"]["payload"]["amount"] = 99
-        connection.execute(
-            "UPDATE runtime_ledger SET details_json = ? WHERE runtime_position = ?",
-            (json.dumps(details, sort_keys=True, separators=(",", ":")), int(row[0])),
+        ingress = ComponentAdapter(
+            binding_id="binding.test.ingress",
+            component_contract_id="component.test.ingress",
         )
-
-    restarted = SqliteMessageRuntime.open(database, runtime_key="test.runtime")
-    target = _Counter()
-    restarted.register_adapter(
-        instance_key="test.counter.primary",
-        component_contract_id="component.test.counter",
-        adapter=_counter_adapter(target),
-    )
-    try:
-        report = restarted.reconstruct_sync(RuntimeReconstructionRequest())
-        assert not report.verified
-        assert report.applied_effects == 0
-        assert report.incompatible_effects == 1
-        assert "digest mismatch" in " ".join(report.limitations)
-        assert target.calls == 0
-        assert target.value == 0
-        assert restarted.health == "recovery_required"
-    finally:
-        restarted.close()
-
-
-def test_external_exchange_is_playback_only(
-    tmp_path: Path,
-) -> None:
-    runtime = SqliteMessageRuntime.open(tmp_path / "runtime.sqlite", runtime_key="test.external")
-    calls = 0
-
-    def exchange(value: str) -> str:
-        nonlocal calls
-        calls += 1
-        return value.upper()
-
-    descriptor = RuntimeActionBindingDescriptor(
-        component_contract_id="component.test.external",
-        action_id="component.test.external.exchange",
-        binding_id="binding.test.external.v1",
-        binding_version=1,
-        schema_version=1,
-        request_codec_id="codec.test.external.request.json",
-        result_codec_id="codec.test.external.result.json",
-        failure_codec_id="codec.test.external.failure.json",
-        idempotency=RuntimeActionIdempotency.UNSPECIFIED,
-        replay_mode=RuntimeReplayMode.EXTERNAL_EXCHANGE,
-        externally_effectful=True,
-    )
-    registration = runtime.register_adapter(
-        instance_key="test.external.primary",
-        component_contract_id="component.test.external",
-        adapter=ExplicitComponentAdapter(
-            (
-                ActionBinding(
-                    descriptor=descriptor,
-                    invoke=exchange,
-                    decode_request=lambda payload: ((cast(str, payload["value"]),), {}),
-                    encode_result=encode_json,
-                ),
-            )
-        ),
-    )
-    address = runtime.address_for(registration.instance_key)
-    client = RuntimeClient(
-        runtime,
-        source=address,
-        target=address,
-        component_contract_id="component.test.external",
-        request_codec_id="codec.test.external.request.json",
-    )
-    try:
-        outcome = client.request_sync("component.test.external.exchange", {"value": "hello"})
-        cursor = runtime.current_position
-        assert calls == 1
-        report = runtime.reconstruct_sync(RuntimeReconstructionRequest(through_position=cursor))
-        assert report.start_position == 0
-        assert report.external_effects_skipped == 1
-        assert report.external_boundaries == (
-            RuntimeExternalBoundaryDisposition(
-                boundary_id="test.external.primary",
-                mode=RuntimeExternalBoundaryMode.PLAYBACK_ONLY,
-            ),
-        )
-        assert report.verified
-        assert calls == 1
-        with pytest.raises(RuntimeReplayIncompatible, match="historical reconstruction"):
-            runtime.record_branch_provenance_sync(
-                source_runtime_id=runtime.runtime_id,
-                source_cursor=cursor,
-                verified_digest="b" * 64,
-            )
-        assert outcome.trace_disposition is RuntimeTraceDisposition.COMMITTED
-    finally:
-        runtime.close()
-
-
-def test_recorded_external_response_is_supplied_without_a_live_collaborator(
-    tmp_path: Path,
-) -> None:
-    database = tmp_path / "runtime.sqlite"
-    external_descriptor = RuntimeActionBindingDescriptor(
-        component_contract_id="component.test.external",
-        action_id="component.test.external.exchange",
-        binding_id="binding.test.external.v1",
-        binding_version=1,
-        schema_version=1,
-        request_codec_id="codec.test.external.request.json",
-        result_codec_id="codec.test.external.result.json",
-        failure_codec_id="codec.test.external.failure.json",
-        idempotency=RuntimeActionIdempotency.UNSPECIFIED,
-        replay_mode=RuntimeReplayMode.EXTERNAL_EXCHANGE,
-        externally_effectful=True,
-    )
-    parent_descriptor = RuntimeActionBindingDescriptor(
-        component_contract_id="component.test.external_parent",
-        action_id="component.test.external_parent.resolve",
-        binding_id="binding.test.external_parent.v1",
-        binding_version=1,
-        schema_version=1,
-        request_codec_id="codec.test.external_parent.request.json",
-        result_codec_id="codec.test.external_parent.result.json",
-        failure_codec_id="codec.test.external_parent.failure.json",
-        idempotency=RuntimeActionIdempotency.NON_IDEMPOTENT,
-        replay_mode=RuntimeReplayMode.CANONICAL_EFFECT,
-    )
-
-    def attach_parent(
-        runtime: SqliteMessageRuntime,
-        state: dict[str, str | None],
-    ) -> tuple[RuntimeClient, RuntimeAddress]:
-        registration = runtime.declare_occurrence(
+        runtime = SqliteMessageRuntime(tmp_path / "aggregate.sqlite", runtime_key="test.runtime")
+        declarations = (
             ComponentOccurrenceDeclaration(
-                instance_key="test.external_parent.primary",
-                component_contract_id="component.test.external_parent",
-                binding_id="binding.test.external_parent.v1",
-                binding_version=1,
+                "child",
+                _CONTRACT,
+                _BINDING,
+                1,
+                replay_authority=RuntimeReplayMode.CANONICAL_EFFECT,
+            ),
+            ComponentOccurrenceDeclaration("parent", _CONTRACT, _BINDING, 1),
+            ComponentOccurrenceDeclaration(
+                "ingress", "component.test.ingress", "binding.test.ingress", 1
+            ),
+        )
+        manifest = RuntimeTopologyManifest("test.runtime", 4, declarations, (), "")
+        manifest = replace(manifest, manifest_hash=topology_manifest_hash(manifest))
+        await runtime.prepare_static_topology(manifest)
+        registrations = [await runtime.register_occurrence(item) for item in declarations]
+        await runtime.attach_participant(registrations[0], child, child.describe().actions)
+        await runtime.attach_participant(registrations[1], parent, parent.describe().actions)
+        await runtime.attach_participant(registrations[2], ingress)
+        await runtime.confirm_static_topology(manifest)
+        endpoint = ComponentEndpoint(runtime, ingress, source=runtime.address_for("ingress"))
+
+        await endpoint.request(
+            parent_descriptor.action_ref(),
+            {"amount": 5},
+            target=runtime.address_for("parent"),
+        )
+        assert counter.value == 5
+        report = await runtime.reconstruct(RuntimeReconstructionRequest(reset_targets=True))
+        assert report.applied_effects == 1
+        assert counter.value == 5
+
+        await endpoint.request(
+            parent_descriptor.action_ref(),
+            {"amount": 1, "corrupt_digest": True},
+            target=runtime.address_for("parent"),
+        )
+        with pytest.raises(RuntimeReplayIncompatible, match="digest differs"):
+            await runtime.reconstruct(RuntimeReconstructionRequest(reset_targets=True))
+        await runtime.aclose()
+
+    asyncio.run(exercise())
+
+
+def test_reconstruction_preflight_rejection_preserves_ready_health(tmp_path: Path) -> None:
+    async def exercise() -> None:
+        counter = _Counter()
+        runtime, endpoint, _ = await _compose(
+            tmp_path / "preflight.sqlite",
+            _replayable_counter_adapter(counter),
+            replay_authority=RuntimeReplayMode.CANONICAL_EFFECT,
+        )
+        await endpoint.request(
+            _descriptor("add", replay=RuntimeReplayMode.CANONICAL_EFFECT).action_ref(),
+            {"amount": 1},
+            target=runtime.address_for("target"),
+        )
+        with pytest.raises(RuntimeReplayTargetNotPrepared):
+            await runtime.reconstruct(RuntimeReconstructionRequest())
+        assert runtime.health is RuntimeHealth.READY
+        await runtime.aclose()
+
+    asyncio.run(exercise())
+
+
+def test_checkpoint_reconstruction_requires_one_common_cursor(tmp_path: Path) -> None:
+    async def compose(path: Path) -> tuple[SqliteMessageRuntime, _Counter, _Counter]:
+        runtime = SqliteMessageRuntime(path, runtime_key="checkpoint.test")
+        left_counter, right_counter = _Counter(), _Counter()
+        left = _replayable_counter_adapter(left_counter)
+        right = _replayable_counter_adapter(right_counter)
+        declarations = tuple(
+            ComponentOccurrenceDeclaration(
+                key,
+                _CONTRACT,
+                _BINDING,
+                1,
                 replay_authority=RuntimeReplayMode.CANONICAL_EFFECT,
             )
+            for key in ("left", "right")
         )
-        parent_address = runtime.address_for(registration.instance_key)
-        external_address = runtime.address_for("test.external.primary")
-        external_client = RuntimeClient(
-            runtime,
-            source=parent_address,
-            target=external_address,
-            component_contract_id="component.test.external",
-            request_codec_id="codec.test.external.request.json",
-        )
-
-        def resolve(value: str) -> str:
-            outcome = external_client.request_sync(
-                "component.test.external.exchange", {"value": value}
+        manifest = RuntimeTopologyManifest("checkpoint.test", 4, declarations, (), "")
+        manifest = replace(manifest, manifest_hash=topology_manifest_hash(manifest))
+        await runtime.prepare_static_topology(manifest)
+        for declaration, participant in zip(declarations, (left, right), strict=True):
+            registration = await runtime.register_occurrence(declaration)
+            await runtime.attach_participant(
+                registration,
+                participant,
+                participant.describe().actions,
             )
-            payload = outcome.response.payload.value
-            if not isinstance(payload, dict) or not isinstance(payload.get("result"), str):
-                raise AssertionError("recorded external result is not a string")
-            resolved = cast(str, payload["result"])
-            state["value"] = resolved
-            return resolved
+        await runtime.confirm_static_topology(manifest)
+        return runtime, left_counter, right_counter
 
-        runtime.attach_adapter(
-            registration,
-            ExplicitComponentAdapter(
-                (
-                    ActionBinding(
-                        descriptor=parent_descriptor,
-                        invoke=resolve,
-                        decode_request=lambda payload: ((cast(str, payload["value"]),), {}),
-                        encode_result=encode_json,
-                        build_replay_effect=lambda args, _kwargs, _result: {
-                            "value": cast(str, args[0])
-                        },
-                        apply_replay_effect=lambda payload: resolve(
-                            cast(str, payload["value"])
-                        ),
-                    ),
-                ),
-                replay_state=ReplayStateBinding(
-                    is_empty=lambda: state["value"] is None,
-                    reset=lambda: state.update(value=None),
-                    import_checkpoint=lambda _reference: 0,
-                    export_state=lambda: dict(state),
-                ),
-            ),
-        )
-        return (
-            RuntimeClient(
-                runtime,
-                source=parent_address,
-                target=parent_address,
-                component_contract_id="component.test.external_parent",
-                request_codec_id="codec.test.external_parent.request.json",
-            ),
-            parent_address,
-        )
-
-    runtime = SqliteMessageRuntime.open(database, runtime_key="test.external.playback")
-    external_calls = 0
-
-    def exchange(value: str) -> str:
-        nonlocal external_calls
-        external_calls += 1
-        return value.upper()
-
-    runtime.register_adapter(
-        instance_key="test.external.primary",
-        component_contract_id="component.test.external",
-        adapter=ExplicitComponentAdapter(
-            (
-                ActionBinding(
-                    descriptor=external_descriptor,
-                    invoke=exchange,
-                    decode_request=lambda payload: ((cast(str, payload["value"]),), {}),
-                    encode_result=encode_json,
-                ),
+    async def exercise() -> None:
+        valid, _left, _right = await compose(tmp_path / "valid-checkpoints.sqlite")
+        report = await valid.reconstruct(
+            RuntimeReconstructionRequest(
+                checkpoint_references={"left": "checkpoint:2", "right": "checkpoint:2"}
             )
-        ),
-    )
-    source_state: dict[str, str | None] = {"value": None}
-    source_client, _ = attach_parent(runtime, source_state)
-    outcome = source_client.request_sync(
-        "component.test.external_parent.resolve", {"value": "hello"}
-    )
-    cursor = runtime.current_position
-    assert outcome.response.payload.value == {"result": "HELLO"}
-    assert source_state == {"value": "HELLO"}
-    assert external_calls == 1
-    runtime.close()
+        )
+        assert report.start_position == 2
+        assert report.verified is True
+        await valid.aclose()
 
-    restarted = SqliteMessageRuntime.open(database, runtime_key="test.external.playback")
-    restored_state: dict[str, str | None] = {"value": None}
-    attach_parent(restarted, restored_state)
-    try:
-        with pytest.raises(RuntimeReplayIncompatible, match="unknown occurrences"):
-            restarted.reconstruct_sync(
+        invalid, _left, _right = await compose(tmp_path / "invalid-checkpoints.sqlite")
+        with pytest.raises(RuntimeReplayIncompatible):
+            await invalid.reconstruct(
                 RuntimeReconstructionRequest(
-                    through_position=cursor,
-                    external_boundaries=(
-                        RuntimeExternalBoundaryDisposition(
-                            boundary_id="test.external.unknown",
-                            mode=RuntimeExternalBoundaryMode.LIVE,
-                        ),
-                    ),
+                    checkpoint_references={
+                        "left": "checkpoint:2",
+                        "right": "checkpoint:3",
+                    }
                 )
             )
-        assert restored_state == {"value": None}
+        assert invalid.health is RuntimeHealth.RECOVERY_REQUIRED
+        await invalid.aclose()
 
-        boundary = RuntimeExternalBoundaryDisposition(
-            boundary_id="test.external.primary",
-            mode=RuntimeExternalBoundaryMode.UNAVAILABLE,
-            limitation="no collaborator attached for branch continuation",
-        )
-        report = restarted.reconstruct_sync(
-            RuntimeReconstructionRequest(
-                through_position=cursor,
-                external_boundaries=(boundary,),
-            )
-        )
-        assert report.verified
-        assert report.external_effects_skipped == 1
-        assert report.external_boundaries == (boundary,)
-        assert restored_state == {"value": "HELLO"}
-        assert external_calls == 1
-        assert not restarted.query_history_sync(
-            RuntimeHistoryQuery(after_position=cursor, fact_type="message_accepted")
-        ).facts
-    finally:
-        restarted.close()
+    asyncio.run(exercise())
 
 
-def test_nested_replay_calls_do_not_grow_canonical_business_history(
-    tmp_path: Path,
-) -> None:
-    database = tmp_path / "runtime.sqlite"
+def test_reconstruction_failure_after_partial_reset_requires_recovery(tmp_path: Path) -> None:
+    async def exercise() -> None:
+        runtime = SqliteMessageRuntime(tmp_path / "partial-reset.sqlite", runtime_key="reset.test")
+        left_state = {"value": 1}
+        right_state = {"value": 1}
 
-    def parent_adapter(child_client: RuntimeClient) -> ExplicitComponentAdapter:
-        descriptor = RuntimeActionBindingDescriptor(
-            component_contract_id="component.test.replay_parent",
-            action_id="component.test.replay_parent.restore",
-            binding_id="binding.test.replay_parent.v1",
-            binding_version=1,
-            schema_version=1,
-            request_codec_id="codec.test.replay_parent.request.json",
-            result_codec_id="codec.test.replay_parent.result.json",
-            failure_codec_id="codec.test.replay_parent.failure.json",
-            idempotency=RuntimeActionIdempotency.NON_IDEMPOTENT,
-            replay_mode=RuntimeReplayMode.CANONICAL_EFFECT,
-        )
+        def fail_reset() -> None:
+            raise RuntimeError("right reset failed")
 
-        def replay(payload: JsonObject) -> None:
-            child_client.request_sync(
-                "component.test.counter.increment",
-                {"amount": cast(int, payload["amount"])},
-            )
-
-        return ExplicitComponentAdapter(
-            (
-                ActionBinding(
-                    descriptor=descriptor,
-                    invoke=lambda amount: amount,
-                    decode_request=lambda payload: ((cast(int, payload["amount"]),), {}),
-                    encode_result=encode_json,
-                    build_replay_effect=lambda args, _kwargs, _result: {
-                        "amount": cast(int, args[0])
-                    },
-                    apply_replay_effect=replay,
-                ),
-            ),
+        left = ComponentAdapter(
+            binding_id="binding.test.left",
+            component_contract_id="component.test.left",
             replay_state=ReplayStateBinding(
-                is_empty=lambda: True,
-                reset=lambda: None,
+                is_empty=lambda: left_state["value"] == 0,
+                reset=lambda: left_state.update(value=0),
                 import_checkpoint=lambda _reference: 0,
-                export_state=lambda: {},
+                export_state=lambda: left_state,
             ),
         )
-
-    runtime = SqliteMessageRuntime.open(database, runtime_key="test.nested.replay")
-    source_child = _Counter()
-    child_registration = runtime.register_adapter(
-        instance_key="test.counter.child",
-        component_contract_id="component.test.counter",
-        adapter=_counter_adapter(source_child),
-    )
-    child_address = runtime.address_for(child_registration.instance_key)
-    source_child_client = RuntimeClient(
-        runtime,
-        source=child_address,
-        target=child_address,
-        component_contract_id="component.test.counter",
-        request_codec_id="codec.test.counter.request.json",
-    )
-    parent_registration = runtime.register_adapter(
-        instance_key="test.replay_parent.primary",
-        component_contract_id="component.test.replay_parent",
-        adapter=parent_adapter(source_child_client),
-    )
-    parent_address = runtime.address_for(parent_registration.instance_key)
-    source_parent_client = RuntimeClient(
-        runtime,
-        source=parent_address,
-        target=parent_address,
-        component_contract_id="component.test.replay_parent",
-        request_codec_id="codec.test.replay_parent.request.json",
-    )
-    source_parent_client.request_sync("component.test.replay_parent.restore", {"amount": 6})
-    cursor = runtime.current_position
-    accepted_before = len(
-        runtime.query_history_sync(RuntimeHistoryQuery(fact_type="message_accepted")).facts
-    )
-    runtime.close()
-
-    restarted = SqliteMessageRuntime.open(database, runtime_key="test.nested.replay")
-    restored_child = _Counter()
-    restored_child_registration = restarted.register_adapter(
-        instance_key="test.counter.child",
-        component_contract_id="component.test.counter",
-        adapter=_counter_adapter(restored_child),
-    )
-    restored_child_address = restarted.address_for(restored_child_registration.instance_key)
-    restored_child_client = RuntimeClient(
-        restarted,
-        source=restored_child_address,
-        target=restored_child_address,
-        component_contract_id="component.test.counter",
-        request_codec_id="codec.test.counter.request.json",
-    )
-    restarted.register_adapter(
-        instance_key="test.replay_parent.primary",
-        component_contract_id="component.test.replay_parent",
-        adapter=parent_adapter(restored_child_client),
-    )
-    try:
-        report = restarted.reconstruct_sync(RuntimeReconstructionRequest(through_position=cursor))
-        assert report.verified
-        assert restored_child.value == 6
-        accepted_after = len(
-            restarted.query_history_sync(RuntimeHistoryQuery(fact_type="message_accepted")).facts
+        right = ComponentAdapter(
+            binding_id="binding.test.right",
+            component_contract_id="component.test.right",
+            replay_state=ReplayStateBinding(
+                is_empty=lambda: right_state["value"] == 0,
+                reset=fail_reset,
+                import_checkpoint=lambda _reference: 0,
+                export_state=lambda: right_state,
+            ),
         )
-        assert accepted_after == accepted_before
-        assert not restarted.query_history_sync(
-            RuntimeHistoryQuery(
-                after_position=cursor,
-                fact_type="canonical_effect",
-            )
-        ).facts
-    finally:
-        restarted.close()
-
-
-def test_replay_verification_may_use_runtime_messages_without_growing_history(
-    tmp_path: Path,
-) -> None:
-    database = tmp_path / "runtime.sqlite"
-
-    def attach_counter(
-        runtime: SqliteMessageRuntime,
-        counter: _Counter,
-    ) -> RuntimeClient:
-        registration = runtime.declare_occurrence(
+        declarations = (
             ComponentOccurrenceDeclaration(
-                instance_key="test.verifying_counter.primary",
-                component_contract_id="component.test.verifying_counter",
-                binding_id="binding.test.verifying_counter.v1",
-                binding_version=1,
+                "left",
+                "component.test.left",
+                "binding.test.left",
+                1,
                 replay_authority=RuntimeReplayMode.CANONICAL_EFFECT,
-            )
-        )
-        address = runtime.address_for(registration.instance_key)
-        client = RuntimeClient(
-            runtime,
-            source=address,
-            target=address,
-            component_contract_id="component.test.verifying_counter",
-            request_codec_id="codec.test.verifying_counter.request.json",
-        )
-        increment_descriptor = RuntimeActionBindingDescriptor(
-            component_contract_id="component.test.verifying_counter",
-            action_id="component.test.verifying_counter.increment",
-            binding_id="binding.test.verifying_counter.v1",
-            binding_version=1,
-            schema_version=1,
-            request_codec_id="codec.test.verifying_counter.request.json",
-            result_codec_id="codec.test.verifying_counter.result.json",
-            failure_codec_id="codec.test.verifying_counter.failure.json",
-            idempotency=RuntimeActionIdempotency.NON_IDEMPOTENT,
-            replay_mode=RuntimeReplayMode.CANONICAL_EFFECT,
-        )
-        read_descriptor = replace(
-            increment_descriptor,
-            action_id="component.test.verifying_counter.read",
-            idempotency=RuntimeActionIdempotency.IDEMPOTENT,
-            replay_mode=RuntimeReplayMode.NO_STATE_EFFECT,
-        )
-
-        def verify() -> tuple[str, ...]:
-            outcome = client.request_sync("component.test.verifying_counter.read", {})
-            if outcome.response.payload.value != {"result": counter.value}:
-                return ("message-mediated state read did not match replayed state",)
-            return ()
-
-        runtime.attach_adapter(
-            registration,
-            ExplicitComponentAdapter(
-                (
-                    ActionBinding(
-                        descriptor=increment_descriptor,
-                        invoke=counter.increment,
-                        decode_request=lambda payload: (
-                            (cast(int, payload["amount"]),),
-                            {},
-                        ),
-                        encode_result=encode_json,
-                        build_replay_effect=lambda args, _kwargs, _result: {
-                            "amount": cast(int, args[0])
-                        },
-                        apply_replay_effect=lambda payload: counter.increment(
-                            cast(int, payload["amount"])
-                        ),
-                    ),
-                    ActionBinding(
-                        descriptor=read_descriptor,
-                        invoke=lambda: counter.value,
-                        decode_request=lambda _payload: ((), {}),
-                        encode_result=encode_json,
-                    ),
-                ),
-                replay_state=ReplayStateBinding(
-                    is_empty=lambda: counter.value == 0,
-                    reset=counter.reset,
-                    import_checkpoint=lambda _reference: 0,
-                    export_state=lambda: {"value": counter.value},
-                    verify=verify,
-                ),
+            ),
+            ComponentOccurrenceDeclaration(
+                "right",
+                "component.test.right",
+                "binding.test.right",
+                1,
+                replay_authority=RuntimeReplayMode.CANONICAL_EFFECT,
             ),
         )
-        return client
+        manifest = RuntimeTopologyManifest("reset.test", 4, declarations, (), "")
+        manifest = replace(manifest, manifest_hash=topology_manifest_hash(manifest))
+        await runtime.prepare_static_topology(manifest)
+        for declaration, participant in zip(declarations, (left, right), strict=True):
+            registration = await runtime.register_occurrence(declaration)
+            await runtime.attach_participant(registration, participant)
+        await runtime.confirm_static_topology(manifest)
 
-    runtime = SqliteMessageRuntime.open(database, runtime_key="test.replay.verification")
-    source = _Counter()
-    source_client = attach_counter(runtime, source)
-    source_client.request_sync("component.test.verifying_counter.increment", {"amount": 8})
-    cursor = runtime.current_position
-    accepted_before = len(
-        runtime.query_history_sync(RuntimeHistoryQuery(fact_type="message_accepted")).facts
-    )
-    runtime.close()
+        with pytest.raises(RuntimeError, match="right reset failed"):
+            await runtime.reconstruct(RuntimeReconstructionRequest(reset_targets=True))
 
-    restarted = SqliteMessageRuntime.open(
-        database,
-        runtime_key="test.replay.verification",
-    )
-    restored = _Counter()
-    attach_counter(restarted, restored)
-    try:
-        report = restarted.reconstruct_sync(
-            RuntimeReconstructionRequest(through_position=cursor)
+        assert left_state["value"] == 0
+        assert right_state["value"] == 1
+        assert runtime.health is RuntimeHealth.RECOVERY_REQUIRED
+        await runtime.aclose()
+
+    asyncio.run(exercise())
+
+
+def test_external_boundaries_are_reported_without_replay_invocation(tmp_path: Path) -> None:
+    async def exercise() -> None:
+        invoked = False
+
+        def replay_should_not_run(_effect: JsonObject) -> None:
+            nonlocal invoked
+            invoked = True
+
+        descriptor = _descriptor("external", replay=RuntimeReplayMode.EXTERNAL_EXCHANGE)
+        external = ComponentAdapter(
+            (
+                ActionBinding(
+                    descriptor,
+                    lambda payload: ((payload,), {}),
+                    lambda value: value,
+                    invoke=lambda value: value,
+                    apply_replay_effect=replay_should_not_run,
+                ),
+            )
         )
-        assert report.verified
-        assert restored.value == 8
-        accepted_after = len(
-            restarted.query_history_sync(
-                RuntimeHistoryQuery(fact_type="message_accepted")
-            ).facts
+        runtime = SqliteMessageRuntime(tmp_path / "external.sqlite", runtime_key="external.test")
+        declaration = ComponentOccurrenceDeclaration(
+            "external.api",
+            _CONTRACT,
+            _BINDING,
+            1,
+            replay_authority=RuntimeReplayMode.EXTERNAL_EXCHANGE,
         )
-        assert accepted_after == accepted_before
-        assert not restarted.query_history_sync(
-            RuntimeHistoryQuery(after_position=cursor, fact_type="message_accepted")
-        ).facts
-    finally:
-        restarted.close()
+        manifest = RuntimeTopologyManifest("external.test", 4, (declaration,), (), "")
+        manifest = replace(manifest, manifest_hash=topology_manifest_hash(manifest))
+        await runtime.prepare_static_topology(manifest)
+        registration = await runtime.register_occurrence(declaration)
+        await runtime.attach_participant(registration, external, external.describe().actions)
+        await runtime.confirm_static_topology(manifest)
+        report = await runtime.reconstruct(
+            RuntimeReconstructionRequest(
+                external_boundaries=(
+                    RuntimeExternalBoundaryDisposition(
+                        "external.api",
+                        RuntimeExternalBoundaryMode.LIVE,
+                    ),
+                )
+            )
+        )
+        assert invoked is False
+        assert report.external_boundaries[0].mode is RuntimeExternalBoundaryMode.LIVE
+        await runtime.aclose()
+
+    asyncio.run(exercise())
 
 
-def test_restart_requires_reconstruction_after_unconfirmed_terminal_effect(
-    tmp_path: Path,
-) -> None:
-    database = tmp_path / "runtime.sqlite"
-    runtime, counter, client = _runtime_and_counter(database)
-    runtime.simulate_ledger_failure_once("response_recorded")
-    failed_envelope = client.envelope("component.test.counter.increment", {"amount": 1})
-    with pytest.raises(RuntimeFailStopped):
-        runtime.request_sync(failed_envelope)
-    assert counter.value == 1
-    runtime.close()
+def test_get_trace_has_no_one_thousand_fact_cap(tmp_path: Path) -> None:
+    async def exercise() -> None:
+        runtime, endpoint, _ = await _compose(
+            tmp_path / "large-trace.sqlite",
+            _counter_adapter(_Counter()),
+        )
+        outcome = await endpoint.request(
+            _descriptor("add").action_ref(),
+            {"amount": 1},
+            target=runtime.address_for("target"),
+        )
+        durable = await runtime.lookup_message_outcome(outcome.request.message_id)
+        assert durable is not None
+        for index in range(1001):
+            runtime._append_fact(  # noqa: SLF001 - contract stress fixture
+                "trace_diagnostic",
+                envelope=durable.request_envelope,
+                details={"index": index},
+            )
+        trace = await runtime.get_trace(outcome.request.trace_id)
+        assert len(trace.facts) > 1000
+        assert sum(fact.fact_type == "trace_diagnostic" for fact in trace.facts) == 1001
+        await runtime.aclose()
 
-    restarted = SqliteMessageRuntime.open(database, runtime_key="test.runtime")
-    restored = _Counter()
-    registration = restarted.register_adapter(
-        instance_key="test.counter.primary",
-        component_contract_id="component.test.counter",
-        adapter=_counter_adapter(restored),
+    asyncio.run(exercise())
+
+
+def test_invalid_curated_operation_prevents_topology_confirmation(tmp_path: Path) -> None:
+    async def exercise() -> None:
+        runtime = SqliteMessageRuntime(tmp_path / "invalid-topology.sqlite", runtime_key="bad")
+        target_adapter = _counter_adapter(_Counter())
+        occurrence = ComponentOccurrenceDeclaration("target", _CONTRACT, _BINDING, 1)
+        operation = RuntimeCuratedOperationDeclaration(
+            operation_id="bad.operation",
+            target_instance_key="target",
+            component_contract_id=_CONTRACT,
+            action_id=f"{_CONTRACT}.missing",
+            schema_version=1,
+            binding_id=_BINDING,
+            binding_version=1,
+            request_codec_id="codec.test.missing.request.json",
+            request_codec_version=1,
+            request_payload_disposition=RuntimePayloadDisposition.COMMAND,
+            result_payload_disposition=RuntimePayloadDisposition.QUERY_RESULT,
+            fault_payload_disposition=RuntimePayloadDisposition.DIAGNOSTIC,
+        )
+        manifest = RuntimeTopologyManifest("bad", 4, (occurrence,), (operation,), "")
+        manifest = replace(manifest, manifest_hash=topology_manifest_hash(manifest))
+        await runtime.prepare_static_topology(manifest)
+        registration = await runtime.register_occurrence(occurrence)
+        await runtime.attach_participant(
+            registration,
+            target_adapter,
+            target_adapter.describe().actions,
+        )
+        with pytest.raises(RuntimeRegistrationInvalid):
+            await runtime.confirm_static_topology(manifest)
+        assert runtime.health is RuntimeHealth.STARTING
+        await runtime.aclose()
+
+    asyncio.run(exercise())
+
+
+def test_replay_state_spi_is_available_to_runtime() -> None:
+    state = {"value": 1}
+    adapter = ComponentAdapter(
+        (
+            ActionBinding(
+                _descriptor("add"),
+                lambda _payload: ((), {}),
+                lambda value: value,
+                invoke=lambda: None,
+            ),
+        ),
+        replay_state=ReplayStateBinding(
+            is_empty=lambda: state["value"] == 0,
+            reset=lambda: state.update(value=0),
+            import_checkpoint=lambda _reference: 2,
+            export_state=lambda: state,
+            verify=lambda: (),
+        ),
     )
-    address = restarted.address_for(registration.instance_key)
-    restored_client = RuntimeClient(
-        restarted,
-        source=address,
-        target=address,
-        component_contract_id="component.test.counter",
-        request_codec_id="codec.test.counter.request.json",
-    )
-    try:
-        assert restarted.health == "recovery_required"
-        with pytest.raises(RuntimeFailStopped, match="recovery_required"):
-            restored_client.request_sync("component.test.counter.increment", {"amount": 1})
-        report = restarted.reconstruct_sync(RuntimeReconstructionRequest())
-        assert report.verified
-        assert restored.value == 0
-        assert restarted.health == "ready"
-        recovered_outcome = restarted.request_sync(failed_envelope)
-        assert recovered_outcome.response.kind is RuntimeMessageKind.FAULT
-        assert recovered_outcome.trace_disposition is RuntimeTraceDisposition.INDETERMINATE
-        assert restored.value == 0
-        restored_client.request_sync("component.test.counter.increment", {"amount": 2})
-        assert restored.value == 2
-    finally:
-        restarted.close()
+
+    async def exercise() -> None:
+        assert not (await adapter.replay_state_status()).empty
+        await adapter.reset_replay_state()
+        assert (await adapter.replay_state_status()).empty
+        assert await adapter.import_replay_checkpoint("checkpoint") == 2
+        assert len(await adapter.replay_state_digest()) == 64
+        assert await adapter.verify_replay_state() == ()
+
+    asyncio.run(exercise())
+
+
+def test_branch_provenance_requires_matching_reconstruction(tmp_path: Path) -> None:
+    async def exercise() -> None:
+        runtime, _endpoint, _ = await _compose(
+            tmp_path / "branch.sqlite", _counter_adapter(_Counter())
+        )
+        with pytest.raises(RuntimeReplayIncompatible):
+            await runtime.record_branch_provenance(
+                source_runtime_id=UUID(int=0), source_cursor=0, verified_digest="0" * 64
+            )
+        await runtime.aclose()
+
+    asyncio.run(exercise())

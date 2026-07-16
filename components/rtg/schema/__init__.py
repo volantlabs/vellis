@@ -11,11 +11,15 @@ from components.rtg.schema.protocol import (
     RtgSchemaAnchorTypeSummary,
     RtgSchemaAnchorTypeSummaryList,
     RtgSchemaAssociatedDataTypeList,
+    RtgSchemaBatchResult,
+    RtgSchemaChangeSet,
+    RtgSchemaCountSummary,
     RtgSchemaDefinition,
     RtgSchemaDefinitionInvalid,
     RtgSchemaDefinitionKindInvalid,
     RtgSchemaDefinitionList,
     RtgSchemaDefinitionNotFound,
+    RtgSchemaDefinitionWrite,
     RtgSchemaDeleteResult,
     RtgSchemaDirectionInvalid,
     RtgSchemaError,
@@ -24,6 +28,7 @@ from components.rtg.schema.protocol import (
     RtgSchemaLinkParticipation,
     RtgSchemaLinkParticipationList,
     RtgSchemaLiveConflict,
+    RtgSchemaLiveStatusChange,
     RtgSchemaLiveTypeConflict,
     RtgSchemaPack,
     RtgSchemaPayload,
@@ -38,8 +43,8 @@ from components.rtg.schema.protocol import (
     UuidInput,
 )
 from components.rtg.schema.runtime_binding import (
+    RTG_SCHEMA_ACTIONS,
     create_rtg_schema_adapter,
-    create_rtg_schema_proxy,
 )
 
 __all__ = [
@@ -50,6 +55,11 @@ __all__ = [
     "RtgDataObjectSchemaPayload",
     "RtgLinkSchemaPayload",
     "RtgSchema",
+    "RtgSchemaBatchResult",
+    "RtgSchemaChangeSet",
+    "RtgSchemaDefinitionWrite",
+    "RtgSchemaLiveStatusChange",
+    "RtgSchemaCountSummary",
     "RtgSchemaAnchorTypeSummary",
     "RtgSchemaAnchorTypeSummaryList",
     "RtgSchemaAssociatedDataTypeList",
@@ -77,7 +87,7 @@ __all__ = [
     "RtgSchemaTypeKeyInvalid",
     "RtgSchemaUuidConflict",
     "RtgSchemaUuidInvalid",
+    "RTG_SCHEMA_ACTIONS",
     "UuidInput",
     "create_rtg_schema_adapter",
-    "create_rtg_schema_proxy",
 ]

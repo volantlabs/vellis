@@ -1,5 +1,10 @@
-from components.interface.mcp_gateway.implementation import RuntimeMcpGateway
+from components.interface.mcp_gateway.implementation import (
+    McpGatewayEndpoint,
+    RuntimeMcpGateway,
+    mcp_gateway_registration_digest,
+)
 from components.interface.mcp_gateway.protocol import (
+    ConfigurableMcpGateway,
     McpGateway,
     McpGatewayInvocation,
     McpGatewayInvocationInvalid,
@@ -10,7 +15,9 @@ from components.interface.mcp_gateway.protocol import (
 )
 
 __all__ = [
+    "ConfigurableMcpGateway",
     "McpGateway",
+    "McpGatewayEndpoint",
     "McpGatewayInvocation",
     "McpGatewayInvocationInvalid",
     "McpGatewayOutcome",
@@ -18,4 +25,5 @@ __all__ = [
     "McpGatewayToolRegistration",
     "McpGatewayToolUnknown",
     "RuntimeMcpGateway",
+    "mcp_gateway_registration_digest",
 ]

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import os
 import shutil
@@ -25,6 +26,7 @@ from apps.rtg_knowledge_graph.starter_schema import (
     VellisStartupFailed,
     load_starter_schema_bundle,
 )
+from components.interface.mcp_gateway import McpGatewayInvocation
 
 JsonObject = dict[str, Any]
 CLIENTS = ("codex", "claude-code", "claude-desktop", "generic-json")
@@ -168,12 +170,25 @@ def setup_vellis(
         if answer not in {"y", "yes"}:
             raise VellisStartupFailed("setup cancelled")
 
-    composition = None
     try:
-        composition = build_app(config)
-        starter = composition.prepare()
-        validation = composition.controller.validate_graph()
-        if not validation.accepted:
+
+        async def prepare_and_validate() -> StarterSchemaStatus:
+            async with await build_app(config) as composition:
+                prepared = await composition.prepare()
+                outcome = await composition.gateway.invoke_tool(
+                    McpGatewayInvocation("rtg_validate_graph", {})
+                )
+                result = outcome.result.get("result")
+                if (
+                    outcome.result.get("ok") is not True
+                    or not isinstance(result, dict)
+                    or result.get("accepted") is not True
+                ):
+                    raise VellisStartupFailed("the prepared Vellis graph did not pass validation")
+                return prepared
+
+        starter = asyncio.run(prepare_and_validate())
+        if starter.status not in {"empty", "custom", "installed"}:
             raise VellisStartupFailed("the prepared Vellis graph did not pass validation")
     except VellisStartupFailed:
         raise
@@ -182,9 +197,6 @@ def setup_vellis(
             "Vellis could not open or validate durable local state; no replacement empty graph "
             f"was configured. Run `uv run vellis doctor`. Cause: {error}"
         ) from error
-    finally:
-        if composition is not None:
-            composition.close()
 
     registration = register_client(
         selected,
@@ -460,15 +472,19 @@ def _reconstruction_check(config: RtgKnowledgeGraphConfig) -> JsonObject:
             root = Path(temporary)
             copied_ledger = root / "runtime.sqlite"
             shutil.copy2(source, copied_ledger)
-            with build_app(
-                RtgKnowledgeGraphConfig(
-                    storage_root=root / "json_file",
-                    runtime_database_path=copied_ledger,
-                    install_starter_schema=False,
-                    automatic_recovery=True,
-                )
-            ) as probe:
-                status = probe.prepare()
+
+            async def reconstruct() -> StarterSchemaStatus:
+                async with await build_app(
+                    RtgKnowledgeGraphConfig(
+                        storage_root=root / "json_file",
+                        runtime_database_path=copied_ledger,
+                        install_starter_schema=False,
+                        automatic_recovery=True,
+                    )
+                ) as probe:
+                    return await probe.prepare()
+
+            status = asyncio.run(reconstruct())
         return {
             "id": "reconstruction_feasibility",
             "ok": True,

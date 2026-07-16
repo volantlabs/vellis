@@ -5,6 +5,7 @@ from uuid import UUID, uuid4
 
 import pytest
 
+from components.rtg.change import RtgChangeReference
 from components.rtg.graph import (
     InMemoryRtgGraph,
     RtgAnchor,
@@ -12,9 +13,12 @@ from components.rtg.graph import (
     RtgGraph,
     RtgGraphAnchorDataIndexEntryNotFound,
     RtgGraphAnchorNotFound,
+    RtgGraphAnchorWrite,
+    RtgGraphChangeSet,
     RtgGraphDataObjectNotFound,
     RtgGraphEndpointNotFound,
     RtgGraphJsonValueInvalid,
+    RtgGraphLinkWrite,
     RtgGraphObjectNotFound,
     RtgGraphReferenceInvalid,
     RtgGraphSnapshot,
@@ -38,7 +42,38 @@ def concrete_uuid(value: UUID | None) -> UUID:
     return value
 
 
+def test_graph_batch_is_atomic_and_never_uses_snapshots(monkeypatch: pytest.MonkeyPatch) -> None:
+    graph = InMemoryRtgGraph.empty()
+    anchor_id = uuid4()
+    monkeypatch.setattr(
+        InMemoryRtgGraph,
+        "export_snapshot",
+        lambda _self: pytest.fail("routine batches must not export snapshots"),
+    )
+    with pytest.raises(RtgGraphEndpointNotFound):
+        graph.apply_batch(
+            RtgGraphChangeSet(
+                anchor_writes=(
+                    RtgGraphAnchorWrite(RtgChangeReference(resource_id=anchor_id), "Person"),
+                ),
+                link_writes=(
+                    RtgGraphLinkWrite(
+                        RtgChangeReference(resource_id=uuid4()),
+                        "knows",
+                        RtgChangeReference(resource_id=anchor_id),
+                        RtgChangeReference(resource_id=uuid4()),
+                    ),
+                ),
+            )
+        )
+    assert graph.count_by_type().counts == ()
+
+
 MODEL_EVIDENCE = {
+    "GraphBatchAtomicityContractVerification": (
+        "test_graph_batch_is_atomic_and_never_uses_snapshots",
+    ),
+    "GraphRoutineWorkScalingVerification": ("test_graph_batch_is_atomic_and_never_uses_snapshots",),
     "ExportGraphSnapshotContractVerification": (
         "test_anchor_display_name_is_optional_preserved_and_non_unique",
         "test_association_is_idempotent_and_metadata_free",
@@ -46,9 +81,7 @@ MODEL_EVIDENCE = {
         "test_dissociation_and_data_delete_previews_match_mutations_without_mutating",
         "test_snapshot_round_trip_and_missing_live_default",
     ),
-    "ReplaceGraphSnapshotContractVerification": (
-        "test_replace_snapshot_is_atomic_and_idempotent",
-    ),
+    "ReplaceGraphSnapshotContractVerification": ("test_replace_snapshot_is_atomic_and_idempotent",),
     "PutAnchorContractVerification": (
         "test_anchor_data_link_round_trip_and_indexes",
         "test_writes_generate_missing_uuids_and_preserve_supplied_uuids",
@@ -278,6 +311,9 @@ def test_anchor_data_link_round_trip_and_indexes() -> None:
     assert graph.list_incident_links(anchor_uuid).links == (link,)
     assert graph.list_incident_links(data_uuid, "target").links == (link,)
     assert graph.list_incident_links(data_uuid, "source").links == ()
+    assert graph.list_by_type("Person", offset=1, limit=1).objects == ()
+    assert graph.list_anchor_data(anchor_uuid, offset=0, limit=1).data_objects == (data,)
+    assert graph.list_incident_links(anchor_uuid, "both", offset=1, limit=1).links == ()
 
 
 def test_writes_generate_missing_uuids_and_preserve_supplied_uuids() -> None:

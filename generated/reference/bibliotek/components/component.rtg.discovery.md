@@ -92,4 +92,10 @@ Generated from textual SysML v2 by `just model-render` as a non-normative readin
 | `CreateEmptyRtgDiscoveryContractVerification` | `CreateEmptyRtgDiscovery` | `createEmptyRtgDiscoveryFailureSemantics` | `pending#CreateEmptyRtgDiscoveryContractVerification` |
 | `RtgDiscoveryBoundaryVerification` | `RtgDiscovery` | `deterministicReads`, `intentionalBoundary`, `viewsNotSchema`, `noGraphDependency`, `knowledgeEngineerCurated` | `pending#RtgDiscoveryBoundaryVerification` |
 
+## Diagram
+
+![component.rtg.discovery contract diagram](../diagrams/component.rtg.discovery.contract.svg)
+
+[PlantUML source](../diagrams/component.rtg.discovery.contract.puml)
+
 Equivalent private algorithms, helpers, storage layouts, and implementation-language inheritance remain implementation choices.

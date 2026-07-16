@@ -1,20 +1,24 @@
 from __future__ import annotations
 
 import inspect
+import json
 import os
 import types
 import typing
-from collections.abc import Callable, Mapping
-from dataclasses import dataclass, fields, is_dataclass
+from collections.abc import Awaitable, Callable, Mapping
+from dataclasses import dataclass, fields, is_dataclass, replace
+from dataclasses import field as dataclass_field
 from datetime import datetime
 from enum import Enum
+from importlib.resources import files
 from types import NoneType
-from typing import Any, cast, get_args, get_origin, get_type_hints
+from typing import Any, cast, get_args, get_origin, get_type_hints, overload
 from uuid import UUID
 
-from components.runtime.component_adapter.implementation import (
+from components.runtime.component_adapter.native import (
     ActionBinding,
-    MutableAdapterHost,
+    ComponentAdapter,
+    ComponentExecution,
     ReplayStateBinding,
     encode_json,
 )
@@ -28,23 +32,28 @@ from components.runtime.component_adapter.protocol import (
 from components.runtime.message_runtime.protocol import (
     JsonObject,
     JsonValue,
-    MessageRuntime,
-    RuntimeAddress,
-    RuntimeMessageKind,
     RuntimeReplayMode,
     RuntimeTraceDisposition,
+)
+from components.runtime.messaging import (
+    ActionRef,
+    RuntimeConsistencyAccess,
+    RuntimePayloadDisposition,
 )
 
 
 @dataclass(frozen=True, slots=True)
-class MethodBindingSpec:
+class RuntimeBindingAction:
+    action_id: str
     method_name: str
     replay_mode: RuntimeReplayMode
     idempotency: RuntimeActionIdempotency
     resolved_argument_from_result: str | None = None
     externally_effectful: bool = False
     concurrency_lane: str = "serialized"
-    max_in_flight: int = 1
+    consistency_group: str | None = None
+    consistency_access: RuntimeConsistencyAccess = RuntimeConsistencyAccess.INDEPENDENT
+    deadline_seconds: float | None = None
     modeled_fault_trace_disposition: RuntimeTraceDisposition = RuntimeTraceDisposition.ABORTED
     replay_effect_builder: (
         Callable[[tuple[object, ...], dict[str, object], object], JsonObject] | None
@@ -52,32 +61,312 @@ class MethodBindingSpec:
     failure_replay_effect_builder: Callable[[object, Exception], JsonObject] | None = None
     failure_replay_effect_applier: Callable[[object, JsonObject], object] | None = None
     failure_types: tuple[type[Exception], ...] | None = None
-    failure_trace_dispositions: tuple[
-        tuple[type[Exception], RuntimeTraceDisposition], ...
-    ] = ()
+    failure_trace_dispositions: tuple[tuple[type[Exception], RuntimeTraceDisposition], ...] = ()
     failure_replay_effect_types: tuple[type[Exception], ...] | None = None
     recovery_authorized: bool = False
+    request_payload_disposition: RuntimePayloadDisposition = RuntimePayloadDisposition.COMMAND
+    result_payload_disposition: RuntimePayloadDisposition = (
+        RuntimePayloadDisposition.QUERY_RESULT
+    )
+    fault_payload_disposition: RuntimePayloadDisposition = RuntimePayloadDisposition.DIAGNOSTIC
+    effect_payload_disposition: RuntimePayloadDisposition | None = None
+    request_codec_id: str = ""
+    request_codec_version: int = 1
+    result_codec_id: str = ""
+    result_codec_version: int = 1
+    failure_codec_id: str = ""
+    failure_codec_version: int = 1
+    schema_version: int = 1
+    request_arguments: tuple[RuntimeArgumentDescriptor, ...] = ()
+    request_schema: JsonObject = dataclass_field(default_factory=dict)
+    result_schema: JsonObject = dataclass_field(default_factory=dict)
+    fault_schema: JsonObject = dataclass_field(default_factory=dict)
+    canonical_effect_schema_version: int | None = None
+    canonical_effect_codec_id: str | None = None
+    canonical_effect_codec_version: int | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class RuntimeBindingResource:
+    component_contract_id: str
+    binding_id: str
+    binding_version: int
+    actions: tuple[RuntimeBindingAction, ...]
+
+
+def load_runtime_binding_resource(
+    package: str | None,
+    *,
+    failure_types: Mapping[str, tuple[type[Exception], ...]],
+) -> RuntimeBindingResource:
+    """Load model-projected metadata and bind its failure names to Python codecs."""
+
+    if package is None:
+        raise RuntimeBindingInvalid("runtime binding resource requires a package")
+    resource = files(package).joinpath("resources/runtime_binding.json")
+    raw = json.loads(resource.read_text(encoding="utf-8"))
+    if not isinstance(raw, dict) or raw.get("schema_version") != 1:
+        raise RuntimeBindingInvalid(f"invalid runtime binding resource: {resource}")
+    contract = raw.get("component_contract_id")
+    binding_id = raw.get("binding_id")
+    binding_version = raw.get("binding_version")
+    action_values = raw.get("actions")
+    if (
+        not isinstance(contract, str)
+        or not isinstance(binding_id, str)
+        or not isinstance(binding_version, int)
+        or not isinstance(action_values, list)
+    ):
+        raise RuntimeBindingInvalid(f"incomplete runtime binding resource: {resource}")
+    actions: list[RuntimeBindingAction] = []
+    seen: set[str] = set()
+    for value in action_values:
+        if not isinstance(value, dict) or not isinstance(value.get("method_name"), str):
+            raise RuntimeBindingInvalid(f"invalid action in runtime binding resource: {resource}")
+        method_name = str(value["method_name"])
+        if method_name in seen:
+            raise RuntimeBindingInvalid(f"duplicate runtime action registration: {method_name}")
+        seen.add(method_name)
+        action_id = value.get("action_id")
+        if action_id != f"{contract}.{method_name}":
+            raise RuntimeBindingInvalid(f"runtime action identity differs: {method_name}")
+        mapped_failures = failure_types.get(method_name)
+        if mapped_failures is None:
+            raise RuntimeBindingInvalid(
+                f"runtime action has no Python failure mapping: {method_name}"
+            )
+        declared_failure_names = value.get("failure_names")
+        if declared_failure_names != [failure.__name__ for failure in mapped_failures]:
+            raise RuntimeBindingInvalid(f"runtime failure mapping differs: {method_name}")
+        disposition_values = value.get("failure_dispositions", {})
+        if not isinstance(disposition_values, dict):
+            raise RuntimeBindingInvalid(f"invalid failure dispositions: {method_name}")
+        failures_by_name = {failure.__name__: failure for failure in mapped_failures}
+        unknown_dispositions = set(disposition_values) - set(failures_by_name)
+        if unknown_dispositions:
+            raise RuntimeBindingInvalid(
+                f"unknown failure disposition for {method_name}: {sorted(unknown_dispositions)}"
+            )
+        raw_arguments = value.get("request_arguments")
+        request_schema = value.get("request_schema")
+        result_schema = value.get("result_schema")
+        fault_schema = value.get("fault_schema")
+        if (
+            not isinstance(raw_arguments, list)
+            or not isinstance(request_schema, dict)
+            or not isinstance(result_schema, dict)
+            or not isinstance(fault_schema, dict)
+        ):
+            raise RuntimeBindingInvalid(f"runtime action schemas are incomplete: {method_name}")
+        request_arguments = tuple(
+            RuntimeArgumentDescriptor(
+                name=str(argument["name"]),
+                required=bool(argument["required"]),
+                default=argument.get("default"),
+                schema=cast(JsonObject, argument["schema"]),
+            )
+            for argument in raw_arguments
+            if isinstance(argument, dict) and isinstance(argument.get("schema"), dict)
+        )
+        if len(request_arguments) != len(raw_arguments):
+            raise RuntimeBindingInvalid(f"runtime arguments are malformed: {method_name}")
+        actions.append(
+            RuntimeBindingAction(
+                action_id=str(action_id),
+                method_name=method_name,
+                replay_mode=RuntimeReplayMode(str(value["replay_mode"])),
+                idempotency=RuntimeActionIdempotency(str(value["idempotency"])),
+                resolved_argument_from_result=cast(
+                    str | None, value.get("resolved_argument_from_result")
+                ),
+                externally_effectful=bool(value.get("externally_effectful", False)),
+                concurrency_lane=str(value.get("concurrency_lane", "serialized")),
+                consistency_group=cast(str | None, value.get("consistency_group")),
+                consistency_access=RuntimeConsistencyAccess(
+                    str(value.get("consistency_access", "independent"))
+                ),
+                deadline_seconds=cast(float | None, value.get("deadline_seconds")),
+                modeled_fault_trace_disposition=RuntimeTraceDisposition(
+                    str(value.get("modeled_fault_trace_disposition", "aborted"))
+                ),
+                failure_types=mapped_failures,
+                failure_trace_dispositions=tuple(
+                    (failures_by_name[name], RuntimeTraceDisposition(str(disposition)))
+                    for name, disposition in disposition_values.items()
+                ),
+                recovery_authorized=bool(value.get("recovery_authorized", False)),
+                request_payload_disposition=RuntimePayloadDisposition(
+                    str(value.get("request_payload_disposition", "command"))
+                ),
+                result_payload_disposition=RuntimePayloadDisposition(
+                    str(value.get("result_payload_disposition", "query_result"))
+                ),
+                fault_payload_disposition=RuntimePayloadDisposition(
+                    str(value.get("fault_payload_disposition", "diagnostic"))
+                ),
+                effect_payload_disposition=(
+                    RuntimePayloadDisposition(str(value["effect_payload_disposition"]))
+                    if value.get("effect_payload_disposition") is not None
+                    else None
+                ),
+                request_codec_id=str(value["request_codec_id"]),
+                request_codec_version=int(value["request_codec_version"]),
+                result_codec_id=str(value["result_codec_id"]),
+                result_codec_version=int(value["result_codec_version"]),
+                failure_codec_id=str(value["failure_codec_id"]),
+                failure_codec_version=int(value["failure_codec_version"]),
+                schema_version=int(value["schema_version"]),
+                request_arguments=request_arguments,
+                request_schema=cast(JsonObject, request_schema),
+                result_schema=cast(JsonObject, result_schema),
+                fault_schema=cast(JsonObject, fault_schema),
+                canonical_effect_schema_version=cast(
+                    int | None, value.get("canonical_effect_schema_version")
+                ),
+                canonical_effect_codec_id=cast(
+                    str | None, value.get("canonical_effect_codec_id")
+                ),
+                canonical_effect_codec_version=cast(
+                    int | None, value.get("canonical_effect_codec_version")
+                ),
+            )
+        )
+    if set(failure_types) != seen:
+        raise RuntimeBindingInvalid(
+            f"Python failure registrations invent actions: {sorted(set(failure_types) - seen)}"
+        )
+    return RuntimeBindingResource(contract, binding_id, binding_version, tuple(actions))
+
+
+def runtime_binding_descriptor(
+    binding: RuntimeBindingResource,
+    method_name: str,
+) -> RuntimeActionBindingDescriptor:
+    """Materialize one descriptor from model-projected metadata and explicit codecs."""
+
+    matches = [action for action in binding.actions if action.method_name == method_name]
+    if len(matches) != 1:
+        raise RuntimeBindingInvalid(f"runtime binding action is unavailable: {method_name}")
+    action = matches[0]
+    request_codec = action.request_codec_id
+    result_codec = action.result_codec_id
+    failure_codec = action.failure_codec_id
+    dispositions = dict(action.failure_trace_dispositions)
+    has_effect = action.replay_mode is RuntimeReplayMode.CANONICAL_EFFECT
+    return RuntimeActionBindingDescriptor(
+        component_contract_id=binding.component_contract_id,
+        action_id=action.action_id,
+        binding_id=binding.binding_id,
+        binding_version=binding.binding_version,
+        schema_version=action.schema_version,
+        request_codec_id=request_codec,
+        result_codec_id=result_codec,
+        failure_codec_id=failure_codec,
+        idempotency=action.idempotency,
+        replay_mode=action.replay_mode,
+        concurrency_lane=action.concurrency_lane,
+        consistency_group=action.consistency_group,
+        consistency_access=action.consistency_access,
+        deadline_seconds=action.deadline_seconds,
+        externally_effectful=action.externally_effectful,
+        request_codec_version=action.request_codec_version,
+        result_codec_version=action.result_codec_version,
+        failure_codec_version=action.failure_codec_version,
+        request_arguments=action.request_arguments,
+        supported_failure_names=tuple(failure.__name__ for failure in action.failure_types or ()),
+        failure_bindings=tuple(
+            RuntimeFailureBindingDescriptor(
+                failure_name=failure.__name__,
+                codec_id=failure_codec,
+                codec_version=action.failure_codec_version,
+                content_type="application/json",
+                trace_disposition=dispositions.get(failure, action.modeled_fault_trace_disposition),
+            )
+            for failure in action.failure_types or ()
+        ),
+        canonical_effect_schema_version=(
+            action.canonical_effect_schema_version if has_effect else None
+        ),
+        canonical_effect_codec_id=action.canonical_effect_codec_id if has_effect else None,
+        canonical_effect_codec_version=(
+            action.canonical_effect_codec_version if has_effect else None
+        ),
+        modeled_fault_trace_disposition=action.modeled_fault_trace_disposition,
+        recovery_authorized=action.recovery_authorized,
+        request_payload_disposition=action.request_payload_disposition,
+        result_payload_disposition=action.result_payload_disposition,
+        fault_payload_disposition=action.fault_payload_disposition,
+        effect_payload_disposition=action.effect_payload_disposition,
+        request_schema=action.request_schema,
+        result_schema=action.result_schema,
+        fault_schema=action.fault_schema,
+    )
 
 
 def create_typed_component_adapter(
-    component: object | MutableAdapterHost[object],
+    component: object,
     protocol_type: type[object],
     *,
-    component_contract_id: str,
-    binding_id: str,
-    specs: tuple[MethodBindingSpec, ...],
+    binding: RuntimeBindingResource,
     failure_types: tuple[type[Exception], ...],
     replay_state: ReplayStateBinding | None = None,
 ):
     """Build an adapter from an explicit method inventory and protocol annotations."""
-    from components.runtime.component_adapter.implementation import ExplicitComponentAdapter
+    return _create_typed_adapter(
+        component,
+        protocol_type,
+        binding=binding,
+        failure_types=failure_types,
+        replay_state=replay_state,
+        handlers=None,
+    )
 
-    request_codec = f"codec.python.{component_contract_id}.request.json"
-    result_codec = f"codec.python.{component_contract_id}.result.json"
-    failure_codec = f"codec.python.{component_contract_id}.failure.json"
-    host = component if isinstance(component, MutableAdapterHost) else MutableAdapterHost(component)
+
+def create_typed_handler_adapter(
+    protocol_type: type[object],
+    *,
+    binding: RuntimeBindingResource,
+    failure_types: tuple[type[Exception], ...],
+    handlers: Mapping[
+        str,
+        Callable[
+            [tuple[object, ...], dict[str, object], ComponentExecution],
+            Awaitable[None],
+        ],
+    ],
+    replay_state: ReplayStateBinding | None = None,
+) -> ComponentAdapter:
+    """Build ordinary typed action registrations around explicit async handlers."""
+    return _create_typed_adapter(
+        None,
+        protocol_type,
+        binding=binding,
+        failure_types=failure_types,
+        replay_state=replay_state,
+        handlers=handlers,
+    )
+
+
+def _create_typed_adapter(
+    component: object | None,
+    protocol_type: type[object],
+    *,
+    binding: RuntimeBindingResource,
+    failure_types: tuple[type[Exception], ...],
+    replay_state: ReplayStateBinding | None,
+    handlers: Mapping[
+        str,
+        Callable[
+            [tuple[object, ...], dict[str, object], ComponentExecution],
+            Awaitable[None],
+        ],
+    ]
+    | None,
+) -> ComponentAdapter:
+
+    binding_id = binding.binding_id
     bindings: list[ActionBinding] = []
-    for spec in specs:
+    for spec in binding.actions:
         action_failure_types = (
             spec.failure_types if spec.failure_types is not None else failure_types
         )
@@ -88,18 +377,14 @@ def create_typed_component_adapter(
             )
         if any(failure not in action_failure_types for failure in failure_dispositions):
             raise RuntimeBindingInvalid(
-                f"failure disposition override is not a supported failure for "
-                f"{spec.method_name}"
+                f"failure disposition override is not a supported failure for {spec.method_name}"
             )
         failure_replay_effect_types = (
             action_failure_types
             if spec.failure_replay_effect_types is None
             else spec.failure_replay_effect_types
         )
-        if any(
-            failure not in action_failure_types
-            for failure in failure_replay_effect_types
-        ):
+        if any(failure not in action_failure_types for failure in failure_replay_effect_types):
             raise RuntimeBindingInvalid(
                 f"failure replay effect is not a supported failure for {spec.method_name}"
             )
@@ -132,93 +417,59 @@ def create_typed_component_adapter(
             raise RuntimeBindingInvalid(
                 f"protocol has no explicitly bound method: {spec.method_name}"
             )
-        method = getattr(host.resolve(), spec.method_name, None)
-        if not callable(method):
+        handler = handlers.get(spec.method_name) if handlers is not None else None
+        method = getattr(component, spec.method_name, None) if component is not None else None
+        if handler is None and not callable(method):
             raise RuntimeBindingInvalid(
                 f"component does not implement explicitly bound method: {spec.method_name}"
             )
         signature = inspect.signature(protocol_method)
         hints = get_type_hints(protocol_method)
-        action_id = f"{component_contract_id}.{spec.method_name}"
-        descriptor = RuntimeActionBindingDescriptor(
-            component_contract_id=component_contract_id,
-            action_id=action_id,
-            binding_id=binding_id,
-            binding_version=1,
-            schema_version=1,
-            request_codec_id=request_codec,
-            result_codec_id=result_codec,
-            failure_codec_id=failure_codec,
-            idempotency=spec.idempotency,
-            replay_mode=spec.replay_mode,
-            concurrency_lane=spec.concurrency_lane,
-            externally_effectful=spec.externally_effectful,
-            request_codec_version=1,
-            result_codec_version=1,
-            failure_codec_version=1,
-            request_arguments=tuple(
-                RuntimeArgumentDescriptor(
-                    name=name,
-                    required=parameter.default is inspect.Parameter.empty,
-                    default=(
-                        None
-                        if parameter.default is inspect.Parameter.empty
-                        else encode_json(parameter.default)
-                    ),
-                )
-                for name, parameter in signature.parameters.items()
-                if name not in {"self", "cls"}
-            ),
-            supported_failure_names=tuple(
-                failure.__name__ for failure in action_failure_types
-            ),
-            failure_bindings=tuple(
-                RuntimeFailureBindingDescriptor(
-                    failure_name=failure.__name__,
-                    codec_id=failure_codec,
-                    codec_version=1,
-                    content_type="application/json",
-                    trace_disposition=failure_dispositions.get(
-                        failure, spec.modeled_fault_trace_disposition
-                    ),
-                    replay_mode=(
-                        RuntimeReplayMode.CANONICAL_EFFECT
-                        if spec.failure_replay_effect_builder is not None
-                        and failure in failure_replay_effect_types
-                        else RuntimeReplayMode.NO_STATE_EFFECT
-                    ),
-                )
-                for failure in action_failure_types
-            ),
-            canonical_effect_schema_version=(
-                1
-                if spec.replay_mode is RuntimeReplayMode.CANONICAL_EFFECT
-                or spec.failure_replay_effect_builder is not None
-                else None
-            ),
-            canonical_effect_codec_id=(
-                f"{binding_id}.{action_id}.effect.json"
-                if spec.replay_mode is RuntimeReplayMode.CANONICAL_EFFECT
-                or spec.failure_replay_effect_builder is not None
-                else None
-            ),
-            canonical_effect_codec_version=(
-                1
-                if spec.replay_mode is RuntimeReplayMode.CANONICAL_EFFECT
-                or spec.failure_replay_effect_builder is not None
-                else None
-            ),
-            modeled_fault_trace_disposition=spec.modeled_fault_trace_disposition,
-            max_in_flight=spec.max_in_flight,
-            recovery_authorized=spec.recovery_authorized,
+        descriptor = runtime_binding_descriptor(binding, spec.method_name)
+        projected_names = tuple(item.name for item in descriptor.request_arguments)
+        python_names = tuple(
+            name for name in signature.parameters if name not in {"self", "cls"}
         )
+        if projected_names != python_names:
+            raise RuntimeBindingInvalid(
+                f"modeled arguments differ for {spec.method_name}: "
+                f"{projected_names} != {python_names}"
+            )
+        if spec.failure_replay_effect_builder is not None:
+            descriptor = replace(
+                descriptor,
+                canonical_effect_schema_version=descriptor.canonical_effect_schema_version or 1,
+                canonical_effect_codec_id=(
+                    descriptor.canonical_effect_codec_id
+                    or f"{binding_id}.{descriptor.action_id}.effect.json"
+                ),
+                canonical_effect_codec_version=descriptor.canonical_effect_codec_version or 1,
+                failure_bindings=tuple(
+                    replace(
+                        failure,
+                        replay_mode=(
+                            RuntimeReplayMode.CANONICAL_EFFECT
+                            if next(
+                                item
+                                for item in action_failure_types
+                                if item.__name__ == failure.failure_name
+                            )
+                            in failure_replay_effect_types
+                            else RuntimeReplayMode.NO_STATE_EFFECT
+                        ),
+                    )
+                    for failure in descriptor.failure_bindings
+                ),
+            )
 
         def invoke(
             *args: object,
             method_name: str = spec.method_name,
             **kwargs: object,
         ) -> object:
-            current_method = getattr(host.resolve(), method_name, None)
+            if component is None:
+                raise RuntimeBindingInvalid(f"typed handler has no direct component: {method_name}")
+            current_method = getattr(component, method_name, None)
             if not callable(current_method):
                 raise RuntimeBindingInvalid(
                     f"component no longer implements bound method: {method_name}"
@@ -271,11 +522,15 @@ def create_typed_component_adapter(
             signature: inspect.Signature = signature,
             hints: dict[str, object] = hints,
         ) -> object:
+            if component is None:
+                raise RuntimeBindingInvalid(
+                    f"typed handler has no direct replay component: {method_name}"
+                )
             arguments = payload.get("arguments")
             if not isinstance(arguments, dict):
                 raise ValueError("canonical effect arguments must be an object")
             _, decoded = _decode_arguments(cast(JsonObject, arguments), signature, hints)
-            current_method = getattr(host.resolve(), method_name, None)
+            current_method = getattr(component, method_name, None)
             if not callable(current_method):
                 raise RuntimeBindingInvalid(
                     f"component no longer implements bound method: {method_name}"
@@ -291,7 +546,9 @@ def create_typed_component_adapter(
         ) -> JsonObject:
             if builder is None:
                 raise RuntimeBindingInvalid("modeled-fault replay builder is not configured")
-            return builder(host.resolve(), error)
+            if component is None:
+                raise RuntimeBindingInvalid("typed handler has no failure-effect component")
+            return builder(component, error)
 
         def apply_failure_effect(
             payload: JsonObject,
@@ -302,12 +559,15 @@ def create_typed_component_adapter(
         ) -> object:
             if applier is None:
                 raise RuntimeBindingInvalid("modeled-fault replay applier is not configured")
-            return applier(host.resolve(), payload)
+            if component is None:
+                raise RuntimeBindingInvalid("typed handler has no failure-effect component")
+            return applier(component, payload)
 
         bindings.append(
             ActionBinding(
                 descriptor=descriptor,
-                invoke=invoke,
+                invoke=invoke if handler is None else None,
+                handler=handler,
                 decode_request=decode_request,
                 encode_result=encode_json,
                 failure_types=action_failure_types,
@@ -328,99 +588,35 @@ def create_typed_component_adapter(
                 ),
             )
         )
-    return ExplicitComponentAdapter(tuple(bindings), replay_state=replay_state)
+    return ComponentAdapter(tuple(bindings), replay_state=replay_state)
 
 
-class TypedMessageProxy:
-    """Sync proxy exposing only the explicitly supplied protocol method inventory."""
-
-    def __init__(
-        self,
-        runtime: MessageRuntime,
-        source: RuntimeAddress,
-        target: RuntimeAddress,
-        protocol_type: type[object],
-        *,
-        component_contract_id: str,
-        specs: tuple[MethodBindingSpec, ...],
-        failure_types: tuple[type[Exception], ...],
-    ) -> None:
-        from components.runtime.component_adapter.implementation import RuntimeClient
-
-        self._client = RuntimeClient(
-            runtime,
-            source=source,
-            target=target,
+def create_action_catalog(
+    binding: RuntimeBindingResource,
+) -> dict[str, ActionRef]:
+    """Create the message-oriented action references shared by callers and handlers."""
+    component_contract_id = binding.component_contract_id
+    request_codec = f"codec.python.{component_contract_id}.request.json"
+    return {
+        spec.method_name: ActionRef(
             component_contract_id=component_contract_id,
-            request_codec_id=f"codec.python.{component_contract_id}.request.json",
+            action_id=f"{component_contract_id}.{spec.method_name}",
+            schema_version=1,
+            request_codec_id=request_codec,
         )
-        self._component_contract_id = component_contract_id
-        self._methods: dict[str, tuple[inspect.Signature, dict[str, object]]] = {}
-        for spec in specs:
-            protocol_method = inspect.getattr_static(protocol_type, spec.method_name, None)
-            if protocol_method is None:
-                raise RuntimeBindingInvalid(f"protocol has no method: {spec.method_name}")
-            self._methods[spec.method_name] = (
-                inspect.signature(protocol_method),
-                get_type_hints(protocol_method),
-            )
-        self._failure_types = _exception_type_map(failure_types)
-        self._bibliotek_runtime_proxy = True
-
-    def __getattr__(self, name: str) -> Callable[..., object]:
-        method = self._methods.get(name)
-        if method is None:
-            raise AttributeError(name)
-        signature, hints = method
-
-        def invoke(*args: object, **kwargs: object) -> object:
-            bound = signature.bind(None, *args, **kwargs)
-            bound.arguments.pop("self", None)
-            bound.arguments.pop("cls", None)
-            payload = cast(JsonObject, encode_json(dict(bound.arguments)))
-            outcome = self._client.request_sync(f"{self._component_contract_id}.{name}", payload)
-            response_payload = outcome.response.payload.value
-            if not isinstance(response_payload, dict):
-                raise RuntimeBindingInvalid("component response payload is not an object")
-            if outcome.response.kind is RuntimeMessageKind.FAULT:
-                failure_name = str(response_payload.get("type", "RuntimeBindingInvalid"))
-                failure = self._failure_types.get(failure_name, RuntimeBindingInvalid)
-                evidence = response_payload.get("evidence")
-                raise _decode_failure(
-                    failure,
-                    str(response_payload.get("message", failure_name)),
-                    cast(JsonObject, evidence) if isinstance(evidence, dict) else {},
-                )
-            return decode_typed(response_payload.get("result"), hints.get("return", NoneType))
-
-        return invoke
+        for spec in binding.actions
+    }
 
 
-def create_typed_proxy[T](
-    runtime: MessageRuntime,
-    source: RuntimeAddress,
-    target: RuntimeAddress,
-    protocol_type: type[T],
-    *,
-    component_contract_id: str,
-    specs: tuple[MethodBindingSpec, ...],
-    failure_types: tuple[type[Exception], ...],
-) -> T:
-    return cast(
-        T,
-        TypedMessageProxy(
-            runtime,
-            source,
-            target,
-            cast(type[object], protocol_type),
-            component_contract_id=component_contract_id,
-            specs=specs,
-            failure_types=failure_types,
-        ),
-    )
+@overload
+def decode_typed[T](value: object, annotation: type[T]) -> T: ...
 
 
-def decode_typed(value: object, annotation: object) -> object:
+@overload
+def decode_typed(value: object, annotation: object) -> Any: ...
+
+
+def decode_typed(value: object, annotation: object) -> Any:
     if annotation in {Any, object, inspect.Signature.empty}:
         return value
     if getattr(annotation, "__name__", None) in {"JsonValue", "JsonObject", "JsonScalar"}:

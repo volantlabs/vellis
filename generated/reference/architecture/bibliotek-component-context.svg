@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" contentStyleType="text/css" height="161px" preserveAspectRatio="none" style="width:1088px;height:161px;background:#FFFFFF;" version="1.1" viewBox="0 0 1088 161" width="1088px" zoomAndPan="magnify"><defs/><g><rect fill="#FFFFFF" height="24" id="_title" rx="6" ry="6" style="stroke:none;stroke-width:1.0;" width="298" x="388" y="5"/><text fill="#000000" font-family="Helvetica" font-size="14" font-weight="bold" x="393" y="20.7803">Bibliotek component dependency context</text><!--MD5=[0fc2a70d6b8a7498cd52a1ab73f05f84]
+entity n_e4909d33b499--><g id="elem_n_e4909d33b499"><rect fill="#D6EAF8" height="33" rx="6" ry="6" style="stroke:#181818;stroke-width:1.0;" width="96" x="7" y="40"/><text fill="#000000" font-family="Helvetica" font-size="13" x="17" y="60.0103">McpGateway</text></g><!--MD5=[23effef175e0edab9156724167e32a3e]
+entity n_87bb3f8f081e--><g id="elem_n_87bb3f8f081e"><rect fill="#D6EAF8" height="33" rx="6" ry="6" style="stroke:#181818;stroke-width:1.0;" width="135" x="246.5" y="122"/><text fill="#000000" font-family="Helvetica" font-size="13" x="256.5" y="142.0103">RtgChangeValidator</text></g><!--MD5=[ed424a2764235b8e8b4d0aadeda97c40]
+entity n_9fb7b295fe59--><g id="elem_n_9fb7b295fe59"><rect fill="#D6EAF8" height="33" rx="6" ry="6" style="stroke:#181818;stroke-width:1.0;" width="106" x="400" y="122"/><text fill="#000000" font-family="Helvetica" font-size="13" x="410" y="142.0103">RtgConstraints</text></g><!--MD5=[f96aa6467891e569eabe745687bda879]
+entity n_ef03ec0a7ac3--><g id="elem_n_ef03ec0a7ac3"><rect fill="#D6EAF8" height="33" rx="6" ry="6" style="stroke:#181818;stroke-width:1.0;" width="95" x="616.5" y="40"/><text fill="#000000" font-family="Helvetica" font-size="13" x="626.5" y="60.0103">RtgController</text></g><!--MD5=[37da524b0a895031bbb31fcd7a8d5ccb]
+entity n_c74a57049a70--><g id="elem_n_c74a57049a70"><rect fill="#D6EAF8" height="33" rx="6" ry="6" style="stroke:#181818;stroke-width:1.0;" width="98" x="730" y="40"/><text fill="#000000" font-family="Helvetica" font-size="13" x="740" y="60.0103">RtgDiscovery</text></g><!--MD5=[c52df2df6cdcb9ce0f4cde35468c7b3c]
+entity n_7f6b1b9bcea6--><g id="elem_n_7f6b1b9bcea6"><rect fill="#D6EAF8" height="33" rx="6" ry="6" style="stroke:#181818;stroke-width:1.0;" width="75" x="524.5" y="122"/><text fill="#000000" font-family="Helvetica" font-size="13" x="534.5" y="142.0103">RtgGraph</text></g><!--MD5=[cc2ed11b8846d43200b62b7dd3c339b1]
+entity n_9b016ecc9280--><g id="elem_n_9b016ecc9280"><rect fill="#D6EAF8" height="33" rx="6" ry="6" style="stroke:#181818;stroke-width:1.0;" width="93" x="617.5" y="122"/><text fill="#000000" font-family="Helvetica" font-size="13" x="627.5" y="142.0103">RtgMigration</text></g><!--MD5=[70584bb546f0ed7ea712a33f4bdef1ba]
+entity n_9d716862a8fb--><g id="elem_n_9d716862a8fb"><rect fill="#D6EAF8" height="33" rx="6" ry="6" style="stroke:#181818;stroke-width:1.0;" width="115" x="728.5" y="122"/><text fill="#000000" font-family="Helvetica" font-size="13" x="738.5" y="142.0103">RtgQueryEngine</text></g><!--MD5=[3f160033eec39bc9bd1f696ed2e6e00d]
+entity n_edd3978c7600--><g id="elem_n_edd3978c7600"><rect fill="#D6EAF8" height="33" rx="6" ry="6" style="stroke:#181818;stroke-width:1.0;" width="88" x="862" y="122"/><text fill="#000000" font-family="Helvetica" font-size="13" x="872" y="142.0103">RtgSchema</text></g><!--MD5=[f5ccc5e18b2f1cacfce234231ae933c6]
+entity n_f898d42cd8af--><g id="elem_n_f898d42cd8af"><rect fill="#D6EAF8" height="33" rx="6" ry="6" style="stroke:#181818;stroke-width:1.0;" width="179" x="121.5" y="40"/><text fill="#000000" font-family="Helvetica" font-size="13" x="131.5" y="60.0103">ComponentRuntimeAdapter</text></g><!--MD5=[e946a0ebbdff310c870c2eac100f611f]
+entity n_e7086a080846--><g id="elem_n_e7086a080846"><rect fill="#D6EAF8" height="33" rx="6" ry="6" style="stroke:#181818;stroke-width:1.0;" width="121" x="51.5" y="122"/><text fill="#000000" font-family="Helvetica" font-size="13" x="61.5" y="142.0103">MessageRuntime</text></g><!--MD5=[1764002986ffb065466f68f9f57433c4]
+entity n_e43ae848505b--><g id="elem_n_e43ae848505b"><rect fill="#D6EAF8" height="33" rx="6" ry="6" style="stroke:#181818;stroke-width:1.0;" width="114" x="968" y="122"/><text fill="#000000" font-family="Helvetica" font-size="13" x="978" y="142.0103">JsonFileStorage</text></g><!--MD5=[a820386f2aa897b940fb45da75a637c3]
+entity n_f6c8c67bcd48--><g id="elem_n_f6c8c67bcd48"><rect fill="#D6EAF8" height="33" rx="6" ry="6" style="stroke:#181818;stroke-width:1.0;" width="84" x="846" y="40"/><text fill="#000000" font-family="Helvetica" font-size="13" x="856" y="60.0103">SqlStorage</text></g><path d="M66.2614,73.3054 C76.3191,87.4216 90.965,107.9772 100.956,121.9996 " fill="none" style="stroke:#884EA0;stroke-width:1.2;"/><polygon fill="#884EA0" points="100.956,121.9996,98.9912,112.3487,98.0546,117.9275,92.4758,116.9909,100.956,121.9996" style="stroke:#884EA0;stroke-width:1.0;"/><text fill="#000000" font-family="Helvetica" font-size="11" x="88" y="100.4702">runtime</text><path d="M616.2423,61.2979 C569.2829,65.7676 495.8546,74.7333 434,91 C404.1809,98.8419 371.6399,111.7416 347.9766,121.9674 " fill="none" style="stroke:#884EA0;stroke-width:1.2;"/><polygon fill="#884EA0" points="347.9766,121.9674,357.825,122.0691,352.5664,119.984,354.6515,114.7254,347.9766,121.9674" style="stroke:#884EA0;stroke-width:1.0;"/><text fill="#000000" font-family="Helvetica" font-size="11" x="435" y="100.4702">changeValidator</text><path d="M616.3922,69.0413 C594.8979,74.7825 569.3658,82.3477 547,91 C524.2459,99.8025 499.5577,112.1303 481.1945,121.8811 " fill="none" style="stroke:#884EA0;stroke-width:1.2;"/><polygon fill="#884EA0" points="481.1945,121.8811,491.0193,121.1931,485.6106,119.5362,487.2675,114.1274,481.1945,121.8811" style="stroke:#884EA0;stroke-width:1.0;"/><text fill="#000000" font-family="Helvetica" font-size="11" x="548" y="100.4702">constraints</text><path d="M643.8481,73.3054 C625.85,87.4216 599.6416,107.9772 581.763,121.9996 " fill="none" style="stroke:#884EA0;stroke-width:1.2;"/><polygon fill="#884EA0" points="581.763,121.9996,591.3132,119.5928,585.6972,118.9139,586.3761,113.2979,581.763,121.9996" style="stroke:#884EA0;stroke-width:1.0;"/><text fill="#000000" font-family="Helvetica" font-size="11" x="621" y="100.4702">graph</text><path d="M664,73.3054 C664,87.4216 664,107.9772 664,121.9996 " fill="none" style="stroke:#884EA0;stroke-width:1.2;"/><polygon fill="#884EA0" points="664,121.9996,668,112.9996,664,116.9996,660,112.9996,664,121.9996" style="stroke:#884EA0;stroke-width:1.0;"/><text fill="#000000" font-family="Helvetica" font-size="11" x="665" y="100.4702">migration</text><path d="M687.8124,73.1147 C709.3091,87.2109 740.7695,107.8407 762.2476,121.9247 " fill="none" style="stroke:#884EA0;stroke-width:1.2;"/><polygon fill="#884EA0" points="762.2476,121.9247,756.9148,113.6445,758.0664,119.1829,752.528,120.3344,762.2476,121.9247" style="stroke:#884EA0;stroke-width:1.0;"/><text fill="#000000" font-family="Helvetica" font-size="11" x="734" y="100.4702">queryEngine</text><path d="M711.5472,70.5879 C714.7425,71.4185 717.9156,72.2296 721,73 C755.9376,81.7265 765.8025,79.7162 800,91 C825.7629,99.5007 853.8317,111.9671 874.6099,121.8526 " fill="none" style="stroke:#884EA0;stroke-width:1.2;"/><polygon fill="#884EA0" points="874.6099,121.8526,868.2013,114.374,870.0949,119.7045,864.7643,121.5981,874.6099,121.8526" style="stroke:#884EA0;stroke-width:1.0;"/><text fill="#000000" font-family="Helvetica" font-size="11" x="834" y="100.4702">schema</text><path d="M711.7711,71.054 C714.8828,71.7622 717.9787,72.4195 721,73 C789.9732,86.2528 809.3119,76.341 878,91 C914.2562,98.7376 954.3086,111.7133 983.4376,121.9946 " fill="none" style="stroke:#884EA0;stroke-width:1.2;"/><polygon fill="#884EA0" points="983.4376,121.9946,976.282,115.2271,978.7226,120.3304,973.6194,122.771,983.4376,121.9946" style="stroke:#884EA0;stroke-width:1.0;"/><text fill="#000000" font-family="Helvetica" font-size="11" x="929" y="100.4702">jsonStorage</text><path d="M191.4408,73.3054 C173.972,87.4216 148.5345,107.9772 131.1817,121.9996 " fill="none" style="stroke:#884EA0;stroke-width:1.2;"/><polygon fill="#884EA0" points="131.1817,121.9996,140.6959,119.4541,135.0707,118.857,135.6678,113.2318,131.1817,121.9996" style="stroke:#884EA0;stroke-width:1.0;"/><text fill="#000000" font-family="Helvetica" font-size="11" x="169" y="100.4702">runtime</text><!--MD5=[557ad3ad1be873ba464c0c213a4b50cb]
+@startuml
+!pragma layout smetana
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+skinparam shadowing false
+skinparam roundCorner 12
+skinparam linetype ortho
+skinparam ArrowThickness 1.2
+skinparam ArrowFontSize 11
+skinparam rectangleBorderThickness 1
+skinparam nodesep 35
+skinparam ranksep 45
+title Bibliotek component dependency context
+left to right direction
+rectangle "McpGateway" as n_e4909d33b499 #D6EAF8
+rectangle "RtgChangeValidator" as n_87bb3f8f081e #D6EAF8
+rectangle "RtgConstraints" as n_9fb7b295fe59 #D6EAF8
+rectangle "RtgController" as n_ef03ec0a7ac3 #D6EAF8
+rectangle "RtgDiscovery" as n_c74a57049a70 #D6EAF8
+rectangle "RtgGraph" as n_7f6b1b9bcea6 #D6EAF8
+rectangle "RtgMigration" as n_9b016ecc9280 #D6EAF8
+rectangle "RtgQueryEngine" as n_9d716862a8fb #D6EAF8
+rectangle "RtgSchema" as n_edd3978c7600 #D6EAF8
+rectangle "ComponentRuntimeAdapter" as n_f898d42cd8af #D6EAF8
+rectangle "MessageRuntime" as n_e7086a080846 #D6EAF8
+rectangle "JsonFileStorage" as n_e43ae848505b #D6EAF8
+rectangle "SqlStorage" as n_f6c8c67bcd48 #D6EAF8
+n_e4909d33b499 -[#884EA0]-> n_e7086a080846 : runtime
+n_ef03ec0a7ac3 -[#884EA0]-> n_87bb3f8f081e : changeValidator
+n_ef03ec0a7ac3 -[#884EA0]-> n_9fb7b295fe59 : constraints
+n_ef03ec0a7ac3 -[#884EA0]-> n_7f6b1b9bcea6 : graph
+n_ef03ec0a7ac3 -[#884EA0]-> n_9b016ecc9280 : migration
+n_ef03ec0a7ac3 -[#884EA0]-> n_9d716862a8fb : queryEngine
+n_ef03ec0a7ac3 -[#884EA0]-> n_edd3978c7600 : schema
+n_ef03ec0a7ac3 -[#884EA0]-> n_e43ae848505b : jsonStorage
+n_f898d42cd8af -[#884EA0]-> n_e7086a080846 : runtime
+@enduml
+
+PlantUML version 1.2022.7(Mon Aug 22 10:01:30 PDT 2022)
+(EPL source distribution)
+Java Runtime: OpenJDK Runtime Environment
+JVM: OpenJDK 64-Bit Server VM
+Default Encoding: UTF-8
+Language: en
+Country: US
+--></g></svg>

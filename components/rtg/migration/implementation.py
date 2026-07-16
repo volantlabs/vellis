@@ -1,10 +1,15 @@
 from __future__ import annotations
 
 import copy
+from dataclasses import replace
 from uuid import UUID, uuid4
 
 from components.rtg.migration.protocol import (
     JsonObject,
+    RtgMigrationBatchResult,
+    RtgMigrationCandidateOwners,
+    RtgMigrationChangeSet,
+    RtgMigrationCountSummary,
     RtgMigrationDeleteNotAllowed,
     RtgMigrationDeleteResult,
     RtgMigrationEvidence,
@@ -20,17 +25,11 @@ from components.rtg.migration.protocol import (
     RtgMigrationSnapshotInvalid,
     RtgMigrationStatusInvalid,
     RtgMigrationStatusTransitionInvalid,
+    migration_status_transition_allowed,
 )
 
 _STATUSES = {"draft", "ready", "applied", "failed", "abandoned"}
 _TERMINAL = {"applied", "abandoned"}
-_TRANSITIONS = {
-    "draft": {"ready", "abandoned"},
-    "ready": {"draft", "applied", "failed", "abandoned"},
-    "failed": {"ready", "abandoned"},
-    "applied": set(),
-    "abandoned": set(),
-}
 
 
 class InMemoryRtgMigration:
@@ -69,6 +68,82 @@ class InMemoryRtgMigration:
         candidate = type(self).import_snapshot(snapshot)
         self._migrations = candidate._migrations
 
+    def apply_batch(self, changes: RtgMigrationChangeSet) -> RtgMigrationBatchResult:
+        if not isinstance(changes, RtgMigrationChangeSet):
+            raise RtgMigrationRecordInvalid("changes must be an RtgMigrationChangeSet")
+        missing = object()
+        saved: dict[str, RtgMigrationRecord | object] = {}
+
+        def remember(migration_id: str) -> None:
+            if migration_id not in saved:
+                saved[migration_id] = (
+                    copy.deepcopy(self._migrations[migration_id])
+                    if migration_id in self._migrations
+                    else missing
+                )
+
+        writes = deletes = status_changes = evidence_additions = 0
+        try:
+            for write in changes.migration_writes:
+                migration_id = _resolved_migration_id(write.ref.resource_id)
+                remember(migration_id)
+                if write.migration.migration_id not in {None, migration_id}:
+                    raise RtgMigrationIdConflict(migration_id)
+                self.put_migration(replace(write.migration, migration_id=migration_id))
+                writes += 1
+            for change in changes.status_changes:
+                migration_id = _resolved_migration_id(change.migration_ref.resource_id)
+                remember(migration_id)
+                self.set_status(migration_id, change.status, change.status_metadata)
+                status_changes += 1
+            for change in changes.evidence_additions:
+                migration_id = _resolved_migration_id(change.migration_ref.resource_id)
+                remember(migration_id)
+                self.add_evidence(migration_id, change.evidence)
+                evidence_additions += 1
+            for ref in changes.delete_migrations:
+                migration_id = _resolved_migration_id(ref.resource_id)
+                remember(migration_id)
+                self.delete_migration(migration_id)
+                deletes += 1
+        except BaseException:
+            for migration_id, value in saved.items():
+                if value is missing:
+                    self._migrations.pop(migration_id, None)
+                else:
+                    self._migrations[migration_id] = value  # type: ignore[assignment]
+            raise
+        return RtgMigrationBatchResult(writes, deletes, status_changes, evidence_additions)
+
+    def count_summary(self) -> RtgMigrationCountSummary:
+        counts = {status: 0 for status in _STATUSES}
+        for migration in self._migrations.values():
+            counts[migration.status] += 1
+        return RtgMigrationCountSummary(
+            counts["draft"],
+            counts["ready"],
+            counts["failed"],
+            counts["applied"],
+            counts["abandoned"],
+            len(self._migrations),
+        )
+
+    def find_candidate_owners(
+        self, kind: str, resource_id: UUID | str
+    ) -> RtgMigrationCandidateOwners:
+        if kind not in {"schema", "constraints", "graph"}:
+            raise RtgMigrationRecordInvalid(f"unknown candidate kind: {kind}")
+        try:
+            resource_uuid = resource_id if isinstance(resource_id, UUID) else UUID(str(resource_id))
+        except (TypeError, ValueError, AttributeError) as error:
+            raise RtgMigrationRecordInvalid(str(resource_id)) from error
+        owners = tuple(
+            migration_id
+            for migration_id, migration in sorted(self._migrations.items())
+            if resource_uuid in getattr(migration, f"{kind.rstrip('s')}_make_live")
+        )
+        return RtgMigrationCandidateOwners(owners)
+
     def put_migration(self, migration: RtgMigrationRecord) -> RtgMigrationRecord:
         if not isinstance(migration, RtgMigrationRecord):
             raise RtgMigrationRecordInvalid("migration must be a migration record")
@@ -87,15 +162,22 @@ class InMemoryRtgMigration:
         except KeyError as error:
             raise RtgMigrationNotFound(key) from error
 
-    def list_migrations(self, status: str | None = None) -> RtgMigrationRecordList:
+    def list_migrations(
+        self, status: str | None = None, offset: int = 0, limit: int | None = None
+    ) -> RtgMigrationRecordList:
         if status is not None:
             _validate_status(status)
+        values = tuple(
+            _copy_record(item) for item in self._sorted() if status is None or item.status == status
+        )
+        if offset < 0 or (limit is not None and limit < 1):
+            raise RtgMigrationRecordInvalid("offset must be nonnegative and limit positive")
+        page = values[offset:] if limit is None else values[offset : offset + limit]
+        next_offset = offset + len(page) if offset + len(page) < len(values) else None
         return RtgMigrationRecordList(
-            migrations=tuple(
-                _copy_record(item)
-                for item in self._sorted()
-                if status is None or item.status == status
-            )
+            migrations=page,
+            total=len(values),
+            next_offset=next_offset,
         )
 
     def set_status(
@@ -240,6 +322,12 @@ class InMemoryRtgMigration:
         return tuple(sorted(self._migrations.values(), key=lambda item: _record_id(item)))
 
 
+def _resolved_migration_id(value: UUID | str | None) -> str:
+    if value is None:
+        raise RtgMigrationIdInvalid("batch references must be resolved")
+    return _validate_migration_id(str(value))
+
+
 def _validate_migration_id(value: str | None) -> str:
     if not isinstance(value, str) or value == "" or value != value.strip():
         raise RtgMigrationIdInvalid(str(value))
@@ -259,7 +347,7 @@ def _validate_status(value: str) -> str:
 
 
 def _transition_allowed(current: str, requested: str) -> bool:
-    return current == requested or requested in _TRANSITIONS[current]
+    return migration_status_transition_allowed(current, requested)
 
 
 def _validate_disjoint(left: tuple[UUID, ...], right: tuple[UUID, ...], label: str) -> None:

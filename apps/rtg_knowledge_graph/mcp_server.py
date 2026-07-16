@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from copy import deepcopy
 from typing import Any, Literal, cast
 
@@ -84,26 +85,29 @@ def mcp_dry_run_status(
     port: int = DEFAULT_LOCALHOST_PORT,
     path: str = DEFAULT_LOCALHOST_PATH,
 ) -> dict[str, Any]:
-    with build_app(config) as composition:
-        starter_schema = composition.prepare()
-        status = composition.run()
-        launch_metadata = mcp_launch_metadata(
-            config,
-            localhost_host=host,
-            localhost_port=port,
-            localhost_path=path,
-            preferred_transport=transport,
-        )
-        return {
-            "app": status.to_json_value(),
-            "mcp": {
-                "server_name": MCP_SERVER_NAME,
-                "transport": transport,
-                **launch_metadata,
-                "starter_schema": starter_schema.to_json_value(),
-                "tools": mcp_tool_metadata(),
-            },
-        }
+    async def inspect() -> dict[str, Any]:
+        async with await build_app(config) as composition:
+            starter_schema = await composition.prepare()
+            status = await composition.run()
+            launch_metadata = mcp_launch_metadata(
+                config,
+                localhost_host=host,
+                localhost_port=port,
+                localhost_path=path,
+                preferred_transport=transport,
+            )
+            return {
+                "app": status.to_json_value(),
+                "mcp": {
+                    "server_name": MCP_SERVER_NAME,
+                    "transport": transport,
+                    **launch_metadata,
+                    "starter_schema": starter_schema.to_json_value(),
+                    "tools": mcp_tool_metadata(),
+                },
+            }
+
+    return asyncio.run(inspect())
 
 
 def run_mcp_server(
@@ -114,10 +118,19 @@ def run_mcp_server(
     port: int = DEFAULT_LOCALHOST_PORT,
     path: str = DEFAULT_LOCALHOST_PATH,
 ) -> None:
-    with build_app(config) as composition:
-        starter_schema = composition.prepare()
-        composition.run()
-        server = build_mcp_server(composition.build_mcp_gateway(starter_schema))
+    async def prepare():
+        composition = await build_app(config)
+        try:
+            await composition.prepare()
+            await composition.run()
+            gateway = await composition.build_mcp_gateway()
+            return composition, build_mcp_server(gateway)
+        except Exception:
+            await composition.close()
+            raise
+
+    composition, server = asyncio.run(prepare())
+    try:
         if transport == "stdio":
             server.run(transport=transport)
             return
@@ -127,3 +140,5 @@ def run_mcp_server(
             port=port,
             path=path,
         )
+    finally:
+        asyncio.run(composition.close())

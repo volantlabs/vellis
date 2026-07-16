@@ -1,0 +1,17 @@
+@startuml
+skin sysmlc
+skinparam wrapWidth 380
+hide circle
+  
+comp def "~<component.storage.sql> SqlStorage" as E1  <<(T,blue) part def>>  {
+Own a small SQLite<U+002D>backed SQL execution boundary without application table, ledger, or domain semantics.
+--
+##//items//##
+database: SqlDatabase
+--
+##//perform actions//##
+execute: ExecuteSql
+query: QuerySql
+transaction: ExecuteSqlTransaction
+}
+@enduml

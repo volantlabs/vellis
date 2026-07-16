@@ -1,0 +1,4 @@
+interface:
+  display_name: "SysML View Authoring"
+  short_description: "Author and validate repository SysML views"
+  default_prompt: "Use $sysml-view-authoring to create or revise a focused SysML view and render its generated diagram."

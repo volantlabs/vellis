@@ -1,6 +1,6 @@
 """RTG Controller component."""
 
-from components.rtg.controller.implementation import InProcessRtgController
+from components.rtg.controller.coordinator import RtgControllerCoordinator
 from components.rtg.controller.protocol import (
     RtgAnchorTypeDiscoveryEntry,
     RtgAnchorTypeDiscoveryResult,
@@ -28,15 +28,17 @@ from components.rtg.controller.protocol import (
     RtgControllerValidationOptions,
     RtgPersistedSnapshotDocument,
     RtgPersistedSnapshotList,
+    RtgSnapshotPersistenceResult,
+    RtgSnapshotStateCounts,
     RtgSystemSnapshot,
 )
 from components.rtg.controller.runtime_binding import (
+    RTG_CONTROLLER_ACTIONS,
     create_rtg_controller_adapter,
-    create_rtg_controller_proxy,
 )
 
 __all__ = [
-    "InProcessRtgController",
+    "RTG_CONTROLLER_ACTIONS",
     "RtgAnchorTypeDiscoveryEntry",
     "RtgAnchorTypeDiscoveryResult",
     "RtgController",
@@ -44,6 +46,7 @@ __all__ = [
     "RtgControllerApplyFailed",
     "RtgControllerCandidateCounts",
     "RtgControllerConfigurationInvalid",
+    "RtgControllerCoordinator",
     "RtgControllerCutoverOptions",
     "RtgControllerDiscoveryOptions",
     "RtgControllerDiscoveryFailed",
@@ -63,7 +66,8 @@ __all__ = [
     "RtgControllerValidationOptions",
     "RtgPersistedSnapshotDocument",
     "RtgPersistedSnapshotList",
+    "RtgSnapshotPersistenceResult",
+    "RtgSnapshotStateCounts",
     "RtgSystemSnapshot",
     "create_rtg_controller_adapter",
-    "create_rtg_controller_proxy",
 ]

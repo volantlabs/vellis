@@ -73,6 +73,25 @@ with compatible subjects. Do not create hollow calculations, constraints, states
 interfaces to hold prose. Use view definitions for reusable projections and viewpoints only for
 explicit stakeholder concerns; generated Markdown is a projection.
 
+Use `.agents/skills/sysml-view-authoring/SKILL.md` when creating, revising, splitting, reviewing,
+or diagnosing SysML views and diagrams. Authored view usages under `model/` are canonical;
+PlantUML and SVG under `generated/reference/<product>/diagrams/` are committed generated
+projections and must not be edited by hand. Register a graphical view with a unique
+`diagram.<product>.<name>` short name only when its targeted exposure renders completely as a tree
+or interconnection diagram. Keep table views as `asElementTable`, express alternative type filters
+in one disjunctive expression, and leave broad views unregistered when the pilot reports its
+traversal limit. Render component contract overviews as compact member compartments; use separate
+focused views when relationships, flows, or sequencing are the concern.
+
+Use `.agents/skills/architecture-projection/SKILL.md` when answering architecture questions from
+the model: contract context, dependency impact, composition, runtime topology, operation flow,
+requirements, verification coverage, or package layering. Discover presets and parameter contracts
+through `just model-view-presets`; do not rely on a memorized list. Stable dashboard artifacts under
+`generated/reference/architecture/` are committed projections. On-demand and changed-model bundles
+under `build/` are disposable evidence. A node-limit failure must narrow the query rather than
+truncate it, and sequence or state behavior must never be inferred when the parser-backed graph has
+no such facts. Use `model-view-promote` only to draft a candidate for normal SysML view review.
+
 The accepted message runtime is modeled as separately packageable Bibliotek runtime contracts with
 intentional delivery, addressing, routing, correlation, ordering, retry-foundation, idempotency,
 ledger, and reconstruction semantics. First-party application realizations should use generated
@@ -183,6 +202,29 @@ Prefer the simplest contract that serves current implementation and validation n
 
 Favor modular, reusable, narrowly scoped components whose boundaries revolve around invariant ownership.
 
+Bibliotek uses one software-component archetype. Components differ through their contracts, owned
+state, invariants, collaborators, and composed behavior, not through architectural metatypes.
+Store, controller, coordinator, facade, gateway, actor, and saga name responsibilities, roles, or
+behavioral patterns. Do not create SysML specializations, runtime registration categories, or
+implementation inheritance solely from those labels. Build complexity by composing ordinary
+components and their public actions.
+
+Complete component state may cross a runtime message boundary only through an explicitly modeled
+state-transfer action: snapshot export/import, restore, checkpoint, or external document transfer.
+Ordinary actions exchange commands, targeted reads, deltas, bounded summaries and diagnostics, or
+durable references. Do not use a snapshot as a convenient collaborator argument, mutation result,
+fault detail, canonical effect, or history projection. Secrets, credentials, live handles,
+connections, and filesystem capabilities never belong in durable messages; use opaque durable
+references owned by the appropriate component.
+
+Non-state-transfer mutations must be atomic within their owning component without copying,
+serializing, hashing, or retaining complete canonical state for validation or recovery. Their
+preparation, projection, targeted reads, and invocation-local recovery data may grow with the
+requested delta and documented cascade closure, but not unrelated state. Semantically global rules
+may traverse relevant canonical state, but validation scaffolding must not materialize a second
+complete store. Cross-owner uncertainty uses indeterminate-trace quiescence and reconstruction,
+not controller-owned distributed compensation.
+
 Good designs in this repository should be:
 
 - Modular: responsibilities are separated when they have different owners, invariants, dependencies, or reasons to change.
@@ -192,6 +234,8 @@ Good designs in this repository should be:
 - Low-coupling: components consume public contracts and avoid reaching into private internals or unrelated runtime frameworks.
 - Simple and elegant: public contracts have one clear representation per operation and avoid speculative extension seams.
 - Verifiable: behavior can be proven with black-box tests, contract tests, side-effect checks, and dependency checks at the component boundary.
+- Compositional: richer behavior emerges from ordinary components invoking public contracts; a
+  workflow style never creates a privileged kind of component.
 
 These qualities matter because they make systems easier to understand, maintain, test, and extend. When a design choice weakens one of them, record the reason near the relevant model element or ask for human judgment before encoding it.
 
@@ -267,7 +311,9 @@ Use `just` as the task runner for common workflows. Prefer adding or updating `j
 Default recipes:
 
 - `just setup`: install or update the uv-managed development environment.
-- `just test`: run component and repository tests when tests exist.
+- `just test`: run the fast component and repository suite, excluding tests marked `integration`.
+- `just test-integration`: run whole-system, subprocess/restart, and pinned-runtime tests.
+- `just test-full`: run the complete fast and integration suite.
 - `just lint`: run Ruff checks.
 - `just typecheck`: run BasedPyright checks.
 - `just format`: format Python code with Ruff.
@@ -276,7 +322,12 @@ Default recipes:
 - `just model-setup`: fetch and checksum-verify the pinned official validator, formal libraries, and Java runtime.
 - `just model-check`: run official SysML validation plus profile, architecture, implementation-binding, and generated-artifact checks.
 - `just model-check-formal`: run the pinned official SysML validator directly.
-- `just model-render`: regenerate model-derived documentation views and the static Vellis application manifest.
+- `just model-diagrams`: regenerate the parser inventory and committed PlantUML/SVG diagrams.
+- `just model-dashboard`: regenerate the parser-backed architecture graph and stable dashboard.
+- `just model-view-presets`: list supported on-demand architecture questions and defaults.
+- `just model-view <preset> [target] [options]`: render an ignored on-demand projection.
+- `just model-view-changed BASE=<git-ref>`: render an ignored model-change review bundle.
+- `just model-render`: regenerate the parser inventory, diagrams, model-derived documentation views, and static Vellis application manifest.
 - `just model-reference-render`: regenerate searchable SysML and KerML Markdown from the pinned PDFs.
 - `just model-reference-check`: reject stale or manually edited specification reference projections.
 - `just model-reference-find "<question>"`: rank relevant specification sections and page snippets.

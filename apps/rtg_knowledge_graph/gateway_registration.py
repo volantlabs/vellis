@@ -1,17 +1,24 @@
 from __future__ import annotations
 
 import json
+from copy import deepcopy
+from dataclasses import replace
 from importlib.resources import files
 from typing import Any, cast
 
-from components.interface.mcp_gateway import McpGatewayToolRegistration
+from components.interface.mcp_gateway import (
+    McpGatewayToolRegistration,
+    mcp_gateway_registration_digest,
+)
 from components.runtime.message_runtime import (
     ComponentOccurrenceDeclaration,
     JsonObject,
     RuntimeCuratedOperationDeclaration,
+    RuntimeLaneDeclaration,
     RuntimeReplayMode,
     RuntimeTopologyManifest,
 )
+from components.runtime.messaging import RuntimePayloadDisposition, topology_manifest_hash
 
 
 def model_mcp_gateway_registrations() -> tuple[McpGatewayToolRegistration, ...]:
@@ -59,13 +66,16 @@ def model_runtime_topology_manifest() -> RuntimeTopologyManifest:
         or not isinstance(manifest_hash, str)
     ):
         raise RuntimeError("generated application manifest has invalid runtime identity")
-    return RuntimeTopologyManifest(
+    registrations = model_mcp_gateway_registrations()
+    topology = RuntimeTopologyManifest(
         runtime_key=runtime_key,
         manifest_schema_version=schema_version,
         occurrences=tuple(_occurrence_declaration(value) for value in occurrences),
         curated_operations=tuple(_operation_declaration(value) for value in tools),
         manifest_hash=manifest_hash,
+        curated_registration_digest=mcp_gateway_registration_digest(registrations),
     )
+    return replace(topology, manifest_hash=topology_manifest_hash(topology))
 
 
 def _registration(value: dict[str, Any]) -> McpGatewayToolRegistration:
@@ -79,17 +89,50 @@ def _registration(value: dict[str, Any]) -> McpGatewayToolRegistration:
     annotations = value.get("annotations")
     if not isinstance(parameter_schema, dict) or not isinstance(annotations, dict):
         raise RuntimeError("tool registration lacks parameter schema or annotations")
+    exposed_schema = deepcopy(parameter_schema)
+    properties = exposed_schema.setdefault("properties", {})
+    if not isinstance(properties, dict):
+        raise RuntimeError("tool parameter schema properties must be an object")
+    properties["runtime_options"] = {
+        "type": "object",
+        "additionalProperties": False,
+        "properties": {
+            "request_key": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128,
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+            }
+        },
+        "required": ["request_key"],
+    }
     return McpGatewayToolRegistration(
         tool_name=required_string("name"),
         description=required_string("description"),
-        parameter_schema=cast(JsonObject, parameter_schema),
+        parameter_schema=cast(JsonObject, exposed_schema),
         annotations=cast(JsonObject, annotations),
         target_instance_key=required_string("target_instance_key"),
         component_contract_id=required_string("target_component_contract_id"),
         action_id=required_string("target_action_id"),
         schema_version=_positive_integer(value, "message_schema_version"),
-        codec_id=required_string("codec_id"),
-        codec_version=_positive_integer(value, "codec_version"),
+        binding_id=required_string("binding_id"),
+        binding_version=_positive_integer(value, "binding_version"),
+        request_codec_id=required_string("request_codec_id"),
+        request_codec_version=_positive_integer(value, "request_codec_version"),
+        request_payload_disposition=RuntimePayloadDisposition(
+            required_string("request_payload_disposition")
+        ),
+        result_payload_disposition=RuntimePayloadDisposition(
+            required_string("result_payload_disposition")
+        ),
+        fault_payload_disposition=RuntimePayloadDisposition(
+            required_string("fault_payload_disposition")
+        ),
+        effect_payload_disposition=(
+            RuntimePayloadDisposition(str(value["effect_payload_disposition"]))
+            if value.get("effect_payload_disposition") is not None
+            else None
+        ),
     )
 
 
@@ -130,8 +173,7 @@ def _occurrence_declaration(value: object) -> ComponentOccurrenceDeclaration:
         component_contract_id=required_string("component_contract_id"),
         binding_id=required_string("runtime_binding_id"),
         binding_version=_positive_integer(value, "binding_version"),
-        queue_capacity=_optional_positive_integer(value, "queue_capacity", 128),
-        max_in_flight=_optional_positive_integer(value, "max_in_flight", 1),
+        lanes=_lane_declarations(value),
         replay_authority=replay_mode,
         configuration_references=tuple(configuration),
     )
@@ -153,6 +195,24 @@ def _operation_declaration(value: object) -> RuntimeCuratedOperationDeclaration:
         component_contract_id=required_string("target_component_contract_id"),
         action_id=required_string("target_action_id"),
         schema_version=_positive_integer(value, "message_schema_version"),
+        binding_id=required_string("binding_id"),
+        binding_version=_positive_integer(value, "binding_version"),
+        request_codec_id=required_string("request_codec_id"),
+        request_codec_version=_positive_integer(value, "request_codec_version"),
+        request_payload_disposition=RuntimePayloadDisposition(
+            required_string("request_payload_disposition")
+        ),
+        result_payload_disposition=RuntimePayloadDisposition(
+            required_string("result_payload_disposition")
+        ),
+        fault_payload_disposition=RuntimePayloadDisposition(
+            required_string("fault_payload_disposition")
+        ),
+        effect_payload_disposition=(
+            RuntimePayloadDisposition(str(value["effect_payload_disposition"]))
+            if value.get("effect_payload_disposition") is not None
+            else None
+        ),
     )
 
 
@@ -161,3 +221,26 @@ def _optional_positive_integer(value: dict[str, Any], name: str, default: int) -
     if not isinstance(item, int) or isinstance(item, bool) or item < 1:
         raise RuntimeError(f"runtime occurrence has invalid {name}")
     return item
+
+
+def _lane_declarations(value: dict[str, Any]) -> tuple[RuntimeLaneDeclaration, ...]:
+    lanes = value.get("lanes")
+    if not isinstance(lanes, list) or not lanes:
+        raise RuntimeError("runtime occurrence must declare at least one lane")
+    declarations: list[RuntimeLaneDeclaration] = []
+    names: set[str] = set()
+    for lane in lanes:
+        if not isinstance(lane, dict):
+            raise RuntimeError("runtime occurrence lane is not an object")
+        name = lane.get("name")
+        if not isinstance(name, str) or not name or name in names:
+            raise RuntimeError("runtime occurrence lane name is missing or duplicated")
+        names.add(name)
+        declarations.append(
+            RuntimeLaneDeclaration(
+                name,
+                _optional_positive_integer(lane, "queue_capacity", 128),
+                _optional_positive_integer(lane, "worker_limit", 1),
+            )
+        )
+    return tuple(declarations)

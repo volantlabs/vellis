@@ -1,6 +1,7 @@
 package VellisRuntimePythonRealization {
     private import SoftwareComponentModeling::*;
     private import ScalarValues::*;
+    private import BibliotekRuntimeMessaging::*;
     private import BibliotekRuntimeMessageRuntime::*;
     private import BibliotekRuntimeComponentAdapter::*;
     private import BibliotekInterfaceMcpGateway::*;
@@ -13,8 +14,9 @@ package VellisRuntimePythonRealization {
         attribute implementationBinding : String;
         attribute runtimeBindingId : String;
         attribute bindingVersion : Integer default = 1;
-        attribute queueCapacity : Integer default = 128;
-        attribute maxInFlight : Integer default = 1;
+        attribute laneNames[1..*] : String;
+        attribute laneCapacities[1..*] : Integer;
+        attribute laneWorkerLimits[1..*] : Integer;
         attribute configurationReferences[0..*] : String;
         attribute replayAuthority : RuntimeReplayMode;
         doc /* Vellis-runtime realization metadata projected into the generated static occurrence manifest. The annotated usage remains the authoritative application occurrence. */
@@ -23,64 +25,67 @@ package VellisRuntimePythonRealization {
     part def SqliteMessageRuntime :> MessageRuntime {
         @ImplementationBinding { implementationLanguage = ImplementationLanguage::python; codeRoot = "components/runtime/message_runtime"; symbol = "components.runtime.message_runtime.SqliteMessageRuntime"; realization = "VellisRuntimePython"; }
     }
-    part def ExplicitPythonComponentAdapter :> ComponentRuntimeAdapter {
-        @ImplementationBinding { implementationLanguage = ImplementationLanguage::python; codeRoot = "components/runtime/component_adapter"; symbol = "components.runtime.component_adapter.ExplicitComponentAdapter"; realization = "VellisRuntimePython"; }
+    part def StandardPythonComponentAdapter :> ComponentRuntimeAdapter {
+        @ImplementationBinding { implementationLanguage = ImplementationLanguage::python; codeRoot = "components/runtime/component_adapter"; symbol = "components.runtime.component_adapter.ComponentAdapter"; realization = "VellisRuntimePython"; }
     }
     part def PythonMcpGateway :> McpGateway {
-        @ImplementationBinding { implementationLanguage = ImplementationLanguage::python; codeRoot = "components/interface/mcp_gateway"; symbol = "components.interface.mcp_gateway.RuntimeMcpGateway"; realization = "VellisRuntimePython"; }
+        @ImplementationBinding { implementationLanguage = ImplementationLanguage::python; codeRoot = "components/interface/mcp_gateway"; symbol = "components.interface.mcp_gateway.McpGatewayEndpoint"; realization = "VellisRuntimePython"; }
     }
 
     part def VellisRuntimePython :> VellisLocalPython {
         @SpecificationStatus { lifecycleStatus = SpecLifecycle::accepted; owner = "humans"; }
         @ImplementationBinding { implementationLanguage = ImplementationLanguage::python; codeRoot = "apps/rtg_knowledge_graph"; symbol = "apps.rtg_knowledge_graph.composition.build_app"; realization = "local manifest-composed message runtime"; }
-        doc /* Runtime-native Vellis realization. Every black-box component boundary is mediated by an explicit binding and the runtime; the controller retains RTG saga and coordinated snapshot authority while runtime history and reconstruction remain outside it. */
+        doc /* Runtime-native Vellis realization. Every occurrence attaches through the same participant contract; ordinary controller action behavior coordinates by messages while runtime history and reconstruction remain outside it. */
 
         part :>> runtime : SqliteMessageRuntime;
         part :>> graphStore : InMemoryRtgGraph {
-            @RuntimeOccurrenceBinding { instanceKey = "vellis.graph.primary"; componentContractId = "component.rtg.graph"; implementationBinding = "VellisLocalPythonRealization::InMemoryRtgGraph"; runtimeBindingId = "binding.python.rtg.graph.v1"; replayAuthority = RuntimeReplayMode::canonical_effect; }
+            @RuntimeOccurrenceBinding { instanceKey = "vellis.graph.primary"; componentContractId = "component.rtg.graph"; implementationBinding = "VellisLocalPythonRealization::InMemoryRtgGraph"; runtimeBindingId = "binding.python.rtg.graph.v1"; laneNames = ("serialized"); laneCapacities = (128); laneWorkerLimits = (1); replayAuthority = RuntimeReplayMode::canonical_effect; }
         }
         part :>> schemaRegistry : InMemoryRtgSchema {
-            @RuntimeOccurrenceBinding { instanceKey = "vellis.schema.primary"; componentContractId = "component.rtg.schema"; implementationBinding = "VellisLocalPythonRealization::InMemoryRtgSchema"; runtimeBindingId = "binding.python.rtg.schema.v1"; replayAuthority = RuntimeReplayMode::canonical_effect; }
+            @RuntimeOccurrenceBinding { instanceKey = "vellis.schema.primary"; componentContractId = "component.rtg.schema"; implementationBinding = "VellisLocalPythonRealization::InMemoryRtgSchema"; runtimeBindingId = "binding.python.rtg.schema.v1"; laneNames = ("serialized"); laneCapacities = (128); laneWorkerLimits = (1); replayAuthority = RuntimeReplayMode::canonical_effect; }
         }
         part :>> constraintRegistry : InMemoryRtgConstraints {
-            @RuntimeOccurrenceBinding { instanceKey = "vellis.constraints.primary"; componentContractId = "component.rtg.constraints"; implementationBinding = "VellisLocalPythonRealization::InMemoryRtgConstraints"; runtimeBindingId = "binding.python.rtg.constraints.v1"; replayAuthority = RuntimeReplayMode::canonical_effect; }
+            @RuntimeOccurrenceBinding { instanceKey = "vellis.constraints.primary"; componentContractId = "component.rtg.constraints"; implementationBinding = "VellisLocalPythonRealization::InMemoryRtgConstraints"; runtimeBindingId = "binding.python.rtg.constraints.v1"; laneNames = ("serialized"); laneCapacities = (128); laneWorkerLimits = (1); replayAuthority = RuntimeReplayMode::canonical_effect; }
         }
         part :>> migrationStore : InMemoryRtgMigration {
-            @RuntimeOccurrenceBinding { instanceKey = "vellis.migration.primary"; componentContractId = "component.rtg.migration"; implementationBinding = "VellisLocalPythonRealization::InMemoryRtgMigration"; runtimeBindingId = "binding.python.rtg.migration.v1"; replayAuthority = RuntimeReplayMode::canonical_effect; }
+            @RuntimeOccurrenceBinding { instanceKey = "vellis.migration.primary"; componentContractId = "component.rtg.migration"; implementationBinding = "VellisLocalPythonRealization::InMemoryRtgMigration"; runtimeBindingId = "binding.python.rtg.migration.v1"; laneNames = ("serialized"); laneCapacities = (128); laneWorkerLimits = (1); replayAuthority = RuntimeReplayMode::canonical_effect; }
         }
         part :>> documentStorage : LocalJsonFileStorage {
-            @RuntimeOccurrenceBinding { instanceKey = "vellis.storage.json.primary"; componentContractId = "component.storage.json_file"; implementationBinding = "VellisLocalPythonRealization::LocalJsonFileStorage"; runtimeBindingId = "binding.python.storage.json_file.v1"; configurationReferences = ("config.storage_root"); replayAuthority = RuntimeReplayMode::external_exchange; }
+            @RuntimeOccurrenceBinding { instanceKey = "vellis.storage.json.primary"; componentContractId = "component.storage.json_file"; implementationBinding = "VellisLocalPythonRealization::LocalJsonFileStorage"; runtimeBindingId = "binding.python.storage.json_file.v1"; laneNames = ("serialized"); laneCapacities = (128); laneWorkerLimits = (1); configurationReferences = ("config.storage_root"); replayAuthority = RuntimeReplayMode::external_exchange; }
         }
         part :>> queryEngine : SimpleRtgQueryEngine {
-            @RuntimeOccurrenceBinding { instanceKey = "vellis.query.primary"; componentContractId = "component.rtg.query"; implementationBinding = "VellisLocalPythonRealization::SimpleRtgQueryEngine"; runtimeBindingId = "binding.python.rtg.query.v1"; replayAuthority = RuntimeReplayMode::no_state_effect; }
+            @RuntimeOccurrenceBinding { instanceKey = "vellis.query.primary"; componentContractId = "component.rtg.query"; implementationBinding = "VellisLocalPythonRealization::SimpleRtgQueryEngine"; runtimeBindingId = "binding.python.rtg.query.v1"; laneNames = ("serialized"); laneCapacities = (128); laneWorkerLimits = (1); replayAuthority = RuntimeReplayMode::no_state_effect; }
         }
         part :>> changeValidator : DeterministicRtgChangeValidator {
-            @RuntimeOccurrenceBinding { instanceKey = "vellis.validation.primary"; componentContractId = "component.rtg.change_validation"; implementationBinding = "VellisLocalPythonRealization::DeterministicRtgChangeValidator"; runtimeBindingId = "binding.python.rtg.change_validation.v1"; replayAuthority = RuntimeReplayMode::no_state_effect; }
+            @RuntimeOccurrenceBinding { instanceKey = "vellis.validation.primary"; componentContractId = "component.rtg.change_validation"; implementationBinding = "VellisLocalPythonRealization::DeterministicRtgChangeValidator"; runtimeBindingId = "binding.python.rtg.change_validation.v1"; laneNames = ("serialized"); laneCapacities = (128); laneWorkerLimits = (1); replayAuthority = RuntimeReplayMode::no_state_effect; }
         }
-        part :>> controller : InProcessRtgController {
-            @RuntimeOccurrenceBinding { instanceKey = "vellis.controller.primary"; componentContractId = "component.rtg.controller"; implementationBinding = "VellisLocalPythonRealization::InProcessRtgController"; runtimeBindingId = "binding.python.rtg.controller.v1"; replayAuthority = RuntimeReplayMode::canonical_effect; }
+        part :>> controller : PythonRtgControllerCoordinator {
+            @RuntimeOccurrenceBinding { instanceKey = "vellis.controller.primary"; componentContractId = "component.rtg.controller"; implementationBinding = "VellisLocalPythonRealization::PythonRtgControllerCoordinator"; runtimeBindingId = "binding.python.rtg.controller.v2"; laneNames = ("read", "mutation"); laneCapacities = (128, 128); laneWorkerLimits = (8, 1); replayAuthority = RuntimeReplayMode::coordinator_trace; }
         }
         part :>> facade : PythonVellisFacade {
-            @RuntimeOccurrenceBinding { instanceKey = "vellis.facade.primary"; componentContractId = "application.vellis.facade"; implementationBinding = "VellisLocalPythonRealization::PythonVellisFacade"; runtimeBindingId = "binding.python.vellis.facade.v1"; replayAuthority = RuntimeReplayMode::coordinator_trace; }
+            @RuntimeOccurrenceBinding { instanceKey = "vellis.facade.primary"; componentContractId = "application.vellis.facade"; implementationBinding = "VellisLocalPythonRealization::PythonVellisFacade"; runtimeBindingId = "binding.python.vellis.facade.v2"; laneNames = ("read", "mutation", "operator"); laneCapacities = (128, 128, 16); laneWorkerLimits = (8, 1, 1); replayAuthority = RuntimeReplayMode::coordinator_trace; }
         }
         part gateway : PythonMcpGateway {
-            @RuntimeOccurrenceBinding { instanceKey = "vellis.interface.mcp"; componentContractId = "component.interface.mcp_gateway"; implementationBinding = "VellisRuntimePythonRealization::PythonMcpGateway"; runtimeBindingId = "binding.python.interface.mcp_gateway.source.v1"; queueCapacity = 1; replayAuthority = RuntimeReplayMode::external_exchange; }
+            @RuntimeOccurrenceBinding { instanceKey = "vellis.interface.mcp"; componentContractId = "component.interface.mcp_gateway"; implementationBinding = "VellisRuntimePythonRealization::PythonMcpGateway"; runtimeBindingId = "binding.python.interface.mcp_gateway.v2"; laneNames = ("ingress"); laneCapacities = (128); laneWorkerLimits = (8); replayAuthority = RuntimeReplayMode::external_exchange; }
         }
         part :>> starterOntologyInstaller : PythonEverydayLifeOntologyInstaller {
-            @RuntimeOccurrenceBinding { instanceKey = "vellis.starter_ontology.installer"; componentContractId = "application.vellis.starter_ontology_installer"; implementationBinding = "VellisLocalPythonRealization::PythonEverydayLifeOntologyInstaller"; runtimeBindingId = "binding.python.vellis.starter_ontology_installer.source.v1"; queueCapacity = 1; replayAuthority = RuntimeReplayMode::external_exchange; }
+            @RuntimeOccurrenceBinding { instanceKey = "vellis.starter_ontology.installer"; componentContractId = "application.vellis.starter_ontology_installer"; implementationBinding = "VellisLocalPythonRealization::PythonEverydayLifeOntologyInstaller"; runtimeBindingId = "binding.python.vellis.starter_ontology_installer.v2"; laneNames = ("installer"); laneCapacities = (8); laneWorkerLimits = (1); replayAuthority = RuntimeReplayMode::external_exchange; }
         }
-        part :>> runner : RtgKnowledgeGraphRunner {
-            @RuntimeOccurrenceBinding { instanceKey = "vellis.runner.local"; componentContractId = "application.vellis.runner"; implementationBinding = "VellisLocalPythonRealization::RtgKnowledgeGraphRunner"; runtimeBindingId = "binding.python.vellis.runner.source.v1"; queueCapacity = 1; replayAuthority = RuntimeReplayMode::external_exchange; }
+        part :>> runner : PythonRtgKnowledgeGraphRunner {
+            @RuntimeOccurrenceBinding { instanceKey = "vellis.runner.local"; componentContractId = "application.vellis.runner"; implementationBinding = "VellisLocalPythonRealization::PythonRtgKnowledgeGraphRunner"; runtimeBindingId = "binding.python.vellis.runner.v2"; laneNames = ("runner"); laneCapacities = (8); laneWorkerLimits = (1); replayAuthority = RuntimeReplayMode::external_exchange; }
         }
-        part graphAdapter : ExplicitPythonComponentAdapter;
-        part schemaAdapter : ExplicitPythonComponentAdapter;
-        part constraintsAdapter : ExplicitPythonComponentAdapter;
-        part migrationAdapter : ExplicitPythonComponentAdapter;
-        part queryAdapter : ExplicitPythonComponentAdapter;
-        part validationAdapter : ExplicitPythonComponentAdapter;
-        part jsonStorageAdapter : ExplicitPythonComponentAdapter;
-        part controllerAdapter : ExplicitPythonComponentAdapter;
-        part facadeAdapter : ExplicitPythonComponentAdapter;
+        part graphAdapter : StandardPythonComponentAdapter;
+        part schemaAdapter : StandardPythonComponentAdapter;
+        part constraintsAdapter : StandardPythonComponentAdapter;
+        part migrationAdapter : StandardPythonComponentAdapter;
+        part queryAdapter : StandardPythonComponentAdapter;
+        part validationAdapter : StandardPythonComponentAdapter;
+        part jsonStorageAdapter : StandardPythonComponentAdapter;
+        part controllerAdapter : StandardPythonComponentAdapter;
+        part facadeAdapter : StandardPythonComponentAdapter;
+        part gatewayAdapter : StandardPythonComponentAdapter;
+        part installerAdapter : StandardPythonComponentAdapter;
+        part runnerAdapter : StandardPythonComponentAdapter;
 
         interface graphRuntime : RuntimeMessageExchange connect graphAdapter.messages to runtime.messages;
         interface schemaRuntime : RuntimeMessageExchange connect schemaAdapter.messages to runtime.messages;
@@ -91,7 +96,9 @@ package VellisRuntimePythonRealization {
         interface jsonStorageRuntime : RuntimeMessageExchange connect jsonStorageAdapter.messages to runtime.messages;
         interface controllerRuntime : RuntimeMessageExchange connect controllerAdapter.messages to runtime.messages;
         interface facadeRuntime : RuntimeMessageExchange connect facadeAdapter.messages to runtime.messages;
-        interface gatewayRuntime : RuntimeMessageExchange connect gateway.messages to runtime.messages;
+        interface gatewayRuntime : RuntimeMessageExchange connect gatewayAdapter.messages to runtime.messages;
+        interface installerRuntime : RuntimeMessageExchange connect installerAdapter.messages to runtime.messages;
+        interface runnerRuntime : RuntimeMessageExchange connect runnerAdapter.messages to runtime.messages;
 
         bind graphAdapter.runtime = runtime;
         bind schemaAdapter.runtime = runtime;
@@ -102,11 +109,13 @@ package VellisRuntimePythonRealization {
         bind jsonStorageAdapter.runtime = runtime;
         bind controllerAdapter.runtime = runtime;
         bind facadeAdapter.runtime = runtime;
-        bind gateway.runtime = runtime;
+        bind gatewayAdapter.runtime = runtime;
+        bind installerAdapter.runtime = runtime;
+        bind runnerAdapter.runtime = runtime;
 
         action routeGatewayRequest {
             in item requestEnvelope : RuntimeMessageEnvelope;
-            action emitRequest send requestEnvelope via gateway.messages;
+            action emitRequest send requestEnvelope via gatewayAdapter.messages;
             action acceptRequest accept receivedRequest : RuntimeMessageEnvelope via runtime.messages;
             message gatewayRequestTransfer of RuntimeMessageEnvelope from emitRequest to acceptRequest;
         }
@@ -132,17 +141,17 @@ package VellisRuntimePythonRealization {
 
     part runtimeVellis : VellisRuntimePython;
     allocate runtimeVellis.facade to runtimeVellis.facadeAdapter {
-        allocate runtimeVellis.facade.rtgGetObject to runtimeVellis.facadeAdapter.dispatch;
-        allocate runtimeVellis.facade.rtgReplayLedger to runtimeVellis.facadeAdapter.dispatch;
-        allocate runtimeVellis.facade.rtgListMigrationHistory to runtimeVellis.facadeAdapter.dispatch;
-        allocate runtimeVellis.facade.rtgRestoreFromSnapshot to runtimeVellis.facadeAdapter.dispatch;
+        allocate runtimeVellis.facade.rtgGetObject to runtimeVellis.facadeAdapter.deliver;
+        allocate runtimeVellis.facade.rtgReplayLedger to runtimeVellis.facadeAdapter.deliver;
+        allocate runtimeVellis.facade.rtgListMigrationHistory to runtimeVellis.facadeAdapter.deliver;
+        allocate runtimeVellis.facade.rtgRestoreFromSnapshot to runtimeVellis.facadeAdapter.deliver;
     }
     allocate runtimeVellis.controller to runtimeVellis.controllerAdapter {
-        allocate runtimeVellis.controller.getObject to runtimeVellis.controllerAdapter.dispatch;
-        allocate runtimeVellis.controller.restoreFromSnapshot to runtimeVellis.controllerAdapter.dispatch;
+        allocate runtimeVellis.controller.getObject to runtimeVellis.controllerAdapter.deliver;
+        allocate runtimeVellis.controller.restoreFromSnapshot to runtimeVellis.controllerAdapter.deliver;
     }
     allocate runtimeVellis.graphStore to runtimeVellis.graphAdapter {
-        allocate runtimeVellis.graphStore.getObject to runtimeVellis.graphAdapter.dispatch;
+        allocate runtimeVellis.graphStore.getObject to runtimeVellis.graphAdapter.deliver;
     }
     allocate runtimeVellis.schemaRegistry to runtimeVellis.schemaAdapter;
     allocate runtimeVellis.constraintRegistry to runtimeVellis.constraintsAdapter;
@@ -150,6 +159,9 @@ package VellisRuntimePythonRealization {
     allocate runtimeVellis.queryEngine to runtimeVellis.queryAdapter;
     allocate runtimeVellis.changeValidator to runtimeVellis.validationAdapter;
     allocate runtimeVellis.documentStorage to runtimeVellis.jsonStorageAdapter;
+    allocate runtimeVellis.gateway to runtimeVellis.gatewayAdapter;
+    allocate runtimeVellis.starterOntologyInstaller to runtimeVellis.installerAdapter;
+    allocate runtimeVellis.runner to runtimeVellis.runnerAdapter;
 
     requirement <'invariant.vellis.runtime.curated_gateway'> curatedRuntimeGateway {
         subject application : VellisRuntimePython;
@@ -157,7 +169,7 @@ package VellisRuntimePythonRealization {
     }
     requirement <'invariant.vellis.runtime.message_mediated_boundaries'> messageMediatedBoundaries {
         subject application : VellisRuntimePython;
-        require constraint { doc /* MCP, façade, controller, and lower component black-box interactions use registered message bindings; concrete business occurrences are constructed only at the composition root and never injected directly across managed boundaries. */ }
+        require constraint { doc /* Gateway, façade, controller, and lower component black-box interactions use the same participant attachment and registered message actions. Concrete business occurrences are constructed only at the composition root and no occurrence receives another business component object. */ }
     }
     requirement <'invariant.vellis.runtime.snapshot_transfer'> snapshotTransferStartsNewChronology {
         subject application : VellisRuntimePython;

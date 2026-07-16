@@ -4,6 +4,7 @@ from dataclasses import dataclass, field
 from typing import Protocol
 from uuid import UUID
 
+from components.rtg.change import RtgChangeReference
 from components.rtg.query.protocol import RtgQuerySpec
 
 type JsonScalar = str | int | float | bool | None
@@ -44,6 +45,38 @@ class RtgConstraintDefinition:
 @dataclass(frozen=True, slots=True)
 class RtgConstraintSnapshot:
     constraints: tuple[RtgConstraintDefinition, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class RtgConstraintDefinitionWrite:
+    ref: RtgChangeReference
+    constraint: RtgConstraintDefinition
+
+
+@dataclass(frozen=True, slots=True)
+class RtgConstraintLiveStatusChange:
+    target_ref: RtgChangeReference
+    live: bool
+
+
+@dataclass(frozen=True, slots=True)
+class RtgConstraintChangeSet:
+    constraint_writes: tuple[RtgConstraintDefinitionWrite, ...] = ()
+    delete_constraints: tuple[RtgChangeReference, ...] = ()
+    set_live: tuple[RtgConstraintLiveStatusChange, ...] = ()
+
+
+@dataclass(frozen=True, slots=True)
+class RtgConstraintBatchResult:
+    writes: int = 0
+    deletes: int = 0
+    live_changes: int = 0
+
+
+@dataclass(frozen=True, slots=True)
+class RtgConstraintCountSummary:
+    live_total: int = 0
+    non_live_total: int = 0
 
 
 @dataclass(frozen=True, slots=True)
@@ -115,6 +148,14 @@ class RtgConstraints(Protocol):
         """Atomically replace all constraint state from a validated snapshot."""
         ...
 
+    def apply_batch(self, changes: RtgConstraintChangeSet) -> RtgConstraintBatchResult:
+        """Apply one constraint-local change set atomically."""
+        ...
+
+    def count_summary(self) -> RtgConstraintCountSummary:
+        """Return bounded constraint counts without materializing definitions."""
+        ...
+
     def put_constraint(self, constraint: RtgConstraintDefinition) -> RtgConstraintDefinition:
         """Create or fully replace one constraint definition."""
         ...
@@ -127,6 +168,8 @@ class RtgConstraints(Protocol):
         self,
         kind: str | None = None,
         live: bool | None = None,
+        offset: int = 0,
+        limit: int | None = None,
     ) -> RtgConstraintDefinitionList:
         """List constraints, optionally filtered by kind and live status."""
         ...

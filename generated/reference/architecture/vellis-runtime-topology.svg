@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" contentStyleType="text/css" height="265px" preserveAspectRatio="none" style="width:740px;height:265px;background:#FFFFFF;" version="1.1" viewBox="0 0 740 265" width="740px" zoomAndPan="magnify"><defs/><g><rect fill="#FFFFFF" height="24" id="_title" rx="6" ry="6" style="stroke:none;stroke-width:1.0;" width="169" x="278.75" y="5"/><text fill="#000000" font-family="Helvetica" font-size="14" font-weight="bold" x="283.75" y="20.7803">Vellis runtime topology</text><!--MD5=[3f31e219e59ee318c80a788928546d4f]
+entity n_073ccfc87962--><g id="elem_n_073ccfc87962"><rect fill="#E8F8F5" height="46" rx="6" ry="6" style="stroke:#181818;stroke-width:1.0;" width="168" x="269" y="213"/><text fill="#000000" font-family="Helvetica" font-size="13" x="279" y="233.0103">runtime</text><text fill="#000000" font-family="Helvetica" font-size="13" x="279" y="246.0103">«SqliteMessageRuntime»</text></g><!--MD5=[51393da9bd799c5bcaeae4b5d7461703]
+entity n_d15b300ba6ed--><g id="elem_n_d15b300ba6ed"><rect fill="#E8F8F5" height="59" rx="6" ry="6" style="stroke:#181818;stroke-width:1.0;" width="144" x="7" y="72.5"/><text fill="#000000" font-family="Helvetica" font-size="13" x="17" y="92.5103">Interface adapters (2)</text><text fill="#000000" font-family="Helvetica" font-size="13" x="17" y="105.5103">facadeAdapter</text><text fill="#000000" font-family="Helvetica" font-size="13" x="17" y="118.5103">gatewayAdapter</text></g><!--MD5=[0ec4b040bb00fd6cdbb36f716ce007ee]
+entity n_6b9fa1dbe942--><g id="elem_n_6b9fa1dbe942"><rect fill="#E8F8F5" height="124" rx="6" ry="6" style="stroke:#181818;stroke-width:1.0;" width="188" x="169" y="40"/><text fill="#000000" font-family="Helvetica" font-size="13" x="179" y="60.0103">RTG component adapters (7)</text><text fill="#000000" font-family="Helvetica" font-size="13" x="179" y="73.0103">constraintsAdapter</text><text fill="#000000" font-family="Helvetica" font-size="13" x="179" y="86.0103">controllerAdapter</text><text fill="#000000" font-family="Helvetica" font-size="13" x="179" y="99.0103">graphAdapter</text><text fill="#000000" font-family="Helvetica" font-size="13" x="179" y="112.0103">migrationAdapter</text><text fill="#000000" font-family="Helvetica" font-size="13" x="179" y="125.0103">queryAdapter</text><text fill="#000000" font-family="Helvetica" font-size="13" x="179" y="138.0103">schemaAdapter</text><text fill="#000000" font-family="Helvetica" font-size="13" x="179" y="151.0103">validationAdapter</text></g><!--MD5=[e2178b215dfb9254b8d40c5f1a4f4749]
+entity n_0aa351c512dd--><g id="elem_n_0aa351c512dd"><rect fill="#E8F8F5" height="46" rx="6" ry="6" style="stroke:#181818;stroke-width:1.0;" width="138" x="375" y="79"/><text fill="#000000" font-family="Helvetica" font-size="13" x="385" y="99.0103">Storage adapters (1)</text><text fill="#000000" font-family="Helvetica" font-size="13" x="385" y="112.0103">jsonStorageAdapter</text></g><!--MD5=[cdb5da683c6eb80be3de0549ec05db94]
+entity n_5d2cd0621f48--><g id="elem_n_5d2cd0621f48"><rect fill="#E8F8F5" height="59" rx="6" ry="6" style="stroke:#181818;stroke-width:1.0;" width="203" x="531.5" y="72.5"/><text fill="#000000" font-family="Helvetica" font-size="13" x="541.5" y="92.5103">Application service adapters (2)</text><text fill="#000000" font-family="Helvetica" font-size="13" x="541.5" y="105.5103">installerAdapter</text><text fill="#000000" font-family="Helvetica" font-size="13" x="541.5" y="118.5103">runnerAdapter</text></g><path d="M112.5684,131.7777 C126.5963,142.8505 143.4603,154.986 160,164 C196.9918,184.1603 240.8872,200.8202 277.4626,212.9234 " fill="none" style="stroke:#117864;stroke-width:1.2;"/><polygon fill="#117864" points="277.4626,212.9234,270.1748,206.2985,272.7157,211.3526,267.6616,213.8934,277.4626,212.9234" style="stroke:#117864;stroke-width:1.0;"/><text fill="#000000" font-family="Helvetica" font-size="11" x="228" y="191.4702">runtime</text><path d="M304.8383,164.3628 C316.6815,181.7329 328.8183,199.5335 337.9455,212.9201 " fill="none" style="stroke:#117864;stroke-width:1.2;"/><polygon fill="#117864" points="337.9455,212.9201,336.1804,203.2307,335.1288,208.789,329.5706,207.7374,337.9455,212.9201" style="stroke:#117864;stroke-width:1.0;"/><text fill="#000000" font-family="Helvetica" font-size="11" x="325" y="191.4702">runtime</text><path d="M428.7686,125.0938 C411.9706,149.4603 385.099,188.4389 368.281,212.8341 " fill="none" style="stroke:#117864;stroke-width:1.2;"/><polygon fill="#117864" points="368.281,212.8341,376.6826,207.6946,371.119,208.7175,370.0961,203.1539,368.281,212.8341" style="stroke:#117864;stroke-width:1.0;"/><text fill="#000000" font-family="Helvetica" font-size="11" x="389" y="191.4702">runtime</text><path d="M583.5754,131.6088 C564.5578,142.2324 542.4919,154.0984 522,164 C485.1788,181.7918 442.7419,199.6112 409.6043,212.9478 " fill="none" style="stroke:#117864;stroke-width:1.2;"/><polygon fill="#117864" points="409.6043,212.9478,419.4469,213.2983,414.2428,211.081,416.4601,205.8768,409.6043,212.9478" style="stroke:#117864;stroke-width:1.0;"/><text fill="#000000" font-family="Helvetica" font-size="11" x="482" y="191.4702">runtime</text><!--MD5=[d70e70ea657fe36af45753d6d1c3b050]
+@startuml
+!pragma layout smetana
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+skinparam shadowing false
+skinparam roundCorner 12
+skinparam linetype ortho
+skinparam ArrowThickness 1.2
+skinparam ArrowFontSize 11
+skinparam rectangleBorderThickness 1
+skinparam nodesep 35
+skinparam ranksep 45
+title Vellis runtime topology
+top to bottom direction
+rectangle "runtime\n«SqliteMessageRuntime»" as n_073ccfc87962 #E8F8F5
+rectangle "Interface adapters (2)\nfacadeAdapter\ngatewayAdapter" as n_d15b300ba6ed #E8F8F5
+rectangle "RTG component adapters (7)\nconstraintsAdapter\ncontrollerAdapter\ngraphAdapter\nmigrationAdapter\nqueryAdapter\nschemaAdapter\nvalidationAdapter" as n_6b9fa1dbe942 #E8F8F5
+rectangle "Storage adapters (1)\njsonStorageAdapter" as n_0aa351c512dd #E8F8F5
+rectangle "Application service adapters (2)\ninstallerAdapter\nrunnerAdapter" as n_5d2cd0621f48 #E8F8F5
+n_d15b300ba6ed -[#117864]-> n_073ccfc87962 : runtime
+n_6b9fa1dbe942 -[#117864]-> n_073ccfc87962 : runtime
+n_0aa351c512dd -[#117864]-> n_073ccfc87962 : runtime
+n_5d2cd0621f48 -[#117864]-> n_073ccfc87962 : runtime
+@enduml
+
+PlantUML version 1.2022.7(Mon Aug 22 10:01:30 PDT 2022)
+(EPL source distribution)
+Java Runtime: OpenJDK Runtime Environment
+JVM: OpenJDK 64-Bit Server VM
+Default Encoding: UTF-8
+Language: en
+Country: US
+--></g></svg>

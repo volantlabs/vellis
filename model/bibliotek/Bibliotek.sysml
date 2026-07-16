@@ -1,6 +1,7 @@
 library package Bibliotek {
     private import SoftwareComponentModeling::*;
     public import BibliotekSoftwareValues::*;
+    public import BibliotekRtgChangeValues::*;
     public import BibliotekStorageJsonFile::*;
     public import BibliotekStorageSql::*;
     public import BibliotekRtgDiagnostics::*;
@@ -12,8 +13,10 @@ library package Bibliotek {
     public import BibliotekRtgChangeValidation::*;
     public import BibliotekRtgDiscovery::*;
     public import BibliotekRtgController::*;
+    public import BibliotekRuntimeMessaging::*;
     public import BibliotekRuntimeMessageRuntime::*;
     public import BibliotekRuntimeComponentAdapter::*;
+    public import BibliotekRuntimePythonRealization::*;
     public import BibliotekInterfaceMcpGateway::*;
 
     doc /*

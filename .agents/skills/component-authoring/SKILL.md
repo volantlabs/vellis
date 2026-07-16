@@ -81,8 +81,9 @@ and page basis, and distinguish it from repository modeling conventions.
     concerns are explicitly modeled.
 15. Run a conformant SysML parser/linker/semantic validator as well as repository profile checks,
     validate downstream products against their packaged dependencies, then regenerate
-    parser-backed projections and review the complete boundary. Grammar matching and regular
-    expressions alone do not establish language conformance.
+    parser-backed projections and review the complete boundary. Use `architecture-projection` to
+    inspect the contract, context, inbound impact, and requirement coverage of the changed stable
+    ID. Grammar matching and regular expressions alone do not establish language conformance.
 16. Ask whether a conforming implementation in a different suitable language could be built from
     the model and pass black-box conformance at this boundary. Repair the model if correct callers,
     state effects, results, failures, or composition behavior would still require guessing.
@@ -134,6 +135,10 @@ invariants, or observable behavior that the design intentionally promises.
 ## Governance
 
 - Humans approve accepted boundaries, public contracts, state ownership, dependencies, and invariants.
+- Use one ordinary component archetype. Store, controller, coordinator, facade, gateway, actor, and
+  saga describe responsibilities, composition roles, or behavior; they do not justify a SysML
+  component specialization by themselves. Add complexity through ordinary component composition
+  and action behavior.
 - If model, implementation, and tests disagree, surface the design decision; do not silently choose code.
 - Keep runtime and language choices outside the logical component unless they are observable contract terms.
 - Put genuinely shared public semantics in an owning library package; do not use an application,

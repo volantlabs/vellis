@@ -1,0 +1,2254 @@
+{
+  "actions": [
+    {
+      "action_id": "component.rtg.schema.export_snapshot",
+      "binding_id": "binding.python.rtg.schema.v1",
+      "binding_version": 1,
+      "canonical_effect_codec_id": null,
+      "canonical_effect_codec_version": null,
+      "canonical_effect_schema_version": null,
+      "concurrency_lane": "serialized",
+      "consistency_access": "independent",
+      "consistency_group": null,
+      "deadline_seconds": null,
+      "effect_payload_disposition": null,
+      "externally_effectful": false,
+      "failure_codec_id": "codec.python.component.rtg.schema.failure.json",
+      "failure_codec_version": 1,
+      "failure_dispositions": {},
+      "failure_names": [],
+      "fault_payload_disposition": "diagnostic",
+      "fault_schema": {
+        "oneOf": []
+      },
+      "idempotency": "idempotent",
+      "method_name": "export_snapshot",
+      "modeled_fault_trace_disposition": "aborted",
+      "recovery_authorized": false,
+      "replay_mode": "no_state_effect",
+      "request_arguments": [],
+      "request_codec_id": "codec.python.component.rtg.schema.request.json",
+      "request_codec_version": 1,
+      "request_payload_disposition": "command",
+      "request_schema": {
+        "additionalProperties": false,
+        "properties": {},
+        "required": [],
+        "type": "object"
+      },
+      "resolved_argument_from_result": null,
+      "result_codec_id": "codec.python.component.rtg.schema.result.json",
+      "result_codec_version": 1,
+      "result_payload_disposition": "state_transfer",
+      "result_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "definitions": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "description": {
+                  "type": "string"
+                },
+                "kind": {
+                  "enum": [
+                    "anchor",
+                    "data_object",
+                    "link"
+                  ],
+                  "type": "string"
+                },
+                "payload": {
+                  "type": "object"
+                },
+                "system": {
+                  "type": "object"
+                },
+                "type_key": {
+                  "type": "string"
+                },
+                "uuid": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "type_key",
+                "description",
+                "payload",
+                "system"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "schema_version": 1
+    },
+    {
+      "action_id": "component.rtg.schema.replace_snapshot",
+      "binding_id": "binding.python.rtg.schema.v1",
+      "binding_version": 1,
+      "canonical_effect_codec_id": "binding.python.rtg.schema.v1.component.rtg.schema.replace_snapshot.effect.json",
+      "canonical_effect_codec_version": 1,
+      "canonical_effect_schema_version": 1,
+      "concurrency_lane": "serialized",
+      "consistency_access": "independent",
+      "consistency_group": null,
+      "deadline_seconds": null,
+      "effect_payload_disposition": "state_transfer",
+      "externally_effectful": false,
+      "failure_codec_id": "codec.python.component.rtg.schema.failure.json",
+      "failure_codec_version": 1,
+      "failure_dispositions": {},
+      "failure_names": [
+        "RtgSchemaSnapshotInvalid",
+        "RtgSchemaUuidInvalid",
+        "RtgSchemaUuidConflict",
+        "RtgSchemaDefinitionKindInvalid",
+        "RtgSchemaTypeKeyInvalid",
+        "RtgSchemaDefinitionInvalid",
+        "RtgSchemaPayloadInvalid",
+        "RtgSchemaSystemValueInvalid",
+        "RtgSchemaLiveTypeConflict"
+      ],
+      "fault_payload_disposition": "diagnostic",
+      "fault_schema": {
+        "oneOf": [
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          }
+        ]
+      },
+      "idempotency": "idempotent",
+      "method_name": "replace_snapshot",
+      "modeled_fault_trace_disposition": "aborted",
+      "recovery_authorized": false,
+      "replay_mode": "canonical_effect",
+      "request_arguments": [
+        {
+          "default": null,
+          "name": "snapshot",
+          "required": true,
+          "schema": {
+            "additionalProperties": false,
+            "properties": {
+              "definitions": {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "description": {
+                      "type": "string"
+                    },
+                    "kind": {
+                      "enum": [
+                        "anchor",
+                        "data_object",
+                        "link"
+                      ],
+                      "type": "string"
+                    },
+                    "payload": {
+                      "type": "object"
+                    },
+                    "system": {
+                      "type": "object"
+                    },
+                    "type_key": {
+                      "type": "string"
+                    },
+                    "uuid": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "kind",
+                    "type_key",
+                    "description",
+                    "payload",
+                    "system"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              }
+            },
+            "type": "object"
+          }
+        }
+      ],
+      "request_codec_id": "codec.python.component.rtg.schema.request.json",
+      "request_codec_version": 1,
+      "request_payload_disposition": "state_transfer",
+      "request_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "snapshot": {
+            "additionalProperties": false,
+            "properties": {
+              "definitions": {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "description": {
+                      "type": "string"
+                    },
+                    "kind": {
+                      "enum": [
+                        "anchor",
+                        "data_object",
+                        "link"
+                      ],
+                      "type": "string"
+                    },
+                    "payload": {
+                      "type": "object"
+                    },
+                    "system": {
+                      "type": "object"
+                    },
+                    "type_key": {
+                      "type": "string"
+                    },
+                    "uuid": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "kind",
+                    "type_key",
+                    "description",
+                    "payload",
+                    "system"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              }
+            },
+            "type": "object"
+          }
+        },
+        "required": [
+          "snapshot"
+        ],
+        "type": "object"
+      },
+      "resolved_argument_from_result": null,
+      "result_codec_id": "codec.python.component.rtg.schema.result.json",
+      "result_codec_version": 1,
+      "result_payload_disposition": "query_result",
+      "result_schema": {
+        "type": "null"
+      },
+      "schema_version": 1
+    },
+    {
+      "action_id": "component.rtg.schema.apply_batch",
+      "binding_id": "binding.python.rtg.schema.v1",
+      "binding_version": 1,
+      "canonical_effect_codec_id": "binding.python.rtg.schema.v1.component.rtg.schema.apply_batch.effect.json",
+      "canonical_effect_codec_version": 1,
+      "canonical_effect_schema_version": 1,
+      "concurrency_lane": "serialized",
+      "consistency_access": "independent",
+      "consistency_group": null,
+      "deadline_seconds": null,
+      "effect_payload_disposition": "canonical_delta",
+      "externally_effectful": false,
+      "failure_codec_id": "codec.python.component.rtg.schema.failure.json",
+      "failure_codec_version": 1,
+      "failure_dispositions": {},
+      "failure_names": [
+        "RtgSchemaUuidInvalid",
+        "RtgSchemaUuidConflict",
+        "RtgSchemaDefinitionKindInvalid",
+        "RtgSchemaTypeKeyInvalid",
+        "RtgSchemaDefinitionInvalid",
+        "RtgSchemaPayloadInvalid",
+        "RtgSchemaSystemValueInvalid",
+        "RtgSchemaLiveTypeConflict",
+        "RtgSchemaDefinitionNotFound"
+      ],
+      "fault_payload_disposition": "diagnostic",
+      "fault_schema": {
+        "oneOf": [
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          }
+        ]
+      },
+      "idempotency": "non_idempotent",
+      "method_name": "apply_batch",
+      "modeled_fault_trace_disposition": "aborted",
+      "recovery_authorized": false,
+      "replay_mode": "canonical_effect",
+      "request_arguments": [
+        {
+          "default": null,
+          "name": "changes",
+          "required": true,
+          "schema": {
+            "additionalProperties": false,
+            "properties": {
+              "definition_writes": {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "definition": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "description": {
+                          "type": "string"
+                        },
+                        "kind": {
+                          "enum": [
+                            "anchor",
+                            "data_object",
+                            "link"
+                          ],
+                          "type": "string"
+                        },
+                        "payload": {
+                          "type": "object"
+                        },
+                        "system": {
+                          "type": "object"
+                        },
+                        "type_key": {
+                          "type": "string"
+                        },
+                        "uuid": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "type_key",
+                        "description",
+                        "payload",
+                        "system"
+                      ],
+                      "type": "object"
+                    },
+                    "ref": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "local_ref": {
+                          "type": "string"
+                        },
+                        "resource_id": {
+                          "type": "string"
+                        }
+                      },
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "ref",
+                    "definition"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "delete_definitions": {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "local_ref": {
+                      "type": "string"
+                    },
+                    "resource_id": {
+                      "type": "string"
+                    }
+                  },
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "set_live": {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "live": {
+                      "type": "boolean"
+                    },
+                    "target_ref": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "local_ref": {
+                          "type": "string"
+                        },
+                        "resource_id": {
+                          "type": "string"
+                        }
+                      },
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "target_ref",
+                    "live"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              }
+            },
+            "type": "object"
+          }
+        }
+      ],
+      "request_codec_id": "codec.python.component.rtg.schema.request.json",
+      "request_codec_version": 1,
+      "request_payload_disposition": "command",
+      "request_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "changes": {
+            "additionalProperties": false,
+            "properties": {
+              "definition_writes": {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "definition": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "description": {
+                          "type": "string"
+                        },
+                        "kind": {
+                          "enum": [
+                            "anchor",
+                            "data_object",
+                            "link"
+                          ],
+                          "type": "string"
+                        },
+                        "payload": {
+                          "type": "object"
+                        },
+                        "system": {
+                          "type": "object"
+                        },
+                        "type_key": {
+                          "type": "string"
+                        },
+                        "uuid": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "type_key",
+                        "description",
+                        "payload",
+                        "system"
+                      ],
+                      "type": "object"
+                    },
+                    "ref": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "local_ref": {
+                          "type": "string"
+                        },
+                        "resource_id": {
+                          "type": "string"
+                        }
+                      },
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "ref",
+                    "definition"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "delete_definitions": {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "local_ref": {
+                      "type": "string"
+                    },
+                    "resource_id": {
+                      "type": "string"
+                    }
+                  },
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "set_live": {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "live": {
+                      "type": "boolean"
+                    },
+                    "target_ref": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "local_ref": {
+                          "type": "string"
+                        },
+                        "resource_id": {
+                          "type": "string"
+                        }
+                      },
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "target_ref",
+                    "live"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              }
+            },
+            "type": "object"
+          }
+        },
+        "required": [
+          "changes"
+        ],
+        "type": "object"
+      },
+      "resolved_argument_from_result": null,
+      "result_codec_id": "codec.python.component.rtg.schema.result.json",
+      "result_codec_version": 1,
+      "result_payload_disposition": "query_result",
+      "result_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "deletes": {
+            "type": "integer"
+          },
+          "live_changes": {
+            "type": "integer"
+          },
+          "writes": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "writes",
+          "deletes",
+          "live_changes"
+        ],
+        "type": "object"
+      },
+      "schema_version": 1
+    },
+    {
+      "action_id": "component.rtg.schema.count_summary",
+      "binding_id": "binding.python.rtg.schema.v1",
+      "binding_version": 1,
+      "canonical_effect_codec_id": null,
+      "canonical_effect_codec_version": null,
+      "canonical_effect_schema_version": null,
+      "concurrency_lane": "serialized",
+      "consistency_access": "independent",
+      "consistency_group": null,
+      "deadline_seconds": null,
+      "effect_payload_disposition": null,
+      "externally_effectful": false,
+      "failure_codec_id": "codec.python.component.rtg.schema.failure.json",
+      "failure_codec_version": 1,
+      "failure_dispositions": {},
+      "failure_names": [],
+      "fault_payload_disposition": "diagnostic",
+      "fault_schema": {
+        "oneOf": []
+      },
+      "idempotency": "idempotent",
+      "method_name": "count_summary",
+      "modeled_fault_trace_disposition": "aborted",
+      "recovery_authorized": false,
+      "replay_mode": "no_state_effect",
+      "request_arguments": [],
+      "request_codec_id": "codec.python.component.rtg.schema.request.json",
+      "request_codec_version": 1,
+      "request_payload_disposition": "command",
+      "request_schema": {
+        "additionalProperties": false,
+        "properties": {},
+        "required": [],
+        "type": "object"
+      },
+      "resolved_argument_from_result": null,
+      "result_codec_id": "codec.python.component.rtg.schema.result.json",
+      "result_codec_version": 1,
+      "result_payload_disposition": "query_result",
+      "result_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "anchor_live": {
+            "type": "integer"
+          },
+          "data_object_live": {
+            "type": "integer"
+          },
+          "link_live": {
+            "type": "integer"
+          },
+          "live_total": {
+            "type": "integer"
+          },
+          "non_live_total": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "anchor_live",
+          "data_object_live",
+          "link_live",
+          "live_total",
+          "non_live_total"
+        ],
+        "type": "object"
+      },
+      "schema_version": 1
+    },
+    {
+      "action_id": "component.rtg.schema.put_definition",
+      "binding_id": "binding.python.rtg.schema.v1",
+      "binding_version": 1,
+      "canonical_effect_codec_id": "binding.python.rtg.schema.v1.component.rtg.schema.put_definition.effect.json",
+      "canonical_effect_codec_version": 1,
+      "canonical_effect_schema_version": 1,
+      "concurrency_lane": "serialized",
+      "consistency_access": "independent",
+      "consistency_group": null,
+      "deadline_seconds": null,
+      "effect_payload_disposition": "canonical_delta",
+      "externally_effectful": false,
+      "failure_codec_id": "codec.python.component.rtg.schema.failure.json",
+      "failure_codec_version": 1,
+      "failure_dispositions": {},
+      "failure_names": [
+        "RtgSchemaUuidInvalid",
+        "RtgSchemaDefinitionKindInvalid",
+        "RtgSchemaTypeKeyInvalid",
+        "RtgSchemaDefinitionInvalid",
+        "RtgSchemaPayloadInvalid",
+        "RtgSchemaSystemValueInvalid",
+        "RtgSchemaLiveTypeConflict"
+      ],
+      "fault_payload_disposition": "diagnostic",
+      "fault_schema": {
+        "oneOf": [
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          }
+        ]
+      },
+      "idempotency": "non_idempotent",
+      "method_name": "put_definition",
+      "modeled_fault_trace_disposition": "aborted",
+      "recovery_authorized": false,
+      "replay_mode": "canonical_effect",
+      "request_arguments": [
+        {
+          "default": null,
+          "name": "definition",
+          "required": true,
+          "schema": {
+            "additionalProperties": false,
+            "properties": {
+              "description": {
+                "type": "string"
+              },
+              "kind": {
+                "enum": [
+                  "anchor",
+                  "data_object",
+                  "link"
+                ],
+                "type": "string"
+              },
+              "payload": {
+                "type": "object"
+              },
+              "system": {
+                "type": "object"
+              },
+              "type_key": {
+                "type": "string"
+              },
+              "uuid": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "kind",
+              "type_key",
+              "description",
+              "payload",
+              "system"
+            ],
+            "type": "object"
+          }
+        }
+      ],
+      "request_codec_id": "codec.python.component.rtg.schema.request.json",
+      "request_codec_version": 1,
+      "request_payload_disposition": "command",
+      "request_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "definition": {
+            "additionalProperties": false,
+            "properties": {
+              "description": {
+                "type": "string"
+              },
+              "kind": {
+                "enum": [
+                  "anchor",
+                  "data_object",
+                  "link"
+                ],
+                "type": "string"
+              },
+              "payload": {
+                "type": "object"
+              },
+              "system": {
+                "type": "object"
+              },
+              "type_key": {
+                "type": "string"
+              },
+              "uuid": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "kind",
+              "type_key",
+              "description",
+              "payload",
+              "system"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "definition"
+        ],
+        "type": "object"
+      },
+      "resolved_argument_from_result": "definition",
+      "result_codec_id": "codec.python.component.rtg.schema.result.json",
+      "result_codec_version": 1,
+      "result_payload_disposition": "query_result",
+      "result_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "description": {
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "anchor",
+              "data_object",
+              "link"
+            ],
+            "type": "string"
+          },
+          "payload": {
+            "type": "object"
+          },
+          "system": {
+            "type": "object"
+          },
+          "type_key": {
+            "type": "string"
+          },
+          "uuid": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "type_key",
+          "description",
+          "payload",
+          "system"
+        ],
+        "type": "object"
+      },
+      "schema_version": 1
+    },
+    {
+      "action_id": "component.rtg.schema.get_definition",
+      "binding_id": "binding.python.rtg.schema.v1",
+      "binding_version": 1,
+      "canonical_effect_codec_id": null,
+      "canonical_effect_codec_version": null,
+      "canonical_effect_schema_version": null,
+      "concurrency_lane": "serialized",
+      "consistency_access": "independent",
+      "consistency_group": null,
+      "deadline_seconds": null,
+      "effect_payload_disposition": null,
+      "externally_effectful": false,
+      "failure_codec_id": "codec.python.component.rtg.schema.failure.json",
+      "failure_codec_version": 1,
+      "failure_dispositions": {},
+      "failure_names": [
+        "RtgSchemaDefinitionNotFound"
+      ],
+      "fault_payload_disposition": "diagnostic",
+      "fault_schema": {
+        "oneOf": [
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          }
+        ]
+      },
+      "idempotency": "idempotent",
+      "method_name": "get_definition",
+      "modeled_fault_trace_disposition": "aborted",
+      "recovery_authorized": false,
+      "replay_mode": "no_state_effect",
+      "request_arguments": [
+        {
+          "default": null,
+          "name": "definition_uuid",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "request_codec_id": "codec.python.component.rtg.schema.request.json",
+      "request_codec_version": 1,
+      "request_payload_disposition": "command",
+      "request_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "definition_uuid": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "definition_uuid"
+        ],
+        "type": "object"
+      },
+      "resolved_argument_from_result": null,
+      "result_codec_id": "codec.python.component.rtg.schema.result.json",
+      "result_codec_version": 1,
+      "result_payload_disposition": "query_result",
+      "result_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "description": {
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "anchor",
+              "data_object",
+              "link"
+            ],
+            "type": "string"
+          },
+          "payload": {
+            "type": "object"
+          },
+          "system": {
+            "type": "object"
+          },
+          "type_key": {
+            "type": "string"
+          },
+          "uuid": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "type_key",
+          "description",
+          "payload",
+          "system"
+        ],
+        "type": "object"
+      },
+      "schema_version": 1
+    },
+    {
+      "action_id": "component.rtg.schema.list_definitions",
+      "binding_id": "binding.python.rtg.schema.v1",
+      "binding_version": 1,
+      "canonical_effect_codec_id": null,
+      "canonical_effect_codec_version": null,
+      "canonical_effect_schema_version": null,
+      "concurrency_lane": "serialized",
+      "consistency_access": "independent",
+      "consistency_group": null,
+      "deadline_seconds": null,
+      "effect_payload_disposition": null,
+      "externally_effectful": false,
+      "failure_codec_id": "codec.python.component.rtg.schema.failure.json",
+      "failure_codec_version": 1,
+      "failure_dispositions": {},
+      "failure_names": [
+        "RtgSchemaDefinitionKindInvalid",
+        "RtgSchemaPayloadInvalid"
+      ],
+      "fault_payload_disposition": "diagnostic",
+      "fault_schema": {
+        "oneOf": [
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          }
+        ]
+      },
+      "idempotency": "idempotent",
+      "method_name": "list_definitions",
+      "modeled_fault_trace_disposition": "aborted",
+      "recovery_authorized": false,
+      "replay_mode": "no_state_effect",
+      "request_arguments": [
+        {
+          "default": null,
+          "name": "kind",
+          "required": false,
+          "schema": {
+            "enum": [
+              "anchor",
+              "data_object",
+              "link"
+            ],
+            "type": "string"
+          }
+        },
+        {
+          "default": null,
+          "name": "live",
+          "required": false,
+          "schema": {
+            "type": "boolean"
+          }
+        },
+        {
+          "default": 0,
+          "name": "offset",
+          "required": false,
+          "schema": {
+            "type": "integer"
+          }
+        },
+        {
+          "default": null,
+          "name": "limit",
+          "required": false,
+          "schema": {
+            "type": "integer"
+          }
+        }
+      ],
+      "request_codec_id": "codec.python.component.rtg.schema.request.json",
+      "request_codec_version": 1,
+      "request_payload_disposition": "command",
+      "request_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "enum": [
+              "anchor",
+              "data_object",
+              "link"
+            ],
+            "type": "string"
+          },
+          "limit": {
+            "type": "integer"
+          },
+          "live": {
+            "type": "boolean"
+          },
+          "offset": {
+            "type": "integer"
+          }
+        },
+        "required": [],
+        "type": "object"
+      },
+      "resolved_argument_from_result": null,
+      "result_codec_id": "codec.python.component.rtg.schema.result.json",
+      "result_codec_version": 1,
+      "result_payload_disposition": "query_result",
+      "result_schema": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "description": {
+              "type": "string"
+            },
+            "kind": {
+              "enum": [
+                "anchor",
+                "data_object",
+                "link"
+              ],
+              "type": "string"
+            },
+            "payload": {
+              "type": "object"
+            },
+            "system": {
+              "type": "object"
+            },
+            "type_key": {
+              "type": "string"
+            },
+            "uuid": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "type_key",
+            "description",
+            "payload",
+            "system"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "schema_version": 1
+    },
+    {
+      "action_id": "component.rtg.schema.list_definitions_by_type_key",
+      "binding_id": "binding.python.rtg.schema.v1",
+      "binding_version": 1,
+      "canonical_effect_codec_id": null,
+      "canonical_effect_codec_version": null,
+      "canonical_effect_schema_version": null,
+      "concurrency_lane": "serialized",
+      "consistency_access": "independent",
+      "consistency_group": null,
+      "deadline_seconds": null,
+      "effect_payload_disposition": null,
+      "externally_effectful": false,
+      "failure_codec_id": "codec.python.component.rtg.schema.failure.json",
+      "failure_codec_version": 1,
+      "failure_dispositions": {},
+      "failure_names": [
+        "RtgSchemaTypeKeyInvalid",
+        "RtgSchemaDefinitionKindInvalid",
+        "RtgSchemaPayloadInvalid"
+      ],
+      "fault_payload_disposition": "diagnostic",
+      "fault_schema": {
+        "oneOf": [
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          }
+        ]
+      },
+      "idempotency": "idempotent",
+      "method_name": "list_definitions_by_type_key",
+      "modeled_fault_trace_disposition": "aborted",
+      "recovery_authorized": false,
+      "replay_mode": "no_state_effect",
+      "request_arguments": [
+        {
+          "default": null,
+          "name": "schema_type_key",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "default": null,
+          "name": "kind",
+          "required": false,
+          "schema": {
+            "enum": [
+              "anchor",
+              "data_object",
+              "link"
+            ],
+            "type": "string"
+          }
+        },
+        {
+          "default": null,
+          "name": "live",
+          "required": false,
+          "schema": {
+            "type": "boolean"
+          }
+        },
+        {
+          "default": 0,
+          "name": "offset",
+          "required": false,
+          "schema": {
+            "type": "integer"
+          }
+        },
+        {
+          "default": null,
+          "name": "limit",
+          "required": false,
+          "schema": {
+            "type": "integer"
+          }
+        }
+      ],
+      "request_codec_id": "codec.python.component.rtg.schema.request.json",
+      "request_codec_version": 1,
+      "request_payload_disposition": "command",
+      "request_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "enum": [
+              "anchor",
+              "data_object",
+              "link"
+            ],
+            "type": "string"
+          },
+          "limit": {
+            "type": "integer"
+          },
+          "live": {
+            "type": "boolean"
+          },
+          "offset": {
+            "type": "integer"
+          },
+          "schema_type_key": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "schema_type_key"
+        ],
+        "type": "object"
+      },
+      "resolved_argument_from_result": null,
+      "result_codec_id": "codec.python.component.rtg.schema.result.json",
+      "result_codec_version": 1,
+      "result_payload_disposition": "query_result",
+      "result_schema": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "description": {
+              "type": "string"
+            },
+            "kind": {
+              "enum": [
+                "anchor",
+                "data_object",
+                "link"
+              ],
+              "type": "string"
+            },
+            "payload": {
+              "type": "object"
+            },
+            "system": {
+              "type": "object"
+            },
+            "type_key": {
+              "type": "string"
+            },
+            "uuid": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "type_key",
+            "description",
+            "payload",
+            "system"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "schema_version": 1
+    },
+    {
+      "action_id": "component.rtg.schema.list_anchor_data_type_keys",
+      "binding_id": "binding.python.rtg.schema.v1",
+      "binding_version": 1,
+      "canonical_effect_codec_id": null,
+      "canonical_effect_codec_version": null,
+      "canonical_effect_schema_version": null,
+      "concurrency_lane": "serialized",
+      "consistency_access": "independent",
+      "consistency_group": null,
+      "deadline_seconds": null,
+      "effect_payload_disposition": null,
+      "externally_effectful": false,
+      "failure_codec_id": "codec.python.component.rtg.schema.failure.json",
+      "failure_codec_version": 1,
+      "failure_dispositions": {},
+      "failure_names": [
+        "RtgSchemaTypeKeyInvalid",
+        "RtgSchemaDefinitionNotFound"
+      ],
+      "fault_payload_disposition": "diagnostic",
+      "fault_schema": {
+        "oneOf": [
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          }
+        ]
+      },
+      "idempotency": "idempotent",
+      "method_name": "list_anchor_data_type_keys",
+      "modeled_fault_trace_disposition": "aborted",
+      "recovery_authorized": false,
+      "replay_mode": "no_state_effect",
+      "request_arguments": [
+        {
+          "default": null,
+          "name": "anchor_type_key",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "default": true,
+          "name": "live",
+          "required": false,
+          "schema": {
+            "type": "boolean"
+          }
+        }
+      ],
+      "request_codec_id": "codec.python.component.rtg.schema.request.json",
+      "request_codec_version": 1,
+      "request_payload_disposition": "command",
+      "request_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "anchor_type_key": {
+            "type": "string"
+          },
+          "live": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "anchor_type_key"
+        ],
+        "type": "object"
+      },
+      "resolved_argument_from_result": null,
+      "result_codec_id": "codec.python.component.rtg.schema.result.json",
+      "result_codec_version": 1,
+      "result_payload_disposition": "query_result",
+      "result_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "optional_data_types": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "required_data_types": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "schema_version": 1
+    },
+    {
+      "action_id": "component.rtg.schema.list_link_participation",
+      "binding_id": "binding.python.rtg.schema.v1",
+      "binding_version": 1,
+      "canonical_effect_codec_id": null,
+      "canonical_effect_codec_version": null,
+      "canonical_effect_schema_version": null,
+      "concurrency_lane": "serialized",
+      "consistency_access": "independent",
+      "consistency_group": null,
+      "deadline_seconds": null,
+      "effect_payload_disposition": null,
+      "externally_effectful": false,
+      "failure_codec_id": "codec.python.component.rtg.schema.failure.json",
+      "failure_codec_version": 1,
+      "failure_dispositions": {},
+      "failure_names": [
+        "RtgSchemaTypeKeyInvalid",
+        "RtgSchemaDirectionInvalid"
+      ],
+      "fault_payload_disposition": "diagnostic",
+      "fault_schema": {
+        "oneOf": [
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          }
+        ]
+      },
+      "idempotency": "idempotent",
+      "method_name": "list_link_participation",
+      "modeled_fault_trace_disposition": "aborted",
+      "recovery_authorized": false,
+      "replay_mode": "no_state_effect",
+      "request_arguments": [
+        {
+          "default": null,
+          "name": "type_key",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "default": "either",
+          "name": "direction",
+          "required": false,
+          "schema": {
+            "enum": [
+              "source",
+              "target",
+              "either"
+            ],
+            "type": "string"
+          }
+        },
+        {
+          "default": true,
+          "name": "live",
+          "required": false,
+          "schema": {
+            "type": "boolean"
+          }
+        }
+      ],
+      "request_codec_id": "codec.python.component.rtg.schema.request.json",
+      "request_codec_version": 1,
+      "request_payload_disposition": "command",
+      "request_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "direction": {
+            "enum": [
+              "source",
+              "target",
+              "either"
+            ],
+            "type": "string"
+          },
+          "live": {
+            "type": "boolean"
+          },
+          "type_key": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "type_key"
+        ],
+        "type": "object"
+      },
+      "resolved_argument_from_result": null,
+      "result_codec_id": "codec.python.component.rtg.schema.result.json",
+      "result_codec_version": 1,
+      "result_payload_disposition": "query_result",
+      "result_schema": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "allowed_source_types": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "allowed_target_types": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "definition_uuid": {
+              "type": "string"
+            },
+            "direction": {
+              "enum": [
+                "source",
+                "target",
+                "both"
+              ],
+              "type": "string"
+            },
+            "live": {
+              "type": "boolean"
+            },
+            "type_key": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "definition_uuid",
+            "type_key",
+            "direction",
+            "live"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "schema_version": 1
+    },
+    {
+      "action_id": "component.rtg.schema.list_anchor_type_summaries",
+      "binding_id": "binding.python.rtg.schema.v1",
+      "binding_version": 1,
+      "canonical_effect_codec_id": null,
+      "canonical_effect_codec_version": null,
+      "canonical_effect_schema_version": null,
+      "concurrency_lane": "serialized",
+      "consistency_access": "independent",
+      "consistency_group": null,
+      "deadline_seconds": null,
+      "effect_payload_disposition": null,
+      "externally_effectful": false,
+      "failure_codec_id": "codec.python.component.rtg.schema.failure.json",
+      "failure_codec_version": 1,
+      "failure_dispositions": {},
+      "failure_names": [],
+      "fault_payload_disposition": "diagnostic",
+      "fault_schema": {
+        "oneOf": []
+      },
+      "idempotency": "idempotent",
+      "method_name": "list_anchor_type_summaries",
+      "modeled_fault_trace_disposition": "aborted",
+      "recovery_authorized": false,
+      "replay_mode": "no_state_effect",
+      "request_arguments": [
+        {
+          "default": true,
+          "name": "live",
+          "required": false,
+          "schema": {
+            "type": "boolean"
+          }
+        }
+      ],
+      "request_codec_id": "codec.python.component.rtg.schema.request.json",
+      "request_codec_version": 1,
+      "request_payload_disposition": "command",
+      "request_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "live": {
+            "type": "boolean"
+          }
+        },
+        "required": [],
+        "type": "object"
+      },
+      "resolved_argument_from_result": null,
+      "result_codec_id": "codec.python.component.rtg.schema.result.json",
+      "result_codec_version": 1,
+      "result_payload_disposition": "query_result",
+      "result_schema": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "definition_uuid": {
+              "type": "string"
+            },
+            "description": {
+              "type": "string"
+            },
+            "live": {
+              "type": "boolean"
+            },
+            "type_key": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "definition_uuid",
+            "type_key",
+            "description",
+            "live"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "schema_version": 1
+    },
+    {
+      "action_id": "component.rtg.schema.get_schema_pack",
+      "binding_id": "binding.python.rtg.schema.v1",
+      "binding_version": 1,
+      "canonical_effect_codec_id": null,
+      "canonical_effect_codec_version": null,
+      "canonical_effect_schema_version": null,
+      "concurrency_lane": "serialized",
+      "consistency_access": "independent",
+      "consistency_group": null,
+      "deadline_seconds": null,
+      "effect_payload_disposition": null,
+      "externally_effectful": false,
+      "failure_codec_id": "codec.python.component.rtg.schema.failure.json",
+      "failure_codec_version": 1,
+      "failure_dispositions": {},
+      "failure_names": [
+        "RtgSchemaTypeKeyInvalid",
+        "RtgSchemaDefinitionNotFound"
+      ],
+      "fault_payload_disposition": "diagnostic",
+      "fault_schema": {
+        "oneOf": [
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          }
+        ]
+      },
+      "idempotency": "idempotent",
+      "method_name": "get_schema_pack",
+      "modeled_fault_trace_disposition": "aborted",
+      "recovery_authorized": false,
+      "replay_mode": "no_state_effect",
+      "request_arguments": [
+        {
+          "default": null,
+          "name": "anchor_type_keys",
+          "required": true,
+          "schema": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        {
+          "default": true,
+          "name": "live",
+          "required": false,
+          "schema": {
+            "type": "boolean"
+          }
+        }
+      ],
+      "request_codec_id": "codec.python.component.rtg.schema.request.json",
+      "request_codec_version": 1,
+      "request_payload_disposition": "command",
+      "request_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "anchor_type_keys": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "live": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "anchor_type_keys"
+        ],
+        "type": "object"
+      },
+      "resolved_argument_from_result": null,
+      "result_codec_id": "codec.python.component.rtg.schema.result.json",
+      "result_codec_version": 1,
+      "result_payload_disposition": "query_result",
+      "result_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "anchor_schemas": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "description": {
+                  "type": "string"
+                },
+                "kind": {
+                  "enum": [
+                    "anchor",
+                    "data_object",
+                    "link"
+                  ],
+                  "type": "string"
+                },
+                "payload": {
+                  "type": "object"
+                },
+                "system": {
+                  "type": "object"
+                },
+                "type_key": {
+                  "type": "string"
+                },
+                "uuid": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "type_key",
+                "description",
+                "payload",
+                "system"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "associated_data_object_schemas": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "description": {
+                  "type": "string"
+                },
+                "kind": {
+                  "enum": [
+                    "anchor",
+                    "data_object",
+                    "link"
+                  ],
+                  "type": "string"
+                },
+                "payload": {
+                  "type": "object"
+                },
+                "system": {
+                  "type": "object"
+                },
+                "type_key": {
+                  "type": "string"
+                },
+                "uuid": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "type_key",
+                "description",
+                "payload",
+                "system"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "link_schemas": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "description": {
+                  "type": "string"
+                },
+                "kind": {
+                  "enum": [
+                    "anchor",
+                    "data_object",
+                    "link"
+                  ],
+                  "type": "string"
+                },
+                "payload": {
+                  "type": "object"
+                },
+                "system": {
+                  "type": "object"
+                },
+                "type_key": {
+                  "type": "string"
+                },
+                "uuid": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "type_key",
+                "description",
+                "payload",
+                "system"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "schema_version": 1
+    },
+    {
+      "action_id": "component.rtg.schema.delete_definition",
+      "binding_id": "binding.python.rtg.schema.v1",
+      "binding_version": 1,
+      "canonical_effect_codec_id": "binding.python.rtg.schema.v1.component.rtg.schema.delete_definition.effect.json",
+      "canonical_effect_codec_version": 1,
+      "canonical_effect_schema_version": 1,
+      "concurrency_lane": "serialized",
+      "consistency_access": "independent",
+      "consistency_group": null,
+      "deadline_seconds": null,
+      "effect_payload_disposition": "canonical_delta",
+      "externally_effectful": false,
+      "failure_codec_id": "codec.python.component.rtg.schema.failure.json",
+      "failure_codec_version": 1,
+      "failure_dispositions": {},
+      "failure_names": [
+        "RtgSchemaDefinitionNotFound"
+      ],
+      "fault_payload_disposition": "diagnostic",
+      "fault_schema": {
+        "oneOf": [
+          {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          }
+        ]
+      },
+      "idempotency": "non_idempotent",
+      "method_name": "delete_definition",
+      "modeled_fault_trace_disposition": "aborted",
+      "recovery_authorized": false,
+      "replay_mode": "canonical_effect",
+      "request_arguments": [
+        {
+          "default": null,
+          "name": "definition_uuid",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "request_codec_id": "codec.python.component.rtg.schema.request.json",
+      "request_codec_version": 1,
+      "request_payload_disposition": "command",
+      "request_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "definition_uuid": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "definition_uuid"
+        ],
+        "type": "object"
+      },
+      "resolved_argument_from_result": null,
+      "result_codec_id": "codec.python.component.rtg.schema.result.json",
+      "result_codec_version": 1,
+      "result_payload_disposition": "query_result",
+      "result_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "deleted_definition": {
+            "additionalProperties": false,
+            "properties": {
+              "description": {
+                "type": "string"
+              },
+              "kind": {
+                "enum": [
+                  "anchor",
+                  "data_object",
+                  "link"
+                ],
+                "type": "string"
+              },
+              "payload": {
+                "type": "object"
+              },
+              "system": {
+                "type": "object"
+              },
+              "type_key": {
+                "type": "string"
+              },
+              "uuid": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "kind",
+              "type_key",
+              "description",
+              "payload",
+              "system"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "deleted_definition"
+        ],
+        "type": "object"
+      },
+      "schema_version": 1
+    }
+  ],
+  "binding_id": "binding.python.rtg.schema.v1",
+  "binding_version": 1,
+  "component_contract_id": "component.rtg.schema",
+  "schema_version": 1,
+  "source_contract_id": "component.rtg.schema"
+}

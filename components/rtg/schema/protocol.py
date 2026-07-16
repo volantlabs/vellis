@@ -4,6 +4,8 @@ from dataclasses import dataclass, field
 from typing import Protocol
 from uuid import UUID
 
+from components.rtg.change import RtgChangeReference
+
 type JsonScalar = str | int | float | bool | None
 type JsonValue = JsonScalar | list[JsonValue] | dict[str, JsonValue]
 type JsonObject = dict[str, JsonValue]
@@ -56,6 +58,41 @@ class RtgSchemaDefinition:
 @dataclass(frozen=True, slots=True)
 class RtgSchemaSnapshot:
     definitions: tuple[JsonObject, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class RtgSchemaDefinitionWrite:
+    ref: RtgChangeReference
+    definition: RtgSchemaDefinition
+
+
+@dataclass(frozen=True, slots=True)
+class RtgSchemaLiveStatusChange:
+    target_ref: RtgChangeReference
+    live: bool
+
+
+@dataclass(frozen=True, slots=True)
+class RtgSchemaChangeSet:
+    definition_writes: tuple[RtgSchemaDefinitionWrite, ...] = ()
+    delete_definitions: tuple[RtgChangeReference, ...] = ()
+    set_live: tuple[RtgSchemaLiveStatusChange, ...] = ()
+
+
+@dataclass(frozen=True, slots=True)
+class RtgSchemaBatchResult:
+    writes: int = 0
+    deletes: int = 0
+    live_changes: int = 0
+
+
+@dataclass(frozen=True, slots=True)
+class RtgSchemaCountSummary:
+    anchor_live: int = 0
+    data_object_live: int = 0
+    link_live: int = 0
+    live_total: int = 0
+    non_live_total: int = 0
 
 
 @dataclass(frozen=True, slots=True)
@@ -183,6 +220,14 @@ class RtgSchema(Protocol):
         """Atomically replace all schema state from a validated snapshot."""
         ...
 
+    def apply_batch(self, changes: RtgSchemaChangeSet) -> RtgSchemaBatchResult:
+        """Apply one schema-local change set atomically."""
+        ...
+
+    def count_summary(self) -> RtgSchemaCountSummary:
+        """Return bounded schema counts without materializing definitions."""
+        ...
+
     def put_definition(self, definition: RtgSchemaDefinition) -> RtgSchemaDefinition:
         """Create or fully replace a schema definition."""
         ...
@@ -195,6 +240,8 @@ class RtgSchema(Protocol):
         self,
         kind: str | None = None,
         live: bool | None = None,
+        offset: int = 0,
+        limit: int | None = None,
     ) -> RtgSchemaDefinitionList:
         """List definitions, optionally filtered by kind and live status."""
         ...
@@ -204,6 +251,8 @@ class RtgSchema(Protocol):
         schema_type_key: str,
         kind: str | None = None,
         live: bool | None = None,
+        offset: int = 0,
+        limit: int | None = None,
     ) -> RtgSchemaDefinitionList:
         """List definitions for one schema type key."""
         ...

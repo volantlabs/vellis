@@ -8,6 +8,7 @@ library package BibliotekRtgChangeValidation {
     private import BibliotekRtgMigration::*;
     private import BibliotekRtgQuery::*;
     private import BibliotekRtgDiagnostics::*;
+    private import BibliotekRtgChangeValues::*;
 
     doc /* Deterministic, read-only validation of proposed RTG changes and supplied RTG state. */
 
@@ -19,31 +20,6 @@ library package BibliotekRtgChangeValidation {
     enum def RtgValidationSeverity { enum blocking; enum warning; enum informational; }
     enum def RtgValidationTrackSelection { enum 'all'; enum selected; }
 
-    attribute def RtgResourceIdentifier {
-        attribute uuid[0..1] : Uuid;
-        attribute migrationId[0..1] : String;
-        doc /* Exactly one representation identifies an existing or caller-assigned resource: UUID for graph/schema/constraint resources or text for migrations. */
-    }
-    attribute def RtgChangeReference {
-        attribute resourceId[0..1] : RtgResourceIdentifier;
-        attribute localRef[0..1] : String;
-        doc /* Exactly one of resourceId and localRef identifies the target. localRef is unique within one batch and may be resolved by a controller before apply. */
-    }
-    attribute def RtgGraphAnchorWrite { attribute 'ref' : RtgChangeReference; attribute type : String; attribute displayName[0..1] : String; attribute system : JsonObject; }
-    attribute def RtgGraphDataObjectWrite { attribute 'ref' : RtgChangeReference; attribute type : String; attribute properties : JsonObject; attribute system : JsonObject; attribute anchorRefs[1..*] : RtgChangeReference; }
-    attribute def RtgGraphLinkWrite { attribute 'ref' : RtgChangeReference; attribute type : String; attribute sourceRef : RtgChangeReference; attribute targetRef : RtgChangeReference; attribute system : JsonObject; }
-    attribute def RtgGraphAssociationChange { attribute anchorRef : RtgChangeReference; attribute dataRef : RtgChangeReference; }
-    attribute def RtgGraphLiveStatusChange { attribute objectRef : RtgChangeReference; attribute live : Boolean; }
-    attribute def RtgGraphChangeSet { attribute anchorWrites[0..*] : RtgGraphAnchorWrite; attribute dataObjectWrites[0..*] : RtgGraphDataObjectWrite; attribute linkWrites[0..*] : RtgGraphLinkWrite; attribute associateData[0..*] : RtgGraphAssociationChange; attribute dissociateData[0..*] : RtgGraphAssociationChange; attribute deleteAnchors[0..*] : RtgChangeReference; attribute deleteDataObjects[0..*] : RtgChangeReference; attribute deleteLinks[0..*] : RtgChangeReference; attribute setLive[0..*] : RtgGraphLiveStatusChange; }
-    attribute def RtgSchemaDefinitionWrite { attribute 'ref' : RtgChangeReference; item definition : RtgSchemaDefinition; }
-    attribute def RtgLiveStatusChange { attribute targetRef : RtgChangeReference; attribute live : Boolean; }
-    attribute def RtgSchemaChangeSet { attribute definitionWrites[0..*] : RtgSchemaDefinitionWrite; attribute deleteDefinitions[0..*] : RtgChangeReference; attribute setLive[0..*] : RtgLiveStatusChange; }
-    attribute def RtgConstraintDefinitionWrite { attribute 'ref' : RtgChangeReference; item 'constraint' : RtgConstraintDefinition; }
-    attribute def RtgConstraintChangeSet { attribute constraintWrites[0..*] : RtgConstraintDefinitionWrite; attribute deleteConstraints[0..*] : RtgChangeReference; attribute setLive[0..*] : RtgLiveStatusChange; }
-    attribute def RtgMigrationRecordWrite { attribute 'ref' : RtgChangeReference; item migration : RtgMigrationRecord; }
-    attribute def RtgMigrationStatusChange { attribute migrationRef : RtgChangeReference; attribute status : RtgMigrationStatus; attribute statusMetadata : JsonObject; }
-    attribute def RtgMigrationEvidenceAddition { attribute migrationRef : RtgChangeReference; attribute evidence : RtgMigrationEvidence; }
-    attribute def RtgMigrationChangeSet { attribute migrationWrites[0..*] : RtgMigrationRecordWrite; attribute deleteMigrations[0..*] : RtgChangeReference; attribute statusChanges[0..*] : RtgMigrationStatusChange; attribute evidenceAdditions[0..*] : RtgMigrationEvidenceAddition; }
     attribute def RtgChangeBatch {
         attribute graphChanges[0..1] : RtgGraphChangeSet;
         attribute schemaChanges[0..1] : RtgSchemaChangeSet;
@@ -115,6 +91,13 @@ library package BibliotekRtgChangeValidation {
         subject operation : ValidateRtgChangeBatch;
         require constraint {
             doc /* Resolve batch-local references and construct separate proposed graph, schema, constraint, and migration views from public component semantics. Projection never mutates supplied sources. */
+        }
+    }
+
+    requirement <'invariant.rtg.change_validation.projection_is_delta_scaled'> projectionWorkBounded {
+        subject operation : ValidateRtgChangeBatch;
+        require constraint {
+            doc /* Projection construction stores only the proposed changes, required cascade closure, and records actually examined. It does not copy, serialize, hash, or retain complete component state. A rule may traverse relevant canonical state when its declared semantics require it, but that traversal does not license a second complete in-memory store. */
         }
     }
 
@@ -271,6 +254,7 @@ library package BibliotekRtgChangeValidation {
         satisfy patternEvaluationDelegated by validator;
         satisfy cascadeEffectsFromPreview by validator;
         satisfy projectionSemantics by validator.validateBatch;
+        satisfy projectionWorkBounded by validator.validateBatch;
         satisfy trackIsolation by validator.validateBatch;
 
         satisfy validateRtgChangeBatchFailureSemantics by validator.validateBatch;
@@ -289,6 +273,12 @@ library package BibliotekRtgChangeValidation {
             evidenceId = "components/rtg/change_validation/tests/test_rtg_change_validation_contract.py#ValidateRtgChangeBatchContractVerification";
             implementationScope = "DeterministicRtgChangeValidator";
         }
+    }
+
+    verification def RtgChangeValidationScalingVerification {
+        subject operation : ValidateRtgChangeBatch;
+        objective { verify projectionWorkBounded; }
+        @EvidenceBinding { evidenceId = "components/rtg/change_validation/tests/test_rtg_change_validation_contract.py#RtgChangeValidationScalingVerification"; implementationScope = "DeterministicRtgChangeValidator"; }
     }
     verification def ValidateRtgGraphStateContractVerification {
         subject operation : ValidateRtgGraphState;

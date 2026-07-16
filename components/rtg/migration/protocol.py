@@ -4,10 +4,27 @@ from dataclasses import dataclass, field
 from typing import Protocol
 from uuid import UUID
 
+from components.rtg.change import RtgChangeReference
+
 type JsonScalar = str | int | float | bool | None
 type JsonValue = JsonScalar | list[JsonValue] | dict[str, JsonValue]
 type JsonObject = dict[str, JsonValue]
 type UuidInput = UUID | str
+
+RTG_MIGRATION_STATUS_TRANSITIONS: dict[str, frozenset[str]] = {
+    "draft": frozenset({"ready", "abandoned"}),
+    "ready": frozenset({"draft", "applied", "failed", "abandoned"}),
+    "failed": frozenset({"ready", "abandoned"}),
+    "applied": frozenset(),
+    "abandoned": frozenset(),
+}
+
+
+def migration_status_transition_allowed(current: str, requested: str) -> bool:
+    """Return whether the public migration lifecycle permits this transition."""
+    return current == requested or requested in RTG_MIGRATION_STATUS_TRANSITIONS.get(
+        current, frozenset()
+    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -49,8 +66,60 @@ class RtgMigrationSnapshot:
 
 
 @dataclass(frozen=True, slots=True)
+class RtgMigrationRecordWrite:
+    ref: RtgChangeReference
+    migration: RtgMigrationRecord
+
+
+@dataclass(frozen=True, slots=True)
+class RtgMigrationStatusChange:
+    migration_ref: RtgChangeReference
+    status: str
+    status_metadata: JsonObject = field(default_factory=dict)
+
+
+@dataclass(frozen=True, slots=True)
+class RtgMigrationEvidenceAddition:
+    migration_ref: RtgChangeReference
+    evidence: RtgMigrationEvidence
+
+
+@dataclass(frozen=True, slots=True)
+class RtgMigrationChangeSet:
+    migration_writes: tuple[RtgMigrationRecordWrite, ...] = ()
+    delete_migrations: tuple[RtgChangeReference, ...] = ()
+    status_changes: tuple[RtgMigrationStatusChange, ...] = ()
+    evidence_additions: tuple[RtgMigrationEvidenceAddition, ...] = ()
+
+
+@dataclass(frozen=True, slots=True)
+class RtgMigrationBatchResult:
+    writes: int = 0
+    deletes: int = 0
+    status_changes: int = 0
+    evidence_additions: int = 0
+
+
+@dataclass(frozen=True, slots=True)
+class RtgMigrationCountSummary:
+    draft: int = 0
+    ready: int = 0
+    failed: int = 0
+    applied: int = 0
+    abandoned: int = 0
+    total: int = 0
+
+
+@dataclass(frozen=True, slots=True)
+class RtgMigrationCandidateOwners:
+    migration_ids: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True, slots=True)
 class RtgMigrationRecordList:
     migrations: tuple[RtgMigrationRecord, ...]
+    total: int = 0
+    next_offset: int | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -153,6 +222,20 @@ class RtgMigration(Protocol):
         """Atomically replace all migration state from a validated snapshot."""
         ...
 
+    def apply_batch(self, changes: RtgMigrationChangeSet) -> RtgMigrationBatchResult:
+        """Apply one migration-local change set atomically."""
+        ...
+
+    def count_summary(self) -> RtgMigrationCountSummary:
+        """Return bounded migration counts by status."""
+        ...
+
+    def find_candidate_owners(
+        self, kind: str, resource_id: UuidInput
+    ) -> RtgMigrationCandidateOwners:
+        """Return migrations that reference one candidate resource."""
+        ...
+
     def put_migration(self, migration: RtgMigrationRecord) -> RtgMigrationRecord:
         """Create or fully replace a migration record."""
         ...
@@ -161,7 +244,9 @@ class RtgMigration(Protocol):
         """Return one migration record."""
         ...
 
-    def list_migrations(self, status: str | None = None) -> RtgMigrationRecordList:
+    def list_migrations(
+        self, status: str | None = None, offset: int = 0, limit: int | None = None
+    ) -> RtgMigrationRecordList:
         """List migrations, optionally filtered by status."""
         ...
 

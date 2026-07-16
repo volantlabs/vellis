@@ -2,128 +2,64 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from typing import Protocol
-from uuid import UUID
 
-from components.rtg.constraints.protocol import RtgConstraintDefinition
-from components.rtg.graph.protocol import JsonObject
-from components.rtg.migration.protocol import RtgMigrationEvidence, RtgMigrationRecord
-from components.rtg.schema.protocol import RtgSchemaDefinition
+from components.rtg.change import RtgChangeReference  # noqa: F401 - compatibility re-export
+from components.rtg.constraints.protocol import (
+    RtgConstraintChangeSet,
+    RtgConstraintDefinitionWrite,
+    RtgConstraintLiveStatusChange,
+)  # noqa: F401 - compatibility re-exports for one release
+from components.rtg.graph.protocol import (
+    JsonObject,
+    RtgGraphAnchorWrite,
+    RtgGraphAssociationChange,
+    RtgGraphChangeSet,
+    RtgGraphDataObjectWrite,
+    RtgGraphLinkWrite,
+    RtgGraphLiveStatusChange,
+)  # noqa: F401 - compatibility re-exports for one release
+from components.rtg.migration.protocol import (
+    RtgMigrationChangeSet,
+    RtgMigrationEvidenceAddition,
+    RtgMigrationRecordWrite,
+    RtgMigrationStatusChange,
+)  # noqa: F401 - compatibility re-exports for one release
+from components.rtg.schema.protocol import (
+    RtgSchemaChangeSet,
+    RtgSchemaDefinitionWrite,
+    RtgSchemaLiveStatusChange,
+)  # noqa: F401 - compatibility re-exports for one release
 
+__all__ = [
+    "RtgChangeBatch",
+    "RtgChangeReference",
+    "RtgChangeValidator",
+    "RtgConstraintChangeSet",
+    "RtgConstraintDefinitionWrite",
+    "RtgConstraintLiveStatusChange",
+    "RtgGraphAnchorWrite",
+    "RtgGraphAssociationChange",
+    "RtgGraphChangeSet",
+    "RtgGraphDataObjectWrite",
+    "RtgGraphLinkWrite",
+    "RtgGraphLiveStatusChange",
+    "RtgLiveStatusChange",
+    "RtgMigrationChangeSet",
+    "RtgMigrationEvidenceAddition",
+    "RtgMigrationRecordWrite",
+    "RtgMigrationStatusChange",
+    "RtgSchemaChangeSet",
+    "RtgSchemaDefinitionWrite",
+    "RtgSchemaLiveStatusChange",
+    "RtgValidationError",
+    "RtgValidationFinding",
+    "RtgValidationInputInvalid",
+    "RtgValidationOptions",
+    "RtgValidationReport",
+]
 
-@dataclass(frozen=True, slots=True)
-class RtgChangeReference:
-    resource_id: UUID | str | None = None
-    local_ref: str | None = None
-
-
-@dataclass(frozen=True, slots=True)
-class RtgGraphAnchorWrite:
-    ref: RtgChangeReference
-    type: str
-    display_name: str | None = None
-    system: JsonObject = field(default_factory=dict)
-
-
-@dataclass(frozen=True, slots=True)
-class RtgGraphDataObjectWrite:
-    ref: RtgChangeReference
-    type: str
-    properties: JsonObject = field(default_factory=dict)
-    system: JsonObject = field(default_factory=dict)
-    anchor_refs: tuple[RtgChangeReference, ...] = ()
-
-
-@dataclass(frozen=True, slots=True)
-class RtgGraphLinkWrite:
-    ref: RtgChangeReference
-    type: str
-    source_ref: RtgChangeReference
-    target_ref: RtgChangeReference
-    system: JsonObject = field(default_factory=dict)
-
-
-@dataclass(frozen=True, slots=True)
-class RtgGraphAssociationChange:
-    anchor_ref: RtgChangeReference
-    data_ref: RtgChangeReference
-
-
-@dataclass(frozen=True, slots=True)
-class RtgGraphLiveStatusChange:
-    object_ref: RtgChangeReference
-    live: bool
-
-
-@dataclass(frozen=True, slots=True)
-class RtgGraphChangeSet:
-    anchor_writes: tuple[RtgGraphAnchorWrite, ...] = ()
-    data_object_writes: tuple[RtgGraphDataObjectWrite, ...] = ()
-    link_writes: tuple[RtgGraphLinkWrite, ...] = ()
-    associate_data: tuple[RtgGraphAssociationChange, ...] = ()
-    dissociate_data: tuple[RtgGraphAssociationChange, ...] = ()
-    delete_anchors: tuple[RtgChangeReference, ...] = ()
-    delete_data_objects: tuple[RtgChangeReference, ...] = ()
-    delete_links: tuple[RtgChangeReference, ...] = ()
-    set_live: tuple[RtgGraphLiveStatusChange, ...] = ()
-
-
-@dataclass(frozen=True, slots=True)
-class RtgSchemaDefinitionWrite:
-    ref: RtgChangeReference
-    definition: RtgSchemaDefinition
-
-
-@dataclass(frozen=True, slots=True)
-class RtgLiveStatusChange:
-    target_ref: RtgChangeReference
-    live: bool
-
-
-@dataclass(frozen=True, slots=True)
-class RtgSchemaChangeSet:
-    definition_writes: tuple[RtgSchemaDefinitionWrite, ...] = ()
-    delete_definitions: tuple[RtgChangeReference, ...] = ()
-    set_live: tuple[RtgLiveStatusChange, ...] = ()
-
-
-@dataclass(frozen=True, slots=True)
-class RtgConstraintDefinitionWrite:
-    ref: RtgChangeReference
-    constraint: RtgConstraintDefinition
-
-
-@dataclass(frozen=True, slots=True)
-class RtgConstraintChangeSet:
-    constraint_writes: tuple[RtgConstraintDefinitionWrite, ...] = ()
-    delete_constraints: tuple[RtgChangeReference, ...] = ()
-    set_live: tuple[RtgLiveStatusChange, ...] = ()
-
-
-@dataclass(frozen=True, slots=True)
-class RtgMigrationRecordWrite:
-    ref: RtgChangeReference
-    migration: RtgMigrationRecord
-
-
-@dataclass(frozen=True, slots=True)
-class RtgMigrationStatusChange:
-    migration_ref: RtgChangeReference
-    status: str
-    status_metadata: JsonObject = field(default_factory=dict)
-
-
-@dataclass(frozen=True, slots=True)
-class RtgMigrationEvidenceAddition:
-    migration_ref: RtgChangeReference
-    evidence: RtgMigrationEvidence
-
-
-@dataclass(frozen=True, slots=True)
-class RtgMigrationChangeSet:
-    migration_writes: tuple[RtgMigrationRecordWrite, ...] = ()
-    delete_migrations: tuple[RtgChangeReference, ...] = ()
-    status_changes: tuple[RtgMigrationStatusChange, ...] = ()
-    evidence_additions: tuple[RtgMigrationEvidenceAddition, ...] = ()
+# One-cycle compatibility alias for callers of the former aggregate-owned type.
+RtgLiveStatusChange = RtgSchemaLiveStatusChange
 
 
 @dataclass(frozen=True, slots=True)

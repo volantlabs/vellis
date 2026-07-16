@@ -20,6 +20,7 @@ package Vellis {
         part controller : RtgController;
         part facade : VellisApplicationFacade;
         part starterOntologyInstaller : EverydayLifeOntologyInstaller;
+        part runner : RtgKnowledgeGraphRunner;
 
         bind controller.graph = graphStore;
         bind controller.schema = schemaRegistry;

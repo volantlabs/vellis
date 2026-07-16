@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import asyncio
 import io
 import json
 import os
@@ -267,9 +268,12 @@ def _run_command(args: argparse.Namespace, config: RtgKnowledgeGraphConfig) -> i
             print(json.dumps(client_config, indent=2, sort_keys=True))
         return 0
 
-    with build_app(config) as composition:
-        composition.prepare()
-        status = composition.run()
+    async def run_app():
+        async with await build_app(config) as composition:
+            await composition.prepare()
+            return await composition.run()
+
+    status = asyncio.run(run_app())
 
     if args.json:
         print(json.dumps(status.to_json_value(), sort_keys=True))

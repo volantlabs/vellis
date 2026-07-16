@@ -43,11 +43,14 @@ except ImportError:  # pragma: no cover - direct script execution
 
 LOCK_PATH = VALIDATOR_LOCK_PATH
 CACHE_ROOT = VALIDATOR_CACHE_ROOT
+JAVA_HEADLESS_OPTION = "-Djava.awt.headless=true"
 
 MODEL_ORDER = (
     "foundation/SoftwareComponentModeling.sysml",
     "bibliotek/shared-values/SoftwareValues.sysml",
     "bibliotek/shared-values/RtgDiagnostics.sysml",
+    "bibliotek/shared-values/RtgChangeValues.sysml",
+    "bibliotek/shared-values/RuntimeMessaging.sysml",
     "bibliotek/components/component.runtime.message_runtime.sysml",
     "bibliotek/components/component.runtime.component_adapter.sysml",
     "bibliotek/components/component.interface.mcp_gateway.sysml",
@@ -61,6 +64,7 @@ MODEL_ORDER = (
     "bibliotek/components/component.rtg.change_validation.sysml",
     "bibliotek/components/component.rtg.discovery.sysml",
     "bibliotek/components/component.rtg.controller.sysml",
+    "bibliotek/realizations/BibliotekRuntimePython.sysml",
     "bibliotek/Bibliotek.sysml",
     "bibliotek/views/BibliotekViews.sysml",
     "vellis/EverydayLifeOntology.sysml",
@@ -314,6 +318,7 @@ def _kernel_session() -> Iterator[BlockingKernelClient]:
             process = subprocess.Popen(  # noqa: S603
                 [
                     str(java),
+                    JAVA_HEADLESS_OPTION,
                     "-cp",
                     str(jar),
                     "org.omg.sysml.jupyter.kernel.ISysML",

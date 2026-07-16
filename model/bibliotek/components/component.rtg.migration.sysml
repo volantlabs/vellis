@@ -1,6 +1,7 @@
 library package BibliotekRtgMigration {
     private import SoftwareComponentModeling::*;
     private import BibliotekSoftwareValues::*;
+    private import BibliotekRtgChangeValues::*;
     private import ScalarValues::*;
 
     enum def RtgMigrationStatus {
@@ -27,7 +28,7 @@ library package BibliotekRtgMigration {
         attribute kind : String;
         attribute reference : String;
         attribute summary : String;
-        attribute 'metadata' : JsonObject;
+        attribute 'metadata'[0..1] : JsonObject;
     }
     item def RtgMigrationRecord {
         attribute migrationId[0..1] : String;
@@ -43,11 +44,18 @@ library package BibliotekRtgMigration {
         attribute constraintReplacements[0..*] : RtgMigrationReplacement;
         attribute graphReplacements[0..*] : RtgMigrationReplacement;
         attribute evidence[0..*] ordered : RtgMigrationEvidence;
-        attribute 'metadata' : JsonObject;
+        attribute 'metadata'[0..1] : JsonObject;
         doc /* Identity may be absent only on write. Stored records have a concrete generated or caller-supplied ID. The record stores references and intent, never referenced resources or executable transforms. */
     }
-    attribute def RtgMigrationRecordList { item migrations[0..*] ordered : RtgMigrationRecord; }
+    attribute def RtgMigrationRecordList { item migrations[0..*] ordered : RtgMigrationRecord; attribute total : Integer default = 0; attribute nextOffset[0..1] : Integer; }
     attribute def RtgMigrationSnapshot { item migrations[0..*] ordered : RtgMigrationRecord; }
+    attribute def RtgMigrationRecordWrite { attribute 'ref' : RtgChangeReference; item migration : RtgMigrationRecord; }
+    attribute def RtgMigrationStatusChange { attribute migrationRef : RtgChangeReference; attribute status : RtgMigrationStatus; attribute statusMetadata : JsonObject; }
+    attribute def RtgMigrationEvidenceAddition { attribute migrationRef : RtgChangeReference; attribute evidence : RtgMigrationEvidence; }
+    attribute def RtgMigrationChangeSet { attribute migrationWrites[0..*] : RtgMigrationRecordWrite; attribute deleteMigrations[0..*] : RtgChangeReference; attribute statusChanges[0..*] : RtgMigrationStatusChange; attribute evidenceAdditions[0..*] : RtgMigrationEvidenceAddition; }
+    attribute def RtgMigrationBatchResult { attribute writes : Integer; attribute deletes : Integer; attribute statusChanges : Integer; attribute evidenceAdditions : Integer; }
+    attribute def RtgMigrationCountSummary { attribute draft : Integer; attribute ready : Integer; attribute failed : Integer; attribute applied : Integer; attribute abandoned : Integer; attribute total : Integer; }
+    attribute def RtgMigrationCandidateOwners { attribute migrationIds[0..*] ordered : String; }
     attribute def RtgMigrationDeleteResult { item deletedMigration : RtgMigrationRecord; }
     attribute def RtgMigrationCutoverPlan {
         attribute migrationId : String;
@@ -74,6 +82,9 @@ library package BibliotekRtgMigration {
 
     action def ExportMigrationSnapshot { out 'snapshot' : RtgMigrationSnapshot; doc /* Export all records without inspecting referenced component state. */ @FailureContract { errorIds = (); } }
     action def ReplaceMigrationSnapshot { in 'snapshot' : RtgMigrationSnapshot; doc /* Validate the complete candidate, then atomically replace every migration record and rebuild the status index without applying lifecycle transitions against prior state. */ @FailureContract { errorIds = ("RtgMigrationSnapshotInvalid", "RtgMigrationIdInvalid", "RtgMigrationIdConflict", "RtgMigrationRecordInvalid", "RtgMigrationStatusInvalid", "RtgMigrationEvidenceInvalid"); } }
+    action def ApplyRtgMigrationBatch { in changes : RtgMigrationChangeSet; out result : RtgMigrationBatchResult; doc /* Apply one resolved migration-local change set atomically. */ @FailureContract { errorIds = ("RtgMigrationIdInvalid", "RtgMigrationIdConflict", "RtgMigrationNotFound", "RtgMigrationRecordInvalid", "RtgMigrationStatusInvalid", "RtgMigrationStatusTransitionInvalid", "RtgMigrationEvidenceInvalid", "RtgMigrationDeleteNotAllowed"); } }
+    action def CountRtgMigrationSummary { out result : RtgMigrationCountSummary; doc /* Return bounded counts by migration status without returning records. */ @FailureContract { errorIds = (); } }
+    action def FindMigrationCandidateOwners { in kind : String; in resourceId : Uuid; out result : RtgMigrationCandidateOwners; doc /* Return migration IDs whose make-live membership references one resource. */ @FailureContract { errorIds = ("RtgMigrationRecordInvalid"); } }
     action def PutMigration {
         in migration : RtgMigrationRecord;
         out stored : RtgMigrationRecord;
@@ -81,7 +92,7 @@ library package BibliotekRtgMigration {
         @FailureContract { errorIds = ("RtgMigrationIdInvalid", "RtgMigrationRecordInvalid", "RtgMigrationStatusInvalid", "RtgMigrationStatusTransitionInvalid", "RtgMigrationEvidenceInvalid"); }
     }
     action def GetMigration { in migrationId : String; out migration : RtgMigrationRecord; doc /* Return one migration tracking record by ID. */ @FailureContract { errorIds = ("RtgMigrationNotFound"); } }
-    action def ListMigrations { in status[0..1] : RtgMigrationStatus; out result : RtgMigrationRecordList; doc /* Return all records or records in one status in deterministic migration-ID order. */ @FailureContract { errorIds = ("RtgMigrationStatusInvalid"); } }
+    action def ListMigrations { in status[0..1] : RtgMigrationStatus; in offset : Integer default = 0; in limit[0..1] : Integer; out result : RtgMigrationRecordList; doc /* Return one stable page of all records or records in one status in migration-ID order. */ @FailureContract { errorIds = ("RtgMigrationStatusInvalid", "RtgMigrationRecordInvalid"); } }
     action def SetMigrationStatus {
         in migrationId : String;
         in status : RtgMigrationStatus;
@@ -101,6 +112,7 @@ library package BibliotekRtgMigration {
         derived attribute statusIndex : JsonObject { doc /* Ephemeral status index derived from canonical migration records. */ }
         perform action exportSnapshot[0..*] : ExportMigrationSnapshot;
         perform action replaceSnapshot[0..*] : ReplaceMigrationSnapshot;
+        perform action applyBatch[0..*] : ApplyRtgMigrationBatch; perform action countSummary[0..*] : CountRtgMigrationSummary; perform action findCandidateOwners[0..*] : FindMigrationCandidateOwners;
         perform action putMigration[0..*] : PutMigration;
         perform action getMigration[0..*] : GetMigration;
         perform action listMigrations[0..*] : ListMigrations;
@@ -110,6 +122,9 @@ library package BibliotekRtgMigration {
         perform action buildCutoverPlan[0..*] : BuildMigrationCutoverPlan;
         dependency snapshotState from exportSnapshot to migrationRecords { @StateAccess { kind = StateAccessKind::read; } doc /* return all migration records in migration-ID order. */ }
         dependency replaceSnapshotState from replaceSnapshot to migrationRecords { @StateAccess { kind = StateAccessKind::write; } doc /* validate before visibility and atomically replace every record and derived status entry. */ }
+        dependency applyBatchState from applyBatch to migrationRecords { @StateAccess { kind = StateAccessKind::write; } doc /* expose the complete resolved migration change set or leave canonical migration state unchanged. */ }
+        dependency countSummaryState from countSummary to statusIndex { @StateAccess { kind = StateAccessKind::read; } doc /* return only bounded aggregate counts. */ }
+        dependency candidateOwnerState from findCandidateOwners to migrationRecords { @StateAccess { kind = StateAccessKind::read; } doc /* resolve ownership for one candidate without returning unrelated records. */ }
         dependency putState from putMigration to migrationRecords { @StateAccess { kind = StateAccessKind::write; } doc /* create or lifecycle-safe replace one complete record. */ }
         dependency statusState from setStatus to migrationRecords { @StateAccess { kind = StateAccessKind::write; } doc /* apply one allowed lifecycle transition or same-status metadata update. */ }
         dependency evidenceState from addEvidence to migrationRecords { @StateAccess { kind = StateAccessKind::write; } doc /* append one evidence identity not already present. */ }
@@ -344,6 +359,10 @@ library package BibliotekRtgMigration {
         satisfy statusTrackingNotProof by migration;
         satisfy completedHistoryExternal by migration;
         satisfy rollbackForwardChange by migration;
+        satisfy migrationBatchAtomicity by migration.applyBatch;
+        satisfy migrationRoutineWorkBounded by migration;
+        satisfy countMigrationSummaryFailureSemantics by migration.countSummary;
+        satisfy findMigrationCandidateOwnersFailureSemantics by migration.findCandidateOwners;
 
         satisfy exportMigrationSnapshotFailureSemantics by migration.exportSnapshot;
         satisfy replaceMigrationSnapshotFailureSemantics by migration.replaceSnapshot;
@@ -354,6 +373,7 @@ library package BibliotekRtgMigration {
         satisfy addMigrationEvidenceFailureSemantics by migration.addEvidence;
         satisfy deleteMigrationFailureSemantics by migration.deleteMigration;
         satisfy buildMigrationCutoverPlanFailureSemantics by migration.buildCutoverPlan;
+        satisfy applyRtgMigrationBatchFailureSemantics by migration.applyBatch;
         action createEmptyRtgMigrationSubject : CreateEmptyRtgMigration;
         satisfy createEmptyRtgMigrationFailureSemantics by createEmptyRtgMigrationSubject;
         action importRtgMigrationSnapshotSubject : ImportRtgMigrationSnapshot;
@@ -462,6 +482,16 @@ library package BibliotekRtgMigration {
     }
 
 
+
+    requirement <'contract.rtg.migration.batch_atomicity'> migrationBatchAtomicity { subject operation : ApplyRtgMigrationBatch; require constraint { doc /* Success exposes the complete requested migration-local batch; rejection or failure exposes the exact prior migration state. */ } }
+    requirement <'invariant.rtg.migration.routine_work_is_delta_scaled'> migrationRoutineWorkBounded { subject migration : RtgMigration; require constraint { doc /* A non-state-transfer action does not copy, serialize, hash, or retain complete migration state solely for validation, atomicity, or recovery. Transient work may grow with the requested mutation and affected membership/index closure, but not unrelated migrations. Explicit state-transfer and reconstruction actions are exceptions. */ } }
+    requirement <'contract.rtg.migration.apply_batch.failures'> applyRtgMigrationBatchFailureSemantics { subject operation : ApplyRtgMigrationBatch; require constraint { doc /* Any invalid identity, record, transition, evidence, or deletion rejects the whole batch without observable migration state effect. */ } }
+    requirement <'contract.rtg.migration.count_summary.failures'> countMigrationSummaryFailureSemantics { subject operation : CountRtgMigrationSummary; require constraint { doc /* Summary reads expose bounded status counts and do not change migration state. */ } }
+    requirement <'contract.rtg.migration.find_candidate_owners.failures'> findMigrationCandidateOwnersFailureSemantics { subject operation : FindMigrationCandidateOwners; require constraint { doc /* A valid kind and resource identity return only matching migration owners; invalid inputs fail without changing migration state. */ } }
+    verification def MigrationBatchAtomicityContractVerification { subject operation : ApplyRtgMigrationBatch; objective { verify migrationBatchAtomicity; verify applyRtgMigrationBatchFailureSemantics; } @EvidenceBinding { evidenceId = "components/rtg/migration/tests/test_rtg_migration_contract.py#MigrationBatchAtomicityContractVerification"; implementationScope = "InMemoryRtgMigration"; } }
+    verification def MigrationRoutineWorkScalingVerification { subject migration : RtgMigration; objective { verify migrationRoutineWorkBounded; } @EvidenceBinding { evidenceId = "components/rtg/migration/tests/test_rtg_migration_contract.py#MigrationRoutineWorkScalingVerification"; implementationScope = "InMemoryRtgMigration"; } }
+    verification def CountMigrationSummaryContractVerification { subject operation : CountRtgMigrationSummary; objective { verify countMigrationSummaryFailureSemantics; } @EvidenceBinding { evidenceId = "components/rtg/migration/tests/test_rtg_migration_contract.py#CountMigrationSummaryContractVerification"; implementationScope = "InMemoryRtgMigration"; } }
+    verification def FindMigrationCandidateOwnersContractVerification { subject operation : FindMigrationCandidateOwners; objective { verify findMigrationCandidateOwnersFailureSemantics; } @EvidenceBinding { evidenceId = "components/rtg/migration/tests/test_rtg_migration_contract.py#FindMigrationCandidateOwnersContractVerification"; implementationScope = "InMemoryRtgMigration"; } }
 
     verification def RtgMigrationBoundaryVerification {
         subject migration : RtgMigration;

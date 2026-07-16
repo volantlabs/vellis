@@ -35,29 +35,32 @@ package VellisLocalPythonRealization {
         @ImplementationCodec { logicalType = "RtgQuerySpec::diagnosticOptions"; implementationType = "RtgQueryDiagnosticOptions"; normalization = "Absent logical options decode to includeNonFatal=true and suggest_discovery and encode equivalently."; }
         @ImplementationCodec { logicalType = "RtgQueryNamedObjectBinding[0..*]"; implementationType = "dict[str, UUID]"; normalization = "Unique binding names become dictionary keys and preserve every name-to-object identity pair losslessly."; }
         @ImplementationCodec { logicalType = "RtgQueryLiveStatusOverride[0..*]"; implementationType = "dict[UUID, bool]"; normalization = "The unique object-UUID override map preserves every modeled override losslessly."; }
+        @ImplementationCodec { logicalType = "RtgQueryPropertyPredicate::value[0..1]"; implementationType = "JsonValue | RtgQueryValueAbsent"; normalization = "The Python absence sentinel is omitted from JSON while an explicit None encodes as JSON null, preserving optional-field presence losslessly."; }
         @ImplementationBinding { implementationLanguage = ImplementationLanguage::python; codeRoot = "components/rtg/query"; symbol = "components.rtg.query.SimpleRtgQueryEngine"; realization = "VellisLocalPython"; }
     }
     part def DeterministicRtgChangeValidator :> RtgChangeValidator {
-        doc /* Python encodes canonical validation selection as tracks="all" or a non-empty tuple of track literals; decoding preserves the modeled selection and track collection exactly. */
+        @ImplementationCodec { logicalType = "RtgValidationOptions::selection"; implementationType = "tracks='all' | tuple[RtgValidationTrack, ...]"; normalization = "The compact tracks encoding preserves the modeled all-tracks selection or an explicit non-empty ordered track collection losslessly."; }
         @ImplementationBinding { implementationLanguage = ImplementationLanguage::python; codeRoot = "components/rtg/change_validation"; symbol = "components.rtg.change_validation.DeterministicRtgChangeValidator"; realization = "VellisLocalPython"; }
     }
-    part def InProcessRtgController :> RtgController {
+    part def PythonRtgControllerCoordinator :> RtgController {
         doc /* Python controller validation options use the same tracks="all" or non-empty tuple encoding and map losslessly to RtgControllerValidationOptions. */
-        @ImplementationBinding { implementationLanguage = ImplementationLanguage::python; codeRoot = "components/rtg/controller"; symbol = "components.rtg.controller.InProcessRtgController"; realization = "VellisLocalPython"; }
+        @ImplementationBinding { implementationLanguage = ImplementationLanguage::python; codeRoot = "components/rtg/controller"; symbol = "components.rtg.controller.RtgControllerCoordinator"; realization = "VellisLocalPython"; }
     }
     part def PythonVellisFacade :> VellisApplicationFacade {
-        @ImplementationBinding { implementationLanguage = ImplementationLanguage::python; codeRoot = "apps/rtg_knowledge_graph"; symbol = "apps.rtg_knowledge_graph.mcp_toolset.RtgMcpToolset"; realization = "VellisLocalPython"; }
+        @ImplementationBinding { implementationLanguage = ImplementationLanguage::python; codeRoot = "apps/rtg_knowledge_graph"; symbol = "apps.rtg_knowledge_graph.facade.VellisFacadeComponent"; realization = "VellisLocalPython"; }
     }
-    part def RtgKnowledgeGraphRunner {
+    part def PythonRtgKnowledgeGraphRunner :> RtgKnowledgeGraphRunner {
         @ImplementationBinding { implementationLanguage = ImplementationLanguage::python; codeRoot = "apps/rtg_knowledge_graph"; symbol = "apps.rtg_knowledge_graph.runner.RtgKnowledgeGraphRunner"; realization = "VellisLocalPython"; }
+        perform action :>> run : RunRtgKnowledgeGraph;
     }
     part def PythonEverydayLifeOntologyInstaller :> EverydayLifeOntologyInstaller {
-        @ImplementationBinding { implementationLanguage = ImplementationLanguage::python; codeRoot = "apps/rtg_knowledge_graph"; symbol = "apps.rtg_knowledge_graph.starter_schema.install_everyday_life_ontology"; realization = "generated schema bundle staged and cut over through the controller"; }
+        @ImplementationBinding { implementationLanguage = ImplementationLanguage::python; codeRoot = "apps/rtg_knowledge_graph"; symbol = "apps.rtg_knowledge_graph.starter_schema.EverydayLifeOntologyInstaller"; realization = "message-native installation and targeted status actions"; }
         perform action :>> install : InstallEverydayLifeOntology;
+        perform action :>> getStatus : GetEverydayLifeOntologyStatus;
     }
 
     part def VellisLocalPython :> VellisApplication {
-        doc /* Python realizations of the logical Vellis component occurrences. The concrete runtime, adapters, occurrence registrations, and proxy-only composition are defined by VellisRuntimePython. */
+        doc /* Python realizations of the logical Vellis component occurrences. Runtime participation and address-only application composition are defined by VellisRuntimePython. */
         part :>> runtime : MessageRuntime;
         part :>> documentStorage : LocalJsonFileStorage;
         part :>> graphStore : InMemoryRtgGraph;
@@ -66,9 +69,9 @@ package VellisLocalPythonRealization {
         part :>> migrationStore : InMemoryRtgMigration;
         part :>> queryEngine : SimpleRtgQueryEngine;
         part :>> changeValidator : DeterministicRtgChangeValidator;
-        part :>> controller : InProcessRtgController;
+        part :>> controller : PythonRtgControllerCoordinator;
         part :>> facade : PythonVellisFacade;
-        part runner : RtgKnowledgeGraphRunner;
+        part :>> runner : PythonRtgKnowledgeGraphRunner;
         part :>> starterOntologyInstaller : PythonEverydayLifeOntologyInstaller;
     }
 
@@ -110,7 +113,7 @@ package VellisLocalPythonRealization {
             allocate logicalVellis.facade.rtgReplayLedger to pythonVellis.facade.rtgReplayLedger;
             allocate logicalVellis.facade.rtgVerifyReplayFromLedger to pythonVellis.facade.rtgVerifyReplayFromLedger;
             allocate logicalVellis.facade.rtgListMigrationHistory to pythonVellis.facade.rtgListMigrationHistory;
-            allocate logicalVellis.facade.rtgFlushLedgerFailures to pythonVellis.facade.rtgFlushLedgerFailures;
+            allocate logicalVellis.facade.rtgGetOperationOutcome to pythonVellis.facade.rtgGetOperationOutcome;
             allocate logicalVellis.facade.rtgRestoreFromSnapshot to pythonVellis.facade.rtgRestoreFromSnapshot;
         }
         allocate logicalVellis.starterOntologyInstaller to pythonVellis.starterOntologyInstaller;

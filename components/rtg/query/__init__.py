@@ -28,8 +28,8 @@ from components.rtg.query.protocol import (
     RtgQueryUnsupported,
 )
 from components.rtg.query.runtime_binding import (
+    RTG_QUERY_ACTIONS,
     create_rtg_query_adapter,
-    create_rtg_query_proxy,
 )
 
 __all__ = [
@@ -56,8 +56,8 @@ __all__ = [
     "RtgQuerySpec",
     "RtgQuerySpecInvalid",
     "RtgQueryUnsupported",
+    "RTG_QUERY_ACTIONS",
     "RtgQueryUnknownTermGuidance",
     "SimpleRtgQueryEngine",
     "create_rtg_query_adapter",
-    "create_rtg_query_proxy",
 ]

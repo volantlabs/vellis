@@ -99,8 +99,8 @@ Vellis evolves in this order:
 1. Build a coherent component library.
 2. Ship Vellis as the first turnkey application assembled from those components.
 3. Add tooling and SDK surfaces for building software from component models.
-4. Evolve first-party applications onto the accepted local message runtime while preserving a clean
-   future distribution seam.
+4. Refine the accepted message-native component runtime and SDK while preserving a clean future
+   distribution seam.
 
 Current generated component views include:
 
@@ -108,7 +108,7 @@ Current generated component views include:
   shared values, and retained dependency topology.
 
 - [`component.runtime.message_runtime`](generated/reference/bibliotek/components/component.runtime.message_runtime.md): accepted local-first routing, durable chronology, trace query, and reconstruction contract.
-- [`component.runtime.component_adapter`](generated/reference/bibliotek/components/component.runtime.component_adapter.md): accepted explicit action-to-message binding and proxy contract.
+- [`component.runtime.component_adapter`](generated/reference/bibliotek/components/component.runtime.component_adapter.md): accepted uniform participant, action binding, continuation, and replay contract.
 - [`component.interface.mcp_gateway`](generated/reference/bibliotek/components/component.interface.mcp_gateway.md): accepted curated generic MCP-to-runtime gateway.
 
 - [`component.storage.json_file`](generated/reference/bibliotek/components/component.storage.json_file.md): local filesystem-backed JSON document storage.
@@ -132,7 +132,7 @@ Current Python implementations include:
 - [`components/rtg/migration`](components/rtg/migration/): in-memory RTG migration-record store implementation and boundary tests.
 - [`components/rtg/query`](components/rtg/query/): stateless RTG query engine implementation and boundary tests.
 - [`components/rtg/change_validation`](components/rtg/change_validation/): deterministic no-mutation RTG change validator implementation and boundary tests.
-- [`components/rtg/controller`](components/rtg/controller/): runtime-neutral RTG saga controller with validation, compensation, cutover, and coordinated snapshot behavior.
+- [`components/rtg/controller`](components/rtg/controller/): RTG coordination component with delta-scaled owner batches, cutover, indeterminate-operation reconstruction, and explicit coordinated snapshot behavior.
 
 The first application is:
 
@@ -158,7 +158,13 @@ Textual SysML v2 under [`model/`](model/) is the normative black-box design for 
 Vellis. It captures typed public actions and values, abstract owned state, action effects,
 principal failures, collaborator roles, invariants, application composition, use cases, and
 realizations. Human-readable pages under [`generated/reference/`](generated/reference/) are
-generated projections and must not be edited as alternate specifications.
+generated projections and must not be edited as alternate specifications. Canonical graphical
+view usages are authored in the model; their normalized PlantUML and SVG projections are committed
+under [`generated/reference/bibliotek/diagrams/`](generated/reference/bibliotek/diagrams/).
+The parser-backed [architecture dashboard](generated/reference/architecture/index.md) adds stable
+package-layer, component-context, application-composition, runtime-topology, operation-ownership,
+and verification-coverage projections. Exploratory context, impact, operation, behavior, and
+requirements views are generated under ignored `build/` paths and never become a second contract.
 
 Textual SysML is the normative design authority. The pinned official Java validator enforces SysML
 syntax, linking, and semantic validation. Reviewed implementation disagreements have been resolved
@@ -248,7 +254,9 @@ just check
 Useful recipes:
 
 - `just setup`: create or update the uv-managed `.venv`
-- `just test`: run tests when tests exist
+- `just test`: run the fast suite, excluding tests marked `integration`
+- `just test-integration`: run whole-system, subprocess/restart, and pinned-runtime tests
+- `just test-full`: run the complete fast and integration test suite
 - `just lint`: run Ruff checks
 - `just typecheck`: run BasedPyright checks
 - `just format`: format Python code with Ruff
@@ -259,7 +267,12 @@ Useful recipes:
 - `just model-reference-find "<question>"`: find ranked SysML/KerML sections and source pages
 - `just model-check`: validate packaged model products plus architecture, realization, and generated files
 - `just model-check-formal`: run the pinned official SysML validator directly
-- `just model-render`: regenerate the parser inventory, conformance objectives, views, and manifest
+- `just model-diagrams`: regenerate the parser inventory and PlantUML/SVG diagrams with the pinned pilot
+- `just model-render`: regenerate the parser inventory, diagrams, conformance objectives, views, and manifest
+- `just model-dashboard`: regenerate the parser-backed architecture graph and stable dashboard
+- `just model-view-presets`: discover on-demand architecture questions and parameter defaults
+- `just model-view <preset> [target] [options]`: render an ignored on-demand projection
+- `just model-view-changed BASE=<git-ref>`: render an ignored model-change review bundle
 - `just model-package`: build independently packageable KPAR products
 - `just model-diff`: review authored model, generated projection, and runtime-manifest changes
 - `just model-handoff TARGET=<stable-id>`: inspect a model slice for an implementation handoff
