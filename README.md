@@ -10,6 +10,8 @@ audit, snapshots, and replay. Your graph lives on your machine, in your repo, un
 Use it as a personal context graph (one memory across Claude, Codex, and other MCP-capable
 tools), as a team knowledge substrate, or as the storage layer for agents working on their own.
 
+<img width="1200" height="675" alt="Runtime architecture" src="https://github.com/user-attachments/assets/2edfb3e0-3ee7-430a-86e3-d243a90b964f" />
+
 Technically, Vellis is an RTG (Reified Typed Graph) knowledge system. This repository contains
 two deliberately separate products while early adopters benefit from a single clone:
 
@@ -30,6 +32,8 @@ two entry points:
 The library and application are independently modeled and packageable even though their Python
 sources currently share this repository. Bibliotek never depends on Vellis. In a future repository
 layout, each can move to its own repo without changing the component contracts.
+
+<img width="1200" height="675" alt="controlled-change-diagram2" src="https://github.com/user-attachments/assets/6d9f627c-e88e-43b5-8f42-adb134467755" />
 
 ## Start Here: Use Vellis With An AI Agent
 
