@@ -1,14 +1,24 @@
 # Vellis
 
-This repository contains two deliberately separate products while early adopters benefit from a
-single clone:
+Vellis is an **open-source context graph engine for AI agents** — a typed, local-first
+knowledge system your agents connect to over MCP (Model Context Protocol) and use as durable,
+shared memory. Where most agent-memory layers extract-and-embed, Vellis stores meaning
+explicitly: a schema you can read, validation on every change, deterministic query, migration,
+audit, snapshots, and replay. Your graph lives on your machine, in your repo, under Apache-2.0
+— it is yours to keep, move, or rebuild.
+
+Use it as a personal context graph (one memory across Claude, Codex, and other MCP-capable
+tools), as a team knowledge substrate, or as the storage layer for agents working on their own.
+
+Technically, Vellis is an RTG (Reified Typed Graph) knowledge system. This repository contains
+two deliberately separate products while early adopters benefit from a single clone:
 
 - **Bibliotek** is the reusable AI-native software component library.
-- **Vellis** is the first application composed from Bibliotek: a local RTG (Reified Typed Graph)
-  knowledge system for humans working with AI agents, or for agents working on their own.
+- **Vellis** is the first application composed from Bibliotek: the RTG knowledge system
+  described above.
 
-The repository is clone-and-run for beta and open-source evaluation. It gives first-time users two
-entry points:
+The repository is clone-and-run for beta and open-source evaluation. It gives first-time users
+two entry points:
 
 - **Use Vellis**: run the RTG Knowledge Graph application through MCP (Model Context Protocol) 
   as a full-service knowledge substrate with schema, data CRUD (Create, Read, Update, Delete),
