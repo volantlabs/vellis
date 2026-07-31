@@ -1,19 +1,22 @@
 ---
 name: Feature request
-about: Propose a new component, capability, or improvement
+about: Propose a Vellis outcome or model-first workflow improvement
 title: ""
 labels: enhancement
 ---
 
-## Problem
+## Owner need
 
-What need or gap this addresses.
+What owner outcome or engineering problem should this address?
 
-## Proposal
+## Model impact
 
-What you'd like to see. If it changes a component's public behavior, identify the affected SysML
-component or application contract.
+Which use case, requirement, domain concept, or workflow would change?
 
-## Alternatives considered
+## Simplicity impact
 
-Other approaches and why they fall short.
+What new structure would be introduced, and what becomes false or unrealizable without it?
+
+## Acceptance
+
+What observable result or verification would show that the need is met?

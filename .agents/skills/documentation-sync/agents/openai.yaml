@@ -1,6 +1,6 @@
 interface:
   display_name: "Documentation Sync"
-  short_description: "Sync semantic model projections"
-  default_prompt: "Use $documentation-sync to regenerate and verify human projections of canonical SysML v2 models after model or workflow changes."
+  short_description: "Align repository guidance with current authority"
+  default_prompt: "Use $documentation-sync to align the repository documentation, commands, skills, and public status."
 policy:
   allow_implicit_invocation: true

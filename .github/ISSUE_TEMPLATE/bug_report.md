@@ -1,22 +1,19 @@
 ---
 name: Bug report
-about: Report incorrect behavior in a component, app, or tool
+about: Report a model, reference, skill, or tooling problem
 title: ""
 labels: bug
 ---
 
 ## What happened
 
-Describe the incorrect behavior.
+Describe the incorrect behavior and the affected model, reference, skill, or command.
 
 ## Expected behavior
 
-What the SysML component/application contract or its generated reference says should happen.
+State the expected outcome and, for a language-semantics issue, the relevant SysML/KerML section.
 
 ## Reproduction
-
-Exact commands or code to reproduce, including the component or app involved
-(for example `components/rtg/controller` or `apps/rtg_knowledge_graph`).
 
 ```sh
 
@@ -24,12 +21,8 @@ Exact commands or code to reproduce, including the component or app involved
 
 ## Environment
 
-- OS:
-- Architecture (for example x64 or ARM64):
+- OS and architecture:
 - `uv --version`:
-- MCP client and version, if applicable:
-- Commit or branch:
+- Commit:
 
-For setup or MCP launch failures, also include the exact onboarding command, the complete
-`uv sync` error if dependency installation failed, and the MCP client's server-process log. Remove
-personal data and secrets, but keep executable and argument shapes intact.
+Remove personal data, local paths that identify people, and secrets.

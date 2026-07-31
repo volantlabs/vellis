@@ -1,6 +1,5 @@
 .venv/
-.data/*
-!.data/README.md
+.data/
 __pycache__/
 .pytest_cache/
 .ruff_cache/

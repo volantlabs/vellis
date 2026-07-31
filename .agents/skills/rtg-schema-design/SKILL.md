@@ -1,42 +1,26 @@
 ---
 name: rtg-schema-design
-description: Design or evolve language-neutral RTG graph schemas from user and system needs. Use when choosing anchors, associated data, links, required properties, type keys, migration boundaries, or compatibility rules; when reviewing an RTG schema for clarity and extensibility; or before making consequential schema changes to a live RTG graph.
+description: Design, review, or evolve language-neutral RTG graph meaning and schemas from owner needs and intended queries. Use when deciding anchors, associated data objects, direct anchor-data associations, links, endpoint kinds, type keys, typed properties, incomplete records, compatibility effects, or whether a proposed concept belongs in the RTG graph.
 ---
 
 # RTG Schema Design
 
-Turn domain meaning into the smallest precise RTG schema that supports identity, typed facts,
-relationships, queries, and safe evolution. Preserve partial knowledge and implementation freedom.
-
-Read [schema-design.md](references/schema-design.md) before authoring or approving a schema.
+Use this skill for domain meaning, not live graph operation or migration infrastructure. Pair it with `$sysml-modeling` when changing the system model and `$sysml-reference` when the modeling decision depends on SysML or KerML semantics.
 
 ## Workflow
 
-1. Elicit the questions, decisions, and ordinary requests the graph must support.
-2. Inspect the existing schema and representative live data when evolving a graph.
-3. Identify independently addressable things as anchors, coherent typed facts as associated data,
-   and meaningful navigable relationships as links.
-4. Define stable type keys, property kinds, required fields, deliberate field refinements, and
-   allowed link endpoints.
-5. Walk through incomplete, duplicate, evolving, and query scenarios. Remove requirements that
-   would force agents to invent facts.
-6. Explain the proposed semantics and compatibility impact. Obtain human approval before a
-   consequential live-schema change.
-7. Stage and validate the migration, inspect findings, cut over atomically, then validate live
-   data and representative queries.
+1. Begin with owner questions, desired outcomes, and the queries the graph must answer.
+2. Decide which concepts need independent identity and which are descriptive fact groups.
+3. Apply the RTG distinctions in [RTG domain review](references/schema-design.md).
+4. Keep incomplete but truthful records possible; require a property only when absence makes the record misleading or unusable.
+5. Choose stable, meaningful type and property names. Avoid opaque generic JSON when callers need typed facts.
+6. For each link, make direction and permitted source and target kinds and type sets explicit.
+7. Avoid schema detail that no modeled use case, invariant, or intended query requires.
+8. Describe compatibility effects on existing graph meaning without inventing importers, controllers, cutovers, or release machinery.
+9. Obtain human approval before changing consequential domain meaning.
 
-## Output Standard
+Do not assume that a schema decision has an immediately available operational migration path.
 
-Produce a reviewable schema proposal containing:
+## Output
 
-- the user outcomes and queries it supports;
-- anchor, associated-data, and link definitions with rationale;
-- exact property kinds, optionality, justified refinements, and link endpoint sets;
-- identity, naming, and duplicate-handling rules;
-- compatibility and migration effects on existing data;
-- validation and acceptance scenarios;
-- intentional freedoms and deferred specializations.
-
-Stop when the schema is sufficient for correct storage, linking, querying, extension, and
-black-box validation. Do not model agent prompts, private implementation structure, or speculative
-domain detail as schema.
+State the owner need, proposed domain distinction, intended queries, required and optional facts, endpoint rules, compatibility effects, unresolved questions, and the smallest verification examples that discriminate the design.

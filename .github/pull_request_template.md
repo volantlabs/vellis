@@ -1,12 +1,15 @@
-## What changed
+## Intent
 
-Describe the change and why.
+Describe the owner or engineering outcome and the smallest change that realizes it.
 
-## Model contracts
+## Model authority
 
-- [ ] No public component or application behavior changed, or the affected SysML contracts and generated references are updated in this PR.
+- [ ] The SysML model is unchanged, or the affected model intent is updated.
+- [ ] No behavior is specified only in Markdown or generated output.
+- [ ] New abstractions are justified by a current use case, requirement, invariant, failure boundary, or verification need.
 
 ## Verification
 
-- [ ] `just check` passes locally (lint, typecheck, skills validation, tests).
-- Boundary tests added or updated where component behavior changed.
+- [ ] `just check` passes.
+- [ ] Consequential SysML/KerML decisions cite their specification section and page.
+- [ ] `.data/` and unrelated branches were not modified.

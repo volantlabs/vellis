@@ -1,34 +1,16 @@
-# Model
+# Vellis model
 
-This directory contains the authored textual SysML v2 design products for the repository.
+The textual SysML v2 files in this directory are the current engineering source for Vellis. They
+form one application model and load in numeric order; `99-vellis-model.sysml` imports the complete
+working model.
 
-- `foundation/` is the reusable software-component modeling foundation.
-- `bibliotek/` is the reusable component library and its shared values and views.
-- `vellis/` is the application composition, façade, use cases, views, and realizations.
-- `config/` pins the allowed language profile, formal libraries, and validator runtime.
+This model is a draft. Parsing and validation establish language conformance, not architectural
+acceptance. No feature is authorized for implementation until a human selects a vertical slice and
+approves its intent, requirements, and verification objectives.
 
-Foundation and Bibliotek are independently packageable `library package` products. Vellis is an
-application package that consumes Bibliotek. Bibliotek must never import Vellis. KPARs are derived
-distribution artifacts written to `build/model/packages/`; validator downloads and formal source
-artifacts live under the ignored `.cache/sysml/` tree.
+The model intentionally preserves the RTG distinctions among anchors, associated data objects,
+directed links, and identity-free anchor/data associations. It does not preserve the former Python,
+storage, schema, migration, ledger, CLI, or transport designs as contracts.
 
-The modeling-pattern fixture lives under `tests/model/fixtures/`. It is validated against the
-packaged Foundation but is not part of any authored product, formal product index, or KPAR.
-
-Run `just model-render` to refresh human references under `generated/reference/` and machine
-projections under `generated/model/`. Do not edit those projections by hand. Run `just model-check` to validate
-the packaged products, repository profile, architecture, realizations, and generated artifacts.
-
-Vellis application content belongs under `model/vellis/`. `EverydayLifeOntology.sysml` is the
-authored starter schema; `model-render` derives the packaged
-`apps/rtg_knowledge_graph/resources/everyday_life_schema.json` bootstrap bundle. That bundle
-contains schema and migration material only—not user facts or a hand-authored snapshot.
-
-The normal edit loop is `just model-render`, review with `just model-diff`, then
-`just model-check`. Run `just check` before handing off the repository change. Detailed artifact,
-command, authoring, review, and troubleshooting guidance lives in
-[`docs/engineering/sysml-modeling.md`](../docs/engineering/sysml-modeling.md).
-
-The model is the normative design authority. Git history retains superseded transition material;
-the current tree contains only active model, configuration, generated projection, and verification
-artifacts.
+Use `just model-check` to run the pinned validator. Use the `sysml-modeling` and `sysml-reference`
+skills for model changes and language decisions.

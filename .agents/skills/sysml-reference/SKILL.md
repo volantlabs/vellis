@@ -1,64 +1,55 @@
 ---
 name: sysml-reference
-description: Ground textual SysML v2 and KerML authoring, review, language-semantics decisions, construct selection, and official-validator diagnosis in the repository's checksum-pinned specification corpus. Use for questions or changes involving parts, references, features, actions, bindings, successions, flows, ports, interfaces, states, constraints, requirements, views, imports, multiplicities, specialization, or other SysML/KerML syntax and semantics.
+description: Ground textual SysML v2 and KerML authoring, review, construct selection, language-semantics decisions, official citations, and validator diagnosis in the repository's checksum-pinned specification corpus. Use whenever model work depends on precise parts, features, actions, bindings, flows, ports, interfaces, states, constraints, requirements, views, imports, multiplicities, specialization, ownership, or other SysML/KerML meaning.
 ---
 
-# SysML Reference
+# SysML and KerML Reference
 
-Use the committed page corpus as a searchable projection of the pinned official PDFs. Treat the
-PDFs as authoritative and the Markdown as generated retrieval material.
+Use the pinned official specifications as the language authority. The generated page corpus is a searchable projection and must never be edited by hand.
 
-## Workflow
+## Retrieval Workflow
 
-1. Unless the request already supplies an exact specification section or page, the first corpus
-   command **must** be the ranked, outline-aware finder. Pass the modeling question or a concise
-   description, not just one generic word:
+1. Start with the ranked natural-language finder:
 
-   ```sh
-   just model-reference-find "<question or construct description>"
+   ```text
+   just model-reference-find "<question>" [sysml-2.0|kerml-1.0] [limit]
    ```
 
-   Do not replace this first step with a broad `rg` over `pages/`. The finder is designed to handle
-   natural wording without loading every textual match.
-2. Review the ranked section titles and snippets. Open the best page, then read only the adjacent
-   pages needed to finish the section. The finder routes to evidence; its rank is not an answer.
-   If one specification is clearly in scope, rerun with `--specification sysml-2.0` or
-   `--specification kerml-1.0` before broadening the search.
-3. If results are broad or use different terminology, search outline headings before raw page text:
+2. Inspect the best page and the smallest adjacent page set needed to understand the clause. Check page frontmatter for `extraction_warnings` before relying on questionable text.
+3. Follow normative cross-references into SysML or KerML instead of inferring missing semantics.
+4. If the first query ranks poorly, reformulate once with terminology learned from the best result, then inspect outline headings. Use raw page search only for an exact phrase, identifier, or section number.
+5. Inspect the pinned PDF when figures, tables, typography, or extraction warnings affect meaning.
+6. Report the specification, section, printed page, and physical PDF page for consequential conclusions.
 
-   ```sh
-   rg -n -i '<construct or section phrase>' reference/specifications/{sysml-2.0,kerml-1.0}/index.md
-   ```
+Always distinguish:
 
-   Use raw `rg` over `pages/` only for exact phrases, identifiers, or a cited section number.
-4. Follow normative cross-references between SysML and KerML. Search by both the construct name and
-   any referenced section number, and prefer the normative Clause 8 definition when Clause 7 is
-   explicitly informative.
-5. Inspect the pinned PDF under `.cache/sysml/formal/` when a table, figure, mathematical layout,
-   indentation, or questionable extraction affects the conclusion. Run `just model-setup` if it is
-   absent.
-6. Separate the result into:
-   - normative SysML or KerML semantics supported by cited sections and pages;
-   - informative examples in the specifications;
-   - Vellis repository profile or modeling conventions;
-   - explicit inference where the sources do not directly decide the question.
-7. State the reference basis for every consequential conclusion using specification, section, and
-   printed or physical page. Never present training-memory recall as specification evidence.
-8. After changing a model, run the narrow scoped check while editing and the official validation
-   gate required by the repository before completion.
+- normative language clauses;
+- informative examples or annex material;
+- repository or Vellis conventions;
+- agent inference.
 
-Before answering, verify that you can report the finder query (or the exact user-supplied citation),
-the smallest sufficient page set, each source's normative or informative status, any Vellis
-convention used, and every inference. If the pages read are much broader than the pages cited,
-narrow the retrieval before answering.
+Parser acceptance is not semantic proof, and semantic validity is not architectural approval.
 
-## Corpus Rules
+## Validator Diagnosis
 
-- Never edit files under `reference/specifications/` manually. Regenerate them with
-  `just model-reference-render` after an intentional pinned-specification update.
-- Use `just model-reference-check` to prove that Markdown, outlines, indexes, and manifests match
-  the pinned PDFs.
-- Do not infer section semantics merely from an outline title. Read the source text and its stated
-  cross-references.
-- Do not treat successful parsing as proof that a modeling interpretation is correct; the official
-  validator and the specification provide different evidence and both are required.
+Run the current full-model workflow with `just model-check`. For an error:
+
+1. isolate the first diagnostic;
+2. identify the construct involved;
+3. retrieve its normative section;
+4. distinguish a model error, import/order error, repository convention, and validator limitation;
+5. create a temporary minimal model only when isolation requires it;
+6. do not weaken a valid model solely to placate the parser without recording the compatibility decision.
+
+## Specification Baseline Updates
+
+A language-baseline change is intentional and human-approved:
+
+1. update the pinned URL, document identity, and checksum;
+2. run `just model-setup`;
+3. run `just model-reference-render`;
+4. inspect the corpus diff;
+5. run `just model-reference-check` and `just model-check`;
+6. obtain human approval before accepting the new baseline.
+
+Do not create or maintain a second language summary inside this skill.
