@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import collections
+import functools
 import hashlib
 import json
 import logging
@@ -9,7 +10,7 @@ import math
 import re
 import shutil
 import tempfile
-from collections.abc import Iterable
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -830,7 +831,8 @@ LIBRARY_KINDS = frozenset(
 )
 
 
-def _library_documents(library_root: Path | None = None) -> list[Document]:
+@functools.lru_cache(maxsize=4)
+def _library_documents(library_root: Path | None = None) -> tuple[Document, ...]:
     """Library elements: what actually exists, and what it specialises.
 
     The specification never lists library declarations, so questions like "what
@@ -840,7 +842,7 @@ def _library_documents(library_root: Path | None = None) -> list[Document]:
     """
     root = library_root if library_root is not None else _validator_library_root()
     if not root.is_dir():
-        return []
+        return ()
     documents: list[Document] = []
     for path in sorted(root.rglob("*")):
         if path.suffix not in {".sysml", ".kerml"}:
@@ -877,7 +879,7 @@ def _library_documents(library_root: Path | None = None) -> list[Document]:
                     sort_key=(package, name),
                 )
             )
-    return documents
+    return tuple(documents)
 
 
 def _declaration_doc(lines: list[str], line_number: int) -> str:
@@ -898,7 +900,8 @@ def _declaration_doc(lines: list[str], line_number: int) -> str:
     return " ".join(text.split())[:400]
 
 
-def _example_documents(checkout: Path | None = None) -> list[Document]:
+@functools.lru_cache(maxsize=4)
+def _example_documents(checkout: Path | None = None) -> tuple[Document, ...]:
     """Training, example, and validation models: what a construct looks like.
 
     The 42 training modules are named for the decisions agents get wrong, and
@@ -932,10 +935,11 @@ def _example_documents(checkout: Path | None = None) -> list[Document]:
                     sort_key=(area, relative.as_posix()),
                 )
             )
-    return documents
+    return tuple(documents)
 
 
-def _clause_documents(specification: Specification, reference_root: Path) -> list[Document]:
+@functools.lru_cache(maxsize=8)
+def _clause_documents(specification: Specification, reference_root: Path) -> tuple[Document, ...]:
     root = reference_root / specification.specification_id
     outline_path = root / "outline.json"
     if not outline_path.exists():
@@ -983,11 +987,11 @@ def _clause_documents(specification: Specification, reference_root: Path) -> lis
                 sort_key=_section_sort_key(str(number)),
             )
         )
-    return clauses
+    return tuple(clauses)
 
 
 def _bm25_scores(
-    clauses: list[Document], terms: tuple[str, ...], *, k1: float = BM25_K1, b: float = BM25_B
+    clauses: Sequence[Document], terms: tuple[str, ...], *, k1: float = BM25_K1, b: float = BM25_B
 ) -> dict[int, float]:
     """Okapi BM25 over clause bodies, with a light title-path channel.
 
@@ -1093,7 +1097,7 @@ def _print_concepts(inventory: list[Concept]) -> None:
         print(f"  {concept.name.ljust(width)}  {concept.pointer}")
 
 
-def _rank_documents(documents: list[Document], terms: tuple[str, ...]) -> list[SearchResult]:
+def _rank_documents(documents: Sequence[Document], terms: tuple[str, ...]) -> list[SearchResult]:
     scores = _bm25_scores(documents, terms)
     ranked = [
         SearchResult(
@@ -1119,7 +1123,7 @@ def _rank_documents(documents: list[Document], terms: tuple[str, ...]) -> list[S
     )
 
 
-def documents_sort_key(documents: list[Document], result: SearchResult) -> tuple[object, ...]:
+def documents_sort_key(documents: Sequence[Document], result: SearchResult) -> tuple[object, ...]:
     for document in documents:
         if document.identifier == result.identifier and document.corpus_id == result.corpus_id:
             return document.sort_key

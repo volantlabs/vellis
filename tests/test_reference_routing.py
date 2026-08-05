@@ -1,0 +1,375 @@
+"""Retrieval quality: does a realistic question surface material that answers it?
+
+This measures the search layer, not the specification. Each question is tagged
+with the *register* it is asked in, because a single blended number hides the
+thing that matters most:
+
+- A, specification jargon: "what is the difference between subsetting and
+  redefinition". BM25 handles these well.
+- B, lay phrasing: "behaviour that only happens in certain modes". The asker
+  does not know the word "state".
+- C, professional systems-engineering vocabulary: "how is traceability
+  modelled". Real terms, but not the words SysML v2 uses.
+
+Registers A and C were measured 4x apart, so reporting one average would have
+sent effort at ranking, which register A shows is already adequate.
+
+Targets accept any corpus that genuinely answers. A worked training model is
+often a better answer than normative prose, and scoring it as a miss because it
+is not a clause number measures the eval's assumptions rather than the search.
+
+Questions are phrased the way a person actually asks them. Earlier tests used
+specification vocabulary, which is why they passed while natural phrasing failed.
+"""
+
+from __future__ import annotations
+
+import pytest
+
+from tools import model_layout, sysml_reference
+
+# (register, question, accepted targets as (source, identifier prefix))
+ROUTING_QUESTIONS: tuple[tuple[str, str, tuple[tuple[str, str], ...]], ...] = (
+    # --- Register A: specification jargon -----------------------------------
+    (
+        "A",
+        "what is the difference between subsetting and redefinition",
+        (("specification", "7.3.4"),),
+    ),
+    ("A", "what is the difference between a definition and a usage", (("specification", "7.6"),)),
+    (
+        "A",
+        "when do I use an item def versus a part def",
+        (("specification", "7.10"), ("specification", "7.11")),
+    ),
+    (
+        "A",
+        "what does conjugation of a port mean",
+        (("specification", "7.12"), ("specification", "8.2")),
+    ),
+    (
+        "A",
+        "what is a binding connector",
+        (
+            ("specification", "7.13"),
+            ("specification", "7.4.6"),
+            ("example", "12. Binding Connectors"),
+        ),
+    ),
+    ("A", "what is a feature value", (("specification", "7.4.11"), ("specification", "7.7"))),
+    (
+        "A",
+        "what does specializes mean for a classifier",
+        (("specification", "7.3.3"), ("specification", "7.3.2")),
+    ),
+    ("A", "what does a satisfy requirement usage do", (("specification", "7.21"),)),
+    ("A", "what is a verification case subject", (("specification", "7.24"),)),
+    (
+        "A",
+        "what is an allocation usage",
+        (("specification", "7.15"), ("example", "38. Allocation")),
+    ),
+    ("A", "what is a viewpoint", (("specification", "7.26"), ("example", "42. Views"))),
+    (
+        "A",
+        "what is an occurrence usage",
+        (("specification", "7.9"), ("example", "27. Occurrences")),
+    ),
+    (
+        "A",
+        "what does a succession flow mean",
+        (("specification", "7.16"), ("specification", "7.17")),
+    ),
+    ("A", "what is a variation point", (("specification", "7.6"), ("example", "36. Variability"))),
+    (
+        "A",
+        "what is an enumeration definition",
+        (("specification", "7.8"), ("example", "06. Enumeration Definitions")),
+    ),
+    # --- Register B: lay phrasing -------------------------------------------
+    (
+        "B",
+        "how do I model behavior that only happens in certain modes",
+        (
+            ("specification", "7.18"),
+            ("example", "23. State Definitions"),
+            ("example", "24. States"),
+        ),
+    ),
+    (
+        "B",
+        "how do I express a rule that must always hold true",
+        (("specification", "7.20"), ("example", "31. Constraints")),
+    ),
+    (
+        "B",
+        "how do I model data moving from one action to another",
+        (("specification", "7.16"), ("example", "13. Flows")),
+    ),
+    (
+        "B",
+        "how do I capture what a user wants to accomplish with the system",
+        (("specification", "7.25"), ("example", "35. Use Cases")),
+    ),
+    (
+        "B",
+        "how do I define a connection point on a component",
+        (("specification", "7.12"), ("example", "10. Ports")),
+    ),
+    (
+        "B",
+        "how do I represent a subsystem of my system",
+        (("specification", "7.11"), ("example", "07. Parts")),
+    ),
+    (
+        "B",
+        "how do I model a value like a temperature",
+        (("specification", "7.7"), ("library", "ISQ"), ("example", "Quantities")),
+    ),
+    (
+        "B",
+        "how do I connect two parts together",
+        (("specification", "7.13"), ("example", "09. Connections")),
+    ),
+    (
+        "B",
+        "how do I define a behavior with inputs and outputs",
+        (("specification", "7.17"), ("example", "14. Action Definitions")),
+    ),
+    (
+        "B",
+        "how do I say one element depends on another element",
+        (("specification", "7.3"), ("example", "37. Dependencies")),
+    ),
+    (
+        "B",
+        "what does it mean for a type to be abstract",
+        (("specification", "7.3.2"), ("specification", "7.6")),
+    ),
+    (
+        "B",
+        "how do I give a feature a default value",
+        (("specification", "7.4.11"), ("specification", "7.7")),
+    ),
+    (
+        "B",
+        "how do I narrow an inherited feature to a smaller type",
+        (("specification", "7.3.4"), ("example", "05. Redefinition")),
+    ),
+    (
+        "B",
+        "how do I write documentation attached to an element",
+        (("specification", "7.4"), ("example", "01. Packages")),
+    ),
+    (
+        "B",
+        "how do I group related elements together",
+        (("specification", "7.5"), ("example", "01. Packages")),
+    ),
+    # --- Register C: professional systems-engineering vocabulary ------------
+    ("C", "how is composition represented", (("specification", "7.3.4"), ("specification", "7.6"))),
+    (
+        "C",
+        "how is traceability modeled",
+        (
+            ("specification", "7.3"),
+            ("specification", "7.21"),
+            ("specification", "7.24"),
+            ("specification", "7.15"),
+        ),
+    ),
+    (
+        "C",
+        "how do I model decomposition of a system",
+        (("specification", "7.11"), ("example", "07. Parts")),
+    ),
+    (
+        "C",
+        "how is behavior allocated to structure",
+        (
+            ("specification", "7.15"),
+            ("specification", "7.17"),
+            ("example", "38. Allocation"),
+            ("example", "18. Action Performance"),
+        ),
+    ),
+    (
+        "C",
+        "how is variability handled",
+        (("specification", "7.6"), ("example", "36. Variability"), ("specification", "A.12")),
+    ),
+    (
+        "C",
+        "how do I capture design rationale",
+        (("specification", "7.4"), ("specification", "7.27"), ("example", "39. Metadata")),
+    ),
+    (
+        "C",
+        "how is interface control managed",
+        (("specification", "7.14"), ("specification", "7.12"), ("example", "11. Interfaces")),
+    ),
+    (
+        "C",
+        "how is verification and validation represented",
+        (("specification", "7.24"), ("example", "34. Verification")),
+    ),
+    (
+        "C",
+        "how do I model the system context and boundary",
+        (("specification", "7.11"), ("specification", "7.25")),
+    ),
+    (
+        "C",
+        "how is inheritance done",
+        (("specification", "7.3.2"), ("specification", "7.3.3"), ("example", "03. Generalization")),
+    ),
+    (
+        "C",
+        "how do I model a requirements hierarchy",
+        (("specification", "7.21"), ("example", "32. Requirements")),
+    ),
+    (
+        "C",
+        "how is concurrency represented",
+        (("specification", "7.17"), ("example", "17. Control")),
+    ),
+    (
+        "C",
+        "how is state based behavior exhibited by a part",
+        (("specification", "7.18"), ("example", "26. State Exhibition")),
+    ),
+    (
+        "C",
+        "how are analysis results captured",
+        (("specification", "7.23"), ("example", "33. Analysis")),
+    ),
+    (
+        "C",
+        "how is the language itself extended",
+        (("specification", "7.27"), ("example", "41. Language Extension")),
+    ),
+)
+
+# Measured floors, set just below observed rates so they catch regression rather
+# than expressing a wish. Observed: A 86%, B 13%, C 33%.
+#
+# The gap between A and the others is not a ranking defect and no amount of
+# scoring work closes it. Register B and C questions use words the corpus never
+# contains -- "modes" for states, "rule" for constraints, "inheritance" for
+# specialization -- and every lexical bridge was measured and lost: pseudo-
+# relevance feedback dropped MRR from 0.664 to 0.306, rank fusion to 0.388,
+# character n-grams to 0.590, and an aggressive stemmer was a wash.
+#
+# What closes it is vocabulary, not search. Retrieval reaches the right clause
+# ~93% of the time once the concept name is right, so the fix is to hand the
+# agent the concept inventory and let it name the construct, which is a language
+# task rather than an information-retrieval one. That step needs a model in the
+# loop and is deliberately outside this deterministic test; what is tested here
+# is that the inventory actually contains the words an agent would need.
+REGISTER_FLOORS = {"A": 0.80, "B": 0.10, "C": 0.30}
+TOP_N = 5
+
+# For each lay or professional phrasing, the SysML v2 concept an agent has to
+# name in order to search successfully. Every one must exist in the inventory,
+# or the documented fallback is a dead end.
+CONCEPT_AN_AGENT_MUST_FIND = (
+    ("behavior that only happens in certain modes", "States"),
+    ("a rule that must always hold true", "Constraints"),
+    ("data moving from one action to another", "Flows"),
+    ("what a user wants to accomplish", "Use Cases"),
+    ("a connection point on a component", "Ports"),
+    ("a subsystem of my system", "Parts"),
+    ("composition", "Features"),
+    ("traceability", "Dependencies"),
+    ("decomposition", "Parts"),
+    ("inheritance", "Generalization"),
+    ("concurrency", "Control"),
+    ("design rationale", "Metadata"),
+    ("extending the language itself", "Language Extension"),
+    ("a requirements hierarchy", "Requirements"),
+    ("variability", "Variability"),
+    ("interface control", "Interfaces"),
+)
+
+
+def _corpus_ready() -> bool:
+    return any(
+        (model_layout.SPECIFICATION_REFERENCE_ROOT / identifier).exists()
+        for identifier in ("sysml-2.1", "kerml-1.1")
+    )
+
+
+def _hit_rank(question: str, targets: tuple[tuple[str, str], ...]) -> int | None:
+    results = sysml_reference.find_references(question, limit=TOP_N)
+    for rank, result in enumerate(results, start=1):
+        for source, prefix in targets:
+            if result.source != source:
+                continue
+            candidate = f"{result.identifier} {' '.join(result.title_path)}"
+            if result.identifier.startswith(prefix) or prefix in candidate:
+                return rank
+    return None
+
+
+@pytest.mark.parametrize("register", sorted(REGISTER_FLOORS))
+def test_each_register_meets_its_retrieval_floor(register: str) -> None:
+    if not _corpus_ready():
+        pytest.skip("generated corpus absent; run `just model-setup`")
+    questions = [entry for entry in ROUTING_QUESTIONS if entry[0] == register]
+    ranks = {question: _hit_rank(question, targets) for _, question, targets in questions}
+    missed = [question for question, rank in ranks.items() if rank is None]
+    found = len(questions) - len(missed)
+    rate = found / len(questions)
+
+    assert rate >= REGISTER_FLOORS[register], (
+        f"register {register}: {found}/{len(questions)} = {rate:.0%} "
+        f"(floor {REGISTER_FLOORS[register]:.0%}); missed: {missed}"
+    )
+
+
+@pytest.mark.parametrize(("phrasing", "concept"), CONCEPT_AN_AGENT_MUST_FIND)
+def test_concept_inventory_carries_the_word_the_agent_needs(phrasing: str, concept: str) -> None:
+    """The documented fallback for a failed search is the concept inventory.
+
+    Search cannot bridge these gaps lexically, so the inventory must contain the
+    construct name for every phrasing that fails. If a name is missing, an agent
+    following the fallback reaches a dead end.
+    """
+    if not _corpus_ready():
+        pytest.skip("generated corpus absent; run `just model-setup`")
+    names = {entry.name.casefold() for entry in sysml_reference.concepts()}
+
+    assert concept.casefold() in names, f"{phrasing!r} has no concept named {concept!r}"
+
+
+def test_concept_inventory_draws_on_practitioner_vocabulary_too() -> None:
+    """Clause titles alone are not enough.
+
+    The specification names clause 7.6 "Definition and Usage"; the training
+    curriculum names the same idea "Variability", which is the word people search
+    for. Losing the training-derived half would silently narrow the inventory.
+    """
+    if not _corpus_ready():
+        pytest.skip("generated corpus absent; run `just model-setup`")
+    inventory = sysml_reference.concepts()
+    origins = {entry.origin for entry in inventory}
+
+    assert origins == {"specification", "training"}
+    assert len(inventory) > 50
+
+
+def test_question_set_is_large_enough_to_distinguish_registers() -> None:
+    """Twelve questions give a 52-point confidence interval, which cannot separate
+    a good retriever from a mediocre one. Fifteen per register is the working
+    minimum; more is better."""
+    counts = {register: 0 for register in REGISTER_FLOORS}
+    for register, _, _ in ROUTING_QUESTIONS:
+        counts[register] += 1
+
+    assert all(count >= 15 for count in counts.values()), counts
+
+
+def test_every_question_is_phrased_without_specification_section_numbers() -> None:
+    """A question naming its own answer measures nothing."""
+    for _, question, _ in ROUTING_QUESTIONS:
+        assert not any(part.replace(".", "").isdigit() for part in question.split())
