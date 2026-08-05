@@ -43,3 +43,6 @@ model-reference-find query specification="" limit="8":
     @specification={{quote(specification)}}; if test -n "$specification"; then uv run python tools/sysml_reference.py find {{quote(query)}} --specification "$specification" --limit {{quote(limit)}}; else uv run python tools/sysml_reference.py find {{quote(query)}} --limit {{quote(limit)}}; fi
 
 check: lint typecheck skills-check model-check model-reference-check test
+
+model-reference-concepts:
+    @uv run python tools/sysml_reference.py concepts
