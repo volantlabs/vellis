@@ -30,7 +30,7 @@ Use the pinned official specifications as the language authority. The generated 
 3. Start with the ranked natural-language finder:
 
    ```text
-   just model-reference-find "<question>" [sysml-2.0|kerml-1.0] [limit]
+   just model-reference-find "<question>" [<specification-id>] [limit]
    ```
 
 4. Inspect the primary clause and the smallest adjacent page set needed. Check page-frontmatter `extraction_warnings` before relying on extracted text.
