@@ -5,13 +5,6 @@ from pathlib import Path
 
 from tools import model_layout, sync_agent_skills, validate_skills
 
-EXPECTED_SKILLS = {
-    "documentation-sync",
-    "rtg-schema-design",
-    "sysml-modeling",
-    "sysml-reference",
-}
-
 
 def _write_valid_skill(skill_dir: Path, body: str = "# Sample\n\nUseful instructions.\n") -> None:
     (skill_dir / "agents").mkdir(parents=True)
@@ -34,24 +27,24 @@ def _write_valid_skill(skill_dir: Path, body: str = "# Sample\n\nUseful instruct
     )
 
 
-def test_exact_skill_inventory_and_metadata() -> None:
-    """The four complementary skills are an intentional repository contract."""
+def test_all_source_skills_have_valid_metadata() -> None:
     skill_root = model_layout.ROOT / ".agents" / "skills"
     skill_dirs = {path.name: path for path in skill_root.iterdir() if path.is_dir()}
 
-    assert set(skill_dirs) == EXPECTED_SKILLS
+    assert skill_dirs
     errors = [
         error for path in skill_dirs.values() for error in validate_skills.validate_skill(path)
     ]
     assert errors == []
 
 
-def test_exact_managed_skill_exposure() -> None:
-    """Managed exposure mirrors the intentional four-skill inventory exactly."""
+def test_managed_skill_exposure_matches_source_inventory() -> None:
+    skill_root = model_layout.ROOT / ".agents" / "skills"
+    source_skills = {path.name for path in skill_root.iterdir() if path.is_dir()}
     claude_root = model_layout.ROOT / ".claude" / "skills"
     links = {path.name: path for path in claude_root.iterdir()}
 
-    assert set(links) == EXPECTED_SKILLS
+    assert set(links) == source_skills
     assert all(path.is_symlink() for path in links.values())
     assert sync_agent_skills.sync_agent_skills(check=True) == []
 

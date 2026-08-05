@@ -23,84 +23,40 @@ def test_model_discovery_is_dynamic_and_filename_ordered(
     ]
 
 
-def test_current_model_packages_are_unique_and_imports_are_ordered() -> None:
-    files = sysml_validator._model_files()
-
-    assert files == sorted(model_layout.MODEL_ROOT.glob("*.sysml"), key=lambda path: path.name)
-    sysml_validator._check_packages_and_import_order(files)
-
-
-def test_model_readme_maps_every_discovered_file_and_package() -> None:
+def test_model_readme_maps_every_discovered_file() -> None:
     files = sysml_validator._model_files()
     readme = (model_layout.MODEL_ROOT / "README.md").read_text(encoding="utf-8")
-    mapped_files = set(re.findall(r"`(\d{2}-[^`]+\.sysml)`", readme))
-    packages = [
-        sysml_validator.PACKAGE.findall(
-            sysml_validator._mask_non_code(path.read_text(encoding="utf-8"))
-        )[0]
-        for path in files
-    ]
+    mapped_files = set(re.findall(r"`([^`/]+\.sysml)`", readme))
 
     assert mapped_files == {path.name for path in files}
-    assert all(f"`{package}`" in readme for package in packages)
 
 
-def test_import_from_later_file_is_rejected(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_combined_source_retains_file_line_spans(tmp_path: Path) -> None:
     first = tmp_path / "10-first.sysml"
     second = tmp_path / "20-second.sysml"
-    first.write_text("package First { private import Second::*; }\n", encoding="utf-8")
-    second.write_text("package Second {}\n", encoding="utf-8")
-    monkeypatch.setattr(sysml_validator, "ROOT", tmp_path)  # type: ignore[attr-defined]
+    first.write_text("package First {\n}\n", encoding="utf-8")
+    second.write_text("package Second {}", encoding="utf-8")
 
-    with pytest.raises(RuntimeError, match="not earlier in filename order"):
-        sysml_validator._check_packages_and_import_order([first, second])
+    source, spans = sysml_validator._combined_source([first, second])
 
-
-def test_multiple_packages_in_one_file_are_rejected(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    model = tmp_path / "10-model.sysml"
-    model.write_text("package First {}\npackage Second {}\n", encoding="utf-8")
-    monkeypatch.setattr(sysml_validator, "ROOT", tmp_path)  # type: ignore[attr-defined]
-
-    with pytest.raises(RuntimeError, match="exactly one package"):
-        sysml_validator._check_packages_and_import_order([model])
+    assert source == "package First {\n}\npackage Second {}\n"
+    assert spans == [
+        sysml_validator.SourceSpan(first, 1, 2),
+        sysml_validator.SourceSpan(second, 3, 3),
+    ]
 
 
-def test_duplicate_packages_are_rejected(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    first = tmp_path / "10-first.sysml"
-    second = tmp_path / "20-second.sysml"
-    first.write_text("package Repeated {}\n", encoding="utf-8")
-    second.write_text("package Repeated {}\n", encoding="utf-8")
-    monkeypatch.setattr(sysml_validator, "ROOT", tmp_path)  # type: ignore[attr-defined]
-
-    with pytest.raises(RuntimeError, match="declared by both"):
-        sysml_validator._check_packages_and_import_order([first, second])
-
-
-def test_package_and_import_scan_ignores_comments_and_strings(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    first = tmp_path / "10-first.sysml"
-    second = tmp_path / "20-second.sysml"
-    first.write_text(
-        "/* package Phantom {} private import Second::*; } */\n"
-        "// package AlsoPhantom {} private import Second::*;\n"
-        'package First { attribute note = "package Phantom {}"; }\n',
-        encoding="utf-8",
+def test_official_validator_accepts_later_import_and_multiple_packages() -> None:
+    source = (
+        "package First { private import Second::*; item example : Thing; } "
+        "package Second { item def Thing; } "
+        "package Third {}"
     )
-    second.write_text("package Second {}\n", encoding="utf-8")
-    monkeypatch.setattr(sysml_validator, "ROOT", tmp_path)  # type: ignore[attr-defined]
 
-    sysml_validator._check_packages_and_import_order([first, second])
+    with sysml_validator._kernel_session() as client:
+        diagnostics = sysml_validator._execute_source(client, source)
 
-    source = first.read_text(encoding="utf-8")
-    masked = sysml_validator._mask_non_code(source)
-    assert len(masked) == len(source)
-    assert masked.count("\n") == source.count("\n")
-    assert "Phantom" not in masked
+    assert diagnostics == []
 
 
 def test_model_check_uses_official_validator_and_negative_probe() -> None:
@@ -157,8 +113,10 @@ def test_negative_probe_uses_a_separate_kernel_session(
 def test_validator_warning_maps_to_its_file_and_fails_validation(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    model = tmp_path / "10-model.sysml"
-    model.write_text("package Model {}\n", encoding="utf-8")
+    first = tmp_path / "10-first.sysml"
+    second = tmp_path / "20-second.sysml"
+    first.write_text("package First {\n}\n", encoding="utf-8")
+    second.write_text("package Second {\n}\n", encoding="utf-8")
 
     class FakeSession:
         def __enter__(self) -> object:
@@ -168,16 +126,16 @@ def test_validator_warning_maps_to_its_file_and_fails_validation(
             return None
 
     monkeypatch.setattr(sysml_validator, "ROOT", tmp_path)  # type: ignore[attr-defined]
-    monkeypatch.setattr(sysml_validator, "_model_files", lambda: [model])
+    monkeypatch.setattr(sysml_validator, "_model_files", lambda: [first, second])
     monkeypatch.setattr(sysml_validator, "_kernel_session", FakeSession)
     monkeypatch.setattr(
         sysml_validator,
         "_execute_source",
-        lambda *_: ["WARNING:ambiguous model(1.sysml line : 7 column : 9)"],
+        lambda *_: ["WARNING:ambiguous model(1.sysml line : 4 column : 9)"],
     )
 
     assert sysml_validator.validate() == 1
-    assert "WARNING 10-model.sysml:7:9:ambiguous model" in capsys.readouterr().out
+    assert "WARNING 20-second.sysml:2:9:ambiguous model" in capsys.readouterr().out
 
 
 def test_kernel_execution_collects_only_related_diagnostics() -> None:

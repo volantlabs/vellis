@@ -15,6 +15,7 @@ import urllib.request
 import zipfile
 from collections.abc import Iterator
 from contextlib import contextmanager
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -44,62 +45,13 @@ DIAGNOSTIC = re.compile(
     r"(?P<level>ERROR|WARNING):(?P<message>.*?)"
     r"\((?P<cell>\d+)\.sysml line : (?P<line>\d+) column : (?P<column>\d+)\)"
 )
-PACKAGE = re.compile(r"\bpackage\s+([A-Za-z_]\w*)\s*\{")
-IMPORT = re.compile(r"\b(?:private|public)?\s*import\s+([A-Za-z_]\w*)::")
 
 
-def _mask_non_code(text: str) -> str:
-    """Mask comments and string literals while preserving offsets and newlines."""
-    masked = list(text)
-    index = 0
-    state = "code"
-    while index < len(text):
-        current = text[index]
-        following = text[index + 1] if index + 1 < len(text) else ""
-        if state == "code":
-            if current == "/" and following == "/":
-                masked[index] = masked[index + 1] = " "
-                index += 2
-                state = "line-comment"
-                continue
-            if current == "/" and following == "*":
-                masked[index] = masked[index + 1] = " "
-                index += 2
-                state = "block-comment"
-                continue
-            if current == '"':
-                masked[index] = " "
-                index += 1
-                state = "string"
-                continue
-        elif state == "line-comment":
-            if current == "\n":
-                state = "code"
-            else:
-                masked[index] = " "
-        elif state == "block-comment":
-            if current == "*" and following == "/":
-                masked[index] = masked[index + 1] = " "
-                index += 2
-                state = "code"
-                continue
-            if current != "\n":
-                masked[index] = " "
-        elif state == "string":
-            if current == "\\" and following:
-                if current != "\n":
-                    masked[index] = " "
-                if following != "\n":
-                    masked[index + 1] = " "
-                index += 2
-                continue
-            if current == '"':
-                masked[index] = " "
-                state = "code"
-            elif current != "\n":
-                masked[index] = " "
-        index += 1
-    return "".join(masked)
+@dataclass(frozen=True)
+class SourceSpan:
+    path: Path
+    first_line: int
+    last_line: int
 
 
 def _json_object(path: Path) -> dict[str, Any]:
@@ -306,36 +258,27 @@ def _model_files() -> list[Path]:
     return files
 
 
-def _check_packages_and_import_order(files: list[Path]) -> None:
-    package_files: dict[str, Path] = {}
-    imports_by_file: dict[Path, set[str]] = {}
+def _combined_source(files: list[Path]) -> tuple[str, list[SourceSpan]]:
+    """Assemble one model submission while retaining file-aware line spans."""
+    chunks: list[str] = []
+    spans: list[SourceSpan] = []
+    first_line = 1
     for path in files:
-        text = _mask_non_code(path.read_text(encoding="utf-8"))
-        packages = PACKAGE.findall(text)
-        if not packages:
-            raise RuntimeError(f"{path.relative_to(ROOT)} does not declare a package")
-        if len(packages) != 1:
-            raise RuntimeError(
-                f"{path.relative_to(ROOT)} must declare exactly one package, found {packages}"
-            )
-        package = packages[0]
-        previous = package_files.get(package)
-        if previous is not None:
-            raise RuntimeError(
-                f"package {package} is declared by both {previous.relative_to(ROOT)} "
-                f"and {path.relative_to(ROOT)}"
-            )
-        package_files[package] = path
-        imports_by_file[path] = set(IMPORT.findall(text))
-    position = {path: index for index, path in enumerate(files)}
-    for path, imports in imports_by_file.items():
-        for imported_package in imports:
-            dependency = package_files.get(imported_package)
-            if dependency is not None and position[dependency] >= position[path]:
-                raise RuntimeError(
-                    f"{path.relative_to(ROOT)} imports {imported_package} from "
-                    f"{dependency.relative_to(ROOT)}, which is not earlier in filename order"
-                )
+        source = path.read_text(encoding="utf-8")
+        if not source.endswith("\n"):
+            source += "\n"
+        line_count = source.count("\n")
+        spans.append(SourceSpan(path, first_line, first_line + line_count - 1))
+        chunks.append(source)
+        first_line += line_count
+    return "".join(chunks), spans
+
+
+def _source_location(spans: list[SourceSpan], line: int) -> tuple[str, int]:
+    for span in spans:
+        if span.first_line <= line <= span.last_line:
+            return span.path.relative_to(ROOT).as_posix(), line - span.first_line + 1
+    return "model", line
 
 
 @contextmanager
@@ -408,12 +351,11 @@ def _execute_source(client: BlockingKernelClient, source: str) -> list[str]:
 
 def validate(*, self_test: bool = False) -> int:
     files = _model_files()
-    _check_packages_and_import_order(files)
+    source, spans = _combined_source(files)
     diagnostics: list[str] = []
     negative: list[str] = []
     with _kernel_session() as client:
-        for path in files:
-            diagnostics.extend(_execute_source(client, path.read_text(encoding="utf-8")))
+        diagnostics.extend(_execute_source(client, source))
     if self_test:
         with _kernel_session() as client:
             negative = _execute_source(
@@ -430,15 +372,14 @@ def validate(*, self_test: bool = False) -> int:
     ):
         print("ERROR formal validator negative self-test accepted an unresolved type")
         failed = True
-    labels = [path.relative_to(ROOT).as_posix() for path in files]
     for diagnostic in diagnostics:
         match = DIAGNOSTIC.search(diagnostic)
         if match:
-            cell = int(match.group("cell"))
-            label = labels[cell - 1] if 0 < cell <= len(labels) else "model"
+            combined_line = int(match.group("line"))
+            label, local_line = _source_location(spans, combined_line)
             level = match.group("level")
             print(
-                f"{level} {label}:{match.group('line')}:{match.group('column')}:"
+                f"{level} {label}:{local_line}:{match.group('column')}:"
                 f"{match.group('message').strip()}"
             )
             failed = failed or level in {"ERROR", "WARNING"}
