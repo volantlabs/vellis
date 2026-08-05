@@ -16,16 +16,16 @@ from pypdf import PdfReader
 
 try:
     from .model_layout import (
-        FORMAL_CACHE_ROOT,
         LANGUAGE_LOCK_PATH,
         ROOT,
+        SPECIFICATION_CACHE_ROOT,
         SPECIFICATION_REFERENCE_ROOT,
     )
 except ImportError:  # pragma: no cover - direct script execution
     from model_layout import (  # type: ignore[no-redef]
-        FORMAL_CACHE_ROOT,
         LANGUAGE_LOCK_PATH,
         ROOT,
+        SPECIFICATION_CACHE_ROOT,
         SPECIFICATION_REFERENCE_ROOT,
     )
 
@@ -103,12 +103,12 @@ def _sha256(path: Path) -> str:
 
 def _load_specifications() -> list[Specification]:
     lock = json.loads(LANGUAGE_LOCK_PATH.read_text(encoding="utf-8"))
-    grammar = lock.get("grammar")
-    if not isinstance(grammar, dict):
-        raise RuntimeError(f"{LANGUAGE_LOCK_PATH}: missing grammar artifacts")
+    artifacts = lock.get("specifications")
+    if not isinstance(artifacts, dict):
+        raise RuntimeError(f"{LANGUAGE_LOCK_PATH}: missing specification artifacts")
     specifications: list[Specification] = []
     for artifact_id in ("sysml_language_pdf", "kerml_language_pdf"):
-        artifact = grammar.get(artifact_id)
+        artifact = artifacts.get(artifact_id)
         if not isinstance(artifact, dict):
             raise RuntimeError(f"{LANGUAGE_LOCK_PATH}: missing {artifact_id}")
         try:
@@ -121,7 +121,7 @@ def _load_specifications() -> list[Specification]:
                     document_number=str(artifact["document_number"]),
                     source_url=str(artifact["url"]),
                     source_sha256=str(artifact["sha256"]),
-                    source_pdf=FORMAL_CACHE_ROOT / f"{artifact_id}.pdf",
+                    source_pdf=SPECIFICATION_CACHE_ROOT / f"{artifact_id}.pdf",
                     front_matter_start=int(artifact["front_matter_start_physical_page"]),
                     body_start=int(artifact["body_start_physical_page"]),
                     expected_page_count=int(artifact["expected_page_count"]),
@@ -222,11 +222,7 @@ def _flatten_outline(reader: PdfReader) -> list[dict[str, Any]]:
         )
         entry["physical_page_end"] = max(entry["physical_page_start"], next_page - 1)
         next_peer = next(
-            (
-                later
-                for later in entries[index + 1 :]
-                if later["level"] <= entry["level"]
-            ),
+            (later for later in entries[index + 1 :] if later["level"] <= entry["level"]),
             None,
         )
         entry["subtree_physical_page_end"] = (
@@ -284,9 +280,7 @@ def _page_context_before(entries: list[dict[str, Any]], physical_page: int) -> l
     return _entry_path(entries, prior[-1]) if prior else []
 
 
-def _section_paths_starting(
-    entries: list[dict[str, Any]], physical_page: int
-) -> list[list[str]]:
+def _section_paths_starting(entries: list[dict[str, Any]], physical_page: int) -> list[list[str]]:
     return [
         _entry_path(entries, entry)
         for entry in entries
@@ -351,9 +345,7 @@ def _page_markdown(
         lines[-1] = "section_context_before_page: []"
     if starting_paths:
         lines.append("section_paths_starting_here:")
-        lines.extend(
-            f"  - {json.dumps(path, ensure_ascii=False)}" for path in starting_paths
-        )
+        lines.extend(f"  - {json.dumps(path, ensure_ascii=False)}" for path in starting_paths)
     else:
         lines.append("section_paths_starting_here: []")
     if starts:
@@ -399,9 +391,7 @@ def _outline_data(
         value["printed_page_start"] = _printed_page(
             specification, int(entry["physical_page_start"])
         )
-        value["printed_page_end"] = _printed_page(
-            specification, int(entry["physical_page_end"])
-        )
+        value["printed_page_end"] = _printed_page(specification, int(entry["physical_page_end"]))
         projected.append(value)
     return {
         "schema_version": 1,
@@ -483,9 +473,7 @@ def _write_specification(specification: Specification, output_root: Path) -> dic
                 for entry in entries
                 if entry["physical_page_start"] == physical_page
             ]
-            text = _normalize_text(
-                page.extract_text(extraction_mode="layout") or "", specification
-            )
+            text = _normalize_text(page.extract_text(extraction_mode="layout") or "", specification)
             warnings = list(warning_collector.messages)
             if warnings:
                 extraction_warning_pages[str(physical_page)] = warnings
@@ -541,8 +529,7 @@ def _write_specification(specification: Specification, output_root: Path) -> dic
 def _render_into(output_root: Path) -> list[dict[str, Any]]:
     output_root.mkdir(parents=True)
     manifests = [
-        _write_specification(specification, output_root)
-        for specification in _load_specifications()
+        _write_specification(specification, output_root) for specification in _load_specifications()
     ]
     (output_root / "index.md").write_text(
         "# SysML and KerML specification references\n\n"
@@ -635,14 +622,17 @@ def find_references(
     specification_id: str | None = None,
     reference_root: Path = SPECIFICATION_REFERENCE_ROOT,
 ) -> list[SearchResult]:
+    if not 1 <= limit <= 50:
+        raise ValueError("reference result limit must be between 1 and 50")
     terms = _search_terms(query)
     if not terms:
         raise ValueError("reference query must contain at least one searchable term")
     normalized_query = " ".join(terms)
     specifications = {
-        specification.specification_id: specification
-        for specification in _load_specifications()
+        specification.specification_id: specification for specification in _load_specifications()
     }
+    if specification_id is not None and specification_id not in specifications:
+        raise ValueError(f"unknown specification: {specification_id}")
     selected = (
         [specifications[specification_id]]
         if specification_id is not None
@@ -731,9 +721,7 @@ def main() -> int:
     find_parser = subparsers.add_parser("find")
     find_parser.add_argument("query")
     find_parser.add_argument("--limit", type=int, default=8)
-    find_parser.add_argument(
-        "--specification", choices=("sysml-2.0", "kerml-1.0"), default=None
-    )
+    find_parser.add_argument("--specification", choices=("sysml-2.0", "kerml-1.0"), default=None)
     args = parser.parse_args()
     try:
         if args.command == "render":

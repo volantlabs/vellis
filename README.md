@@ -1,26 +1,26 @@
 # Vellis
 
-Vellis is an individually owned personal AI system and an open demonstration of model-first software
-engineering with textual SysML v2.
+Vellis is an individually owned personal AI system and an open demonstration of model-first software engineering with textual SysML v2.
 
-The repository is currently at the **v2 model reset**: the former implementation and component-
-library architecture have been removed, and the new Vellis model is the sole engineering source.
-There is no supported runtime, CLI, package, server, or migration utility in this commit. The next
-work is to simplify the draft model, approve the first vertical slice, and generate its source.
+The repository currently contains the Vellis system model and its development tooling, with no application implementation or generated product source yet. The model covers owner-facing behavior, Reified Type Graph (RTG) graph and query meaning, cold-agent definition discovery, definition governance, snapshots and replay, a selected MCP tool contract, cohesive system responsibility, requirements, satisfiers, and verification cases.
 
 ## What is here
 
-- [`model/`](model/): the working Vellis SysML v2 model.
+- [`model/`](model/): five ordered SysML packages forming the current system authority.
 - [`docs/vision.md`](docs/vision.md): the human/agent engineering vision.
-- [`docs/modeling-method.md`](docs/modeling-method.md): the use-case-first modeling method.
-- [`docs/open-questions.md`](docs/open-questions.md): non-normative questions for the draft.
-- [`reference/specifications/`](reference/specifications/): searchable projections of pinned SysML
-  and KerML PDFs.
-- [`.agents/skills/`](.agents/skills/): four focused modeling and synchronization skills.
+- [`docs/modeling-method.md`](docs/modeling-method.md): the use-case-first model-as-code method.
+- [`docs/mcp-realization.md`](docs/mcp-realization.md): non-normative guidance for a future FastMCP realization.
+- [`reference/specifications/`](reference/specifications/): searchable projections of pinned SysML and KerML PDFs.
+- [`.agents/skills/`](.agents/skills/): four complementary engineering-copilot skills.
 - [`tools/`](tools/): the pinned validator, reference finder, and skill checks.
 
-Markdown explains the work; it does not replace the SysML model as product authority. The generated
-specification pages are retrieval aids, and their official PDFs remain authoritative.
+The SysML on a branch is that branch's system definition. A pull request proposes changes to behavior, requirements, system responsibility, and verification; review and merge are the acceptance mechanism. Markdown explains the work without duplicating the model as a parallel contract.
+
+## Agent-assisted modeling
+
+Begin with [`AGENTS.md`](AGENTS.md), then read the [model map](model/README.md), every current `model/*.sysml` file, and the current diff. Use `$sysml-modeling` for the engineering workflow, `$sysml-reference` for language decisions, `$rtg-schema-design` for RTG domain and governance meaning, and `$documentation-sync` after model or workflow changes.
+
+A useful handoff answers the question, states the changed or reviewed meaning, gives decisive evidence and checks, and names only the remaining decision or follow-up work. An agent unfamiliar with an RTG begins with the modeled current definition summary, then inspects only the active anchor neighborhoods needed for its query or proposed change.
 
 ## Development setup
 
@@ -38,17 +38,11 @@ Useful commands:
 - `just model-reference-find "<question>"`: find relevant specification pages.
 - `just model-reference-find "<question>" sysml-2.0 5`: limit a search by specification and count.
 - `just model-reference-check`: prove the committed search corpus matches the pinned PDFs.
-- `just skills-check`: validate the four skills and their Claude Code exposure.
+- `just skills-check`: validate the four repo-local skills and their managed project links.
 - `just check`: run the complete repository gate.
 
-## Modeling stance
-
-Start with the owner, external participants, system boundary, and valued outcomes. Introduce internal
-parts, actions, services, ports, states, and other abstractions only when a current use case,
-requirement, invariant, failure boundary, or verification need makes them necessary.
-
-The RTG model preserves the domain distinction among anchors, associated data objects, directed
-links, and identity-free anchor/data associations. It intentionally makes no compatibility promise
-for the old runtime, schema lifecycle, ledger, storage, or protocol surfaces.
-
-See [CONTRIBUTING.md](CONTRIBUTING.md) for the contribution workflow.
+The model selects ten portable MCP tool behaviors but does not implement an MCP server. Runtime,
+storage, transport, deployment, and migration realization remain open. The initial contract assumes
+one trusted owner-configured client; its tools do not implement per-call authorization or decide owner
+approval. See
+[CONTRIBUTING.md](CONTRIBUTING.md) for the contribution workflow.

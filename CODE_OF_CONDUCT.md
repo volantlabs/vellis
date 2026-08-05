@@ -8,7 +8,7 @@ Vellis should be a practical, respectful engineering space.
 - Critique designs and code, not people.
 - Assume good intent while still asking for evidence.
 - Keep discussions focused on improving the software and its documentation.
-- Respect maintainers' decisions about component boundaries and accepted specs.
+- Respect maintainers' decisions about current model intent and contribution scope.
 
 ## Unacceptable Behavior
 

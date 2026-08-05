@@ -23,19 +23,19 @@ from jupyter_client.connect import write_connection_file
 
 try:
     from .model_layout import (
-        FORMAL_CACHE_ROOT,
         LANGUAGE_LOCK_PATH,
         MODEL_ROOT,
         ROOT,
+        SPECIFICATION_CACHE_ROOT,
         VALIDATOR_CACHE_ROOT,
         VALIDATOR_LOCK_PATH,
     )
 except ImportError:  # pragma: no cover - direct script execution
     from model_layout import (  # type: ignore[no-redef]
-        FORMAL_CACHE_ROOT,
         LANGUAGE_LOCK_PATH,
         MODEL_ROOT,
         ROOT,
+        SPECIFICATION_CACHE_ROOT,
         VALIDATOR_CACHE_ROOT,
         VALIDATOR_LOCK_PATH,
     )
@@ -46,6 +46,60 @@ DIAGNOSTIC = re.compile(
 )
 PACKAGE = re.compile(r"\bpackage\s+([A-Za-z_]\w*)\s*\{")
 IMPORT = re.compile(r"\b(?:private|public)?\s*import\s+([A-Za-z_]\w*)::")
+
+
+def _mask_non_code(text: str) -> str:
+    """Mask comments and string literals while preserving offsets and newlines."""
+    masked = list(text)
+    index = 0
+    state = "code"
+    while index < len(text):
+        current = text[index]
+        following = text[index + 1] if index + 1 < len(text) else ""
+        if state == "code":
+            if current == "/" and following == "/":
+                masked[index] = masked[index + 1] = " "
+                index += 2
+                state = "line-comment"
+                continue
+            if current == "/" and following == "*":
+                masked[index] = masked[index + 1] = " "
+                index += 2
+                state = "block-comment"
+                continue
+            if current == '"':
+                masked[index] = " "
+                index += 1
+                state = "string"
+                continue
+        elif state == "line-comment":
+            if current == "\n":
+                state = "code"
+            else:
+                masked[index] = " "
+        elif state == "block-comment":
+            if current == "*" and following == "/":
+                masked[index] = masked[index + 1] = " "
+                index += 2
+                state = "code"
+                continue
+            if current != "\n":
+                masked[index] = " "
+        elif state == "string":
+            if current == "\\" and following:
+                if current != "\n":
+                    masked[index] = " "
+                if following != "\n":
+                    masked[index + 1] = " "
+                index += 2
+                continue
+            if current == '"':
+                masked[index] = " "
+                state = "code"
+            elif current != "\n":
+                masked[index] = " "
+        index += 1
+    return "".join(masked)
 
 
 def _json_object(path: Path) -> dict[str, Any]:
@@ -80,15 +134,15 @@ def _download(url: str, expected: str, destination: Path) -> None:
 
 def _setup_language_pdfs() -> list[Path]:
     lock = _json_object(LANGUAGE_LOCK_PATH)
-    grammar = lock.get("grammar")
-    if not isinstance(grammar, dict):
-        raise RuntimeError(f"{LANGUAGE_LOCK_PATH}: missing grammar artifacts")
+    artifacts = lock.get("specifications")
+    if not isinstance(artifacts, dict):
+        raise RuntimeError(f"{LANGUAGE_LOCK_PATH}: missing specification artifacts")
     downloaded: list[Path] = []
     for artifact_id in ("sysml_language_pdf", "kerml_language_pdf"):
-        artifact = grammar.get(artifact_id)
+        artifact = artifacts.get(artifact_id)
         if not isinstance(artifact, dict):
             raise RuntimeError(f"{LANGUAGE_LOCK_PATH}: missing {artifact_id}")
-        destination = FORMAL_CACHE_ROOT / f"{artifact_id}.pdf"
+        destination = SPECIFICATION_CACHE_ROOT / f"{artifact_id}.pdf"
         _download(str(artifact["url"]), str(artifact["sha256"]), destination)
         downloaded.append(destination)
     return downloaded
@@ -169,11 +223,15 @@ def _check_packages_and_import_order(files: list[Path]) -> None:
     package_files: dict[str, Path] = {}
     imports_by_file: dict[Path, set[str]] = {}
     for path in files:
-        text = path.read_text(encoding="utf-8")
-        match = PACKAGE.search(text)
-        if not match:
+        text = _mask_non_code(path.read_text(encoding="utf-8"))
+        packages = PACKAGE.findall(text)
+        if not packages:
             raise RuntimeError(f"{path.relative_to(ROOT)} does not declare a package")
-        package = match.group(1)
+        if len(packages) != 1:
+            raise RuntimeError(
+                f"{path.relative_to(ROOT)} must declare exactly one package, found {packages}"
+            )
+        package = packages[0]
         previous = package_files.get(package)
         if previous is not None:
             raise RuntimeError(
@@ -237,6 +295,7 @@ def _kernel_session() -> Iterator[BlockingKernelClient]:
                 process.wait(timeout=5)
             except subprocess.TimeoutExpired:
                 process.kill()
+                process.wait(timeout=5)
 
 
 def _execute_source(client: BlockingKernelClient, source: str) -> list[str]:
@@ -247,8 +306,12 @@ def _execute_source(client: BlockingKernelClient, source: str) -> list[str]:
         if message["parent_header"].get("msg_id") != message_id:
             continue
         content = message["content"]
-        if message["msg_type"] == "stream" and content.get("name") == "stderr":
-            diagnostics.extend(str(content.get("text", "")).splitlines())
+        if message["msg_type"] == "stream":
+            lines = str(content.get("text", "")).splitlines()
+            if content.get("name") == "stderr":
+                diagnostics.extend(lines)
+            else:
+                diagnostics.extend(line for line in lines if DIAGNOSTIC.search(line))
         elif message["msg_type"] == "error":
             diagnostics.extend(str(line) for line in content.get("traceback", []))
         elif message["msg_type"] == "status" and content.get("execution_state") == "idle":
@@ -262,12 +325,15 @@ def validate(*, self_test: bool = False) -> int:
     diagnostics: list[str] = []
     negative: list[str] = []
     with _kernel_session() as client:
-        if self_test:
-            negative = _execute_source(
-                client, "package ValidatorNegative { part def Broken :> MissingType; }"
-            )
         for path in files:
             diagnostics.extend(_execute_source(client, path.read_text(encoding="utf-8")))
+    if self_test:
+        with _kernel_session() as client:
+            negative = _execute_source(
+                client,
+                "package VellisValidatorNegative_7F3A { "
+                "part def Broken :> VellisMissingType_7F3A; }",
+            )
 
     failed = False
     if self_test and not any(
@@ -277,19 +343,18 @@ def validate(*, self_test: bool = False) -> int:
     ):
         print("ERROR formal validator negative self-test accepted an unresolved type")
         failed = True
-    cell_offset = 1 if self_test else 0
     labels = [path.relative_to(ROOT).as_posix() for path in files]
     for diagnostic in diagnostics:
         match = DIAGNOSTIC.search(diagnostic)
         if match:
-            cell = int(match.group("cell")) - cell_offset
+            cell = int(match.group("cell"))
             label = labels[cell - 1] if 0 < cell <= len(labels) else "model"
             level = match.group("level")
             print(
                 f"{level} {label}:{match.group('line')}:{match.group('column')}:"
                 f"{match.group('message').strip()}"
             )
-            failed = failed or level == "ERROR"
+            failed = failed or level in {"ERROR", "WARNING"}
         elif diagnostic.strip():
             print(f"ERROR {diagnostic.strip()}")
             failed = True
@@ -298,8 +363,7 @@ def validate(*, self_test: bool = False) -> int:
         return 1
     version = _json_object(VALIDATOR_LOCK_PATH)["implementation_version"]
     print(
-        f"Formal SysML validation passed for {len(files)} files "
-        f"with official Java pilot {version}."
+        f"Formal SysML validation passed for {len(files)} files with official Java pilot {version}."
     )
     return 0
 

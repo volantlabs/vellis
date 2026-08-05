@@ -1,6 +1,6 @@
 interface:
   display_name: "RTG Schema Design"
-  short_description: "Design precise RTG concepts and graph schemas"
-  default_prompt: "Use $rtg-schema-design to classify these graph concepts and propose the smallest precise RTG schema."
+  short_description: "Design discoverable RTG meaning and governance"
+  default_prompt: "Use $rtg-schema-design to design trusted agent access, RTG meaning, governance, validation, bounded history, and recovery with decisive evidence."
 policy:
   allow_implicit_invocation: true

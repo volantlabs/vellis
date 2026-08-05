@@ -1,15 +1,35 @@
 ## Intent
 
-Describe the owner or engineering outcome and the smallest change that realizes it.
+What one owner or engineering question does this change answer, and what becomes observable?
 
-## Model authority
+Which explicit owner decisions, selected model meaning, and deliberate deferrals does it preserve? If
+one was reopened, identify the review scope or new contradictory evidence and changed consequence.
 
-- [ ] The SysML model is unchanged, or the affected model intent is updated.
-- [ ] No behavior is specified only in Markdown or generated output.
-- [ ] New abstractions are justified by a current use case, requirement, invariant, failure boundary, or verification need.
+## Semantic closure
 
-## Verification
+Trace each changed claim through the applicable behavior, domain meaning, native representation,
+responsibility, requirements, satisfiers, and verification. Identify reused authority as well as new
+elements. Note compatibility effects and bounded follow-up work.
 
-- [ ] `just check` passes.
-- [ ] Consequential SysML/KerML decisions cite their specification section and page.
+If implementing a formal plan, identify the conformance evidence for every mandatory claim and
+non-goal and confirm the final full review cycle found no new material issue.
+
+## Evidence
+
+- [ ] The smallest accepted case, refusal or failure with non-effects, and plausible-invalid
+      counterexample were exercised.
+- [ ] Instance-level review followed nested ownership and closed row-shaped result semantics rather
+      than inferring correctness from declarations, comments, or passing inventory checks.
+- [ ] Applicable requirements, satisfying features, and subject-compatible verification close the
+      changed claims without mirrored inventory.
+- [ ] Consequential language choices cite official specification sections and pages.
+- [ ] Official model validation and `just check` pass.
+- [ ] Adequacy and subtraction reviews found no responsibility stranded in prose and no unsupported
+      service, runtime, storage, migration, transport, deployment, or inventory-driven architecture.
+- [ ] Natural identity, derived meaning, bounded responses, and existing authority were preferred
+      before new IDs, stored flags, parallel rules, envelopes, or operational machinery.
+- [ ] Deferred realization choices and external tool surfaces were not modeled as optional product
+      structure or one-to-one use-case/action inventories.
+- [ ] Any public tool inventory is intentional, typed, traceable to behavior, and does not imply a
+      runnable server, transport, framework, service, adapter, or matching internal decomposition.
 - [ ] `.data/` and unrelated branches were not modified.

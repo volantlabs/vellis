@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+import re
 from pathlib import Path
 
 import pytest
@@ -28,6 +30,21 @@ def test_current_model_packages_are_unique_and_imports_are_ordered() -> None:
     sysml_validator._check_packages_and_import_order(files)
 
 
+def test_model_readme_maps_every_discovered_file_and_package() -> None:
+    files = sysml_validator._model_files()
+    readme = (model_layout.MODEL_ROOT / "README.md").read_text(encoding="utf-8")
+    mapped_files = set(re.findall(r"`(\d{2}-[^`]+\.sysml)`", readme))
+    packages = [
+        sysml_validator.PACKAGE.findall(
+            sysml_validator._mask_non_code(path.read_text(encoding="utf-8"))
+        )[0]
+        for path in files
+    ]
+
+    assert mapped_files == {path.name for path in files}
+    assert all(f"`{package}`" in readme for package in packages)
+
+
 def test_import_from_later_file_is_rejected(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -41,10 +58,176 @@ def test_import_from_later_file_is_rejected(
         sysml_validator._check_packages_and_import_order([first, second])
 
 
+def test_multiple_packages_in_one_file_are_rejected(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    model = tmp_path / "10-model.sysml"
+    model.write_text("package First {}\npackage Second {}\n", encoding="utf-8")
+    monkeypatch.setattr(sysml_validator, "ROOT", tmp_path)  # type: ignore[attr-defined]
+
+    with pytest.raises(RuntimeError, match="exactly one package"):
+        sysml_validator._check_packages_and_import_order([model])
+
+
+def test_duplicate_packages_are_rejected(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    first = tmp_path / "10-first.sysml"
+    second = tmp_path / "20-second.sysml"
+    first.write_text("package Repeated {}\n", encoding="utf-8")
+    second.write_text("package Repeated {}\n", encoding="utf-8")
+    monkeypatch.setattr(sysml_validator, "ROOT", tmp_path)  # type: ignore[attr-defined]
+
+    with pytest.raises(RuntimeError, match="declared by both"):
+        sysml_validator._check_packages_and_import_order([first, second])
+
+
+def test_package_and_import_scan_ignores_comments_and_strings(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    first = tmp_path / "10-first.sysml"
+    second = tmp_path / "20-second.sysml"
+    first.write_text(
+        "/* package Phantom {} private import Second::*; } */\n"
+        "// package AlsoPhantom {} private import Second::*;\n"
+        'package First { attribute note = "package Phantom {}"; }\n',
+        encoding="utf-8",
+    )
+    second.write_text("package Second {}\n", encoding="utf-8")
+    monkeypatch.setattr(sysml_validator, "ROOT", tmp_path)  # type: ignore[attr-defined]
+
+    sysml_validator._check_packages_and_import_order([first, second])
+
+    source = first.read_text(encoding="utf-8")
+    masked = sysml_validator._mask_non_code(source)
+    assert len(masked) == len(source)
+    assert masked.count("\n") == source.count("\n")
+    assert "Phantom" not in masked
+
+
 def test_model_check_uses_official_validator_and_negative_probe() -> None:
     justfile = (model_layout.ROOT / "justfile").read_text(encoding="utf-8")
-    lock = (model_layout.MODEL_CONFIG_ROOT / "validator.lock.json").read_text(encoding="utf-8")
+    lock = json.loads(
+        (model_layout.MODEL_CONFIG_ROOT / "validator.lock.json").read_text(encoding="utf-8")
+    )
 
     assert "tools/sysml_validator.py validate --self-test" in justfile
-    assert "Systems-Modeling/SysML-v2-Pilot-Implementation" in lock
-    assert "jupyter-sysml-kernel" in lock
+    assert lock["provider"] == "Systems-Modeling/SysML-v2-Pilot-Implementation"
+    assert lock["kernel"]["jar"].endswith(
+        f"jupyter-sysml-kernel-{lock['implementation_version']}-all.jar"
+    )
+
+
+def test_negative_probe_uses_a_separate_kernel_session(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    model = tmp_path / "10-model.sysml"
+    model.write_text("package Model {}\n", encoding="utf-8")
+    sessions: list[str] = []
+    executions: list[tuple[str, str]] = []
+
+    class FakeSession:
+        def __enter__(self) -> str:
+            label = f"session-{len(sessions) + 1}"
+            sessions.append(label)
+            return label
+
+        def __exit__(self, *_: object) -> None:
+            return None
+
+    def fake_execute(client: str, source: str) -> list[str]:
+        executions.append((client, source))
+        if "VellisValidatorNegative" in source:
+            return ["ERROR:unresolved type(1.sysml line : 1 column : 1)"]
+        return []
+
+    monkeypatch.setattr(sysml_validator, "ROOT", tmp_path)  # type: ignore[attr-defined]
+    monkeypatch.setattr(sysml_validator, "_model_files", lambda: [model])
+    monkeypatch.setattr(sysml_validator, "_kernel_session", FakeSession)
+    monkeypatch.setattr(sysml_validator, "_execute_source", fake_execute)
+    monkeypatch.setattr(
+        sysml_validator,
+        "_json_object",
+        lambda _: {"implementation_version": "test"},
+    )
+
+    assert sysml_validator.validate(self_test=True) == 0
+    assert sessions == ["session-1", "session-2"]
+    assert executions[0][0] != executions[1][0]
+
+
+def test_validator_warning_maps_to_its_file_and_fails_validation(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    model = tmp_path / "10-model.sysml"
+    model.write_text("package Model {}\n", encoding="utf-8")
+
+    class FakeSession:
+        def __enter__(self) -> object:
+            return object()
+
+        def __exit__(self, *_: object) -> None:
+            return None
+
+    monkeypatch.setattr(sysml_validator, "ROOT", tmp_path)  # type: ignore[attr-defined]
+    monkeypatch.setattr(sysml_validator, "_model_files", lambda: [model])
+    monkeypatch.setattr(sysml_validator, "_kernel_session", FakeSession)
+    monkeypatch.setattr(
+        sysml_validator,
+        "_execute_source",
+        lambda *_: ["WARNING:ambiguous model(1.sysml line : 7 column : 9)"],
+    )
+
+    assert sysml_validator.validate() == 1
+    assert "WARNING 10-model.sysml:7:9:ambiguous model" in capsys.readouterr().out
+
+
+def test_kernel_execution_collects_only_related_diagnostics() -> None:
+    messages = iter(
+        (
+            {
+                "parent_header": {"msg_id": "unrelated"},
+                "msg_type": "stream",
+                "content": {"name": "stderr", "text": "unrelated error"},
+            },
+            {
+                "parent_header": {"msg_id": "wanted"},
+                "msg_type": "stream",
+                "content": {"name": "stdout", "text": "ordinary output"},
+            },
+            {
+                "parent_header": {"msg_id": "wanted"},
+                "msg_type": "stream",
+                "content": {
+                    "name": "stdout",
+                    "text": "WARNING:notice(1.sysml line : 2 column : 3)",
+                },
+            },
+            {
+                "parent_header": {"msg_id": "wanted"},
+                "msg_type": "stream",
+                "content": {
+                    "name": "stderr",
+                    "text": "ERROR:broken(1.sysml line : 4 column : 5)",
+                },
+            },
+            {
+                "parent_header": {"msg_id": "wanted"},
+                "msg_type": "status",
+                "content": {"execution_state": "idle"},
+            },
+        )
+    )
+
+    class FakeClient:
+        def execute(self, _: str) -> str:
+            return "wanted"
+
+        def get_iopub_msg(self, *, timeout: int) -> dict[str, object]:
+            assert timeout == 120
+            return next(messages)
+
+    diagnostics = sysml_validator._execute_source(FakeClient(), "package Model {}")  # type: ignore[arg-type]
+
+    assert diagnostics == [
+        "WARNING:notice(1.sysml line : 2 column : 3)",
+        "ERROR:broken(1.sysml line : 4 column : 5)",
+    ]

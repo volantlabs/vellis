@@ -1,78 +1,91 @@
 # AGENTS.md
 
-## Purpose
+## Authority
 
 Vellis is one individually owned application and an open demonstration of model-first software
-engineering. It is not a component library or an enterprise platform.
+engineering. Textual SysML v2 under `model/` is the product and system authority on each branch.
+Pull requests propose changes to that authority; Markdown explains the work without restating its
+contracts.
 
-Textual SysML v2 under `model/` is the current engineering authority. The model is a working draft;
-implementation begins only after a human approves a vertical slice and its verification objectives.
-
-## Startup and safety
+## Safety
 
 At the start of work, run `pwd`, `git status --short --branch`, and `git worktree list`. Do not switch
 branches in a worktree without human confirmation.
 
 The ignored `.data/` directory may contain user-owned graphs and databases. Do not inspect, move,
-rewrite, migrate, or delete it unless the human explicitly requests that exact data operation. Never
-use broad ignored-file cleanup commands in this repository.
+rewrite, migrate, or delete it unless the human explicitly requests that exact operation. Never run
+broad ignored-file cleanup commands here.
 
-Do not mine v1 Git history for current requirements or design patterns unless the human explicitly
-requests historical comparison or recovery work.
+Do not mine v1 history for current requirements or design patterns unless the human requests a
+historical comparison or recovery task.
 
-## Model-first workflow
+## Skill routing
 
-1. Begin with the owner, external participants, Vellis boundary, and valued outcome.
-2. Model black-box use cases before internal structure.
-3. Add domain vocabulary, state, requirements, and white-box elements only when current intent needs
-   them.
-4. Use `sysml-reference` before consequential SysML/KerML syntax or semantics decisions.
-5. Run `just model-check`; parser success is evidence, not architectural acceptance.
-6. Obtain human approval before treating a slice as implementation-authorizing.
-7. Define verification objectives before generation or implementation.
-8. Keep model, future generated source, verification, and public guidance synchronized.
+- `$sysml-modeling`: owner needs, use cases, behavior, logical responsibility, requirements,
+  verification, adequacy, and simplification.
+- `$sysml-reference`: official language semantics, construct comparison, citations, and validator
+  diagnosis. Use it for every consequential SysML or KerML choice.
+- `$rtg-schema-design`: RTG meaning, queries, definitions, validation, revision, history, recovery,
+  and compatibility.
+- `$documentation-sync`: repository authority, commands, skills, templates, and public guidance.
 
-Use the repo-local skills as follows:
+## Non-negotiable modeling rules
 
-- `sysml-modeling`: model design, revision, review, and simplification.
-- `sysml-reference`: language semantics, citations, and validator diagnosis.
-- `rtg-schema-design`: anchors, associated data, links, associations, schemas, and compatibility.
-- `documentation-sync`: authority, commands, skills, and public-document alignment.
+- Begin with owner value and observable behavior. Do not infer architecture from requested nouns,
+  familiar names, predecessor code, framework examples, popular repository patterns, training-data
+  priors, or incidental tests. Treat familiar architecture as a hypothesis, not a default.
+- Close one changed semantic path at a time. Reuse existing behavior, domain meaning, requirements,
+  satisfiers, and verification where they already carry the claim; add an element only at a layer
+  whose meaning is missing. Semantic completeness does not require a new artifact in every layer.
+- Prefer native SysML semantics. Comments and names cannot repair incorrect ownership, multiplicity,
+  control, reference, satisfaction, or verification semantics.
+- Review permitted instances recursively, not only declaration names. Inspect nested composites for
+  accidental full-state ownership and define the joint tuple, projection, duplicate, absence, and
+  null semantics of row-shaped results.
+- Add actions only when functional refinement adds meaning. Group capabilities before parts, and add
+  a part only for an independent lifecycle, state owner, failure responsibility, external
+  interaction, or current realization decision.
+- Keep persistence, transport, runtime, language, deployment, algorithms, and migration machinery
+  open until intentionally selected. Do not add speculative services, controllers, adapters,
+  managers, envelopes, extension seams, or duplicate authority.
+- Prefer natural keys, derived meaning, one relationship authority, and one current prospective
+  overlay before adding surrogate identity, stored flags, parallel rules, intent logs, or lifecycle
+  machinery.
+- Preserve explicit owner decisions and selected model meaning within the task's scope. Do not treat
+  incidental tests, familiar patterns, explanatory comments, or mere element presence as owner
+  decisions. An explicit review request may reassess them; otherwise reopen a decision only when new
+  evidence creates a named contradiction and changed consequence.
+- Do not use optional multiplicity to represent uncertainty, or configurable structure to represent
+  a realization choice that is merely deferred. Absence, unknown, not applicable, and not yet decided
+  are different meanings.
+- Treat tool, protocol, and framework affordances as feasibility constraints, not a use-case or
+  action inventory. Reflect them in the system model only when they change observable behavior or a
+  selected realization boundary. The selected RTG MCP inventory is an intentional public contract,
+  not evidence for services, adapters, ports, or matching internal decomposition. Its trusted-client
+  assumption does not establish per-call authorization or owner approval.
+- For agent-facing RTG work, begin cold: summarize the complete current anchor vocabulary, inspect
+  only the relevant active-definition neighborhoods at that evaluated revision,
+  and retrieve the sole current proposed definition set separately when continuing definition work.
+  Do not assume predecessor schema knowledge or imply that current discovery reveals retired
+  historical vocabulary.
+- Preserve independently valuable outcomes, state governance, failure non-effects, recovery meaning,
+  and verification while subtracting unsupported structure.
+- Protect semantic invariants in tests. Do not restore decorative model inventory to satisfy brittle
+  counts or names.
+- Never hand-edit future generated product source; regenerate it and check freshness when generation
+  exists.
 
-## Modeling rules
+Before model edits, read `model/README.md`, every current `model/*.sysml` file, affected dependencies,
+and the current diff. Follow the operative workflow and handoff in `$sysml-modeling`.
 
-- Prefer native SysML constructs over custom annotations or pseudo-language.
-- Model owner value and observable behavior, not source-code structure.
-- Distinguish owned, derived, and independently existing state.
-- Use ports and interfaces only for intentional connections and transfers.
-- Use states only for activated or event-driven behavior.
-- Define a calculation only when it returns a result and a constraint only when it is a complete
-  predicate.
-- Keep persistence, transport, runtime, language, deployment, and algorithms open until intentionally
-  selected or externally meaningful.
-- Do not create placeholder services, adapters, managers, request/response types, extension seams,
-  or duplicate representations.
-- Ask what becomes false or unrealizable if a proposed element is removed. If nothing does, defer it.
-- Keep one product-behavior authority. Markdown explains method, vision, operation, or open questions;
-  it does not restate the model as a parallel contract.
-- Never hand-edit future generated source. When generation exists, commit it and check freshness.
+## Resources and checks
 
-## RTG domain boundary
+The Markdown under `reference/specifications/` is a searchable projection of checksum-pinned official
+PDFs. Begin with `just model-reference-find`, follow normative cross-references, inspect extraction
+warnings, and never edit the corpus by hand.
 
-Preserve anchors, associated data objects, directed identity-bearing links, and identity-free direct
-anchor/data associations as distinct concepts. Links may address anchors or associated data objects,
-never links. Do not infer compatibility for former schemas, constraints, ledgers, storage layouts,
-or transport encodings.
+Use `uv` and `just`. Run `just setup` and `just model-setup` after cloning. Before completion, run the
+relevant narrow checks and normally `just check`. Keep `.data/` untouched.
 
-## Language resources
-
-The committed Markdown under `reference/specifications/` is a searchable projection of pinned
-official PDFs. The PDFs are authoritative. Begin retrieval with `just model-reference-find`, follow
-normative cross-references, inspect extraction warnings, and cite specification section plus printed
-or physical page. Never edit the corpus by hand.
-
-## Repository commands
-
-Use `uv` for Python and `just` for workflows. Run `just setup` and `just model-setup` after cloning.
-Before completion, run the narrow relevant commands and normally `just check`. Do not add build,
-runtime, packaging, or generation machinery before a real modeled slice needs it.
+The model selects an MCP tool contract but the repository has no runnable MCP server. Use modeled,
+selected, implemented, and runnable precisely.

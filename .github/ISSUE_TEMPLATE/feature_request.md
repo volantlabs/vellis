@@ -1,22 +1,23 @@
 ---
 name: Feature request
-about: Propose a Vellis outcome or model-first workflow improvement
+about: Propose one Vellis outcome or model-first workflow improvement
 title: ""
 labels: enhancement
 ---
 
-## Owner need
+## Primary owner question
 
-What owner outcome or engineering problem should this address?
+What one owner outcome or engineering question should this address?
 
-## Model impact
+## Current gap
 
-Which use case, requirement, domain concept, or workflow would change?
+What behavior, meaning, state effect, refusal, failure, responsibility, or evidence is missing?
 
-## Simplicity impact
+## Smallest decisive evidence
 
-What new structure would be introduced, and what becomes false or unrealizable without it?
+What accepted result, failure non-effect, or invalid counterexample would prove the change is right?
 
-## Acceptance
+## Affected authority
 
-What observable result or verification would show that the need is met?
+Which existing model claim appears to change? Leave this open rather than inventing structure when it
+is not yet known.

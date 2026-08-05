@@ -10,10 +10,13 @@ SKILL_NAME = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 LOCAL_LINK = re.compile(r"\[[^]]*]\(([^)]+)\)")
 REQUIRED_INTERFACE_KEYS = {"display_name", "short_description", "default_prompt"}
 ALLOWED_FRONTMATTER_KEYS = {"name", "description"}
+ALLOWED_METADATA_KEYS = {"interface", "policy"}
+ALLOWED_POLICY_KEYS = {"allow_implicit_invocation"}
 PLACEHOLDER = re.compile(
     r"\b(?:TODO|TBD|FIXME)\b|[<\[](?:placeholder|insert[^>\]]*)[>\]]",
     re.IGNORECASE,
 )
+TRIGGER_WORD = re.compile(r"\b(?:use|when)\b", re.IGNORECASE)
 
 
 def load_yaml(path: Path) -> object:
@@ -30,7 +33,11 @@ def _frontmatter(skill_file: Path, errors: list[str]) -> dict[str, object]:
     if len(parts) < 3:
         errors.append(f"{skill_file}: unterminated YAML frontmatter")
         return {}
-    value = yaml.safe_load(parts[1]) or {}
+    try:
+        value = yaml.safe_load(parts[1]) or {}
+    except yaml.YAMLError as error:
+        errors.append(f"{skill_file}: invalid YAML frontmatter: {error}")
+        return {}
     if not isinstance(value, dict):
         errors.append(f"{skill_file}: frontmatter must be a mapping")
         return {}
@@ -96,13 +103,15 @@ def validate_skill(skill_dir: Path) -> list[str]:
 
     _validate_layout(skill_dir, errors)
     skill_text = skill_file.read_text(encoding="utf-8")
+    if len(skill_text.splitlines()) > 500:
+        errors.append(f"{skill_file}: skill body must not exceed 500 lines")
     frontmatter = _frontmatter(skill_file, errors)
     if frontmatter.get("name") != skill_dir.name:
         errors.append(f"{skill_file}: frontmatter name must be {skill_dir.name!r}")
     description = frontmatter.get("description")
     if not isinstance(description, str) or len(description.strip()) < 40:
         errors.append(f"{skill_file}: description must be non-empty and trigger-oriented")
-    elif "use" not in description.casefold() and "when" not in description.casefold():
+    elif not TRIGGER_WORD.search(description):
         errors.append(f"{skill_file}: description must state when to use the skill")
     if PLACEHOLDER.search(skill_text):
         errors.append(f"{skill_file}: placeholder content is prohibited")
@@ -111,10 +120,17 @@ def validate_skill(skill_dir: Path) -> list[str]:
     if not metadata_file.exists():
         errors.append(f"{metadata_file}: missing skill UI metadata")
         return errors
-    metadata = load_yaml(metadata_file)
+    try:
+        metadata = load_yaml(metadata_file)
+    except yaml.YAMLError as error:
+        errors.append(f"{metadata_file}: invalid YAML metadata: {error}")
+        return errors
     if not isinstance(metadata, dict):
         errors.append(f"{metadata_file}: expected mapping")
         return errors
+    unexpected_metadata = set(metadata) - ALLOWED_METADATA_KEYS
+    if unexpected_metadata:
+        errors.append(f"{metadata_file}: prohibited metadata keys: {sorted(unexpected_metadata)}")
     interface = metadata.get("interface")
     if not isinstance(interface, dict):
         errors.append(f"{metadata_file}: missing interface mapping")
@@ -122,6 +138,11 @@ def validate_skill(skill_dir: Path) -> list[str]:
         missing = REQUIRED_INTERFACE_KEYS - set(interface)
         if missing:
             errors.append(f"{metadata_file}: missing interface keys: {sorted(missing)}")
+        unexpected_interface = set(interface) - REQUIRED_INTERFACE_KEYS
+        if unexpected_interface:
+            errors.append(
+                f"{metadata_file}: prohibited interface keys: {sorted(unexpected_interface)}"
+            )
         short = interface.get("short_description")
         if not isinstance(short, str) or not 25 <= len(short) <= 64:
             errors.append(f"{metadata_file}: short_description must be 25-64 characters")
@@ -131,6 +152,10 @@ def validate_skill(skill_dir: Path) -> list[str]:
     policy = metadata.get("policy")
     if not isinstance(policy, dict) or policy.get("allow_implicit_invocation") is not True:
         errors.append(f"{metadata_file}: policy.allow_implicit_invocation must be true")
+    elif set(policy) - ALLOWED_POLICY_KEYS:
+        errors.append(
+            f"{metadata_file}: prohibited policy keys: {sorted(set(policy) - ALLOWED_POLICY_KEYS)}"
+        )
     if PLACEHOLDER.search(metadata_file.read_text(encoding="utf-8")):
         errors.append(f"{metadata_file}: placeholder content is prohibited")
     return errors

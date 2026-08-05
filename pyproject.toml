@@ -1,17 +1,8 @@
 [project]
 name = "vellis"
 version = "0.2.0.dev0"
-description = "A model-first exploration of the Vellis personal knowledge system."
-readme = "README.md"
 requires-python = ">=3.14"
-license = "Apache-2.0"
-license-files = ["LICENSE"]
-authors = [{ name = "Vellis contributors" }]
 dependencies = []
-
-[project.urls]
-Repository = "https://github.com/volantlabs/vellis"
-Issues = "https://github.com/volantlabs/vellis/issues"
 
 [tool.uv]
 package = false

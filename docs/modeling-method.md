@@ -1,95 +1,75 @@
-# Use-Case-First Model-Based Software Development with SysML v2
+# Use-case-first model-as-code development
 
-This model is organized as a practical starting point for model-native software development rather than as a complete architecture.
+Vellis treats textual SysML v2 like source code: the model on a branch is the current system
+definition, and a pull request is the unit of change and review.
 
-## 1. Establish system boundaries and valued outcomes
+## Breadth before depth
 
-Start with:
+Begin with the owner, external actors, system boundary, and independently valuable outcomes. An
+encompassing journey may compose those outcomes but should not erase their different success,
+failure, state, or evidence semantics.
 
-- the owner and external participants,
-- the Vellis system boundary,
-- the RTG subsystem boundary,
-- externally valuable use cases,
-- the minimum information exchanged across those boundaries.
+## One semantic slice
 
-Avoid beginning with controllers, repositories, adapters, services, managers, queues, or deployment processes.
+Start each change with one owner or engineering question. Refine only the affected black-box behavior,
+then add the domain meaning and minimal native representation needed to make it precise. Derive actions
+when they add ordering, reuse, state, failure, interaction, or verification meaning; group capabilities
+before considering structural parts.
 
-## 2. Keep use cases black-box
+Trace the changed claim through applicable requirements, explicitly named satisfiers, and decisive
+verification. Reuse current elements when they already carry the meaning; do not create one artifact
+per layer merely to make the path look complete.
 
-A use case should state:
+Treat the path as a reasoning order, not a completeness template. Elaborate query, state, history,
+architecture, interfaces, or realization only when the current question changes them. Stop when the
+slice is closed; exhaustive representation is not the same as engineering rigor.
 
-- its subject,
-- its external actors,
-- its objective,
-- externally observable interaction ordering.
+An undecided realization is not optional system behavior. Keep it open in the PR or issue rather than
+modeling interchangeable parts, variants, or configuration. Likewise, tool and framework operations
+are implementation affordances, not an automatic use-case or action inventory.
 
-Do not allocate the use case to internal design elements yet. Do not express a validation algorithm as a linear use-case sequence unless failure and alternate outcomes are modeled explicitly.
+When an external operation inventory is intentionally selected as product meaning, model those
+callable behaviors directly and keep them distinct from internal functional decomposition. A staged
+interaction such as shallow discovery followed by focused inspection justifies separate actions only
+because the first bounded result supplies information needed to formulate the second.
 
-## 3. Instantiate reusable use cases in contexts
+## Proportionality and continuity
 
-Use-case definitions remain reusable. Context packages bind their inherited subject and actor parameters to concrete participants. This makes the selected system boundary and external environment explicit without coupling the reusable behavior to one deployment.
+Common enterprise architectures, framework examples, and popular repository patterns are possible
+solutions, not neutral starting points. Add a model element only when it expresses a current owner
+consequence, compatibility obligation, or implementation-blocking semantic ambiguity in the
+selected slice.
 
-## 4. Add requirements when a use case reveals a necessary guarantee
+Preserve explicit owner decisions and deliberate deferrals across review rounds. An explicit review
+may reassess claims in its scope; otherwise reopen a decision only when new evidence creates a
+concrete contradiction, and record what consequence changed. Do not mistake incidental tests,
+comments, or existing structure for owner decisions. Prefer natural identity, derived facts, one
+authoritative relationship rule, and bounded agent interactions before introducing surrogate IDs,
+stored flags, parallel schemas, universal envelopes, or operational machinery.
 
-Examples in this model:
+## Semantic closure
 
-- durable history follows from recovery, audit, and time travel,
-- atomic state changes follow from governed graph mutation,
-- provenance follows from agents and automations acting for the owner,
-- simplicity requirements follow from the turn-key single-owner product intent.
+Walk changed inputs forward into outputs, state, revision, and history. Walk every returned value,
+state effect, responsibility, and requirement backward to the owner outcome and model element that
+authorizes it. Confirm shared occurrences have one owner and deliberate references elsewhere. Inspect
+nested owned payloads rather than only direct feature names, and define the concrete instance meaning
+of each returned row—including projection completeness, duplicates, absence, and null.
 
-Prefer requirement statements about externally meaningful properties. Derive internal requirements only after selecting a logical design.
+## Adequacy and subtraction
 
-## 5. Introduce white-box design incrementally
+Review adequacy before subtraction. Preserve independent outcomes, state authority, failure behavior,
+recovery meaning, and verification; then remove elements that express no necessary claim or exclude no
+invalid design. The goal is semantic compression: fewer elements with all consequential distinctions
+intact.
 
-Add an internal part, action, or service only when at least one of the following is true:
+## Evidence and review
 
-- a use case cannot be realized without assigning a distinct responsibility,
-- a requirement needs a clear satisfying element,
-- a failure boundary or lifecycle requires independent identity,
-- a trade study needs an explicit alternative.
+Use the pinned official specifications for consequential language decisions and the official validator
+for language conformance. Review the full model diff, requirements closure, verification evidence, and
+unsupported commitments separately. Put unresolved work in an issue or PR discussion rather than a
+model status system or parallel design document.
 
-A useful review question is: **What model element would become false or unrealizable if this design element were removed?** If there is no answer, defer it.
-
-## 6. Derive implementation slices from the model
-
-For each implementation increment:
-
-1. Select one use-case scenario and its requirements.
-2. Define only the request/result data needed by that scenario.
-3. Add the smallest logical behavior that realizes it.
-4. Allocate behavior only where responsibility is unclear without allocation.
-5. Add verification cases before asking implementation agents to build the slice.
-6. Require implementation changes to reference the model elements they realize.
-7. Validate the SysML model and implementation tests in the same change set.
-
-## 7. Use the model as an agent contract
-
-An implementation-agent task should identify:
-
-- the use-case usage being implemented,
-- the requirements it must satisfy,
-- the service requests and responses involved,
-- the allowed model and generated-source roots to change,
-- the verification cases that must pass,
-- explicit non-goals.
-
-This limits local optimization and prevents agents from inventing generalized infrastructure that is not present in the system model.
-
-## 8. Preserve intentional minimalism
-
-Current explicit non-goals include:
-
-- enterprise multi-tenancy,
-- organization or team administration,
-- complex RBAC,
-- microservice decomposition,
-- distributed consensus,
-- high-availability clustering,
-- generic workflow engines,
-- service meshes,
-- pluggable persistence abstractions without a demonstrated need.
-
-Intentional minimalism does not remove core integrity. Durable state history, deterministic recovery, atomic committed changes, and understandable provenance are fundamental to trusted personal memory and agent activity.
-
-It also does not erase compatibility-critical domain distinctions. The RTG user graph keeps stable anchors, typed associated data objects, typed directed links, and direct identity-free anchor-data associations explicit while leaving indexes, persistence layout, query algorithms, and protocol encodings to realizations.
+For an approved formal plan, map each mandatory claim and non-goal to its authoritative model or
+guidance location and decisive evidence. After the last correction, repeat plan conformance, semantic
+closure, adequacy, subtraction, and repository-truth review as one full cycle; completion requires a
+cycle that finds no new material issue.

@@ -1,245 +1,819 @@
-package RTGDomain {
+package RTG {
     /*
-     * Minimal domain concepts required by the current RTG use cases and
-     * requirements. The canonical user-graph structure is explicit because it
-     * is a compatibility boundary. Detailed schema, query, ledger-storage, and
-     * persistence representations remain intentionally deferred.
+     * Language-neutral RTG graph, definition, query, validation, revision,
+     * snapshot, and history vocabulary. Physical storage, serialization,
+     * executable query syntax, and recovery mechanisms remain open.
      */
 
-    // -----------------------------------------------------------------
-    // Graph and constraint-model concepts
-    // -----------------------------------------------------------------
-
-    attribute def RTG_UUID :> ScalarValues::String {
-        doc /* Stable UUID text preserved across storage and realization changes. */
+    attribute def 'Graph UUID' :> ScalarValues::String {
+        doc /* The stable UUID of one identity-bearing graph object. */
     }
 
-    attribute def JSON_Object {
+    attribute def 'Type Key' :> ScalarValues::String {
+        doc /* A non-empty key in the single namespace shared by all RTG types. */
+    }
+
+    attribute def 'Query Name' :> ScalarValues::String {
+        doc /* A non-empty query-local name for one group, link condition, data condition, or projection. */
+    }
+
+    attribute def 'Revision Number' :> ScalarValues::Natural {
+        doc /* A position in the monotonically increasing total revision order. */
+    }
+
+    attribute def 'Recorded Time' {
+        doc /* A language-neutral chronological instant; representation remains open. */
+    }
+
+    attribute def 'JSON Value' {
+        doc /* Any JSON value preserved without loss of kind or nested content. */
+    }
+
+    attribute def 'JSON Object' :> 'JSON Value' {
+        doc /* An object-valued collection of named JSON values. */
+    }
+
+    attribute def 'Value Shape' {
+        attribute minimumSize [0..1] : ScalarValues::Natural;
+        attribute maximumSize [0..1] : ScalarValues::Natural;
         doc /*
-         * A JSON-serializable object value. Its physical encoding and storage
-         * are realization choices; object-valued content and JSON value kinds
-         * are part of the portability boundary.
+         * A closed size condition for a string, array, or object value. Size means
+         * characters, elements, or members respectively. At least one bound is
+         * present, and a present maximum is not less than a present minimum.
+         * Other JSON kinds cannot carry a value-shape condition.
          */
     }
 
-    attribute def RTG_System_Metadata :> JSON_Object {
-        attribute live [0..1] : ScalarValues::Boolean default = true;
-
+    attribute def 'Value Range' {
+        attribute lowerBound [0..1] : 'JSON Value';
+        attribute upperBound [0..1] : 'JSON Value';
+        attribute permittedValues [*] : 'JSON Value';
         doc /*
-         * JSON-safe system metadata preserved on every graph object. Missing
-         * live normalizes to true; supplied live is Boolean. Other keys are
-         * preserved without meaning assigned by the base graph.
+         * A closed permitted-value condition. At least one bound or permitted
+         * value is present. Bounds are lossless numberValue values with a lower
+         * not greater than an upper; both bounds are inclusive.
+         * Permitted values have the governed property's JSON kind and are unique
+         * by lossless JSON equality. When bounds and permitted values coexist, a
+         * value must satisfy both. No expression or pattern language is implied.
          */
     }
 
-    abstract item def RTG_Object {
-        doc /*
-         * An identity-bearing canonical record in the RTG user graph. UUIDs
-         * are globally unique across anchors, associated data objects, and
-         * links. Type keys share one global namespace across those kinds.
-         */
-
-        attribute uuid : RTG_UUID;
-        attribute type : ScalarValues::String;
-        attribute system : RTG_System_Metadata;
+    enum def 'JSON Kind' {
+        enum nullValue;
+        enum booleanValue;
+        enum numberValue;
+        enum stringValue;
+        enum arrayValue;
+        enum objectValue;
     }
 
-    abstract item def RTG_Link_Endpoint :> RTG_Object {
-        doc /* An RTG object kind that a directed link may address. */
+    enum def 'Operation Status' {
+        enum accepted;
+        enum rejected;
+        enum failed;
+        doc /*
+         * Accepted means the invoked domain operation completed, including an
+         * accepted no-op. Rejected means a well-formed semantic request was not
+         * accepted. Failed means an invoked operation did not complete but could
+         * safely report that status, and its promised failure non-effects hold.
+         * Input that cannot form
+         * the tool's typed domain object is malformed before an RTG operation
+         * outcome exists.
+         */
     }
 
-    item def RTG_Anchor :> RTG_Link_Endpoint {
+    enum def 'Validation Scope' {
+        enum graphConformance;
+        enum definitionDelta;
+    }
+
+    enum def 'Property Comparison' {
+        enum equal;
+        enum notEqual;
+        enum lessThan;
+        enum lessThanOrEqual;
+        enum greaterThan;
+        enum greaterThanOrEqual;
+    }
+
+    enum def 'History Kind' {
+        enum canonical;
+        enum activity;
+    }
+
+    enum def 'Activity Kind' {
+        enum read;
+        enum validation;
+        enum rejection;
+        enum failure;
+        enum snapshotCapture;
+    }
+
+    enum def 'Transition Kind' {
+        enum graphMutation;
+        enum definitionDeltaChange;
+        enum definitionActivation;
+        enum historicalRestoration;
+        enum predecessorRecovery;
+    }
+
+    enum def 'Definition Delta Disposition' {
+        enum unchanged;
+        enum present;
+        enum absent;
+    }
+
+    enum def 'Link End' {
+        enum source;
+        enum target;
+    }
+
+    enum def 'Direct Association End' {
+        enum anchor;
+        enum associatedData;
+    }
+
+    attribute def 'System Metadata' :> 'JSON Object' {
+        attribute live : ScalarValues::Boolean default = true;
+
         doc /*
-         * A stable typed ontological identity. It is independently
-         * addressable even when its descriptive facts change.
+         * Canonical metadata has a Boolean live value. Recovery normalizes a
+         * missing predecessor value to true and preserves other JSON values.
+         */
+    }
+
+    abstract item def 'Graph Object' {
+        doc /*
+         * An identity-bearing RTG object. UUIDs are globally unique across
+         * object kinds. A type key never changes an object's kind.
          */
 
+        attribute uuid : 'Graph UUID';
+        attribute typeKey : 'Type Key';
+        attribute systemMetadata : 'System Metadata';
+    }
+
+    abstract item def 'Link Endpoint' :> 'Graph Object';
+
+    item def Anchor :> 'Link Endpoint' {
+        doc /* A stable, independently identifiable concept. */
         attribute displayName [0..1] : ScalarValues::String;
     }
 
-    item def RTG_Associated_Data_Object :> RTG_Link_Endpoint {
+    item def 'Associated Data Object' :> 'Link Endpoint' {
         doc /*
-         * A typed JSON fact group directly associated with one or more
-         * anchors. It has its own UUID but is not a substitute for the stable
-         * identity of an anchor.
+         * An identity-bearing typed fact group grounded by one or more
+         * anchors. The many-to-many references are identity-free direct
+         * associations, not links or graph objects.
          */
 
-        attribute properties : JSON_Object;
+        ref item anchors [1..*] : Anchor;
+        attribute properties : 'JSON Object';
     }
 
-    item def RTG_Link :> RTG_Object {
+    item def Link :> 'Graph Object' {
         doc /*
          * An identity-bearing typed directed relationship. Source and target
-         * UUIDs resolve to anchors or associated data objects, never links.
+         * are independently existing anchors or associated data objects;
+         * links are never endpoints.
          */
 
-        attribute sourceUuid : RTG_UUID;
-        attribute targetUuid : RTG_UUID;
+        ref item source : 'Link Endpoint';
+        ref item target : 'Link Endpoint';
     }
 
-    attribute def RTG_Anchor_Data_Association {
+    item def Graph {
         doc /*
-         * One direct, identity-free anchor-to-data association. This is
-         * canonical graph state, not a link or a fourth graph-object kind.
+         * Canonical graph state. Every direct association and link endpoint
+         * resolves to an object owned by this graph.
          */
 
-        attribute anchorUuid : RTG_UUID;
-        attribute dataUuid : RTG_UUID;
+        item anchors [*] : Anchor;
+        item associatedData [*] : 'Associated Data Object';
+        item links [*] : Link;
     }
 
-    item def Constraint_Model {
+    /* Definition and constraint governance. */
+
+    abstract item def 'Definition Object' {
+        attribute description [0..1] : ScalarValues::String;
         doc /*
-         * A versioned model that governs the validity of RTG Graph changes.
-         * It governs user-graph records but is not itself assumed to be an
-         * anchor, associated data object, or link. Its detailed schema and
-         * rule structure are deferred.
+         * Governance state that is not an RTG graph object. Active definitions
+         * require one non-empty owner-readable description; proposed definitions
+         * may temporarily omit it and report an activation-blocking finding.
+         * Automatic assessment establishes presence and non-emptiness; the
+         * owner judges whether the wording communicates the intended meaning.
          */
-
-        attribute version : ScalarValues::String;
     }
 
-    item def RTG_Graph {
+    abstract item def 'Type Definition' :> 'Definition Object' {
+        attribute typeKey : 'Type Key';
+    }
+
+    abstract item def 'Endpoint Type Definition' :> 'Type Definition';
+
+    item def 'Anchor Type Definition' :> 'Endpoint Type Definition';
+
+    item def 'Associated Data Type Definition' :> 'Endpoint Type Definition' {
+        item propertyConstraints [*] : 'Property Constraint';
+        ref item permittedAnchorTypes [1..*] : 'Anchor Type Definition';
         doc /*
-         * Canonical user graph state owned by an RTG System. Derived indexes,
-         * snapshots, tables, documents, and graph-database projections are
-         * realization choices rather than additional domain objects.
+         * Governs the complete allowed property vocabulary and the anchor types
+         * that may ground this associated-data type. A required property must be
+         * present; an optional property may be absent; an undeclared property is
+         * invalid for an object of this type.
          */
-
-        item anchors [*] : RTG_Anchor;
-        item dataObjects [*] : RTG_Associated_Data_Object;
-        item links [*] : RTG_Link;
-        attribute anchorDataAssociations [*] :
-            RTG_Anchor_Data_Association;
     }
 
-    // -----------------------------------------------------------------
-    // Operations and results
-    // -----------------------------------------------------------------
+    item def 'Link Type Definition' :> 'Type Definition' {
+        item endpointConstraint : 'Endpoint Constraint';
+    }
 
-    item def Graph_Change {
+    item def 'Property Constraint' :> 'Definition Object' {
         doc /*
-         * A requested or committed semantic delta over anchors, associated
-         * data objects, links, or direct anchor-data associations. Atomic
-         * operation and transport-envelope details are deferred.
+         * Governs one associated-data property with requiredness, one JSON kind,
+         * and optional closed size and permitted-value conditions. A condition
+         * incompatible with the selected JSON kind is invalid. No serialized
+         * schema, pattern syntax, or general constraint language is selected.
+         * The property name is non-empty and unique within its owning
+         * associated-data type definition.
          */
+        attribute propertyName : ScalarValues::String;
+        attribute required : ScalarValues::Boolean;
+        attribute jsonKind : 'JSON Kind';
+        attribute valueShape [0..1] : 'Value Shape';
+        attribute range [0..1] : 'Value Range';
     }
 
-    item def Graph_Change_Result {
+    item def 'Endpoint Constraint' :> 'Definition Object' {
+        doc /* States permitted source and target endpoint types. */
+        ref item permittedSourceTypes [1..*] : 'Endpoint Type Definition';
+        ref item permittedTargetTypes [1..*] : 'Endpoint Type Definition';
+    }
+
+    abstract item def 'Relationship Constraint' :> 'Definition Object';
+
+    abstract item def 'Multiplicity Constraint' :> 'Relationship Constraint' {
         doc /*
-         * The authoritative committed, rejected, or failed outcome of a
-         * graph-change request.
+         * The lower bound is required. An absent upper bound is unbounded;
+         * otherwise the upper bound is not less than the lower bound.
          */
+        attribute lowerBound : ScalarValues::Natural;
+        attribute upperBound [0..1] : ScalarValues::Natural;
     }
 
-    item def Memory_Query {
-        doc /* A request for information derived from an RTG Graph revision. */
-    }
-
-    item def Memory_Query_Result {
+    item def 'Link Multiplicity Constraint' :> 'Multiplicity Constraint' {
         doc /*
-         * A memory-query result associated with the graph revision against
-         * which it was evaluated.
+         * Counts links of one type at a selected source or target end for
+         * constrained endpoint types and permitted opposite endpoint types.
          */
-
-        attribute evaluatedRevision : ScalarValues::Natural;
+        ref item linkType : 'Link Type Definition';
+        attribute constrainedEnd : 'Link End';
+        ref item constrainedEndpointTypes [1..*] : 'Endpoint Type Definition';
+        ref item oppositeEndpointTypes [1..*] : 'Endpoint Type Definition';
     }
 
-    item def Constraint_Model_Change {
-        doc /* A semantic change to a staged constraint model. */
-    }
-
-    item def Constraint_Model_Assessment {
+    item def 'Direct Association Multiplicity Constraint' :> 'Multiplicity Constraint' {
         doc /*
-         * The result of validating a staged constraint model and assessing
-         * the effects of activation against a coherent graph revision.
+         * Counts identity-free anchor/data associations at the selected end
+         * between the stated anchor and associated-data type populations.
          */
+        attribute constrainedEnd : 'Direct Association End';
+        ref item anchorTypes [1..*] : 'Anchor Type Definition';
+        ref item associatedDataTypes [1..*] : 'Associated Data Type Definition';
     }
 
-    item def Activity_History_Query {
-        doc /* A request to inspect selected retained RTG activity. */
-    }
-
-    item def Activity_History_Result {
-        doc /* Activity records or projections matching an audit request. */
-    }
-
-    // -----------------------------------------------------------------
-    // Activity provenance and durable ledger
-    // -----------------------------------------------------------------
-
-    enum def Activity_Initiator_Kind {
-        owner;
-        agent;
-        application;
-        automation;
-        system;
-    }
-
-    item def Activity_Provenance {
+    item def 'Graph Definition Set' {
         doc /*
-         * Minimal provenance needed to distinguish owner actions from
-         * actions performed by agents, applications, automations, or Vellis
-         * itself, without introducing enterprise identity or RBAC semantics.
+         * The complete active graph vocabulary and constraints. Type keys are
+         * unique in one namespace and every reference resolves within the set.
          */
-
-        attribute initiatorKind : Activity_Initiator_Kind;
-        attribute initiatorId : ScalarValues::String;
-        attribute interactionId : ScalarValues::String;
-        attribute correlationId : ScalarValues::String;
+        item anchorTypes [*] : 'Anchor Type Definition';
+        item associatedDataTypes [*] : 'Associated Data Type Definition';
+        item linkTypes [*] : 'Link Type Definition';
+        item relationshipConstraints [*] : 'Relationship Constraint';
     }
 
-    abstract item def RTG_Activity_Record {
-        doc /* A durable record of activity observed by the RTG System. */
-
-        attribute activityId : ScalarValues::String;
-        attribute sequenceNumber : ScalarValues::Natural;
-        item provenance : Activity_Provenance;
-    }
-
-    abstract item def RTG_State_Change_Record :> RTG_Activity_Record {
+    item def 'Definition Delta' {
         doc /*
-         * A committed RTG state transition required to reconstruct the
-         * system's historical state.
+         * The sole prospective next definition set. The difference from the
+         * active set is the in-flight change; diff representation remains open.
+         * When present in canonical state, the proposed set is semantically
+         * different from the active set.
          */
-
-        attribute resultingRevision : ScalarValues::Natural;
+        item proposedDefinitions : 'Graph Definition Set';
     }
 
-    abstract item def RTG_Observation_Record :> RTG_Activity_Record {
+    /* Agent-oriented definition discovery. */
+
+    item def 'Anchor Type Summary' {
+        ref item definition : 'Anchor Type Definition';
+        doc /* Projects the authoritative type key and description without copying their authority. */
+    }
+
+    item def 'Definition Inspection Request' {
+        attribute anchorTypeKeys [1..*] : 'Type Key';
+        doc /* Selects a non-empty unique set of anchor keys from the active definition set. */
+    }
+
+    item def 'Anchor Definition Detail' {
+        ref item anchorType : 'Anchor Type Definition';
+        ref item associatedDataTypes [*] : 'Associated Data Type Definition';
+        ref item linkTypes [*] : 'Link Type Definition';
+        ref item relationshipConstraints [*] : 'Relationship Constraint';
         doc /*
-         * A non-state-changing activity retained for audit, provenance, or
-         * diagnostics.
+         * A complete active-definition neighborhood for one selected anchor.
+         * Associated-data property and link endpoint constraints are carried by
+         * their referenced type definitions. Link roles include those involving
+         * the anchor or its permitted associated-data types. Unrelated
+         * definitions are omitted.
          */
     }
 
-    item def Graph_Change_Record :> RTG_State_Change_Record {
-        item committedChange : Graph_Change;
+    item def 'Set Definition Delta Request' {
+        item proposedDefinitions : 'Graph Definition Set';
     }
 
-    item def Constraint_Model_Change_Record :> RTG_State_Change_Record {
-        item committedChange : Constraint_Model_Change;
+    /* Simple semantic query vocabulary. */
+
+    item def 'Anchor UUID Filter' {
+        attribute uuids [1..*] : 'Graph UUID';
+        doc /* Narrows one anchor group to a non-empty set of unique known anchor identities. */
     }
 
-    item def Restore_State_Record :> RTG_State_Change_Record {
-        attribute restoredFromRevision : ScalarValues::Natural;
+    item def 'Link UUID Filter' {
+        attribute uuids [1..*] : 'Graph UUID';
+        doc /* Narrows one required link to a non-empty set of unique known link identities. */
     }
 
-    item def Query_Activity_Record :> RTG_Observation_Record {
-        item query : Memory_Query;
-        attribute evaluatedRevision : ScalarValues::Natural;
+    abstract item def 'Endpoint Group' {
+        attribute name : 'Query Name';
+        doc /* A named candidate set whose members may participate as link endpoints. */
     }
 
-    item def Rejected_Change_Record :> RTG_Observation_Record {
-        item requestedChange : Graph_Change;
-    }
-
-    item def RTG_Activity_Ledger {
+    item def 'Anchor Group' :> 'Endpoint Group' {
+        attribute anchorType : 'Type Key';
+        item uuidFilter [0..1] : 'Anchor UUID Filter';
         doc /*
-         * The durable logical history of RTG activity. Every committed state
-         * transition is retained. Selected non-state-changing activity may
-         * also be retained for owner review and audit.
+         * A named anchor candidate set of exactly one active anchor type. An
+         * absent UUID filter considers all anchors of that type.
          */
+    }
 
-        item records [*] : RTG_Activity_Record;
+    item def 'Required Link' {
+        attribute name : 'Query Name';
+        ref item sourceGroup : 'Endpoint Group';
+        ref item targetGroup : 'Endpoint Group';
+        attribute linkType : 'Type Key';
+        item uuidFilter [0..1] : 'Link UUID Filter';
+        doc /*
+         * Requires a directed link of one active link type from a source-group
+         * candidate to a target-group candidate. Groups may select anchors or
+         * directly associated data. An optional UUID filter restricts the
+         * matching identity-bearing links.
+         */
+    }
+
+    item def 'Data Property Condition' {
+        doc /*
+         * A structured comparison against one present property value. A missing
+         * property does not satisfy the condition. The active
+         * property definition remains authoritative for JSON kind, shape, and
+         * permitted range. Equal and notEqual compare lossless JSON values;
+         * ordered comparisons are valid only for numberValue properties. Other
+         * combinations are rejected.
+         */
+        attribute propertyName : ScalarValues::String;
+        attribute comparison : 'Property Comparison';
+        attribute expectedValue : 'JSON Value';
+    }
+
+    item def 'Associated Data Condition' :> 'Endpoint Group' {
+        ref item anchorGroup : 'Anchor Group';
+        attribute associatedDataType : 'Type Key';
+        item propertyConditions [*] : 'Data Property Condition';
+        doc /*
+         * Selects directly associated data of the active type that satisfies
+         * every stated property condition. With no property conditions, the
+         * condition expresses existence of directly associated data of that
+         * type. Its selected objects may participate as required-link endpoints.
+         */
+    }
+
+    abstract item def 'Return Projection' {
+        attribute name : 'Query Name';
+    }
+
+    item def 'Anchor Projection' :> 'Return Projection' {
+        ref item anchorGroup : 'Anchor Group';
+    }
+
+    item def 'Link Projection' :> 'Return Projection' {
+        ref item requiredLink : 'Required Link';
+    }
+
+    item def 'Associated Data Projection' :> 'Return Projection' {
+        ref item dataCondition : 'Associated Data Condition';
+    }
+
+    item def 'Data Property Projection' :> 'Return Projection' {
+        ref item dataCondition : 'Associated Data Condition';
+        attribute propertyName : ScalarValues::String;
+    }
+
+    item def 'Return Shape' {
+        item projections [1..*] : 'Return Projection';
+        doc /*
+         * Selects named anchor, link, associated-data, and property bindings.
+         * Every projection references a selector owned by its graph query, and
+         * every projection name is unique within that query.
+         * Aggregation, sorting, pagination, traversal, and computed expressions
+         * are outside this query model.
+         */
+    }
+
+    item def 'Graph Query' {
+        item anchorGroups [1..*] : 'Anchor Group';
+        item requiredLinks [*] : 'Required Link';
+        item dataConditions [*] : 'Associated Data Condition';
+        item returnShape : 'Return Shape';
+        item historicalSelection [0..1] : 'Historical State Selection';
+        attribute maximumRows : ScalarValues::Positive;
+        doc /*
+         * Named anchor selection, required-link restriction, associated-data
+         * filtering, and projection define meaning, not evaluation order. All
+         * group, link-condition, data-condition, and projection names are
+         * unique within the query. Every reference resolves to an element owned
+         * by the same query. An absent historical selection evaluates current
+         * state; a present revision or time selection evaluates the resolved
+         * historical state with identical query meaning. The caller supplies
+         * type and property vocabulary valid at that historical revision;
+         * current active-definition discovery does not discover retired
+         * vocabulary. The positive maximum bounds a complete result rather than
+         * requesting a page.
+         */
+    }
+
+    item def 'Anchor Binding' {
+        ref item projection : 'Anchor Projection';
+        ref item anchor : Anchor;
+    }
+
+    item def 'Link Binding' {
+        ref item projection : 'Link Projection';
+        ref item link : Link;
+    }
+
+    item def 'Associated Data Binding' {
+        ref item projection : 'Associated Data Projection';
+        ref item associatedData : 'Associated Data Object';
+    }
+
+    item def 'Returned Property' {
+        ref item projection : 'Data Property Projection';
+        attribute value [0..1] : 'JSON Value';
+        doc /* Absence means the projected optional property is missing; present null remains JSON null. */
+    }
+
+    item def 'Graph Query Row' {
+        item anchors [*] : 'Anchor Binding';
+        item links [*] : 'Link Binding';
+        item associatedData [*] : 'Associated Data Binding';
+        item properties [*] : 'Returned Property';
+        doc /*
+         * One jointly satisfying assignment of every selector needed by the
+         * return shape. The row contains exactly one binding for each projection
+         * and no unrequested binding. Matching objects that are not projected do
+         * not appear. Rows with identical projected bindings and property
+         * presence or values are one result row, not duplicates.
+         */
+    }
+
+    /* Outcomes and validation. */
+
+    item def 'Operation Outcome' {
+        attribute status : 'Operation Status';
+        attribute summary : ScalarValues::String;
+        item findings [*] : 'Validation Finding';
+        doc /*
+         * A completed semantic operation always has one status. An accepted
+         * outcome carries the success payload defined by its specialization. A
+         * rejected or failed outcome carries no success payload unless that
+         * specialization explicitly states otherwise. Malformed input forms no
+         * domain request, and an unexpected tool failure produces no completed
+         * domain outcome.
+         */
+    }
+
+    item def 'Revisioned Outcome' :> 'Operation Outcome' {
+        attribute resultingRevision [0..1] : 'Revision Number';
+        doc /*
+         * The resulting revision is present only when an accepted operation
+         * changes canonical state. An accepted effective no-op has no resulting
+         * revision or canonical transition.
+         */
+    }
+
+    item def 'Validation Finding' {
+        attribute summary : ScalarValues::String;
+        ref item implicatedDefinitions [*] : 'Definition Object';
+        ref item implicatedObjects [*] : 'Graph Object';
+    }
+
+    item def 'Validation Report' {
+        attribute scope : 'Validation Scope';
+        attribute conforms : ScalarValues::Boolean;
+        attribute evaluatedRevision : 'Revision Number';
+        item findings [*] : 'Validation Finding';
+        doc /*
+         * A report is the successful result of an assessment. A false conforms
+         * value describes the assessed subject and is not an execution failure.
+         */
+    }
+
+    item def 'Graph Query Result' :> 'Operation Outcome' {
+        ref item query : 'Graph Query';
+        attribute evaluatedRevision [0..1] : 'Revision Number';
+        item rows [*] : 'Graph Query Row';
+        doc /*
+         * Accepted results contain exactly the bindings requested by the
+         * referenced query's return shape and the evaluated revision. Rejected
+         * or failed queries contain no rows or evaluated revision. Invalid
+         * queries contain findings and change no canonical state. A
+         * result that would exceed maximumRows, or cannot be returned completely,
+         * is rejected whole and never truncated. The operation attempt may still
+         * produce observational activity.
+         */
+    }
+
+    item def 'Definition Summary Result' :> 'Operation Outcome' {
+        attribute evaluatedRevision [0..1] : 'Revision Number';
+        attribute deltaPresent [0..1] : ScalarValues::Boolean;
+        item anchorTypes [*] : 'Anchor Type Summary';
+        doc /*
+         * Contains every active anchor type exactly once. Each summary refers to
+         * its authoritative type key and description. The result is complete
+         * for the current active definitions and changes no canonical state. Evaluated
+         * revision and delta presence are
+         * present exactly for an accepted result. A rejected or failed result
+         * returns no summaries, evaluated revision, or delta-presence value. The
+         * operation attempt may still produce observational activity.
+         */
+    }
+
+    item def 'Definition Inspection Result' :> 'Operation Outcome' {
+        ref item request : 'Definition Inspection Request';
+        attribute evaluatedRevision [0..1] : 'Revision Number';
+        item anchorDetails [*] : 'Anchor Definition Detail';
+        doc /*
+         * An accepted result contains one complete detail for every requested
+         * active anchor type and no unrelated definitions. An unknown or
+         * duplicate key or inability to answer completely produces findings,
+         * no evaluated revision, and no details. The operation changes no
+         * canonical state but may produce observational activity.
+         */
+    }
+
+    item def 'Definition Delta Result' :> 'Revisioned Outcome' {
+        attribute evaluatedRevision [0..1] : 'Revision Number';
+        ref item definitionDelta [0..1] : 'Definition Delta';
+        item assessment [0..1] : 'Validation Report';
+        doc /*
+         * An accepted result always identifies its evaluated revision. Absence
+         * of a delta is a normal accepted result. When a delta is present, the
+         * result exposes the complete authoritative proposal and one current
+         * definitionDelta-scoped assessment without computing a server-side diff.
+         * Assessment is present exactly when a delta is returned and has the same
+         * evaluated revision as this result. A resulting revision, when present,
+         * is also this evaluated revision. A rejected or failed staging operation
+         * returns no proposal, assessment, evaluated revision, or resulting
+         * revision; the caller may retrieve the unchanged current proposal
+         * separately.
+         */
+    }
+
+    item def 'Graph Change' {
+        item anchorUpserts [*] : Anchor;
+        item associatedDataUpserts [*] : 'Associated Data Object';
+        item linkUpserts [*] : Link;
+        attribute anchorRemovals [*] : 'Graph UUID';
+        attribute associatedDataRemovals [*] : 'Graph UUID';
+        attribute linkRemovals [*] : 'Graph UUID';
+        doc /*
+         * Explicit complete-object upserts and UUID removals. Direct
+         * associations change only through complete associated-data anchor
+         * references. Duplicate commands, upsert/removal conflicts, unknown
+         * removals, object-kind changes, invalid final references, and any
+         * change that depends on an implicit cascade are rejected. The complete
+         * resulting graph is validated before one atomic commit.
+         */
+    }
+
+    /* Canonical state, snapshots, and history. */
+
+    item def Provenance {
+        attribute initiator : ScalarValues::String;
+    }
+
+    item def 'Canonical State' {
+        item graph : Graph;
+        item activeDefinitions : 'Graph Definition Set';
+        item definitionDelta [0..1] : 'Definition Delta';
+        attribute revision : 'Revision Number';
+    }
+
+    item def 'Canonical Change' {
+        doc /*
+         * Replay-sufficient meaning for one transition. A graph mutation carries
+         * the accepted graph change, while restoration or predecessor recovery
+         * may carry a complete replacement graph. The two graph forms are never
+         * both present. An absent graph form or active-definition value means
+         * unchanged. Delta disposition distinguishes unchanged, present, and
+         * absent. Present requires a delta value; unchanged and absent forbid one.
+         */
+        item graphChange [0..1] : 'Graph Change';
+        item replacementGraph [0..1] : Graph;
+        item activeDefinitions [0..1] : 'Graph Definition Set';
+        attribute deltaDisposition : 'Definition Delta Disposition';
+        item definitionDelta [0..1] : 'Definition Delta';
+    }
+
+    abstract item def 'History Record' {
+        attribute recordedAt : 'Recorded Time';
+        item provenance : Provenance;
+    }
+
+    abstract item def 'Canonical Record' :> 'History Record';
+
+    item def 'Initial State Record' :> 'Canonical Record' {
+        item canonicalState : 'Canonical State';
+        doc /*
+         * Establishes the owned history base. Its revision may be greater than
+         * zero when a fresh RTG is seeded from reconstructed snapshot state;
+         * the record makes no claim about transitions before that base.
+         */
+    }
+
+    item def 'Canonical Transition Record' :> 'Canonical Record' {
+        attribute priorRevision : 'Revision Number';
+        attribute resultingRevision : 'Revision Number';
+        attribute kind : 'Transition Kind';
+        item change : 'Canonical Change';
+        doc /*
+         * Establishes one contiguous canonical transition. The record carries
+         * enough semantic change to replay without activity history but does
+         * not prescribe event, snapshot, checkpoint, or hybrid storage.
+         *
+         * A graph mutation supplies only graphChange and leaves the delta unchanged.
+         * A definition-delta change supplies only a present or absent delta. An
+         * activation supplies active definitions and an absent delta. Historical
+         * restoration supplies replacementGraph, active definitions, and an absent delta.
+         * Predecessor recovery supplies replacementGraph, optionally replaces active
+         * definitions, and supplies an absent delta. Other combinations are
+         * invalid and cannot be replayed.
+         */
+    }
+
+    item def 'State Change Ledger' {
+        item initial : 'Initial State Record';
+        item transitions [*] ordered : 'Canonical Transition Record';
+        doc /* Complete, durable, ordered canonical history from its owned initial base forward. */
+    }
+
+    item def 'Activity Record' :> 'History Record' {
+        attribute kind : 'Activity Kind';
+        attribute evaluatedRevision [0..1] : 'Revision Number';
+        attribute summary : ScalarValues::String;
+    }
+
+    item def 'Activity Ledger' {
+        item records [*] ordered : 'Activity Record';
+        doc /*
+         * Observational history that is never replayed and cannot establish
+         * canonical state. A history read is evaluated against the activity
+         * ledger before the record of that read is appended, so its result never
+         * includes its own observation.
+         */
+    }
+
+    item def 'Canonical Snapshot' {
+        item canonicalState : 'Canonical State';
+        doc /*
+         * A self-contained, lossless capture of complete canonical state at its
+         * revision. Physical artifact and serialization format remain open.
+         */
+    }
+
+    item def 'Ledger Tail' {
+        attribute followsRevision : 'Revision Number';
+        ref item transitions [1..*] ordered : 'Canonical Transition Record';
+        doc /*
+         * References a contiguous sequence of authoritative records whose first
+         * prior revision equals the stated revision and whose later records
+         * continue without gaps or duplicates.
+         */
+    }
+
+    item def 'Replay Request' {
+        ref item initial [0..1] : 'Initial State Record';
+        ref item capturedSnapshot [0..1] : 'Canonical Snapshot';
+        ref item tail [0..1] : 'Ledger Tail';
+        doc /*
+         * Uses exactly one base: an initial record or a snapshot. A tail may
+         * advance that base through later canonical revisions.
+         */
+    }
+
+    item def 'Historical State' :> 'Canonical State' {
+        doc /* Read-only canonical state reconstructed at one committed revision. */
+    }
+
+    item def 'Replay Outcome' :> 'Operation Outcome' {
+        item reconstructedState [0..1] : 'Historical State';
+        doc /* Reconstructed state is present exactly when status is accepted. */
+    }
+
+    item def 'Snapshot Outcome' :> 'Operation Outcome' {
+        item capturedSnapshot [0..1] : 'Canonical Snapshot';
+        doc /* A snapshot is present exactly when capture is accepted. */
+    }
+
+    item def 'History Query' {
+        attribute kind : 'History Kind';
+        attribute startTime [0..1] : 'Recorded Time';
+        attribute endTime [0..1] : 'Recorded Time';
+        attribute maximumRecords : ScalarValues::Positive;
+        doc /*
+         * Selects one record family and an optional chronological interval. The
+         * start and end bounds are inclusive. The
+         * positive maximum bounds one complete result rather than requesting a
+         * page. Query notation and evaluation representation remain open.
+         */
+    }
+
+    abstract item def 'History Entry' {
+        attribute recordedAt : 'Recorded Time';
+        item provenance : Provenance;
+        attribute summary : ScalarValues::String;
+        doc /*
+         * An owner-facing projection of one authoritative record. It carries
+         * enough meaning for review without becoming replay authority or copying
+         * canonical state and replay payloads into an agent response.
+         */
+    }
+
+    item def 'Canonical History Entry' :> 'History Entry' {
+        attribute revision : 'Revision Number';
+        attribute priorRevision [0..1] : 'Revision Number';
+        attribute transitionKind [0..1] : 'Transition Kind';
+        doc /*
+         * Projects an initial record when priorRevision and transitionKind are
+         * both absent. A transition entry has both present, and revision is its
+         * resulting revision. The replay-sufficient canonical change is not an
+         * inline history-query result.
+         */
+    }
+
+    item def 'Activity History Entry' :> 'History Entry' {
+        attribute activityKind : 'Activity Kind';
+        attribute evaluatedRevision [0..1] : 'Revision Number';
+    }
+
+    item def 'History Result' :> 'Operation Outcome' {
+        ref item query : 'History Query';
+        attribute evaluatedRevision [0..1] : 'Revision Number';
+        item canonicalEntries [*] ordered : 'Canonical History Entry';
+        item activityEntries [*] ordered : 'Activity History Entry';
+        doc /*
+         * An accepted result identifies its evaluated revision. An accepted
+         * canonical query contains one canonical entry for every
+         * selected canonical record and no activity entries. An accepted
+         * activity query contains one activity entry for every selected activity
+         * record and no canonical entries. Entries preserve the complete
+         * requested inclusive interval and selected ledger order without
+         * exposing canonical replay payloads. An over-broad request or one that
+         * cannot be returned completely is rejected with no entries or evaluated
+         * revision. A failed operation likewise returns no success payload;
+         * activity entries are never replayed.
+         */
+    }
+
+    abstract item def 'Historical State Selection';
+
+    item def 'Revision Selection' :> 'Historical State Selection' {
+        attribute revision : 'Revision Number';
+    }
+
+    item def 'Time Selection' :> 'Historical State Selection' {
+        attribute time : 'Recorded Time';
+    }
+
+    item def 'Recovery Candidate' {
+        doc /*
+         * Existing predecessor RTG graph meaning and optional governing
+         * definitions. Recovery into an existing system begins with no delta.
+         */
+        item graph : Graph;
+        item activeDefinitions [0..1] : 'Graph Definition Set';
     }
 }

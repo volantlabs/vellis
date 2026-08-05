@@ -10,5 +10,5 @@ VALIDATOR_LOCK_PATH = MODEL_CONFIG_ROOT / "validator.lock.json"
 SPECIFICATION_REFERENCE_ROOT = ROOT / "reference" / "specifications"
 
 SYSML_CACHE_ROOT = ROOT / ".cache" / "sysml"
-FORMAL_CACHE_ROOT = SYSML_CACHE_ROOT / "formal"
+SPECIFICATION_CACHE_ROOT = SYSML_CACHE_ROOT / "specifications"
 VALIDATOR_CACHE_ROOT = SYSML_CACHE_ROOT / "validator"

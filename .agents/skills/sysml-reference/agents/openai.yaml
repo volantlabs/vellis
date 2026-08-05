@@ -1,6 +1,6 @@
 interface:
   display_name: "SysML Reference"
-  short_description: "Ground SysML decisions in pinned official sources"
-  default_prompt: "Use $sysml-reference to resolve this SysML or KerML question from the pinned official specifications."
+  short_description: "Ground SysML choices in official language evidence"
+  default_prompt: "Use $sysml-reference to compare the smallest plausible constructs—including trace versus performed behavior—or diagnose language behavior from the pinned specifications."
 policy:
   allow_implicit_invocation: true

@@ -38,28 +38,41 @@ def test_outline_hierarchy_and_ranges_are_preserved(tmp_path: Path) -> None:
 
 
 @pytest.mark.parametrize(
-    ("specification_id", "page_count", "outline_count"),
-    (("sysml-2.0", 691, 991), ("kerml-1.0", 454, 661)),
+    "specification_id",
+    ("sysml-2.0", "kerml-1.0"),
 )
-def test_committed_corpus_is_complete_and_checksummed(
-    specification_id: str, page_count: int, outline_count: int
-) -> None:
+def test_committed_corpus_matches_the_pinned_language_baseline(specification_id: str) -> None:
+    lock = json.loads(model_layout.LANGUAGE_LOCK_PATH.read_text(encoding="utf-8"))
+    artifact = next(
+        value
+        for value in lock["specifications"].values()
+        if value["specification_id"] == specification_id
+    )
+    page_count = artifact["expected_page_count"]
+    outline_count = artifact["expected_outline_count"]
     root = model_layout.SPECIFICATION_REFERENCE_ROOT / specification_id
     manifest = json.loads((root / "manifest.json").read_text(encoding="utf-8"))
     outline = json.loads((root / "outline.json").read_text(encoding="utf-8"))
     pages = sorted((root / "pages").glob("page-*.md"))
+    projected_files = {
+        path.relative_to(root).as_posix()
+        for path in root.rglob("*")
+        if path.is_file() and path.name != "manifest.json"
+    }
 
+    assert manifest["source_sha256"] == artifact["sha256"]
+    assert manifest["document_number"] == artifact["document_number"]
     assert manifest["page_count"] == page_count
     assert manifest["outline_entry_count"] == outline_count
     assert len(outline["entries"]) == outline_count
     assert len(pages) == page_count
+    assert set(manifest["files"]) == projected_files
     assert all(
         1 <= entry["physical_page_start"] <= entry["physical_page_end"] <= page_count
         for entry in outline["entries"]
     )
     assert all(
-        manifest["files"][relative] == _digest(root / relative)
-        for relative in manifest["files"]
+        manifest["files"][relative] == _digest(root / relative) for relative in manifest["files"]
     )
 
 
@@ -119,10 +132,7 @@ def test_specification_filter_and_cli_citation_fields(capsys: pytest.CaptureFixt
 
 def test_extraction_warning_is_exposed_in_page_metadata() -> None:
     page = (
-        model_layout.SPECIFICATION_REFERENCE_ROOT
-        / "sysml-2.0"
-        / "pages"
-        / "page-0091.md"
+        model_layout.SPECIFICATION_REFERENCE_ROOT / "sysml-2.0" / "pages" / "page-0091.md"
     ).read_text(encoding="utf-8")
     frontmatter = yaml.safe_load(page.split("---", 2)[1])
 
@@ -131,9 +141,18 @@ def test_extraction_warning_is_exposed_in_page_metadata() -> None:
 
 def test_reference_corpus_remains_text_scale() -> None:
     files = [
-        path
-        for path in model_layout.SPECIFICATION_REFERENCE_ROOT.rglob("*")
-        if path.is_file()
+        path for path in model_layout.SPECIFICATION_REFERENCE_ROOT.rglob("*") if path.is_file()
     ]
 
     assert sum(path.stat().st_size for path in files) < 10 * 1024 * 1024
+
+
+@pytest.mark.parametrize("limit", (0, -1, 51))
+def test_reference_finder_rejects_unbounded_limits(limit: int) -> None:
+    with pytest.raises(ValueError, match="between 1 and 50"):
+        sysml_reference.find_references("use case", limit=limit)
+
+
+def test_reference_finder_rejects_unknown_programmatic_specification() -> None:
+    with pytest.raises(ValueError, match="unknown specification"):
+        sysml_reference.find_references("use case", specification_id="not-a-specification")
