@@ -70,8 +70,8 @@ historical comparison or recovery task.
   historical vocabulary.
 - Preserve independently valuable outcomes, state governance, failure non-effects, recovery meaning,
   and verification while subtracting unsupported structure.
-- Protect semantic invariants in tests. Do not restore decorative model inventory to satisfy brittle
-  counts or names.
+- Tests may observe tooling, repository safety, or an implementation against the current model; they
+  do not choose or freeze the living model's constructs, vocabulary, inventory, topology, or prose.
 - Never hand-edit future generated product source; regenerate it and check freshness when generation
   exists.
 

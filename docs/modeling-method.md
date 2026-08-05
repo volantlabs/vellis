@@ -47,6 +47,12 @@ comments, or existing structure for owner decisions. Prefer natural identity, de
 authoritative relationship rule, and bounded agent interactions before introducing surrogate IDs,
 stored flags, parallel schemas, universal envelopes, or operational machinery.
 
+If tests and model structure were introduced together, re-establish the model's adequacy independently.
+Start again from owner purpose and exercise accepted, refused or failed, and plausible-invalid
+instances before treating any existing element as justified. Tests may verify tooling, repository
+safety, or a future implementation against the current model; they are not evidence that the model's
+inventory, layout, vocabulary, or prose is adequate.
+
 ## Semantic closure
 
 Walk changed inputs forward into outputs, state, revision, and history. Walk every returned value,

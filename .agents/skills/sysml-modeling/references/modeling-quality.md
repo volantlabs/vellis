@@ -116,13 +116,16 @@
 - Treat every type exposed through a selected public contract as an implementation obligation. An
   empty placeholder type with only a promising name is under-modeling: give it the smallest closed
   meaning current behavior needs or defer it from the contract.
-- Prefer tests for semantic invariants, valid references, closure, and forbidden commitments. Freeze exact inventories only when the inventory itself is an intentional repository contract.
-- Use assertions and verification to observe the chosen design, not to choose it. A test that demands element names, counts, or symmetry without an owner invariant is a design generator and should be removed.
-- Test the absence of an actual declaration, dependency, command, or generated capability rather
-  than banning generic words or requiring explanatory prose to match one sentence shape.
-- Classify automated checks as durable semantic invariants, repository or tool safety, or temporary
-  transition guards. A transition guard must name the condition that retires it and must not prohibit
-  generic roots, commands, platforms, or capabilities that the next phase may legitimately add.
+- Keep model-authoring tests limited to language tooling and repository safety. Do not use automated
+  checks to select or freeze generic constructs, vocabulary, paths, dependencies, capabilities,
+  element names, exact inventories, counts, topology, layer symmetry, package layout, or prose.
+- Do not use regular expressions as evidence of SysML semantic correctness. Parser acceptance proves
+  language conformance only; passing tests do not establish model adequacy.
+- A temporary transition guard must name the concrete condition that retires it. It must not become a
+  permanent ban on a generic construct, root, command, platform, dependency, or future capability.
+- Future implementation contract checks may compare implemented behavior with the current model. In
+  that direction the implementation is constrained; a duplicate test inventory must never freeze the
+  living model.
 - Change a test alongside an intentional model decision. Do not preserve an obsolete assertion by
   hiding the new design under different names or by restoring decorative elements.
 - Distinguish state-bearing artifacts from agent-facing responses. A snapshot, ledger, archive, or
@@ -160,9 +163,10 @@ These are demonstrations of questions to ask, not templates or prescribed archit
   does not say when it occurs. If commit happens only after acceptance, use native conditional control
   or keep the behavior black-box with a requirement and decisive verification until that control is
   known.
-- **Exact inventory versus invariant testing:** removing decorative actions should cause a test of an
-  old action-name set to change, not the actions to return. Test that remaining actions are used and
-  semantic paths are closed; freeze an exact inventory only when the inventory itself is intentional.
+- **Model authority versus implementation conformance:** changing an intentionally selected public
+  operation changes the model and its semantic closure. A future implementation test may then require
+  the implementation to conform to that current operation set; no test-owned copy decides what the
+  model must continue to contain.
 - **Open choice versus configurable design:** if storage technology is undecided, omit storage
   structure. A set of storage strategy parts would falsely claim that runtime interchangeability is
   a selected system responsibility.

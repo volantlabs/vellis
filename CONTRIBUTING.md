@@ -28,6 +28,17 @@ just check
    removed or deferred, any decision reopened by the review scope or new contradictory evidence, and
    bounded follow-up work.
 
+## Testing authority
+
+Automated tests may observe language tooling, repository safety, and future implementations. They do
+not choose or freeze the living model's constructs, names, counts, topology, package layout, or prose.
+A future implementation contract check may compare implemented behavior with the current model: the
+implementation is constrained by the model, not the model by a duplicate test inventory.
+
+When tests and model structure were introduced together, review the model independently from owner
+purpose, accepted and refused examples, state effects, and decisive evidence. Passing tests or parser
+acceptance cannot substitute for that semantic review.
+
 Do not introduce realization machinery without a current modeled need. The repository has no product
 runtime or generated product source today. The model selects an MCP tool contract, but no MCP server
 is implemented or runnable.

@@ -34,7 +34,7 @@ Do not create placeholders to satisfy an imagined workflow. When product generat
 6. Remove claims for runtime, generated product, CLI, MCP, migration, packaging, or deployment capabilities that do not exist.
    A selected MCP contract may be documented as modeled while the repository still has no runnable
    MCP server; use the words modeled, selected, implemented, and runnable precisely.
-7. Confirm a fresh agent can find the authority, five-file model map, applicable skills, validation path, and PR expectations without Git history or prior conversation.
+7. Confirm a fresh agent can find the authority, current model map, applicable skills, validation path, and PR expectations without Git history or prior conversation.
 8. Search guidance, tests, templates, commands, and metadata for stale terms and inverse claims after deletions.
 9. If explanatory guidance compares candidate realizations, label it non-normative and keep the model's selected semantics distinct from unselected technology examples.
    For an intentionally selected agent workflow, explain the smallest invocation path without copying

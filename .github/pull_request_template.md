@@ -22,6 +22,8 @@ non-goal and confirm the final full review cycle found no new material issue.
       than inferring correctness from declarations, comments, or passing inventory checks.
 - [ ] Applicable requirements, satisfying features, and subject-compatible verification close the
       changed claims without mirrored inventory.
+- [ ] Model structure introduced alongside tests was reviewed independently from owner purpose and
+      decisive accepted, refused or failed, and plausible-invalid examples.
 - [ ] Consequential language choices cite official specification sections and pages.
 - [ ] Official model validation and `just check` pass.
 - [ ] Adequacy and subtraction reviews found no responsibility stranded in prose and no unsupported

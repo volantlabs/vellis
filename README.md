@@ -6,12 +6,12 @@ The repository currently contains the Vellis system model and its development to
 
 ## What is here
 
-- [`model/`](model/): five ordered SysML packages forming the current system authority.
+- [`model/`](model/): the textual SysML packages forming the current system authority.
 - [`docs/vision.md`](docs/vision.md): the human/agent engineering vision.
 - [`docs/modeling-method.md`](docs/modeling-method.md): the use-case-first model-as-code method.
 - [`docs/mcp-realization.md`](docs/mcp-realization.md): non-normative guidance for a future FastMCP realization.
 - [`model/config/`](model/config/): checksum pins for the specifications, model libraries, and validator. The searchable corpus is generated from them into an ignored cache, never committed.
-- [`.agents/skills/`](.agents/skills/): four complementary engineering-copilot skills.
+- [`.agents/skills/`](.agents/skills/): repo-local engineering-copilot skills.
 - [`tools/`](tools/): the pinned validator, reference finder, and skill checks.
 
 The SysML on a branch is that branch's system definition. A pull request proposes changes to behavior, requirements, system responsibility, and verification; review and merge are the acceptance mechanism. Markdown explains the work without duplicating the model as a parallel contract.
@@ -38,10 +38,10 @@ Useful commands:
 - `just model-reference-find "<question>"`: find relevant specification pages.
 - `just model-reference-find "<question>" sysml-2.0 5`: limit a search by specification and count.
 - `just model-reference-check`: prove the generated search corpus still matches its pin.
-- `just skills-check`: validate the four repo-local skills and their managed project links.
+- `just skills-check`: validate the repo-local skills and their managed project links.
 - `just check`: run the complete repository gate.
 
-The model selects ten portable MCP tool behaviors but does not implement an MCP server. Runtime,
+The model selects a portable MCP tool contract but does not implement an MCP server. Runtime,
 storage, transport, deployment, and migration realization remain open. The initial contract assumes
 one trusted owner-configured client; its tools do not implement per-call authorization or decide owner
 approval. See

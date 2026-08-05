@@ -1,14 +1,17 @@
 # Vellis model
 
-The textual SysML v2 files here are the current product and system authority for Vellis. They form one ordered dependency path:
+The textual SysML v2 files here are the current product and system authority for Vellis. The current
+namespace map is:
 
 1. `10-rtg-domain.sysml` — `RTG`: graph, owner-described definitions, progressive discovery views, bounded query and change meaning, validation results, snapshots, revision, and ledger vocabulary.
-2. `20-rtg-system.sysml` — `RTGSystem`: one cohesive RTG boundary, black-box use cases, and the selected ten-tool MCP contract.
+2. `20-rtg-system.sysml` — `RTGSystem`: one cohesive RTG boundary, black-box use cases, and the selected MCP tool contract.
 3. `30-vellis.sysml` — `Vellis`: owner and external-agent context, product use cases, and RTG composition.
 4. `40-requirements.sysml` — `VellisRequirements`: stakeholder requirements, selected subjects, and explicit satisfying features.
 5. `50-verification.sysml` — `VellisVerification`: subject-bound verification cases and decisive evidence.
 
-The packages are intentional namespaces, not runtime layers. RTG owns graph, definition, revision, and history state as one semantic and transactional boundary. Query, validation, history, and recovery are capabilities rather than internal subsystem parts.
+These packages are intentional namespaces, not validator-required file structure or runtime layers.
+RTG owns graph, definition, revision, and history state as one semantic and transactional boundary.
+Query, validation, history, and recovery are capabilities rather than internal subsystem parts.
 
 The current elements express selected Vellis meaning; they are not a template requiring every future
 feature to add a use case, action, result, requirement, and verification in matching counts. Extend
