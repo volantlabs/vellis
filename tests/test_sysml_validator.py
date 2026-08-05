@@ -231,3 +231,17 @@ def test_kernel_execution_collects_only_related_diagnostics() -> None:
         "WARNING:notice(1.sysml line : 2 column : 3)",
         "ERROR:broken(1.sysml line : 4 column : 5)",
     ]
+
+
+def test_language_source_is_pinned_to_an_immutable_commit() -> None:
+    """A tag can move; a commit cannot. Setup verifies the resolved commit matches."""
+    lock = json.loads(model_layout.LANGUAGE_LOCK_PATH.read_text(encoding="utf-8"))
+    source = lock["source"]
+
+    assert re.fullmatch(r"[0-9a-f]{40}", source["commit"])
+    assert source["repository"].startswith("https://")
+    assert source["sparse_paths"]
+    for artifact in lock["specifications"].values():
+        assert artifact["path"] in source["sparse_paths"] or any(
+            artifact["path"].startswith(prefix.rstrip("*")) for prefix in source["sparse_paths"]
+        )

@@ -17,15 +17,15 @@ from pypdf import PdfReader
 try:
     from .model_layout import (
         LANGUAGE_LOCK_PATH,
+        RELEASE_CACHE_ROOT,
         ROOT,
-        SPECIFICATION_CACHE_ROOT,
         SPECIFICATION_REFERENCE_ROOT,
     )
 except ImportError:  # pragma: no cover - direct script execution
     from model_layout import (  # type: ignore[no-redef]
         LANGUAGE_LOCK_PATH,
+        RELEASE_CACHE_ROOT,
         ROOT,
-        SPECIFICATION_CACHE_ROOT,
         SPECIFICATION_REFERENCE_ROOT,
     )
 
@@ -108,6 +108,10 @@ def _load_specifications() -> list[Specification]:
     artifacts = lock.get("specifications")
     if not isinstance(artifacts, dict):
         raise RuntimeError(f"{LANGUAGE_LOCK_PATH}: missing specification artifacts")
+    source = lock.get("source")
+    if not isinstance(source, dict):
+        raise RuntimeError(f"{LANGUAGE_LOCK_PATH}: missing source")
+    checkout = RELEASE_CACHE_ROOT / str(source["tag"])
     specifications: list[Specification] = []
     for artifact_id in ("sysml_language_pdf", "kerml_language_pdf"):
         artifact = artifacts.get(artifact_id)
@@ -123,9 +127,9 @@ def _load_specifications() -> list[Specification]:
                     version_identity=str(artifact["version_identity"]),
                     page_footer_prefix=str(artifact["page_footer_prefix"]),
                     short_label=str(artifact["short_label"]),
-                    source_url=str(artifact["url"]),
+                    source_url=(f"{source['web_root']}/{source['tag']}/{artifact['path']}"),
                     source_sha256=str(artifact["sha256"]),
-                    source_pdf=SPECIFICATION_CACHE_ROOT / f"{artifact_id}.pdf",
+                    source_pdf=checkout / str(artifact["path"]),
                     front_matter_start=int(artifact["front_matter_start_physical_page"]),
                     body_start=int(artifact["body_start_physical_page"]),
                     expected_page_count=int(artifact["expected_page_count"]),

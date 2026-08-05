@@ -25,8 +25,8 @@ try:
     from .model_layout import (
         LANGUAGE_LOCK_PATH,
         MODEL_ROOT,
+        RELEASE_CACHE_ROOT,
         ROOT,
-        SPECIFICATION_CACHE_ROOT,
         VALIDATOR_CACHE_ROOT,
         VALIDATOR_LOCK_PATH,
     )
@@ -34,8 +34,8 @@ except ImportError:  # pragma: no cover - direct script execution
     from model_layout import (  # type: ignore[no-redef]
         LANGUAGE_LOCK_PATH,
         MODEL_ROOT,
+        RELEASE_CACHE_ROOT,
         ROOT,
-        SPECIFICATION_CACHE_ROOT,
         VALIDATOR_CACHE_ROOT,
         VALIDATOR_LOCK_PATH,
     )
@@ -146,20 +146,93 @@ def _download(url: str, expected: str, destination: Path) -> None:
     temporary_path.replace(destination)
 
 
+def _git(*arguments: str, cwd: Path | None = None) -> str:
+    completed = subprocess.run(  # noqa: S603
+        ["git", *arguments],
+        cwd=str(cwd) if cwd is not None else None,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if completed.returncode != 0:
+        raise RuntimeError(f"git {' '.join(arguments)} failed:\n{completed.stderr.strip()}")
+    return completed.stdout.strip()
+
+
+def _setup_release_checkout() -> Path:
+    """Materialise the pinned upstream release into the cache.
+
+    A blobless sparse clone fetches only the paths the reference layer needs
+    (12MB rather than 364MB), and Git's content addressing verifies every object,
+    so pinning the commit is a stronger guarantee than per-file checksums.
+    """
+    lock = _json_object(LANGUAGE_LOCK_PATH)
+    source = lock.get("source")
+    if not isinstance(source, dict):
+        raise RuntimeError(f"{LANGUAGE_LOCK_PATH}: missing source")
+    repository = str(source["repository"])
+    tag = str(source["tag"])
+    commit = str(source["commit"])
+    paths = [str(entry) for entry in source["sparse_paths"]]
+    checkout = RELEASE_CACHE_ROOT / tag
+
+    if (checkout / ".git").is_dir():
+        if _git("rev-parse", "HEAD", cwd=checkout) == commit:
+            return checkout
+        shutil.rmtree(checkout)
+
+    checkout.parent.mkdir(parents=True, exist_ok=True)
+    staged = checkout.with_name(f"{checkout.name}.partial")
+    if staged.exists():
+        shutil.rmtree(staged)
+    try:
+        _git(
+            "clone",
+            "--depth",
+            "1",
+            "--branch",
+            tag,
+            "--filter=blob:none",
+            "--sparse",
+            "--quiet",
+            repository,
+            str(staged),
+        )
+        _git("sparse-checkout", "set", "--no-cone", *paths, cwd=staged)
+        actual = _git("rev-parse", "HEAD", cwd=staged)
+        if actual != commit:
+            raise RuntimeError(
+                f"{repository} tag {tag} resolved to commit {actual}, expected {commit}"
+            )
+    except BaseException:
+        shutil.rmtree(staged, ignore_errors=True)
+        raise
+    staged.replace(checkout)
+    return checkout
+
+
 def _setup_language_pdfs() -> list[Path]:
+    checkout = _setup_release_checkout()
     lock = _json_object(LANGUAGE_LOCK_PATH)
     artifacts = lock.get("specifications")
     if not isinstance(artifacts, dict):
         raise RuntimeError(f"{LANGUAGE_LOCK_PATH}: missing specification artifacts")
-    downloaded: list[Path] = []
+    pdfs: list[Path] = []
     for artifact_id in ("sysml_language_pdf", "kerml_language_pdf"):
         artifact = artifacts.get(artifact_id)
         if not isinstance(artifact, dict):
             raise RuntimeError(f"{LANGUAGE_LOCK_PATH}: missing {artifact_id}")
-        destination = SPECIFICATION_CACHE_ROOT / f"{artifact_id}.pdf"
-        _download(str(artifact["url"]), str(artifact["sha256"]), destination)
-        downloaded.append(destination)
-    return downloaded
+        source_pdf = checkout / str(artifact["path"])
+        if not source_pdf.is_file():
+            raise RuntimeError(f"{artifact_id}: {source_pdf} is absent from the pinned checkout")
+        actual = _sha256(source_pdf)
+        if actual != str(artifact["sha256"]):
+            raise RuntimeError(
+                f"{artifact_id}: checksum mismatch in the pinned checkout: "
+                f"expected {artifact['sha256']}, found {actual}"
+            )
+        pdfs.append(source_pdf)
+    return pdfs
 
 
 def _platform_key() -> str:
