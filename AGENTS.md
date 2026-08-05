@@ -87,8 +87,14 @@ corpus cannot drift from its pin. What setup provides:
 | Artifact | Answers | Where |
 | --- | --- | --- |
 | Specification corpus | what a construct *means* | `just model-reference-find` |
-| Standard model library | what exists and what it specializes | `.cache/sysml/validator/<version>/kernel/sysml/sysml.library` |
-| Pinned validator | what the parser actually accepts | `just model-check` |
+| Standard model library | what exists and what it specializes | same finder, hits labelled `[library]` |
+| Example and training models | what a construct looks like in working SysML | same finder, hits labelled `[example]` |
+| Construct inventory | which SysML name a question maps to | `just model-reference-concepts` |
+| Pinned validator | what the parser actually accepts | `just model-probe`, `just model-check` |
+
+SysML v2 names concepts differently from ordinary systems-engineering usage, so a search that returns
+nothing convincing usually means the wrong word, not a missing capability. Consult the construct
+inventory, then search again.
 
 Begin with `just model-reference-find`, follow normative cross-references, inspect extraction
 warnings, and never edit the generated corpus by hand. Cite the specification version and release

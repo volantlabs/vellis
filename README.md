@@ -35,8 +35,9 @@ just check
 Useful commands:
 
 - `just model-check`: validate every authored SysML file with the pinned validator.
-- `just model-reference-find "<question>"`: find relevant specification pages.
-- `just model-reference-find "<question>" sysml-2.1 5`: limit a search by specification and count. Run without arguments to see the currently pinned specification identifiers.
+- `just model-reference-find "<question>"`: search the specifications, model libraries, and example models; every hit is labelled with its source.
+- `just model-reference-concepts`: list every SysML v2 construct name, for turning a question into a searchable term.
+- `just model-probe "<snippet>"`: check one SysML snippet against the pinned parser in about six seconds.
 - `just model-reference-check`: prove the generated search corpus still matches its pin.
 - `just skills-check`: validate the repo-local skills and their managed project links.
 - `just check`: run the complete repository gate.

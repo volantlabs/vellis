@@ -5,7 +5,28 @@ description: Ground textual SysML v2 and KerML authoring, software-system constr
 
 # SysML and KerML Reference
 
-Use the pinned official specifications as the language authority. The generated page corpus is a searchable projection and must never be edited by hand.
+Use the pinned official specifications as the language authority. The corpus is generated from checksum-pinned sources into the ignored cache and must never be edited by hand.
+
+## What answers which question
+
+`just model-setup` provides four sources, and they answer different questions. Reaching for the wrong one is the most common way to waste a lookup.
+
+| Source | Answers | How |
+| --- | --- | --- |
+| Specification | what a construct **means** | `just model-reference-find` |
+| Model library | what **exists**, and what it specializes | same finder; hits are labelled `[library]` |
+| Example models | what it **looks like** in working SysML | same finder; hits are labelled `[example]` |
+| Pinned validator | what the parser **accepts** | `just model-probe`, `just model-check` |
+
+Library and example hits are pinned-release evidence, not normative text. Cite them as such, and never present a worked example as though it were a clause.
+
+## Prior knowledge is not evidence
+
+SysML v1 and UML dominate training data, and SysML v2 displaced much of that notation. A construct you are confident about but cannot cite is an inference, and must be reported as one.
+
+When a construct feels familiar, check that it exists before designing around it. `block`, `ValueType`, value properties, associations, flow ports, and stereotypes are all v1 notation with different v2 replacements. The parser rejects them and the diagnostic names the replacement, so an uncertain construct is cheaper to probe than to reason about.
+
+Names are the other trap. SysML v2 names concepts differently from ordinary systems-engineering usage: states rather than modes, constraints rather than rules, specialization rather than inheritance, "Definition and Usage" rather than variability. If a search returns nothing convincing, the query is probably using the wrong word rather than asking about something absent. Run `just model-reference-concepts` for the full construct inventory, pick the name, and search again.
 
 ## Evidence guardrails
 
@@ -41,13 +62,17 @@ Use the pinned official specifications as the language authority. The generated 
    is actually performed, and whether multiplicity, binding, succession, or a guard carries the
    intended claim.
 7. Inspect the pinned PDF when figures, tables, typography, or extraction quality matters.
-8. Validate the selected textual form.
-9. Report the specification, section, printed page, physical PDF page, and the concrete model commitment the clause supports.
+8. Validate the selected textual form. Use `just model-probe "<snippet>"` to settle a syntax
+   question against the pinned parser in about six seconds rather than reading grammar clauses.
+9. Report the specification version and release tag, section, printed page, physical PDF page, and
+   the concrete model commitment the clause supports. The pinned beta documents carry no OMG
+   document number, so the version and release tag are the identity.
 
 Always separate:
 
 - normative specification clauses;
 - informative examples or annex material;
+- pinned model-library and example-model evidence;
 - repository convention;
 - agent inference.
 
@@ -61,18 +86,20 @@ Run the complete source set with `just model-check`. For an error:
 2. identify the construct involved;
 3. retrieve its normative clause and necessary cross-references;
 4. distinguish model error, import or order error, repository convention, and validator limitation;
-5. create a temporary minimal model only when isolation requires it;
+5. reduce to the smallest snippet that reproduces the diagnostic and run it through
+   `just model-probe`; do not create temporary model files;
 6. do not silently weaken a semantically correct model to placate the parser; record any validator-compatibility choice in the PR.
 
 ## Specification baseline changes
 
 Treat a language-baseline change as an explicit PR:
 
-1. update the pinned URL, document identity, and checksum;
-2. run `just model-setup`;
-3. run `just model-reference-render`;
-4. inspect the generated corpus diff and extraction warnings;
-5. run `just model-reference-check` and `just model-check`;
-6. review the complete lock, corpus, and model impact before merge.
+1. update the pinned release tag, commit, version identity, and checksums;
+2. run `just model-setup`, which fetches the pinned checkout and regenerates the corpus;
+3. compare the reported page and outline counts against the lock, since the corpus is generated
+   rather than committed and so has no reviewable diff;
+4. run `just model-reference-check` and `just model-check`;
+5. re-run the retrieval eval and confirm each register still meets its floor;
+6. review the complete lock and model impact before merge.
 
 Do not create or maintain a second bundled language summary in this skill.
