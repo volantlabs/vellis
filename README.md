@@ -10,7 +10,7 @@ The repository currently contains the Vellis system model and its development to
 - [`docs/vision.md`](docs/vision.md): the human/agent engineering vision.
 - [`docs/modeling-method.md`](docs/modeling-method.md): the use-case-first model-as-code method.
 - [`docs/mcp-realization.md`](docs/mcp-realization.md): non-normative guidance for a future FastMCP realization.
-- [`reference/specifications/`](reference/specifications/): searchable projections of pinned SysML and KerML PDFs.
+- [`model/config/`](model/config/): checksum pins for the specifications, model libraries, and validator. The searchable corpus is generated from them into an ignored cache, never committed.
 - [`.agents/skills/`](.agents/skills/): four complementary engineering-copilot skills.
 - [`tools/`](tools/): the pinned validator, reference finder, and skill checks.
 
@@ -37,7 +37,7 @@ Useful commands:
 - `just model-check`: validate every authored SysML file with the pinned validator.
 - `just model-reference-find "<question>"`: find relevant specification pages.
 - `just model-reference-find "<question>" sysml-2.0 5`: limit a search by specification and count.
-- `just model-reference-check`: prove the committed search corpus matches the pinned PDFs.
+- `just model-reference-check`: prove the generated search corpus still matches its pin.
 - `just skills-check`: validate the four repo-local skills and their managed project links.
 - `just check`: run the complete repository gate.
 

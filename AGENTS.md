@@ -80,9 +80,19 @@ and the current diff. Follow the operative workflow and handoff in `$sysml-model
 
 ## Resources and checks
 
-The Markdown under `reference/specifications/` is a searchable projection of checksum-pinned official
-PDFs. Begin with `just model-reference-find`, follow normative cross-references, inspect extraction
-warnings, and never edit the corpus by hand.
+`just model-setup` downloads and checksum-verifies every reference artifact into the ignored
+`.cache/`, then generates the searchable corpus. Nothing derived from upstream is committed, so the
+corpus cannot drift from its pin. What setup provides:
+
+| Artifact | Answers | Where |
+| --- | --- | --- |
+| Specification corpus | what a construct *means* | `just model-reference-find` |
+| Standard model library | what exists and what it specializes | `.cache/sysml/validator/<version>/kernel/sysml/sysml.library` |
+| Pinned validator | what the parser actually accepts | `just model-check` |
+
+Begin with `just model-reference-find`, follow normative cross-references, inspect extraction
+warnings, and never edit the generated corpus by hand. Cite the specification version and release
+tag with the clause and page; the pinned beta documents carry no OMG document number.
 
 Use `uv` and `just`. Run `just setup` and `just model-setup` after cloning. Before completion, run the
 relevant narrow checks and normally `just check`. Keep `.data/` untouched.

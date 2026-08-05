@@ -1,15 +1,15 @@
 {
   "provider": "Systems-Modeling/SysML-v2-Pilot-Implementation",
-  "release": "2026-03",
-  "implementation_version": "0.58.0",
+  "release": "2026-05",
+  "implementation_version": "0.60.1",
   "language_baseline": {
-    "sysml": "2.0",
-    "kerml": "1.0"
+    "sysml": "2.1 Beta 1",
+    "kerml": "1.1 Beta 1"
   },
   "kernel": {
-    "url": "https://github.com/Systems-Modeling/SysML-v2-Pilot-Implementation/releases/download/2026-03/jupyter-sysml-kernel-0.58.0.zip",
-    "sha256": "93f6f7cae4fffc0241f3108bf9a0b3a38ddddec9aa257758a920f33dc4f75308",
-    "jar": "sysml/jupyter-sysml-kernel-0.58.0-all.jar",
+    "url": "https://github.com/Systems-Modeling/SysML-v2-Pilot-Implementation/releases/download/2026-05/jupyter-sysml-kernel-0.60.1.zip",
+    "sha256": "cd19e05f5a45f1d9df30d7497647fccc6898e2453761228a473884ec1c4dace1",
+    "jar": "sysml/jupyter-sysml-kernel-0.60.1-all.jar",
     "library": "sysml/sysml.library"
   },
   "java": {

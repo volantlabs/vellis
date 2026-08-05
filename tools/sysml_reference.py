@@ -29,7 +29,7 @@ except ImportError:  # pragma: no cover - direct script execution
         SPECIFICATION_REFERENCE_ROOT,
     )
 
-GENERATOR_VERSION = 2
+GENERATOR_VERSION = 3
 SECTION_NUMBER = re.compile(r"^(?P<number>(?:\d+|[A-Z])(?:\.\d+)*)\s+")
 SEARCH_WORD = re.compile(r"[a-z0-9]+")
 SEARCH_STOP_WORDS = {
@@ -61,7 +61,9 @@ class Specification:
     specification_id: str
     title: str
     pdf_title: str
-    document_number: str
+    version_identity: str
+    page_footer_prefix: str
+    short_label: str
     source_url: str
     source_sha256: str
     source_pdf: Path
@@ -118,7 +120,9 @@ def _load_specifications() -> list[Specification]:
                     specification_id=str(artifact["specification_id"]),
                     title=str(artifact["title"]),
                     pdf_title=str(artifact["pdf_title"]),
-                    document_number=str(artifact["document_number"]),
+                    version_identity=str(artifact["version_identity"]),
+                    page_footer_prefix=str(artifact["page_footer_prefix"]),
+                    short_label=str(artifact["short_label"]),
                     source_url=str(artifact["url"]),
                     source_sha256=str(artifact["sha256"]),
                     source_pdf=SPECIFICATION_CACHE_ROOT / f"{artifact_id}.pdf",
@@ -245,10 +249,10 @@ def _verify_pdf_identity(
             f"{specification.pdf_title!r}, found {actual_title!r}"
         )
     cover_text = reader.pages[0].extract_text() or ""
-    if specification.document_number not in cover_text:
+    if specification.version_identity not in cover_text:
         raise RuntimeError(
-            f"{specification.specification_id}: cover does not contain configured document "
-            f"number {specification.document_number!r}"
+            f"{specification.specification_id}: cover does not contain configured version "
+            f"identity {specification.version_identity!r}"
         )
     anchors = {str(entry["title"]): int(entry["physical_page_start"]) for entry in entries}
     expected_anchors = {
@@ -291,10 +295,7 @@ def _section_paths_starting(entries: list[dict[str, Any]], physical_page: int) -
 def _normalize_text(text: str, specification: Specification) -> str:
     normalized = text.replace("\r\n", "\n").replace("\r", "\n").replace("\f", "")
     lines = [line.rstrip() for line in normalized.splitlines()]
-    if specification.specification_id == "sysml-2.0":
-        footer = re.compile(r"^Systems Modeling Language v2\.0, Part 1\s+\d+$")
-    else:
-        footer = re.compile(r"^Kernel Modeling Language v1\.0\s+\d+$")
+    footer = re.compile(rf"^{re.escape(specification.page_footer_prefix)}\s+\d+$")
     lines = [line for line in lines if not footer.fullmatch(line.strip())]
     while lines and not lines[0]:
         lines.pop(0)
@@ -331,7 +332,7 @@ def _page_markdown(
         "---",
         f"specification_id: {_json_string(specification.specification_id)}",
         f"specification: {_json_string(specification.title)}",
-        f"document_number: {_json_string(specification.document_number)}",
+        f"version_identity: {_json_string(specification.version_identity)}",
         f"source_url: {_json_string(specification.source_url)}",
         f"source_sha256: {_json_string(specification.source_sha256)}",
         f"physical_page: {physical_page}",
@@ -372,7 +373,7 @@ def _page_markdown(
             "---",
             "",
             f"Source: [{specification.title}]({specification.source_url}), "
-            f"{specification.document_number}, physical page {physical_page}. "
+            f"{specification.version_identity}, physical page {physical_page}. "
             "The official PDF is authoritative.",
             "",
         ]
@@ -415,7 +416,7 @@ def _index_markdown(
         "is authoritative; do not edit these pages manually or treat them as a replacement",
         "specification.",
         "",
-        f"- OMG document: `{specification.document_number}`",
+        f"- Specification version: `{specification.version_identity}`",
         f"- Official source: [{specification.source_url}]({specification.source_url})",
         f"- Source SHA-256: `{specification.source_sha256}`",
         f"- Physical pages: {page_count}",
@@ -509,10 +510,11 @@ def _write_specification(specification: Specification, output_root: Path) -> dic
     manifest = {
         "schema_version": 1,
         "generator_version": GENERATOR_VERSION,
+        "lock_sha256": _sha256(LANGUAGE_LOCK_PATH),
         "specification_id": specification.specification_id,
         "title": specification.title,
         "pdf_title": specification.pdf_title,
-        "document_number": specification.document_number,
+        "version_identity": specification.version_identity,
         "source_url": specification.source_url,
         "source_sha256": specification.source_sha256,
         "page_count": page_count,
@@ -528,15 +530,18 @@ def _write_specification(specification: Specification, output_root: Path) -> dic
 
 def _render_into(output_root: Path) -> list[dict[str, Any]]:
     output_root.mkdir(parents=True)
+    specifications = _load_specifications()
     manifests = [
-        _write_specification(specification, output_root) for specification in _load_specifications()
+        _write_specification(specification, output_root) for specification in specifications
     ]
+    links = "".join(
+        f"- [{specification.short_label}]({specification.specification_id}/index.md)\n"
+        for specification in specifications
+    )
     (output_root / "index.md").write_text(
         "# SysML and KerML specification references\n\n"
         "Generated searchable projections of the checksum-pinned official specifications. "
-        "The official PDFs are authoritative.\n\n"
-        "- [SysML 2.0](sysml-2.0/index.md)\n"
-        "- [KerML 1.0](kerml-1.0/index.md)\n",
+        f"The official PDFs are authoritative.\n\n{links}",
         encoding="utf-8",
     )
     return manifests
@@ -558,29 +563,55 @@ def render(output_root: Path = SPECIFICATION_REFERENCE_ROOT) -> list[dict[str, A
     return manifests
 
 
-def _directory_files(root: Path) -> dict[str, str]:
-    if not root.exists():
-        return {}
-    return {
-        path.relative_to(root).as_posix(): _sha256(path)
-        for path in sorted(root.rglob("*"))
-        if path.is_file()
-    }
-
-
 def check(reference_root: Path = SPECIFICATION_REFERENCE_ROOT) -> list[str]:
-    with tempfile.TemporaryDirectory(prefix="vellis-sysml-reference-") as temporary:
-        generated = Path(temporary) / "specifications"
-        render(generated)
-        expected = _directory_files(generated)
-        actual = _directory_files(reference_root)
-    missing = sorted(set(expected) - set(actual))
-    extra = sorted(set(actual) - set(expected))
-    changed = sorted(path for path in set(expected) & set(actual) if expected[path] != actual[path])
+    """Verify the generated corpus against the pin that produced it.
+
+    The corpus is generated into the ignored cache rather than committed, so there
+    is no repository copy to diff. What can go wrong instead is a lock bumped
+    without regenerating, or a hand-edited page. Both are caught by comparing the
+    recorded lock digest and the recorded per-file digests.
+    """
     findings: list[str] = []
-    findings.extend(f"missing generated reference: {path}" for path in missing)
-    findings.extend(f"unexpected generated reference: {path}" for path in extra)
-    findings.extend(f"stale generated reference: {path}" for path in changed)
+    lock_digest = _sha256(LANGUAGE_LOCK_PATH)
+    for specification in _load_specifications():
+        target = reference_root / specification.specification_id
+        manifest_path = target / "manifest.json"
+        if not manifest_path.exists():
+            findings.append(
+                f"missing generated corpus for {specification.specification_id}; "
+                f"run `just model-setup`"
+            )
+            continue
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        if manifest.get("lock_sha256") != lock_digest:
+            findings.append(
+                f"{specification.specification_id}: generated from a different language lock; "
+                f"run `just model-reference-render`"
+            )
+            continue
+        if int(manifest.get("generator_version", 0)) != GENERATOR_VERSION:
+            findings.append(
+                f"{specification.specification_id}: generated by generator version "
+                f"{manifest.get('generator_version')}, expected {GENERATOR_VERSION}; "
+                f"run `just model-reference-render`"
+            )
+            continue
+        recorded = manifest.get("files")
+        if not isinstance(recorded, dict):
+            findings.append(f"{specification.specification_id}: manifest has no file digests")
+            continue
+        present = {
+            path.relative_to(target).as_posix()
+            for path in target.rglob("*")
+            if path.is_file() and path.name != "manifest.json"
+        }
+        for relative in sorted(set(recorded) - present):
+            findings.append(f"missing generated reference: {relative}")
+        for relative in sorted(present - set(recorded)):
+            findings.append(f"unexpected generated reference: {relative}")
+        for relative in sorted(set(recorded) & present):
+            if _sha256(target / relative) != recorded[relative]:
+                findings.append(f"hand-edited generated reference: {relative}")
     return findings
 
 
@@ -643,7 +674,10 @@ def find_references(
         root = reference_root / specification.specification_id
         outline_path = root / "outline.json"
         if not outline_path.exists():
-            raise RuntimeError(f"missing reference outline: {outline_path}")
+            raise RuntimeError(
+                f"missing generated corpus for {specification.specification_id} at {root}; "
+                f"run `just model-setup`"
+            )
         outline = json.loads(outline_path.read_text(encoding="utf-8"))
         entries = outline.get("entries")
         if not isinstance(entries, list):
@@ -721,7 +755,11 @@ def main() -> int:
     find_parser = subparsers.add_parser("find")
     find_parser.add_argument("query")
     find_parser.add_argument("--limit", type=int, default=8)
-    find_parser.add_argument("--specification", choices=("sysml-2.0", "kerml-1.0"), default=None)
+    find_parser.add_argument(
+        "--specification",
+        choices=tuple(specification.specification_id for specification in _load_specifications()),
+        default=None,
+    )
     args = parser.parse_args()
     try:
         if args.command == "render":

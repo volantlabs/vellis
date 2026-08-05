@@ -28,6 +28,7 @@ skills-sync:
 
 model-setup:
     @uv run python tools/sysml_validator.py setup
+    @uv run python tools/sysml_reference.py render
 
 model-check:
     @uv run python tools/sysml_validator.py validate --self-test

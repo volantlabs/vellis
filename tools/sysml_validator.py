@@ -117,6 +117,9 @@ def _sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
+DOWNLOAD_READ_TIMEOUT_SECONDS = 300
+
+
 def _download(url: str, expected: str, destination: Path) -> None:
     if destination.exists() and _sha256(destination) == expected:
         return
@@ -124,11 +127,22 @@ def _download(url: str, expected: str, destination: Path) -> None:
     request = urllib.request.Request(url, headers={"User-Agent": "vellis-model-setup"})
     with tempfile.NamedTemporaryFile(dir=destination.parent, delete=False) as temporary:
         temporary_path = Path(temporary.name)
-        with urllib.request.urlopen(request, timeout=120) as response:  # noqa: S310
-            shutil.copyfileobj(response, temporary)
-    if _sha256(temporary_path) != expected:
+    try:
+        with (
+            urllib.request.urlopen(  # noqa: S310
+                request, timeout=DOWNLOAD_READ_TIMEOUT_SECONDS
+            ) as response,
+            temporary_path.open("wb") as stream,
+        ):
+            shutil.copyfileobj(response, stream)
+        actual = _sha256(temporary_path)
+        if actual != expected:
+            raise RuntimeError(f"checksum mismatch for {url}: expected {expected}, found {actual}")
+    except BaseException:
+        # A partial or corrupt download must never be left behind: the next run
+        # would either resume from it or report a confusing checksum failure.
         temporary_path.unlink(missing_ok=True)
-        raise RuntimeError(f"checksum mismatch for {url}")
+        raise
     temporary_path.replace(destination)
 
 

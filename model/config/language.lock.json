@@ -1,34 +1,41 @@
 {
   "language": {
-    "sysml": "2.0",
-    "kerml": "1.0",
-    "sysml_specification": "https://www.omg.org/spec/SysML/2.0",
-    "kerml_specification": "https://www.omg.org/spec/KerML/1.0"
+    "sysml": "2.1 Beta 1",
+    "kerml": "1.1 Beta 1",
+    "release": "2026-05",
+    "release_repository": "https://github.com/Systems-Modeling/SysML-v2-Release",
+    "note": "Beta specifications carry no OMG document number; identity is verified by version string and checksum."
   },
   "specifications": {
     "sysml_language_pdf": {
-      "specification_id": "sysml-2.0",
-      "title": "OMG Systems Modeling Language (SysML) Version 2.0, Part 1: Language Specification",
+      "specification_id": "sysml-2.1",
+      "title": "OMG Systems Modeling Language (SysML) Version 2.1 Beta 1, Part 1: Language Specification",
       "pdf_title": "SysML Specification",
-      "document_number": "formal/2026-03-02",
+      "version_identity": "Version 2.1 Beta 1",
+      "release": "2026-05",
       "front_matter_start_physical_page": 11,
       "body_start_physical_page": 33,
-      "expected_page_count": 691,
-      "expected_outline_count": 991,
-      "url": "https://www.omg.org/spec/SysML/2.0/Language/PDF",
-      "sha256": "46e6c0476a6f1f34f367d57e039d56659bff75e41d2e4b3d37ca4cadea84a83a"
+      "expected_page_count": 695,
+      "expected_outline_count": 985,
+      "url": "https://raw.githubusercontent.com/Systems-Modeling/SysML-v2-Release/2026-05/doc/2a-OMG_Systems_Modeling_Language.pdf",
+      "sha256": "2560a68bef67a8cca7783fdf0c1badae4ce864f15df07e9378430f96d6dd9640",
+      "page_footer_prefix": "Systems Modeling Language v2.1, Beta 1, Part 1",
+      "short_label": "SysML 2.1 Beta 1"
     },
     "kerml_language_pdf": {
-      "specification_id": "kerml-1.0",
-      "title": "Kernel Modeling Language (KerML) Version 1.0",
+      "specification_id": "kerml-1.1",
+      "title": "Kernel Modeling Language (KerML) Version 1.1 Beta 1",
       "pdf_title": "KerML Specification",
-      "document_number": "formal/2026-03-01",
+      "version_identity": "Version 1.1 Beta 1",
+      "release": "2026-05",
       "front_matter_start_physical_page": 11,
       "body_start_physical_page": 27,
-      "expected_page_count": 454,
+      "expected_page_count": 460,
       "expected_outline_count": 661,
-      "url": "https://www.omg.org/spec/KerML/1.0/PDF",
-      "sha256": "3bcc96f989bfa9d05cd28e026df3351b795fe8d494187b87bff3db7d96373697"
+      "url": "https://raw.githubusercontent.com/Systems-Modeling/SysML-v2-Release/2026-05/doc/1-Kernel_Modeling_Language.pdf",
+      "sha256": "c2624342c6f17fcb2c4719dd4dabea9cf1fbe99687da21c1e3d8ed0484c28ddd",
+      "page_footer_prefix": "Kernel Modeling Language v1.1, Beta 1",
+      "short_label": "KerML 1.1 Beta 1"
     }
   }
 }

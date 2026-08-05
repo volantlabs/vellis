@@ -14,7 +14,7 @@ Bias toward small, claim-driven documentation changes. Do not turn a model edit 
 - `model/*.sysml` on the current branch is that branch's product and system authority.
 - Handwritten Markdown explains vision, method, contribution, operation, or tooling without restating model contracts.
 - GitHub issues and PR discussion carry unresolved design work and review decisions.
-- `reference/specifications/` is generated from checksum-pinned official PDFs and must not be hand-edited.
+- Reference corpora are generated from checksum-pinned upstream sources into the ignored `.cache/`; they are never committed and must not be hand-edited.
 - `.agents/skills/` is the repo-local skill source; `.claude/skills/` contains managed links.
 - There are currently no generated Vellis product views, runtime sources, or implementation artifacts.
 
