@@ -51,6 +51,18 @@ def test_reference_finder_quotes_untrusted_questions() -> None:
     assert "'$(printf unsafe)'" in result.stdout + result.stderr
 
 
+def test_snippet_probe_quotes_untrusted_source() -> None:
+    result = subprocess.run(
+        ["just", "--dry-run", "model-probe", "$(printf unsafe)"],
+        cwd=ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+    assert "'$(printf unsafe)'" in result.stdout + result.stderr
+
+
 def test_ci_runs_locked_setup_before_full_check() -> None:
     workflow = yaml.safe_load(
         (ROOT / ".github" / "workflows" / "check.yml").read_text(encoding="utf-8")

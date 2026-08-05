@@ -198,3 +198,35 @@ def test_language_source_is_pinned_to_an_immutable_commit() -> None:
         assert artifact["path"] in source["sparse_paths"] or any(
             artifact["path"].startswith(prefix.rstrip("*")) for prefix in source["sparse_paths"]
         )
+
+
+@pytest.mark.parametrize(
+    ("line", "expected"),
+    (
+        ("part def A { block def B; }", "part def"),
+        ("attribute x = «stereotyped»;", "metadata def"),
+        ("value def Temperature;", "attribute def"),
+        ("assoc Ownership { }", "connection def"),
+        ("part property wheel : Wheel;", "declares features directly"),
+        ("flow port p : P;", "port def"),
+        ("package P { struct A; }", "KerML root notation"),
+    ),
+)
+def test_rejected_v1_notation_gets_a_hint_naming_its_replacement(line: str, expected: str) -> None:
+    hint = sysml_validator._v1_notation_hint(line)
+
+    assert hint is not None
+    assert expected in hint
+
+
+@pytest.mark.parametrize(
+    "line",
+    (
+        "attribute def 'Block Diagram';",
+        "part def BlockCache;",
+        "doc /* the v1 block was replaced by part def */",
+        "part def A { ref part b : B; }",
+    ),
+)
+def test_valid_v2_declarations_are_never_hinted(line: str) -> None:
+    assert sysml_validator._v1_notation_hint(line) is None

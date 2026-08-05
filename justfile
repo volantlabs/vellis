@@ -46,3 +46,6 @@ check: lint typecheck skills-check model-check model-reference-check test
 
 model-reference-concepts:
     @uv run python tools/sysml_reference.py concepts
+
+model-probe source:
+    @uv run python tools/sysml_validator.py probe {{quote(source)}}

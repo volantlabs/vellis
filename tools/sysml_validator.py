@@ -8,6 +8,7 @@ import platform
 import re
 import shutil
 import subprocess
+import sys
 import tarfile
 import tempfile
 import time
@@ -349,6 +350,126 @@ def _execute_source(client: BlockingKernelClient, source: str) -> list[str]:
     return diagnostics
 
 
+# The pinned parser already rejects every one of these -- a separate lint would
+# catch nothing it does not. What it does not do is say *why*: the diagnostic for
+# `block def A;` is "no viable alternative at input 'def'", which never mentions
+# that `block` is SysML v1 or that `part def` replaces it. These hints supply the
+# missing half. Because a hint only ever fires on a line the parser has already
+# rejected, false positives are impossible by construction -- `attribute def
+# 'Block Diagram'` parses, so it is never inspected.
+V1_NOTATION_HINTS: tuple[tuple[re.Pattern[str], str], ...] = (
+    (
+        re.compile(r"\bblock\s+def\b|^\s*block\s+\w", re.IGNORECASE | re.MULTILINE),
+        "'block' is SysML v1 notation. SysML v2 uses 'part def' for structural "
+        "constituents, 'item def' for things that flow or are acted on, and "
+        "'attribute def' for values without identity.",
+    ),
+    (
+        re.compile(r"[«»]"),
+        "Guillemet stereotypes are UML/SysML v1 notation. SysML v2 uses "
+        "'metadata def' with an '@' annotation, or a '#' user keyword.",
+    ),
+    (
+        re.compile(r"\bValueType\b|\bvalue\s+(?:def|property|type)\b", re.IGNORECASE),
+        "'ValueType' and value properties are SysML v1 notation. SysML v2 uses "
+        "'attribute def'; attributes are values and carry no identity.",
+    ),
+    (
+        re.compile(r"\bassoc(?:iation)?\s+(?:def\b|[A-Za-z_]\w*\s*\{)", re.IGNORECASE),
+        "SysML v2 has no 'association'. Use 'connection def' with 'end' features, "
+        "or a plain reference feature when the relationship needs no identity.",
+    ),
+    (
+        re.compile(r"\b(?:part|value|flow)\s+property\b", re.IGNORECASE),
+        "Properties are SysML v1 notation. SysML v2 declares features directly, "
+        "for example 'part wheel : Wheel;' or 'attribute mass : MassValue;'.",
+    ),
+    (
+        re.compile(r"\b(?:flow|full|proxy)\s+port\b", re.IGNORECASE),
+        "Flow, full, and proxy ports are SysML v1 notation. SysML v2 uses "
+        "'port def' with directed features and '~' conjugation.",
+    ),
+    (
+        re.compile(r"\b(?:stereotype|profile|taggedValue)\b", re.IGNORECASE),
+        "Stereotypes and profiles are UML notation. SysML v2 extends the language "
+        "with 'metadata def'.",
+    ),
+    (
+        re.compile(
+            r"\b(?:struct|datatype|assoc|metaclass|behavior|function|predicate)\s+[A-Za-z_]"
+        ),
+        "This is KerML root notation, which a .sysml file does not accept. Use the "
+        "SysML-layer equivalent, such as 'item def', 'attribute def', "
+        "'connection def', 'action def', or 'calc def'.",
+    ),
+    (
+        re.compile(r"^\s*(?:bdd|ibd|par|stm|act|uc|sd)\b", re.MULTILINE | re.IGNORECASE),
+        "SysML v2 has no diagram-kind syntax. Views are modelled with 'view def' "
+        "and 'viewpoint def'.",
+    ),
+)
+
+
+def _v1_notation_hint(line_text: str) -> str | None:
+    for pattern, message in V1_NOTATION_HINTS:
+        if pattern.search(line_text):
+            return message
+    return None
+
+
+def _report_diagnostics(
+    diagnostics: list[str],
+    *,
+    source: str,
+    spans: object,
+    label_for: Any,
+) -> bool:
+    """Print diagnostics, annotating parse errors caused by displaced v1 notation."""
+    lines = source.splitlines()
+    failed = False
+    for diagnostic in diagnostics:
+        match = DIAGNOSTIC.search(diagnostic)
+        if not match:
+            if diagnostic.strip():
+                print(f"ERROR {diagnostic.strip()}")
+                failed = True
+            continue
+        combined_line = int(match.group("line"))
+        label, local_line = label_for(spans, combined_line)
+        level = match.group("level")
+        print(
+            f"{level} {label}:{local_line}:{match.group('column')}:{match.group('message').strip()}"
+        )
+        if 1 <= combined_line <= len(lines):
+            hint = _v1_notation_hint(lines[combined_line - 1])
+            if hint is not None:
+                print(f"  hint: {hint}")
+        failed = failed or level == "ERROR"
+    return failed
+
+
+def probe(snippet: str) -> int:
+    """Check an arbitrary snippet against the pinned parser.
+
+    Roughly six seconds, which is far cheaper than reading grammar clauses to
+    settle a syntax question. Each probe gets a fresh kernel, so one probe can
+    never depend on names left behind by an earlier one.
+    """
+    with _kernel_session() as client:
+        diagnostics = _execute_source(client, snippet)
+    failed = _report_diagnostics(
+        diagnostics,
+        source=snippet,
+        spans=None,
+        label_for=lambda _spans, line: ("probe", line),
+    )
+    if failed:
+        print("Snippet rejected by the pinned validator.")
+        return 1
+    print("Snippet accepted by the pinned validator. Acceptance is not meaning.")
+    return 0
+
+
 def validate(*, self_test: bool = False) -> int:
     files = _model_files()
     source, spans = _combined_source(files)
@@ -372,20 +493,10 @@ def validate(*, self_test: bool = False) -> int:
     ):
         print("ERROR formal validator negative self-test accepted an unresolved type")
         failed = True
-    for diagnostic in diagnostics:
-        match = DIAGNOSTIC.search(diagnostic)
-        if match:
-            combined_line = int(match.group("line"))
-            label, local_line = _source_location(spans, combined_line)
-            level = match.group("level")
-            print(
-                f"{level} {label}:{local_line}:{match.group('column')}:"
-                f"{match.group('message').strip()}"
-            )
-            failed = failed or level == "ERROR"
-        elif diagnostic.strip():
-            print(f"ERROR {diagnostic.strip()}")
-            failed = True
+    failed = (
+        _report_diagnostics(diagnostics, source=source, spans=spans, label_for=_source_location)
+        or failed
+    )
     if failed:
         print("Formal SysML validation failed.")
         return 1
@@ -402,7 +513,18 @@ def main() -> int:
     subparsers.add_parser("setup")
     validate_parser = subparsers.add_parser("validate")
     validate_parser.add_argument("--self-test", action="store_true")
+    probe_parser = subparsers.add_parser("probe")
+    probe_parser.add_argument(
+        "source",
+        nargs="?",
+        help="SysML snippet; omit to read from standard input",
+    )
     arguments = parser.parse_args()
+    if arguments.command == "probe":
+        snippet = arguments.source if arguments.source is not None else sys.stdin.read()
+        if not snippet.strip():
+            raise SystemExit("probe requires a SysML snippet argument or standard input")
+        return probe(snippet)
     if arguments.command == "setup":
         pdfs, java, jar, library = setup()
         for pdf in pdfs:
