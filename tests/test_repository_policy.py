@@ -3,19 +3,22 @@ from __future__ import annotations
 import re
 import subprocess
 
+import yaml
+
 from tools import model_layout
 
 ROOT = model_layout.ROOT
 
 
 def _just_recipes() -> set[str]:
-    justfile = (ROOT / "justfile").read_text(encoding="utf-8")
-    return {
-        match.group(1)
-        for line in justfile.splitlines()
-        if not line.startswith("set ")
-        and (match := re.match(r"^([a-z][a-z0-9-]*)(?: [^:]*)?:", line))
-    }
+    result = subprocess.run(
+        ["just", "--summary"],
+        cwd=ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    return set(result.stdout.split())
 
 
 def test_documented_commands_exist() -> None:
@@ -49,7 +52,14 @@ def test_reference_finder_quotes_untrusted_questions() -> None:
 
 
 def test_ci_runs_locked_setup_before_full_check() -> None:
-    workflow = (ROOT / ".github" / "workflows" / "check.yml").read_text(encoding="utf-8")
+    workflow = yaml.safe_load(
+        (ROOT / ".github" / "workflows" / "check.yml").read_text(encoding="utf-8")
+    )
+    commands = [
+        " ".join(str(step["run"]).split())
+        for step in workflow["jobs"]["check"]["steps"]
+        if "run" in step
+    ]
 
-    assert "uv sync --locked" in workflow
-    assert workflow.index("run: just model-setup") < workflow.index("run: just check")
+    assert "uv sync --locked" in commands
+    assert commands.index("just model-setup") < commands.index("just check")

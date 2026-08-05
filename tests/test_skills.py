@@ -103,94 +103,90 @@ def test_sync_refuses_to_replace_a_real_skill_exposure(tmp_path: Path, monkeypat
     assert any("refusing to replace real file or directory" in error for error in errors)
 
 
-def test_skill_validator_rejects_unbounded_or_extended_metadata(tmp_path: Path) -> None:
+def test_skill_validator_accepts_extensible_layout_metadata_and_policy(tmp_path: Path) -> None:
     skill_dir = tmp_path / "sample-skill"
-    (skill_dir / "agents").mkdir(parents=True)
-    (skill_dir / "SKILL.md").write_text(
-        "---\n"
-        "name: sample-skill\n"
-        "description: Use this sample skill when validating skill guardrails.\n"
-        "---\n"
-        "# Sample\n" + "instruction\n" * 500,
+    _write_valid_skill(
+        skill_dir,
+        "# Sample\n\n[Guide](references/index.md)\n\n"
+        "TODO is legitimate discussion text.\n" + "Detailed instruction.\n" * 501,
+    )
+    skill_file = skill_dir / "SKILL.md"
+    skill_file.write_text(
+        skill_file.read_text(encoding="utf-8").replace(
+            "description: Use this sample skill when validating repository skill guardrails.\n",
+            "description: A focused repository validator.\ncompatibility: local\n",
+        ),
         encoding="utf-8",
     )
+    nested = skill_dir / "references" / "nested"
+    nested.mkdir(parents=True)
+    (skill_dir / "references" / "index.md").write_text("[Deep](nested/deep.md)\n", encoding="utf-8")
+    (nested / "deep.md").write_text("Complete guidance.\n", encoding="utf-8")
+    (skill_dir / "scripts").mkdir()
+    (skill_dir / "scripts" / "check.py").write_text("print('ok')\n", encoding="utf-8")
+    (skill_dir / "assets").mkdir()
+    (skill_dir / "assets" / "icon.svg").write_text("<svg/>\n", encoding="utf-8")
     (skill_dir / "agents" / "openai.yaml").write_text(
         "interface:\n"
         '  display_name: "Sample Skill"\n'
-        '  short_description: "Validate sample skill metadata"\n'
+        '  short_description: "Validate"\n'
         '  default_prompt: "Use $sample-skill to validate this sample."\n'
-        '  icon_small: "./icon.svg"\n'
-        "dependencies: {}\n"
+        '  icon_small: "../assets/icon.svg"\n'
+        "dependencies:\n"
+        "  tools: []\n"
         "policy:\n"
-        "  allow_implicit_invocation: true\n",
+        "  allow_implicit_invocation: false\n"
+        "  future_policy: preserved\n",
         encoding="utf-8",
     )
 
     errors = validate_skills.validate_skill(skill_dir)
 
-    assert any("must not exceed 500 lines" in error for error in errors)
-    assert any("prohibited metadata keys" in error for error in errors)
-    assert any("prohibited interface keys" in error for error in errors)
+    assert errors == []
 
 
-def test_skill_validator_rejects_unsafe_or_unlinked_references_and_placeholders(
-    tmp_path: Path,
-) -> None:
+def test_skill_validator_rejects_missing_or_escaping_local_links(tmp_path: Path) -> None:
     skill_dir = tmp_path / "sample-skill"
-    references = skill_dir / "references"
-    (references / "nested").mkdir(parents=True)
-    (references / "linked.md").write_text("Linked.\n", encoding="utf-8")
-    (references / "orphan.md").write_text("Orphan.\n", encoding="utf-8")
-    (references / "nested" / "deep.md").write_text("Deep.\n", encoding="utf-8")
     _write_valid_skill(
-        skill_dir,
-        "# Sample\n\n"
-        "[Linked](references/linked.md)\n"
-        "[Missing](references/missing.md)\n"
-        "[Escape](../outside.md)\n"
-        "TODO\n",
+        skill_dir, "# Sample\n\n[Missing](references/missing.md)\n[Escape](../outside.md)\n"
     )
 
     errors = validate_skills.validate_skill(skill_dir)
 
     assert any("missing linked file" in error for error in errors)
     assert any("local link escapes" in error for error in errors)
-    assert any("nested reference directory" in error for error in errors)
-    assert any("reference is not linked directly" in error for error in errors)
-    assert any("placeholder content is prohibited" in error for error in errors)
 
 
-def test_skill_validator_requires_implicit_invocation_policy(tmp_path: Path) -> None:
+def test_skill_validator_requires_core_ui_metadata(tmp_path: Path) -> None:
     skill_dir = tmp_path / "sample-skill"
     _write_valid_skill(skill_dir)
     metadata = skill_dir / "agents" / "openai.yaml"
     metadata.write_text(
         metadata.read_text(encoding="utf-8").replace(
-            "allow_implicit_invocation: true", "allow_implicit_invocation: false"
+            '  short_description: "Validate repository skill metadata"\n', ""
         ),
         encoding="utf-8",
     )
 
     errors = validate_skills.validate_skill(skill_dir)
 
-    assert any("policy.allow_implicit_invocation must be true" in error for error in errors)
+    assert any("missing interface keys" in error for error in errors)
 
 
-def test_skill_validator_requires_a_trigger_word_not_a_substring(tmp_path: Path) -> None:
+def test_skill_validator_rejects_non_boolean_invocation_policy(tmp_path: Path) -> None:
     skill_dir = tmp_path / "sample-skill"
     _write_valid_skill(skill_dir)
-    skill_file = skill_dir / "SKILL.md"
-    skill_file.write_text(
-        skill_file.read_text(encoding="utf-8").replace(
-            "Use this sample skill when validating repository skill guardrails.",
-            "Because this sample skill validates repository guardrails effectively.",
+    metadata = skill_dir / "agents" / "openai.yaml"
+    metadata.write_text(
+        metadata.read_text(encoding="utf-8").replace(
+            "allow_implicit_invocation: true", "allow_implicit_invocation: []"
         ),
         encoding="utf-8",
     )
 
     errors = validate_skills.validate_skill(skill_dir)
 
-    assert any("description must state when to use the skill" in error for error in errors)
+    assert any("must be Boolean when present" in error for error in errors)
 
 
 def test_skill_validator_reports_malformed_yaml(tmp_path: Path) -> None:

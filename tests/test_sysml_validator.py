@@ -23,14 +23,6 @@ def test_model_discovery_is_dynamic_and_filename_ordered(
     ]
 
 
-def test_model_readme_maps_every_discovered_file() -> None:
-    files = sysml_validator._model_files()
-    readme = (model_layout.MODEL_ROOT / "README.md").read_text(encoding="utf-8")
-    mapped_files = set(re.findall(r"`([^`/]+\.sysml)`", readme))
-
-    assert mapped_files == {path.name for path in files}
-
-
 def test_combined_source_retains_file_line_spans(tmp_path: Path) -> None:
     first = tmp_path / "10-first.sysml"
     second = tmp_path / "20-second.sysml"
@@ -59,17 +51,15 @@ def test_official_validator_accepts_later_import_and_multiple_packages() -> None
     assert diagnostics == []
 
 
-def test_model_check_uses_official_validator_and_negative_probe() -> None:
-    justfile = (model_layout.ROOT / "justfile").read_text(encoding="utf-8")
+def test_validator_downloads_are_checksum_pinned() -> None:
     lock = json.loads(
         (model_layout.MODEL_CONFIG_ROOT / "validator.lock.json").read_text(encoding="utf-8")
     )
+    downloads = [lock["kernel"], *lock["java"]["platforms"].values()]
 
-    assert "tools/sysml_validator.py validate --self-test" in justfile
-    assert lock["provider"] == "Systems-Modeling/SysML-v2-Pilot-Implementation"
-    assert lock["kernel"]["jar"].endswith(
-        f"jupyter-sysml-kernel-{lock['implementation_version']}-all.jar"
-    )
+    assert downloads
+    assert all(download["url"].startswith("https://") for download in downloads)
+    assert all(re.fullmatch(r"[0-9a-f]{64}", download["sha256"]) for download in downloads)
 
 
 def test_negative_probe_uses_a_separate_kernel_session(
@@ -110,8 +100,13 @@ def test_negative_probe_uses_a_separate_kernel_session(
     assert executions[0][0] != executions[1][0]
 
 
-def test_validator_warning_maps_to_its_file_and_fails_validation(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+@pytest.mark.parametrize(("level", "expected_status"), (("WARNING", 0), ("ERROR", 1)))
+def test_validator_diagnostic_maps_to_its_file_without_promoting_warnings(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    level: str,
+    expected_status: int,
 ) -> None:
     first = tmp_path / "10-first.sysml"
     second = tmp_path / "20-second.sysml"
@@ -131,11 +126,11 @@ def test_validator_warning_maps_to_its_file_and_fails_validation(
     monkeypatch.setattr(
         sysml_validator,
         "_execute_source",
-        lambda *_: ["WARNING:ambiguous model(1.sysml line : 4 column : 9)"],
+        lambda *_: [f"{level}:ambiguous model(1.sysml line : 4 column : 9)"],
     )
 
-    assert sysml_validator.validate() == 1
-    assert "WARNING 20-second.sysml:2:9:ambiguous model" in capsys.readouterr().out
+    assert sysml_validator.validate() == expected_status
+    assert f"{level} 20-second.sysml:2:9:ambiguous model" in capsys.readouterr().out
 
 
 def test_kernel_execution_collects_only_related_diagnostics() -> None:

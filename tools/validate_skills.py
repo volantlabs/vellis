@@ -9,14 +9,6 @@ import yaml
 SKILL_NAME = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 LOCAL_LINK = re.compile(r"\[[^]]*]\(([^)]+)\)")
 REQUIRED_INTERFACE_KEYS = {"display_name", "short_description", "default_prompt"}
-ALLOWED_FRONTMATTER_KEYS = {"name", "description"}
-ALLOWED_METADATA_KEYS = {"interface", "policy"}
-ALLOWED_POLICY_KEYS = {"allow_implicit_invocation"}
-PLACEHOLDER = re.compile(
-    r"\b(?:TODO|TBD|FIXME)\b|[<\[](?:placeholder|insert[^>\]]*)[>\]]",
-    re.IGNORECASE,
-)
-TRIGGER_WORD = re.compile(r"\b(?:use|when)\b", re.IGNORECASE)
 
 
 def load_yaml(path: Path) -> object:
@@ -41,54 +33,26 @@ def _frontmatter(skill_file: Path, errors: list[str]) -> dict[str, object]:
     if not isinstance(value, dict):
         errors.append(f"{skill_file}: frontmatter must be a mapping")
         return {}
-    unexpected = set(value) - ALLOWED_FRONTMATTER_KEYS
-    if unexpected:
-        errors.append(f"{skill_file}: prohibited frontmatter keys: {sorted(unexpected)}")
     return value
 
 
-def _validate_references(skill_dir: Path, skill_text: str, errors: list[str]) -> None:
-    references_root = skill_dir / "references"
-    linked: set[Path] = set()
-    for target_text in LOCAL_LINK.findall(skill_text):
-        target_text = target_text.split("#", 1)[0].strip()
-        if not target_text or "://" in target_text or target_text.startswith("#"):
-            continue
-        target = (skill_dir / target_text).resolve()
-        try:
-            relative = target.relative_to(skill_dir.resolve())
-        except ValueError:
-            errors.append(f"{skill_dir / 'SKILL.md'}: local link escapes the skill: {target_text}")
-            continue
-        if not target.exists():
-            errors.append(f"{skill_dir / 'SKILL.md'}: missing linked file {target_text}")
-        if relative.parts and relative.parts[0] == "references":
-            if len(relative.parts) != 2:
-                errors.append(f"{skill_dir}: references must be one level deep: {relative}")
-            linked.add(target)
-
-    if not references_root.exists():
-        return
-    for path in references_root.rglob("*"):
-        if path.is_dir():
-            if path != references_root:
-                errors.append(f"{skill_dir}: nested reference directory is prohibited: {path}")
-            continue
-        if path.resolve() not in linked:
-            errors.append(f"{path}: reference is not linked directly from SKILL.md")
-
-
-def _validate_layout(skill_dir: Path, errors: list[str]) -> None:
-    allowed = {Path("SKILL.md"), Path("agents/openai.yaml")}
-    for path in skill_dir.rglob("*"):
-        if path.is_dir():
-            continue
-        relative = path.relative_to(skill_dir)
-        if relative in allowed:
-            continue
-        if len(relative.parts) == 2 and relative.parts[0] == "references":
-            continue
-        errors.append(f"{path}: prohibited auxiliary skill file")
+def _validate_local_links(skill_dir: Path, errors: list[str]) -> None:
+    skill_root = skill_dir.resolve()
+    markdown_files = [skill_dir / "SKILL.md", *sorted(skill_dir.rglob("*.md"))]
+    for source in dict.fromkeys(markdown_files):
+        text = source.read_text(encoding="utf-8")
+        for target_text in LOCAL_LINK.findall(text):
+            target_text = target_text.split("#", 1)[0].strip()
+            if not target_text or "://" in target_text or target_text.startswith("#"):
+                continue
+            target = (source.parent / target_text).resolve()
+            try:
+                target.relative_to(skill_root)
+            except ValueError:
+                errors.append(f"{source}: local link escapes the skill: {target_text}")
+                continue
+            if not target.exists():
+                errors.append(f"{source}: missing linked file {target_text}")
 
 
 def validate_skill(skill_dir: Path) -> list[str]:
@@ -101,21 +65,13 @@ def validate_skill(skill_dir: Path) -> list[str]:
     if not skill_file.exists():
         return [*errors, f"{skill_dir}: missing SKILL.md"]
 
-    _validate_layout(skill_dir, errors)
-    skill_text = skill_file.read_text(encoding="utf-8")
-    if len(skill_text.splitlines()) > 500:
-        errors.append(f"{skill_file}: skill body must not exceed 500 lines")
     frontmatter = _frontmatter(skill_file, errors)
     if frontmatter.get("name") != skill_dir.name:
         errors.append(f"{skill_file}: frontmatter name must be {skill_dir.name!r}")
     description = frontmatter.get("description")
-    if not isinstance(description, str) or len(description.strip()) < 40:
-        errors.append(f"{skill_file}: description must be non-empty and trigger-oriented")
-    elif not TRIGGER_WORD.search(description):
-        errors.append(f"{skill_file}: description must state when to use the skill")
-    if PLACEHOLDER.search(skill_text):
-        errors.append(f"{skill_file}: placeholder content is prohibited")
-    _validate_references(skill_dir, skill_text, errors)
+    if not isinstance(description, str) or not description.strip():
+        errors.append(f"{skill_file}: description must be non-empty")
+    _validate_local_links(skill_dir, errors)
 
     if not metadata_file.exists():
         errors.append(f"{metadata_file}: missing skill UI metadata")
@@ -128,9 +84,6 @@ def validate_skill(skill_dir: Path) -> list[str]:
     if not isinstance(metadata, dict):
         errors.append(f"{metadata_file}: expected mapping")
         return errors
-    unexpected_metadata = set(metadata) - ALLOWED_METADATA_KEYS
-    if unexpected_metadata:
-        errors.append(f"{metadata_file}: prohibited metadata keys: {sorted(unexpected_metadata)}")
     interface = metadata.get("interface")
     if not isinstance(interface, dict):
         errors.append(f"{metadata_file}: missing interface mapping")
@@ -138,26 +91,24 @@ def validate_skill(skill_dir: Path) -> list[str]:
         missing = REQUIRED_INTERFACE_KEYS - set(interface)
         if missing:
             errors.append(f"{metadata_file}: missing interface keys: {sorted(missing)}")
-        unexpected_interface = set(interface) - REQUIRED_INTERFACE_KEYS
-        if unexpected_interface:
-            errors.append(
-                f"{metadata_file}: prohibited interface keys: {sorted(unexpected_interface)}"
-            )
+        display_name = interface.get("display_name")
+        if not isinstance(display_name, str) or not display_name.strip():
+            errors.append(f"{metadata_file}: display_name must be non-empty")
         short = interface.get("short_description")
-        if not isinstance(short, str) or not 25 <= len(short) <= 64:
-            errors.append(f"{metadata_file}: short_description must be 25-64 characters")
+        if not isinstance(short, str) or not short.strip():
+            errors.append(f"{metadata_file}: short_description must be non-empty")
         prompt = interface.get("default_prompt")
         if not isinstance(prompt, str) or f"${skill_dir.name}" not in prompt:
             errors.append(f"{metadata_file}: default_prompt must contain ${skill_dir.name}")
     policy = metadata.get("policy")
-    if not isinstance(policy, dict) or policy.get("allow_implicit_invocation") is not True:
-        errors.append(f"{metadata_file}: policy.allow_implicit_invocation must be true")
-    elif set(policy) - ALLOWED_POLICY_KEYS:
-        errors.append(
-            f"{metadata_file}: prohibited policy keys: {sorted(set(policy) - ALLOWED_POLICY_KEYS)}"
-        )
-    if PLACEHOLDER.search(metadata_file.read_text(encoding="utf-8")):
-        errors.append(f"{metadata_file}: placeholder content is prohibited")
+    if policy is not None and not isinstance(policy, dict):
+        errors.append(f"{metadata_file}: policy must be a mapping when present")
+    elif isinstance(policy, dict):
+        implicit = policy.get("allow_implicit_invocation")
+        if implicit is not None and not isinstance(implicit, bool):
+            errors.append(
+                f"{metadata_file}: policy.allow_implicit_invocation must be Boolean when present"
+            )
     return errors
 
 

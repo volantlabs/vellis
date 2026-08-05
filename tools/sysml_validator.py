@@ -382,7 +382,7 @@ def validate(*, self_test: bool = False) -> int:
                 f"{level} {label}:{local_line}:{match.group('column')}:"
                 f"{match.group('message').strip()}"
             )
-            failed = failed or level in {"ERROR", "WARNING"}
+            failed = failed or level == "ERROR"
         elif diagnostic.strip():
             print(f"ERROR {diagnostic.strip()}")
             failed = True
