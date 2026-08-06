@@ -86,6 +86,25 @@ ROUTING_QUESTIONS: tuple[tuple[str, str, tuple[tuple[str, str], ...]], ...] = (
         "what is an enumeration definition",
         (("specification", "7.8"), ("example", "06. Enumeration Definitions")),
     ),
+    (
+        "A",
+        "subsetting versus redefinition",
+        (
+            ("specification", "7.3.4"),
+            ("example", "04. Subsetting"),
+            ("example", "05. Redefinition"),
+        ),
+    ),
+    (
+        "A",
+        "binding connector versus item flow",
+        (("specification", "7.13"), ("specification", "7.16"), ("specification", "7.4.6")),
+    ),
+    (
+        "A",
+        "allocation versus satisfaction",
+        (("specification", "7.15"), ("specification", "7.21")),
+    ),
     # --- Register B: lay phrasing -------------------------------------------
     (
         "B",

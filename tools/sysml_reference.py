@@ -169,6 +169,7 @@ class Document:
     location: Path | None
     body: str
     sort_key: tuple[object, ...]
+    extraction_warning: bool = False
 
 
 @dataclass(frozen=True)
@@ -181,6 +182,7 @@ class SearchResult:
     location: Path | None
     snippet: str
     score: float
+    extraction_warning: bool = False
 
     @property
     def specification_id(self) -> str:
@@ -757,6 +759,20 @@ def _search_terms(value: str) -> tuple[str, ...]:
     return tuple(terms)
 
 
+def _definition_snippet(body: str) -> str | None:
+    """The defining sentence of a library element, if its doc comment has one.
+
+    A library hit answers "what is this and what does it specialise", so leading
+    with the definition removes a file-open from the common case.
+    """
+    match = re.search(r"\b(?:is|are)\s+(?:a|an|the)\b.*", body)
+    if match is None:
+        return None
+    sentence = re.split(r"(?<=\.)\s", match.group(0))[0]
+    compact = " ".join(sentence.split())
+    return compact[:320] + ("…" if len(compact) > 320 else "") if len(compact) > 25 else None
+
+
 def _search_snippet(text: str, terms: tuple[str, ...]) -> str:
     marker = "## Extracted specification text"
     body = text.split(marker, 1)[1] if marker in text else text
@@ -957,12 +973,15 @@ def _clause_documents(specification: Specification, reference_root: Path) -> tup
 
     page_text: dict[int, str] = {}
     page_paths: dict[int, Path] = {}
+    warned_pages: set[int] = set()
     marker = "## Extracted specification text"
     for page_path in sorted((root / "pages").glob("page-*.md")):
         physical_page = int(page_path.stem.removeprefix("page-"))
         raw = page_path.read_text(encoding="utf-8")
         page_text[physical_page] = raw.split(marker, 1)[1] if marker in raw else raw
         page_paths[physical_page] = page_path
+        if "extraction_warnings: []" not in raw.split(marker, 1)[0]:
+            warned_pages.add(physical_page)
 
     clauses: list[Document] = []
     for entry in entries:
@@ -988,6 +1007,7 @@ def _clause_documents(specification: Specification, reference_root: Path) -> tup
                 location=page_paths[pages[0]] if pages else None,
                 body="\n".join(page_text[page] for page in pages),
                 sort_key=_section_sort_key(str(number)),
+                extraction_warning=any(page in warned_pages for page in pages),
             )
         )
     return tuple(clauses)
@@ -1136,7 +1156,15 @@ def _rank_documents(documents: Sequence[Document], terms: tuple[str, ...]) -> li
             title_path=documents[index].title_path,
             citation=documents[index].citation,
             location=documents[index].location,
-            snippet=_search_snippet(documents[index].body, terms),
+            extraction_warning=documents[index].extraction_warning,
+            snippet=(
+                (
+                    _definition_snippet(documents[index].body)
+                    if documents[index].source == "library"
+                    else None
+                )
+                or _search_snippet(documents[index].body, terms)
+            ),
             score=score,
         )
         for index, score in scores.items()
@@ -1227,7 +1255,12 @@ def _print_search_results(results: list[SearchResult]) -> None:
         # Every hit is labelled with the corpus it came from, so an agent never
         # has to guess whether it is reading normative prose, a library
         # declaration, or a worked example.
-        print(f"{index}. [{result.source}] {title} — {result.citation}  ({result.score:.1f})")
+        warning = (
+            "  [extraction warning: verify against the PDF]" if result.extraction_warning else ""
+        )
+        print(
+            f"{index}. [{result.source}] {title} — {result.citation}  ({result.score:.1f}){warning}"
+        )
         if len(result.title_path) > 1:
             print(f"   {' > '.join(result.title_path[:-1])}")
         if result.location is not None:
@@ -1252,6 +1285,11 @@ def main() -> int:
     find_parser.add_argument("query")
     find_parser.add_argument("--limit", type=int, default=8)
     find_parser.add_argument(
+        "--json",
+        action="store_true",
+        help="emit structured results, which agents parse more reliably than text",
+    )
+    find_parser.add_argument(
         "--specification",
         choices=tuple(specification.specification_id for specification in _load_specifications()),
         default=None,
@@ -1275,6 +1313,30 @@ def main() -> int:
                 limit=args.limit,
                 specification_id=args.specification,
             )
+            if getattr(args, "json", False):
+                print(
+                    json.dumps(
+                        {
+                            "query": args.query,
+                            "results": [
+                                {
+                                    "source": result.source,
+                                    "corpus": result.corpus_id,
+                                    "identifier": result.identifier,
+                                    "title_path": list(result.title_path),
+                                    "citation": result.citation,
+                                    "location": (str(result.location) if result.location else None),
+                                    "score": round(result.score, 3),
+                                    "extraction_warning": result.extraction_warning,
+                                    "snippet": result.snippet,
+                                }
+                                for result in results
+                            ],
+                        },
+                        indent=2,
+                    )
+                )
+                return 0 if results else 1
             if not results:
                 print("No reference material matched the query.")
                 _print_concept_hint()
