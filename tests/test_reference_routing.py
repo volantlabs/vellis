@@ -296,10 +296,77 @@ ROUTING_QUESTIONS: tuple[tuple[str, str, tuple[tuple[str, str], ...]], ...] = (
             ("example", "Language Extensions"),
         ),
     ),
+    # --- Held-out set -------------------------------------------------------
+    # Written after the questions above, with targets fixed from specification
+    # structure before any search was run, then merged in unchanged. Merging
+    # rather than discarding keeps the set large and dilutes any tuning that
+    # leaked into the original questions.
+    ("A", "what is a transition usage trigger", (("specification", "7.18"),)),
+    ("A", "what does an exhibit state usage do", (("specification", "7.18"),)),
+    ("A", "what is a decision node in an action", (("specification", "7.17"),)),
+    ("A", "what is a metadata usage", (("specification", "7.27"),)),
+    ("A", "what does a filter condition do in a package", (("specification", "7.5"),)),
+    ("A", "what is an individual usage", (("specification", "7.9"),)),
+    ("A", "what is a rendering definition", (("specification", "7.26"),)),
+    ("A", "what is a subject parameter of a case", (("specification", "7.22"),)),
+    ("B", "how do I show that one step happens after another", (("specification", "7.17"),)),
+    (
+        "B",
+        "how do I say something can appear more than once",
+        (("specification", "7.4.12"), ("specification", "7.6")),
+    ),
+    ("B", "how do I model a choice between two paths", (("specification", "7.17"),)),
+    (
+        "B",
+        "how do I reuse a definition with small changes",
+        (("specification", "7.6"), ("specification", "7.3.3")),
+    ),
+    ("B", "how do I model a physical thing the system produces", (("specification", "7.10"),)),
+    ("B", "how do I attach a note to an element for tooling", (("specification", "7.27"),)),
+    (
+        "B",
+        "how do I describe something the system must never do",
+        (("specification", "7.21"), ("specification", "7.20")),
+    ),
+    ("B", "how do I show a whole made of smaller pieces", (("specification", "7.11"),)),
+    ("C", "how are non functional requirements captured", (("specification", "7.21"),)),
+    ("C", "how is model organization handled at scale", (("specification", "7.5"),)),
+    ("C", "how are stakeholder concerns addressed", (("specification", "7.26"),)),
+    ("C", "how is behavior sequencing controlled", (("specification", "7.17"),)),
+    ("C", "how is quantitative analysis integrated", (("specification", "7.23"),)),
+    (
+        "C",
+        "how is a black box boundary distinguished from internals",
+        (("specification", "7.11"), ("specification", "7.26")),
+    ),
+    (
+        "C",
+        "how is failure behavior represented",
+        (("specification", "7.18"), ("specification", "7.17")),
+    ),
+    ("C", "how is configuration of a product line expressed", (("specification", "7.6"),)),
 )
 
 # Measured floors, set just below observed rates so they catch regression rather
-# than expressing a wish. Observed: A 93%, B 66%, C 66%.
+# than expressing a wish. Observed on the combined set: A 96%, B 43%, C 56%.
+#
+# Those are lower than an earlier reading of 93/66/66, and the difference is the
+# point. A held-out set was written afterwards, with targets fixed from
+# specification structure before any search ran, and the two sets disagreed
+# sharply: register A scored 100% held-out against 94% in-sample, but register B
+# scored 0% held-out against 46% in-sample when both were scored the same way.
+#
+# So register A genuinely generalises and register B did not: its earlier number
+# was inflated by questions and targets that had been adjusted while looking at
+# results. Both sets are now merged, which is why the rates moved. Widening a
+# target after seeing output is exactly the move that produced the inflation, so
+# treat any future widening as suspect and prefer adding questions.
+#
+# The two tuned constants were re-checked against held-out data. The descriptive
+# clause weight generalises -- held-out register C rises monotonically from 1/8
+# to 3/8 as it goes from 1.0 to 2.0, then plateaus. The title weight is within
+# noise held-out; it was retained on in-sample evidence and is not re-tuned here,
+# because tuning on the held-out set would simply overfit that set instead.
 #
 # Two changes moved B and C from 13% and 33% to 66% each. Preferring the
 # descriptive specification chapter over the syntax and library chapters was
@@ -319,7 +386,7 @@ ROUTING_QUESTIONS: tuple[tuple[str, str, tuple[tuple[str, str], ...]], ...] = (
 # language task rather than an information-retrieval one. That step needs a model
 # in the loop and is deliberately outside this deterministic test; what is tested
 # here is that the inventory contains the words an agent would need.
-REGISTER_FLOORS = {"A": 0.85, "B": 0.55, "C": 0.55}
+REGISTER_FLOORS = {"A": 0.90, "B": 0.35, "C": 0.45}
 TOP_N = 5
 
 # For each lay or professional phrasing, the SysML v2 concept an agent has to
