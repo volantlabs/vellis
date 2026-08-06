@@ -1,6 +1,6 @@
 interface:
   display_name: "SysML Modeling"
-  short_description: "Guide complete, proportional model-based work"
-  default_prompt: "Use $sysml-modeling to develop one semantically complete system slice with native traceability, explicit state authority, plan conformance, and decisive evidence."
+  short_description: "Develop models and implementation handoffs"
+  default_prompt: "Use $sysml-modeling to close one proportional system slice and produce an implementation-ready handoff with explicit authority coverage, remaining obligations, and conformance-evidence intent."
 policy:
   allow_implicit_invocation: true

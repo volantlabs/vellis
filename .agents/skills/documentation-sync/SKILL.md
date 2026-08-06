@@ -16,6 +16,9 @@ Bias toward small, claim-driven documentation changes. Do not turn a model edit 
 - GitHub issues and PR discussion carry unresolved design work and review decisions.
 - Reference corpora are generated from checksum-pinned upstream sources into the ignored `.cache/`; they are never committed and must not be hand-edited.
 - `.agents/skills/` is the repo-local skill source; `.claude/skills/` contains managed links.
+- `$sysml-reference`, `$sysml-modeling`, and `$sysml-implementation` are a portable core. Vellis
+  paths, commands, RTG vocabulary, and repository workflow belong in project bindings or optional
+  domain skills rather than those core instructions.
 - There are currently no generated Vellis product views, runtime sources, or implementation artifacts.
 
 Keep detailed workflow heuristics and agent failure patterns in the applicable skills. Keep
@@ -36,6 +39,12 @@ Do not create placeholders to satisfy an imagined workflow. When product generat
    MCP server; use the words modeled, selected, implemented, and runnable precisely.
 7. Confirm a fresh agent can find the authority, current model map, applicable skills, validation path, and PR expectations without Git history or prior conversation.
 8. Search guidance, tests, templates, commands, and metadata for stale terms and inverse claims after deletions.
+   When a portable core skill changes, also check that it has not acquired a hard dependency on
+   Vellis, RTG, MCP, local paths, local commands, a programming language, or a particular software
+   architecture. Keep concrete bindings in repository guidance and domain extensions. Confirm that
+   modeling, domain, and implementation skills use the same handoff fields and divergence taxonomy;
+   documentation and PR claims must not present partial authority coverage as complete requirement
+   satisfaction or verification.
 9. If explanatory guidance compares candidate realizations, label it non-normative and keep the model's selected semantics distinct from unselected technology examples.
    For an intentionally selected agent workflow, explain the smallest invocation path without copying
    the full model contract or implying the future framework is already installed.

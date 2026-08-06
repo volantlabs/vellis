@@ -1,81 +1,156 @@
 # Use-case-first model-as-code development
 
-Vellis treats textual SysML v2 like source code: the model on a branch is the current system
-definition, and a pull request is the unit of change and review.
+This method treats textual SysML v2 as versioned system authority: changes are validated, reviewed for
+engineering meaning, and accepted through the project's normal change-control workflow. It is
+designed for reuse across software systems rather than around one product, domain, repository layout,
+or implementation style.
+
+## Portable method and local binding
+
+The portable modeling method begins with stakeholder value, closes one semantic slice, uses official
+SysML and KerML evidence, and hands implementation system obligations without prescribing code.
+Each project supplies local bindings for:
+
+- model entry points, dependency order, and required reading scope;
+- active specification, model-library, examples, and validator baseline;
+- reference search, snippet probing, and complete-model validation;
+- review, decision, documentation, and generated-artifact workflows;
+- optional domain skills that add specialized semantics.
+
+The method assumes no directory name, command runner, source-control system, application protocol,
+runtime, persistence technology, or programming language. Vellis binds these capabilities locally;
+another project can bind them differently without editing the core skills.
 
 ## Breadth before depth
 
-Begin with the owner, external actors, system boundary, and independently valuable outcomes. An
-encompassing journey may compose those outcomes but should not erase their different success,
-failure, state, or evidence semantics.
+Begin with stakeholders, external actors, system boundary, environment, and independently valuable
+outcomes. Actors may be people, organizations, software systems, devices, or physical processes. An
+encompassing journey may compose outcomes but should not erase their different nominal, alternate,
+failure, state, physical, temporal, or evidence semantics.
+
+Do not infer architecture from requested nouns, familiar names, reference architectures, framework
+examples, predecessor code, or incidental tests. Establish the current system meaning first.
 
 ## One semantic slice
 
-Start each change with one owner or engineering question. Refine only the affected black-box behavior,
-then add the domain meaning and minimal native representation needed to make it precise. Derive actions
-when they add ordering, reuse, state, failure, interaction, or verification meaning; group capabilities
-before considering structural parts.
+Start each change with one stakeholder or engineering question and the observable distinction at
+stake. Update only the affected black-box behavior, then add the minimum domain meaning and native
+representation needed to make the distinction decidable.
 
-Trace the changed claim through applicable requirements, explicitly named satisfiers, and decisive
-verification. Reuse current elements when they already carry the meaning; do not create one artifact
-per layer merely to make the path look complete.
+Elaborate conditionally:
 
-Treat the path as a reasoning order, not a completeness template. Elaborate query, state, history,
-architecture, interfaces, or realization only when the current question changes them. Stop when the
-slice is closed; exhaustive representation is not the same as engineering rigor.
+- identity, values, quantities, units, relationships, invariants, and governed state;
+- actions, calculations, constraints, modes, events, transitions, control, and data flow;
+- interactions, ports, interfaces, connections, flows, and messages;
+- timing, ordering, concurrency, resources, physical behavior, safety, security, and privacy;
+- requirements, satisfiers, analysis, and verification;
+- logical structure and selected realization boundaries.
 
-An undecided realization is not optional system behavior. Keep it open in the PR or issue rather than
-modeling interchangeable parts, variants, or configuration. Likewise, tool and framework operations
-are implementation affordances, not an automatic use-case or action inventory.
+Not every slice needs every dimension or a new artifact at every layer. Refine behavior when it adds
+ordering, transformation, reuse, state, failure, interaction, timing, or evidence meaning. Group
+capabilities before considering parts. Stop when the changed claim is governed and verifiable and
+further detail would only anticipate implementation or unrelated features.
 
-When an external operation inventory is intentionally selected as product meaning, model those
-callable behaviors directly and keep them distinct from internal functional decomposition. A staged
-interaction such as shallow discovery followed by focused inspection justifies separate actions only
-because the first bounded result supplies information needed to formulate the second.
+An undecided realization is not optional system behavior. Keep it open in the project's decision
+record rather than modeling interchangeable parts, variants, interfaces, or configuration. Tool,
+framework, protocol, and device affordances are feasibility constraints, not an automatic inventory
+of use cases, actions, or subsystems.
+
+## Systems structure is not code structure
+
+A logical part needs independent system meaning: lifecycle, identity, governed state, invariant,
+failure, safety, security, resource, physical, external-interaction, substitution, or selected
+realization responsibility. Code maintainability alone does not establish one.
+
+Implementation may still isolate semantic neighborhoods into classes, modules, functions, processes,
+tasks, or generated types. One modeled responsibility may use several software components, and one
+software mechanism may realize several model elements. Modeling work should expose those cohesion
+cues and the system boundaries they must preserve, not manufacture a one-to-one architecture.
 
 ## Proportionality and continuity
 
-Common enterprise architectures, framework examples, and popular repository patterns are possible
-solutions, not neutral starting points. Add a model element only when it expresses a current owner
-consequence, compatibility obligation, or implementation-blocking semantic ambiguity in the
-selected slice.
+Add an element only when it expresses a current system consequence, obligation, or
+implementation-blocking ambiguity. Preserve explicit stakeholder decisions and deliberate deferrals
+across review rounds. Reopen a decision only under explicit reassessment or when new evidence creates
+a concrete contradiction; record the prior decision, evidence, and changed consequence.
 
-Preserve explicit owner decisions and deliberate deferrals across review rounds. An explicit review
-may reassess claims in its scope; otherwise reopen a decision only when new evidence creates a
-concrete contradiction, and record what consequence changed. Do not mistake incidental tests,
-comments, or existing structure for owner decisions. Prefer natural identity, derived facts, one
-authoritative relationship rule, and bounded agent interactions before introducing surrogate IDs,
-stored flags, parallel schemas, universal envelopes, or operational machinery.
+Prefer existing domain identity, derived facts, one authority for each rule, and the least committal
+native construct before adding surrogate identifiers, stored flags, parallel schemas, generic
+envelopes, lifecycle machinery, or extension seams.
 
-If tests and model structure were introduced together, re-establish the model's adequacy independently.
-Start again from owner purpose and exercise accepted, refused or failed, and plausible-invalid
-instances before treating any existing element as justified. Tests may verify tooling, repository
-safety, or a future implementation against the current model; they are not evidence that the model's
-inventory, layout, vocabulary, or prose is adequate.
+If tests and model structure were introduced together, reassess model adequacy independently.
+Passing checks, matching names, and parser acceptance do not establish that the system meaning is
+necessary or correct.
 
 ## Semantic closure
 
-Walk changed inputs forward into outputs, state, revision, and history. Walk every returned value,
-state effect, responsibility, and requirement backward to the owner outcome and model element that
-authorizes it. Confirm shared occurrences have one owner and deliberate references elsewhere. Inspect
-nested owned payloads rather than only direct feature names, and define the concrete instance meaning
-of each returned row—including projection completeness, duplicates, absence, and null.
+Exercise consequential claims with the smallest applicable:
+
+1. nominal instance;
+2. alternate, degraded, refused, or failed instance and promised non-effects;
+3. boundary or plausible-invalid counterexample.
+
+Walk semantic chains in both directions:
+
+- stimulus or input through behavior to output or effect;
+- event and guard through transition to state and non-effect;
+- calculation input through units and precision to result;
+- flow or message through source, destination, carried content, ordering, and timing;
+- shared occurrence through ownership and reference;
+- requirement through subject, satisfier, and discriminating evidence.
+
+Check collection ordering, equality, uniqueness, completeness, and absence only where behavior
+depends on them. Check time, concurrency, resources, physical behavior, safety, security, durability,
+and recovery only where the current claim depends on them. Conditional depth is rigor; compulsory
+elaboration is not.
 
 ## Adequacy and subtraction
 
-Review adequacy before subtraction. Preserve independent outcomes, state authority, failure behavior,
-recovery meaning, and verification; then remove elements that express no necessary claim or exclude no
-invalid design. The goal is semantic compression: fewer elements with all consequential distinctions
-intact.
+Review adequacy before subtraction. Preserve independently valuable outcomes, state and invariant
+authority, interactions, failure behavior, required non-effects, and evidence. Then remove elements
+that express no necessary claim, exclude no invalid model instance, or merely transcribe an expected
+implementation.
+
+The goal is semantic compression: fewer elements with all consequential distinctions intact. Mere
+deletion is not simplification when it makes ownership contradictory, behavior ambiguous, or evidence
+unable to distinguish the nearest wrong system.
 
 ## Evidence and review
 
-Use the pinned official specifications for consequential language decisions and the official validator
-for language conformance. Review the full model diff, requirements closure, verification evidence, and
-unsupported commitments separately. Put unresolved work in an issue or PR discussion rather than a
-model status system or parallel design document.
+Use the active pinned official specifications for consequential language decisions and the selected
+official validator for language conformance. Separate normative clauses, standard-library and example
+evidence, project convention, stakeholder decision, and agent inference.
 
-For an approved formal plan, map each mandatory claim and non-goal to its authoritative model or
-guidance location and decisive evidence. After the last correction, repeat plan conformance, semantic
-closure, adequacy, subtraction, and repository-truth review as one full cycle; completion requires a
-cycle that finds no new material issue.
+Review the complete required model scope, current change set, semantic closure, requirements and
+evidence where applicable, unsupported commitments, and project truth separately. After the last
+material correction, repeat the full review cycle; completion requires one pass that finds no new
+material issue.
+
+## Handoff to implementation
+
+Accepted model work intended for code ends with a compact semantic handoff: active baseline and scope,
+qualified authority, each in-scope obligation, full or partial authority coverage, any remaining
+obligations, decisive cases, relevant system boundaries, conformance-evidence intent, compatibility
+effects, and exact realization decisions left open. Partial coverage is valid for a bounded slice but
+does not establish whole-requirement satisfaction or whole-verification completion.
+
+The handoff may identify semantic neighborhoods that offer implementation cohesion while naming the
+single identity, lifecycle, state, timing, safety, physical, failure, or external boundary they remain
+inside. It is task-local and reconstructible from current model authority; it does not restate the
+model as a parallel specification or predict software structure.
+
+Implementation verifies or reconstructs the handoff before taking architecture from existing source.
+Implementation defects are fixed in code. A missing consequential system distinction returns to the
+affected semantic slice. A feasibility constraint changes the model only when its demonstrated
+consequence changes stakeholder-visible behavior or an intentionally selected realization boundary.
+Unselected storage, acknowledgement, process, transport, framework, and deployment mechanics remain
+realization decisions unless their consequence crosses that gate. See the
+[model-to-implementation method](implementation-method.md) and use `$sysml-implementation` for the
+operational workflow.
+
+## Vellis binding
+
+Vellis uses branches and pull requests, the model under `model/`, checksum-pinned local reference
+tooling, the official validator, and `just` checks as its project binding. `$rtg-schema-design`
+supplies RTG-specific meaning as an optional domain extension. Those paths, commands, and domain
+semantics are deliberately absent from the portable core.

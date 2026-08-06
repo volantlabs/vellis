@@ -13,6 +13,14 @@ just model-setup
 just check
 ```
 
+## Skill portability
+
+`$sysml-reference`, `$sysml-modeling`, and `$sysml-implementation` are maintained as a portable
+SysML v2 MBSwE core. Keep Vellis paths, commands, RTG and MCP semantics, implementation language,
+and repository-specific review rules in local guidance or optional extensions. When changing the
+core, apply the cross-domain portability review in `AGENTS.md`; do not use Vellis as the only test
+case or claim that a standalone plugin already exists.
+
 ## Change workflow
 
 1. Create a branch and read `AGENTS.md`, `model/README.md`, the complete model, relevant skills, and
@@ -29,6 +37,33 @@ just check
 6. In the PR, report changed meaning, evidence, compatibility effects, unsupported architecture
    removed or deferred, any decision reopened by the review scope or new contradictory evidence, and
    bounded follow-up work.
+
+## Implementation workflow
+
+1. Read the current model and diff before taking architecture from existing source. Use a current
+   model-work semantic handoff when available and verify it against the branch; otherwise reconstruct
+   the affected authority directly.
+2. Separate required model meaning, already selected realization constraints, realization decisions
+   still open to implementation, genuine model gaps, and deliberate non-goals. Return to model work
+   before coding across a gap in stakeholder-visible behavior, state, responsibility, failure,
+   compatibility, or verification.
+3. Plan one end-to-end semantic slice. For every cited authority, record the in-scope obligation,
+   full or partial coverage, any remaining obligations, decisive conformance evidence, and required
+   non-effects. Keep implementation status—`not evaluated`, `absent`, `partial`, `conforming`, or
+   `conflicting`—separate from authority coverage. When software needs finer structure than the
+   systems model, record a many-to-many realization against semantic neighborhoods and preserve the
+   modeled lifecycle, state, transaction, failure, and external boundaries.
+4. Implement the simplest sufficient realization and derive conformance evidence from verification
+   intent rather than mirroring model declarations. Use tests, analysis, simulation, inspection,
+   demonstration, numerical references, timing measurements, or hardware evidence as appropriate.
+   Exercise accepted behavior, semantic rejection or failure, and the nearest invalid counterexample.
+5. Review plan conformance, model meaning in code, evidence adequacy, realization leakage,
+   subtraction, and repository truth separately. Repeat the complete review after material fixes until
+   one pass finds no new issue.
+6. In the PR, distinguish modeled, selected, implemented, verified, and runnable. Do not claim an
+   entire requirement satisfied or verification case passed from a partially covered slice. Return
+   reproducible implementation evidence to model work only for a model gap or demonstrated
+   feasibility consequence; keep unselected implementation mechanics in realization work.
 
 ## Testing authority
 

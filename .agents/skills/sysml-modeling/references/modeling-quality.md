@@ -2,174 +2,193 @@
 
 ## Contents
 
-- [Meaning and state](#meaning-and-state)
-- [Behavior and responsibility](#behavior-and-responsibility)
+- [Meaning, identity, and state](#meaning-identity-and-state)
+- [Behavior, interaction, and time](#behavior-interaction-and-time)
+- [Structure and responsibility](#structure-and-responsibility)
 - [Definitions and expressions](#definitions-and-expressions)
-- [Requirements and verification](#requirements-and-verification)
+- [Requirements and evidence](#requirements-and-evidence)
+- [Implementation-facing quality](#implementation-facing-quality)
 - [Reasoning demonstrations](#reasoning-demonstrations)
 
-## Meaning and state
+## Meaning, identity, and state
 
-- Use an owned feature when the subject governs the value's lifecycle and invariants.
-- Use a derived feature when the value is determined from other modeled facts.
+- Use an owned feature when the subject governs an occurrence or value as part of itself.
+- Use a derived feature when other modeled facts determine the value.
 - Use a reference feature for an independently existing occurrence that the subject does not own.
-- Audit repeated appearances of the same conceptual occurrence. If an authoritative record, snapshot, actor, or domain object is used in another context, reference it unless a genuinely distinct copy with separately defined identity is intended.
-- Reify a relationship only when the relationship itself needs identity, metadata, direction, lifecycle, or behavior.
-- Prefer a natural key already present in domain meaning before introducing a surrogate identifier.
-  Do not give rules, definitions, snapshots, archives, or requests UUIDs merely so they resemble
-  persisted entities.
-- Derive a value from its authoritative state when storing it independently would permit
-  contradiction. Do not duplicate lifecycle flags, statuses, counts, or projections that another
-  modeled relationship already determines.
-- Model a proposed replacement as proposed state for an identity unless the proposal itself needs
-  independent identity and lifecycle. Avoid creating current and staged domain occurrences that claim
-  the same identity.
-- Distinguish absent, empty, unknown, not applicable, and not yet decided. Encode each only when it is
-  system meaning; do not use optionality or a status value to store modeling uncertainty.
-- Keep storage identifiers, rows, documents, events, and serialized associations out of canonical domain meaning unless they are intentional product contracts.
-- Ensure each owned state has governing behavior, failure rules, and verification evidence.
-- Test ownership with concrete instances: ask whether the same occurrence must appear in two containers, whether it may outlive either, and which subject governs its invariants. Use a reference when the answers reveal independent existence.
-- Expand owned payloads recursively during review. A transition record that does not directly own a
-  resulting state can still imply snapshot-per-change semantics when its owned change object contains
-  a complete state one level below.
+- Audit repeated appearances of the same conceptual occurrence. Reference one independently existing
+  occurrence unless a distinct copy, sample, estimate, plan, or observation has its own intended
+  identity and semantics.
+- Reify a relationship only when the relationship itself needs identity, attributes, direction,
+  lifecycle, behavior, or independent reference.
+- Prefer identity already meaningful in the domain before introducing surrogate identifiers. Do not
+  make every modeled thing addressable merely because source code or persistence often does.
+- Derive a value from its authority when storing it separately would permit contradiction. Avoid
+  duplicate flags, statuses, counts, totals, and classifications that another relationship or
+  calculation already determines.
+- Distinguish a thing from a description, measurement, command, plan, observation, or copy of that
+  thing. Similar payloads do not establish shared identity.
+- Distinguish absent, empty, unknown, not applicable, invalid, and not yet decided. Encode each only
+  when it is system meaning; do not store modeling uncertainty as optionality or status.
+- Define collection semantics when behavior depends on them: multiplicity, ordering, uniqueness,
+  equality, duplicate treatment, completeness, and the meaning of an absent member.
+- Keep storage keys, memory addresses, rows, documents, event records, serialized associations, and
+  wire encodings out of domain meaning unless the system intentionally exposes them.
+- Ensure each governed state has behavior that creates, observes, changes, or retires it, together
+  with failure rules and discriminating evidence.
+- Test ownership with instances: may the same occurrence appear in two contexts, may it outlive
+  either, and which subject governs its invariants? Use reference semantics when the answers reveal
+  independent existence.
+- Review nested composites recursively. A container may imply ownership or complete-state copying
+  through a nested payload even when its top-level declaration appears referential.
+- Treat quantity kind, unit, dimension, tolerance, precision, uncertainty, and conservation as
+  separate commitments. Add only those needed to decide system behavior.
 
-## Behavior and responsibility
+## Behavior, interaction, and time
 
-- Give every use case a distinct actor-valued objective, success, refusal or failure, state effect, and evidence.
-- Derive actions from use cases, requirements, or invariants only when functional refinement adds engineering meaning; avoid both orphan actions and mechanical one-action-per-use-case mappings.
-- Connect action inputs, outputs, and control when those connections are the reason for decomposition. Optional multiplicity does not encode a guard or acceptance decision.
-- Remove an action tree whose steps exchange no information or control and exclude no invalid
-  behavior. Stage names are not functional refinement; keep the behavior black-box until a meaningful
-  handoff is known.
-- Group actions as capabilities before introducing structural decomposition.
-- Use performed actions when a part carries out referenced behavior during its lifetime.
-- Use allocations only to map distinct source and realization elements. Do not allocate a performed action back to its existing performer.
-- Add a part only for independently meaningful lifecycle, state ownership, failure or invariant responsibility, external interaction, substitution, or realization. A desirable code module alone is not a system part.
-- Add ports and interfaces only for intentional connected interactions and transfers.
-- Use state behavior only for activated or event-driven behavior, not merely because data has possible values.
-- Give intended system use-case definitions contextual usages; do not let the instantiated landscape collapse back to one encompassing journey.
-- State explicit multiplicity for included use cases when their occurrence count affects success or state change.
-- Do not let comments imply control, transformation, or authorization that the selected action, binding, succession, guard, or usage does not express.
-- Treat a trusted or owner-configured actor as a boundary assumption, not an authorization decision.
-  If the system does not evaluate authorization or approval, scope the input to an already permitted
-  request and do not promise a refusal the modeled behavior cannot produce.
-- Qualify nonmutation by authority. A read may leave canonical state and revision unchanged while
-  appending observational activity; calling that operation entirely state-free contradicts the
-  activity owner.
-- Do not turn a human judgment into an automatic system guard without modeled evidence the system can
-  evaluate. Put owner review in owner-facing behavior and verification; keep machine-checkable
-  preconditions limited to information available to the system.
-- Do not mirror a tool, protocol, or framework operation into a use case and action by default.
-  External affordances constrain realizability; owner outcomes and system semantics determine the
-  model decomposition.
-- When a public operation inventory is deliberately selected, test every operation for a distinct
-  caller intent, input/output meaning, and state effect. Model it without deriving equal-count use
-  cases, internal parts, requests, reports, or verification wrappers. Treat staged discovery as real
-  refinement only when one bounded result supplies information needed to formulate the next request.
-- Trace a selected public operation to its black-box behavior at the least committal native level.
-  Use `$sysml-reference` to distinguish abstract trace or change impact from actual included or
-  performed behavior; do not choose behavioral composition solely as a trace marker.
-- Keep a general actor protocol-neutral when only one contextual role uses a selected protocol.
-  Specialize or type the contextual role rather than asserting that every future actor of that kind
-  is a client of the current boundary.
+- Give each contextual use case a stakeholder-valued objective, nominal outcome, applicable alternate
+  or failure outcomes, effects and non-effects, and evidence.
+- Refine behavior only when actions, states, calculations, constraints, flows, or interactions add
+  ordering, transformation, mode, event, timing, concurrency, state, failure, or evidence meaning.
+- Connect inputs, outputs, matter, energy, data, and control when those connections justify
+  decomposition. Labels and succession alone do not explain a transformation.
+- Multiplicity states permitted occurrence count; it does not encode a guard, trigger, scheduling
+  rule, or acceptance decision.
+- Remove a behavior tree whose stages exchange no meaningful information or control and exclude no
+  invalid behavior. Keep the behavior black-box until a meaningful refinement is known.
+- Use state behavior for modes or conditions that affect behavior over time. A value having several
+  allowed literals does not by itself require a state machine.
+- State the events, guards, transitions, entry or exit effects, and invalid transitions needed by the
+  claim. Do not invent a complete lifecycle where only one state-dependent distinction matters.
+- Model concurrency, deadlines, rates, latency, jitter, ordering, loss, retry, or synchronization
+  only when they change an outcome, safety property, resource obligation, or selected boundary.
+- Add ports, interfaces, connections, flows, or messages only for intentional interaction meaning.
+  Define direction, carried item or value, cardinality, and temporal or reliability semantics only
+  to the precision required by the current behavior.
+- Keep an actor protocol-neutral unless protocol participation is inherent to its modeled role.
+- Treat a platform, framework, device, or protocol affordance as feasibility evidence. It becomes
+  system authority only when its consequence is observable or intentionally selected.
+- Do not convert human judgment, environmental uncertainty, or external responsibility into an
+  automatic system guard unless the system has the information and authority to evaluate it.
+- Qualify non-effects by subject. Behavior can preserve governed product state while changing
+  diagnostics, telemetry, cache state, physical energy, or another authority when the model permits
+  it.
+
+## Structure and responsibility
+
+- Group behavior as capabilities before introducing parts.
+- Add a logical part only for independently meaningful lifecycle, identity, governed state,
+  invariant, failure, safety, security, resource, external-interaction, substitution, physical, or
+  selected realization responsibility.
+- Use performed behavior when a part carries out referenced behavior during its lifetime.
+- Use allocations only to relate genuinely distinct source and target responsibility structures.
+  Do not allocate behavior back to the element already performing it.
+- A code module, class, function family, process, service, table, pipeline stage, or test fixture is
+  not evidence of a system part by itself.
+- A system part does not prescribe one code component. One modeled responsibility may be realized by
+  several software components, and one software mechanism may support several modeled elements.
+- Do not add ports or interfaces merely to represent private code calls. A private dependency can
+  remain an implementation choice unless the interaction boundary is system meaning.
+- Keep packages as intentional namespaces or viewpoints, not automatic architecture layers.
+- Avoid part hierarchies that merely reproduce documents, teams, process phases, screens, or source
+  directories.
 
 ## Definitions and expressions
 
 - Add definitions and supertypes only for current reuse, substitution, or shared semantics.
 - Prefer native SysML semantics to annotations or prose-shaped pseudo-language.
-- Define a calculation only when it returns an evaluable result.
-- Define a constraint usage only when it has a complete predicate.
-- Keep packages as intentional namespaces rather than artificial architecture layers.
-- When replacing subtypes with a kind, scope, or status attribute, state which payload combinations
-  are valid. For a public result, define success-payload presence for every status and distinguish a
-  malformed request, a typed semantic rejection, a safely reported failure, and an unexpected
-  failure that produces no completed result. Simplifying representation must not make previously
-  distinct states indistinguishable.
-- A public request type must expose only choices the caller may invoke. Do not reuse a broader
-  internal scope enumeration when most values are invalid at that operation, and do not create an
-  empty domain request solely because a protocol represents parameterless calls with an empty object.
-- Do not add a generic superclass, predicate, envelope, status, identifier, extension point, or lifecycle merely because several names look similar. Require shared semantics and a current consumer.
-- Do not model a deferred realization choice as configurable strategies, interchangeable parts,
-  variants, or optional connections. Open design space is not runtime variability.
-- Keep one source for each relationship rule. Do not split permission, endpoint eligibility,
-  multiplicity, and validation into overlapping authorities that can disagree unless the distinctions
-  are independently owner-visible.
-- Choose the smallest one-current-proposal representation from actual scale and agent workflow. A
-  small complete proposal can simplify inspection and replacement; a keyed overlay can avoid
-  material copying. Add intent ordering only when edit history itself is required product behavior.
-- Treat effective no-ops as no state change before adding idempotency keys, request lineage, or
-  expected-version protocols.
+- Define a calculation only when it returns an evaluable result with sufficiently clear inputs and,
+  when relevant, units and numerical expectations.
+- Define a constraint usage only when it has a complete predicate or deliberately bound expression.
+- When replacing subtype structure with a kind, mode, or status value, define the valid feature
+  combinations and behavior for each value. Representation simplification must not erase distinct
+  system states.
+- Do not add a generic superclass, envelope, predicate, identifier, extension point, lifecycle,
+  strategy, or variant merely because several names or implementation shapes look similar.
+- Do not model a deferred realization decision as runtime variability. Open design space is not a
+  configurable system responsibility.
+- Keep one authority for each rule. Split a rule only when the distinctions have independent
+  stakeholder meaning, responsibility, or evidence.
+- Treat an apparent no-op according to system semantics before adding deduplication keys, lineage,
+  compensating behavior, or version machinery.
 
-## Requirements and verification
+## Requirements and evidence
 
 - Give each requirement a clear obligation and compatible subject.
 - Reuse or refine an existing requirement when it already governs the changed claim. Do not create a
-  requirement and verification pair merely to mirror each use case, action, tool, or type.
-- Keep satisfaction assertions distinct from the requirement and from evidence.
-- Identify a logical satisfier for every consequential requirement.
-- Give each verification case a subject compatible with the requirement and evidence that discriminates success, refusal, failure, and required non-effects.
-- Check that owner outcomes, contextual use-case usages, any functional refinement, system responsibility, requirements, explicit satisfiers, and verification are navigable without demanding identical element counts.
-- Trace request semantics through response semantics. A shaped result must identify the request and the exact selector or projection responsible for each returned binding.
-- For row-shaped results, define one row's joint assignment, exactly which projections bind in it,
-  whether equal projected tuples duplicate, and how a requested absent value differs from null. A
-  collection of optional binding families is not sufficient by itself.
-- Treat every type exposed through a selected public contract as an implementation obligation. An
-  empty placeholder type with only a promising name is under-modeling: give it the smallest closed
-  meaning current behavior needs or defer it from the contract.
-- Keep model-authoring tests limited to language tooling and repository safety. Do not use automated
-  checks to select or freeze generic constructs, vocabulary, paths, dependencies, capabilities,
-  element names, exact inventories, counts, topology, layer symmetry, package layout, or prose.
-- Do not use regular expressions as evidence of SysML semantic correctness. Parser acceptance proves
-  language conformance only; passing tests do not establish model adequacy.
-- A temporary transition guard must name the concrete condition that retires it. It must not become a
-  permanent ban on a generic construct, root, command, platform, dependency, or future capability.
-- Future implementation contract checks may compare implemented behavior with the current model. In
-  that direction the implementation is constrained; a duplicate test inventory must never freeze the
-  living model.
-- Change a test alongside an intentional model decision. Do not preserve an obsolete assertion by
-  hiding the new design under different names or by restoring decorative elements.
-- Distinguish state-bearing artifacts from agent-facing responses. A snapshot, ledger, archive, or
-  full graph may be required for recovery without being suitable for inline return into an agent's
-  context. Prefer bounded questions or artifact references before inventing pagination and streaming.
-- A count bound does not bound an owned payload recursively. If one selected ledger record can own a
-  complete graph or snapshot, return a bounded owner-facing projection unless the caller actually
-  needs the replay artifact.
-- Capture observability asymmetrically. Reads, rejected changes, and accepted canonical changes need
-  not duplicate the same request and result payloads. Record only what the current reflection or audit
-  use case needs.
+  requirement and verification pair merely to mirror every use case, action, interface, or type.
+- Keep a requirement, its satisfaction assertion, and evidence distinct.
+- Identify a logical satisfier when the model selects one; satisfaction is a claim, not proof.
+- Give each verification or analysis case a compatible subject and evidence that discriminates the
+  intended result from its nearest plausible wrong result.
+- Navigate from stakeholder outcomes through contextual behavior, logical responsibility,
+  requirements, satisfiers, and evidence without demanding identical element counts.
+- For numerical behavior, make evidence sensitive to units, ranges, boundary values, precision, and
+  tolerances that the model actually promises.
+- For temporal or concurrent behavior, make evidence sensitive to ordering, deadlines, interleavings,
+  rates, and non-effects that the model actually promises.
+- For safety, security, privacy, or resource claims, identify the unsafe, unauthorized, disclosed, or
+  exhausted counterexample the evidence must exclude.
+- Keep model-authoring checks focused on language conformance, generated-artifact freshness, and
+  project safety. Do not let tests freeze generic model vocabulary, package layout, exact element
+  counts, or a living architecture.
+- Parser acceptance proves syntax and baseline conformance, not model adequacy or product correctness.
+- Implementation tests may verify software against current model authority. They must not become a
+  duplicate inventory that prevents intentional model evolution.
 
 Before retaining any new element, answer:
 
 1. What current claim does it express that was otherwise missing?
-2. Which accepted, rejected, or failed example depends on it?
+2. Which nominal, alternate, failed, or invalid example depends on it?
 3. What invalid model instance does it exclude?
-4. Why is this the least committal native construct for that claim?
-5. Is this detail semantic authority, decisive evidence, or merely implementation-shaped precision?
+4. Why is it the least committal native construct for that claim?
+5. Is it system authority, decisive evidence, or merely implementation-shaped precision?
 
-Use `$sysml-reference` to ground ownership, reference, derivation, performed behavior, allocation, satisfaction, and verification decisions in the pinned specifications.
+Use the reference skill to ground ownership, occurrence, multiplicity, behavior, allocation,
+satisfaction, and verification decisions in the active official baseline.
+
+## Implementation-facing quality
+
+- Produce handoffs from qualified model authority and decisive cases, not a copied declaration
+  inventory.
+- State implementation cohesion cues without relabeling them as modeled subsystems. Examples include
+  a family of pure calculations, one group of invariants, a state-transition boundary, a timing
+  concern, or an interaction adapter.
+- State which system boundary finer code must preserve: identity, lifecycle, state ownership,
+  atomicity, timing, safety, failure responsibility, physical interaction, or selected external
+  behavior.
+- Allow a task-local many-to-many realization map. It explains software design but does not become a
+  second system model.
+- Translate implementation feedback upward. Replace “this class needs another field” with the
+  system-level distinction, smallest failing instance, and differing observable consequences before
+  editing the model.
+- A new helper, module, class, process, or deployment unit requires model change only when it creates
+  or selects new system meaning.
 
 ## Reasoning demonstrations
 
-These are demonstrations of questions to ask, not templates or prescribed architecture.
+These are questions to ask, not templates or prescribed architecture.
 
-- **Composite copy versus reference:** if a ledger owns an authoritative transition and a replay tail
-  selects that same occurrence, the tail references it. Composition would assert a second owned copy
-  or contradictory ownership. A self-contained snapshot, by contrast, owns its captured state because
-  that state is intentionally a distinct copy.
-- **Filtering participation versus authorized projection:** an associated-data object may determine
-  whether an anchor matches without appearing in the result. Return only bindings explicitly selected
-  by the return shape; participation in evaluation is not disclosure authority.
-- **Optional multiplicity versus conditional behavior:** `[0..1]` permits zero or one occurrence but
-  does not say when it occurs. If commit happens only after acceptance, use native conditional control
-  or keep the behavior black-box with a requirement and decisive verification until that control is
-  known.
-- **Model authority versus implementation conformance:** changing an intentionally selected public
-  operation changes the model and its semantic closure. A future implementation test may then require
-  the implementation to conform to that current operation set; no test-owned copy decides what the
-  model must continue to contain.
-- **Open choice versus configurable design:** if storage technology is undecided, omit storage
-  structure. A set of storage strategy parts would falsely claim that runtime interchangeability is
-  a selected system responsibility.
-- **Tool affordance versus owner behavior:** if a protocol exposes separate read and resource forms,
-  first decide which owner outcomes need bounded inline results or referenced artifacts. Do not create
-  parallel use cases and response families merely because the framework has two primitives.
+- **Composite versus reference:** if two controllers use the same independently maintained
+  calibration profile, they reference one occurrence. If each controller owns a private calibrated
+  copy with a separate lifecycle, composition may be correct.
+- **Optional multiplicity versus conditional behavior:** zero-or-one permits absence; it does not say
+  when behavior occurs. Use a guard, event, state transition, or black-box requirement when the
+  condition matters.
+- **Logical part versus software component:** one transformation system may be implemented with
+  parser, analyzer, optimizer, and emitter modules. Those modules do not become four subsystems unless
+  the system assigns them independent lifecycle, state, failure, interaction, or realization
+  responsibility.
+- **State versus value:** an operating mode that changes permitted behavior and transitions on events
+  may need state semantics. A display color selected from an enumeration usually remains a value.
+- **Flow versus storage:** modeled transfer of samples from a sensor to an estimator does not select
+  a queue, database, message broker, or buffer. Add those only when their behavior or boundary is
+  selected.
+- **Requirement versus constraint:** “the controller shall reach a safe condition within the selected
+  interval” is an obligation with a subject and evidence. The mathematical predicate defining the
+  safe region is a constraint; neither substitutes for the other.
+- **Open choice versus configurable design:** if persistence, deployment, or algorithm choice is
+  undecided, leave it open. Modeling interchangeable strategies would falsely claim runtime
+  variability.
+- **Implementation feedback versus model transcription:** a retry implementation that duplicates an
+  effect may expose missing idempotence, ordering, or failure non-effect meaning. Model that
+  consequence if required; do not model a retry class.

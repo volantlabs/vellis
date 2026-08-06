@@ -51,7 +51,7 @@ model-reference-render:
 model-reference-check:
     @uv run python tools/sysml_reference.py check
 
-# Search specifications, model libraries, and example models.
+# Search specifications, model libraries, and examples; optional specification and limit are positional.
 model-reference-find query specification="" limit="8":
     @specification={{quote(specification)}}; if test -n "$specification"; then uv run python tools/sysml_reference.py find {{quote(query)}} --specification "$specification" --limit {{quote(limit)}}; else uv run python tools/sysml_reference.py find {{quote(query)}} --limit {{quote(limit)}}; fi
 

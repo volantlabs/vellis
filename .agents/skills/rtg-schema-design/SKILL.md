@@ -1,9 +1,12 @@
 ---
 name: rtg-schema-design
-description: Design, review, and evolve language-neutral Reified Type Graph (RTG) meaning and governance from owner needs and intended queries. Use for cold-agent definition discovery; anchor, associated-data, link, and direct-association classification; current or prospective graph queries; definitions and relationship rules; prospective changes; validation, revisions, canonical and activity ledgers, snapshots, replay, restore, predecessor recovery, MCP exposure, and compatibility.
+description: Design, review, evolve, and prepare implementation-ready handoffs for language-neutral Reified Type Graph (RTG) meaning and governance from owner needs and intended queries. Use for cold-agent definition discovery; anchor, associated-data, link, and direct-association classification; current or prospective graph queries; definitions and relationship rules; prospective changes; validation, revisions, canonical and activity ledgers, snapshots, replay, restore, predecessor recovery, MCP exposure, compatibility, and RTG implementation feedback.
 ---
 
 # RTG Schema Design
+
+This is an optional domain extension to the portable SysML modeling and implementation method. Other
+projects do not need it, and portable core skills must not depend on it.
 
 Use this skill for RTG domain, query, governance, snapshot, and history meaning, not live graph
 operation, executable syntax, storage layout, migration infrastructure, or constraint-engine design.
@@ -68,12 +71,51 @@ SysML or KerML choices.
    at the system boundary and do not turn it into domain types or internal structure.
 9. Exercise the smallest accepted case, rejected case with non-effects, and counterexample that
    exposes mistaken identity, relationship authority, projection, delta, or history meaning.
-10. Perform adequacy and subtraction reviews. Stop once the affected dimensions are closed.
+10. When the result will guide implementation, surface the applicable RTG semantic commitments below
+    through `$sysml-modeling`'s implementation-handoff pattern. When code returns feedback, reproduce
+    its failing graph instance or transition before deciding whether the model or implementation is
+    wrong.
+11. Perform adequacy and subtraction reviews. Stop once the affected dimensions are closed.
 
 Apply the distinctions and review criteria in [RTG domain and governance review](references/schema-design.md).
+
+## Implementation leverage
+
+Expose only the dimensions the selected implementation slice needs:
+
+- canonical object kinds, identity, natural keys, ownership, direct associations, and link direction;
+- exact semantic equality, ordered and unordered collections, missing versus null, and no-op meaning;
+- definition closure, property and relationship rules, and the smallest valid and invalid graph;
+- query selector, participation, projection, row, duplicate, absence, revision, and bound semantics;
+- canonical state tuple, prospective-state cardinality, valid transition combinations, atomicity,
+  revision, replay, and every rejection or failure non-effect;
+- canonical versus observational history, recovery and compatibility meaning, and selected public
+  operation boundaries;
+- storage, indexing, serialization, algorithms, runtime, and deployment choices that remain open.
+
+Use concrete instances and qualified model authority rather than proposing tables, classes, graph
+engines, repositories, event stores, validators, or API envelopes. If implementation evidence reveals
+that two modeled states cannot be distinguished, one invariant cannot be enforced, or one promised
+transition cannot be made atomic under a selected boundary, return that exact counterexample and
+changed consequence to model review. Do not promote the implementation's current data structures into
+RTG meaning.
+
+For software realization, expose graph/value/equality, active-definition and prospective-definition
+meaning, conformance assessment, query evaluation and projection, canonical transition and replay,
+observational history, and external exposure as possible cohesion neighborhoods. They are neither an
+exhaustive class inventory nor modeled subsystems. An implementation may isolate them into classes or
+modules for clarity and testing while preserving the RTG System as the one semantic and transactional
+owner of graph, definitions, delta, revision, and canonical history. Finer code must not create
+competing stores, revisions, transaction boundaries, or authorities.
 
 ## Output
 
 Report the preferred answer, affected canonical meaning and consequences, compatibility impact, and
-discriminating evidence. Mention an unchanged dimension only when doing so prevents a likely false
-inference; do not fill an output schema for completeness.
+discriminating conformance evidence. For an implementation handoff, use `$sysml-modeling`'s shared
+producer contract: qualified authority, the in-scope obligation, full or partial authority coverage,
+remaining obligations, decisive instances, evidence intent, applicable invariants and transition
+non-effects, and deliberately open realization. For implementation feedback, classify the issue as
+language question, model gap, realization decision, feasibility consequence, implementation defect,
+or stale baseline. Treat an out-of-scope request as a scope disposition rather than a divergence
+class. Mention an unchanged dimension only when doing so prevents a likely false inference; do not
+fill an output schema for completeness.

@@ -1,128 +1,152 @@
 ---
 name: sysml-reference
-description: Ground textual SysML v2 and KerML authoring, software-system construct selection, official citations, semantic comparison, and validator diagnosis in the repository's checksum-pinned specification corpus. Use whenever model work depends on precise packages, features, parts, items, actions, performed actions, bindings, flows, ports, interfaces, states, constraints, requirements, satisfaction, verification cases, use cases, allocations, imports, multiplicities, specialization, ownership, derivation, reference, or other SysML/KerML meaning.
+description: Ground textual SysML v2 and KerML authoring, software-system construct selection, implementation-facing model interpretation, official citations, semantic comparison, and validator diagnosis in an active checksum-pinned specification baseline. Use whenever model or implementation work depends on precise packages, features, parts, items, actions, performed actions, bindings, flows, ports, interfaces, states, constraints, requirements, satisfaction, verification cases, use cases, allocations, imports, multiplicities, specialization, ownership, derivation, reference, or other SysML or KerML meaning.
 ---
 
 # SysML and KerML Reference
 
-Use the pinned official specifications as the language authority. The corpus is generated from checksum-pinned sources into the ignored cache and must never be edited by hand.
+Use the project's active, pinned official specifications as language authority. Generated search
+corpora, indexes, and extracted pages are derivative evidence and must never be edited as though they
+were authority.
+
+## Project binding
+
+This skill defines a portable evidence method. Discover the project's local instructions and bind
+the following capabilities before use:
+
+| Capability | Purpose |
+| --- | --- |
+| Baseline identity | identifies the exact specification publication, version, release, commit, and checksums |
+| Normative reference search | locates clauses and necessary cross-references by engineering question |
+| Construct inventory | maps ordinary engineering intent to SysML and KerML terminology |
+| Standard-library search | establishes which declarations exist and what they specialize |
+| Example search | finds informative textual forms from the same release |
+| Snippet probe | settles isolated syntax against the selected official validator |
+| Complete model validation | checks the project's required authored model scope |
+
+The capabilities may be supplied by a repository, an installed plugin, or another reproducible local
+toolchain. Do not assume paths, command names, a command runner, document format, or source-control
+workflow. If a required capability is unavailable, report the evidence limitation instead of
+substituting recalled syntax, an unpinned summary, or a different language baseline.
 
 ## What answers which question
 
-`just model-setup` provides four sources, and they answer different questions. Reaching for the wrong one is the most common way to waste a lookup.
+The sources answer different questions. Reaching for the wrong one is the most common cause of a
+confident but unsupported decision.
 
-| Source | Answers | How |
-| --- | --- | --- |
-| Specification | what a construct **means** | `just model-reference-find` |
-| Model library | what **exists**, and what it specializes | same finder; hits are labelled `[library]` |
-| Example models | what it **looks like** in working SysML | same finder; hits are labelled `[example]` |
-| Pinned validator | what the parser **accepts** | `just model-probe`, `just model-check` |
+| Source | Answers |
+| --- | --- |
+| Normative specification | what a construct means |
+| Standard model library | what exists and what it specializes |
+| Example and training models | what accepted textual usage looks like |
+| Official validator | what the selected parser accepts |
 
-Library and example hits are pinned-release evidence, not normative text. Cite them as such, and never present a worked example as though it were a clause.
+Library and example hits are release-matched evidence, not normative text. Cite them as such, and
+never present a worked example as though it were a clause. Parser acceptance establishes neither
+semantic correctness nor model adequacy.
 
 ## Prior knowledge is not evidence
 
-SysML v1 and UML dominate training data, and SysML v2 displaced much of that notation. A construct you are confident about but cannot cite is an inference, and must be reported as one.
+SysML v1 and UML dominate historical examples and much training data, while SysML v2 displaced much
+of that notation. A construct recalled with confidence but not supported by the active baseline is an
+inference and must be reported as one.
 
-When a construct feels familiar, check that it exists before designing around it. `block`, `ValueType`, value properties, associations, flow ports, and stereotypes are all v1 notation with different v2 replacements. The parser rejects them and the diagnostic names the replacement, so an uncertain construct is cheaper to probe than to reason about.
+When a construct feels familiar, check that it exists before designing around it. Examples such as
+block, ValueType, value properties, associations, flow ports, and stereotypes are v1 or UML notation
+with different v2 replacements. An uncertain construct is cheaper to probe than to reason about from
+memory.
 
-Names are the other trap, and the maps below exist for it: SysML v2 names concepts differently from ordinary systems-engineering usage. If a search returns nothing convincing, the query is almost always using the wrong word rather than asking about something absent.
+Names are another trap: SysML v2 often names concepts differently from ordinary systems-engineering
+usage. If a search returns nothing convincing, first map the intent to a construct and search again.
 
 ## Naming the construct
 
-### From what you are trying to do, to what SysML v2 calls it
+### From engineering intent to SysML v2
 
-Search reaches the right clause reliably once the construct is named, so naming is
-the step that decides whether a lookup succeeds. Searching in your own words often
-cannot work: "mode", "rule" and "piece" appear on zero of 695 specification pages.
-Map the intent first, then search by the construct name.
+The headings below are conceptual routing, not fixed clause numbers. Confirm the exact section in the
+active baseline before citing it.
 
-| If you are trying to express | The construct is | Clause |
-| --- | --- | --- |
-| a thing the system is made of, that is part of it | Parts | 7.11 |
-| a thing that flows through, is acted on, or is exchanged | Items | 7.10 |
-| a value, quantity, or characteristic with no identity | Attributes | 7.7 |
-| a fixed set of allowed values | Enumerations | 7.8 |
-| a point of interaction on something | Ports | 7.12 |
-| a link between things | Connections | 7.13 |
-| an agreed interaction surface between parts | Interfaces | 7.14 |
-| something moving from one place to another | Flows and Messages | 7.16 |
-| something the system does | Actions | 7.17 |
-| behaviour that depends on a mode or condition, and changes between them | States | 7.18 |
-| a computation that returns a result | Calculations | 7.19 |
-| a rule that must always hold | Constraints | 7.20 |
-| something required of the system, and who satisfies it | Requirements | 7.21 |
-| a study, trade-off, or quantitative evaluation | Analysis Cases | 7.23 |
-| evidence that a requirement is met | Verification Cases | 7.24 |
-| what a user wants to accomplish with the system | Use Cases | 7.25 |
-| a filtered presentation for a stakeholder concern | Views and Viewpoints | 7.26 |
-| annotation, rationale, tags, or language extension | Metadata | 7.27 |
-| responsibility handed from one element to another | Allocations | 7.15 |
-| that one element depends on another | Dependencies | 7.3 |
-| documentation attached to an element | Annotations | 7.4 |
-| grouping and namespacing of a model | Namespaces and Packages | 7.5 |
-| a reusable definition and its contextual uses | Definition and Usage | 7.6 |
-| a family of variants, or a product line | Variability (Definition and Usage) | 7.6 |
-| something occurring over time, or an individual instance | Occurrences | 7.9 |
+| If you are trying to express | Search for |
+| --- | --- |
+| an occurrence representing all or part of a system, including a component or interacting actor, especially when it performs actions | Parts |
+| an identifiable object that is part of, exists in, or flows through a system, including one transferred, stored, or acted on | Items |
+| a value, quantity, or characteristic with no identity | Attributes |
+| a fixed set of allowed values | Enumerations |
+| a point of interaction on something | Ports |
+| a link between things | Connections |
+| an agreed interaction surface between parts | Interfaces |
+| something moving from one place to another | Flows and Messages |
+| something the system does | Actions |
+| behavior that depends on mode or condition and changes between them | States |
+| a computation that returns a result | Calculations |
+| a predicate that must hold | Constraints |
+| an obligation on a subject and who satisfies it | Requirements |
+| a study, trade-off, or quantitative evaluation | Analysis Cases |
+| evidence that a requirement is met | Verification Cases |
+| what an actor wants to accomplish with the system | Use Cases |
+| a filtered presentation for a stakeholder concern | Views and Viewpoints |
+| annotation, rationale, tags, or language extension | Metadata |
+| responsibility mapped from one element to another | Allocations |
+| one element depending on another | Dependencies |
+| documentation attached to an element | Annotations |
+| grouping and namespacing of a model | Namespaces and Packages |
+| a reusable definition and its contextual uses | Definition and Usage |
+| a family of variants or a product line | Variability |
+| something occurring over time or an individual instance | Occurrences |
 
-Language mechanics, when the question is about the type system rather than the
-system being modelled: Generalization, Subsetting, Redefinition, Multiplicities,
-Features, Feature Values, Types, Classifiers, Expressions.
+For type-system mechanics rather than the system being modeled, search for Generalization,
+Subsetting, Redefinition, Multiplicities, Features, Feature Values, Types, Classifiers, and
+Expressions.
 
-The left column is ordinary engineering intent, not SysML vocabulary; that is the
-point. If a question does not fit a row, take the closest one and search by its
-construct name rather than by the question's own words.
+The left column is ordinary engineering intent. If a question does not fit a row, take the closest
+construct and use the construct inventory before broad full-text searching.
 
 ### Which specification answers it
 
 SysML describes the systems layer; KerML describes the type system underneath.
-Searching the wrong one wastes the query, and the split is stable.
 
-- **SysML** — Parts, Items, Ports, Connections, Interfaces, Actions, States,
-  Flows, Calculations, Constraints, Requirements, Use Cases, Analysis and
-  Verification Cases, Views, Metadata, Allocations, Occurrences, Attributes,
-  Enumerations, Definition and Usage, Namespaces and Packages.
-- **KerML** — Types, Classifiers, Features, Feature Values, Multiplicities,
-  Specialization, Structures, Behaviors, Functions, Expressions, Associations,
-  Connectors, Namespaces, Packages.
+- **SysML** — Parts, Items, Ports, Connections, Interfaces, Actions, States, Flows, Calculations,
+  Constraints, Requirements, Use Cases, Analysis and Verification Cases, Views, Metadata,
+  Allocations, Occurrences, Attributes, Enumerations, Definition and Usage, Namespaces, and Packages.
+- **KerML** — Types, Classifiers, Features, Feature Values, Multiplicities, Specialization,
+  Structures, Behaviors, Functions, Expressions, Associations, Connectors, Namespaces, and Packages.
 
-A few concepts are covered by both, namespacing among them: SysML restates them
-for the systems layer while KerML defines the underlying mechanism. When both
-apply, read SysML first and follow its cross-reference down.
-
-Rule of thumb: if the question is about the system being modelled, search SysML.
-If it is about how the language types and relates things, search KerML.
+When both apply, read the SysML systems-layer meaning first and follow its normative cross-reference
+into KerML. Rule of thumb: a question about the modeled system starts in SysML; a question about how
+the language types, owns, or relates elements often continues in KerML.
 
 ### Which library file answers it
 
-The specification never lists library declarations, so "what exists" and "what
-does this implicitly specialize" are library questions, not clause questions.
+The normative prose may not list every standard declaration. “What exists?” and “what does this
+implicitly specialize?” are library questions.
 
-| Looking for | Library |
+| Looking for | Typical standard-library area |
 | --- | --- |
-| String, Boolean, Real, Integer, Natural | `Kernel Data Type Library/ScalarValues.kerml` |
-| units, quantities, physical values | `Domain Libraries/Quantities and Units/` (ISQ, SI) |
-| what a `part def` / `item def` / `action def` implicitly specializes | `Systems Library/<Concept>.sysml` |
-| the base types of the language itself | `Kernel Semantic Library/Base.kerml`, `KerML.kerml` |
-| callable functions and operators | `Kernel Function Library/` |
+| String, Boolean, Real, Integer, Natural | scalar or kernel data types |
+| units, quantities, and physical values | quantities and units domain libraries |
+| implicit specialization of part, item, action, and other definitions | systems concept libraries |
+| base language types | kernel semantic libraries |
+| callable functions and operators | kernel function libraries |
+
+Locate the exact file through the configured standard-library search; do not assume a checkout path.
 
 ### Distinctions worth resolving before choosing
 
-These are the decisions that actually recur. Both options are valid SysML, so the
-parser cannot settle them; retrieve the clause and decide on meaning.
+Both options in these comparisons can be valid syntax. The validator cannot select the intended
+meaning; retrieve the relevant clauses and decide from instance-level consequences.
 
 | Question | Turns on |
 | --- | --- |
-| `item def` or `part def`? | `Part :> Item`. A part is a structural constituent of the system; an item flows through, is exchanged, or is acted on. |
-| `attribute def` or `item def`? | Identity. Attributes are values and have none; items do. |
-| `part x` or `ref part x`? | Ownership. Plain means composite and lifetime-bound; `ref` means it exists independently. |
-| `:>` or `:>>`? | Subsetting keeps the inherited feature alongside the new one; redefinition replaces it. |
-| action or use case? | A use case is what a user wants to accomplish; an action is behaviour the system performs. |
-| connection or interface? | An interface is the agreed interaction surface between ports; a connection is a link between things. |
-| allocation or satisfaction? | Allocation hands responsibility to a realizing element; satisfaction claims a requirement is met. |
-| constraint or requirement? | A constraint is a rule that must hold; a requirement is an obligation on the system, with a subject and satisfiers. |
+| item definition or part definition? | All parts are items. Use a part when an occurrence represents all or part of a system or is normally modeled as an action performer; parts may represent people, organizations, software, hardware, facilities, or external systems. Use an item when its relevant role is being part of, existing in, flowing through, transferred, stored, or acted on by a system. Items may themselves have attributes, states, and nested items, so state or lifecycle alone does not select a part. Confirm specialization in the active library. |
+| attribute definition or item definition? | Identity. Attributes are values; items are occurrences. |
+| composite usage or reference usage? | Ownership and lifetime versus independent existence and sharing. |
+| subsetting or redefinition? | Whether the inherited feature remains alongside a specializing feature or is replaced in context. |
+| action or use case? | Actor-valued objective versus behavior the system performs. |
+| connection or interface? | A link between things versus a specified interaction surface. |
+| allocation or satisfaction? | Mapping responsibility versus claiming that an obligation is met. |
+| constraint or requirement? | A predicate that holds versus an obligation on a subject with satisfiers and evidence. |
 
-The full construct inventory, generated from the pinned release so it cannot drift:
+Use the active construct inventory rather than treating this table as exhaustive.
 
 <!-- generated: construct inventory -->
 Action Definitions · Action Performance · Actions · Allocation · Allocations · Analysis ·
@@ -142,80 +166,100 @@ Verification Cases · Views · Views and Viewpoints
 ## Evidence guardrails
 
 - Retrieve evidence before committing to a consequential construct, not only after validation fails.
-- Establish the product claim before retrieving a construct. A specification clause explains the
-  meaning of an element; it does not create a need for that element.
-- Search first for the semantic commitment, not the project's noun. “Can the same occurrence be shared?” is a better starting question than “How should a ledger tail be modeled?”
-- Cite the clause that supports the exact commitment being made. A nearby keyword hit or informative example is not enough.
-- Apply the clause at the instance level: state what becomes owned, shared, performed, ordered, conditional, satisfied, or verified.
+- Establish the system claim before retrieving a construct. A clause explains an element; it does not
+  create a need for that element.
+- Search for the semantic commitment, not the project's noun. “May the same occurrence be shared?”
+  is more useful than asking how to model a project-specific container.
+- Cite the clause that supports the exact commitment. A nearby keyword hit or informative example is
+  not enough.
+- Apply the clause at instance level: state what becomes owned, shared, performed, ordered,
+  conditional, satisfied, or verified.
 - Do not copy an example's surrounding architecture when only one language construct is relevant.
-- If the specification does not decide the product design, label the remaining choice as repository convention or inference rather than laundering it through a citation.
+- If the specification does not decide system design, label the remaining choice as project
+  convention, stakeholder decision, or inference rather than laundering it through a citation.
+
+## Implementation-facing interpretation
+
+When a language question arises while planning or reviewing code, report separately:
+
+1. the normative construct meaning supported by the retrieved clause;
+2. the concrete instance-level commitment the current model makes;
+3. the implementation mapping, explicitly labeled as a project choice or inference.
+
+Also state the nearest tempting mapping the construct does not establish. A package does not by
+itself select a code package or deployable layer; a part does not select a service or class; an item
+does not select a record, transfer object, or table; an action does not select a method; a port does
+not select a private code interface; and a verification case does not require one same-named
+automated test.
+
+Judge a code representation by semantic equivalence at the modeled instance level. Several code
+structures may realize the same SysML commitment. Conversely, matching names or generated shapes do
+not establish conformance when lifecycle, sharing, cardinality, control, state, timing, interaction,
+or evidence differs.
 
 ## Evidence workflow
 
-1. State the semantic question independently of Vellis vocabulary: ownership, identity, lifecycle, behavior performance, responsibility, transfer, satisfaction, verification, or another language commitment.
+1. State the semantic question independently of project vocabulary: ownership, identity, lifecycle,
+   behavior performance, responsibility, transfer, calculation, state, satisfaction, verification,
+   or another language commitment.
 2. Identify the smallest plausible construct set. Common comparisons include use case versus action,
-   action versus performed action, abstract dependency versus included or performed behavior, item
-   versus part, composite versus referential usage, owned versus derived versus reference feature,
-   multiplicity versus conditional action control, binding versus flow versus interface, allocation
-   versus satisfaction, requirement subject versus verification subject, and state behavior versus
-   ordinary state.
-3. Start with the ranked natural-language finder:
-
-   ```text
-   just model-reference-find "<question>" [<specification-id>] [limit]
-   ```
-
-4. Inspect the primary clause and the smallest adjacent page set needed. Check page-frontmatter `extraction_warnings` before relying on extracted text.
-5. Follow necessary normative cross-references into SysML or KerML. If the first query ranks poorly, reformulate once with terminology discovered in the best result, then inspect outline headings. Use raw page search only for an exact phrase, identifier, or section number.
-6. Compare the semantic commitments added by each candidate, including leaving the claim at a less
-   formal authority level, and choose the least committal construct that expresses the required
-   meaning. Check instance-level consequences: whether values may be shared, whether a nested action
-   is actually performed, and whether multiplicity, binding, succession, or a guard carries the
-   intended claim.
-7. Inspect the pinned PDF when figures, tables, typography, or extraction quality matters.
-8. Validate the selected textual form. Use `just model-probe "<snippet>"` to settle a syntax
-   question against the pinned parser in about six seconds rather than reading grammar clauses.
-9. Report the specification version and release tag, section, printed page, physical PDF page, and
-   the concrete model commitment the clause supports. The pinned beta documents carry no OMG
-   document number, so the version and release tag are the identity.
+   action definition versus performed action, item versus part, composite versus referential usage,
+   owned versus derived versus reference feature, multiplicity versus conditional control, binding
+   versus flow versus interface, allocation versus satisfaction, requirement subject versus
+   verification subject, and state behavior versus an enumerated value.
+3. Use the configured natural-language reference search with the engineering question and active
+   specification identity.
+4. Inspect the primary clause and the smallest adjacent section set needed. Check extraction warnings
+   before relying on generated text.
+5. Follow necessary normative cross-references into SysML or KerML. If ranking is poor, reformulate
+   once with terminology discovered in the best result, then inspect headings. Use raw text search
+   only for an exact phrase, identifier, or section.
+6. Compare the commitments added by each candidate, including leaving the claim at a less formal
+   authority level. Choose the least committal construct that expresses required meaning, and check
+   ownership, occurrence, performance, multiplicity, binding, succession, and guard consequences.
+7. Inspect the authoritative publication directly when figures, tables, typography, or extraction
+   quality matters.
+8. Validate the selected textual form with the configured snippet probe.
+9. Report the active baseline identity, clause or section, source location or page when available,
+   and the concrete model commitment supported.
 
 Always separate:
 
 - normative specification clauses;
 - informative examples or annex material;
-- pinned model-library and example-model evidence;
-- repository convention;
+- release-matched standard-library evidence;
+- project convention or stakeholder decision;
 - agent inference.
-
-Parser acceptance establishes neither full semantic proof nor design correctness. The model diff still requires engineering review.
 
 ## Validator diagnosis
 
-Run the complete source set with `just model-check`. For an error:
+Run complete model validation through the configured official validator. For an error:
 
 1. isolate the first diagnostic;
 2. identify the construct involved;
-3. retrieve its normative clause and necessary cross-references;
-4. distinguish model error, import or order error, repository convention, and validator limitation;
-5. reduce to the smallest snippet that reproduces the diagnostic and run it through
-   `just model-probe`; do not create temporary model files;
-6. do not silently weaken a semantically correct model to placate the parser; record any validator-compatibility choice in the PR.
+3. retrieve its normative clause and required cross-references;
+4. distinguish model error, import or evaluation-order error, project convention, and validator
+   limitation;
+5. reduce to the smallest snippet that reproduces the diagnostic and use the configured snippet
+   probe without adding temporary product-model files;
+6. do not silently weaken a semantically correct model to placate a parser. Record any
+   validator-compatibility choice in the project's review record.
 
 ## Specification baseline changes
 
-Treat a language-baseline change as an explicit PR:
+Treat a language-baseline change as an explicit, reviewable engineering change:
 
-1. update the pinned release tag, commit, version identity, and checksums;
-2. run `just model-setup`, which fetches the pinned checkout and regenerates the corpus;
-3. compare the reported page and outline counts against the lock, since the corpus is generated
-   rather than committed and so has no reviewable diff;
-4. run `just model-reference-check` and `just model-check`;
-5. re-run the retrieval eval and confirm each register still meets its floor;
-6. review the complete lock and model impact before merge.
+1. update the pinned publication, release or commit identity, and checksums;
+2. fetch or regenerate derivative corpora, indexes, library metadata, and validator bindings;
+3. compare expected corpus and outline metadata because generated evidence may have no reviewable
+   source diff;
+4. validate the reference package and complete authored model scope;
+5. rerun retrieval evaluations or known semantic probes;
+6. review model, citation, library, and validator impact before integration.
 
-Do not create or maintain a second bundled language summary in this skill.
+Do not maintain a second bundled language summary as a substitute for the pinned official baseline.
 
 ## References
 
-- [SysML v2 is not SysML v1](references/v1-displacement.md): displaced v1 and UML notation, and the
-  forms that parse cleanly but mean something else, which no tooling here checks.
+- [SysML v2 is not SysML v1](references/v1-displacement.md): displaced v1 and UML notation, and valid
+  v2 forms whose meaning is easy to misread.

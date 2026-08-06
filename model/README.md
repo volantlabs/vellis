@@ -47,4 +47,7 @@ Realization remains open. Select the simplest approach from actual scale, startu
 
 The SysML on a branch is that branch's current system definition. Review its diff like code and accept changes through the normal pull-request process. Official validation establishes language conformance; requirements closure, verification evidence, and engineering review establish design quality.
 
-Run `just model-check` for full-model validation. Use `$sysml-modeling` for the engineering workflow, `$sysml-reference` for language evidence, `$rtg-schema-design` for RTG meaning and governance, and `$documentation-sync` after model or workflow changes.
+Run `just model-check` for full-model validation. Use `$sysml-modeling` for the engineering workflow,
+`$sysml-reference` for language evidence, `$rtg-schema-design` for RTG meaning and governance,
+`$sysml-implementation` to turn accepted model meaning into code and conformance evidence, and
+`$documentation-sync` after model or workflow changes.

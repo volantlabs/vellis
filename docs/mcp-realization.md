@@ -37,7 +37,7 @@ explicitly with `rtg_definition_delta`.
 The first implementation PR will verify and pin the latest stable non-prerelease FastMCP version and
 use documentation for that exact major version. It will use typed input and return models and keep
 text and structured content semantically equivalent. FastMCP, Python models, decorators, transport,
-and serialization are realization choices rather than RTG domain meaning.
+and serialization are realization decisions rather than RTG domain meaning.
 
 FastMCP may represent a parameterless tool with an empty object schema, but that representation does
 not create an empty RTG request concept. Public input schemas must advertise only caller-valid

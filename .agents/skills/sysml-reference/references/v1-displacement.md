@@ -10,10 +10,9 @@ this file exists.
 
 ## Table A — displaced notation the parser rejects
 
-The pinned validator rejects every form below, and `just model-check` and
-`just model-probe` name the replacement in the diagnostic. You do not need to
-memorise these; you need to know that a confusing parse error near a familiar
-keyword usually means v1 notation.
+The selected official validator rejects every form below, and a complete-model check or isolated
+snippet probe commonly names the replacement in the diagnostic. You do not need to memorize these;
+you need to know that a confusing parse error near a familiar keyword often means v1 notation.
 
 | v1 / UML form | What it meant | SysML v2 |
 | --- | --- | --- |
@@ -53,34 +52,31 @@ it is always legal and usually wrong.
 
 ## Checking, in cost order
 
-1. **Does it exist?** `just model-reference-concepts`, or grep the pinned
-   library. Milliseconds, and it settles "is this a real construct".
-2. **Does it parse?** `just model-probe "<snippet>"`. About six seconds, and it
-   settles syntax without reading grammar clauses.
-3. **What does it mean?** `just model-reference-find`. Table B questions live
-   here; the parser cannot answer them.
-4. **Does the whole model still hold?** `just model-check`.
+1. **Does it exist?** Use the configured construct inventory and active standard-library search.
+2. **Does it parse?** Use the configured isolated snippet probe.
+3. **What does it mean?** Use the normative reference search. Table B questions live here; the
+   parser cannot answer them.
+4. **Does the whole model still hold?** Run the configured complete-model validation.
 
 Acceptance is not meaning. A snippet the parser accepts may still make the wrong
 claim, which is exactly what Table B is about.
 
 ## Worked example
 
-**Question.** An associated data object must refer to one or more anchors.
-`item anchors : Anchor[1..*]`, or `ref item anchors [1..*] : Anchor`?
+**Question.** An inspection assignment refers to one or more independently existing assets. Should
+the asset usage be composite or referential?
 
 1. **State the semantic question without project vocabulary.** Does the
    referring object *own* these, or do they exist independently and get
    referenced?
-2. **Check what exists.** `Parts::Part :> Item` and `Items::Item :> Object` in
-   the pinned library: `part` is strictly narrower than `item`, not a synonym.
+2. **Check what exists.** Inspect the active standard library to establish the specialization and
+   default semantics of the candidate usages.
 3. **Retrieve the meaning.** Search for composite versus referential usage. The
    distinction is ownership, not syntax preference.
-4. **Probe the form.**
-   `just model-probe "package P { item def A; item def B { ref item a [1..*] : A; } }"`
-5. **Decide.** Anchors exist independently of any one associated data object, so
-   ownership is wrong: `ref item` expresses reference without implying the
-   anchors live and die with the referrer.
+4. **Probe the form.** Reduce the candidate to the smallest valid package and use the configured
+   snippet probe.
+5. **Decide.** The assets exist independently of an inspection assignment, so composition would
+   assert the wrong lifetime and ownership. A reference usage expresses the required sharing.
 6. **Report separately.** The normative basis (the composite-versus-reference
-   clause), the pinned-release evidence (library specialisation), the repository
-   convention (the RTG boundary), and anything still inferred.
+   clause), release-matched library evidence, any project convention or stakeholder decision, and
+   anything still inferred.

@@ -1,121 +1,133 @@
 # Simplicity Review
 
-Perform two independent reviews. Adequacy catches missing authority; subtraction catches unjustified complexity. Do not use simplicity as a reason to erase behavior, state governance, recovery semantics, or verification.
+## Contents
+
+- [Adequacy review](#adequacy-review)
+- [Subtraction review](#subtraction-review)
+- [Agent correction patterns](#agent-correction-patterns)
+- [Final result](#final-result)
+
+Perform two independent reviews. Adequacy catches missing authority; subtraction catches unjustified
+complexity. Review adequacy first so simplification does not erase behavior, state governance,
+interaction, safety, recovery, or evidence that the system actually needs.
 
 ## Adequacy review
 
-Look for:
+Look for, as applicable:
 
-- one omnibus use case hiding independently valuable outcomes;
-- owned state with no governing behavior;
-- failures, refusals, or required non-effects absent from black-box behavior;
-- actions with no owner-valued origin or no added refinement value;
-- parts with no performed or allocated behavior, requirement, state, invariant, or failure responsibility;
-- requirements with no logical satisfier or verification path;
-- important responsibilities existing only in Markdown or comments outside the model;
-- recovery, ordering, atomicity, or lifecycle semantics too vague to judge;
-- state-change history that cannot reconstruct promised canonical state from an initial state or snapshot plus a contiguous tail;
-- reusable use-case definitions absent from the actual system context;
-- alternative selectors, outcomes, or relationship roles that the model cannot distinguish;
-- outputs that cannot be traced to the selector, projection, request, or decision that authorizes them;
-- result rows whose joint assignment, projection completeness, duplicate semantics, or absent values
-  are undefined;
-- one conceptual occurrence compositionally owned by multiple containers;
-- a nested composite that quietly carries a complete state where only a semantic change was intended;
-- optional subactions whose multiplicity is being mistaken for a condition;
-- kind or scope values with payload combinations whose validity is undefined;
-- public request schemas that advertise internal-only enum values;
-- selected public input or output types that remain empty placeholders;
-- historical behavior evaluated against definitions other than those active at that revision;
-- a cold historical outcome that cannot discover or otherwise obtain vocabulary valid at the selected
-  revision;
-- a read declared state-free while its required observability behavior mutates an activity ledger;
-- a trusted-client label being used as if it were an authorization or approval guard;
-- optional features whose absence is being used to hide an unresolved design decision;
+- one omnibus use case hiding independently valuable stakeholder outcomes;
+- missing actors, environmental assumptions, or system-boundary distinctions;
+- governed state with no behavior that creates, observes, changes, or retires it;
+- alternate, degraded, failed, unsafe, or unauthorized outcomes and required non-effects absent from
+  black-box behavior;
+- actions with no stakeholder-valued origin or no added refinement meaning;
+- transformations with unclear inputs, outputs, control, or result;
+- modes, events, guards, or invalid transitions too vague to judge;
+- interactions whose source, destination, direction, carried item, or applicable timing is unknown;
+- quantities without required units, dimensions, ranges, precision, tolerance, or uncertainty;
+- concurrency, ordering, deadlines, capacity, resource, safety, security, privacy, durability, or
+  recovery semantics too vague for a current obligation;
+- logical parts with no independent lifecycle, state, invariant, failure, interaction, physical,
+  substitution, or selected realization responsibility;
+- requirements with an incompatible or missing subject, or consequential obligations with no
+  selected satisfier or verification path where the project requires them;
+- important responsibilities existing only in explanatory prose or comments;
+- contextual use-case or behavior definitions absent from the actual system context;
+- a conceptual occurrence compositionally owned by more than one container;
+- nested composite content that quietly carries full state or a duplicate occurrence;
+- optional usages whose multiplicity is mistaken for a condition;
+- kind, mode, or status values with undefined valid feature combinations;
+- collections whose ordering, equality, uniqueness, completeness, or absence meaning affects
+  behavior but remains undefined;
+- outputs or effects that cannot be traced to the input, event, decision, interaction, or requirement
+  that authorizes them;
+- a selected external interaction whose inputs, outputs, effects, or compatibility meaning remain
+  placeholders;
+- optional features or variants used to hide an unresolved design decision;
+- implementation feedback exposing observable ambiguity that has not been translated into system
+  meaning;
 - excessive deletion that makes system authority unknowable.
 
-Add the smallest native model element that closes each material gap.
+Add the smallest native model element that closes each material gap. Do not add every listed
+dimension; absence is a gap only when the current system claim depends on it.
 
 ## Subtraction review
 
 For every element ask:
 
-1. Which use case, requirement, invariant, failure, or verification case needs it?
-2. What becomes false, unrealizable, or unverifiable if it is removed?
+1. Which stakeholder outcome, use case, requirement, invariant, interaction, failure, analysis, or
+   verification needs it?
+2. What becomes false, unrealizable, unsafe, or unverifiable if it is removed?
 3. Is it the lowest-commitment native representation of that claim?
 
 Remove or defer elements with no concrete answer.
 
 Warning signs include:
 
-- classes, methods, handlers, or call graphs transcribed into the model;
-- one same-named action, outcome, report, or verification wrapper for every use case without added meaning;
-- one use case, action, request, result, requirement, or test for every tool or protocol operation;
-- one universal discovery operation that either floods an agent with the full definition state or
-  requires it to guess identifiers before it can ask a focused question;
-- action trees that name stages without connecting the information, state, or control that makes the stages meaningful;
+- classes, functions, handlers, tables, processes, call graphs, screens, or source directories
+  transcribed into the model;
+- one same-named action, outcome, report, requirement, or verification wrapper for every use case;
+- one use case, action, request, result, or test for every interface or protocol operation;
+- action trees that name stages without connecting the information, matter, energy, state, or control
+  that makes the stages meaningful;
 - empty subtype families that differ only by label;
-- capability groupings promoted to parts solely to anticipate code modules;
-- generic predicates or extension points with no current semantic need;
-- speculative services, runtimes, adapters, controllers, managers, repositories, or protocols;
-- request/response envelopes or generic JSON standing in for domain meaning;
-- empty request types created only to make parameterless protocol calls look symmetrical;
-- duplicate authoritative representations;
-- event, snapshot, checkpoint, database, or serialized-form commitments stronger than the owner-visible durability and recovery need;
-- ports and interfaces with no intentional connected transfer;
-- lifecycle machinery with no behavior that depends on it;
-- extension seams or interchangeable layers with no current consumer;
-- a distinction carried forward only because predecessor code had it;
-- package structure that merely mirrors documents or phases;
-- surrogate identifiers, lineage, statuses, or versions added before anything must address or compare
-  them independently;
-- stored flags or result wrappers that duplicate meaning already available from ownership,
-  membership, omission, or the operation being performed;
-- separate permission, endpoint, multiplicity, and validation representations for one relationship;
-- a public check or assessment operation duplicating a current report already returned by the
-  governing workflow;
-- full-state reads, response mirroring, or result capture that pushes state-bearing artifacts into an
-  agent context without an owner use case;
-- a record-count bound that still permits one record to carry an unbounded full-state payload;
-- initialization state machines for a system that can simply begin in a valid empty state;
-- incremental-validation, locking, paging, retry, archive, or checkpoint algorithms promoted into
-  normative meaning before their tradeoff is selected;
-- exhaustive error codes, scopes, paths, request IDs, correlations, and envelopes before a caller
-  demonstrates the need;
-- generic vocabulary bans and exact prose assertions used as substitutes for repository-truth tests;
-- an intent history where the product only needs one current prospective overlay;
-- strategies, plugins, variants, or configurable parts representing a realization choice that is only
-  deferred;
+- capability groupings promoted to parts solely to anticipate code modules or team boundaries;
+- speculative services, adapters, controllers, managers, repositories, runtimes, devices, databases,
+  protocols, or deployment units;
+- request or response envelopes and serialization shapes standing in for domain meaning;
+- generic predicates, base types, identifiers, extension points, or configuration with no current
+  semantic need;
+- duplicate authoritative representations or independently stored derived values;
+- persistence, events, checkpoints, caches, transport, retry, paging, synchronization, or migration
+  machinery stronger than the selected system behavior;
+- ports, interfaces, flows, or messages with no intentional interaction;
+- state machines or lifecycle machinery with no behavior that depends on state;
+- variability or interchangeable parts representing a realization decision that is merely deferred;
+- package structure that mirrors documents, process phases, teams, or code layers;
+- a distinction retained only because predecessor code or a familiar architecture had it;
+- broad error taxonomies, telemetry, correlation, audit, or operational machinery before a current
+  stakeholder or engineering obligation needs them;
+- precision, timing, resource, safety, or security detail copied from a technology without a modeled
+  consequence;
+- initialization behavior for a system that can simply begin in a valid state;
+- tests or generated inventories used to freeze model vocabulary, topology, exact counts, or prose;
+- a public assessment or duplicate result that restates information already supplied by the
+  governing behavior;
+- handoff artifacts promoted into permanent parallel requirements or architecture.
 
 ## Agent correction patterns
 
 Use these groups to diagnose behavior, not as another checklist to satisfy:
 
-- **Transcription:** noun transcription, familiar-name substitution, API-surface mirroring, and
-  symmetry completion create elements because source material contains names or matching columns.
-  Return to the owner distinction and keep only elements that change its meaning.
-- **Authority theater:** prose repair, parser theater, and specification cosplay substitute comments,
-  successful parsing, or nearby citations for correct native semantics and design evidence. State the
-  instance-level commitment and test it.
-- **Anticipation:** enterprise-prior gravity, future-proofing, precision theater, contract inflation,
-  and uncertainty encoding turn common or possible implementations into current product contracts.
-  Keep choices open in the work, not configurable in the system.
-- **Mechanical closure:** test-shaped modeling and layer completion add mirrored actions,
-  requirements, reports, or verifications to satisfy an inventory. Reset-era tests can fossilize the
-  same mistake by banning future directories, commands, packages, or capabilities after the
-  transition ends. Close claims and invariants, not columns or historical snapshots.
+- **Transcription:** noun substitution, familiar-name matching, interface mirroring, and symmetry
+  completion create elements because source material contains matching names or columns. Return to
+  the stakeholder distinction and keep only elements that change its meaning.
+- **Authority theater:** prose repair, parser theater, and citation theater substitute comments,
+  successful parsing, or nearby references for correct native semantics and design evidence. State
+  the instance-level commitment and exercise it.
+- **Anticipation:** reference-architecture gravity, future-proofing, precision theater, contract
+  inflation, and uncertainty encoding turn common or possible realizations into current system
+  contracts. Keep open choices in the engineering work, not configurable in the system.
+- **Mechanical closure:** layer completion and test-shaped modeling add mirrored actions,
+  requirements, reports, or verification artifacts to satisfy an inventory. Close claims and
+  invariants, not columns.
 - **Destructive correction:** subtraction panic and local-patch blindness remove necessary authority
-  or fix one declaration without following its semantic consequences. Review adequacy first, then
+  or fix one declaration without following semantic consequences. Review adequacy first, then
   subtract.
-- **Decision churn:** repeated reviews reopen explicit owner decisions without new evidence or an
-  explicit reassessment scope. Preserve continuity while still challenging incidental structure.
+- **Decision churn:** repeated reviews reopen explicit stakeholder decisions without new evidence or
+  an explicit reassessment scope. Preserve continuity while still challenging incidental structure.
 
 For execution of a formal plan, also look for quiet omission: a plan item marked complete because a
-nearby name exists, a negative commitment checked only in one file, or a later edit invalidating an
-earlier review. A clean fixed point requires one full review cycle after the last material correction.
+nearby name exists, a negative commitment checked in only one artifact, or a later edit invalidating
+an earlier review. A clean fixed point requires one full review cycle after the last material
+correction.
 
 ## Final result
 
-Prefer one laminar route from owner outcome through behavior, domain meaning, logical responsibility, requirements, satisfiers, verification, and later implementation. Record unresolved design work in an issue or PR discussion instead of modeling a speculative answer.
+Prefer one laminar route from stakeholder outcome through behavior, domain meaning, logical
+responsibility, requirements, satisfiers, evidence, and later implementation. Record unresolved
+design work in the project's decision or review mechanism rather than modeling a speculative answer.
 
-Prefer **semantic compression**: fewer elements with all necessary distinctions intact. Mere deletion is not simplification when it leaves outputs unauthorized, ownership contradictory, or tagged payloads ambiguous.
+Prefer **semantic compression**: fewer elements with all necessary distinctions intact. Mere
+deletion is not simplification when it leaves outcomes ambiguous, ownership contradictory,
+interactions incomplete, or verification unable to distinguish the nearest wrong system.

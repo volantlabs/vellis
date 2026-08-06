@@ -5,7 +5,9 @@
 Vellis is one individually owned application and an open demonstration of model-first software
 engineering. Textual SysML v2 under `model/` is the product and system authority on each branch.
 Pull requests propose changes to that authority; Markdown explains the work without restating its
-contracts.
+contracts. Implementation source realizes the current model and may select choices the model
+intentionally leaves open; tests provide evidence of conformance. Neither source nor tests become a
+parallel product authority.
 
 ## Safety
 
@@ -21,13 +23,40 @@ historical comparison or recovery task.
 
 ## Skill routing
 
+`$sysml-reference`, `$sysml-modeling`, and `$sysml-implementation` are the portable MBSwE core.
+The paths, commands, reading scope, checks, and review rules in this file bind that core to Vellis.
+`$rtg-schema-design` and `$documentation-sync` are optional Vellis domain and repository extensions,
+not dependencies that another project must carry.
+
 - `$sysml-modeling`: owner needs, use cases, behavior, logical responsibility, requirements,
   verification, adequacy, and simplification.
 - `$sysml-reference`: official language semantics, construct comparison, citations, and validator
   diagnosis. Use it for every consequential SysML or KerML choice.
 - `$rtg-schema-design`: RTG meaning, queries, definitions, validation, revision, history, recovery,
   and compatibility.
+- `$sysml-implementation`: consume current model authority, form implementation-ready semantic
+  slices, select bounded realization decisions, implement them, and review conformance evidence.
 - `$documentation-sync`: repository authority, commands, skills, templates, and public guidance.
+
+## Portable-method boundary
+
+Keep the three core skills reusable as written outside Vellis. They may require abstract capabilities
+such as model entry-point discovery, pinned reference search, official validation, project checks,
+and change review, but must not hard-code Vellis paths, `just` commands, RTG or MCP vocabulary,
+Python, Git, persistence, networking, code generation, or a particular application architecture.
+Bind those concerns in project instructions or optional domain skills.
+
+When changing the portable core, exercise its guidance against at least these distinct archetypes:
+a stateless transformation, an interactive stateful workflow, a distributed message-driven system,
+an embedded or real-time cyber-physical controller, and numerical or safety/security-relevant
+software. The method must expose units, timing, concurrency, physical, safety, security, durability,
+or recovery semantics when consequential without demanding them from every project. Vellis and RTG
+may demonstrate the method but must not become its implicit template. Do not claim a packaged plugin
+until one exists.
+
+Run those forward tests manually with fresh agents and do not disclose expected conclusions or prior
+diagnoses. Keep prompts, transcripts, and expected-answer fixtures out of the repository; summarize
+only the scenarios, material findings, and disposition in the task handoff or PR discussion.
 
 ## Non-negotiable modeling rules
 
@@ -56,7 +85,7 @@ historical comparison or recovery task.
   decisions. An explicit review request may reassess them; otherwise reopen a decision only when new
   evidence creates a named contradiction and changed consequence.
 - Do not use optional multiplicity to represent uncertainty, or configurable structure to represent
-  a realization choice that is merely deferred. Absence, unknown, not applicable, and not yet decided
+  a realization decision that is merely deferred. Absence, unknown, not applicable, and not yet decided
   are different meanings.
 - Treat tool, protocol, and framework affordances as feasibility constraints, not a use-case or
   action inventory. Reflect them in the system model only when they change observable behavior or a
@@ -74,9 +103,33 @@ historical comparison or recovery task.
   do not choose or freeze the living model's constructs, vocabulary, inventory, topology, or prose.
 - Never hand-edit future generated product source; regenerate it and check freshness when generation
   exists.
+- When accepted model work will guide implementation, hand off qualified authority, observable
+  obligations, full or partial authority coverage, remaining obligations, decisive
+  accepted/refused/failed cases, state and ownership boundaries, conformance-evidence intent, and
+  exact realization deferrals. Keep that handoff reconstructible from the branch rather than
+  creating a shadow specification. Implementation status is a separate value: not evaluated,
+  absent, partial, conforming, or conflicting. Partial coverage never establishes whole-requirement
+  satisfaction or whole-verification completion. Judge coverage against the complete cited accepted
+  authority, not merely the task prompt or row summary; `full` always means no remaining obligation.
+- Treat implementation feedback as evidence. Fix code that contradicts sufficient model authority;
+  change the model only for a genuine model gap or a demonstrated feasibility consequence whose
+  stakeholder-visible or intentionally selected realization-boundary consequence changes. Classify
+  feedback as language question, model gap, realization decision, feasibility consequence,
+  implementation defect, or stale baseline; treat an out-of-scope request separately. Unselected
+  storage, acknowledgement, process, transport, framework, and deployment mechanics remain
+  realization decisions unless their demonstrated consequence crosses that gate.
+- Permit implementation classes and modules to be finer-grained than modeled parts. Record their
+  many-to-many realization against semantic neighborhoods while preserving modeled lifecycle, state,
+  transaction, failure, and external boundaries; a useful code component is not by itself a SysML
+  subsystem.
 
 Before model edits, read `model/README.md`, every current `model/*.sysml` file, affected dependencies,
 and the current diff. Follow the operative workflow and handoff in `$sysml-modeling`.
+
+Before implementation edits, first read the same current authority without taking architecture from
+existing source, then follow `$sysml-implementation`. Use a current model-work handoff when available
+and verify it against the branch; otherwise reconstruct its task-local implementation frame directly
+from the model. Return to model work before coding across an unresolved semantic gap.
 
 ## Resources and checks
 
@@ -96,7 +149,8 @@ SysML v2 names concepts differently from ordinary systems-engineering usage, so 
 nothing convincing usually means the wrong word, not a missing capability. Consult the construct
 inventory, then search again.
 
-Begin with `just model-reference-find`, follow normative cross-references, inspect extraction
+Begin with `just model-reference-find`; optional specification and limit arguments are positional,
+for example `just model-reference-find "<question>" sysml-2.1 8`. Follow normative cross-references, inspect extraction
 warnings, and never edit the generated corpus by hand. Cite the specification version and release
 tag with the clause and page; the pinned beta documents carry no OMG document number.
 

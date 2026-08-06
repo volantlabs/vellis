@@ -51,6 +51,21 @@ def test_reference_finder_quotes_untrusted_questions() -> None:
     assert "'$(printf unsafe)'" in result.stdout + result.stderr
 
 
+def test_reference_finder_routes_positional_specification_and_limit() -> None:
+    result = subprocess.run(
+        ["just", "--dry-run", "model-reference-find", "part or item", "sysml-2.1", "5"],
+        cwd=ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+    command = result.stdout + result.stderr
+    assert "specification='sysml-2.1'" in command
+    assert '--specification "$specification"' in command
+    assert "--limit '5'" in command
+
+
 def test_snippet_probe_quotes_untrusted_source() -> None:
     result = subprocess.run(
         ["just", "--dry-run", "model-probe", "$(printf unsafe)"],
