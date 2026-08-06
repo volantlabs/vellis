@@ -170,6 +170,9 @@ class Document:
     body: str
     sort_key: tuple[object, ...]
     extraction_warning: bool = False
+    # Body text is shaped for matching and repeats the name to boost it. A
+    # summary, when present, is what a reader should actually see.
+    summary: str = ""
 
 
 @dataclass(frozen=True)
@@ -895,6 +898,9 @@ def _library_documents(library_root: Path | None = None) -> tuple[Document, ...]
                     citation=f"{path.relative_to(root).as_posix()}:{line_number}",
                     location=path,
                     body=f"{name} {kind} {declaration} {_declaration_doc(lines, line_number)}",
+                    summary=" ".join(
+                        part for part in (declaration, _declaration_doc(lines, line_number)) if part
+                    ),
                     sort_key=(package, name),
                 )
             )
@@ -1158,11 +1164,8 @@ def _rank_documents(documents: Sequence[Document], terms: tuple[str, ...]) -> li
             location=documents[index].location,
             extraction_warning=documents[index].extraction_warning,
             snippet=(
-                (
-                    _definition_snippet(documents[index].body)
-                    if documents[index].source == "library"
-                    else None
-                )
+                _definition_snippet(documents[index].summary)
+                or documents[index].summary[:320]
                 or _search_snippet(documents[index].body, terms)
             ),
             score=score,

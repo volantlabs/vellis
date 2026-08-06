@@ -119,3 +119,30 @@ def test_reference_finder_rejects_unbounded_limits(limit: int) -> None:
 def test_reference_finder_rejects_unknown_programmatic_specification() -> None:
     with pytest.raises(ValueError, match="unknown specification"):
         sysml_reference.find_references("use case", specification_id="not-a-specification")
+
+
+def test_library_hits_read_as_a_definition_not_a_search_index_artifact() -> None:
+    """Library bodies repeat the name to boost matching; readers must not see that."""
+    if not model_layout.SPECIFICATION_REFERENCE_ROOT.exists():
+        pytest.skip("generated corpus absent; run `just model-setup`")
+    results = [
+        result
+        for result in sysml_reference.find_references("part definition", limit=8)
+        if result.source == "library"
+    ]
+
+    assert results
+    for result in results:
+        assert not result.snippet.startswith(result.title_path[-1] + " ")
+
+
+def test_scalar_value_types_are_reachable_from_the_library() -> None:
+    """ScalarValues lives in the Kernel Data Type library, so scoping the index to
+    the Semantic library alone would silently break "what do I import for X"."""
+    if not model_layout.SPECIFICATION_REFERENCE_ROOT.exists():
+        pytest.skip("generated corpus absent; run `just model-setup`")
+    results = sysml_reference.find_references("what do I import for a String attribute", limit=6)
+
+    assert any(
+        result.source == "library" and "ScalarValues" in result.identifier for result in results
+    )
