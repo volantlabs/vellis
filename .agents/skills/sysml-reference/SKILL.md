@@ -26,15 +26,16 @@ SysML v1 and UML dominate training data, and SysML v2 displaced much of that not
 
 When a construct feels familiar, check that it exists before designing around it. `block`, `ValueType`, value properties, associations, flow ports, and stereotypes are all v1 notation with different v2 replacements. The parser rejects them and the diagnostic names the replacement, so an uncertain construct is cheaper to probe than to reason about.
 
-Names are the other trap. SysML v2 names concepts differently from ordinary systems-engineering usage: states rather than modes, constraints rather than rules, specialization rather than inheritance, "Definition and Usage" rather than variability. If a search returns nothing convincing, the query is probably using the wrong word rather than asking about something absent. Run `just model-reference-concepts` for the full construct inventory, pick the name, and search again.
+Names are the other trap, and the maps below exist for it: SysML v2 names concepts differently from ordinary systems-engineering usage. If a search returns nothing convincing, the query is almost always using the wrong word rather than asking about something absent.
+
+## Naming the construct
 
 ### From what you are trying to do, to what SysML v2 calls it
 
-Search reaches the right clause reliably once the construct is named, so the hard
-step is naming. SysML v2 frequently uses a different word than ordinary
-systems-engineering usage, and the specification does not contain the ordinary
-word at all -- "mode", "rule", and "piece" appear on zero pages -- so searching in
-your own words cannot find them. Map the intent first, then search by name.
+Search reaches the right clause reliably once the construct is named, so naming is
+the step that decides whether a lookup succeeds. Searching in your own words often
+cannot work: "mode", "rule" and "piece" appear on zero of 695 specification pages.
+Map the intent first, then search by the construct name.
 
 | If you are trying to express | The construct is | Clause |
 | --- | --- | --- |
