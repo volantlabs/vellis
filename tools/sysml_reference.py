@@ -42,9 +42,11 @@ GENERATOR_VERSION = 3
 BM25_K1 = 1.2
 BM25_B = 0.75
 # Clause titles carry the concept name ("Reference Usages", "States"), so a hit
-# there is strong evidence. Swept on the register question sets: 0.0 scores 5/12
-# on the jargon register, 1.8 scores 9/12, and everything above 1.8 is flat. The
-# lowest weight that reaches the plateau is chosen rather than the largest.
+# there is strong evidence. Re-swept on the full 72-question set: 0.0 is clearly
+# worse (45 hits), while 0.6, 1.2, 1.8 and 3.0 all land within one question of
+# each other (48-49). A five-fold range of indistinguishable values is the
+# signature of a robust parameter rather than a fitted one, so the value is not
+# re-tuned to whichever number happens to win on the current set.
 BM25_TITLE_WEIGHT = 1.8
 # Specification clause 7 is descriptive; clauses 8 and 9 are syntax and library
 # reference that restate construct names constantly. See _clause_family_weight.
@@ -1051,9 +1053,6 @@ def _bm25_scores(
 
 
 SOURCES = ("specification", "library", "example")
-# Below this, a hit is weak enough that the concept inventory is more useful than
-# the results themselves.
-WEAK_SCORE = 6.0
 
 
 @dataclass(frozen=True)
@@ -1110,13 +1109,25 @@ def concepts(reference_root: Path = SPECIFICATION_REFERENCE_ROOT) -> list[Concep
 
 
 def _print_concept_hint() -> None:
-    """Nothing scored well, so hand over the vocabulary instead of a bad guess."""
+    """Always shown, because a lexical score cannot detect its own failure.
+
+    This was previously gated on a low top score. Measured against the routing
+    questions, that gate fired for none of the 23 failing lay or professional
+    questions: they return confident wrong answers scoring 9 to 30, because BM25
+    measures term overlap rather than correctness. A query using words the
+    specification never contains still matches something, and matches it firmly.
+
+    Retrieval is measured at 100% once the construct is named correctly, so the
+    escape hatch matters more than the ranking does for those registers. An
+    unconditional line is honest about a limitation the tool cannot detect.
+    """
     print()
     print(
-        "Nothing scored strongly. SysML v2 names concepts differently from common "
-        "systems-engineering usage, so try naming the construct directly. Run "
-        "`just model-reference-concepts` for the full inventory, then search again "
-        "using the concept name."
+        "Note: SysML v2 often names a concept differently from common "
+        "systems-engineering usage (states not modes, constraints not rules, "
+        "specialization not inheritance). A confident-looking result can still be "
+        "the wrong register. Run `just model-reference-concepts` and search again "
+        "by construct name if these results do not answer the question."
     )
 
 
@@ -1345,8 +1356,7 @@ def main() -> int:
                 _print_concept_hint()
                 return 1
             _print_search_results(results)
-            if max(result.score for result in results) < WEAK_SCORE:
-                _print_concept_hint()
+            _print_concept_hint()
             return 0
         findings = check()
     except (OSError, ValueError, RuntimeError) as error:

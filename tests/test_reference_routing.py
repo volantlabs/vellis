@@ -493,3 +493,22 @@ def test_every_question_is_phrased_without_specification_section_numbers() -> No
     """A question naming its own answer measures nothing."""
     for _, question, _ in ROUTING_QUESTIONS:
         assert not any(part.replace(".", "").isdigit() for part in question.split())
+
+
+def test_the_concept_escape_hatch_is_unconditional(capsys: pytest.CaptureFixture[str]) -> None:
+    """A lexical score cannot detect its own failure, so the hatch cannot be gated.
+
+    Measured against these questions, a score threshold fired for none of the
+    failing lay or professional questions: they return confident wrong answers,
+    because term overlap is not correctness. The pointer is therefore always
+    shown, including when results look strong.
+    """
+    if not _corpus_ready():
+        pytest.skip("generated corpus absent; run `just model-setup`")
+    results = sysml_reference.find_references("redefinition", limit=2)
+    sysml_reference._print_search_results(results)
+    sysml_reference._print_concept_hint()
+    output = capsys.readouterr().out
+
+    assert results and max(result.score for result in results) > 10
+    assert "model-reference-concepts" in output
