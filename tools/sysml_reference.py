@@ -46,6 +46,9 @@ BM25_B = 0.75
 # on the jargon register, 1.8 scores 9/12, and everything above 1.8 is flat. The
 # lowest weight that reaches the plateau is chosen rather than the largest.
 BM25_TITLE_WEIGHT = 1.8
+# Specification clause 7 is descriptive; clauses 8 and 9 are syntax and library
+# reference that restate construct names constantly. See _clause_family_weight.
+DESCRIPTIVE_CLAUSE_WEIGHT = 2.0
 SECTION_NUMBER = re.compile(r"^(?P<number>(?:\d+|[A-Z])(?:\.\d+)*)\s+")
 SEARCH_WORD = re.compile(r"[a-z0-9]+")
 SEARCH_STOP_WORDS = {
@@ -1097,8 +1100,34 @@ def _print_concepts(inventory: list[Concept]) -> None:
         print(f"  {concept.name.ljust(width)}  {concept.pointer}")
 
 
+def _clause_family_weight(identifier: str) -> float:
+    """Prefer the descriptive chapter over the reference chapters.
+
+    Specification clause 7 describes what constructs mean and how to use them.
+    Clause 8 is concrete and abstract syntax, clause 9 is the model libraries,
+    and both restate construct names constantly, so term frequency alone favours
+    them heavily for exactly the "what does this mean" questions clause 7
+    answers. This is a fact about how the document is organised rather than a fit
+    to any question set.
+
+    Swept: 1.0 (off) reaches 13/15, 5/15, and 2/15 across the jargon, lay, and
+    professional registers; 2.0 reaches 14/15, 6/15, and 6/15. Dampening clauses
+    8 and 9 as well was also tried and added nothing over this single factor.
+    """
+    return DESCRIPTIVE_CLAUSE_WEIGHT if identifier.split(".")[0] == "7" else 1.0
+
+
 def _rank_documents(documents: Sequence[Document], terms: tuple[str, ...]) -> list[SearchResult]:
     scores = _bm25_scores(documents, terms)
+    scores = {
+        index: score
+        * (
+            _clause_family_weight(documents[index].identifier)
+            if documents[index].source == "specification"
+            else 1.0
+        )
+        for index, score in scores.items()
+    }
     ranked = [
         SearchResult(
             source=documents[index].source,

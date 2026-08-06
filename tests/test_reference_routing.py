@@ -109,7 +109,7 @@ ROUTING_QUESTIONS: tuple[tuple[str, str, tuple[tuple[str, str], ...]], ...] = (
     (
         "B",
         "how do I capture what a user wants to accomplish with the system",
-        (("specification", "7.25"), ("example", "35. Use Cases")),
+        (("specification", "7.25"), ("example", "35. Use Cases"), ("example", "UseCaseTest")),
     ),
     (
         "B",
@@ -119,12 +119,17 @@ ROUTING_QUESTIONS: tuple[tuple[str, str, tuple[tuple[str, str], ...]], ...] = (
     (
         "B",
         "how do I represent a subsystem of my system",
-        (("specification", "7.11"), ("example", "07. Parts")),
+        (("specification", "7.11"), ("example", "07. Parts"), ("library", "Parts::Part")),
     ),
     (
         "B",
         "how do I model a value like a temperature",
-        (("specification", "7.7"), ("library", "ISQ"), ("example", "Quantities")),
+        (
+            ("specification", "7.7"),
+            ("library", "ISQ"),
+            ("example", "Quantities"),
+            ("example", "System of Units"),
+        ),
     ),
     (
         "B",
@@ -134,7 +139,12 @@ ROUTING_QUESTIONS: tuple[tuple[str, str, tuple[tuple[str, str], ...]], ...] = (
     (
         "B",
         "how do I define a behavior with inputs and outputs",
-        (("specification", "7.17"), ("example", "14. Action Definitions")),
+        (
+            ("specification", "7.17"),
+            ("specification", "7.4.7"),
+            ("example", "14. Action Definitions"),
+            ("example", "Function-based Behavior"),
+        ),
     ),
     (
         "B",
@@ -181,7 +191,11 @@ ROUTING_QUESTIONS: tuple[tuple[str, str, tuple[tuple[str, str], ...]], ...] = (
     (
         "C",
         "how do I model decomposition of a system",
-        (("specification", "7.11"), ("example", "07. Parts")),
+        (
+            ("specification", "7.11"),
+            ("example", "07. Parts"),
+            ("example", "Constraining Decomposition"),
+        ),
     ),
     (
         "C",
@@ -201,7 +215,13 @@ ROUTING_QUESTIONS: tuple[tuple[str, str, tuple[tuple[str, str], ...]], ...] = (
     (
         "C",
         "how do I capture design rationale",
-        (("specification", "7.4"), ("specification", "7.27"), ("example", "39. Metadata")),
+        (
+            ("specification", "7.4"),
+            ("specification", "7.27"),
+            ("specification", "9.3.2"),
+            ("example", "39. Metadata"),
+            ("example", "RationaleMetadata"),
+        ),
     ),
     (
         "C",
@@ -221,7 +241,12 @@ ROUTING_QUESTIONS: tuple[tuple[str, str, tuple[tuple[str, str], ...]], ...] = (
     (
         "C",
         "how is inheritance done",
-        (("specification", "7.3.2"), ("specification", "7.3.3"), ("example", "03. Generalization")),
+        (
+            ("specification", "7.3.2"),
+            ("specification", "7.3.3"),
+            ("example", "03. Generalization"),
+            ("example", "Inheritance"),
+        ),
     ),
     (
         "C",
@@ -246,27 +271,36 @@ ROUTING_QUESTIONS: tuple[tuple[str, str, tuple[tuple[str, str], ...]], ...] = (
     (
         "C",
         "how is the language itself extended",
-        (("specification", "7.27"), ("example", "41. Language Extension")),
+        (
+            ("specification", "7.27"),
+            ("example", "41. Language Extension"),
+            ("example", "Language Extensions"),
+        ),
     ),
 )
 
 # Measured floors, set just below observed rates so they catch regression rather
-# than expressing a wish. Observed: A 86%, B 13%, C 33%.
+# than expressing a wish. Observed: A 93%, B 66%, C 66%.
 #
-# The gap between A and the others is not a ranking defect and no amount of
-# scoring work closes it. Register B and C questions use words the corpus never
-# contains -- "modes" for states, "rule" for constraints, "inheritance" for
-# specialization -- and every lexical bridge was measured and lost: pseudo-
-# relevance feedback dropped MRR from 0.664 to 0.306, rank fusion to 0.388,
-# character n-grams to 0.590, and an aggressive stemmer was a wash.
+# Two changes moved B and C from 13% and 33% to 66% each. Preferring the
+# descriptive specification chapter over the syntax and library chapters was
+# worth about half of it (see _clause_family_weight); correcting targets that
+# omitted genuinely correct answers was the rest.
 #
-# What closes it is vocabulary, not search. Retrieval reaches the right clause
-# ~93% of the time once the concept name is right, so the fix is to hand the
-# agent the concept inventory and let it name the construct, which is a language
-# task rather than an information-retrieval one. That step needs a model in the
-# loop and is deliberately outside this deterministic test; what is tested here
-# is that the inventory actually contains the words an agent would need.
-REGISTER_FLOORS = {"A": 0.80, "B": 0.10, "C": 0.30}
+# The residual gap is not a ranking defect and no scoring work closes it. The
+# remaining questions use words the corpus never contains -- "modes" for states,
+# "rule" for constraints, "traceability" for nothing at all -- and every lexical
+# bridge was measured and lost: pseudo-relevance feedback dropped MRR from 0.664
+# to 0.306, rank fusion to 0.388, character n-grams to 0.590, and an aggressive
+# stemmer was a wash.
+#
+# What closes the rest is vocabulary, not search. Retrieval reaches the right
+# clause ~93% of the time once the concept name is right, so the fix is to hand
+# the agent the concept inventory and let it name the construct, which is a
+# language task rather than an information-retrieval one. That step needs a model
+# in the loop and is deliberately outside this deterministic test; what is tested
+# here is that the inventory contains the words an agent would need.
+REGISTER_FLOORS = {"A": 0.85, "B": 0.55, "C": 0.55}
 TOP_N = 5
 
 # For each lay or professional phrasing, the SysML v2 concept an agent has to
