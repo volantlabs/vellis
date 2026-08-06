@@ -10,8 +10,9 @@ package VellisRequirements {
          * associations and link endpoints; permitted type pairings; one type-
          * key namespace; lossless JSON; Boolean live normalization; associated-
          * data property constraints with JSON-kind-compatible closed size,
-         * inclusive numeric-bound, and permitted-value meaning; endpoint constraints; directed link
-         * multiplicity; and direct-association multiplicity.
+         * inclusive numeric-bound, permitted-value, and string-pattern meaning;
+         * endpoint constraints; directed link multiplicity; and direct-association
+         * multiplicity. Every anchor shall have a non-empty display name.
          * Every graph object's type key shall resolve to exactly one active type
          * definition of the same object kind, and active type keys shall be
          * unique across the shared namespace.
@@ -20,11 +21,15 @@ package VellisRequirements {
          * shall contain at least one inclusive numeric bound or permitted value;
          * numeric bounds shall be ordered, permitted values shall be unique and
          * match the property's JSON kind, and coexisting forms shall both hold.
+         * A string pattern shall occur only on a stringValue property and every
+         * listed permitted string shall match it. Duplicate multiplicity-rule
+         * natural identities and duplicate participating types shall be invalid;
+         * distinct overlapping multiplicity rules shall all hold conjunctively.
          * Property names shall be non-empty and unique within each associated-
          * data type definition. Each associated-data object's properties shall
          * use only names declared by its active type definition, include every
          * required property, and validate every present required or optional
-         * property against its declared JSON kind, shape, and range.
+         * property against its declared JSON kind, shape, range, and pattern.
          */
     }
 
@@ -39,7 +44,8 @@ package VellisRequirements {
          * named projections in its return shape at an identified revision. An
          * associated-data group with no property comparisons shall select by
          * direct association and type alone. Active definitions at the evaluated
-         * revision shall govern property kind, shape, range, and endpoint validity.
+         * revision shall govern property kind, shape, range, pattern validation,
+         * and endpoint validity.
          * Equality shall compare lossless JSON values; ordered comparisons shall
          * be valid only for number-valued properties. A listed property
          * comparison shall match only when that property is present; omission
@@ -308,18 +314,82 @@ package VellisRequirements {
          * Recovery of representative predecessor RTG graphs shall preserve
          * object identity and kind, type meaning, direct associations, directed
          * links, endpoint eligibility, lossless JSON, and system.live meaning
-         * without making predecessor storage shape canonical. Accepted recovery
-         * is one transition; rejection or failure preserves current canonical state.
+         * without making predecessor storage shape canonical. A predecessor
+         * anchor without a display name shall receive "[recovered] {typeKey}
+         * {uuid}" from its exact stored values. Accepted recovery is one
+         * transition; rejection or failure preserves current canonical state.
          */
     }
 
     requirement def 'Simple Individual Operation' {
         subject system : 'Vellis System';
         doc /*
-         * One owner shall be able to initialize, use, query, preserve, and
+         * One owner shall be able to initialize blank, with the recommended
+         * Everyday Life starter, or from a snapshot; use, query, preserve, and
          * govern one cohesive Vellis system without tenant, organization, role,
          * cluster, server-fleet, concurrent definition-delta, or required
          * enterprise-infrastructure administration.
+         */
+    }
+
+    requirement def 'Canonical Semantic Equality' {
+        subject system : 'RTG System';
+        doc /*
+         * Every no-op, definition-delta comparison, graph comparison, replay
+         * comparison, and permitted-value uniqueness decision shall use one
+         * canonical semantic equality. JSON equality shall be kind-sensitive;
+         * numbers shall compare by exact mathematical value, strings exactly,
+         * arrays recursively in order, and objects recursively without member-
+         * order significance, with missing distinct from null. Graph equality
+         * shall include every canonical object value, association, and directed
+         * endpoint while ignoring order in unordered collections. Definition
+         * equality shall use the modeled natural identities and include kind,
+         * descriptions, and every structured rule. Reordering unordered content
+         * shall be an effective no-op; changing canonical meaning shall not. Two
+         * canonical states shall additionally require equal revision and equal
+         * definition-delta presence and content.
+         */
+    }
+
+    requirement def 'Fresh Initialization' {
+        subject system : 'RTG System';
+        doc /*
+         * A fresh RTG initialized without prior state shall accept one internally
+         * valid initial definition set and establish revision 0 with an empty
+         * graph, exactly that active set, no definition delta, one matching
+         * initial-state record, no transitions, and an empty activity ledger.
+         * Refusal or failure shall establish no partial state. Snapshot-based
+         * initialization shall use only reconstructed snapshot state and shall
+         * not overlay fresh-start definitions.
+         */
+    }
+
+    requirement def 'String Pattern Validation' {
+        subject system : 'RTG System';
+        doc /*
+         * An optional property pattern shall use Google RE2 syntax and Unicode
+         * semantics with whole-string FullMatch behavior. The system shall reject
+         * malformed or unsupported expressions and patterns on non-string
+         * properties. Requiredness, shape, range, and pattern shall apply
+         * conjunctively to present values, without requiring general
+         * satisfiability analysis. Pattern expression text shall be discoverable
+         * exactly and shall participate exactly in definition equality. Pattern
+         * validation shall add no regex query comparison or ordered string
+         * comparison.
+         */
+    }
+
+    requirement def 'Recommended Everyday Life Start' {
+        subject system : 'Vellis System';
+        doc /*
+         * When no prior state exists, Vellis shall offer blank and Everyday Life
+         * fresh vocabulary choices, present Everyday Life as recommended and
+         * preselected, and require explicit owner confirmation before either
+         * initialization. Blank shall use an empty definition set; Everyday Life
+         * shall use exactly the modeled Everyday Life starter definition set.
+         * Neither choice shall create graph objects. Snapshot initialization
+         * shall not offer or overlay the starter, and existing systems shall gain
+         * no separate starter-install behavior.
          */
     }
 
@@ -343,10 +413,14 @@ package VellisRequirements {
     requirement <RTG016> boundedHistoryRead : 'Bounded History Read';
     requirement <RTG017> mcpAgentToolContract : 'MCP Agent Tool Contract';
     requirement <RTG018> mcpOutcomeIntegrity : 'MCP Outcome Integrity';
+    requirement <RTG019> canonicalSemanticEquality : 'Canonical Semantic Equality';
+    requirement <RTG020> freshInitialization : 'Fresh Initialization';
+    requirement <RTG021> stringPatternValidation : 'String Pattern Validation';
     requirement <VEL001> ownerControlledMemory : 'Owner Controlled Memory';
     requirement <VEL002> observableFailure : 'Observable Failure';
     requirement <VEL003> rtgCompatibility : 'RTG Compatibility';
     requirement <VEL004> simpleIndividualOperation : 'Simple Individual Operation';
+    requirement <VEL005> recommendedEverydayLifeStart : 'Recommended Everyday Life Start';
 
     satisfy graphInvariants by vellis.memory;
     satisfy semanticQueryMeaning by vellis.memory;
@@ -366,8 +440,12 @@ package VellisRequirements {
     satisfy boundedHistoryRead by vellis.memory;
     satisfy mcpAgentToolContract by vellis.memory;
     satisfy mcpOutcomeIntegrity by vellis.memory;
+    satisfy canonicalSemanticEquality by vellis.memory;
+    satisfy freshInitialization by vellis.memory;
+    satisfy stringPatternValidation by vellis.memory;
     satisfy ownerControlledMemory by vellis;
     satisfy observableFailure by vellis;
     satisfy rtgCompatibility by vellis;
     satisfy simpleIndividualOperation by vellis;
+    satisfy recommendedEverydayLifeStart by vellis;
 }

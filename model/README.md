@@ -3,11 +3,12 @@
 The textual SysML v2 files here are the current product and system authority for Vellis. The current
 namespace map is:
 
-1. `10-rtg-domain.sysml` — `RTG`: graph, owner-described definitions, progressive discovery views, bounded query and change meaning, validation results, snapshots, revision, and ledger vocabulary.
-2. `20-rtg-system.sysml` — `RTGSystem`: one cohesive RTG boundary, black-box use cases, and the selected MCP tool contract.
-3. `30-vellis.sysml` — `Vellis`: owner and external-agent context, product use cases, and RTG composition.
-4. `40-requirements.sysml` — `VellisRequirements`: stakeholder requirements, selected subjects, and explicit satisfying features.
-5. `50-verification.sysml` — `VellisVerification`: subject-bound verification cases and decisive evidence.
+1. `10-rtg-domain.sysml` — `RTG`: graph, owner-described definitions and constraints, canonical equality, progressive discovery views, bounded query and change meaning, validation results, snapshots, revision, and ledger vocabulary.
+2. `15-everyday-life-starter.sysml` — `EverydayLifeStarter`: the complete modeled optional Everyday Life fresh-start definition set, with no graph data or separate schema authority.
+3. `20-rtg-system.sysml` — `RTGSystem`: one cohesive RTG boundary, black-box use cases, and the selected MCP tool contract.
+4. `30-vellis.sysml` — `Vellis`: owner and external-agent context, product use cases, fresh vocabulary choice, and RTG composition.
+5. `40-requirements.sysml` — `VellisRequirements`: stakeholder requirements, selected subjects, and explicit satisfying features.
+6. `50-verification.sysml` — `VellisVerification`: subject-bound verification cases and decisive evidence.
 
 These packages are intentional namespaces, not validator-required file structure or runtime layers.
 RTG owns graph, definition, revision, and history state as one semantic and transactional boundary.
@@ -21,6 +22,13 @@ The model selects core MCP tool discovery and invocation as the first agent-acce
 not select a server part, FastMCP runtime, storage design, transport, deployment, migration utility,
 generator, or implementation language. Its discovery results, snapshots, and ledgers are semantic
 artifacts, not serialized formats.
+
+The modeled property vocabulary includes RE2 whole-string constraints for string shape without
+selecting a runtime regex engine. Fresh systems may begin blank or, after explicit confirmation,
+with the recommended Everyday Life starter. Snapshot initialization uses the snapshot's definitions;
+the starter is not a later installer and is never overlaid on existing state. Existing systems adapt
+vocabulary through ordinary owner-controlled definition governance, including an agent translating
+an owner prompt. Starter dates constrain lexical shape only, not calendar validity or ordering.
 
 A cold agent first requests the complete shallow anchor summary for current active state, then
 inspects the relevant anchor neighborhoods. Each result identifies its evaluated revision; if those

@@ -15,8 +15,8 @@ authority for selected Vellis behavior.
 
 ## Canonical graph distinctions
 
-- **Anchor:** a stable independently identifiable concept with UUID, type key, metadata, and optional
-  display name.
+- **Anchor:** a stable independently identifiable concept with UUID, type key, metadata, and a
+  required non-empty convenience display name. UUID remains identity and type key remains ontology.
 - **Associated data object:** an identity-bearing typed fact group with lossless JSON properties,
   associated with one or more anchors.
 - **Link:** an identity-bearing typed directed relationship whose endpoints may be anchors or
@@ -149,9 +149,10 @@ Specify whether every requested projection has one binding, how projected option
 absence without becoming null, and whether identical projected tuples collapse. Do not manufacture an
 evaluation pipeline merely to explain these declarative semantics.
 
-Property rules exposed to agents need closed typed meaning. Prefer a small JSON-kind-compatible size,
-numeric-bound, or permitted-value vocabulary over empty `shape` or `range` placeholders. Do not add a
-pattern, expression, or nested schema language before an owner query or validation case needs it.
+Property rules exposed to agents need closed typed meaning. Prefer the selected JSON-kind-compatible
+size, numeric-bound, permitted-value, and RE2 whole-string pattern vocabulary over empty `shape` or
+`range` placeholders. Do not extend that pattern constraint into a broader expression or nested
+schema language before an owner query or validation case needs it.
 When discovery claims to return the complete property vocabulary, decide explicitly whether that
 vocabulary is closed or whether undeclared properties remain valid; do not make agents infer the
 answer from implementation behavior.

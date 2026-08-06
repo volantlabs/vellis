@@ -28,6 +28,67 @@ When a construct feels familiar, check that it exists before designing around it
 
 Names are the other trap. SysML v2 names concepts differently from ordinary systems-engineering usage: states rather than modes, constraints rather than rules, specialization rather than inheritance, "Definition and Usage" rather than variability. If a search returns nothing convincing, the query is probably using the wrong word rather than asking about something absent. Run `just model-reference-concepts` for the full construct inventory, pick the name, and search again.
 
+### From what you are trying to do, to what SysML v2 calls it
+
+Search reaches the right clause reliably once the construct is named, so the hard
+step is naming. SysML v2 frequently uses a different word than ordinary
+systems-engineering usage, and the specification does not contain the ordinary
+word at all -- "mode", "rule", and "piece" appear on zero pages -- so searching in
+your own words cannot find them. Map the intent first, then search by name.
+
+| If you are trying to express | The construct is | Clause |
+| --- | --- | --- |
+| a thing the system is made of, that is part of it | Parts | 7.11 |
+| a thing that flows through, is acted on, or is exchanged | Items | 7.10 |
+| a value, quantity, or characteristic with no identity | Attributes | 7.7 |
+| a fixed set of allowed values | Enumerations | 7.8 |
+| a point of interaction on something | Ports | 7.12 |
+| a link between things | Connections | 7.13 |
+| an agreed interaction surface between parts | Interfaces | 7.14 |
+| something moving from one place to another | Flows and Messages | 7.16 |
+| something the system does | Actions | 7.17 |
+| behaviour that depends on a mode or condition, and changes between them | States | 7.18 |
+| a computation that returns a result | Calculations | 7.19 |
+| a rule that must always hold | Constraints | 7.20 |
+| something required of the system, and who satisfies it | Requirements | 7.21 |
+| a study, trade-off, or quantitative evaluation | Analysis Cases | 7.23 |
+| evidence that a requirement is met | Verification Cases | 7.24 |
+| what a user wants to accomplish with the system | Use Cases | 7.25 |
+| a filtered presentation for a stakeholder concern | Views and Viewpoints | 7.26 |
+| annotation, rationale, tags, or language extension | Metadata | 7.27 |
+| responsibility handed from one element to another | Allocations | 7.15 |
+| that one element depends on another | Dependencies | 7.3 |
+| documentation attached to an element | Annotations | 7.4 |
+| grouping and namespacing of a model | Namespaces and Packages | 7.5 |
+| a reusable definition and its contextual uses | Definition and Usage | 7.6 |
+| a family of variants, or a product line | Variability (Definition and Usage) | 7.6 |
+| something occurring over time, or an individual instance | Occurrences | 7.9 |
+
+Language mechanics, when the question is about the type system rather than the
+system being modelled: Generalization, Subsetting, Redefinition, Multiplicities,
+Features, Feature Values, Types, Classifiers, Expressions.
+
+The left column is ordinary engineering intent, not SysML vocabulary; that is the
+point. If a question does not fit a row, take the closest one and search by its
+construct name rather than by the question's own words.
+
+The full construct inventory, generated from the pinned release so it cannot drift:
+
+<!-- generated: construct inventory -->
+Action Definitions · Action Performance · Actions · Allocation · Allocations · Analysis ·
+Analysis Cases · Annotations · Assignment Actions · Associations · Asynchronous Messaging ·
+Attributes · Behaviors · Binding Connectors · Calculations · Cases · Classes · Classifiers ·
+Conditional Succession · Connections · Connectors · Constraints · Control · Data Types ·
+Definition and Usage · Dependencies · Elements and Relationships · Enumeration Definitions ·
+Enumerations · Expressions · Feature Values · Features · Filtering · Flows · Flows and
+Messages · Functions · Generalization · Individuals · Interactions · Interfaces · Items ·
+Language Extension · Metadata · Multiplicities · Namespaces · Namespaces and Packages ·
+Occurrences · Opaque Actions · Packages · Part Definitions · Parts · Ports · Redefinition ·
+Requirements · State Definitions · State Exhibition · States · Structures · Subsetting ·
+Terminate Actions · Transitions · Types · Use Cases · Variability · Verification ·
+Verification Cases · Views · Views and Viewpoints
+<!-- end generated -->
+
 ## Evidence guardrails
 
 - Retrieve evidence before committing to a consequential construct, not only after validation fails.

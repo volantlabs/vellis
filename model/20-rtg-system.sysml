@@ -285,6 +285,24 @@ package RTGSystem {
         }
     }
 
+    use case def 'Initialize fresh RTG' {
+        subject system : 'RTG System';
+        actor client : 'RTG Client';
+        in item initialDefinitions : 'Graph Definition Set';
+        objective {
+            doc /*
+             * Input: one internally valid initial definition set, supplied only
+             * for an RTG with no established canonical state. Success: establish
+             * revision 0 with an empty graph, exactly those active definitions,
+             * no definition delta, one initial-state record containing that
+             * state, no transition records, and an empty activity ledger.
+             * Refusal or failure establishes no partial canonical or activity
+             * state. Evidence: direct state, the initial record, and replay all
+             * agree on the same revision-0 state.
+             */
+        }
+    }
+
     use case def 'Initialize fresh RTG from snapshot' {
         subject system : 'RTG System';
         actor client : 'RTG Client';
@@ -294,6 +312,7 @@ package RTGSystem {
              * tail for an RTG with no established canonical state. Success:
              * establish the reconstructed graph, definitions, optional delta,
              * and captured or replayed revision without inventing a revision.
+             * No blank or recommended fresh-start definitions are overlaid.
              * Begin the fresh RTG's canonical history with one initial record
              * containing that reconstructed state; do not claim omitted earlier
              * transitions. Refusal or failure establishes no partial canonical
@@ -325,7 +344,9 @@ package RTGSystem {
             doc /*
              * Input: predecessor RTG meaning and optional definitions. Success:
              * validate and commit preserved graph meaning, supplied or current
-             * active definitions, no delta, and one new revision. Refusal or
+             * active definitions, no delta, and one new revision. A predecessor
+             * anchor without a display name receives the deterministic synthetic
+             * display name defined by the recovery candidate. Refusal or
              * failure preserves all current canonical state. Recovery representation and
              * interchange mechanism remain open. Evidence: current query and
              * replay preserve the accepted predecessor RTG distinctions.

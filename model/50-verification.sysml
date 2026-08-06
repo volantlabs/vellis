@@ -10,7 +10,8 @@ package VellisVerification {
              * Exercise anchors, associated data, direct associations, and links
              * across valid and invalid identity, kind, type, endpoint, property,
              * link-role multiplicity, direct-association multiplicity, JSON,
-             * closed size bounds, inclusive numeric bounds, permitted values, and
+             * closed size bounds, inclusive numeric bounds, permitted values,
+             * string patterns, required non-empty anchor display names, and
              * live-value cases. Reject unknown object type keys, kind-mismatched
              * type keys, duplicate active type keys across kinds, and empty,
              * inverted, duplicate, and JSON-kind-
@@ -18,6 +19,8 @@ package VellisVerification {
              * names within one associated-data type. Accept an absent optional
              * property, and reject a missing required property, an undeclared
              * property, or a present value that violates its declared rule.
+             * Reject duplicate natural identities or participating members in
+             * multiplicity rules, and show distinct overlapping rules all apply.
              * Every accepted graph conforms and every invalid proposal changes
              * no canonical state or revision.
              */
@@ -347,8 +350,10 @@ package VellisVerification {
              * Recover representative predecessor examples and show stable UUIDs
              * and kinds, direct associations distinct from links, directed
              * anchor or associated-data endpoints, lossless nested JSON, and
-             * missing system.live normalized to true. Accepted recovery is one
-             * replayable transition; invalid recovery changes no canonical state.
+             * missing system.live normalized to true. Give each unnamed
+             * predecessor anchor exactly "[recovered] {typeKey} {uuid}" while
+             * preserving its UUID and type key. Accepted recovery is one replayable
+             * transition; invalid recovery changes no canonical state.
              */
             verify VellisRequirements::rtgCompatibility;
         }
@@ -358,13 +363,98 @@ package VellisVerification {
         subject system : 'Vellis System';
         objective {
             doc /*
-             * Start once with an empty valid RTG and once from a complete
-             * snapshot plus later records. Show one owner can query, preserve,
+             * Start once blank, once with the Everyday Life starter, and once
+             * from a complete snapshot plus later records. Show one owner can query, preserve,
              * and govern the resulting system and sole definition delta without
              * tenant, organization, role, cluster, server-fleet, or enterprise-
              * infrastructure administration and without internal RTG subsystems.
              */
             verify VellisRequirements::simpleIndividualOperation;
+        }
+    }
+
+    verification def 'Canonical Equality Decides No Ops' {
+        subject system : 'RTG System';
+        objective {
+            doc /*
+             * Compare Boolean, number, string, array, object, and null JSON
+             * values. Show JSON kinds remain distinct, 1 and 1.0 have equal exact
+             * mathematical value, array order matters, object-member order does
+             * not, and a missing property differs from null. Reorder graph-object,
+             * definition, association, and participating-type sets and show an
+             * accepted effective no-op with no revision, transition, or delta.
+             * Change a description, pattern expression text, graph-object value,
+             * endpoint, or association and show a semantic difference. Show type,
+             * property, endpoint-rule, and multiplicity natural identities decide
+             * whether content is an edit, addition, removal, or invalid duplicate.
+             * Compare canonical states and show revision, delta presence, and
+             * proposed-definition content also participate.
+             */
+            verify VellisRequirements::canonicalSemanticEquality;
+        }
+    }
+
+    verification def 'String Patterns Validate Stored Values' {
+        subject system : 'RTG System';
+        objective {
+            doc /*
+             * Activate a stringValue property with a valid RE2 expression and
+             * show whole-string matching accepts a conforming present value and
+             * rejects prefix, suffix, and otherwise nonmatching values. Accept an
+             * absent optional property. Combine pattern, size, and permitted
+             * values and show every present condition applies, including rejection
+             * of a listed permitted string that does not match. Reject a malformed
+             * expression, RE2-unsupported lookaround or backreference, and a
+             * pattern on every non-string JSON kind. Every rejection preserves
+             * graph, definitions, delta, revision, and canonical history. Discover
+             * the exact active expression. Change only its text and show a
+             * meaningful definition change even when the expressions recognize
+             * the same language. Confirm query comparisons remain the existing
+             * closed set and ordered comparisons remain number-only.
+             */
+            verify VellisRequirements::stringPatternValidation;
+        }
+    }
+
+    verification def 'Fresh RTG Begins At Revision Zero' {
+        subject system : 'RTG System';
+        objective {
+            doc /*
+             * Initialize one state-free RTG with an empty valid definition set
+             * and another with a non-empty valid set. Show each has revision 0,
+             * an empty graph, exactly the supplied active definitions, no delta,
+             * one equivalent initial-state record, no transitions, and an empty
+             * activity ledger. Reject an invalid initial set and a request against
+             * an already initialized RTG without establishing partial state.
+             * Initialize separately from a snapshot and show its definitions and
+             * revision are reconstructed without any fresh-start overlay.
+             */
+            verify VellisRequirements::freshInitialization;
+        }
+    }
+
+    verification def 'Everyday Life Is An Optional Confirmed Start' {
+        subject system : 'Vellis System';
+        objective {
+            doc /*
+             * With no prior state, show blank and Everyday Life are the complete
+             * choice set, Everyday Life is recommended and preselected, and
+             * neither choice initializes before explicit owner confirmation.
+             * Confirm blank and show empty definitions. Confirm Everyday Life and
+             * show exactly twelve anchor types, twelve optional profile types,
+             * nine links, and twenty-four profile multiplicity rules with no
+             * graph objects or example data. Inspect every profile and endpoint
+             * neighborhood and show it matches the modeled starter. For each
+             * date-like property, accept 2024-02-29; reject 2024-2-9, 2024-13-01,
+             * 2024-01-00, and arbitrary text; accept absent dates and show
+             * 2023-02-31 is lexically accepted without claiming calendar validity.
+             * Initialize from a snapshot and show no starter overlay. Show an
+             * existing system has no separate starter-install operation and may
+             * use only ordinary owner-controlled definition governance.
+             */
+            verify VellisRequirements::recommendedEverydayLifeStart;
+            verify VellisRequirements::freshInitialization;
+            verify VellisRequirements::graphInvariants;
         }
     }
 
@@ -426,6 +516,18 @@ package VellisVerification {
         subject redefines system = VellisRequirements::vellis;
     }
     verification simpleOperation : 'One Owner Begins Using One Cohesive System' {
+        subject redefines system = VellisRequirements::vellis;
+    }
+    verification canonicalEquality : 'Canonical Equality Decides No Ops' {
+        subject redefines system = VellisRequirements::vellis.memory;
+    }
+    verification stringPatterns : 'String Patterns Validate Stored Values' {
+        subject redefines system = VellisRequirements::vellis.memory;
+    }
+    verification freshInitialization : 'Fresh RTG Begins At Revision Zero' {
+        subject redefines system = VellisRequirements::vellis.memory;
+    }
+    verification everydayLifeStart : 'Everyday Life Is An Optional Confirmed Start' {
         subject redefines system = VellisRequirements::vellis;
     }
 }

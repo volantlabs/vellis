@@ -496,3 +496,51 @@ def test_the_concept_escape_hatch_is_unconditional(capsys: pytest.CaptureFixture
 
     assert results and max(result.score for result in results) > 10
     assert "model-reference-concepts" in output
+
+
+def test_skill_inventory_matches_the_generated_one() -> None:
+    """The skill embeds the construct inventory so an agent has it without a tool
+    call, which is the whole point: retrieval is measured at 100% once the
+    construct is named, so the vocabulary has to be in context at the moment of
+    naming.
+
+    Embedding generated content risks drift, so this asserts the embedded list is
+    exactly what the pinned release produces. If upstream adds a construct, this
+    fails until the skill is regenerated.
+    """
+    if not _corpus_ready():
+        pytest.skip("generated corpus absent; run `just model-setup`")
+    skill = (model_layout.ROOT / ".agents" / "skills" / "sysml-reference" / "SKILL.md").read_text(
+        encoding="utf-8"
+    )
+    start = skill.index("<!-- generated: construct inventory -->")
+    end = skill.index("<!-- end generated -->")
+    embedded = {
+        name.strip()
+        for name in skill[start:end].split("-->", 1)[1].replace("\n", " ").split("·")
+        if name.strip()
+    }
+
+    assert embedded == {entry.name for entry in sysml_reference.concepts()}
+
+
+def test_intent_map_covers_every_construct_or_names_it_as_language_mechanics() -> None:
+    """The intent map is hand-written, because no derived artifact can contain it.
+
+    The lay vocabulary it bridges from appears nowhere in the pinned material, so
+    there is nothing to derive the mapping from; it is domain knowledge. What can
+    be machine-checked is completeness, which is what actually rots: when upstream
+    adds a construct, this fails until the map accounts for it.
+    """
+    if not _corpus_ready():
+        pytest.skip("generated corpus absent; run `just model-setup`")
+    skill = (model_layout.ROOT / ".agents" / "skills" / "sysml-reference" / "SKILL.md").read_text(
+        encoding="utf-8"
+    )
+    missing = [
+        entry.name
+        for entry in sysml_reference.concepts()
+        if entry.origin == "specification" and entry.name not in skill
+    ]
+
+    assert not missing, f"constructs absent from the intent map: {missing}"

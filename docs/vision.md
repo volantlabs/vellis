@@ -10,6 +10,11 @@ Algorithms, storage layouts, transports, protocols, frameworks, deployment choic
 
 The measure of success is a turnkey personal application and a repository whose path from owner outcome through model, generated source, and evidence is easy to inspect, understand, and trust. The future is model-first, agent-assisted, and plain.
 
+A first-time owner may start from a blank personal vocabulary or explicitly confirm the modeled,
+recommended Everyday Life starter. The starter accelerates a useful beginning without becoming a
+universal platform ontology: selected definitions become ordinary owner-governed meaning, and an
+existing or restored system is never silently overlaid.
+
 That includes agents arriving without hidden project memory. Vellis should let them discover the
 owner-described concepts in one personal graph, inspect only the relevant meaning, and act through a
 small portable contract without importing enterprise architecture or predecessor assumptions.

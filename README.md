@@ -2,7 +2,7 @@
 
 Vellis is an individually owned personal AI system and an open demonstration of model-first software engineering with textual SysML v2.
 
-The repository currently contains the Vellis system model and its development tooling, with no application implementation or generated product source yet. The model covers owner-facing behavior, Reified Type Graph (RTG) graph and query meaning, cold-agent definition discovery, definition governance, snapshots and replay, a selected MCP tool contract, cohesive system responsibility, requirements, satisfiers, and verification cases.
+The repository currently contains the Vellis system model and its development tooling, with no application implementation or generated product source yet. The model covers owner-facing behavior, Reified Type Graph (RTG) graph and query meaning, canonical equality and string-shape constraints, cold-agent definition discovery, definition governance, blank or recommended Everyday Life initialization, snapshots and replay, a selected MCP tool contract, cohesive system responsibility, requirements, satisfiers, and verification cases.
 
 ## What is here
 

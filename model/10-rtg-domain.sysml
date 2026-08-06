@@ -26,7 +26,13 @@ package RTG {
     }
 
     attribute def 'JSON Value' {
-        doc /* Any JSON value preserved without loss of kind or nested content. */
+        doc /*
+         * Any JSON value preserved without loss of kind or nested content.
+         * Semantic equality is JSON-kind-sensitive. Numbers compare by exact
+         * mathematical value, strings exactly, arrays recursively in order, and
+         * objects recursively without member-order significance. A missing
+         * property remains distinct from a present JSON null value.
+         */
     }
 
     attribute def 'JSON Object' :> 'JSON Value' {
@@ -44,6 +50,17 @@ package RTG {
          */
     }
 
+    attribute def 'String Pattern' {
+        attribute expression : ScalarValues::String;
+        doc /*
+         * A Google RE2 regular expression evaluated over a Unicode string with
+         * whole-string FullMatch semantics. RE2-supported inline flags are part
+         * of the expression; there is no separate flags value. An expression
+         * that RE2 rejects, including lookaround or a backreference, is invalid.
+         * The selected language and semantics do not select a runtime engine.
+         */
+    }
+
     attribute def 'Value Range' {
         attribute lowerBound [0..1] : 'JSON Value';
         attribute upperBound [0..1] : 'JSON Value';
@@ -54,7 +71,7 @@ package RTG {
          * not greater than an upper; both bounds are inclusive.
          * Permitted values have the governed property's JSON kind and are unique
          * by lossless JSON equality. When bounds and permitted values coexist, a
-         * value must satisfy both. No expression or pattern language is implied.
+         * value must satisfy both.
          */
     }
 
@@ -156,8 +173,12 @@ package RTG {
     abstract item def 'Link Endpoint' :> 'Graph Object';
 
     item def Anchor :> 'Link Endpoint' {
-        doc /* A stable, independently identifiable concept. */
-        attribute displayName [0..1] : ScalarValues::String;
+        doc /*
+         * A stable, independently identifiable concept. Its required non-empty
+         * display name is an editable human and agent convenience; UUID remains
+         * identity and type key remains ontology.
+         */
+        attribute displayName : ScalarValues::String;
     }
 
     item def 'Associated Data Object' :> 'Link Endpoint' {
@@ -185,7 +206,11 @@ package RTG {
     item def Graph {
         doc /*
          * Canonical graph state. Every direct association and link endpoint
-         * resolves to an object owned by this graph.
+         * resolves to an object owned by this graph. Semantic equality compares
+         * graph-object UUID, kind, type key, display name when applicable,
+         * metadata, properties, direct anchor associations, and directed link
+         * endpoints. Owned graph-object collections and direct-association sets
+         * are unordered; reordering them does not change graph meaning.
          */
 
         item anchors [*] : Anchor;
@@ -203,6 +228,9 @@ package RTG {
          * may temporarily omit it and report an activation-blocking finding.
          * Automatic assessment establishes presence and non-emptiness; the
          * owner judges whether the wording communicates the intended meaning.
+         * Descriptions and all structured rules participate in semantic
+         * equality. Definition collections and referenced type sets are
+         * unordered unless explicitly declared ordered.
          */
     }
 
@@ -232,17 +260,23 @@ package RTG {
     item def 'Property Constraint' :> 'Definition Object' {
         doc /*
          * Governs one associated-data property with requiredness, one JSON kind,
-         * and optional closed size and permitted-value conditions. A condition
-         * incompatible with the selected JSON kind is invalid. No serialized
-         * schema, pattern syntax, or general constraint language is selected.
+         * and optional closed size, permitted-value, and string-pattern
+         * conditions. A pattern is valid only for stringValue and every listed
+         * permitted string must also match it. Present conditions apply
+         * conjunctively; no satisfiability proof between pattern and size is
+         * required. A condition incompatible with the selected JSON kind is
+         * invalid. No serialized schema or general constraint language is selected.
          * The property name is non-empty and unique within its owning
-         * associated-data type definition.
+         * associated-data type definition. Its natural identity is that owning
+         * type key plus property name. Pattern expression text participates
+         * exactly in equality; equivalent expressions are not normalized.
          */
         attribute propertyName : ScalarValues::String;
         attribute required : ScalarValues::Boolean;
         attribute jsonKind : 'JSON Kind';
         attribute valueShape [0..1] : 'Value Shape';
         attribute range [0..1] : 'Value Range';
+        attribute pattern [0..1] : 'String Pattern';
     }
 
     item def 'Endpoint Constraint' :> 'Definition Object' {
@@ -265,7 +299,9 @@ package RTG {
     item def 'Link Multiplicity Constraint' :> 'Multiplicity Constraint' {
         doc /*
          * Counts links of one type at a selected source or target end for
-         * constrained endpoint types and permitted opposite endpoint types.
+         * constrained endpoint types and permitted opposite endpoint types. Its
+         * natural identity is the link type key, constrained end, and the two
+         * unordered participating type-key sets.
          */
         ref item linkType : 'Link Type Definition';
         attribute constrainedEnd : 'Link End';
@@ -276,7 +312,9 @@ package RTG {
     item def 'Direct Association Multiplicity Constraint' :> 'Multiplicity Constraint' {
         doc /*
          * Counts identity-free anchor/data associations at the selected end
-         * between the stated anchor and associated-data type populations.
+         * between the stated anchor and associated-data type populations. Its
+         * natural identity is the constrained end and the two unordered
+         * participating type-key sets.
          */
         attribute constrainedEnd : 'Direct Association End';
         ref item anchorTypes [1..*] : 'Anchor Type Definition';
@@ -287,6 +325,13 @@ package RTG {
         doc /*
          * The complete active graph vocabulary and constraints. Type keys are
          * unique in one namespace and every reference resolves within the set.
+         * A type definition's natural identity is its type key; its definition
+         * kind is semantic content. Endpoint constraints are identified by their
+         * owning link type. Property and multiplicity constraints use their
+         * stated natural identities. Duplicate natural identities and duplicate
+         * members of any set are invalid. Distinct overlapping multiplicity
+         * constraints apply conjunctively. Unordered definition and referenced
+         * type collections compare without order significance.
          */
         item anchorTypes [*] : 'Anchor Type Definition';
         item associatedDataTypes [*] : 'Associated Data Type Definition';
@@ -299,7 +344,7 @@ package RTG {
          * The sole prospective next definition set. The difference from the
          * active set is the in-flight change; diff representation remains open.
          * When present in canonical state, the proposed set is semantically
-         * different from the active set.
+         * different from the active set by canonical semantic equality.
          */
         item proposedDefinitions : 'Graph Definition Set';
     }
@@ -378,8 +423,9 @@ package RTG {
         doc /*
          * A structured comparison against one present property value. A missing
          * property does not satisfy the condition. The active
-         * property definition remains authoritative for JSON kind, shape, and
-         * permitted range. Equal and notEqual compare lossless JSON values;
+         * property definition remains authoritative for JSON kind, shape,
+         * permitted range, and stored-value pattern validation. Equal and
+         * notEqual compare lossless JSON values;
          * ordered comparisons are valid only for numberValue properties. Other
          * combinations are rejected.
          */
@@ -620,6 +666,11 @@ package RTG {
         item activeDefinitions : 'Graph Definition Set';
         item definitionDelta [0..1] : 'Definition Delta';
         attribute revision : 'Revision Number';
+        doc /*
+         * Two canonical states are semantically equal exactly when their
+         * revisions, graphs, active definitions, and delta presence agree and,
+         * when present, their proposed definition sets are semantically equal.
+         */
     }
 
     item def 'Canonical Change' {
@@ -810,8 +861,12 @@ package RTG {
 
     item def 'Recovery Candidate' {
         doc /*
-         * Existing predecessor RTG graph meaning and optional governing
-         * definitions. Recovery into an existing system begins with no delta.
+         * Normalized existing predecessor RTG graph meaning and optional
+         * governing definitions. While forming this candidate, a predecessor
+         * anchor without a display name is assigned the clearly synthetic value
+         * "[recovered] {typeKey} {uuid}" using that anchor's exact type-key and
+         * UUID strings; the owned graph therefore contains only valid canonical
+         * anchors. Recovery into an existing system begins with no delta.
          */
         item graph : Graph;
         item activeDefinitions [0..1] : 'Graph Definition Set';

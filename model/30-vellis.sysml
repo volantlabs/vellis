@@ -1,5 +1,16 @@
 package Vellis {
     private import RTGSystem::*;
+    private import EverydayLifeStarter::*;
+
+    enum def 'Fresh Vocabulary Choice' {
+        enum blank;
+        enum everydayLifeStarter;
+        doc /*
+         * The two owner-confirmed vocabulary choices available only when
+         * beginning without prior canonical state. Everyday Life is presented
+         * as the recommended preselected choice; blank remains fully supported.
+         */
+    }
 
     part def Owner {
         doc /* The single authoritative human owner of one Vellis system and its personal memory. */
@@ -21,19 +32,34 @@ package Vellis {
     use case def 'Begin using one personal Vellis system' {
         subject system : 'Vellis System';
         actor owner : Owner;
+        in attribute freshVocabularyChoice [0..1] : 'Fresh Vocabulary Choice';
+        in attribute freshVocabularyConfirmed [0..1] : ScalarValues::Boolean;
         objective {
             doc /*
-             * Input: either no prior memory or a complete canonical snapshot
-             * with an optional later ledger tail. Success: establish one valid
-             * personal-memory system ready for owner use. Snapshot-based
-             * initialization begins its own history at the reconstructed
-             * revision without claiming omitted earlier transitions. Refusal
-             * or failure establishes no partial recovered state. Evidence: the
+             * Input: either no prior memory with one explicitly confirmed fresh
+             * vocabulary choice, or a complete canonical snapshot with an
+             * optional later ledger tail. For a fresh start, present Everyday
+             * Life as recommended and preselected while retaining blank as an
+             * alternative; do not initialize until the owner confirms the
+             * selected choice. Success: blank establishes revision 0 with empty
+             * definitions, while everydayLifeStarter establishes revision 0
+             * with exactly EverydayLifeStarter::everydayLifeStarter; both have
+             * an empty graph, no delta, one initial record, no transitions, and
+             * an empty activity ledger. Snapshot initialization uses only its
+             * reconstructed definitions and never overlays a fresh vocabulary.
+             * Refusal or failure, including absent or false confirmation,
+             * establishes no partial canonical or activity state. Evidence: the
              * owner can use the resulting system without tenant, organization,
-             * role, cluster, server-fleet, or infrastructure administration.
+             * role, cluster, server-fleet, or infrastructure administration and
+             * no starter-created people, examples, or other graph objects exist.
              */
         }
     }
+
+    dependency beginningBehavior
+        from 'Begin using one personal Vellis system'
+        to RTGSystem::'Initialize fresh RTG',
+           RTGSystem::'Initialize fresh RTG from snapshot';
 
     use case def 'Obtain authorized relevant context' {
         subject system : 'Vellis System';
