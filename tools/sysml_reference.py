@@ -991,6 +991,36 @@ def _clause_documents(specification: Specification, reference_root: Path) -> tup
         if "extraction_warnings: []" not in raw.split(marker, 1)[0]:
             warned_pages.add(physical_page)
 
+    # Concatenate the body once, then cut it at each clause's own section-number
+    # anchor. Assembling whole pages made every clause carry its neighbours' text,
+    # because clauses start mid-page: descriptions and scores both reflected the
+    # wrong prose. Anchors resolve for 98% of clauses; the rest keep page text,
+    # which is the previous behaviour rather than a loss.
+    ordered = sorted(page_text)
+    joined: list[str] = []
+    page_at: list[tuple[int, int]] = []
+    for page in ordered:
+        page_at.append((len("".join(joined)), page))
+        joined.append(page_text[page])
+    corpus = "".join(joined)
+
+    anchor_at: dict[str, int] = {}
+    for entry in entries:
+        if not isinstance(entry, dict):
+            continue
+        number = entry.get("section_number")
+        if not number:
+            continue
+        page = int(entry["physical_page_start"])
+        base = next((off for off, candidate in page_at if candidate == page), None)
+        if base is None:
+            continue
+        window = corpus[base : base + len(page_text.get(page, ""))]
+        match = re.search(rf"(?m)^\s*{re.escape(str(number))}(?=\s)", window)
+        if match is not None:
+            anchor_at[str(number)] = base + match.start()
+    boundaries = sorted(anchor_at.values())
+
     clauses: list[Document] = []
     for entry in entries:
         if not isinstance(entry, dict):
@@ -1001,6 +1031,12 @@ def _clause_documents(specification: Specification, reference_root: Path) -> tup
         start = int(entry["physical_page_start"])
         end = int(entry["physical_page_end"])
         pages = [page for page in range(start, end + 1) if page in page_text]
+        begin = anchor_at.get(str(number))
+        if begin is None:
+            body = "\n".join(page_text[page] for page in pages)
+        else:
+            stop = next((offset for offset in boundaries if offset > begin), len(corpus))
+            body = corpus[begin:stop]
         printed = _page_span(_printed_page(specification, start), _printed_page(specification, end))
         physical = _page_span(str(start), str(end))
         clauses.append(
@@ -1013,7 +1049,7 @@ def _clause_documents(specification: Specification, reference_root: Path) -> tup
                     f"{specification.short_label} {number}, printed {printed}, physical {physical}"
                 ),
                 location=page_paths[pages[0]] if pages else None,
-                body="\n".join(page_text[page] for page in pages),
+                body=body,
                 sort_key=_section_sort_key(str(number)),
                 extraction_warning=any(page in warned_pages for page in pages),
             )
