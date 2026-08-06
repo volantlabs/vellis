@@ -103,3 +103,8 @@ Treat a language-baseline change as an explicit PR:
 6. review the complete lock and model impact before merge.
 
 Do not create or maintain a second bundled language summary in this skill.
+
+## References
+
+- [SysML v2 is not SysML v1](references/v1-displacement.md): displaced v1 and UML notation, and the
+  forms that parse cleanly but mean something else, which no tooling here checks.

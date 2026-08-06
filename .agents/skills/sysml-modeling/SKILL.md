@@ -37,7 +37,9 @@ manufacturing a fresh artifact at every modeling layer.
    completeness, duplicate meaning, and absent-value meaning. Stop when the changed claim is
    discriminated, governed, and verifiable and further detail would only predict a realization or
    unrelated feature.
-8. Run official validation, inspect the diff as code, and perform separate plan-conformance,
+8. Settle uncertain syntax with `just model-probe "<snippet>"` before editing rather than after a
+   failed run, then run official validation, inspect the diff as code, and perform separate
+   plan-conformance,
    semantic-closure, adequacy, subtraction, and repository-truth reviews. Fix material findings and
    repeat the whole review sequence until one complete pass finds no new material issue. Update
    public guidance with `$documentation-sync` only when its claims actually changed.
