@@ -5,6 +5,8 @@ handwritten documentation remains explanatory.
 
 ## Setup
 
+Requires `uv`, `just`, and `git`.
+
 ```sh
 just setup
 just model-setup

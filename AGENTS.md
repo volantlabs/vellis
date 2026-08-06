@@ -88,7 +88,7 @@ corpus cannot drift from its pin. What setup provides:
 | --- | --- | --- |
 | Specification corpus | what a construct *means* | `just model-reference-find` |
 | Standard model library | what exists and what it specializes | same finder, hits labelled `[library]` |
-| Example and training models | what a construct looks like in working SysML | same finder, hits labelled `[example]` |
+| Example and training models | what a construct looks like in working SysML (309 models) | same finder, hits labelled `[example]` |
 | Construct inventory | which SysML name a question maps to | `just model-reference-concepts` |
 | Pinned validator | what the parser actually accepts | `just model-probe`, `just model-check` |
 

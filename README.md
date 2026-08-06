@@ -12,7 +12,13 @@ The repository currently contains the Vellis system model and its development to
 - [`docs/mcp-realization.md`](docs/mcp-realization.md): non-normative guidance for a future FastMCP realization.
 - [`model/config/`](model/config/): checksum pins for the specifications, model libraries, and validator. The searchable corpus is generated from them into an ignored cache, never committed.
 - [`.agents/skills/`](.agents/skills/): repo-local engineering-copilot skills.
-- [`tools/`](tools/): the pinned validator, reference finder, and skill checks.
+- [`tools/`](tools/): the pinned validator, reference search, and skill checks.
+
+`just model-setup` builds a searchable SysML v2 reference layer into an ignored cache: the pinned
+specifications, the normative model libraries, and 309 validated example models, all searched
+together with each result labelled by source. The `$sysml-reference` skill carries a map from
+ordinary engineering intent to SysML construct names, so an agent can name what it needs before
+searching.
 
 The SysML on a branch is that branch's system definition. A pull request proposes changes to behavior, requirements, system responsibility, and verification; review and merge are the acceptance mechanism. Markdown explains the work without duplicating the model as a parallel contract.
 
@@ -24,7 +30,7 @@ A useful handoff answers the question, states the changed or reviewed meaning, g
 
 ## Development setup
 
-Install [uv](https://docs.astral.sh/uv/) and [just](https://just.systems/), then run:
+Install [uv](https://docs.astral.sh/uv/) and [just](https://just.systems/). `git` is also required, since `model-setup` fetches the pinned upstream release as a sparse checkout. Then run:
 
 ```sh
 just setup
