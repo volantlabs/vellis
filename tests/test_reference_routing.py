@@ -544,3 +544,25 @@ def test_intent_map_covers_every_construct_or_names_it_as_language_mechanics() -
     ]
 
     assert not missing, f"constructs absent from the intent map: {missing}"
+
+
+def test_specification_routing_matches_where_constructs_actually_live() -> None:
+    """The skill tells the agent which specification to search. That claim is
+    derived from the inventory, so it can be checked rather than trusted."""
+    if not _corpus_ready():
+        pytest.skip("generated corpus absent; run `just model-setup`")
+    skill = (model_layout.ROOT / ".agents" / "skills" / "sysml-reference" / "SKILL.md").read_text(
+        encoding="utf-8"
+    )
+    start = skill.index("### Which specification answers it")
+    end = skill.index("### Which library file answers it")
+    sysml_half, kerml_half = skill[start:end].split("- **KerML**")
+
+    for entry in sysml_reference.concepts():
+        if entry.origin != "specification":
+            continue
+        half = sysml_half if entry.pointer.startswith("sysml") else kerml_half
+        other = kerml_half if entry.pointer.startswith("sysml") else sysml_half
+        first = entry.name.split()[0]
+        if first in other and first not in half:
+            raise AssertionError(f"{entry.name} is routed to the wrong specification")

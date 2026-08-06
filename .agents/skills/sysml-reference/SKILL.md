@@ -72,6 +72,55 @@ The left column is ordinary engineering intent, not SysML vocabulary; that is th
 point. If a question does not fit a row, take the closest one and search by its
 construct name rather than by the question's own words.
 
+### Which specification answers it
+
+SysML describes the systems layer; KerML describes the type system underneath.
+Searching the wrong one wastes the query, and the split is stable.
+
+- **SysML** — Parts, Items, Ports, Connections, Interfaces, Actions, States,
+  Flows, Calculations, Constraints, Requirements, Use Cases, Analysis and
+  Verification Cases, Views, Metadata, Allocations, Occurrences, Attributes,
+  Enumerations, Definition and Usage, Namespaces and Packages.
+- **KerML** — Types, Classifiers, Features, Feature Values, Multiplicities,
+  Specialization, Structures, Behaviors, Functions, Expressions, Associations,
+  Connectors, Namespaces, Packages.
+
+A few concepts are covered by both, namespacing among them: SysML restates them
+for the systems layer while KerML defines the underlying mechanism. When both
+apply, read SysML first and follow its cross-reference down.
+
+Rule of thumb: if the question is about the system being modelled, search SysML.
+If it is about how the language types and relates things, search KerML.
+
+### Which library file answers it
+
+The specification never lists library declarations, so "what exists" and "what
+does this implicitly specialize" are library questions, not clause questions.
+
+| Looking for | Library |
+| --- | --- |
+| String, Boolean, Real, Integer, Natural | `Kernel Data Type Library/ScalarValues.kerml` |
+| units, quantities, physical values | `Domain Libraries/Quantities and Units/` (ISQ, SI) |
+| what a `part def` / `item def` / `action def` implicitly specializes | `Systems Library/<Concept>.sysml` |
+| the base types of the language itself | `Kernel Semantic Library/Base.kerml`, `KerML.kerml` |
+| callable functions and operators | `Kernel Function Library/` |
+
+### Distinctions worth resolving before choosing
+
+These are the decisions that actually recur. Both options are valid SysML, so the
+parser cannot settle them; retrieve the clause and decide on meaning.
+
+| Question | Turns on |
+| --- | --- |
+| `item def` or `part def`? | `Part :> Item`. A part is a structural constituent of the system; an item flows through, is exchanged, or is acted on. |
+| `attribute def` or `item def`? | Identity. Attributes are values and have none; items do. |
+| `part x` or `ref part x`? | Ownership. Plain means composite and lifetime-bound; `ref` means it exists independently. |
+| `:>` or `:>>`? | Subsetting keeps the inherited feature alongside the new one; redefinition replaces it. |
+| action or use case? | A use case is what a user wants to accomplish; an action is behaviour the system performs. |
+| connection or interface? | An interface is the agreed interaction surface between ports; a connection is a link between things. |
+| allocation or satisfaction? | Allocation hands responsibility to a realizing element; satisfaction claims a requirement is met. |
+| constraint or requirement? | A constraint is a rule that must hold; a requirement is an obligation on the system, with a subject and satisfiers. |
+
 The full construct inventory, generated from the pinned release so it cannot drift:
 
 <!-- generated: construct inventory -->
