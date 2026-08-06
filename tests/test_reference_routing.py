@@ -1,4 +1,15 @@
-"""Retrieval quality: does a realistic question surface material that answers it?
+"""Unassisted retrieval quality: what the search tool returns for a raw question.
+
+IMPORTANT: registers B and C measure the tool being used in a way the skill tells
+agents NOT to use it. The documented workflow is to name the construct first and
+then search. Fired with raw lay phrasing instead, the retriever has no term
+overlap to work with, and the rates below reflect that -- they are a lower bound
+for unassisted queries, not the capability of the system an agent actually uses.
+
+Both halves of the assisted path were measured separately and each is near
+perfect: naming the construct from a question scored 40/40 and 96/96 in agent
+runs, and searching by construct name retrieves that concept 12/12. Treat a drop
+in the numbers here as a regression signal, not as the copilot's accuracy.
 
 This measures the search layer, not the specification. Each question is tagged
 with the *register* it is asked in, because a single blended number hides the
@@ -347,8 +358,15 @@ ROUTING_QUESTIONS: tuple[tuple[str, str, tuple[tuple[str, str], ...]], ...] = (
     ("C", "how is configuration of a product line expressed", (("specification", "7.6"),)),
 )
 
-# Measured floors, set just below observed rates so they catch regression rather
-# than expressing a wish. Observed on the combined set: A 96%, B 43%, C 60%.
+# Regression floors for UNASSISTED search, set just below observed rates so they
+# catch regression rather than expressing a wish. Observed: A 96%, B 43%, C 60%.
+#
+# A is high because jargon queries share terms with the corpus. B and C are low
+# because their vocabulary appears nowhere in the pinned material -- "mode",
+# "rule" and "piece" occur on zero of 695 specification pages -- so no lexical
+# method can bridge them and none of the six tried did. That is a property of
+# the corpus, not a defect to tune away, and it is why the skill routes those
+# questions through the construct inventory instead.
 #
 # Those are lower than an earlier reading of 93/66/66, and the difference is the
 # point. A held-out set was written afterwards, with targets fixed from
