@@ -14,6 +14,13 @@
 
 - Use an owned feature when the subject governs an occurrence or value as part of itself.
 - Use a derived feature when other modeled facts determine the value.
+- When multiple derived values are jointly determined by one behavior occurrence, state transition,
+  snapshot, revision, or other authority, first check whether existing owning behavior or structure
+  already preserves that joint context. If not, derive one structured projection or bind the
+  projections to their common authority; do not invent a wrapper solely to group outputs. The
+  `derived` modifier alone does not establish the relationship. Preserve independently progressing
+  state while naming the authority and equality or compatibility rule that makes its values
+  applicable. Exercise a mixed-source counterexample that combines otherwise valid values.
 - Use a reference feature for an independently existing occurrence that the subject does not own.
 - Audit repeated appearances of the same conceptual occurrence. Reference one independently existing
   occurrence unless a distinct copy, sample, estimate, plan, or observation has its own intended

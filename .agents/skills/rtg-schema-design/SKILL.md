@@ -63,10 +63,12 @@ SysML or KerML choices.
    agent inspection; a keyed overlay can be simpler when copying is material. Distinguish either
    proposal from a second canonical occurrence.
 6. If canonical state changes, state validation, atomicity, effective no-op, revision, rejection, and
-   replay effects. Carry the smallest replay-sufficient semantic change for ordinary transitions;
-   reserve complete replacement state for an ordinary transition only when restore actually replaces
-   state. Add history,
-   snapshot, restore, or activity detail only when the changed behavior depends on it.
+   replay effects. Treat graph, active definitions, optional delta, and revision as one canonical
+   tuple; current and historical projections must not mix values from different established or
+   evaluated revisions. Exercise that mixed-revision counterexample explicitly. Carry the smallest
+   replay-sufficient semantic change for ordinary transitions; reserve complete replacement state
+   for an ordinary transition only when restore actually replaces state. Add history, snapshot,
+   restore, or activity detail only when the changed behavior depends on it.
 7. If recovery or compatibility changes, distinguish ordinary restart, fresh snapshot-based lineage,
    restore, and first-use v1 initialization. Preserve RTG meaning without adopting predecessor
    storage, schema, runtime, ledger history, or migration architecture.

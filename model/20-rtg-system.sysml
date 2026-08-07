@@ -20,16 +20,13 @@ package RTGSystem {
         doc /*
          * The one cohesive semantic and transactional boundary. It owns the
          * state-change and activity ledgers and governs graph, definition, and
-         * revision meaning. The state-change ledger is authority; current graph,
-         * active definitions, optional delta, and revision are derived references
-         * to its projection through the final canonical record, not parallel
-         * authority. Query, validation, history, and recovery are capabilities,
-         * not independently existing subsystems.
+         * revision meaning. The state-change ledger is authority; current state
+         * is one derived reference to the canonical-state tuple established by
+         * replay through the final canonical record, not parallel authority.
+         * Query, validation, history, and recovery are capabilities, not
+         * independently existing subsystems.
          */
-        derived ref item currentGraph : Graph;
-        derived ref item activeDefinitions : 'Graph Definition Set';
-        derived ref item definitionDelta [0..1] : 'Definition Delta';
-        derived attribute currentRevision : 'Revision Number';
+        derived ref item currentState : 'Canonical State';
         item stateChanges : 'State Change Ledger';
         item activities : 'Activity Ledger';
 

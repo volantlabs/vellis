@@ -12,8 +12,9 @@ namespace map is:
 
 These packages are intentional namespaces, not validator-required file structure or runtime layers.
 RTG owns graph, definition, revision, and history state as one semantic and transactional boundary.
-Its canonical ledger is authoritative; current graph, active definitions, optional delta, and revision
-are projections through the final canonical record rather than parallel authority.
+Its canonical ledger is authoritative; one current canonical-state tuple containing graph, active
+definitions, optional delta, and revision is derived through the final canonical record rather than
+forming parallel authority.
 Query, validation, history, and recovery are capabilities rather than internal subsystem parts.
 
 The current elements express selected Vellis meaning; they are not a template requiring every future

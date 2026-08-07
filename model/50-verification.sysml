@@ -181,8 +181,11 @@ package VellisVerification {
              * resulting revision chain, stable earlier records, and no activity
              * record in canonical history. Show the initial record establishes
              * its contained revision, every transition establishes its resulting
-             * revision, and the current graph, definitions, delta, and revision
-             * equal replay through the final record before and after restart.
+             * revision, and the one current canonical-state tuple equals replay
+             * through the final record before and after restart. Construct two
+             * successive states that differ in graph, definitions, or delta and
+             * show that no permitted current-state tuple can mix their components
+             * or revision.
              */
             verify VellisRequirements::durableCanonicalHistory;
         }
@@ -195,7 +198,8 @@ package VellisVerification {
              * Capture snapshots with and without an in-flight delta. Show each
              * contains equivalent graph, active definitions, optional delta,
              * and revision, identifies the exact canonical record establishing
-             * that revision, and changes no canonical state, revision, or history.
+             * that revision, and changes no canonical state, revision, or
+             * canonical history.
              */
             verify VellisRequirements::canonicalSnapshotCompleteness;
         }
@@ -499,16 +503,16 @@ package VellisVerification {
         subject system : 'RTG System';
         objective {
             doc /*
-             * Construct canonically equivalent current graph, active definitions,
-             * optional delta, and revision projections backed by short and long
-             * logical histories. Instrument semantic record accesses while
-             * performing current definition summary and inspection, current graph
-             * query, current conformance assessment, delta retrieval, and ordinary
-             * change validation. Show each performs constant historical-record
-             * work while scaling only with current state, proposal, and requested
-             * return bounds. Commit one effective canonical mutation and show the
-             * current projection update and one appended transition are recoverably
-             * atomic without traversing or rewriting the earlier logical prefix.
+             * Construct equivalent current canonical-state tuples backed by short
+             * and long logical histories. Instrument semantic record accesses
+             * while performing current definition summary and inspection, current
+             * graph query, current conformance assessment, delta retrieval, and
+             * ordinary change validation. Show each performs constant
+             * historical-record work while scaling only with current state,
+             * proposal, and requested return bounds. Commit one effective
+             * canonical mutation and show the current projection update and one
+             * appended transition are recoverably atomic without traversing or
+             * rewriting the earlier logical prefix.
              * Append activity and show it neither visits the canonical prefix nor
              * reconstructs canonical state.
              */

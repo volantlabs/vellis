@@ -95,7 +95,11 @@ package VellisRequirements {
 
     requirement def 'Definition Cardinality' {
         subject system : 'RTG System';
-        doc /* The system shall own exactly one active definition set and zero or one delta. */
+        doc /*
+         * At every established revision, the current canonical-state projection
+         * shall contain exactly one active definition set and zero or one
+         * definition delta.
+         */
     }
 
     requirement def 'Non Disruptive Definition Work' {
@@ -137,13 +141,15 @@ package VellisRequirements {
          * for deterministic replay without activity history. Every initial record
          * shall establish its contained-state revision and every transition shall
          * establish its resulting revision. Current graph, active definitions,
-         * optional delta, and revision shall be projections of replay through the
-         * final canonical record and shall not form parallel authority. An initial
-         * base seeded from reconstructed snapshot state shall not claim omitted
-         * earlier transitions. Each transition's semantic change shall be valid
-         * for its kind. An ordinary graph mutation record shall carry its accepted
-         * graph change rather than a complete replacement graph. Only historical
-         * restoration may carry a complete replacement graph.
+         * optional delta, and revision shall form one current canonical-state
+         * projection of replay through the final canonical record and shall not
+         * form parallel authority. No permitted current-state tuple shall mix
+         * values established by different canonical records. An initial base
+         * seeded from reconstructed snapshot state shall not claim
+         * omitted earlier transitions. Each transition's semantic change shall be
+         * valid for its kind. An ordinary graph mutation record shall carry its
+         * accepted graph change rather than a complete replacement graph. Only
+         * historical restoration may carry a complete replacement graph.
          */
     }
 
@@ -280,8 +286,8 @@ package VellisRequirements {
         doc /*
          * Current definition summary and inspection, current graph query,
          * current conformance assessment, delta retrieval, and ordinary change
-         * validation shall use current canonical projections and shall not
-         * traverse canonical or activity history to rediscover current state.
+         * validation shall use the current canonical-state projection and shall
+         * not traverse canonical or activity history to rediscover current state.
          * Their work may scale with current graph size, active or proposed
          * definitions, requested return bounds, and proposed change size.
          * Canonical mutation and activity observation may perform constant

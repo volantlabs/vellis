@@ -33,8 +33,15 @@ case or claim that a standalone plugin already exists.
 4. For a formal plan, map every mandatory claim and non-goal to authority and evidence. Review
    decisive examples, then repeat plan-conformance, closure, adequacy, subtraction, and repository-
    truth reviews until one full cycle finds no new material issue.
-5. Cite official sections and pages for consequential language choices and run `just check`.
-6. In the PR, report changed meaning, evidence, compatibility effects, unsupported architecture
+5. Run a task-local semantic consistency audit before validation. For each changed claim, compare
+   native ownership, reference, multiplicity, binding, and derivation with observable effects and
+   non-effects, requirement wording, satisfiers, verification evidence, and explanatory documentation.
+   Record a temporary state-effect vector for every governed state the behavior may preserve or change
+   (for RTG: graph, active definitions, delta, revision, canonical ledger, and activity ledger), then
+   exercise the nearest wrong permitted instance. Search for stale and inverse claims. Do not commit
+   the audit matrix; after a material fix, repeat the audit from the current diff to a clean fixed point.
+6. Cite official sections and pages for consequential language choices and run `just check`.
+7. In the PR, report changed meaning, evidence, compatibility effects, unsupported architecture
    removed or deferred, any decision reopened by the review scope or new contradictory evidence, and
    bounded follow-up work.
 

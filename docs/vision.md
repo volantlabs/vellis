@@ -38,9 +38,11 @@ universal platform ontology: selected definitions become ordinary owner-governed
 existing or restored system is never silently overlaid.
 
 A first-time v2 owner may also preview and explicitly confirm compatible data and definitions from a
-complete Vellis v1 JSON snapshot. The graph crosses over unchanged when it can conform; definition
-simplifications and omissions are visible before acceptance. The result begins a new revision-zero
-v2 lineage rather than importing enterprise-era history or creating an existing-system merge path.
+complete Vellis v1 JSON snapshot. Graph identities, kinds, stored values, and relationships are
+preserved when they can conform; missing `system.live` uses its compatibility default and an unnamed
+anchor receives the disclosed deterministic display name. Definition simplifications and omissions
+are visible before acceptance. The result begins a new revision-zero v2 lineage rather than importing
+enterprise-era history or creating an existing-system merge path.
 
 That includes agents arriving without hidden project memory. Vellis should let them discover the
 owner-described concepts in one personal graph, inspect only the relevant meaning, and act through a

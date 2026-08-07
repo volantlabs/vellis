@@ -775,6 +775,7 @@ package RTG {
     item def 'Canonical Snapshot' {
         item canonicalState : 'Canonical State';
         ref item capturedThrough : 'Canonical Record';
+        bind canonicalState.revision = capturedThrough.establishedRevision;
         doc /*
          * A self-contained, lossless capture of complete canonical state at its
          * revision, bound to the exact authoritative record that establishes

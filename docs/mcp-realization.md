@@ -61,12 +61,12 @@ submitted to `rtg_change`; exposing graph mutation does not by itself implement 
 owner approval of personal context. The first implementation must preserve that distinction without
 inventing roles, tenants, or an authentication subsystem inside RTG.
 
-Current operations must use the current canonical projection rather than replaying history. Bounded
-history and revision/time selection must avoid scanning excluded ledger prefixes, and historical
-definition discovery must avoid replaying unrelated graph-only transitions. Materialized projections,
-revision/time indexes, definition checkpoints, caches, and snapshot cadence are allowed realization
-choices, not selected architecture. Conformance should use semantic record-access counts or equivalent
-traces; wall-clock targets wait for representative runtime, hardware, and owner data.
+Current operations must use the current canonical-state projection rather than replaying history.
+Bounded history and revision/time selection must avoid scanning excluded ledger prefixes, and
+historical definition discovery must avoid replaying unrelated graph-only transitions. Materialized
+projections, revision/time indexes, definition checkpoints, caches, and snapshot cadence are allowed
+realization choices, not selected architecture. Conformance should use semantic record-access counts
+or equivalent traces; wall-clock targets wait for representative runtime, hardware, and owner data.
 
 The implementation PR must verify two realization-only properties that do not belong in the RTG
 domain model: text and structured content communicate the same typed outcome, and removing or
