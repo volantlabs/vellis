@@ -85,8 +85,10 @@ package VellisRequirements {
         doc /*
          * Every accepted canonical state change shall advance the one total
          * revision exactly once and commit its semantic change and contiguous
-         * transition record recoverably atomically. Rejected or failed
-         * operations shall change no canonical state or revision. An accepted
+         * transition record recoverably atomically. The updated current graph,
+         * active definitions, optional delta, and revision projection and the
+         * appended transition shall become recoverable as one effect. Rejected
+         * or failed operations shall change no canonical state or revision. An accepted
          * effective no-op shall create neither a revision nor a transition.
          */
     }
@@ -116,8 +118,8 @@ package VellisRequirements {
         doc /*
          * The system shall produce typed findings within the governing outcome
          * for semantically invalid graph queries, proposed graph changes,
-         * replayed state, and recovered state. Validation reports shall identify
-         * only the assessment scopes that currently return reports: complete
+         * replayed state, and v1 recovery candidates. Validation reports shall
+         * identify only the assessment scopes that currently return reports: complete
          * graph conformance and definition-delta consistency and graph impact.
          * The parameterless public check operation shall produce the former;
          * whole-delta retrieval and staging shall produce the latter. Validation
@@ -132,12 +134,16 @@ package VellisRequirements {
          * ordinary process restarts, and append-only in ordinary operation from
          * its owned initial base. One initial record and one contiguous
          * transition per successive revision after that base shall be sufficient
-         * for deterministic replay without activity history. An initial base
-         * seeded from reconstructed snapshot state shall not claim omitted
+         * for deterministic replay without activity history. Every initial record
+         * shall establish its contained-state revision and every transition shall
+         * establish its resulting revision. Current graph, active definitions,
+         * optional delta, and revision shall be projections of replay through the
+         * final canonical record and shall not form parallel authority. An initial
+         * base seeded from reconstructed snapshot state shall not claim omitted
          * earlier transitions. Each transition's semantic change shall be valid
          * for its kind. An ordinary graph mutation record shall carry its accepted
-         * graph change rather than a complete replacement graph. Only restoration
-         * and predecessor recovery may carry a complete replacement graph.
+         * graph change rather than a complete replacement graph. Only historical
+         * restoration may carry a complete replacement graph.
          */
     }
 
@@ -146,7 +152,8 @@ package VellisRequirements {
         doc /*
          * A canonical snapshot shall be a self-contained, lossless capture of
          * graph, active definitions, optional in-flight delta, and total
-         * revision. Creating it shall not change canonical state or revision.
+         * revision and shall identify the exact canonical record it captures.
+         * Creating it shall not change canonical state or revision.
          */
     }
 
@@ -154,9 +161,12 @@ package VellisRequirements {
         subject system : 'RTG System';
         doc /*
          * Replay from an initial record or complete snapshot plus an optional
-         * contiguous later ledger tail shall reconstruct equivalent graph,
+         * contiguous later same-ledger tail shall reconstruct equivalent graph,
          * active definitions, optional delta, and revision without activity
-         * history. Initializing a fresh RTG shall seed its owned history with the
+         * history. A snapshot shall identify the exact record it captures and a
+         * tail shall identify the exact record it follows. A tail from another
+         * ledger shall be rejected even when its preceding revision number is
+         * equal. Initializing a fresh RTG shall seed its owned history with the
          * reconstructed state at the resulting revision, without claiming
          * earlier transitions. A gap, duplicate, reorder, invalid transition,
          * or incompatible base shall fail without partially accepted canonical
@@ -170,9 +180,13 @@ package VellisRequirements {
          * Historical graph queries shall accept exactly one revision or time
          * selector, change no canonical state, and evaluate the selected committed
          * revision with current-query semantics. A time resolves to the greatest
-         * committed revision at or before it. The caller shall supply vocabulary
-         * known to be valid at the selected revision; current active-definition
-         * discovery shall not claim discovery of retired vocabulary.
+         * committed revision at or before it. Definition summary and focused
+         * inspection shall accept the same optional selector, return definitions
+         * active at the exact evaluated revision and delta presence at that state,
+         * and reject unresolved selections without partial content or evaluated
+         * revision. A caller may reuse a time-based summary's resolved revision
+         * for inspection and graph query. Definition-delta retrieval remains
+         * current-only.
          */
     }
 
@@ -193,7 +207,11 @@ package VellisRequirements {
          * outcome has been determined. An activity-history read shall select its
          * result before its own record is appended and shall never include itself.
          * Activity history shall remain observational, never be replayed, and
-         * never establish canonical state. Owner-directed retention may change
+         * never establish canonical state or trigger canonical reconstruction.
+         * Each activity summary shall identify capability, outcome category,
+         * provenance, evaluated revision when applicable, and bounded semantic
+         * scope without copying result rows, canonical payloads, or inferred
+         * intent. Owner-directed retention may change
          * only activity history and shall not affect reconstruction.
          */
     }
@@ -204,19 +222,20 @@ package VellisRequirements {
          * Every active type and rule definition shall have a non-empty,
          * owner-readable description. Automatic assessment shall establish only
          * presence and non-emptiness; owner review shall establish readability.
-         * A complete shallow read shall return every
-         * currently active anchor type, its description, the evaluated revision,
-         * and current delta presence, or no summaries when it cannot return the
-         * complete vocabulary. A focused read shall return the complete relevant
-         * active-definition neighborhood at its own identified evaluated revision
+         * A complete shallow read shall return every anchor type active at the
+         * current or selected historical state, its description, the evaluated
+         * revision, and delta presence at that state, or no summaries when it
+         * cannot return the complete vocabulary. A focused read shall return the
+         * complete relevant definition neighborhood at its own identified
+         * evaluated revision
          * for each selected anchor and no unrelated definitions. A caller shall
          * be able to detect an intervening definition change by comparing the
          * summary and inspection revisions. Unknown, duplicate, or
          * incompletely answerable selections shall return findings and no partial
-         * details or evaluated revision. The sole current
-         * proposed set shall be separately retrievable
-         * whole with its current assessment. All discovery shall change no
-         * canonical state or revision, while its operation attempt may be recorded
+         * details or evaluated revision. The sole current proposed set shall
+         * remain separately retrievable whole with its current assessment;
+         * historical discovery shall not change delta retrieval. All discovery
+         * shall change no canonical state or revision, while its operation attempt may be recorded
          * observationally.
          * A returned assessment shall be present exactly with a returned delta;
          * its evaluated revision, and any resulting revision from staging, shall
@@ -248,10 +267,44 @@ package VellisRequirements {
          * cannot be returned completely. Canonical entries shall expose time,
          * provenance, revision, transition kind when applicable, and semantic
          * summary without exposing canonical state or replay-sufficient changes.
-         * Activity entries shall expose time, provenance, activity kind, optional
-         * evaluated revision, and summary. A start after its end shall be invalid.
+         * Activity entries shall expose time, provenance, capability, outcome
+         * category, optional evaluated revision, bounded
+         * semantic scope, and summary. A start after its end shall be invalid.
          * A result shall never mix entry families, paginate silently, mutate
          * canonical state, or treat activity as replay authority.
+         */
+    }
+
+    requirement def 'History Independent Current Work' {
+        subject system : 'RTG System';
+        doc /*
+         * Current definition summary and inspection, current graph query,
+         * current conformance assessment, delta retrieval, and ordinary change
+         * validation shall use current canonical projections and shall not
+         * traverse canonical or activity history to rediscover current state.
+         * Their work may scale with current graph size, active or proposed
+         * definitions, requested return bounds, and proposed change size.
+         * Canonical mutation and activity observation may perform constant
+         * terminal-position and append work but shall neither traverse nor
+         * rewrite the existing logical ledger prefix. Activity recording shall
+         * remain observational and shall not trigger canonical reconstruction.
+         */
+    }
+
+    requirement def 'Bounded Historical Selection Work' {
+        subject system : 'RTG System';
+        doc /*
+         * Resolving a revision or time selector shall not linearly scan the
+         * complete ledger. Selecting a bounded canonical or activity interval
+         * shall perform no linear scan of records preceding that interval; its
+         * expected semantic record-processing work shall be logarithmic selection
+         * plus the returned interval. Historical definition summary and focused
+         * inspection shall locate the revision and applicable definition-changing
+         * records without replaying unrelated graph-only transitions. Historical
+         * graph reconstruction, explicit replay, restoration, and startup recovery
+         * may depend on their required replay tail and shall be characterized
+         * separately. These constraints govern semantic record processing, not
+         * physical database pages or a selected indexing technology.
          */
     }
 
@@ -260,8 +313,10 @@ package VellisRequirements {
         doc /*
          * The system shall expose exactly the selected ten stable, discoverable
          * MCP tool names. Every completed invocation shall return typed object
-         * meaning; tools with semantic input shall accept typed object meaning,
-         * while parameterless tools shall introduce no empty domain request.
+         * meaning; tools with semantic input shall accept typed object meaning.
+         * Optional selection on definition summary shall be carried directly and
+         * shall not introduce an empty request type. Other parameterless tools
+         * shall introduce no empty domain request.
          * Every tool shall preserve canonical RTG semantics and remain usable
          * through core tool discovery and invocation without requiring any
          * additional MCP capability.
@@ -308,16 +363,48 @@ package VellisRequirements {
          */
     }
 
-    requirement def 'RTG Compatibility' {
+    requirement def 'V1 Snapshot Compatibility' {
         subject system : 'Vellis System';
         doc /*
-         * Recovery of representative predecessor RTG graphs shall preserve
-         * object identity and kind, type meaning, direct associations, directed
-         * links, endpoint eligibility, lossless JSON, and system.live meaning
-         * without making predecessor storage shape canonical. A predecessor
-         * anchor without a display name shall receive "[recovered] {typeKey}
-         * {uuid}" from its exact stored values. Accepted recovery is one
-         * transition; rejection or failure preserves current canonical state.
+         * Only before any v2 canonical state exists, Vellis shall analyze one
+         * complete v1.0.0 JSON system snapshot into a transient complete target
+         * graph, active definition set, and report bound to that exact source.
+         * Missing v1 system.live shall mean true. The candidate shall contain
+         * every live graph object and its closed live relationships, report every
+         * omitted non-live candidate, and preserve UUID, object kind, type key,
+         * display name, nested JSON, metadata, direct associations, link direction,
+         * and endpoints exactly. Only an absent anchor display name shall use
+         * "[recovered] {typeKey} {uuid}" from its exact stored values. After live
+         * filtering, the graph shall already be closed and valid; Vellis shall
+         * neither repair dangling relationships nor rewrite stored values.
+         *
+         * Active definitions shall translate by natural type and property
+         * identity, discarding v1 definition UUID and lifecycle metadata while
+         * exactly preserving representable type, property, endpoint, requiredness,
+         * range, permitted-value, multiplicity, and active-cardinality meaning.
+         * Unsupported refinements shall be removed, never replaced by invented
+         * meaning. A property shall be retained only when one v2 JSON kind follows
+         * from its v1 rule or all imported values. The report shall summarize
+         * preserved graph content and identify every narrowing, removed refinement,
+         * synthesized description, omitted unused
+         * property or type, omitted query-pattern or migration-oriented constraint,
+         * and untranslatable constraint. A definition may be omitted only when no
+         * imported object, relationship, or retained definition depends on it.
+         *
+         * Initialization shall refuse atomically when unchanged graph data cannot
+         * conform to translated definitions, including duplicate or kind-conflicting
+         * natural identities, dangling endpoints, unresolved used types, or mixed
+         * JSON kinds for one used v2 property. It shall omit v1 migrations, inactive
+         * candidates, definition lifecycle state, ledger history, transaction and
+         * storage/runtime metadata. V1 Everyday Life vocabulary shall retain its
+         * original keys and shall never be reinterpreted as or overlaid with the v2
+         * starter. The owner shall preview and confirm the exact candidate/report
+         * pair. Acceptance shall establish the unchanged graph, translated active
+         * definitions, no delta, revision 0, one initial record with import
+         * provenance and a bounded recovery summary, no transitions, and an empty
+         * activity ledger as a new v2 lineage. Decline, changed input, rejection,
+         * failure, or an existing v2 state shall establish no canonical or activity
+         * state; no merge or replacement behavior exists.
          */
     }
 
@@ -325,7 +412,8 @@ package VellisRequirements {
         subject system : 'Vellis System';
         doc /*
          * One owner shall be able to initialize blank, with the recommended
-         * Everyday Life starter, or from a snapshot; use, query, preserve, and
+         * Everyday Life starter, from a compatible v2 snapshot and tail, or from
+         * a confirmed compatible v1 JSON snapshot; use, query, preserve, and
          * govern one cohesive Vellis system without tenant, organization, role,
          * cluster, server-fleet, concurrent definition-delta, or required
          * enterprise-infrastructure administration.
@@ -360,7 +448,9 @@ package VellisRequirements {
          * initial-state record, no transitions, and an empty activity ledger.
          * Refusal or failure shall establish no partial state. Snapshot-based
          * initialization shall use only reconstructed snapshot state and shall
-         * not overlay fresh-start definitions.
+         * not overlay fresh-start definitions. Confirmed v1 initialization shall
+         * establish its complete recovery candidate at revision 0 as a new owned
+         * history base with no transitions or activity records.
          */
     }
 
@@ -388,8 +478,25 @@ package VellisRequirements {
          * initialization. Blank shall use an empty definition set; Everyday Life
          * shall use exactly the modeled Everyday Life starter definition set.
          * Neither choice shall create graph objects. Snapshot initialization
-         * shall not offer or overlay the starter, and existing systems shall gain
-         * no separate starter-install behavior.
+         * and v1 initialization shall not offer or overlay the starter, and
+         * existing systems shall gain no separate starter-install behavior.
+         */
+    }
+
+    requirement def 'Owner Visible Improvement Analysis' {
+        subject system : 'Vellis System';
+        doc /*
+         * Vellis shall support an external owner-configured agent in using
+         * explicit bounded canonical and activity intervals, evaluated historical
+         * definitions, and bounded historical or current graph queries to prepare
+         * traceable owner-visible findings about stale data, repeated failures,
+         * unused vocabulary, and cleanup opportunities. Scheduled analysis shall
+         * continue incrementally from its previously processed interval rather
+         * than repeatedly requesting all history. Before proposing a current
+         * graph change or definition delta, the agent shall rediscover current
+         * definitions. Vellis shall add no scheduler, job registry, worker, or
+         * inference authority. Automated analysis shall not bypass owner approval;
+         * declined proposals shall create no canonical mutation.
          */
     }
 
@@ -416,11 +523,14 @@ package VellisRequirements {
     requirement <RTG019> canonicalSemanticEquality : 'Canonical Semantic Equality';
     requirement <RTG020> freshInitialization : 'Fresh Initialization';
     requirement <RTG021> stringPatternValidation : 'String Pattern Validation';
+    requirement <RTG022> historyIndependentCurrentWork : 'History Independent Current Work';
+    requirement <RTG023> boundedHistoricalSelectionWork : 'Bounded Historical Selection Work';
     requirement <VEL001> ownerControlledMemory : 'Owner Controlled Memory';
     requirement <VEL002> observableFailure : 'Observable Failure';
-    requirement <VEL003> rtgCompatibility : 'RTG Compatibility';
+    requirement <VEL003> v1SnapshotCompatibility : 'V1 Snapshot Compatibility';
     requirement <VEL004> simpleIndividualOperation : 'Simple Individual Operation';
     requirement <VEL005> recommendedEverydayLifeStart : 'Recommended Everyday Life Start';
+    requirement <VEL006> ownerVisibleImprovementAnalysis : 'Owner Visible Improvement Analysis';
 
     satisfy graphInvariants by vellis.memory;
     satisfy semanticQueryMeaning by vellis.memory;
@@ -443,9 +553,12 @@ package VellisRequirements {
     satisfy canonicalSemanticEquality by vellis.memory;
     satisfy freshInitialization by vellis.memory;
     satisfy stringPatternValidation by vellis.memory;
+    satisfy historyIndependentCurrentWork by vellis.memory;
+    satisfy boundedHistoricalSelectionWork by vellis.memory;
     satisfy ownerControlledMemory by vellis;
     satisfy observableFailure by vellis;
-    satisfy rtgCompatibility by vellis;
+    satisfy v1SnapshotCompatibility by vellis;
     satisfy simpleIndividualOperation by vellis;
     satisfy recommendedEverydayLifeStart by vellis;
+    satisfy ownerVisibleImprovementAnalysis by vellis;
 }

@@ -49,10 +49,9 @@ package VellisVerification {
              * and the result identifies its query. Repeat against current state, a selected revision, and
              * a selected time; all use the same meaning. Alternative evaluation
              * orders produce equivalent rows. After a definition change, repeat
-             * a query whose historical vocabulary the caller already knows at an
-             * earlier revision and show that evaluation uses the definitions active
-             * at that revision. Show current-only discovery makes no claim to
-             * discover retired vocabulary.
+             * a query after cold discovery of the historical vocabulary at an
+             * earlier revision and show that evaluation uses the definitions
+             * active there.
              */
             verify VellisRequirements::semanticQueryMeaning;
         }
@@ -81,8 +80,8 @@ package VellisVerification {
         objective {
             doc /*
              * Exercise accepted graph mutation, delta create or edit, delta
-             * discard, definition activation, historical restoration, and
-             * predecessor recovery. Each advances exactly one revision with one
+             * discard, definition activation, and historical restoration. Each
+             * advances exactly one revision with one
              * contiguous replay-sufficient, kind-compatible record. Show each
              * kind changes only its permitted state facets. A rejection and
              * failure in every family change no canonical state or revision.
@@ -90,8 +89,8 @@ package VellisVerification {
              * removals, then reject duplicate commands, conflicts, unknown
              * removals, kind changes, invalid references, and an assumed cascade.
              * Show the accepted graph-change record carries those semantic upserts
-             * and removals rather than a complete replacement graph; restoration
-             * and recovery alone carry replacement graphs. An effective no-op
+             * and removals rather than a complete replacement graph; historical
+             * restoration alone carries a replacement graph. An effective no-op
              * creates neither revision nor record.
              */
             verify VellisRequirements::atomicCanonicalRevision;
@@ -99,7 +98,7 @@ package VellisVerification {
         }
     }
 
-    verification def 'Cold Agent Discovers Active Definitions' {
+    verification def 'Cold Agent Discovers Evaluated Definitions' {
         subject system : 'RTG System';
         objective {
             doc /*
@@ -116,9 +115,14 @@ package VellisVerification {
              * revisions agree. Change active definitions between the two calls,
              * show the differing revisions expose the stale summary, then repeat
              * discovery successfully without a session or lock.
-             * Confirm that neither discovery operation accepts a historical
-             * selector. All reads leave canonical state and revision unchanged
-             * while recording their observational outcomes after result selection.
+             * Select a revision and a time where definitions later retired were
+             * active. Show summary and inspection return those definitions and
+             * delta presence at one consistent evaluated revision; reuse a time
+             * summary's resolved revision for inspection and graph query. Reject
+             * unresolved selections with no partial summary, detail, or evaluated
+             * revision. Confirm whole-delta retrieval remains current-only. All
+             * reads leave canonical state and revision unchanged while recording
+             * their observational outcomes after result selection.
              */
             verify VellisRequirements::agentDefinitionDiscoverability;
         }
@@ -154,7 +158,7 @@ package VellisVerification {
         objective {
             doc /*
              * Produce governing-outcome findings for a well-formed but invalid
-             * graph query, graph change, replay, and predecessor recovery. Show
+             * graph query, graph change, replay, and v1 recovery candidate. Show
              * malformed typed input is rejected before a domain outcome exists.
              * Show the parameterless public check produces a graphConformance
              * report for current graph state, while whole-delta retrieval and
@@ -175,7 +179,10 @@ package VellisVerification {
              * transitions, restart the ordinary process boundary, and show the
              * same complete ordered records with one uninterrupted prior-to-
              * resulting revision chain, stable earlier records, and no activity
-             * record in canonical history.
+             * record in canonical history. Show the initial record establishes
+             * its contained revision, every transition establishes its resulting
+             * revision, and the current graph, definitions, delta, and revision
+             * equal replay through the final record before and after restart.
              */
             verify VellisRequirements::durableCanonicalHistory;
         }
@@ -187,8 +194,8 @@ package VellisVerification {
             doc /*
              * Capture snapshots with and without an in-flight delta. Show each
              * contains equivalent graph, active definitions, optional delta,
-             * and revision and that capture changes no canonical state, revision,
-             * or canonical history.
+             * and revision, identifies the exact canonical record establishing
+             * that revision, and changes no canonical state, revision, or history.
              */
             verify VellisRequirements::canonicalSnapshotCompleteness;
         }
@@ -199,7 +206,8 @@ package VellisVerification {
         objective {
             doc /*
              * Initialize a fresh RTG from a complete snapshot, then apply every
-             * later contiguous canonical transition. Show equivalent graph,
+             * later contiguous same-ledger canonical transition from the exact
+             * captured source record. Show equivalent graph,
              * active definitions, optional delta, and final revision without
              * inventing a revision or reading activity history. Show the fresh
              * RTG owns one initial record containing the reconstructed final
@@ -215,7 +223,10 @@ package VellisVerification {
             doc /*
              * Replay tails with a gap, duplicate, reorder, mismatched base,
              * invalid or kind-incompatible semantic change, and incompatible
-             * result. Show observable findings and no partially accepted state.
+             * result. Supply a tail from another ledger whose preceding record
+             * has the same revision number and show it is rejected because record
+             * identity and ledger lineage do not match. Show observable findings
+             * and no partially accepted state.
              */
             verify VellisRequirements::replayEquivalence;
         }
@@ -229,8 +240,9 @@ package VellisVerification {
              * committed instants using the same bounded graph-query semantics as
              * current evaluation. Exactly one selector kind is accepted, each
              * resolvable time selects the greatest revision at or before it, and
-             * every returned result changes no canonical state. Use caller-known
-             * vocabulary valid at each selected historical revision.
+             * every returned result changes no canonical state. Starting cold,
+             * discover definitions later retired, then use a time summary's exact
+             * resolved revision for inspection and graph query with consistent results.
              */
             verify VellisRequirements::historicalStateCorrectness;
         }
@@ -253,11 +265,15 @@ package VellisVerification {
         objective {
             doc /*
              * Record reads, validation, rejections, failures, and snapshot
-             * activity with provenance and summaries after each outcome is
+             * activity with capability, outcome category, provenance, evaluated
+             * revision when applicable, bounded semantic scope, and summaries
+             * after each outcome is
              * determined. Query activity history and show the result is selected
              * before its own observation is appended and therefore never includes
              * itself. Vary owner-directed activity retention and disclosure, then
              * show identical reconstructed state from the unchanged canonical source.
+             * Show no activity summary copies result rows, canonical payloads, or
+             * inferred intent and no activity append reconstructs canonical state.
              * Reject one retention request and show every preexisting activity
              * record remains while only the failure observation may be appended.
              * Query canonical and activity records separately with chronological
@@ -284,7 +300,9 @@ package VellisVerification {
              * rtg_activate_definition_delta, rtg_discard_definition_delta,
              * rtg_check, and rtg_history with typed object outputs and typed
              * object inputs only where the operation has semantic input. Show
-             * parameterless tools introduce no empty domain request type.
+             * rtg_definition_summary carries its optional selector directly,
+             * without an empty request type, and remaining parameterless tools
+             * introduce no empty domain request type.
              * Invoke every tool through core MCP discovery and invocation alone,
              * without any additional MCP capability.
              */
@@ -343,19 +361,34 @@ package VellisVerification {
         }
     }
 
-    verification def 'Predecessor RTG Meaning Is Preserved' {
+    verification def 'V1 Snapshot Initializes Compatible Memory' {
         subject system : 'Vellis System';
         objective {
             doc /*
-             * Recover representative predecessor examples and show stable UUIDs
-             * and kinds, direct associations distinct from links, directed
-             * anchor or associated-data endpoints, lossless nested JSON, and
-             * missing system.live normalized to true. Give each unnamed
-             * predecessor anchor exactly "[recovered] {typeKey} {uuid}" while
-             * preserving its UUID and type key. Accepted recovery is one replayable
-             * transition; invalid recovery changes no canonical state.
+             * Analyze representative complete v1 JSON snapshots. Treat absent
+             * system.live as true; import live objects and closed live relationships
+             * while reporting omitted non-live candidates. Show UUIDs, kinds,
+             * type keys, display names, nested JSON, metadata, direct associations,
+             * link direction, and endpoints are lossless. Give only an unnamed
+             * anchor "[recovered] {typeKey} {uuid}" from its stored values.
+             * Translate active definitions by natural identity, discarding UUID
+             * and lifecycle metadata while exactly preserving supported property,
+             * endpoint, requiredness, range, permitted-value, multiplicity, and
+             * cardinality meaning. Preview every narrowing, removed refinement,
+             * synthesized description, omission, and untranslatable constraint,
+             * then require owner confirmation of that exact candidate/report pair.
+             * Show accepted first-use initialization has the unchanged graph and
+             * translated definitions at revision 0, no delta, one initial record
+             * with import provenance and bounded summary, no transitions, empty
+             * activity history, and a new lineage without v1 ledger history,
+             * transaction metadata, or storage/runtime metadata.
+             * Refuse an existing-system import, changed-input confirmation,
+             * mixed-kind used property, duplicate or kind-conflicting identity,
+             * dangling live relationship, unresolved used type, and any other
+             * preservation failure with no partial canonical or activity state.
+             * Show v1 Everyday Life keys remain unchanged with no v2 starter overlay.
              */
-            verify VellisRequirements::rtgCompatibility;
+            verify VellisRequirements::v1SnapshotCompatibility;
         }
     }
 
@@ -363,8 +396,9 @@ package VellisVerification {
         subject system : 'Vellis System';
         objective {
             doc /*
-             * Start once blank, once with the Everyday Life starter, and once
-             * from a complete snapshot plus later records. Show one owner can query, preserve,
+             * Start once blank, once with the Everyday Life starter, once from a
+             * complete v2 snapshot plus later records, and once from a confirmed
+             * compatible v1 snapshot. Show one owner can query, preserve,
              * and govern the resulting system and sole definition delta without
              * tenant, organization, role, cluster, server-fleet, or enterprise-
              * infrastructure administration and without internal RTG subsystems.
@@ -427,7 +461,9 @@ package VellisVerification {
              * activity ledger. Reject an invalid initial set and a request against
              * an already initialized RTG without establishing partial state.
              * Initialize separately from a snapshot and show its definitions and
-             * revision are reconstructed without any fresh-start overlay.
+             * revision are reconstructed without any fresh-start overlay. Initialize
+             * separately from a confirmed v1 candidate and show its graph and
+             * translated definitions form revision 0 with no transitions or activity.
              */
             verify VellisRequirements::freshInitialization;
         }
@@ -448,13 +484,109 @@ package VellisVerification {
              * date-like property, accept 2024-02-29; reject 2024-2-9, 2024-13-01,
              * 2024-01-00, and arbitrary text; accept absent dates and show
              * 2023-02-31 is lexically accepted without claiming calendar validity.
-             * Initialize from a snapshot and show no starter overlay. Show an
+             * Initialize from a v2 snapshot and a v1 snapshot and show no starter
+             * overlay. Show an
              * existing system has no separate starter-install operation and may
              * use only ordinary owner-controlled definition governance.
              */
             verify VellisRequirements::recommendedEverydayLifeStart;
             verify VellisRequirements::freshInitialization;
             verify VellisRequirements::graphInvariants;
+        }
+    }
+
+    verification def 'Current Operations Ignore History Length' {
+        subject system : 'RTG System';
+        objective {
+            doc /*
+             * Construct canonically equivalent current graph, active definitions,
+             * optional delta, and revision projections backed by short and long
+             * logical histories. Instrument semantic record accesses while
+             * performing current definition summary and inspection, current graph
+             * query, current conformance assessment, delta retrieval, and ordinary
+             * change validation. Show each performs constant historical-record
+             * work while scaling only with current state, proposal, and requested
+             * return bounds. Commit one effective canonical mutation and show the
+             * current projection update and one appended transition are recoverably
+             * atomic without traversing or rewriting the earlier logical prefix.
+             * Append activity and show it neither visits the canonical prefix nor
+             * reconstructs canonical state.
+             */
+            verify VellisRequirements::historyIndependentCurrentWork;
+            verify VellisRequirements::atomicCanonicalRevision;
+        }
+    }
+
+    verification def 'Historical Selection Avoids Irrelevant Records' {
+        subject system : 'RTG System';
+        objective {
+            doc /*
+             * Select equally narrow canonical and activity intervals behind
+             * differently sized excluded prefixes. Instrument semantic record
+             * accesses and show expected work is logarithmic selection plus the
+             * returned interval, with no linear visit of preceding records. Hold
+             * definition-changing history fixed while increasing unrelated
+             * graph-only transitions; retrieve a historical definition summary
+             * and focused inspection and show no linear growth from those graph
+             * mutations. Resolve revision and time selections without a complete-
+             * ledger scan. Use equivalent access traces when direct counters are
+             * unavailable; do not use unstable wall-clock assertions.
+             */
+            verify VellisRequirements::boundedHistoricalSelectionWork;
+            verify VellisRequirements::historicalStateCorrectness;
+            verify VellisRequirements::boundedHistoryRead;
+        }
+    }
+
+    verification def 'Replay Work Is Characterized By Required Tail' {
+        subject system : 'RTG System';
+        objective {
+            doc /*
+             * Reconstruct and ordinarily restart equivalent states across
+             * increasing required replay-tail lengths. Record semantic record
+             * visits and startup or replay duration with their measurement units,
+             * demonstrate replay equivalence, and characterize the dependency on
+             * required tail length without asserting a numerical performance target.
+             */
+            verify VellisRequirements::replayEquivalence;
+            verify VellisRequirements::durableCanonicalHistory;
+        }
+    }
+
+    verification def 'Cold Agent Prepares Incremental Improvement' {
+        subject system : 'Vellis System';
+        objective {
+            doc /*
+             * Starting cold, have an externally scheduled owner-configured agent
+             * read explicit bounded intervals from both ledgers, discover the
+             * definitions active at evaluated revisions, and issue bounded current
+             * and historical graph queries. Continue a later run from the prior
+             * processed interval instead of rereading all history. Prepare a
+             * traceable cleanup proposal for stale data, repeated failure, or
+             * unused vocabulary; rediscover current definitions before preparing
+             * the current change. Show scheduling and inference remain external,
+             * owner approval is required before mutation, and a declined proposal
+             * creates no canonical mutation.
+             */
+            verify VellisRequirements::ownerVisibleImprovementAnalysis;
+            verify VellisRequirements::ownerControlledMemory;
+        }
+    }
+
+    analysis def 'History Growth Performance Characterization' {
+        subject system : 'RTG System';
+        objective {
+            doc /*
+             * Independently vary current graph size, canonical-ledger length,
+             * definition-change density, activity-history length, selected
+             * interval size, and required replay-tail length. Measure semantic
+             * record visits, current-operation work, historical-selection work,
+             * replay and startup duration with explicit units, and storage growth.
+             * Use the resulting evidence to select later numerical latency,
+             * startup, and storage budgets only after a runtime, hardware profile,
+             * and representative owner dataset exist. This analysis does not
+             * claim satisfaction of any numerical performance target.
+             */
         }
     }
 
@@ -467,7 +599,7 @@ package VellisVerification {
     verification invalidQuery : 'Invalid Query Is Read Only' {
         subject redefines system = VellisRequirements::vellis.memory;
     }
-    verification definitionDiscovery : 'Cold Agent Discovers Active Definitions' {
+    verification definitionDiscovery : 'Cold Agent Discovers Evaluated Definitions' {
         subject redefines system = VellisRequirements::vellis.memory;
     }
     verification atomicTransitions : 'Every Canonical Transition Is Atomic' {
@@ -512,7 +644,7 @@ package VellisVerification {
     verification observableFailure : 'Failures Are Observable And Safe' {
         subject redefines system = VellisRequirements::vellis;
     }
-    verification predecessorCompatibility : 'Predecessor RTG Meaning Is Preserved' {
+    verification v1Compatibility : 'V1 Snapshot Initializes Compatible Memory' {
         subject redefines system = VellisRequirements::vellis;
     }
     verification simpleOperation : 'One Owner Begins Using One Cohesive System' {
@@ -529,5 +661,20 @@ package VellisVerification {
     }
     verification everydayLifeStart : 'Everyday Life Is An Optional Confirmed Start' {
         subject redefines system = VellisRequirements::vellis;
+    }
+    verification currentWorkScaling : 'Current Operations Ignore History Length' {
+        subject redefines system = VellisRequirements::vellis.memory;
+    }
+    verification historicalSelectionScaling : 'Historical Selection Avoids Irrelevant Records' {
+        subject redefines system = VellisRequirements::vellis.memory;
+    }
+    verification replayCharacterization : 'Replay Work Is Characterized By Required Tail' {
+        subject redefines system = VellisRequirements::vellis.memory;
+    }
+    verification improvementAnalysis : 'Cold Agent Prepares Incremental Improvement' {
+        subject redefines system = VellisRequirements::vellis;
+    }
+    analysis historyGrowth : 'History Growth Performance Characterization' {
+        subject redefines system = VellisRequirements::vellis.memory;
     }
 }

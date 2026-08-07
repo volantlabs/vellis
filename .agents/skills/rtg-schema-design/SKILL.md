@@ -1,6 +1,6 @@
 ---
 name: rtg-schema-design
-description: Design, review, evolve, and prepare implementation-ready handoffs for language-neutral Reified Type Graph (RTG) meaning and governance from owner needs and intended queries. Use for cold-agent definition discovery; anchor, associated-data, link, and direct-association classification; current or prospective graph queries; definitions and relationship rules; prospective changes; validation, revisions, canonical and activity ledgers, snapshots, replay, restore, predecessor recovery, MCP exposure, compatibility, and RTG implementation feedback.
+description: Design, review, evolve, and prepare implementation-ready handoffs for language-neutral Reified Type Graph (RTG) meaning and governance from owner needs and intended queries. Use for cold-agent current or historical definition discovery; anchor, associated-data, link, and direct-association classification; current or prospective graph queries; definitions and relationship rules; prospective changes; validation, revisions, canonical and activity ledgers, snapshots, replay, restore, first-use compatibility initialization, MCP exposure, and RTG implementation feedback.
 ---
 
 # RTG Schema Design
@@ -18,16 +18,19 @@ SysML or KerML choices.
 - Do not infer RTG behavior from the phrase “reified type graph,” another graph product, or predecessor class names. Begin with the four canonical RTG distinctions and current owner questions.
 - Decide identity, independent existence, and relationship meaning before type names or schema shape.
 - Keep filtering facts distinct from returned facts: participation in matching does not authorize projection.
-- Keep canonical transition evidence distinct from observational activity, and distinguish replay, initialization, restore, and predecessor recovery before discussing representation.
+- Keep canonical transition evidence distinct from observational activity, and distinguish replay,
+  fresh initialization, snapshot-based initialization, restore, and first-use compatibility
+  initialization before discussing representation.
 - Distinguish replay-bearing history from bounded owner-facing history views, and canonical
   nonmutation from permitted observational activity.
 - Treat a trusted owner-configured client as a boundary assumption, not an RTG authorization or
   approval mechanism.
-- Make current graph state understandable to an agent without predecessor knowledge: prefer a
-  complete shallow active-anchor summary followed by complete focused inspection of selected
-  active-definition neighborhoods. Compare evaluated revisions and repeat discovery if they differ.
-  Keep the sole current proposed definition set
-  separately retrievable in full.
+- Make current or selected historical graph state understandable to an agent without predecessor
+  knowledge: prefer a complete shallow active-anchor summary followed by complete focused inspection
+  of selected active-definition neighborhoods at the same evaluated revision. Reuse a time summary's
+  resolved revision for inspection and query, and compare evaluated revisions before relying on the
+  result. Keep the sole current proposed definition set separately retrievable in full, and rediscover
+  current definitions before preparing a current mutation.
 - Prefer discriminating examples and invalid cases over a generic schema vocabulary. Do not invent a query, constraint, migration, or storage language to make the model look executable.
 - Treat query, governance, validation, history, recovery, and compatibility as conditional
   dimensions. Address only those changed by the current owner question; do not create one public
@@ -44,9 +47,9 @@ SysML or KerML choices.
    contract. An explicit review may reassess in-scope structure; otherwise preserve selected meaning.
 2. Establish the affected canonical distinctions: identity, object kind, direct grounding, link
    direction and endpoints, type keys, associated-data properties, and compatibility defaults.
-3. If discovery changes, distinguish current active summary, focused inspection with its own
-   evaluated revision, and whole current proposed state. Make revision drift detectable rather than
-   inventing a session or lock. Make owner-readable descriptions canonical definition
+3. If discovery changes, distinguish current or selected historical active summary, focused
+   inspection with its own evaluated revision, and whole current proposed state. Make revision drift
+   detectable rather than inventing a session or lock, and keep delta retrieval current-only. Make owner-readable descriptions canonical definition
    data rather than comments; keep structured rules authoritative and do not invent a prose
    constraint language.
 4. If querying changes, define only the selected anchor or associated-data endpoint groups,
@@ -61,10 +64,12 @@ SysML or KerML choices.
    proposal from a second canonical occurrence.
 6. If canonical state changes, state validation, atomicity, effective no-op, revision, rejection, and
    replay effects. Carry the smallest replay-sufficient semantic change for ordinary transitions;
-   reserve complete replacement state for behavior that actually replaces state. Add history,
+   reserve complete replacement state for an ordinary transition only when restore actually replaces
+   state. Add history,
    snapshot, restore, or activity detail only when the changed behavior depends on it.
-7. If recovery or compatibility changes, preserve RTG meaning without adopting predecessor storage,
-   schema, runtime, or migration architecture.
+7. If recovery or compatibility changes, distinguish ordinary restart, fresh snapshot-based lineage,
+   restore, and first-use v1 initialization. Preserve RTG meaning without adopting predecessor
+   storage, schema, runtime, ledger history, or migration architecture.
 8. If a tool, protocol, or framework constrains exposure, translate only the owner-visible limit into
    model meaning. Do not mirror tool names, operation counts, envelopes, resources, or framework
    lifecycles into the RTG domain. If the public operation inventory is intentionally fixed, keep it
@@ -89,7 +94,7 @@ Expose only the dimensions the selected implementation slice needs:
 - query selector, participation, projection, row, duplicate, absence, revision, and bound semantics;
 - canonical state tuple, prospective-state cardinality, valid transition combinations, atomicity,
   revision, replay, and every rejection or failure non-effect;
-- canonical versus observational history, recovery and compatibility meaning, and selected public
+- canonical versus observational history, recovery and first-use compatibility meaning, and selected public
   operation boundaries;
 - storage, indexing, serialization, algorithms, runtime, and deployment choices that remain open.
 

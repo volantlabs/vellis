@@ -94,23 +94,23 @@ no-op need not advance revision.
 A cold agent needs meaning before it can formulate a safe graph query or prospective change. Prefer
 three deliberately different views:
 
-1. a complete shallow summary of currently active anchor type keys and owner-readable descriptions;
-2. complete focused inspection of selected active anchor neighborhoods with its own evaluated
+1. a complete shallow summary of anchor type keys and owner-readable descriptions active at current
+   or explicitly selected historical state;
+2. complete focused inspection of selected active anchor neighborhoods at that state with its own evaluated
    revision, including directly permitted
    associated-data types, property rules, permitted link roles, endpoint eligibility, relationship
    multiplicity, and rule descriptions;
 3. the sole proposed definition set returned whole because it is already the bounded unit of work.
 
-The current summary should reveal whether proposed state exists without mixing it into the active
-view. Compare summary and inspection revisions; when they differ, repeat discovery rather than
-adding a session, lock, or historical discovery contract. Historical queries must still evaluate
-against the definitions active at their resolved revision, but the initial discovery tools are not a
-historical schema browser. Until a later owner use case adds that capability, historical querying
-requires caller-known vocabulary valid at the selected revision; do not imply that current discovery
-makes a cold historical query constructible. Focused inspection must not silently omit a requested
-neighborhood; reject an unknown, ambiguous, unresolved, or unanswerable selection instead of
-returning a misleading partial description. Let the agent compare current active and proposed meaning
-rather than adding server-side diff machinery.
+An absent selection means current state. A time-based summary should return its exact resolved
+revision so inspection and graph query can reuse it. Compare summary and inspection revisions; when
+they differ, repeat discovery rather than adding a session or lock. Historical discovery returns the
+definitions active at its evaluated revision, including vocabulary later retired, while the sole
+proposed definition set remains a separate current-only view. Focused inspection must not silently
+omit a requested neighborhood; reject an unknown, ambiguous, unresolved, or unanswerable selection
+instead of returning a misleading partial description. Rediscover current definitions before
+preparing a current mutation, and let the agent compare current active and proposed meaning rather
+than adding server-side diff machinery.
 
 Descriptions are definition data when agents must retrieve them. They explain owner meaning but do
 not replace structured endpoint, property, or multiplicity rules. Require every active type and rule
@@ -196,7 +196,8 @@ accepted effective no-op is simply not a canonical change.
 
 An ordinary transition should carry the smallest semantic change sufficient for replay. Do not hide a
 complete graph snapshot inside a generically named change object. Carry complete replacement state
-only for explicit restore or recovery behavior, and make kind-compatible payload rules decisive.
+only for explicit restore behavior, and make kind-compatible payload rules decisive. First-use v1
+compatibility establishes a new initial history base rather than a recovery transition.
 
 Do not add a second public delta-assessment path when retrieving or staging the sole delta already
 returns its current assessment. Keep an independently useful whole-graph conformance check only when
@@ -220,7 +221,7 @@ itself. Keep owner-directed activity retention below the canonical revision boun
 
 Do not return replay-bearing records merely because the owner wants to inspect history. A canonical
 record can recursively own a complete replacement graph. Prefer one bounded owner-facing entry per
-record—with time, provenance, revision or activity kind, and semantic summary—while keeping snapshots,
+record—with time, provenance, revision or capability and outcome, and semantic summary—while keeping snapshots,
 canonical changes, and ledger tails available only to behavior that actually reconstructs state.
 
 A trusted owner-configured client is a boundary assumption, not an RTG authorization mechanism.
@@ -236,7 +237,8 @@ Ask:
 - Are property meaning, requiredness, range, link direction, endpoint eligibility, or relationship
   counts changing?
 - Does proposed state preserve the canonical identity rules?
-- Can recovery preserve graph meaning without adopting predecessor storage or architecture?
+- Can first-use compatibility preserve graph meaning without adopting predecessor storage, history,
+  or architecture?
 - Which accepted, rejected, and counterexample instances discriminate the change?
 
 Reject familiar-name substitution from RDF, property graphs, event sourcing, schema registries,

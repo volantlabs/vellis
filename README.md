@@ -2,7 +2,7 @@
 
 Vellis is an individually owned personal AI system and an open demonstration of model-first software engineering with textual SysML v2.
 
-The repository currently contains the Vellis system model and its development tooling, with no application implementation or generated product source yet. The model covers owner-facing behavior, Reified Type Graph (RTG) graph and query meaning, canonical equality and string-shape constraints, cold-agent definition discovery, definition governance, blank or recommended Everyday Life initialization, snapshots and replay, a selected MCP tool contract, cohesive system responsibility, requirements, satisfiers, and verification cases.
+The repository currently contains the Vellis system model and its development tooling, with no application implementation or generated product source yet. The model covers owner-facing behavior, Reified Type Graph (RTG) graph and query meaning, ledger-authoritative state and scalable history access, canonical equality and string-shape constraints, cold-agent current or historical definition discovery, definition governance, blank or recommended Everyday Life initialization, confirmed first-use import from a Vellis v1 JSON snapshot, snapshots and replay, proactive owner-visible analysis support, a selected ten-tool MCP contract, cohesive system responsibility, requirements, satisfiers, analysis, and verification cases.
 
 ## What is here
 
@@ -48,7 +48,7 @@ verifies or reconstructs that frame, selects the simplest evidence-backed realiz
 end-to-end slice, and returns conformance evidence or precisely classified feedback. The handoff is a
 navigation aid, not another contract; the branch's SysML remains authoritative.
 
-A useful handoff answers the question, states the changed or reviewed meaning, gives decisive evidence and checks, and names only the remaining decision or follow-up work. An agent unfamiliar with an RTG begins with the modeled current definition summary, then inspects only the active anchor neighborhoods needed for its query or proposed change.
+A useful handoff answers the question, states the changed or reviewed meaning, gives decisive evidence and checks, and names only the remaining decision or follow-up work. An agent unfamiliar with an RTG begins with the modeled definition summary for current or selected historical state, then inspects only the active anchor neighborhoods needed for its query or proposed change. It retrieves the sole proposed definition set separately when continuing current definition work.
 
 ## Development setup
 

@@ -57,6 +57,12 @@ case or claim that a standalone plugin already exists.
    intent rather than mirroring model declarations. Use tests, analysis, simulation, inspection,
    demonstration, numerical references, timing measurements, or hardware evidence as appropriate.
    Exercise accepted behavior, semantic rejection or failure, and the nearest invalid counterexample.
+   For modeled history scaling, instrument semantic record accesses or equivalent traces before using
+   wall-clock measurements. Materialized current projections, revision/time indexes, definition
+   checkpoints, caches, and snapshot cadence are possible realization choices, not model-selected
+   architecture; do not claim numerical performance satisfaction before representative budgets exist.
+   Treat Vellis v1 compatibility as confirmed first-use initialization from one complete JSON snapshot,
+   never as an existing-system merge or adoption of v1 ledger history.
 5. Review plan conformance, model meaning in code, evidence adequacy, realization leakage,
    subtraction, and repository truth separately. Repeat the complete review after material fixes until
    one pass finds no new issue.

@@ -118,20 +118,18 @@ package RTG {
         enum activity;
     }
 
-    enum def 'Activity Kind' {
-        enum read;
-        enum validation;
-        enum rejection;
-        enum failure;
-        enum snapshotCapture;
-    }
-
     enum def 'Transition Kind' {
         enum graphMutation;
         enum definitionDeltaChange;
         enum definitionActivation;
         enum historicalRestoration;
-        enum predecessorRecovery;
+    }
+
+    enum def 'Recovery Finding Disposition' {
+        enum preserved;
+        enum simplified;
+        enum omitted;
+        enum blocking;
     }
 
     enum def 'Definition Delta Disposition' {
@@ -154,8 +152,8 @@ package RTG {
         attribute live : ScalarValues::Boolean default = true;
 
         doc /*
-         * Canonical metadata has a Boolean live value. Recovery normalizes a
-         * missing predecessor value to true and preserves other JSON values.
+         * Canonical metadata has a Boolean live value. V1 translation normalizes
+         * a missing source value to true and preserves other JSON values.
          */
     }
 
@@ -358,7 +356,12 @@ package RTG {
 
     item def 'Definition Inspection Request' {
         attribute anchorTypeKeys [1..*] : 'Type Key';
-        doc /* Selects a non-empty unique set of anchor keys from the active definition set. */
+        item historicalSelection [0..1] : 'Historical State Selection';
+        doc /*
+         * Selects a non-empty unique set of anchor keys from the definitions
+         * active at the current state when selection is absent, or at exactly
+         * one selected revision or time when present.
+         */
     }
 
     item def 'Anchor Definition Detail' {
@@ -492,11 +495,10 @@ package RTG {
          * unique within the query. Every reference resolves to an element owned
          * by the same query. An absent historical selection evaluates current
          * state; a present revision or time selection evaluates the resolved
-         * historical state with identical query meaning. The caller supplies
-         * type and property vocabulary valid at that historical revision;
-         * current active-definition discovery does not discover retired
-         * vocabulary. The positive maximum bounds a complete result rather than
-         * requesting a page.
+         * historical state with identical query meaning. The caller may discover
+         * the definitions active at that selected state and reuse its exact
+         * evaluated revision for this query. The positive maximum bounds a
+         * complete result rather than requesting a page.
          */
     }
 
@@ -599,9 +601,9 @@ package RTG {
         doc /*
          * Contains every active anchor type exactly once. Each summary refers to
          * its authoritative type key and description. The result is complete
-         * for the current active definitions and changes no canonical state. Evaluated
-         * revision and delta presence are
-         * present exactly for an accepted result. A rejected or failed result
+         * for the definitions active at the evaluated current or historical
+         * state and changes no canonical state. Evaluated revision and delta
+         * presence are present exactly for an accepted result. A rejected or failed result
          * returns no summaries, evaluated revision, or delta-presence value. The
          * operation attempt may still produce observational activity.
          */
@@ -613,7 +615,8 @@ package RTG {
         item anchorDetails [*] : 'Anchor Definition Detail';
         doc /*
          * An accepted result contains one complete detail for every requested
-         * active anchor type and no unrelated definitions. An unknown or
+         * anchor type active at the request's evaluated current or historical
+         * state and no unrelated definitions. An unknown or
          * duplicate key or inability to answer completely produces findings,
          * no evaluated revision, and no details. The operation changes no
          * canonical state but may produce observational activity.
@@ -659,6 +662,8 @@ package RTG {
 
     item def Provenance {
         attribute initiator : ScalarValues::String;
+        attribute source [0..1] : ScalarValues::String;
+        doc /* Identifies who initiated a record and, when applicable, its bounded source provenance. */
     }
 
     item def 'Canonical State' {
@@ -676,8 +681,8 @@ package RTG {
     item def 'Canonical Change' {
         doc /*
          * Replay-sufficient meaning for one transition. A graph mutation carries
-         * the accepted graph change, while restoration or predecessor recovery
-         * may carry a complete replacement graph. The two graph forms are never
+         * the accepted graph change, while historical restoration may carry a
+         * complete replacement graph. The two graph forms are never
          * both present. An absent graph form or active-definition value means
          * unchanged. Delta disposition distinguishes unchanged, present, and
          * absent. Present requires a delta value; unchanged and absent forbid one.
@@ -694,14 +699,24 @@ package RTG {
         item provenance : Provenance;
     }
 
-    abstract item def 'Canonical Record' :> 'History Record';
+    abstract item def 'Canonical Record' :> 'History Record' {
+        attribute establishedRevision : 'Revision Number';
+        doc /*
+         * Establishes exactly one canonical revision: the contained revision
+         * for an initial record and the resulting revision for a transition.
+         */
+    }
 
     item def 'Initial State Record' :> 'Canonical Record' {
         item canonicalState : 'Canonical State';
+        attribute initializationSummary : ScalarValues::String;
+        bind establishedRevision = canonicalState.revision;
         doc /*
          * Establishes the owned history base. Its revision may be greater than
          * zero when a fresh RTG is seeded from reconstructed snapshot state;
-         * the record makes no claim about transitions before that base.
+         * the record makes no claim about transitions before that base. Its
+         * bounded summary describes how the base was established without copying
+         * complete source, candidate, report, or canonical payloads.
          */
     }
 
@@ -710,6 +725,7 @@ package RTG {
         attribute resultingRevision : 'Revision Number';
         attribute kind : 'Transition Kind';
         item change : 'Canonical Change';
+        bind establishedRevision = resultingRevision;
         doc /*
          * Establishes one contiguous canonical transition. The record carries
          * enough semantic change to replay without activity history but does
@@ -718,23 +734,32 @@ package RTG {
          * A graph mutation supplies only graphChange and leaves the delta unchanged.
          * A definition-delta change supplies only a present or absent delta. An
          * activation supplies active definitions and an absent delta. Historical
-         * restoration supplies replacementGraph, active definitions, and an absent delta.
-         * Predecessor recovery supplies replacementGraph, optionally replaces active
-         * definitions, and supplies an absent delta. Other combinations are
-         * invalid and cannot be replayed.
+         * restoration supplies replacementGraph, active definitions, and an
+         * absent delta. Other combinations are invalid and cannot be replayed.
          */
     }
 
     item def 'State Change Ledger' {
         item initial : 'Initial State Record';
         item transitions [*] ordered : 'Canonical Transition Record';
-        doc /* Complete, durable, ordered canonical history from its owned initial base forward. */
+        doc /*
+         * The complete, durable, ordered authority from its owned initial base
+         * forward. Replay through its final canonical record establishes the
+         * current canonical state.
+         */
     }
 
     item def 'Activity Record' :> 'History Record' {
-        attribute kind : 'Activity Kind';
+        attribute capability : ScalarValues::String;
+        attribute outcomeCategory : 'Operation Status';
         attribute evaluatedRevision [0..1] : 'Revision Number';
+        attribute semanticScope : ScalarValues::String;
         attribute summary : ScalarValues::String;
+        doc /*
+         * The bounded owner-facing summary identifies capability, outcome,
+         * provenance, evaluated revision when applicable, and semantic scope.
+         * It copies no result rows, canonical payloads, or inferred intent.
+         */
     }
 
     item def 'Activity Ledger' {
@@ -749,19 +774,21 @@ package RTG {
 
     item def 'Canonical Snapshot' {
         item canonicalState : 'Canonical State';
+        ref item capturedThrough : 'Canonical Record';
         doc /*
          * A self-contained, lossless capture of complete canonical state at its
-         * revision. Physical artifact and serialization format remain open.
+         * revision, bound to the exact authoritative record that establishes
+         * that revision. Physical artifact and serialization format remain open.
          */
     }
 
     item def 'Ledger Tail' {
-        attribute followsRevision : 'Revision Number';
+        ref item precedingRecord : 'Canonical Record';
         ref item transitions [1..*] ordered : 'Canonical Transition Record';
         doc /*
-         * References a contiguous sequence of authoritative records whose first
-         * prior revision equals the stated revision and whose later records
-         * continue without gaps or duplicates.
+         * References a contiguous sequence from the same authoritative ledger.
+         * Its first transition immediately follows the exact preceding record;
+         * revision-number equality alone cannot establish compatibility.
          */
     }
 
@@ -770,8 +797,10 @@ package RTG {
         ref item capturedSnapshot [0..1] : 'Canonical Snapshot';
         ref item tail [0..1] : 'Ledger Tail';
         doc /*
-         * Uses exactly one base: an initial record or a snapshot. A tail may
-         * advance that base through later canonical revisions.
+         * Uses exactly one base: an initial record or a snapshot. When a tail is
+         * present, its preceding record is exactly that initial record or the
+         * selected snapshot's captured-through record. The tail may then advance
+         * that base through later canonical revisions from the same ledger.
          */
     }
 
@@ -826,8 +855,10 @@ package RTG {
     }
 
     item def 'Activity History Entry' :> 'History Entry' {
-        attribute activityKind : 'Activity Kind';
+        attribute capability : ScalarValues::String;
+        attribute outcomeCategory : 'Operation Status';
         attribute evaluatedRevision [0..1] : 'Revision Number';
+        attribute semanticScope : ScalarValues::String;
     }
 
     item def 'History Result' :> 'Operation Outcome' {
@@ -861,14 +892,29 @@ package RTG {
 
     item def 'Recovery Candidate' {
         doc /*
-         * Normalized existing predecessor RTG graph meaning and optional
-         * governing definitions. While forming this candidate, a predecessor
+         * Transient normalized v1 graph meaning and complete target active
+         * definitions. While forming this candidate, a v1
          * anchor without a display name is assigned the clearly synthetic value
          * "[recovered] {typeKey} {uuid}" using that anchor's exact type-key and
-         * UUID strings; the owned graph therefore contains only valid canonical
-         * anchors. Recovery into an existing system begins with no delta.
+         * UUID strings. The candidate is validated before first-use initialization
+         * and never becomes an existing-system mutation.
          */
         item graph : Graph;
-        item activeDefinitions [0..1] : 'Graph Definition Set';
+        item activeDefinitions : 'Graph Definition Set';
+    }
+
+    item def 'Recovery Finding' {
+        attribute disposition : 'Recovery Finding Disposition';
+        attribute summary : ScalarValues::String;
+    }
+
+    item def 'Recovery Report' {
+        ref item candidate : 'Recovery Candidate';
+        item findings [*] : 'Recovery Finding';
+        doc /*
+         * A transient, complete preview of preserved graph meaning and every
+         * simplified, omitted, or blocking definition condition for the exact
+         * candidate. It is not canonical or activity state.
+         */
     }
 }

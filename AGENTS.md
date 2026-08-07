@@ -92,11 +92,12 @@ only the scenarios, material findings, and disposition in the task handoff or PR
   selected realization boundary. The selected RTG MCP inventory is an intentional public contract,
   not evidence for services, adapters, ports, or matching internal decomposition. Its trusted-client
   assumption does not establish per-call authorization or owner approval.
-- For agent-facing RTG work, begin cold: summarize the complete current anchor vocabulary, inspect
-  only the relevant active-definition neighborhoods at that evaluated revision,
-  and retrieve the sole current proposed definition set separately when continuing definition work.
-  Do not assume predecessor schema knowledge or imply that current discovery reveals retired
-  historical vocabulary.
+- For agent-facing RTG work, begin cold: summarize the complete anchor vocabulary for current or
+  explicitly selected historical state, inspect only the relevant active-definition neighborhoods at
+  that evaluated revision, and reuse a time summary's resolved revision for historical inspection and
+  query. Retrieve the sole current proposed definition set separately when continuing definition work,
+  and rediscover current definitions before preparing a current mutation. Do not assume predecessor
+  schema knowledge.
 - Preserve independently valuable outcomes, state governance, failure non-effects, recovery meaning,
   and verification while subtracting unsupported structure.
 - Tests may observe tooling, repository safety, or an implementation against the current model; they

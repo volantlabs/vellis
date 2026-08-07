@@ -18,14 +18,18 @@ package RTGSystem {
 
     part def 'RTG System' {
         doc /*
-         * The one cohesive semantic and transactional boundary. It owns graph,
-         * definition, revision, and history state. Query, validation, history,
-         * and recovery are capabilities, not independently existing subsystems.
+         * The one cohesive semantic and transactional boundary. It owns the
+         * state-change and activity ledgers and governs graph, definition, and
+         * revision meaning. The state-change ledger is authority; current graph,
+         * active definitions, optional delta, and revision are derived references
+         * to its projection through the final canonical record, not parallel
+         * authority. Query, validation, history, and recovery are capabilities,
+         * not independently existing subsystems.
          */
-        item currentGraph : Graph;
-        item activeDefinitions : 'Graph Definition Set';
-        item definitionDelta [0..1] : 'Definition Delta';
-        attribute currentRevision : 'Revision Number';
+        derived ref item currentGraph : Graph;
+        derived ref item activeDefinitions : 'Graph Definition Set';
+        derived ref item definitionDelta [0..1] : 'Definition Delta';
+        derived attribute currentRevision : 'Revision Number';
         item stateChanges : 'State Change Ledger';
         item activities : 'Activity Ledger';
 
@@ -43,25 +47,30 @@ package RTGSystem {
 
     /* Black-box owner-visible use-case landscape. */
 
-    use case def 'Discover active graph definitions' {
+    use case def 'Discover evaluated graph definitions' {
         subject system : 'RTG System';
         actor client : 'RTG Client';
         objective {
             doc /*
-             * Input: none for the shallow summary, followed by a non-empty
-             * unique selection of anchor type keys for focused inspection.
-             * Success: return the complete shallow anchor vocabulary and, for
+             * Input: an optional revision-or-time selector for the shallow
+             * summary, followed by a non-empty unique selection of anchor type
+             * keys and the same optional selector for focused inspection.
+             * Absence means current state. Success: return the complete shallow
+             * anchor vocabulary and, for
              * each later selection, its complete relevant data, link, endpoint,
-             * property, and multiplicity meaning at the current evaluated revision.
-             * The summary reports whether a definition delta currently exists.
+             * property, and multiplicity meaning at the exact evaluated revision.
+             * A time uses the historical-query resolution rule. The summary
+             * reports whether a definition delta exists in the evaluated state.
              * A summary that cannot be returned completely returns no summaries.
              * Unknown, duplicate, or incompletely answerable selections
              * return findings and no partial details. Canonical state and
              * revision never change. One observational activity record for the
              * completed read, rejection, or failure is appended after its
              * outcome is determined.
-             * Evidence: a client with no prior graph knowledge can construct a
-             * valid bounded current query or proposed graph change.
+             * Unresolved selections return no summary, details, or evaluated
+             * revision. Evidence: a client with no prior graph knowledge can
+             * construct a valid bounded current or historical query. A client
+             * preparing a current mutation rediscovers current definitions.
              */
         }
     }
@@ -84,9 +93,8 @@ package RTGSystem {
              * rows. Canonical state and revision never change. One observational
              * activity record for the completed read, rejection, or failure is
              * appended after its outcome is determined. Historical evaluation
-             * requires caller-supplied vocabulary known to be valid at the
-             * selected revision; current-only definition discovery does not
-             * discover retired vocabulary. Evidence: current and historical
+             * may reuse the exact revision resolved by a time-based definition
+             * summary for inspection and query. Evidence: current and historical
              * evaluation preserve identical query meaning.
              */
         }
@@ -104,7 +112,8 @@ package RTGSystem {
              * through associated-data anchor references; no implicit cascade
              * occurs. An effective no-op is accepted without a revision.
              * Refusal or failure: report why it was not applied. State effect:
-             * success changes graph state, revision, and canonical history while
+             * success updates the current projection and appends its transition
+             * as one recoverably atomic effect while
              * leaving active definitions and the delta unchanged; rejection or
              * failure changes no canonical state or revision. Evidence: replay reconstructs the
              * same accepted graph transition without activity history.
@@ -257,7 +266,10 @@ package RTGSystem {
         objective {
             doc /*
              * Input: exactly one initial record or complete snapshot and an
-             * optional contiguous later ledger tail. Success: reconstruct
+             * optional contiguous later ledger tail. A snapshot identifies the
+             * exact source record it captures and a tail identifies the exact
+             * preceding record from the same ledger; matching revision numbers
+             * alone are insufficient. Success: reconstruct
              * equivalent graph, active definitions, optional delta, and
              * revision. A gap, duplicate, reorder, incompatibility, or invalid
              * transition is rejected without partial state. Live canonical state
@@ -276,7 +288,8 @@ package RTGSystem {
             doc /*
              * Input: current canonical state. Success: produce a self-contained
              * snapshot of graph, active definitions, optional delta, and total
-             * revision. Refusal or failure is observable. State effect: no
+             * revision, bound to the exact final canonical record it captures.
+             * Refusal or failure is observable. State effect: no
              * canonical state or revision change; one observational snapshot,
              * rejection, or failure record is appended after the outcome is
              * determined. Evidence: the snapshot initializes an
@@ -308,16 +321,18 @@ package RTGSystem {
         actor client : 'RTG Client';
         objective {
             doc /*
-             * Input: a complete snapshot and optional contiguous later ledger
-             * tail for an RTG with no established canonical state. Success:
+             * Input: a complete snapshot bound to its exact source record and an
+             * optional contiguous later same-ledger tail bound to the exact
+             * record it follows, for an RTG with no established canonical state.
+             * Success:
              * establish the reconstructed graph, definitions, optional delta,
              * and captured or replayed revision without inventing a revision.
              * No blank or recommended fresh-start definitions are overlaid.
              * Begin the fresh RTG's canonical history with one initial record
              * containing that reconstructed state; do not claim omitted earlier
              * transitions. Refusal or failure establishes no partial canonical
-             * state. Evidence: current query and replay agree with the supplied
-             * snapshot and accepted tail at the established revision.
+             * or activity state. Evidence: current query and replay agree with
+             * the supplied snapshot and accepted tail at the established revision.
              */
         }
     }
@@ -337,19 +352,21 @@ package RTGSystem {
         }
     }
 
-    use case def 'Recover predecessor RTG graph' {
+    use case def 'Initialize fresh RTG from recovery candidate' {
         subject system : 'RTG System';
         actor client : 'RTG Client';
+        in ref item candidate : 'Recovery Candidate';
         objective {
             doc /*
-             * Input: predecessor RTG meaning and optional definitions. Success:
-             * validate and commit preserved graph meaning, supplied or current
-             * active definitions, no delta, and one new revision. A predecessor
-             * anchor without a display name receives the deterministic synthetic
-             * display name defined by the recovery candidate. Refusal or
-             * failure preserves all current canonical state. Recovery representation and
-             * interchange mechanism remain open. Evidence: current query and
-             * replay preserve the accepted predecessor RTG distinctions.
+             * Input: one complete, validated transient recovery candidate for an
+             * RTG with no established canonical state. Success: establish its
+             * unchanged graph and translated active definitions at revision 0,
+             * no delta, one initial-state record with bounded import provenance,
+             * no transitions, and an empty activity ledger. This creates a new
+             * lineage and claims no predecessor ledger history. Refusal or
+             * failure, including any existing canonical state, establishes no
+             * canonical or activity state. Evidence: current query, the initial
+             * record, and replay agree on the candidate's graph and definitions.
              */
         }
     }
@@ -357,15 +374,16 @@ package RTGSystem {
     /* Selected external MCP tool contract. Each operation uses typed objects. */
 
     action def rtg_definition_summary {
+        in item historicalSelection [0..1] : 'Historical State Selection';
         out item result : 'Definition Summary Result';
-        doc /* Call first: discover every currently active anchor type and description. */
+        doc /* Discover every anchor type active at current or selected historical state. */
     }
 
     action def rtg_definition_inspect {
         in item request : 'Definition Inspection Request';
         out item result : 'Definition Inspection Result';
         bind result.request = request;
-        doc /* Call after summary: inspect complete active neighborhoods for selected anchors. */
+        doc /* Inspect complete evaluated neighborhoods for selected anchors. */
     }
 
     action def rtg_definition_delta {
@@ -420,9 +438,9 @@ package RTGSystem {
      * internal action decomposition.
      */
     dependency summaryToolBehavior
-        from rtg_definition_summary to 'Discover active graph definitions';
+        from rtg_definition_summary to 'Discover evaluated graph definitions';
     dependency inspectionToolBehavior
-        from rtg_definition_inspect to 'Discover active graph definitions';
+        from rtg_definition_inspect to 'Discover evaluated graph definitions';
     dependency deltaReadToolBehavior
         from rtg_definition_delta to 'Review definition delta';
     dependency queryToolBehavior

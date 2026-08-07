@@ -5,21 +5,26 @@ implement an MCP server.
 
 ## Agent path
 
-An unfamiliar agent first calls parameterless `rtg_definition_summary` to learn every currently
-active anchor type and its owner-readable description. It then calls `rtg_definition_inspect` for
-only the anchor types relevant to its question. Each result identifies its evaluated revision; if
-the revisions differ, the agent repeats discovery instead of relying on stale vocabulary. If
+An unfamiliar agent first calls `rtg_definition_summary`, omitting its optional revision-or-time
+selector for current state or supplying one for historical state, to learn every active anchor type
+and its owner-readable description at the evaluated revision. It then calls
+`rtg_definition_inspect` with the same selection for only the anchor types relevant to its question.
+Each result identifies its evaluated revision; if the revisions differ, the agent repeats discovery
+instead of relying on stale vocabulary. After a time-based summary, it reuses the returned exact
+revision for inspection and graph query. If
 the current summary reports an in-flight proposal, an agent continuing definition work uses
 `rtg_definition_delta` to retrieve that sole proposed set and its current assessment whole.
 
 The remaining selected tools query and change the graph, stage or resolve the sole definition delta,
-check conformance, and inspect bounded history. A historical query uses vocabulary the caller already
-knows was valid at the selected revision; current-only summary and inspection are deliberately not a
-historical schema browser. History results contain bounded owner-facing entries rather than canonical
-state or replay-sufficient changes. Results are complete or rejected rather than silently truncated.
+check conformance, and inspect bounded history. Historical summary and inspection allow cold discovery
+of vocabulary later retired; `rtg_definition_delta` remains current-only. History results contain
+bounded owner-facing entries rather than canonical state or replay-sufficient changes. Results are
+complete or rejected rather than silently truncated.
 Activity-history results are selected before the current read is recorded, so a read never includes
-its own observation. Activity retention, snapshot, replay, initialization, restoration, and
-predecessor recovery are not in the initial MCP surface.
+its own observation. Activity summaries identify capability, outcome category, provenance, applicable
+evaluated revision, and bounded semantic scope without copying result rows or canonical payloads.
+Activity retention, snapshot, replay, initialization, restoration, and v1 first-use onboarding are
+not in the initial MCP surface.
 
 `rtg_check` is a parameterless current-graph conformance check. Delta retrieval and staging already
 return the sole proposal's current assessment, so the realization must not create a duplicate delta-
@@ -40,8 +45,10 @@ text and structured content semantically equivalent. FastMCP, Python models, dec
 and serialization are realization decisions rather than RTG domain meaning.
 
 FastMCP may represent a parameterless tool with an empty object schema, but that representation does
-not create an empty RTG request concept. Public input schemas must advertise only caller-valid
-choices; internal validation scopes do not become `rtg_check` targets by reuse.
+not create an empty RTG request concept. The optional selector for `rtg_definition_summary` belongs
+directly to that tool input and likewise does not create an empty wrapper. Public input schemas must
+advertise only caller-valid choices; internal validation scopes do not become `rtg_check` targets by
+reuse.
 
 Only core MCP tool discovery and invocation are required. Resources, prompts, elicitation, tasks,
 sampling, sessions, notifications, subscriptions, application UI, transforms, tool search,
@@ -53,6 +60,13 @@ establishes nor evaluates per-call authorization. An owner-declined context prop
 submitted to `rtg_change`; exposing graph mutation does not by itself implement Vellis's higher-level
 owner approval of personal context. The first implementation must preserve that distinction without
 inventing roles, tenants, or an authentication subsystem inside RTG.
+
+Current operations must use the current canonical projection rather than replaying history. Bounded
+history and revision/time selection must avoid scanning excluded ledger prefixes, and historical
+definition discovery must avoid replaying unrelated graph-only transitions. Materialized projections,
+revision/time indexes, definition checkpoints, caches, and snapshot cadence are allowed realization
+choices, not selected architecture. Conformance should use semantic record-access counts or equivalent
+traces; wall-clock targets wait for representative runtime, hardware, and owner data.
 
 The implementation PR must verify two realization-only properties that do not belong in the RTG
 domain model: text and structured content communicate the same typed outcome, and removing or

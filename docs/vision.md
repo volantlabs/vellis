@@ -9,6 +9,12 @@ Agents help turn owner needs into use-case landscapes, domain meaning, necessary
 
 Algorithms, storage layouts, transports, protocols, frameworks, deployment choices, and migration machinery remain absent until the product needs or deliberately selects them. Simplicity means both subtracting unsupported machinery and retaining enough explicit behavior, responsibility, history, and verification to make the system understandable and buildable.
 
+Vellis treats one durable canonical ledger as the authority for personal memory while keeping current
+work independent of accumulated history and bounded historical selection efficient. Materialized
+projections, indexes, caches, checkpoints, snapshot cadence, and persistence technology remain
+implementation choices rather than modeled subsystems. Representative measurements will inform
+later numerical performance budgets.
+
 The measure of success is a turnkey personal application and a repository whose path from owner
 outcome through model, implementation source, and evidence is easy to inspect, understand, and
 trust. The future is model-first, agent-assisted, and plain.
@@ -31,6 +37,16 @@ recommended Everyday Life starter. The starter accelerates a useful beginning wi
 universal platform ontology: selected definitions become ordinary owner-governed meaning, and an
 existing or restored system is never silently overlaid.
 
+A first-time v2 owner may also preview and explicitly confirm compatible data and definitions from a
+complete Vellis v1 JSON snapshot. The graph crosses over unchanged when it can conform; definition
+simplifications and omissions are visible before acceptance. The result begins a new revision-zero
+v2 lineage rather than importing enterprise-era history or creating an existing-system merge path.
+
 That includes agents arriving without hidden project memory. Vellis should let them discover the
 owner-described concepts in one personal graph, inspect only the relevant meaning, and act through a
 small portable contract without importing enterprise architecture or predecessor assumptions.
+
+That same bounded history can support owner-configured external agents that periodically surface
+stale data, repeated failures, unused vocabulary, or cleanup opportunities. Vellis supplies visible,
+incremental evidence; scheduling, inference, and recommendation generation stay outside the product,
+and no inferred change bypasses owner approval.

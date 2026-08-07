@@ -1,4 +1,5 @@
 package Vellis {
+    private import RTG::*;
     private import RTGSystem::*;
     private import EverydayLifeStarter::*;
 
@@ -9,6 +10,26 @@ package Vellis {
          * The two owner-confirmed vocabulary choices available only when
          * beginning without prior canonical state. Everyday Life is presented
          * as the recommended preselected choice; blank remains fully supported.
+         */
+    }
+
+    item def 'V1 JSON System Snapshot' {
+        attribute content : 'JSON Object';
+        doc /*
+         * The complete Vellis v1.0.0 JSON snapshot exported or persisted by
+         * main. Envelope tolerance and serialization remain realization choices;
+         * this item identifies the exact analyzed source input.
+         */
+    }
+
+    item def 'V1 Import Preview' {
+        ref item sourceSnapshot : 'V1 JSON System Snapshot';
+        item candidate : 'Recovery Candidate';
+        item report : 'Recovery Report';
+        bind report.candidate = candidate;
+        doc /*
+         * One transient candidate/report pair bound to the exact source snapshot.
+         * Changed input requires a new preview and invalidates prior confirmation.
          */
     }
 
@@ -37,8 +58,9 @@ package Vellis {
         objective {
             doc /*
              * Input: either no prior memory with one explicitly confirmed fresh
-             * vocabulary choice, or a complete canonical snapshot with an
-             * optional later ledger tail. For a fresh start, present Everyday
+             * vocabulary choice, a complete canonical snapshot with an optional
+             * later ledger tail, or a confirmed preview derived from a complete
+             * Vellis v1 snapshot. For a fresh start, present Everyday
              * Life as recommended and preselected while retaining blank as an
              * alternative; do not initialize until the owner confirms the
              * selected choice. Success: blank establishes revision 0 with empty
@@ -47,6 +69,9 @@ package Vellis {
              * an empty graph, no delta, one initial record, no transitions, and
              * an empty activity ledger. Snapshot initialization uses only its
              * reconstructed definitions and never overlays a fresh vocabulary.
+             * V1 initialization uses only the exact owner-confirmed candidate
+             * and report, preserves its graph and translated definitions at
+             * revision 0, and starts a new v2 lineage with no adopted v1 history.
              * Refusal or failure, including absent or false confirmation,
              * establishes no partial canonical or activity state. Evidence: the
              * owner can use the resulting system without tenant, organization,
@@ -59,7 +84,8 @@ package Vellis {
     dependency beginningBehavior
         from 'Begin using one personal Vellis system'
         to RTGSystem::'Initialize fresh RTG',
-           RTGSystem::'Initialize fresh RTG from snapshot';
+           RTGSystem::'Initialize fresh RTG from snapshot',
+           'Begin from Vellis v1 snapshot';
 
     use case def 'Obtain authorized relevant context' {
         subject system : 'Vellis System';
@@ -100,7 +126,7 @@ package Vellis {
              */
         }
 
-        include use case discoverMemory[1] : 'Discover active graph definitions' {
+        include use case discoverMemory[1] : 'Discover evaluated graph definitions' {
             subject redefines system = 'Understand personal memory vocabulary'::system.memory;
             actor redefines client = 'Understand personal memory vocabulary'::agent;
         }
@@ -291,15 +317,20 @@ package Vellis {
         actor agent : 'MCP Agent';
         objective {
             doc /*
-             * Input: an owner-selected bounded graph query whose type and property
-             * vocabulary is already known to be valid at one selected revision or
-             * time. Success: present the requested personal-memory facts at the
-             * resolved revision. Current definition discovery does not discover
-             * retired vocabulary. Rejection or failure returns no partial result.
+             * Input: an owner-selected revision or time. Success: first discover
+             * the definitions active at the resolved revision, then use that exact
+             * evaluated revision for focused inspection and a bounded graph query.
+             * This supports vocabulary later retired without predecessor knowledge.
+             * Rejection or failure returns no partial result.
              * Canonical memory and revision never change; the attempt is recorded
              * observationally. Evidence: the result identifies and matches the
-             * resolved canonical revision using the supplied historical vocabulary.
+             * resolved canonical revision using the discovered historical vocabulary.
              */
+        }
+
+        include use case discoverHistoricalVocabulary[1] : 'Discover evaluated graph definitions' {
+            subject redefines system = 'Explore prior personal memory'::system.memory;
+            actor redefines client = 'Explore prior personal memory'::agent;
         }
 
         include use case exploreMemory[1] : 'Query graph' {
@@ -307,6 +338,39 @@ package Vellis {
             actor redefines client = 'Explore prior personal memory'::agent;
         }
     }
+
+    use case def 'Support owner-visible memory improvement analysis' {
+        subject system : 'Vellis System';
+        actor owner : Owner;
+        actor agent : 'MCP Agent';
+        objective {
+            doc /*
+             * Input: an external owner-configured agent's explicit bounded
+             * canonical and activity intervals, plus bounded historical or
+             * current definition discovery and graph queries. Success: support
+             * traceable owner-visible findings such as stale data, repeated
+             * failures, unused vocabulary, and cleanup opportunities. Scheduled
+             * analysis continues incrementally after its previously processed
+             * interval rather than repeatedly requesting all history. Before
+             * preparing a current graph change or definition delta, the agent
+             * rediscovers current definitions. Scheduling, inference, and
+             * recommendation generation remain outside Vellis. An inferred
+             * change reaches mutation behavior only after owner approval;
+             * declined proposals create no canonical mutation. Evidence: a cold
+             * agent can explain each proposal from bounded observations and the
+             * exact evaluated revisions it used.
+             */
+        }
+    }
+
+    dependency improvementAnalysisBehavior
+        from 'Support owner-visible memory improvement analysis'
+        to 'Review canonical memory history',
+           'Review memory activity',
+           'Understand personal memory vocabulary',
+           'Explore prior personal memory',
+           'Retain owner-approved context',
+           'Manage graph definitions and constraints';
 
     use case def 'Preserve personal memory snapshot' {
         subject system : 'Vellis System';
@@ -368,23 +432,34 @@ package Vellis {
         }
     }
 
-    use case def 'Recover existing RTG graph' {
+    use case def 'Begin from Vellis v1 snapshot' {
         subject system : 'Vellis System';
         actor owner : Owner;
+        in ref item sourceSnapshot : 'V1 JSON System Snapshot';
+        in ref item confirmedPreview [0..1] : 'V1 Import Preview';
         objective {
             doc /*
-             * Input: predecessor RTG meaning presented for compatibility
-             * recovery into an existing system. Success: preserve canonical
-             * identity, kinds, associations, links, endpoints, JSON values, and
-             * live defaults in one new revision. Refusal or failure reports
-             * findings without partial canonical state. Evidence: current query
-             * and replay preserve the representative predecessor meanings.
+             * Input: one complete Vellis v1 JSON snapshot at first use. Analyze
+             * live graph content and active definitions into a transient complete
+             * recovery candidate and report bound to that exact snapshot. Summarize
+             * preserved graph content and present every simplified, omitted, and
+             * blocking definition condition.
+             * Success requires owner confirmation of that exact candidate and
+             * report, then initializes the unchanged graph and translated
+             * definitions at v2 revision 0 with no delta, one provenance-bearing
+             * initial record, no transitions, and empty activity history. The new
+             * v2 lineage adopts no v1 ledger positions, transaction metadata, or
+             * history. Decline, changed input, rejection, failure, or any existing
+             * v2 canonical state creates no canonical or activity state and has no
+             * merge or replacement meaning. Evidence: current query and replay
+             * preserve the accepted candidate and the report accounts for every
+             * definition simplification or omission.
              */
         }
 
-        include use case recoverMemory[1] : 'Recover predecessor RTG graph' {
-            subject redefines system = 'Recover existing RTG graph'::system.memory;
-            actor redefines client = 'Recover existing RTG graph'::system;
+        include use case initializeRecoveredMemory[1] : 'Initialize fresh RTG from recovery candidate' {
+            subject redefines system = 'Begin from Vellis v1 snapshot'::system.memory;
+            actor redefines client = 'Begin from Vellis v1 snapshot'::system;
         }
     }
 
@@ -473,6 +548,11 @@ package Vellis {
             actor redefines owner = Context::owner;
             actor redefines agent = Context::agent;
         }
+        use case improvementAnalysis : 'Support owner-visible memory improvement analysis' {
+            subject redefines system = Context::system;
+            actor redefines owner = Context::owner;
+            actor redefines agent = Context::agent;
+        }
         use case preserveSnapshot : 'Preserve personal memory snapshot' {
             subject redefines system = Context::system;
             actor redefines owner = Context::owner;
@@ -485,7 +565,7 @@ package Vellis {
             subject redefines system = Context::system;
             actor redefines owner = Context::owner;
         }
-        use case recoverExistingGraph : 'Recover existing RTG graph' {
+        use case beginFromV1 : 'Begin from Vellis v1 snapshot' {
             subject redefines system = Context::system;
             actor redefines owner = Context::owner;
         }
