@@ -25,6 +25,8 @@ non-goal and confirm the final full review cycle found no new material issue.
 - [ ] Model structure introduced alongside tests was reviewed independently from owner purpose and
       decisive accepted, refused or failed, and plausible-invalid examples.
 - [ ] Consequential language choices cite official specification sections and pages.
+- [ ] Portable-core skill changes report fresh-agent forward-test scenarios, material findings, and
+      disposition in the PR without committing prompts, transcripts, or expected-answer fixtures.
 - [ ] Official model validation and `just check` pass.
 - [ ] Adequacy and subtraction reviews found no responsibility stranded in prose and no unsupported
       service, runtime, storage, migration, transport, deployment, or inventory-driven architecture.

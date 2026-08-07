@@ -135,6 +135,11 @@ Locate the exact file through the configured standard-library search; do not ass
 Both options in these comparisons can be valid syntax. The validator cannot select the intended
 meaning; retrieve the relevant clauses and decide from instance-level consequences.
 
+Whenever omitted multiplicity is consequential, resolve every subsetted or redefined target usage
+and retrieve the active normative multiplicity clause before deciding cardinality. Do not rely on a
+remembered default: inherited constraints and the conditions for an implicit multiplicity must be
+established from the current model and pinned baseline.
+
 | Question | Turns on |
 | --- | --- |
 | item definition or part definition? | All parts are items. Use a part when an occurrence represents all or part of a system or is normally modeled as an action performer; parts may represent people, organizations, software, hardware, facilities, or external systems. Use an item when its relevant role is being part of, existing in, flowing through, transferred, stored, or acted on by a system. Items may themselves have attributes, states, and nested items, so state or lifecycle alone does not select a part. Confirm specialization in the active library. |

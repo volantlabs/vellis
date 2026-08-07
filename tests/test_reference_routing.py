@@ -108,6 +108,11 @@ ROUTING_QUESTIONS: tuple[tuple[str, str, tuple[tuple[str, str], ...]], ...] = (
     ),
     (
         "A",
+        "what multiplicity applies when a usage subsets a collection and declares no multiplicity",
+        (("specification", "7.6.3"),),
+    ),
+    (
+        "A",
         "binding connector versus item flow",
         (("specification", "7.13"), ("specification", "7.16"), ("specification", "7.4.6")),
     ),
@@ -441,6 +446,16 @@ def test_each_register_meets_its_retrieval_floor(register: str) -> None:
         f"register {register}: {found}/{len(questions)} = {rate:.0%} "
         f"(floor {REGISTER_FLOORS[register]:.0%}); missed: {missed}"
     )
+
+
+def test_omitted_multiplicity_routes_to_definition_and_usage_clause() -> None:
+    if not _corpus_ready():
+        pytest.skip("generated corpus absent; run `just model-setup`")
+    question = (
+        "what multiplicity applies when a usage subsets a collection and declares no multiplicity"
+    )
+
+    assert _hit_rank(question, (("specification", "7.6.3"),)) is not None
 
 
 def test_concept_inventory_covers_every_construct_upstream_defines() -> None:

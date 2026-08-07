@@ -41,14 +41,31 @@ warnings, which destroys the gate. So they are documented rather than checked.
 | `:>>` (redefines) | the same thing | the inherited feature is **replaced** in this context. UML `{redefines}` maps here. |
 | `= expr` | "a default value" | a **binding**, asserted for all time. A differing value is inconsistent, not merely different. |
 | `default = expr` | the same thing | an initial value that may legitimately change. |
-| omitted multiplicity | "any number" | **`[1..1]`.** Exactly one, always. This silently over-constrains. |
+| omitted multiplicity | "any number" or "exactly one" | First inherits multiplicity constraints from any explicitly subsetted or redefined usages. Only without explicit subsetting or redefinition, and under the specification's stated ownership conditions for attribute, item, and port usages, is `[1..1]` implicit; otherwise the implicit multiplicity is `[0..*]`. |
 | `/* comment */` above an element | documentation | an **unowned `Comment`** in the enclosing namespace. Views and exports drop it. |
 | `doc /* … */` inside the body | the same thing | documentation genuinely attached to the element. |
 | `connection def` | "a relationship" | `Connection :> LinkObject, Part` — it **is a Part**, carrying structural-part semantics. |
 
 The pattern: v1 and UML draw a distinction with a diagram adornment or a
-stereotype, and SysML v2 draws it with a keyword that is easy to omit. Omitting
-it is always legal and usually wrong.
+stereotype, and SysML v2 often draws it with a keyword that is easy to omit.
+Omission can be legal while still changing or obscuring the intended meaning.
+
+For example, singleton members can explicitly subset a collection that permits more than one entry:
+
+```sysml
+item def Entry;
+
+item def Catalog {
+    item entries [1..*] : Entry;
+    item primary [1] : Entry subsets entries;
+    item secondary [1] : Entry subsets entries;
+}
+```
+
+`primary` and `secondary` are each singleton usages within the non-singleton `entries` collection.
+The declarations alone do not assert that the two members are distinct or that they exhaust the
+collection. Omitting their multiplicities would require resolving `entries` and applying the active
+normative inheritance rule; a blanket default would not answer the question.
 
 ## Checking, in cost order
 

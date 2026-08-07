@@ -19,6 +19,9 @@ package VellisVerification {
              * names within one associated-data type. Accept an absent optional
              * property, and reject a missing required property, an undeclared
              * property, or a present value that violates its declared rule.
+             * Show composed é (U+00E9) has string size 1, e followed by U+0301
+             * COMBINING ACUTE ACCENT has string size 2, and neither value is
+             * normalized.
              * Reject duplicate natural identities or participating members in
              * multiplicity rules, and show distinct overlapping rules all apply.
              * Every accepted graph conforms and every invalid proposal changes
@@ -417,8 +420,10 @@ package VellisVerification {
             doc /*
              * Compare Boolean, number, string, array, object, and null JSON
              * values. Show JSON kinds remain distinct, 1 and 1.0 have equal exact
-             * mathematical value, array order matters, object-member order does
-             * not, and a missing property differs from null. Reorder graph-object,
+             * mathematical value, composed é (U+00E9) and e followed by U+0301
+             * COMBINING ACUTE ACCENT are unequal code-point sequences, array
+             * order matters, object-member order does not, and a missing property
+             * differs from null. Reorder graph-object,
              * definition, association, and participating-type sets and show an
              * accepted effective no-op with no revision, transition, or delta.
              * Change a description, pattern expression text, graph-object value,
@@ -483,8 +488,11 @@ package VellisVerification {
              * Confirm blank and show empty definitions. Confirm Everyday Life and
              * show exactly twelve anchor types, twelve optional profile types,
              * nine links, and twenty-four profile multiplicity rules with no
-             * graph objects or example data. Inspect every profile and endpoint
-             * neighborhood and show it matches the modeled starter. For each
+             * graph objects or example data. Show every named catalog member,
+             * profile property, permitted source, permitted target, and
+             * relationship rule is a singleton within its explicitly sized
+             * aggregate. Inspect every profile and endpoint neighborhood and show
+             * it matches the modeled starter. For each
              * date-like property, accept 2024-02-29; reject 2024-2-9, 2024-13-01,
              * 2024-01-00, and arbitrary text; accept absent dates and show
              * 2023-02-31 is lexically accepted without claiming calendar validity.

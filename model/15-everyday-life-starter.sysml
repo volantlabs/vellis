@@ -51,62 +51,62 @@ package EverydayLifeStarter {
 
         /* Stable, independently identifiable everyday concepts. */
 
-        item personType : 'Anchor Type Definition' subsets starterAnchorTypes {
+        item personType [1] : 'Anchor Type Definition' subsets starterAnchorTypes {
             attribute :>> typeKey = "life.person";
             attribute :>> description =
                 "A person known to the owner. Use the anchor display name for the person's name.";
         }
-        item groupType : 'Anchor Type Definition' subsets starterAnchorTypes {
+        item groupType [1] : 'Anchor Type Definition' subsets starterAnchorTypes {
             attribute :>> typeKey = "life.group";
             attribute :>> description =
                 "A household, family, team, organization, or community. Use the anchor display name for its name.";
         }
-        item areaType : 'Anchor Type Definition' subsets starterAnchorTypes {
+        item areaType [1] : 'Anchor Type Definition' subsets starterAnchorTypes {
             attribute :>> typeKey = "life.area";
             attribute :>> description =
                 "An ongoing sphere of responsibility such as health, home, family, finances, or work. Use the anchor display name for its title.";
         }
-        item goalType : 'Anchor Type Definition' subsets starterAnchorTypes {
+        item goalType [1] : 'Anchor Type Definition' subsets starterAnchorTypes {
             attribute :>> typeKey = "life.goal";
             attribute :>> description =
                 "An outcome the owner wants to achieve. Use the anchor display name for its title.";
         }
-        item projectType : 'Anchor Type Definition' subsets starterAnchorTypes {
+        item projectType [1] : 'Anchor Type Definition' subsets starterAnchorTypes {
             attribute :>> typeKey = "life.project";
             attribute :>> description =
                 "A coordinated body of work with a desired outcome. Use the anchor display name for its title.";
         }
-        item taskType : 'Anchor Type Definition' subsets starterAnchorTypes {
+        item taskType [1] : 'Anchor Type Definition' subsets starterAnchorTypes {
             attribute :>> typeKey = "life.task";
             attribute :>> description =
                 "A discrete piece of work. Use the anchor display name for its title.";
         }
-        item eventType : 'Anchor Type Definition' subsets starterAnchorTypes {
+        item eventType [1] : 'Anchor Type Definition' subsets starterAnchorTypes {
             attribute :>> typeKey = "life.event";
             attribute :>> description =
                 "An occurrence the owner wants to remember. Use the anchor display name for its title.";
         }
-        item routineType : 'Anchor Type Definition' subsets starterAnchorTypes {
+        item routineType [1] : 'Anchor Type Definition' subsets starterAnchorTypes {
             attribute :>> typeKey = "life.routine";
             attribute :>> description =
                 "A recurring responsibility or practice. Use the anchor display name for its title.";
         }
-        item decisionType : 'Anchor Type Definition' subsets starterAnchorTypes {
+        item decisionType [1] : 'Anchor Type Definition' subsets starterAnchorTypes {
             attribute :>> typeKey = "life.decision";
             attribute :>> description =
                 "A decision whose outcome or reasoning matters later. Use the anchor display name for its title.";
         }
-        item noteType : 'Anchor Type Definition' subsets starterAnchorTypes {
+        item noteType [1] : 'Anchor Type Definition' subsets starterAnchorTypes {
             attribute :>> typeKey = "life.note";
             attribute :>> description =
                 "A captured piece of knowledge or observation. Use the anchor display name for its title.";
         }
-        item resourceType : 'Anchor Type Definition' subsets starterAnchorTypes {
+        item resourceType [1] : 'Anchor Type Definition' subsets starterAnchorTypes {
             attribute :>> typeKey = "life.resource";
             attribute :>> description =
                 "A useful source, object, or reference. Use the anchor display name for its title.";
         }
-        item placeType : 'Anchor Type Definition' subsets starterAnchorTypes {
+        item placeType [1] : 'Anchor Type Definition' subsets starterAnchorTypes {
             attribute :>> typeKey = "life.place";
             attribute :>> description =
                 "A place relevant to the owner's life. Use the anchor display name for its name.";
@@ -114,258 +114,258 @@ package EverydayLifeStarter {
 
         /* Optional current convenience profiles. */
 
-        item personDetails : 'Associated Data Type Definition'
+        item personDetails [1] : 'Associated Data Type Definition'
             subsets starterAssociatedDataTypes {
             attribute :>> typeKey = "life.person.details";
             attribute :>> description =
                 "Optional current everyday details about one Person; other independently typed data may also describe that Person.";
             ref item matchingAnchor [1] redefines permittedAnchorTypes = personType;
             item profileProperties [3] redefines propertyConstraints;
-            item relationship : 'Optional String Property' subsets profileProperties {
+            item relationship [1] : 'Optional String Property' subsets profileProperties {
                 attribute :>> propertyName = "relationship";
                 attribute :>> description = "The person's relationship to the owner or household.";
             }
-            item preferredContact : 'Optional String Property' subsets profileProperties {
+            item preferredContact [1] : 'Optional String Property' subsets profileProperties {
                 attribute :>> propertyName = "preferredContact";
                 attribute :>> description = "The person's preferred contact method when known.";
             }
-            item notes : 'Optional String Property' subsets profileProperties {
+            item notes [1] : 'Optional String Property' subsets profileProperties {
                 attribute :>> propertyName = "notes";
                 attribute :>> description = "Additional owner-provided notes about the person.";
             }
         }
 
-        item groupDetails : 'Associated Data Type Definition'
+        item groupDetails [1] : 'Associated Data Type Definition'
             subsets starterAssociatedDataTypes {
             attribute :>> typeKey = "life.group.details";
             attribute :>> description = "Optional current everyday details about one Group.";
             ref item matchingAnchor [1] redefines permittedAnchorTypes = groupType;
             item profileProperties [2] redefines propertyConstraints;
-            item kind : 'Optional String Property' subsets profileProperties {
+            item kind [1] : 'Optional String Property' subsets profileProperties {
                 attribute :>> propertyName = "kind";
                 attribute :>> description = "The owner-written kind of group.";
             }
-            item descriptionProperty : 'Optional String Property' subsets profileProperties {
+            item descriptionProperty [1] : 'Optional String Property' subsets profileProperties {
                 attribute :>> propertyName = "description";
                 attribute :>> description = "A description of the group.";
             }
         }
 
-        item areaDetails : 'Associated Data Type Definition'
+        item areaDetails [1] : 'Associated Data Type Definition'
             subsets starterAssociatedDataTypes {
             attribute :>> typeKey = "life.area.details";
             attribute :>> description = "Optional current everyday details about one Area.";
             ref item matchingAnchor [1] redefines permittedAnchorTypes = areaType;
             item profileProperties [3] redefines propertyConstraints;
-            item domain : 'Optional String Property' subsets profileProperties {
+            item domain [1] : 'Optional String Property' subsets profileProperties {
                 attribute :>> propertyName = "domain";
                 attribute :>> description = "The owner-written domain of responsibility.";
             }
-            item focus : 'Optional String Property' subsets profileProperties {
+            item focus [1] : 'Optional String Property' subsets profileProperties {
                 attribute :>> propertyName = "focus";
                 attribute :>> description = "The Area's current focus when known.";
             }
-            item active : 'Optional Boolean Property' subsets profileProperties {
+            item active [1] : 'Optional Boolean Property' subsets profileProperties {
                 attribute :>> propertyName = "active";
                 attribute :>> description = "Whether the Area is currently active when known.";
             }
         }
 
-        item goalDetails : 'Associated Data Type Definition'
+        item goalDetails [1] : 'Associated Data Type Definition'
             subsets starterAssociatedDataTypes {
             attribute :>> typeKey = "life.goal.details";
             attribute :>> description = "Optional current everyday details about one Goal.";
             ref item matchingAnchor [1] redefines permittedAnchorTypes = goalType;
             item profileProperties [4] redefines propertyConstraints;
-            item status : 'Optional String Property' subsets profileProperties {
+            item status [1] : 'Optional String Property' subsets profileProperties {
                 attribute :>> propertyName = "status";
                 attribute :>> description = "The Goal status exactly as the owner expresses it.";
             }
-            item priority : 'Optional String Property' subsets profileProperties {
+            item priority [1] : 'Optional String Property' subsets profileProperties {
                 attribute :>> propertyName = "priority";
                 attribute :>> description = "The Goal priority exactly as the owner expresses it.";
             }
-            item targetDate : 'Optional Date String Property' subsets profileProperties {
+            item targetDate [1] : 'Optional Date String Property' subsets profileProperties {
                 attribute :>> propertyName = "targetDate";
                 attribute :>> description = "The Goal target date in the starter's lexical YYYY-MM-DD shape.";
             }
-            item desiredOutcome : 'Optional String Property' subsets profileProperties {
+            item desiredOutcome [1] : 'Optional String Property' subsets profileProperties {
                 attribute :>> propertyName = "desiredOutcome";
                 attribute :>> description = "The desired outcome of the Goal.";
             }
         }
 
-        item projectDetails : 'Associated Data Type Definition'
+        item projectDetails [1] : 'Associated Data Type Definition'
             subsets starterAssociatedDataTypes {
             attribute :>> typeKey = "life.project.details";
             attribute :>> description = "Optional current everyday details about one Project.";
             ref item matchingAnchor [1] redefines permittedAnchorTypes = projectType;
             item profileProperties [4] redefines propertyConstraints;
-            item status : 'Optional String Property' subsets profileProperties {
+            item status [1] : 'Optional String Property' subsets profileProperties {
                 attribute :>> propertyName = "status";
                 attribute :>> description = "The Project status exactly as the owner expresses it.";
             }
-            item priority : 'Optional String Property' subsets profileProperties {
+            item priority [1] : 'Optional String Property' subsets profileProperties {
                 attribute :>> propertyName = "priority";
                 attribute :>> description = "The Project priority exactly as the owner expresses it.";
             }
-            item desiredOutcome : 'Optional String Property' subsets profileProperties {
+            item desiredOutcome [1] : 'Optional String Property' subsets profileProperties {
                 attribute :>> propertyName = "desiredOutcome";
                 attribute :>> description = "The desired outcome of the Project.";
             }
-            item nextReviewDate : 'Optional Date String Property' subsets profileProperties {
+            item nextReviewDate [1] : 'Optional Date String Property' subsets profileProperties {
                 attribute :>> propertyName = "nextReviewDate";
                 attribute :>> description = "The next Project review date in the starter's lexical YYYY-MM-DD shape.";
             }
         }
 
-        item taskDetails : 'Associated Data Type Definition'
+        item taskDetails [1] : 'Associated Data Type Definition'
             subsets starterAssociatedDataTypes {
             attribute :>> typeKey = "life.task.details";
             attribute :>> description = "Optional current everyday details about one Task.";
             ref item matchingAnchor [1] redefines permittedAnchorTypes = taskType;
             item profileProperties [4] redefines propertyConstraints;
-            item status : 'Optional String Property' subsets profileProperties {
+            item status [1] : 'Optional String Property' subsets profileProperties {
                 attribute :>> propertyName = "status";
                 attribute :>> description = "The Task status exactly as the owner expresses it.";
             }
-            item priority : 'Optional String Property' subsets profileProperties {
+            item priority [1] : 'Optional String Property' subsets profileProperties {
                 attribute :>> propertyName = "priority";
                 attribute :>> description = "The Task priority exactly as the owner expresses it.";
             }
-            item dueDate : 'Optional Date String Property' subsets profileProperties {
+            item dueDate [1] : 'Optional Date String Property' subsets profileProperties {
                 attribute :>> propertyName = "dueDate";
                 attribute :>> description = "The Task due date in the starter's lexical YYYY-MM-DD shape.";
             }
-            item context : 'Optional String Property' subsets profileProperties {
+            item context [1] : 'Optional String Property' subsets profileProperties {
                 attribute :>> propertyName = "context";
                 attribute :>> description = "Owner-provided context for completing the Task.";
             }
         }
 
-        item eventDetails : 'Associated Data Type Definition'
+        item eventDetails [1] : 'Associated Data Type Definition'
             subsets starterAssociatedDataTypes {
             attribute :>> typeKey = "life.event.details";
             attribute :>> description = "Optional current everyday details about one Event.";
             ref item matchingAnchor [1] redefines permittedAnchorTypes = eventType;
             item profileProperties [4] redefines propertyConstraints;
-            item status : 'Optional String Property' subsets profileProperties {
+            item status [1] : 'Optional String Property' subsets profileProperties {
                 attribute :>> propertyName = "status";
                 attribute :>> description = "The Event status exactly as the owner expresses it.";
             }
-            item startDateProperty : 'Optional Date String Property' subsets profileProperties {
+            item startDateProperty [1] : 'Optional Date String Property' subsets profileProperties {
                 attribute :>> propertyName = "start";
                 attribute :>> description = "The Event start date in the starter's lexical YYYY-MM-DD shape.";
             }
-            item endDateProperty : 'Optional Date String Property' subsets profileProperties {
+            item endDateProperty [1] : 'Optional Date String Property' subsets profileProperties {
                 attribute :>> propertyName = "end";
                 attribute :>> description = "The Event end date in the starter's lexical YYYY-MM-DD shape.";
             }
-            item summary : 'Optional String Property' subsets profileProperties {
+            item summary [1] : 'Optional String Property' subsets profileProperties {
                 attribute :>> propertyName = "summary";
                 attribute :>> description = "A concise summary of the Event.";
             }
         }
 
-        item routineDetails : 'Associated Data Type Definition'
+        item routineDetails [1] : 'Associated Data Type Definition'
             subsets starterAssociatedDataTypes {
             attribute :>> typeKey = "life.routine.details";
             attribute :>> description = "Optional current everyday details about one Routine.";
             ref item matchingAnchor [1] redefines permittedAnchorTypes = routineType;
             item profileProperties [4] redefines propertyConstraints;
-            item cadence : 'Optional String Property' subsets profileProperties {
+            item cadence [1] : 'Optional String Property' subsets profileProperties {
                 attribute :>> propertyName = "cadence";
                 attribute :>> description = "The owner-written recurrence cadence.";
             }
-            item active : 'Optional Boolean Property' subsets profileProperties {
+            item active [1] : 'Optional Boolean Property' subsets profileProperties {
                 attribute :>> propertyName = "active";
                 attribute :>> description = "Whether the Routine is currently active when known.";
             }
-            item nextDueDate : 'Optional Date String Property' subsets profileProperties {
+            item nextDueDate [1] : 'Optional Date String Property' subsets profileProperties {
                 attribute :>> propertyName = "nextDueDate";
                 attribute :>> description = "The Routine's next due date in the starter's lexical YYYY-MM-DD shape.";
             }
-            item context : 'Optional String Property' subsets profileProperties {
+            item context [1] : 'Optional String Property' subsets profileProperties {
                 attribute :>> propertyName = "context";
                 attribute :>> description = "Owner-provided context for carrying out the Routine.";
             }
         }
 
-        item decisionDetails : 'Associated Data Type Definition'
+        item decisionDetails [1] : 'Associated Data Type Definition'
             subsets starterAssociatedDataTypes {
             attribute :>> typeKey = "life.decision.details";
             attribute :>> description = "Optional current everyday details about one Decision.";
             ref item matchingAnchor [1] redefines permittedAnchorTypes = decisionType;
             item profileProperties [3] redefines propertyConstraints;
-            item status : 'Optional String Property' subsets profileProperties {
+            item status [1] : 'Optional String Property' subsets profileProperties {
                 attribute :>> propertyName = "status";
                 attribute :>> description = "The Decision status exactly as the owner expresses it.";
             }
-            item decisionDate : 'Optional Date String Property' subsets profileProperties {
+            item decisionDate [1] : 'Optional Date String Property' subsets profileProperties {
                 attribute :>> propertyName = "decisionDate";
                 attribute :>> description = "The Decision date in the starter's lexical YYYY-MM-DD shape.";
             }
-            item rationale : 'Optional String Property' subsets profileProperties {
+            item rationale [1] : 'Optional String Property' subsets profileProperties {
                 attribute :>> propertyName = "rationale";
                 attribute :>> description = "The recorded rationale for the Decision.";
             }
         }
 
-        item noteDetails : 'Associated Data Type Definition'
+        item noteDetails [1] : 'Associated Data Type Definition'
             subsets starterAssociatedDataTypes {
             attribute :>> typeKey = "life.note.details";
             attribute :>> description = "Optional current everyday details about one Note.";
             ref item matchingAnchor [1] redefines permittedAnchorTypes = noteType;
             item profileProperties [3] redefines propertyConstraints;
-            item topic : 'Optional String Property' subsets profileProperties {
+            item topic [1] : 'Optional String Property' subsets profileProperties {
                 attribute :>> propertyName = "topic";
                 attribute :>> description = "The Note's topic.";
             }
-            item summary : 'Optional String Property' subsets profileProperties {
+            item summary [1] : 'Optional String Property' subsets profileProperties {
                 attribute :>> propertyName = "summary";
                 attribute :>> description = "A concise summary of the Note.";
             }
-            item captureDate : 'Optional Date String Property' subsets profileProperties {
+            item captureDate [1] : 'Optional Date String Property' subsets profileProperties {
                 attribute :>> propertyName = "captureDate";
                 attribute :>> description = "The Note capture date in the starter's lexical YYYY-MM-DD shape.";
             }
         }
 
-        item resourceDetails : 'Associated Data Type Definition'
+        item resourceDetails [1] : 'Associated Data Type Definition'
             subsets starterAssociatedDataTypes {
             attribute :>> typeKey = "life.resource.details";
             attribute :>> description = "Optional current everyday details about one Resource.";
             ref item matchingAnchor [1] redefines permittedAnchorTypes = resourceType;
             item profileProperties [3] redefines propertyConstraints;
-            item kind : 'Optional String Property' subsets profileProperties {
+            item kind [1] : 'Optional String Property' subsets profileProperties {
                 attribute :>> propertyName = "kind";
                 attribute :>> description = "The owner-written kind of Resource.";
             }
-            item locationOrWebAddress : 'Optional String Property' subsets profileProperties {
+            item locationOrWebAddress [1] : 'Optional String Property' subsets profileProperties {
                 attribute :>> propertyName = "locationOrWebAddress";
                 attribute :>> description = "A physical location or web address for the Resource.";
             }
-            item summary : 'Optional String Property' subsets profileProperties {
+            item summary [1] : 'Optional String Property' subsets profileProperties {
                 attribute :>> propertyName = "summary";
                 attribute :>> description = "A concise summary of the Resource.";
             }
         }
 
-        item placeDetails : 'Associated Data Type Definition'
+        item placeDetails [1] : 'Associated Data Type Definition'
             subsets starterAssociatedDataTypes {
             attribute :>> typeKey = "life.place.details";
             attribute :>> description = "Optional current everyday details about one Place.";
             ref item matchingAnchor [1] redefines permittedAnchorTypes = placeType;
             item profileProperties [3] redefines propertyConstraints;
-            item kind : 'Optional String Property' subsets profileProperties {
+            item kind [1] : 'Optional String Property' subsets profileProperties {
                 attribute :>> propertyName = "kind";
                 attribute :>> description = "The owner-written kind of Place.";
             }
-            item address : 'Optional String Property' subsets profileProperties {
+            item address [1] : 'Optional String Property' subsets profileProperties {
                 attribute :>> propertyName = "address";
                 attribute :>> description = "The Place address when known.";
             }
-            item notes : 'Optional String Property' subsets profileProperties {
+            item notes [1] : 'Optional String Property' subsets profileProperties {
                 attribute :>> propertyName = "notes";
                 attribute :>> description = "Additional owner-provided notes about the Place.";
             }
@@ -373,62 +373,62 @@ package EverydayLifeStarter {
 
         /* Directed connection vocabulary with exact endpoint type sets. */
 
-        item belongsTo : 'Link Type Definition' subsets starterLinkTypes {
+        item belongsTo [1] : 'Link Type Definition' subsets starterLinkTypes {
             attribute :>> typeKey = "life.belongs_to";
             attribute :>> description = "Connects work or knowledge to the Area it belongs to.";
             item endpoints redefines endpointConstraint {
                 attribute :>> description = "Sources are Goals, Projects, Tasks, Events, Routines, Decisions, Notes, or Resources; target is an Area.";
                 ref item sources [8] redefines permittedSourceTypes;
-                ref item goalSource subsets sources = goalType;
-                ref item projectSource subsets sources = projectType;
-                ref item taskSource subsets sources = taskType;
-                ref item eventSource subsets sources = eventType;
-                ref item routineSource subsets sources = routineType;
-                ref item decisionSource subsets sources = decisionType;
-                ref item noteSource subsets sources = noteType;
-                ref item resourceSource subsets sources = resourceType;
+                ref item goalSource [1] subsets sources = goalType;
+                ref item projectSource [1] subsets sources = projectType;
+                ref item taskSource [1] subsets sources = taskType;
+                ref item eventSource [1] subsets sources = eventType;
+                ref item routineSource [1] subsets sources = routineType;
+                ref item decisionSource [1] subsets sources = decisionType;
+                ref item noteSource [1] subsets sources = noteType;
+                ref item resourceSource [1] subsets sources = resourceType;
                 ref item target [1] redefines permittedTargetTypes = areaType;
             }
         }
 
-        item supports : 'Link Type Definition' subsets starterLinkTypes {
+        item supports [1] : 'Link Type Definition' subsets starterLinkTypes {
             attribute :>> typeKey = "life.supports";
             attribute :>> description = "Connects work or knowledge to a Goal or Project it supports. Future agents should avoid self-links and circular support chains; those judgments are advisory.";
             item endpoints redefines endpointConstraint {
                 attribute :>> description = "Sources are Projects, Tasks, Events, Routines, Decisions, Notes, or Resources; targets are Goals or Projects.";
                 ref item sources [7] redefines permittedSourceTypes;
-                ref item projectSource subsets sources = projectType;
-                ref item taskSource subsets sources = taskType;
-                ref item eventSource subsets sources = eventType;
-                ref item routineSource subsets sources = routineType;
-                ref item decisionSource subsets sources = decisionType;
-                ref item noteSource subsets sources = noteType;
-                ref item resourceSource subsets sources = resourceType;
+                ref item projectSource [1] subsets sources = projectType;
+                ref item taskSource [1] subsets sources = taskType;
+                ref item eventSource [1] subsets sources = eventType;
+                ref item routineSource [1] subsets sources = routineType;
+                ref item decisionSource [1] subsets sources = decisionType;
+                ref item noteSource [1] subsets sources = noteType;
+                ref item resourceSource [1] subsets sources = resourceType;
                 ref item targets [2] redefines permittedTargetTypes;
-                ref item goalTarget subsets targets = goalType;
-                ref item projectTarget subsets targets = projectType;
+                ref item goalTarget [1] subsets targets = goalType;
+                ref item projectTarget [1] subsets targets = projectType;
             }
         }
 
-        item responsibleFor : 'Link Type Definition' subsets starterLinkTypes {
+        item responsibleFor [1] : 'Link Type Definition' subsets starterLinkTypes {
             attribute :>> typeKey = "life.responsible_for";
             attribute :>> description = "Connects a Person or Group to an Area or work item for which it is responsible.";
             item endpoints redefines endpointConstraint {
                 attribute :>> description = "Sources are Persons or Groups; targets are Areas, Goals, Projects, Tasks, Events, or Routines.";
                 ref item sources [2] redefines permittedSourceTypes;
-                ref item personSource subsets sources = personType;
-                ref item groupSource subsets sources = groupType;
+                ref item personSource [1] subsets sources = personType;
+                ref item groupSource [1] subsets sources = groupType;
                 ref item targets [6] redefines permittedTargetTypes;
-                ref item areaTarget subsets targets = areaType;
-                ref item goalTarget subsets targets = goalType;
-                ref item projectTarget subsets targets = projectType;
-                ref item taskTarget subsets targets = taskType;
-                ref item eventTarget subsets targets = eventType;
-                ref item routineTarget subsets targets = routineType;
+                ref item areaTarget [1] subsets targets = areaType;
+                ref item goalTarget [1] subsets targets = goalType;
+                ref item projectTarget [1] subsets targets = projectType;
+                ref item taskTarget [1] subsets targets = taskType;
+                ref item eventTarget [1] subsets targets = eventType;
+                ref item routineTarget [1] subsets targets = routineType;
             }
         }
 
-        item memberOf : 'Link Type Definition' subsets starterLinkTypes {
+        item memberOf [1] : 'Link Type Definition' subsets starterLinkTypes {
             attribute :>> typeKey = "life.member_of";
             attribute :>> description = "Connects a Person to a Group of which the Person is a member.";
             item endpoints redefines endpointConstraint {
@@ -438,241 +438,241 @@ package EverydayLifeStarter {
             }
         }
 
-        item involves : 'Link Type Definition' subsets starterLinkTypes {
+        item involves [1] : 'Link Type Definition' subsets starterLinkTypes {
             attribute :>> typeKey = "life.involves";
             attribute :>> description = "Connects a Goal, Project, Task, Event, Routine, or Decision to a participating Person or Group.";
             item endpoints redefines endpointConstraint {
                 attribute :>> description = "Sources are Goals, Projects, Tasks, Events, Routines, or Decisions; targets are Persons or Groups.";
                 ref item sources [6] redefines permittedSourceTypes;
-                ref item goalSource subsets sources = goalType;
-                ref item projectSource subsets sources = projectType;
-                ref item taskSource subsets sources = taskType;
-                ref item eventSource subsets sources = eventType;
-                ref item routineSource subsets sources = routineType;
-                ref item decisionSource subsets sources = decisionType;
+                ref item goalSource [1] subsets sources = goalType;
+                ref item projectSource [1] subsets sources = projectType;
+                ref item taskSource [1] subsets sources = taskType;
+                ref item eventSource [1] subsets sources = eventType;
+                ref item routineSource [1] subsets sources = routineType;
+                ref item decisionSource [1] subsets sources = decisionType;
                 ref item targets [2] redefines permittedTargetTypes;
-                ref item personTarget subsets targets = personType;
-                ref item groupTarget subsets targets = groupType;
+                ref item personTarget [1] subsets targets = personType;
+                ref item groupTarget [1] subsets targets = groupType;
             }
         }
 
-        item locatedAt : 'Link Type Definition' subsets starterLinkTypes {
+        item locatedAt [1] : 'Link Type Definition' subsets starterLinkTypes {
             attribute :>> typeKey = "life.located_at";
             attribute :>> description = "Connects a Task, Event, Routine, or Group to a Place where it occurs or is located.";
             item endpoints redefines endpointConstraint {
                 attribute :>> description = "Sources are Tasks, Events, Routines, or Groups; target is a Place.";
                 ref item sources [4] redefines permittedSourceTypes;
-                ref item taskSource subsets sources = taskType;
-                ref item eventSource subsets sources = eventType;
-                ref item routineSource subsets sources = routineType;
-                ref item groupSource subsets sources = groupType;
+                ref item taskSource [1] subsets sources = taskType;
+                ref item eventSource [1] subsets sources = eventType;
+                ref item routineSource [1] subsets sources = routineType;
+                ref item groupSource [1] subsets sources = groupType;
                 ref item target [1] redefines permittedTargetTypes = placeType;
             }
         }
 
-        item documents : 'Link Type Definition' subsets starterLinkTypes {
+        item documents [1] : 'Link Type Definition' subsets starterLinkTypes {
             attribute :>> typeKey = "life.documents";
             attribute :>> description = "Connects a Note or Resource to an everyday item it documents. Future agents should avoid linking an object to itself; that judgment is advisory.";
             item endpoints redefines endpointConstraint {
                 attribute :>> description = "Sources are Notes or Resources; targets are any Everyday Life starter anchor type.";
                 ref item sources [2] redefines permittedSourceTypes;
-                ref item noteSource subsets sources = noteType;
-                ref item resourceSource subsets sources = resourceType;
+                ref item noteSource [1] subsets sources = noteType;
+                ref item resourceSource [1] subsets sources = resourceType;
                 ref item targets [12] redefines permittedTargetTypes;
-                ref item personTarget subsets targets = personType;
-                ref item groupTarget subsets targets = groupType;
-                ref item areaTarget subsets targets = areaType;
-                ref item goalTarget subsets targets = goalType;
-                ref item projectTarget subsets targets = projectType;
-                ref item taskTarget subsets targets = taskType;
-                ref item eventTarget subsets targets = eventType;
-                ref item routineTarget subsets targets = routineType;
-                ref item decisionTarget subsets targets = decisionType;
-                ref item noteTarget subsets targets = noteType;
-                ref item resourceTarget subsets targets = resourceType;
-                ref item placeTarget subsets targets = placeType;
+                ref item personTarget [1] subsets targets = personType;
+                ref item groupTarget [1] subsets targets = groupType;
+                ref item areaTarget [1] subsets targets = areaType;
+                ref item goalTarget [1] subsets targets = goalType;
+                ref item projectTarget [1] subsets targets = projectType;
+                ref item taskTarget [1] subsets targets = taskType;
+                ref item eventTarget [1] subsets targets = eventType;
+                ref item routineTarget [1] subsets targets = routineType;
+                ref item decisionTarget [1] subsets targets = decisionType;
+                ref item noteTarget [1] subsets targets = noteType;
+                ref item resourceTarget [1] subsets targets = resourceType;
+                ref item placeTarget [1] subsets targets = placeType;
             }
         }
 
-        item mentions : 'Link Type Definition' subsets starterLinkTypes {
+        item mentions [1] : 'Link Type Definition' subsets starterLinkTypes {
             attribute :>> typeKey = "life.mentions";
             attribute :>> description = "Connects a Note to an everyday item it mentions. Future agents should avoid linking a Note to itself; that judgment is advisory.";
             item endpoints redefines endpointConstraint {
                 attribute :>> description = "Source is a Note; targets are any Everyday Life starter anchor type.";
                 ref item source [1] redefines permittedSourceTypes = noteType;
                 ref item targets [12] redefines permittedTargetTypes;
-                ref item personTarget subsets targets = personType;
-                ref item groupTarget subsets targets = groupType;
-                ref item areaTarget subsets targets = areaType;
-                ref item goalTarget subsets targets = goalType;
-                ref item projectTarget subsets targets = projectType;
-                ref item taskTarget subsets targets = taskType;
-                ref item eventTarget subsets targets = eventType;
-                ref item routineTarget subsets targets = routineType;
-                ref item decisionTarget subsets targets = decisionType;
-                ref item noteTarget subsets targets = noteType;
-                ref item resourceTarget subsets targets = resourceType;
-                ref item placeTarget subsets targets = placeType;
+                ref item personTarget [1] subsets targets = personType;
+                ref item groupTarget [1] subsets targets = groupType;
+                ref item areaTarget [1] subsets targets = areaType;
+                ref item goalTarget [1] subsets targets = goalType;
+                ref item projectTarget [1] subsets targets = projectType;
+                ref item taskTarget [1] subsets targets = taskType;
+                ref item eventTarget [1] subsets targets = eventType;
+                ref item routineTarget [1] subsets targets = routineType;
+                ref item decisionTarget [1] subsets targets = decisionType;
+                ref item noteTarget [1] subsets targets = noteType;
+                ref item resourceTarget [1] subsets targets = resourceType;
+                ref item placeTarget [1] subsets targets = placeType;
             }
         }
 
-        item dependsOn : 'Link Type Definition' subsets starterLinkTypes {
+        item dependsOn [1] : 'Link Type Definition' subsets starterLinkTypes {
             attribute :>> typeKey = "life.depends_on";
             attribute :>> description = "Connects a Goal, Project, or Task to another Goal, Project, or Task on which it depends. Future agents should avoid self-links and circular dependency chains; those judgments are advisory.";
             item endpoints redefines endpointConstraint {
                 attribute :>> description = "Sources and targets are Goals, Projects, or Tasks.";
                 ref item sources [3] redefines permittedSourceTypes;
-                ref item goalSource subsets sources = goalType;
-                ref item projectSource subsets sources = projectType;
-                ref item taskSource subsets sources = taskType;
+                ref item goalSource [1] subsets sources = goalType;
+                ref item projectSource [1] subsets sources = projectType;
+                ref item taskSource [1] subsets sources = taskType;
                 ref item targets [3] redefines permittedTargetTypes;
-                ref item goalTarget subsets targets = goalType;
-                ref item projectTarget subsets targets = projectType;
-                ref item taskTarget subsets targets = taskType;
+                ref item goalTarget [1] subsets targets = goalType;
+                ref item projectTarget [1] subsets targets = projectType;
+                ref item taskTarget [1] subsets targets = taskType;
             }
         }
 
         /* One current profile per matching anchor, while other data remains open. */
 
-        item personDetailsOneAnchor : 'Profile Has Exactly One Matching Anchor'
+        item personDetailsOneAnchor [1] : 'Profile Has Exactly One Matching Anchor'
             subsets starterRelationshipConstraints {
             attribute :>> description = "Each Person details object describes exactly one Person.";
             ref item anchorType [1] redefines anchorTypes = personType;
             ref item dataType [1] redefines associatedDataTypes = personDetails;
         }
-        item personOneDetails : 'Anchor Has At Most One Matching Profile'
+        item personOneDetails [1] : 'Anchor Has At Most One Matching Profile'
             subsets starterRelationshipConstraints {
             attribute :>> description = "Each Person has at most one Person details object.";
             ref item anchorType [1] redefines anchorTypes = personType;
             ref item dataType [1] redefines associatedDataTypes = personDetails;
         }
-        item groupDetailsOneAnchor : 'Profile Has Exactly One Matching Anchor'
+        item groupDetailsOneAnchor [1] : 'Profile Has Exactly One Matching Anchor'
             subsets starterRelationshipConstraints {
             attribute :>> description = "Each Group details object describes exactly one Group.";
             ref item anchorType [1] redefines anchorTypes = groupType;
             ref item dataType [1] redefines associatedDataTypes = groupDetails;
         }
-        item groupOneDetails : 'Anchor Has At Most One Matching Profile'
+        item groupOneDetails [1] : 'Anchor Has At Most One Matching Profile'
             subsets starterRelationshipConstraints {
             attribute :>> description = "Each Group has at most one Group details object.";
             ref item anchorType [1] redefines anchorTypes = groupType;
             ref item dataType [1] redefines associatedDataTypes = groupDetails;
         }
-        item areaDetailsOneAnchor : 'Profile Has Exactly One Matching Anchor'
+        item areaDetailsOneAnchor [1] : 'Profile Has Exactly One Matching Anchor'
             subsets starterRelationshipConstraints {
             attribute :>> description = "Each Area details object describes exactly one Area.";
             ref item anchorType [1] redefines anchorTypes = areaType;
             ref item dataType [1] redefines associatedDataTypes = areaDetails;
         }
-        item areaOneDetails : 'Anchor Has At Most One Matching Profile'
+        item areaOneDetails [1] : 'Anchor Has At Most One Matching Profile'
             subsets starterRelationshipConstraints {
             attribute :>> description = "Each Area has at most one Area details object.";
             ref item anchorType [1] redefines anchorTypes = areaType;
             ref item dataType [1] redefines associatedDataTypes = areaDetails;
         }
-        item goalDetailsOneAnchor : 'Profile Has Exactly One Matching Anchor'
+        item goalDetailsOneAnchor [1] : 'Profile Has Exactly One Matching Anchor'
             subsets starterRelationshipConstraints {
             attribute :>> description = "Each Goal details object describes exactly one Goal.";
             ref item anchorType [1] redefines anchorTypes = goalType;
             ref item dataType [1] redefines associatedDataTypes = goalDetails;
         }
-        item goalOneDetails : 'Anchor Has At Most One Matching Profile'
+        item goalOneDetails [1] : 'Anchor Has At Most One Matching Profile'
             subsets starterRelationshipConstraints {
             attribute :>> description = "Each Goal has at most one Goal details object.";
             ref item anchorType [1] redefines anchorTypes = goalType;
             ref item dataType [1] redefines associatedDataTypes = goalDetails;
         }
-        item projectDetailsOneAnchor : 'Profile Has Exactly One Matching Anchor'
+        item projectDetailsOneAnchor [1] : 'Profile Has Exactly One Matching Anchor'
             subsets starterRelationshipConstraints {
             attribute :>> description = "Each Project details object describes exactly one Project.";
             ref item anchorType [1] redefines anchorTypes = projectType;
             ref item dataType [1] redefines associatedDataTypes = projectDetails;
         }
-        item projectOneDetails : 'Anchor Has At Most One Matching Profile'
+        item projectOneDetails [1] : 'Anchor Has At Most One Matching Profile'
             subsets starterRelationshipConstraints {
             attribute :>> description = "Each Project has at most one Project details object.";
             ref item anchorType [1] redefines anchorTypes = projectType;
             ref item dataType [1] redefines associatedDataTypes = projectDetails;
         }
-        item taskDetailsOneAnchor : 'Profile Has Exactly One Matching Anchor'
+        item taskDetailsOneAnchor [1] : 'Profile Has Exactly One Matching Anchor'
             subsets starterRelationshipConstraints {
             attribute :>> description = "Each Task details object describes exactly one Task.";
             ref item anchorType [1] redefines anchorTypes = taskType;
             ref item dataType [1] redefines associatedDataTypes = taskDetails;
         }
-        item taskOneDetails : 'Anchor Has At Most One Matching Profile'
+        item taskOneDetails [1] : 'Anchor Has At Most One Matching Profile'
             subsets starterRelationshipConstraints {
             attribute :>> description = "Each Task has at most one Task details object.";
             ref item anchorType [1] redefines anchorTypes = taskType;
             ref item dataType [1] redefines associatedDataTypes = taskDetails;
         }
-        item eventDetailsOneAnchor : 'Profile Has Exactly One Matching Anchor'
+        item eventDetailsOneAnchor [1] : 'Profile Has Exactly One Matching Anchor'
             subsets starterRelationshipConstraints {
             attribute :>> description = "Each Event details object describes exactly one Event.";
             ref item anchorType [1] redefines anchorTypes = eventType;
             ref item dataType [1] redefines associatedDataTypes = eventDetails;
         }
-        item eventOneDetails : 'Anchor Has At Most One Matching Profile'
+        item eventOneDetails [1] : 'Anchor Has At Most One Matching Profile'
             subsets starterRelationshipConstraints {
             attribute :>> description = "Each Event has at most one Event details object.";
             ref item anchorType [1] redefines anchorTypes = eventType;
             ref item dataType [1] redefines associatedDataTypes = eventDetails;
         }
-        item routineDetailsOneAnchor : 'Profile Has Exactly One Matching Anchor'
+        item routineDetailsOneAnchor [1] : 'Profile Has Exactly One Matching Anchor'
             subsets starterRelationshipConstraints {
             attribute :>> description = "Each Routine details object describes exactly one Routine.";
             ref item anchorType [1] redefines anchorTypes = routineType;
             ref item dataType [1] redefines associatedDataTypes = routineDetails;
         }
-        item routineOneDetails : 'Anchor Has At Most One Matching Profile'
+        item routineOneDetails [1] : 'Anchor Has At Most One Matching Profile'
             subsets starterRelationshipConstraints {
             attribute :>> description = "Each Routine has at most one Routine details object.";
             ref item anchorType [1] redefines anchorTypes = routineType;
             ref item dataType [1] redefines associatedDataTypes = routineDetails;
         }
-        item decisionDetailsOneAnchor : 'Profile Has Exactly One Matching Anchor'
+        item decisionDetailsOneAnchor [1] : 'Profile Has Exactly One Matching Anchor'
             subsets starterRelationshipConstraints {
             attribute :>> description = "Each Decision details object describes exactly one Decision.";
             ref item anchorType [1] redefines anchorTypes = decisionType;
             ref item dataType [1] redefines associatedDataTypes = decisionDetails;
         }
-        item decisionOneDetails : 'Anchor Has At Most One Matching Profile'
+        item decisionOneDetails [1] : 'Anchor Has At Most One Matching Profile'
             subsets starterRelationshipConstraints {
             attribute :>> description = "Each Decision has at most one Decision details object.";
             ref item anchorType [1] redefines anchorTypes = decisionType;
             ref item dataType [1] redefines associatedDataTypes = decisionDetails;
         }
-        item noteDetailsOneAnchor : 'Profile Has Exactly One Matching Anchor'
+        item noteDetailsOneAnchor [1] : 'Profile Has Exactly One Matching Anchor'
             subsets starterRelationshipConstraints {
             attribute :>> description = "Each Note details object describes exactly one Note.";
             ref item anchorType [1] redefines anchorTypes = noteType;
             ref item dataType [1] redefines associatedDataTypes = noteDetails;
         }
-        item noteOneDetails : 'Anchor Has At Most One Matching Profile'
+        item noteOneDetails [1] : 'Anchor Has At Most One Matching Profile'
             subsets starterRelationshipConstraints {
             attribute :>> description = "Each Note has at most one Note details object.";
             ref item anchorType [1] redefines anchorTypes = noteType;
             ref item dataType [1] redefines associatedDataTypes = noteDetails;
         }
-        item resourceDetailsOneAnchor : 'Profile Has Exactly One Matching Anchor'
+        item resourceDetailsOneAnchor [1] : 'Profile Has Exactly One Matching Anchor'
             subsets starterRelationshipConstraints {
             attribute :>> description = "Each Resource details object describes exactly one Resource.";
             ref item anchorType [1] redefines anchorTypes = resourceType;
             ref item dataType [1] redefines associatedDataTypes = resourceDetails;
         }
-        item resourceOneDetails : 'Anchor Has At Most One Matching Profile'
+        item resourceOneDetails [1] : 'Anchor Has At Most One Matching Profile'
             subsets starterRelationshipConstraints {
             attribute :>> description = "Each Resource has at most one Resource details object.";
             ref item anchorType [1] redefines anchorTypes = resourceType;
             ref item dataType [1] redefines associatedDataTypes = resourceDetails;
         }
-        item placeDetailsOneAnchor : 'Profile Has Exactly One Matching Anchor'
+        item placeDetailsOneAnchor [1] : 'Profile Has Exactly One Matching Anchor'
             subsets starterRelationshipConstraints {
             attribute :>> description = "Each Place details object describes exactly one Place.";
             ref item anchorType [1] redefines anchorTypes = placeType;
             ref item dataType [1] redefines associatedDataTypes = placeDetails;
         }
-        item placeOneDetails : 'Anchor Has At Most One Matching Profile'
+        item placeOneDetails [1] : 'Anchor Has At Most One Matching Profile'
             subsets starterRelationshipConstraints {
             attribute :>> description = "Each Place has at most one Place details object.";
             ref item anchorType [1] redefines anchorTypes = placeType;
@@ -680,5 +680,5 @@ package EverydayLifeStarter {
         }
     }
 
-    item everydayLifeStarter : 'Everyday Life Starter Definition Set';
+    item everydayLifeStarter [1] : 'Everyday Life Starter Definition Set';
 }

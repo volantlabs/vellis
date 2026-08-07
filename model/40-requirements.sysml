@@ -17,8 +17,11 @@ package VellisRequirements {
          * definition of the same object kind, and active type keys shall be
          * unique across the shared namespace.
          * A size condition shall apply only to string, array, or object values,
-         * contain at least one bound, and never invert its bounds. A value range
-         * shall contain at least one inclusive numeric bound or permitted value;
+         * contain at least one bound, and never invert its bounds. String size
+         * shall be its number of Unicode code points without normalization;
+         * array and object size shall be their number of elements and members.
+         * A value range shall contain at least one inclusive numeric bound or
+         * permitted value;
          * numeric bounds shall be ordered, permitted values shall be unique and
          * match the property's JSON kind, and coexisting forms shall both hold.
          * A string pattern shall occur only on a stringValue property and every
@@ -432,10 +435,11 @@ package VellisRequirements {
          * Every no-op, definition-delta comparison, graph comparison, replay
          * comparison, and permitted-value uniqueness decision shall use one
          * canonical semantic equality. JSON equality shall be kind-sensitive;
-         * numbers shall compare by exact mathematical value, strings exactly,
-         * arrays recursively in order, and objects recursively without member-
-         * order significance, with missing distinct from null. Graph equality
-         * shall include every canonical object value, association, and directed
+         * numbers shall compare by exact mathematical value, strings by exact
+         * Unicode code-point sequence without normalization, arrays recursively
+         * in order, and objects recursively without member-order significance,
+         * with missing distinct from null. Graph equality shall include every
+         * canonical object value, association, and directed
          * endpoint while ignoring order in unordered collections. Definition
          * equality shall use the modeled natural identities and include kind,
          * descriptions, and every structured rule. Reordering unordered content

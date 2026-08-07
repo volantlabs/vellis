@@ -29,9 +29,10 @@ package RTG {
         doc /*
          * Any JSON value preserved without loss of kind or nested content.
          * Semantic equality is JSON-kind-sensitive. Numbers compare by exact
-         * mathematical value, strings exactly, arrays recursively in order, and
-         * objects recursively without member-order significance. A missing
-         * property remains distinct from a present JSON null value.
+         * mathematical value, strings by exact Unicode code-point sequence
+         * without normalization, arrays recursively in order, and objects
+         * recursively without member-order significance. A missing property
+         * remains distinct from a present JSON null value.
          */
     }
 
@@ -43,10 +44,11 @@ package RTG {
         attribute minimumSize [0..1] : ScalarValues::Natural;
         attribute maximumSize [0..1] : ScalarValues::Natural;
         doc /*
-         * A closed size condition for a string, array, or object value. Size means
-         * characters, elements, or members respectively. At least one bound is
-         * present, and a present maximum is not less than a present minimum.
-         * Other JSON kinds cannot carry a value-shape condition.
+         * A closed size condition for a string, array, or object value. String
+         * size is the number of Unicode code points without normalization; array
+         * and object size are the number of elements and members respectively.
+         * At least one bound is present, and a present maximum is not less than a
+         * present minimum. Other JSON kinds cannot carry a value-shape condition.
          */
     }
 
