@@ -202,6 +202,12 @@ structures may realize the same SysML commitment. Conversely, matching names or 
 not establish conformance when lifecycle, sharing, cardinality, control, state, timing, interaction,
 or evidence differs.
 
+Resolve language meaning before a whole-model planner creates dependency or coverage claims. A
+campaign record may point to qualified model elements and a pinned baseline, but it does not prove
+that a reference is semantically complete or that two elements may be implemented independently.
+Return those questions to the current model and normative clauses rather than inferring meaning from
+the campaign graph.
+
 ## Evidence workflow
 
 1. State the semantic question independently of project vocabulary: ownership, identity, lifecycle,

@@ -38,6 +38,45 @@ def test_all_source_skills_have_valid_metadata() -> None:
     assert errors == []
 
 
+def test_implementation_skill_routing_distinguishes_plan_slice_and_campaign() -> None:
+    skill_root = model_layout.ROOT / ".agents" / "skills"
+    planner = (skill_root / "sysml-implementation-planning" / "SKILL.md").read_text(
+        encoding="utf-8"
+    )
+    executor = (skill_root / "sysml-implementation" / "SKILL.md").read_text(encoding="utf-8")
+    campaign = (skill_root / "sysml-implementation-campaign" / "SKILL.md").read_text(
+        encoding="utf-8"
+    )
+
+    assert "complete accepted" in planner.split("---", 2)[1]
+    assert "one bounded semantic slice" in executor.split("---", 2)[1]
+    assert "long-running autonomous implementation" in campaign.split("---", 2)[1]
+
+
+def test_new_portable_skills_do_not_embed_project_bindings() -> None:
+    skill_root = model_layout.ROOT / ".agents" / "skills"
+    forbidden = (
+        "Vellis",
+        "RTG",
+        "FastMCP",
+        "MCP",
+        "Python",
+        "Git",
+        "just ",
+        ".data/",
+        "model/",
+    )
+
+    for skill_name in ("sysml-implementation-planning", "sysml-implementation-campaign"):
+        files = [
+            path
+            for path in (skill_root / skill_name).rglob("*")
+            if path.is_file() and path.suffix in {".md", ".yaml", ".json"}
+        ]
+        content = "\n".join(path.read_text(encoding="utf-8") for path in files)
+        assert not any(term in content for term in forbidden)
+
+
 def test_managed_skill_exposure_matches_source_inventory() -> None:
     skill_root = model_layout.ROOT / ".agents" / "skills"
     source_skills = {path.name for path in skill_root.iterdir() if path.is_dir()}

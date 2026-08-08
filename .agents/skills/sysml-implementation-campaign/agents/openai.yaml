@@ -1,0 +1,6 @@
+interface:
+  display_name: "SysML Implementation Campaign"
+  short_description: "Run resumable model-first build campaigns"
+  default_prompt: "Use $sysml-implementation-campaign to execute and resume the approved model-derived campaign."
+policy:
+  allow_implicit_invocation: true

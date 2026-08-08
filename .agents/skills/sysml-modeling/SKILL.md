@@ -76,6 +76,13 @@ compact, current navigation and evidence aid rather than a shadow specification.
 agent must be able to reconstruct it from qualified model elements and repository artifacts without
 the modeling agent's hidden context.
 
+For a complete-system implementation request, hand accepted authority to
+`$sysml-implementation-planning` for coverage-complete decomposition before any multi-slice campaign
+begins. Continue to use `$sysml-implementation` for one bounded slice. If a running campaign returns a
+genuine model gap or stakeholder-visible feasibility consequence, review the smallest affected
+semantic path, then require the revised campaign plan to be approved again; do not treat campaign
+state as authority for the model change.
+
 When alternatives change stakeholder-visible meaning, compatibility, or architecture, present the smallest
 meaningful choice and consequences. Otherwise make reversible, model-preserving progress. Do not mine
 predecessor artifacts except for an explicitly requested comparison or compatibility obligation.

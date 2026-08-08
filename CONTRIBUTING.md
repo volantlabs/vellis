@@ -15,11 +15,12 @@ just check
 
 ## Skill portability
 
-`$sysml-reference`, `$sysml-modeling`, and `$sysml-implementation` are maintained as a portable
-SysML v2 MBSwE core. Keep Vellis paths, commands, RTG and MCP semantics, implementation language,
-and repository-specific review rules in local guidance or optional extensions. When changing the
-core, apply the cross-domain portability review in `AGENTS.md`; do not use Vellis as the only test
-case or claim that a standalone plugin already exists.
+`$sysml-reference`, `$sysml-modeling`, `$sysml-implementation-planning`,
+`$sysml-implementation`, and `$sysml-implementation-campaign` are maintained as a portable SysML v2
+MBSwE core. Keep Vellis paths, commands, RTG and MCP semantics, implementation language, and
+repository-specific review rules in local guidance or optional extensions. When changing the core,
+apply the cross-domain portability review in `AGENTS.md`; do not use Vellis as the only test case or
+claim that a standalone plugin already exists.
 
 ## Change workflow
 
@@ -47,20 +48,25 @@ case or claim that a standalone plugin already exists.
 
 ## Implementation workflow
 
-1. Read the current model and diff before taking architecture from existing source. Use a current
+1. For a complete-system request, use `$sysml-implementation-planning` to read the complete model,
+   derive full aggregate authority coverage and a dependency-ordered campaign, validate
+   `implementation-campaign.yaml`, and obtain explicit human approval. Use
+   `$sysml-implementation-campaign` only after approval. For one already selected slice, start with
+   `$sysml-implementation`.
+2. Read the current model and diff before taking architecture from existing source. Use a current
    model-work semantic handoff when available and verify it against the branch; otherwise reconstruct
    the affected authority directly.
-2. Separate required model meaning, already selected realization constraints, realization decisions
+3. Separate required model meaning, already selected realization constraints, realization decisions
    still open to implementation, genuine model gaps, and deliberate non-goals. Return to model work
    before coding across a gap in stakeholder-visible behavior, state, responsibility, failure,
    compatibility, or verification.
-3. Plan one end-to-end semantic slice. For every cited authority, record the in-scope obligation,
+4. Plan one end-to-end semantic slice. For every cited authority, record the in-scope obligation,
    full or partial coverage, any remaining obligations, decisive conformance evidence, and required
    non-effects. Keep implementation status—`not evaluated`, `absent`, `partial`, `conforming`, or
    `conflicting`—separate from authority coverage. When software needs finer structure than the
    systems model, record a many-to-many realization against semantic neighborhoods and preserve the
    modeled lifecycle, state, transaction, failure, and external boundaries.
-4. Implement the simplest sufficient realization and derive conformance evidence from verification
+5. Implement the simplest sufficient realization and derive conformance evidence from verification
    intent rather than mirroring model declarations. Use tests, analysis, simulation, inspection,
    demonstration, numerical references, timing measurements, or hardware evidence as appropriate.
    Exercise accepted behavior, semantic rejection or failure, and the nearest invalid counterexample.
@@ -70,13 +76,23 @@ case or claim that a standalone plugin already exists.
    architecture; do not claim numerical performance satisfaction before representative budgets exist.
    Treat Vellis v1 compatibility as confirmed first-use initialization from one complete JSON snapshot,
    never as an existing-system merge or adoption of v1 ledger history.
-5. Review plan conformance, model meaning in code, evidence adequacy, realization leakage,
-   subtraction, and repository truth separately. Repeat the complete review after material fixes until
-   one pass finds no new issue.
-6. In the PR, distinguish modeled, selected, implemented, verified, and runnable. Do not claim an
+6. After focused evidence passes, use fresh read-only agents for separate authority/conformance and
+   engineering/evidence reviews. One writer remediates findings and repeats both reviews after every
+   material correction. When one full cycle finds no new issue, commit that slice's implementation,
+   tests, evidence, documentation truth, and campaign update together; then continue to the next
+   ready slice.
+7. In the PR, distinguish modeled, selected, implemented, verified, and runnable. Do not claim an
    entire requirement satisfied or verification case passed from a partially covered slice. Return
    reproducible implementation evidence to model work only for a model gap or demonstrated
    feasibility consequence; keep unselected implementation mechanics in realization work.
+
+A model or material plan gap, changed baseline, or stakeholder-visible feasibility consequence
+invalidates campaign approval and requires human review before work resumes. Ordinary code defects
+and model-preserving realization choices remain autonomous implementation work. Use
+`just implementation-campaign-check` before any campaign checkpoint and
+`just implementation-campaign-status` to inspect resumable state.
+After approval, Codex contributors may launch the campaign as a long-running goal; use campaign
+completion as the stopping condition and the modeled human-authority boundary as the pause condition.
 
 ## Testing authority
 

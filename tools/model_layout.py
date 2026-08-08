@@ -7,6 +7,15 @@ MODEL_ROOT = ROOT / "model"
 MODEL_CONFIG_ROOT = MODEL_ROOT / "config"
 LANGUAGE_LOCK_PATH = MODEL_CONFIG_ROOT / "language.lock.json"
 VALIDATOR_LOCK_PATH = MODEL_CONFIG_ROOT / "validator.lock.json"
+IMPLEMENTATION_CAMPAIGN_PATH = ROOT / "implementation-campaign.yaml"
+IMPLEMENTATION_CAMPAIGN_SCHEMA_PATH = (
+    ROOT
+    / ".agents"
+    / "skills"
+    / "sysml-implementation-campaign"
+    / "assets"
+    / "implementation-campaign.schema.json"
+)
 SYSML_CACHE_ROOT = ROOT / ".cache" / "sysml"
 VALIDATOR_CACHE_ROOT = SYSML_CACHE_ROOT / "validator"
 

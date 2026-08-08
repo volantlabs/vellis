@@ -146,7 +146,8 @@ consequence changes stakeholder-visible behavior or an intentionally selected re
 Unselected storage, acknowledgement, process, transport, framework, and deployment mechanics remain
 realization decisions unless their consequence crosses that gate. See the
 [model-to-implementation method](implementation-method.md) and use `$sysml-implementation` for the
-operational workflow.
+bounded-slice workflow. Use `$sysml-implementation-planning` to decompose a complete accepted model
+and `$sysml-implementation-campaign` only after the resulting plan receives human approval.
 
 ## Vellis binding
 

@@ -12,8 +12,10 @@ needs.
 
 The workflow has three deliberately separate layers:
 
-1. **Portable core:** `$sysml-reference`, `$sysml-modeling`, and `$sysml-implementation` define the
-   evidence, modeling, handoff, realization, conformance, and feedback method.
+1. **Portable core:** `$sysml-reference`, `$sysml-modeling`,
+   `$sysml-implementation-planning`, `$sysml-implementation`, and
+   `$sysml-implementation-campaign` define the evidence, modeling, whole-model decomposition,
+   bounded realization, conformance, resumable execution, and feedback method.
 2. **Project binding:** local instructions identify model entry points and reading order, the active
    language baseline, reference and validation tooling, source and generated-artifact ownership,
    implementation constraints, checks, and change-control workflow.
@@ -40,12 +42,16 @@ inventory or become a second requirements system.
 
 Information moves in both directions:
 
-1. Model work hands implementation a current, qualified semantic slice with observable obligations,
+1. Whole-model planning identifies every implementation-bearing authority neighborhood, forms its
+   semantic dependency graph, and derives a complete campaign for human approval.
+2. Model work hands implementation a current, qualified semantic slice with observable obligations,
    full or partial authority coverage, remaining obligations, decisive cases, non-effects, and
    explicit realization deferrals.
-2. Implementation work chooses the smallest sufficient realization, builds the slice, and produces
+3. Implementation work chooses the smallest sufficient realization, builds the slice, and produces
    discriminating conformance evidence and a separate implementation status.
-3. Implementation defects remain implementation work. A reproducible model gap returns to the model.
+4. The campaign reviews and checkpoints that slice, resumes with the next dependency-ready slice,
+   and closes only after full-system integration and runnable evidence.
+5. Implementation defects remain implementation work. A reproducible model gap returns to the model.
    A feasibility limit reaches the model only when its demonstrated consequence changes
    stakeholder-visible system behavior or an intentionally selected realization boundary.
 
@@ -104,6 +110,25 @@ covering only part of a larger requirement, but the remainder must be explicit a
 requirement or verification case must not be reported complete. Coverage is judged against each
 cited accepted authority element's complete meaning, not merely the task prompt or row summary;
 `full` necessarily means that no obligation remains.
+
+## Whole-model planning and durable campaign state
+
+Whole-model planning begins cold from the complete accepted authority. It derives independently
+reviewable obligation neighborhoods, semantic dependencies, inseparable cycles, and end-to-end
+semantic slices before consulting existing source topology. Integration and closure slices appear
+only when modeled meaning spans prior slices. Necessary toolchain setup belongs to the first semantic
+slice that uses and proves it, not an architecture-only phase.
+
+The resulting campaign record contains the current baseline, qualified authority references,
+many-to-many slice coverage, dependencies, implementation status, evidence references, consequential
+realization decisions, blockers, approval, and checkpoints. It contains no copied requirements,
+stories, tasks, estimates, architecture, or serialized model. A fresh agent must reread the cited
+model authority before acting.
+
+The complete plan and every material replan require human approval. A stale baseline, genuine model
+gap, material plan gap, or stakeholder-visible feasibility consequence pauses execution and
+invalidates that approval. Code defects and bounded model-preserving realization choices remain
+autonomous implementation work.
 
 ## Translate gaps back into system meaning
 
@@ -178,11 +203,34 @@ Material corrections restart the complete review. A slice is complete only after
 no new conformance, evidence, simplicity, or project-truth issue. Its handoff states precisely what is
 modeled, selected, implemented, verified, runnable, and still deferred.
 
+## Long-running execution and closure
+
+A continuation harness repeatedly invokes the campaign manager, but durable meaning does not depend
+on one conversation. The validated campaign record and project checkpoints identify the exact
+baseline, active or next slice, evidence, decisions, and blockers. One writer owns one active slice.
+In Codex, the approved campaign is suitable for a
+[long-running goal](https://learn.chatgpt.com/use-cases/follow-goals): completion is the verifiable
+stopping condition, while model gaps, material plan gaps, stale baselines, and stakeholder-visible
+feasibility consequences are explicit pause conditions. Other environments may provide an equivalent
+continuation harness.
+
+After focused evidence passes, independent agents review authority/conformance and
+engineering/evidence. The writer remediates every material finding and repeats both reviews. Only a
+clean fixed-point cycle permits the implementation, evidence, documentation truth, and campaign
+state to checkpoint together.
+
+After the last planned slice, a separate closure cycle reconstructs complete model coverage, tests
+cross-slice semantics, exercises the selected external boundary from a fresh environment, performs a
+cold-agent reconstruction, and subtracts unsupported machinery. Application completion requires a
+current baseline, full aggregate authority coverage, conforming integration evidence, a runnable
+selected boundary, and no blocker.
+
 ## Vellis as a proving case
 
 Vellis binds the portable core through `AGENTS.md`, `model/README.md`, its pinned reference and
-validator tooling, and its `just` checks. `$rtg-schema-design` is an optional Vellis domain extension,
-not part of the portable core.
+validator tooling, `implementation-campaign.yaml`, and its `just` checks. The campaign is inspectable
+with `just implementation-campaign-check` and `just implementation-campaign-status`.
+`$rtg-schema-design` is an optional Vellis domain extension, not part of the portable core.
 
 Within that extension, graph, definitions, validation, query, revision, and history may become
 distinct Python responsibilities while RTG remains one modeled semantic and transactional boundary.

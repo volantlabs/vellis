@@ -27,6 +27,9 @@ non-goal and confirm the final full review cycle found no new material issue.
 - [ ] Consequential language choices cite official specification sections and pages.
 - [ ] Portable-core skill changes report fresh-agent forward-test scenarios, material findings, and
       disposition in the PR without committing prompts, transcripts, or expected-answer fixtures.
+- [ ] Whole-model planning or campaign changes report baseline, human-approval state, resume and
+      checkpoint scenarios, independent review findings, and cold-system closure disposition without
+      copying model contracts into the campaign record.
 - [ ] Official model validation and `just check` pass.
 - [ ] Adequacy and subtraction reviews found no responsibility stranded in prose and no unsupported
       service, runtime, storage, migration, transport, deployment, or inventory-driven architecture.

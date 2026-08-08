@@ -15,9 +15,11 @@ projections, indexes, caches, checkpoints, snapshot cadence, and persistence tec
 implementation choices rather than modeled subsystems. Representative measurements will inform
 later numerical performance budgets.
 
-The measure of success is a turnkey personal application and a repository whose path from owner
-outcome through model, implementation source, and evidence is easy to inspect, understand, and
-trust. The future is model-first, agent-assisted, and plain.
+The central experiment is whether a sufficiently specified model in a standard language can replace
+a pile of tickets and informal prose as the stable source of truth for autonomous agentic
+engineering. The measure of success is a turnkey personal application and a repository whose path
+from owner outcome through a human-approved whole-model plan, implementation source, and evidence is
+easy to inspect, resume, understand, and trust. The future is model-first, agent-assisted, and plain.
 
 That path is bidirectional without making its authorities symmetrical. Model agents expose
 implementation-ready semantic neighborhoods and the system boundaries they must preserve. Software
@@ -25,7 +27,8 @@ agents may realize those concerns through finer-grained classes and modules, the
 or feasibility evidence translated back into stakeholder-visible systems meaning. Code structure informs
 engineering judgment but does not become the model by transcription.
 
-The reference, modeling, and implementation skills form a portable SysML v2 MBSwE core. A project
+The reference, modeling, whole-model planning, bounded implementation, and campaign-management skills
+form a portable SysML v2 MBSwE core. A project
 binds that core to its model layout, language baseline, validator, engineering checks, source rules,
 and change workflow; optional domain skills add specialized meaning. Vellis contributes RTG as one
 such extension, not as the assumed shape of the method. The repository does not yet ship a standalone

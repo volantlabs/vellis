@@ -15,7 +15,9 @@ The repository currently contains the Vellis system model and its development to
 - [`model/config/`](model/config/): checksum pins for the specifications, model libraries, and validator. The searchable corpus is generated from them into an ignored cache, never committed.
 - [`.agents/skills/`](.agents/skills/): a portable SysML v2 MBSwE core plus Vellis-specific domain
   and repository extensions.
-- [`tools/`](tools/): the pinned validator, reference search, and skill checks.
+- [`implementation-campaign.yaml`](implementation-campaign.yaml): the baseline-bound current plan
+  and execution/evidence index for the future application build; it is not product authority.
+- [`tools/`](tools/): the pinned validator, reference search, skill checks, and campaign validation.
 
 `just model-setup` builds a searchable SysML v2 reference layer into an ignored cache: the pinned
 specifications, the normative model libraries, and 309 validated example models, all searched
@@ -29,10 +31,12 @@ The SysML on a branch is that branch's system definition. A pull request propose
 
 Begin with [`AGENTS.md`](AGENTS.md), then read the [model map](model/README.md), every current `model/*.sysml` file, and the current diff. Use `$sysml-modeling` for the engineering workflow, `$sysml-reference` for language decisions, `$rtg-schema-design` for RTG domain and governance meaning, and `$documentation-sync` after model or workflow changes.
 
-The reusable core is `$sysml-reference`, `$sysml-modeling`, and `$sysml-implementation`.
-Together they define a domain-neutral evidence, modeling, handoff, realization, conformance, and
-feedback loop. They deliberately do not assume Vellis, RTG, this repository's paths or commands,
-Git, Python, MCP, persistence, networking, code generation, or a test framework.
+The reusable core is `$sysml-reference`, `$sysml-modeling`,
+`$sysml-implementation-planning`, `$sysml-implementation`, and
+`$sysml-implementation-campaign`. Together they define a domain-neutral evidence, modeling,
+whole-model decomposition, bounded realization, conformance, resumable execution, and closure loop.
+They deliberately do not assume Vellis, RTG, this repository's paths or commands, Git, Python, MCP,
+persistence, networking, code generation, or a test framework.
 
 `AGENTS.md`, the model map, the pinned tooling, and the `just` commands bind that portable method
 to this repository. `$rtg-schema-design` adds Vellis's RTG semantics, while
@@ -40,6 +44,18 @@ to this repository. `$rtg-schema-design` adds Vellis's RTG semantics, while
 optional project and domain extensions, not dependencies of the portable core. No standalone plugin
 is packaged yet; the core skills are written so they can be moved or packaged later without carrying
 the Vellis binding into another project.
+
+For a complete-system build, `$sysml-implementation-planning` reads the complete accepted model and
+derives dependency-ordered, evidence-bearing semantic slices. The committed campaign record remains
+awaiting human approval until that complete plan is accepted. A continuation harness may then invoke
+`$sysml-implementation-campaign`, which selects one ready slice, uses `$sysml-implementation`, runs
+independent review and remediation to a fixed point, checkpoints the slice with the ledger update,
+and repeats through whole-system runnable closure.
+
+For Codex, launch that approved campaign as a [long-running goal](https://learn.chatgpt.com/use-cases/follow-goals)
+whose objective is campaign completion and whose stopping conditions are the campaign skill's human
+authority boundaries. An equivalent continuation harness may be used elsewhere; the committed
+campaign record, rather than one agent conversation, remains the resume authority.
 
 When an accepted semantic slice is ready for code, model work emits a compact handoff of qualified
 authority, in-scope obligations, authority coverage, remaining obligations, decisive examples,
@@ -68,9 +84,15 @@ Useful commands:
 - `just model-probe "<snippet>"`: check one SysML snippet against the pinned parser in about six seconds.
 - `just model-reference-check`: prove the generated search corpus still matches its pin.
 - `just skills-check`: validate the repo-local skills and their managed project links.
+- `just implementation-campaign-check`: validate the campaign schema, baseline, dependency graph,
+  approval, evidence, and closure invariants.
+- `just implementation-campaign-status`: show campaign freshness, approval, active or next slice,
+  blockers, and closure status.
 - `just check`: run the complete repository gate.
 
-The model selects a portable MCP tool contract but does not implement an MCP server. Runtime,
+The model and campaign method are selected, but the application implementation remains absent,
+unverified, and not runnable. The model selects a portable MCP tool contract but does not implement
+an MCP server. Runtime,
 storage, transport, deployment, and migration realization remain open. The initial contract assumes
 one trusted owner-configured client; its tools do not implement per-call authorization or decide owner
 approval. See

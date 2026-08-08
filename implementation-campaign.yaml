@@ -1,0 +1,589 @@
+schema_version: "1.0"
+campaign:
+  id: vellis-model-implementation
+  objective: Realize the complete accepted Vellis model with discriminating evidence and a runnable selected boundary.
+  lifecycle: awaiting-plan-approval
+  plan_approval:
+    status: pending
+    checkpoint: null
+  blocker: null
+  checkpoint: null
+model_baseline:
+  status: current
+  authority_files:
+    - model/10-rtg-domain.sysml
+    - model/15-everyday-life-starter.sysml
+    - model/20-rtg-system.sysml
+    - model/30-vellis.sysml
+    - model/40-requirements.sysml
+    - model/50-verification.sysml
+  planned:
+    authority_sha256: d3efa9d233076c3c3468164e5f77d38da3e50ac28946bc76a7ee83a128df6018
+    language_sha256: 054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
+    validator_sha256: 1f6f2eb0eb43cf4a2154ef4989a0ed22c871051711c50b2f88399c299cad5bbf
+    checkpoint: null
+  observed:
+    authority_sha256: d3efa9d233076c3c3468164e5f77d38da3e50ac28946bc76a7ee83a128df6018
+    language_sha256: 054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
+    validator_sha256: 1f6f2eb0eb43cf4a2154ef4989a0ed22c871051711c50b2f88399c299cad5bbf
+    checkpoint: null
+authority:
+  - id: A001
+    label: Graph, definition, constraint, and canonical equality semantics
+    refs:
+      - {model_ref: "RTG::Graph", source: "model/10-rtg-domain.sysml"}
+      - {model_ref: "RTG::'Graph Definition Set'", source: "model/10-rtg-domain.sysml"}
+      - {model_ref: "RTG::'Property Constraint'", source: "model/10-rtg-domain.sysml"}
+      - {model_ref: "VellisRequirements::graphInvariants", source: "model/40-requirements.sysml"}
+      - {model_ref: "VellisRequirements::canonicalSemanticEquality", source: "model/40-requirements.sysml"}
+      - {model_ref: "VellisRequirements::stringPatternValidation", source: "model/40-requirements.sysml"}
+    planned_coverage: full
+    slice_ids: [S001, S002, S004, S005, S007, S008, S011, S012, S013]
+    implementation_status: absent
+    evidence_refs: []
+  - id: A002
+    label: Fresh canonical base
+    refs:
+      - {model_ref: "RTG::'Canonical State'", source: "model/10-rtg-domain.sysml"}
+      - {model_ref: "RTG::'Initial State Record'", source: "model/10-rtg-domain.sysml"}
+      - {model_ref: "RTGSystem::'Initialize fresh RTG'", source: "model/20-rtg-system.sysml"}
+      - {model_ref: "VellisRequirements::freshInitialization", source: "model/40-requirements.sysml"}
+    planned_coverage: full
+    slice_ids: [S001, S011, S013]
+    implementation_status: absent
+    evidence_refs: []
+  - id: A003
+    label: Canonical transitions, revision, and durable ledger
+    refs:
+      - {model_ref: "RTG::'Canonical Change'", source: "model/10-rtg-domain.sysml"}
+      - {model_ref: "RTG::'Canonical Transition Record'", source: "model/10-rtg-domain.sysml"}
+      - {model_ref: "RTG::'State Change Ledger'", source: "model/10-rtg-domain.sysml"}
+      - {model_ref: "VellisRequirements::atomicCanonicalRevision", source: "model/40-requirements.sysml"}
+      - {model_ref: "VellisRequirements::definitionCardinality", source: "model/40-requirements.sysml"}
+      - {model_ref: "VellisRequirements::durableCanonicalHistory", source: "model/40-requirements.sysml"}
+    planned_coverage: full
+    slice_ids: [S001, S002, S004, S007, S010, S011, S013]
+    implementation_status: absent
+    evidence_refs: []
+  - id: A004
+    label: Explicit conforming graph change
+    refs:
+      - {model_ref: "RTG::'Graph Change'", source: "model/10-rtg-domain.sysml"}
+      - {model_ref: "RTGSystem::'Apply graph change'", source: "model/20-rtg-system.sysml"}
+      - {model_ref: "VellisRequirements::explicitGraphChangeSet", source: "model/40-requirements.sysml"}
+    planned_coverage: full
+    slice_ids: [S002]
+    implementation_status: absent
+    evidence_refs: []
+  - id: A005
+    label: Sole definition proposal governance
+    refs:
+      - {model_ref: "RTG::'Definition Delta'", source: "model/10-rtg-domain.sysml"}
+      - {model_ref: "RTGSystem::'Create or edit definition delta'", source: "model/20-rtg-system.sysml"}
+      - {model_ref: "RTGSystem::'Review definition delta'", source: "model/20-rtg-system.sysml"}
+      - {model_ref: "RTGSystem::'Activate definition delta'", source: "model/20-rtg-system.sysml"}
+      - {model_ref: "RTGSystem::'Discard definition delta'", source: "model/20-rtg-system.sysml"}
+      - {model_ref: "VellisRequirements::nonDisruptiveDefinitionWork", source: "model/40-requirements.sysml"}
+    planned_coverage: full
+    slice_ids: [S004]
+    implementation_status: absent
+    evidence_refs: []
+  - id: A006
+    label: Current and historical definition discovery
+    refs:
+      - {model_ref: "RTG::'Definition Summary Result'", source: "model/10-rtg-domain.sysml"}
+      - {model_ref: "RTG::'Definition Inspection Result'", source: "model/10-rtg-domain.sysml"}
+      - {model_ref: "RTGSystem::'Discover evaluated graph definitions'", source: "model/20-rtg-system.sysml"}
+      - {model_ref: "VellisRequirements::agentDefinitionDiscoverability", source: "model/40-requirements.sysml"}
+    planned_coverage: full
+    slice_ids: [S003, S006, S008]
+    implementation_status: absent
+    evidence_refs: []
+  - id: A007
+    label: Current and historical semantic graph query
+    refs:
+      - {model_ref: "RTG::'Graph Query'", source: "model/10-rtg-domain.sysml"}
+      - {model_ref: "RTG::'Graph Query Result'", source: "model/10-rtg-domain.sysml"}
+      - {model_ref: "RTGSystem::'Query graph'", source: "model/20-rtg-system.sysml"}
+      - {model_ref: "VellisRequirements::semanticQueryMeaning", source: "model/40-requirements.sysml"}
+      - {model_ref: "VellisRequirements::querySafety", source: "model/40-requirements.sysml"}
+    planned_coverage: full
+    slice_ids: [S005, S006, S008]
+    implementation_status: absent
+    evidence_refs: []
+  - id: A008
+    label: Separated activity and bounded owner history
+    refs:
+      - {model_ref: "RTG::'Activity Ledger'", source: "model/10-rtg-domain.sysml"}
+      - {model_ref: "RTG::'History Result'", source: "model/10-rtg-domain.sysml"}
+      - {model_ref: "RTGSystem::'Inspect state-change history'", source: "model/20-rtg-system.sysml"}
+      - {model_ref: "RTGSystem::'Inspect activity history'", source: "model/20-rtg-system.sysml"}
+      - {model_ref: "RTGSystem::'Manage activity retention'", source: "model/20-rtg-system.sysml"}
+      - {model_ref: "VellisRequirements::dualLedgerSeparation", source: "model/40-requirements.sysml"}
+      - {model_ref: "VellisRequirements::boundedHistoryRead", source: "model/40-requirements.sysml"}
+    planned_coverage: full
+    slice_ids: [S006, S007]
+    implementation_status: absent
+    evidence_refs: []
+  - id: A009
+    label: Snapshot, replay, and snapshot-based initialization
+    refs:
+      - {model_ref: "RTG::'Canonical Snapshot'", source: "model/10-rtg-domain.sysml"}
+      - {model_ref: "RTG::'Replay Request'", source: "model/10-rtg-domain.sysml"}
+      - {model_ref: "RTGSystem::'Reconstruct canonical state'", source: "model/20-rtg-system.sysml"}
+      - {model_ref: "RTGSystem::'Create canonical snapshot'", source: "model/20-rtg-system.sysml"}
+      - {model_ref: "RTGSystem::'Initialize fresh RTG from snapshot'", source: "model/20-rtg-system.sysml"}
+      - {model_ref: "VellisRequirements::canonicalSnapshotCompleteness", source: "model/40-requirements.sysml"}
+      - {model_ref: "VellisRequirements::replayEquivalence", source: "model/40-requirements.sysml"}
+    planned_coverage: full
+    slice_ids: [S007, S011]
+    implementation_status: absent
+    evidence_refs: []
+  - id: A010
+    label: Historical selection and restoration
+    refs:
+      - {model_ref: "RTG::'Historical State Selection'", source: "model/10-rtg-domain.sysml"}
+      - {model_ref: "RTGSystem::'Restore historical state'", source: "model/20-rtg-system.sysml"}
+      - {model_ref: "VellisRequirements::historicalStateCorrectness", source: "model/40-requirements.sysml"}
+      - {model_ref: "VellisRequirements::historicalRestoreSemantics", source: "model/40-requirements.sysml"}
+    planned_coverage: full
+    slice_ids: [S008, S010]
+    implementation_status: absent
+    evidence_refs: []
+  - id: A011
+    label: Confirmed V1 first-use compatibility
+    refs:
+      - {model_ref: "RTG::'Recovery Candidate'", source: "model/10-rtg-domain.sysml"}
+      - {model_ref: "Vellis::'V1 JSON System Snapshot'", source: "model/30-vellis.sysml"}
+      - {model_ref: "Vellis::'V1 Import Preview'", source: "model/30-vellis.sysml"}
+      - {model_ref: "Vellis::'Begin from Vellis v1 snapshot'", source: "model/30-vellis.sysml"}
+      - {model_ref: "VellisRequirements::v1SnapshotCompatibility", source: "model/40-requirements.sysml"}
+    planned_coverage: full
+    slice_ids: [S013]
+    implementation_status: absent
+    evidence_refs: []
+  - id: A012
+    label: Optional confirmed Everyday Life start
+    refs:
+      - {model_ref: "EverydayLifeStarter::'Everyday Life Starter Definition Set'", source: "model/15-everyday-life-starter.sysml"}
+      - {model_ref: "EverydayLifeStarter::everydayLifeStarter", source: "model/15-everyday-life-starter.sysml"}
+      - {model_ref: "Vellis::'Fresh Vocabulary Choice'", source: "model/30-vellis.sysml"}
+      - {model_ref: "VellisRequirements::recommendedEverydayLifeStart", source: "model/40-requirements.sysml"}
+    planned_coverage: full
+    slice_ids: [S004, S011, S012, S013, S014]
+    implementation_status: absent
+    evidence_refs: []
+  - id: A013
+    label: Selected ten-tool MCP boundary
+    refs:
+      - {model_ref: "RTGSystem::rtg_definition_summary", source: "model/20-rtg-system.sysml"}
+      - {model_ref: "RTGSystem::rtg_definition_inspect", source: "model/20-rtg-system.sysml"}
+      - {model_ref: "RTGSystem::rtg_definition_delta", source: "model/20-rtg-system.sysml"}
+      - {model_ref: "RTGSystem::rtg_query", source: "model/20-rtg-system.sysml"}
+      - {model_ref: "RTGSystem::rtg_change", source: "model/20-rtg-system.sysml"}
+      - {model_ref: "RTGSystem::rtg_set_definition_delta", source: "model/20-rtg-system.sysml"}
+      - {model_ref: "RTGSystem::rtg_activate_definition_delta", source: "model/20-rtg-system.sysml"}
+      - {model_ref: "RTGSystem::rtg_discard_definition_delta", source: "model/20-rtg-system.sysml"}
+      - {model_ref: "RTGSystem::rtg_check", source: "model/20-rtg-system.sysml"}
+      - {model_ref: "RTGSystem::rtg_history", source: "model/20-rtg-system.sysml"}
+      - {model_ref: "VellisRequirements::mcpAgentToolContract", source: "model/40-requirements.sysml"}
+      - {model_ref: "VellisRequirements::mcpOutcomeIntegrity", source: "model/40-requirements.sysml"}
+    planned_coverage: full
+    slice_ids: [S009]
+    implementation_status: absent
+    evidence_refs: []
+  - id: A014
+    label: Owner governance and safe failure
+    refs:
+      - {model_ref: "Vellis::'Obtain authorized relevant context'", source: "model/30-vellis.sysml"}
+      - {model_ref: "Vellis::'Understand personal memory vocabulary'", source: "model/30-vellis.sysml"}
+      - {model_ref: "Vellis::'Retain owner-approved context'", source: "model/30-vellis.sysml"}
+      - {model_ref: "Vellis::'Review personal memory'", source: "model/30-vellis.sysml"}
+      - {model_ref: "Vellis::'Review canonical memory history'", source: "model/30-vellis.sysml"}
+      - {model_ref: "Vellis::'Review memory activity'", source: "model/30-vellis.sysml"}
+      - {model_ref: "Vellis::'Manage activity history retention'", source: "model/30-vellis.sysml"}
+      - {model_ref: "Vellis::'Correct or forget personal memory'", source: "model/30-vellis.sysml"}
+      - {model_ref: "Vellis::'Manage graph definitions and constraints'", source: "model/30-vellis.sysml"}
+      - {model_ref: "Vellis::'Assess personal memory conformance'", source: "model/30-vellis.sysml"}
+      - {model_ref: "Vellis::'Explore prior personal memory'", source: "model/30-vellis.sysml"}
+      - {model_ref: "Vellis::'Preserve personal memory snapshot'", source: "model/30-vellis.sysml"}
+      - {model_ref: "Vellis::'Check personal memory recovery'", source: "model/30-vellis.sysml"}
+      - {model_ref: "Vellis::'Restore prior personal memory'", source: "model/30-vellis.sysml"}
+      - {model_ref: "VellisRequirements::ownerControlledMemory", source: "model/40-requirements.sysml"}
+      - {model_ref: "VellisRequirements::observableFailure", source: "model/40-requirements.sysml"}
+    planned_coverage: full
+    slice_ids: [S014]
+    implementation_status: absent
+    evidence_refs: []
+  - id: A015
+    label: Incremental owner-visible improvement support
+    refs:
+      - {model_ref: "Vellis::'Support owner-visible memory improvement analysis'", source: "model/30-vellis.sysml"}
+      - {model_ref: "VellisRequirements::ownerVisibleImprovementAnalysis", source: "model/40-requirements.sysml"}
+      - {model_ref: "VellisVerification::improvementAnalysis", source: "model/50-verification.sysml"}
+    planned_coverage: full
+    slice_ids: [S015]
+    implementation_status: absent
+    evidence_refs: []
+  - id: A016
+    label: Current, historical, and replay work characterization
+    refs:
+      - {model_ref: "VellisRequirements::historyIndependentCurrentWork", source: "model/40-requirements.sysml"}
+      - {model_ref: "VellisRequirements::boundedHistoricalSelectionWork", source: "model/40-requirements.sysml"}
+      - {model_ref: "VellisVerification::currentWorkScaling", source: "model/50-verification.sysml"}
+      - {model_ref: "VellisVerification::historicalSelectionScaling", source: "model/50-verification.sysml"}
+      - {model_ref: "VellisVerification::replayCharacterization", source: "model/50-verification.sysml"}
+      - {model_ref: "VellisVerification::historyGrowth", source: "model/50-verification.sysml"}
+    planned_coverage: full
+    slice_ids: [S001, S002, S003, S004, S005, S006, S007, S008, S009, S010, S016]
+    implementation_status: absent
+    evidence_refs: []
+  - id: A017
+    label: Cohesive persistent-context product outcome
+    refs:
+      - {model_ref: "Vellis::'Begin using one personal Vellis system'", source: "model/30-vellis.sysml"}
+      - {model_ref: "Vellis::'Use AI with persistent personal context'", source: "model/30-vellis.sysml"}
+      - {model_ref: "Vellis::Context", source: "model/30-vellis.sysml"}
+      - {model_ref: "VellisRequirements::simpleIndividualOperation", source: "model/40-requirements.sysml"}
+      - {model_ref: "VellisVerification::simpleOperation", source: "model/50-verification.sysml"}
+    planned_coverage: full
+    slice_ids: [S017]
+    implementation_status: absent
+    evidence_refs: []
+  - id: A018
+    label: Typed validation across every selected scope
+    refs:
+      - {model_ref: "RTG::'Validation Report'", source: "model/10-rtg-domain.sysml"}
+      - {model_ref: "RTGSystem::'Assess graph conformance'", source: "model/20-rtg-system.sysml"}
+      - {model_ref: "VellisRequirements::validationCoverage", source: "model/40-requirements.sysml"}
+    planned_coverage: full
+    slice_ids: [S002, S004, S005, S007, S009, S013]
+    implementation_status: absent
+    evidence_refs: []
+slices:
+  - id: S001
+    order: 1
+    label: Establish and assess a fresh canonical base
+    kind: semantic
+    dependencies: []
+    authority:
+      - {authority_id: A001, coverage: partial, remaining_slice_ids: [S002, S004, S005, S007, S008, S011, S012, S013]}
+      - {authority_id: A002, coverage: partial, remaining_slice_ids: [S011, S013]}
+      - {authority_id: A003, coverage: partial, remaining_slice_ids: [S002, S004, S007, S010, S011, S013]}
+      - {authority_id: A016, coverage: partial, remaining_slice_ids: [S002, S003, S004, S005, S006, S007, S008, S009, S010, S016]}
+    verification_refs:
+      - VellisVerification::graphInvariants
+      - VellisVerification::canonicalEquality
+      - VellisVerification::stringPatterns
+      - VellisVerification::freshInitialization
+    lifecycle: pending
+    implementation_status: absent
+    evidence_refs: []
+    realization_decisions: []
+    blocker: null
+    checkpoint: null
+  - id: S002
+    order: 2
+    label: Commit conforming graph changes atomically
+    kind: semantic
+    dependencies: [S001]
+    authority:
+      - {authority_id: A001, coverage: partial, remaining_slice_ids: [S001, S004, S005, S007, S008, S011, S012, S013]}
+      - {authority_id: A003, coverage: partial, remaining_slice_ids: [S001, S004, S007, S010, S011, S013]}
+      - {authority_id: A004, coverage: full, remaining_slice_ids: []}
+      - {authority_id: A018, coverage: partial, remaining_slice_ids: [S004, S005, S007, S009, S013]}
+      - {authority_id: A016, coverage: partial, remaining_slice_ids: [S001, S003, S004, S005, S006, S007, S008, S009, S010, S016]}
+    verification_refs:
+      - VellisVerification::atomicTransitions
+      - VellisVerification::validationCoverage
+      - VellisVerification::graphInvariants
+    lifecycle: pending
+    implementation_status: absent
+    evidence_refs: []
+    realization_decisions: []
+    blocker: null
+    checkpoint: null
+  - id: S003
+    order: 3
+    label: Discover current active definition neighborhoods
+    kind: semantic
+    dependencies: [S001]
+    authority:
+      - {authority_id: A006, coverage: partial, remaining_slice_ids: [S006, S008]}
+      - {authority_id: A016, coverage: partial, remaining_slice_ids: [S001, S002, S004, S005, S006, S007, S008, S009, S010, S016]}
+    verification_refs:
+      - VellisVerification::definitionDiscovery
+    lifecycle: pending
+    implementation_status: absent
+    evidence_refs: []
+    realization_decisions: []
+    blocker: null
+    checkpoint: null
+  - id: S004
+    order: 4
+    label: Govern the sole definition proposal
+    kind: semantic
+    dependencies: [S002, S003]
+    authority:
+      - {authority_id: A001, coverage: partial, remaining_slice_ids: [S001, S002, S005, S007, S008, S011, S012, S013]}
+      - {authority_id: A003, coverage: partial, remaining_slice_ids: [S001, S002, S007, S010, S011, S013]}
+      - {authority_id: A005, coverage: full, remaining_slice_ids: []}
+      - {authority_id: A012, coverage: partial, remaining_slice_ids: [S011, S012, S013, S014]}
+      - {authority_id: A018, coverage: partial, remaining_slice_ids: [S002, S005, S007, S009, S013]}
+      - {authority_id: A016, coverage: partial, remaining_slice_ids: [S001, S002, S003, S005, S006, S007, S008, S009, S010, S016]}
+    verification_refs:
+      - VellisVerification::definitionWork
+      - VellisVerification::canonicalEquality
+      - VellisVerification::stringPatterns
+    lifecycle: pending
+    implementation_status: absent
+    evidence_refs: []
+    realization_decisions: []
+    blocker: null
+    checkpoint: null
+  - id: S005
+    order: 5
+    label: Evaluate bounded current graph queries
+    kind: semantic
+    dependencies: [S002, S003]
+    authority:
+      - {authority_id: A001, coverage: partial, remaining_slice_ids: [S001, S002, S004, S007, S008, S011, S012, S013]}
+      - {authority_id: A007, coverage: partial, remaining_slice_ids: [S006, S008]}
+      - {authority_id: A018, coverage: partial, remaining_slice_ids: [S002, S004, S007, S009, S013]}
+      - {authority_id: A016, coverage: partial, remaining_slice_ids: [S001, S002, S003, S004, S006, S007, S008, S009, S010, S016]}
+    verification_refs:
+      - VellisVerification::semanticQuery
+      - VellisVerification::invalidQuery
+    lifecycle: pending
+    implementation_status: absent
+    evidence_refs: []
+    realization_decisions: []
+    blocker: null
+    checkpoint: null
+  - id: S006
+    order: 6
+    label: Record, read, and retain separated activity history
+    kind: semantic
+    dependencies: [S002, S003, S004, S005]
+    authority:
+      - {authority_id: A006, coverage: partial, remaining_slice_ids: [S003, S008]}
+      - {authority_id: A007, coverage: partial, remaining_slice_ids: [S005, S008]}
+      - {authority_id: A008, coverage: partial, remaining_slice_ids: [S007]}
+      - {authority_id: A016, coverage: partial, remaining_slice_ids: [S001, S002, S003, S004, S005, S007, S008, S009, S010, S016]}
+    verification_refs:
+      - VellisVerification::activitySeparation
+    lifecycle: pending
+    implementation_status: absent
+    evidence_refs: []
+    realization_decisions: []
+    blocker: null
+    checkpoint: null
+  - id: S007
+    order: 7
+    label: Capture and replay canonical state
+    kind: semantic
+    dependencies: [S004, S006]
+    authority:
+      - {authority_id: A001, coverage: partial, remaining_slice_ids: [S001, S002, S004, S005, S008, S011, S012, S013]}
+      - {authority_id: A003, coverage: partial, remaining_slice_ids: [S001, S002, S004, S010, S011, S013]}
+      - {authority_id: A008, coverage: partial, remaining_slice_ids: [S006]}
+      - {authority_id: A009, coverage: partial, remaining_slice_ids: [S011]}
+      - {authority_id: A018, coverage: partial, remaining_slice_ids: [S002, S004, S005, S009, S013]}
+      - {authority_id: A016, coverage: partial, remaining_slice_ids: [S001, S002, S003, S004, S005, S006, S008, S009, S010, S016]}
+    verification_refs:
+      - VellisVerification::snapshotCompleteness
+      - VellisVerification::snapshotReplay
+      - VellisVerification::invalidTail
+    lifecycle: pending
+    implementation_status: absent
+    evidence_refs: []
+    realization_decisions: []
+    blocker: null
+    checkpoint: null
+  - id: S008
+    order: 8
+    label: Discover and query selected historical state
+    kind: semantic
+    dependencies: [S003, S005, S006, S007]
+    authority:
+      - {authority_id: A001, coverage: partial, remaining_slice_ids: [S001, S002, S004, S005, S007, S011, S012, S013]}
+      - {authority_id: A006, coverage: partial, remaining_slice_ids: [S003, S006]}
+      - {authority_id: A007, coverage: partial, remaining_slice_ids: [S005, S006]}
+      - {authority_id: A010, coverage: partial, remaining_slice_ids: [S010]}
+      - {authority_id: A016, coverage: partial, remaining_slice_ids: [S001, S002, S003, S004, S005, S006, S007, S009, S010, S016]}
+    verification_refs:
+      - VellisVerification::definitionDiscovery
+      - VellisVerification::semanticQuery
+      - VellisVerification::historicalSelection
+    lifecycle: pending
+    implementation_status: absent
+    evidence_refs: []
+    realization_decisions: []
+    blocker: null
+    checkpoint: null
+  - id: S009
+    order: 9
+    label: Expose the selected MCP tool contract
+    kind: integration
+    dependencies: [S002, S003, S004, S005, S006, S008]
+    authority:
+      - {authority_id: A013, coverage: full, remaining_slice_ids: []}
+      - {authority_id: A018, coverage: partial, remaining_slice_ids: [S002, S004, S005, S007, S013]}
+      - {authority_id: A016, coverage: partial, remaining_slice_ids: [S001, S002, S003, S004, S005, S006, S007, S008, S010, S016]}
+    verification_refs:
+      - VellisVerification::mcpToolSurface
+      - VellisVerification::mcpOutcomes
+    lifecycle: pending
+    implementation_status: absent
+    evidence_refs: []
+    realization_decisions: []
+    blocker: null
+    checkpoint: null
+  - id: S010
+    order: 10
+    label: Restore selected history as a new transition
+    kind: semantic
+    dependencies: [S004, S007, S008]
+    authority:
+      - {authority_id: A003, coverage: partial, remaining_slice_ids: [S001, S002, S004, S007, S011, S013]}
+      - {authority_id: A010, coverage: partial, remaining_slice_ids: [S008]}
+      - {authority_id: A016, coverage: partial, remaining_slice_ids: [S001, S002, S003, S004, S005, S006, S007, S008, S009, S016]}
+    verification_refs:
+      - VellisVerification::restoreHistory
+      - VellisVerification::atomicTransitions
+      - VellisVerification::durableHistory
+    lifecycle: pending
+    implementation_status: absent
+    evidence_refs: []
+    realization_decisions: []
+    blocker: null
+    checkpoint: null
+  - id: S011
+    order: 11
+    label: Begin a fresh lineage from snapshot and tail
+    kind: semantic
+    dependencies: [S001, S007]
+    authority:
+      - {authority_id: A001, coverage: partial, remaining_slice_ids: [S001, S002, S004, S005, S007, S008, S012, S013]}
+      - {authority_id: A002, coverage: partial, remaining_slice_ids: [S001, S013]}
+      - {authority_id: A003, coverage: partial, remaining_slice_ids: [S001, S002, S004, S007, S010, S013]}
+      - {authority_id: A009, coverage: partial, remaining_slice_ids: [S007]}
+      - {authority_id: A012, coverage: partial, remaining_slice_ids: [S004, S012, S013, S014]}
+    verification_refs:
+      - VellisVerification::snapshotReplay
+      - VellisVerification::freshInitialization
+    lifecycle: pending
+    implementation_status: absent
+    evidence_refs: []
+    realization_decisions: []
+    blocker: null
+    checkpoint: null
+  - id: S012
+    order: 12
+    label: Confirm blank or Everyday Life first use
+    kind: semantic
+    dependencies: [S001, S003]
+    authority:
+      - {authority_id: A001, coverage: partial, remaining_slice_ids: [S001, S002, S004, S005, S007, S008, S011, S013]}
+      - {authority_id: A012, coverage: partial, remaining_slice_ids: [S004, S011, S013, S014]}
+    verification_refs:
+      - VellisVerification::everydayLifeStart
+    lifecycle: pending
+    implementation_status: absent
+    evidence_refs: []
+    realization_decisions: []
+    blocker: null
+    checkpoint: null
+  - id: S013
+    order: 13
+    label: Preview and confirm V1 first-use recovery
+    kind: semantic
+    dependencies: [S001, S002]
+    authority:
+      - {authority_id: A001, coverage: partial, remaining_slice_ids: [S001, S002, S004, S005, S007, S008, S011, S012]}
+      - {authority_id: A002, coverage: partial, remaining_slice_ids: [S001, S011]}
+      - {authority_id: A003, coverage: partial, remaining_slice_ids: [S001, S002, S004, S007, S010, S011]}
+      - {authority_id: A011, coverage: full, remaining_slice_ids: []}
+      - {authority_id: A012, coverage: partial, remaining_slice_ids: [S004, S011, S012, S014]}
+      - {authority_id: A018, coverage: partial, remaining_slice_ids: [S002, S004, S005, S007, S009]}
+    verification_refs:
+      - VellisVerification::v1Compatibility
+    lifecycle: pending
+    implementation_status: absent
+    evidence_refs: []
+    realization_decisions: []
+    blocker: null
+    checkpoint: null
+  - id: S014
+    order: 14
+    label: Assemble owner-controlled personal-memory workflows
+    kind: integration
+    dependencies: [S009, S010, S011, S012, S013]
+    authority:
+      - {authority_id: A014, coverage: full, remaining_slice_ids: []}
+      - {authority_id: A012, coverage: partial, remaining_slice_ids: [S004, S011, S012, S013]}
+    verification_refs:
+      - VellisVerification::ownerControl
+      - VellisVerification::observableFailure
+    lifecycle: pending
+    implementation_status: absent
+    evidence_refs: []
+    realization_decisions: []
+    blocker: null
+    checkpoint: null
+  - id: S015
+    order: 15
+    label: Support incremental owner-visible improvement
+    kind: integration
+    dependencies: [S008, S009, S014]
+    authority:
+      - {authority_id: A015, coverage: full, remaining_slice_ids: []}
+    verification_refs:
+      - VellisVerification::improvementAnalysis
+    lifecycle: pending
+    implementation_status: absent
+    evidence_refs: []
+    realization_decisions: []
+    blocker: null
+    checkpoint: null
+  - id: S016
+    order: 16
+    label: Characterize current, historical, and replay work
+    kind: closure
+    dependencies: [S007, S008, S009, S010]
+    authority:
+      - {authority_id: A016, coverage: partial, remaining_slice_ids: [S001, S002, S003, S004, S005, S006, S007, S008, S009, S010]}
+    verification_refs:
+      - VellisVerification::currentWorkScaling
+      - VellisVerification::historicalSelectionScaling
+      - VellisVerification::replayCharacterization
+      - VellisVerification::historyGrowth
+    lifecycle: pending
+    implementation_status: absent
+    evidence_refs: []
+    realization_decisions: []
+    blocker: null
+    checkpoint: null
+  - id: S017
+    order: 17
+    label: Prove runnable cohesive Vellis and cold reconstruction
+    kind: closure
+    dependencies: [S014, S015, S016]
+    authority:
+      - {authority_id: A017, coverage: full, remaining_slice_ids: []}
+    verification_refs:
+      - VellisVerification::simpleOperation
+      - VellisVerification::ownerControl
+      - VellisVerification::mcpToolSurface
+    lifecycle: pending
+    implementation_status: absent
+    evidence_refs: []
+    realization_decisions: []
+    blocker: null
+    checkpoint: null
+closure:
+  authority_coverage: full
+  integration_status: absent
+  runnable_status: absent
+  evidence_refs: []
+  checkpoint: null

@@ -1,0 +1,480 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:sysml-implementation-campaign:schema:1.0",
+  "title": "Model-derived implementation campaign",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "campaign",
+    "model_baseline",
+    "authority",
+    "slices",
+    "closure"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1.0"
+    },
+    "campaign": {
+      "$ref": "#/$defs/campaign"
+    },
+    "model_baseline": {
+      "$ref": "#/$defs/model_baseline"
+    },
+    "authority": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/authority"
+      }
+    },
+    "slices": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/slice"
+      }
+    },
+    "closure": {
+      "$ref": "#/$defs/closure"
+    }
+  },
+  "$defs": {
+    "nonempty_string": {
+      "type": "string",
+      "minLength": 1
+    },
+    "short_label": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 120
+    },
+    "reference": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 300
+    },
+    "reference_list": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/reference"
+      }
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "checkpoint": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "minLength": 1,
+      "maxLength": 300
+    },
+    "implementation_status": {
+      "enum": [
+        "not evaluated",
+        "absent",
+        "partial",
+        "conforming",
+        "conflicting"
+      ]
+    },
+    "blocker": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "classification",
+        "summary",
+        "authority_ids",
+        "evidence_refs"
+      ],
+      "properties": {
+        "classification": {
+          "enum": [
+            "language question",
+            "model gap",
+            "plan gap",
+            "feasibility consequence",
+            "stale baseline",
+            "external dependency"
+          ]
+        },
+        "summary": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500
+        },
+        "authority_ids": {
+          "$ref": "#/$defs/id_list"
+        },
+        "evidence_refs": {
+          "$ref": "#/$defs/reference_list"
+        }
+      }
+    },
+    "nullable_blocker": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "$ref": "#/$defs/blocker"
+        }
+      ]
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^[A-Z][A-Z0-9_-]{1,31}$"
+    },
+    "id_list": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/id"
+      }
+    },
+    "campaign": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "objective",
+        "lifecycle",
+        "plan_approval",
+        "blocker",
+        "checkpoint"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]{1,63}$"
+        },
+        "objective": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 240
+        },
+        "lifecycle": {
+          "enum": [
+            "planning",
+            "awaiting-plan-approval",
+            "ready",
+            "active",
+            "blocked",
+            "stale",
+            "complete"
+          ]
+        },
+        "plan_approval": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status",
+            "checkpoint"
+          ],
+          "properties": {
+            "status": {
+              "enum": [
+                "pending",
+                "accepted",
+                "changes-required"
+              ]
+            },
+            "checkpoint": {
+              "$ref": "#/$defs/checkpoint"
+            }
+          }
+        },
+        "blocker": {
+          "$ref": "#/$defs/nullable_blocker"
+        },
+        "checkpoint": {
+          "$ref": "#/$defs/checkpoint"
+        }
+      }
+    },
+    "baseline_identity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "authority_sha256",
+        "language_sha256",
+        "validator_sha256",
+        "checkpoint"
+      ],
+      "properties": {
+        "authority_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "language_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "validator_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "checkpoint": {
+          "$ref": "#/$defs/checkpoint"
+        }
+      }
+    },
+    "model_baseline": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "authority_files",
+        "planned",
+        "observed"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "current",
+            "stale"
+          ]
+        },
+        "authority_files": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/reference"
+          }
+        },
+        "planned": {
+          "$ref": "#/$defs/baseline_identity"
+        },
+        "observed": {
+          "$ref": "#/$defs/baseline_identity"
+        }
+      }
+    },
+    "authority": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "label",
+        "refs",
+        "planned_coverage",
+        "slice_ids",
+        "implementation_status",
+        "evidence_refs"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "label": {
+          "$ref": "#/$defs/short_label"
+        },
+        "refs": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/authority_ref"
+          }
+        },
+        "planned_coverage": {
+          "enum": [
+            "full",
+            "partial"
+          ]
+        },
+        "slice_ids": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/id"
+          }
+        },
+        "implementation_status": {
+          "$ref": "#/$defs/implementation_status"
+        },
+        "evidence_refs": {
+          "$ref": "#/$defs/reference_list"
+        }
+      }
+    },
+    "authority_ref": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "model_ref",
+        "source"
+      ],
+      "properties": {
+        "model_ref": {
+          "$ref": "#/$defs/reference"
+        },
+        "source": {
+          "$ref": "#/$defs/reference"
+        }
+      }
+    },
+    "authority_contribution": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "authority_id",
+        "coverage",
+        "remaining_slice_ids"
+      ],
+      "properties": {
+        "authority_id": {
+          "$ref": "#/$defs/id"
+        },
+        "coverage": {
+          "enum": [
+            "full",
+            "partial"
+          ]
+        },
+        "remaining_slice_ids": {
+          "$ref": "#/$defs/id_list"
+        }
+      }
+    },
+    "realization_decision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "summary",
+        "authority_ids",
+        "reversible"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "summary": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 240
+        },
+        "authority_ids": {
+          "$ref": "#/$defs/id_list"
+        },
+        "reversible": {
+          "type": "boolean"
+        }
+      }
+    },
+    "slice": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "order",
+        "label",
+        "kind",
+        "dependencies",
+        "authority",
+        "verification_refs",
+        "lifecycle",
+        "implementation_status",
+        "evidence_refs",
+        "realization_decisions",
+        "blocker",
+        "checkpoint"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "order": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "label": {
+          "$ref": "#/$defs/short_label"
+        },
+        "kind": {
+          "enum": [
+            "semantic",
+            "integration",
+            "closure"
+          ]
+        },
+        "dependencies": {
+          "$ref": "#/$defs/id_list"
+        },
+        "authority": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/authority_contribution"
+          }
+        },
+        "verification_refs": {
+          "$ref": "#/$defs/reference_list"
+        },
+        "lifecycle": {
+          "enum": [
+            "pending",
+            "ready",
+            "active",
+            "blocked",
+            "stale",
+            "complete"
+          ]
+        },
+        "implementation_status": {
+          "$ref": "#/$defs/implementation_status"
+        },
+        "evidence_refs": {
+          "$ref": "#/$defs/reference_list"
+        },
+        "realization_decisions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/realization_decision"
+          }
+        },
+        "blocker": {
+          "$ref": "#/$defs/nullable_blocker"
+        },
+        "checkpoint": {
+          "$ref": "#/$defs/checkpoint"
+        }
+      }
+    },
+    "closure": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "authority_coverage",
+        "integration_status",
+        "runnable_status",
+        "evidence_refs",
+        "checkpoint"
+      ],
+      "properties": {
+        "authority_coverage": {
+          "enum": [
+            "full",
+            "partial"
+          ]
+        },
+        "integration_status": {
+          "$ref": "#/$defs/implementation_status"
+        },
+        "runnable_status": {
+          "$ref": "#/$defs/implementation_status"
+        },
+        "evidence_refs": {
+          "$ref": "#/$defs/reference_list"
+        },
+        "checkpoint": {
+          "$ref": "#/$defs/checkpoint"
+        }
+      }
+    }
+  }
+}

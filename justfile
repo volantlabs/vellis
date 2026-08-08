@@ -30,6 +30,14 @@ skills-check:
     @uv run python tools/validate_skills.py
     @uv run python tools/sync_agent_skills.py --check
 
+# Validate the model-derived implementation campaign and its current baseline.
+implementation-campaign-check:
+    @uv run python tools/implementation_campaign.py check
+
+# Show the current implementation campaign lifecycle and next work.
+implementation-campaign-status:
+    @uv run python tools/implementation_campaign.py status
+
 # Regenerate managed skill links.
 skills-sync:
     @uv run python tools/sync_agent_skills.py
@@ -56,7 +64,7 @@ model-reference-find query specification="" limit="8":
     @specification={{quote(specification)}}; if test -n "$specification"; then uv run python tools/sysml_reference.py find {{quote(query)}} --specification "$specification" --limit {{quote(limit)}}; else uv run python tools/sysml_reference.py find {{quote(query)}} --limit {{quote(limit)}}; fi
 
 # Run the complete repository gate.
-check: lint typecheck skills-check model-check model-reference-check test
+check: lint typecheck skills-check implementation-campaign-check model-check model-reference-check test
 
 # List every SysML v2 construct name, for turning a question into a searchable term.
 model-reference-concepts:

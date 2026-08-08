@@ -1,0 +1,6 @@
+interface:
+  display_name: "SysML Implementation Planning"
+  short_description: "Plan complete model implementation campaigns"
+  default_prompt: "Use $sysml-implementation-planning to derive a complete implementation campaign from the accepted model."
+policy:
+  allow_implicit_invocation: true

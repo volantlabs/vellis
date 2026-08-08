@@ -16,14 +16,15 @@ Bias toward small, claim-driven documentation changes. Do not turn a model edit 
 - GitHub issues and PR discussion carry unresolved design work and review decisions.
 - Reference corpora are generated from checksum-pinned upstream sources into the ignored `.cache/`; they are never committed and must not be hand-edited.
 - `.agents/skills/` is the repo-local skill source; `.claude/skills/` contains managed links.
-- `$sysml-reference`, `$sysml-modeling`, and `$sysml-implementation` are a portable core. Vellis
-  paths, commands, RTG vocabulary, and repository workflow belong in project bindings or optional
-  domain skills rather than those core instructions.
+- `$sysml-reference`, `$sysml-modeling`, `$sysml-implementation-planning`,
+  `$sysml-implementation`, and `$sysml-implementation-campaign` are a portable core. Vellis paths,
+  commands, RTG vocabulary, and repository workflow belong in project bindings or optional domain
+  skills rather than those core instructions.
 - There are currently no generated Vellis product views, runtime sources, or implementation artifacts.
 
 Keep detailed workflow heuristics and agent failure patterns in the applicable skills. Keep
 `AGENTS.md` to safety, routing, authority, and short non-negotiable rules; keep public method documents
-conceptual. Do not copy the same anti-pattern catalog across all three.
+conceptual. Do not copy the same anti-pattern catalog across the portable core.
 
 Do not create placeholders to satisfy an imagined workflow. When product generation exists later, regenerate rather than hand-edit and add freshness checks at that time.
 

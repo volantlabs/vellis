@@ -1,6 +1,6 @@
 ---
 name: sysml-implementation
-description: Consume textual SysML v2 system authority and turn it into model-conformant software plans, implementation slices, conformance evidence, and conformance reviews. Use when planning or building code from a SysML v2 model, continuing implementation after a model change, selecting realization details the model intentionally leaves open, mapping requirements and verification cases to discriminating evidence, or diagnosing divergence between a current model and source code; pair with sysml-reference for language semantics and sysml-modeling whenever model authority may need to change.
+description: Consume one bounded semantic slice of accepted textual SysML v2 system authority and turn it into model-conformant software, discriminating evidence, and conformance review. Use when planning or implementing a selected slice, continuing that slice after a model change, choosing realization details the model intentionally leaves open, mapping its requirements and verification cases to evidence, or diagnosing divergence between current model authority and source code; use sysml-implementation-planning for whole-model decomposition and sysml-implementation-campaign for long-running multi-slice execution.
 ---
 
 # SysML Implementation
@@ -29,8 +29,10 @@ safety- or security-relevant software without requiring concerns those systems d
 
 ## Workflow
 
-1. Establish whether the task is planning, implementation, conformance review, or diagnosis. Keep a
-   planning or review request read-only unless the user also requests changes.
+1. Establish whether the task is bounded-slice planning, implementation, conformance review, or
+   diagnosis. Keep a planning or review request read-only unless the user also requests changes. If
+   the task covers the complete system or manages several slices over time, route it to
+   `$sysml-implementation-planning` or `$sysml-implementation-campaign` before continuing.
 2. Follow project safety and authority instructions. Read the model cold before taking cues from
    existing implementation structure. If the project supplies a semantic handoff from model work,
    verify it against the current model and change set rather than trusting prior conversation. Otherwise
@@ -70,6 +72,30 @@ safety- or security-relevant software without requiring concerns those systems d
    when they changed. Distinguish modeled,
    selected, implemented, verified, and runnable. Hand back implemented meaning, model references,
    realization decisions, checks, compatibility effects, and any bounded model feedback.
+
+## Campaign composition contract
+
+When a campaign manager invokes this skill, validate and consume:
+
+- the active model baseline, stable slice ID, and bounded observable outcome;
+- qualified authority and each slice contribution's `full` or `partial` coverage;
+- the stable IDs that close every remaining partial obligation;
+- completed semantic dependencies and applicable verification or analysis references;
+- selected project constraints, explicit non-goals, and open realization decisions.
+
+Return:
+
+- the slice's implementation status using `not evaluated`, `absent`, `partial`, `conforming`, or
+  `conflicting`;
+- evidence references and the nearest plausible wrong implementation each excludes;
+- consequential realization decisions and the authority they preserve;
+- any language question, model gap, plan gap, feasibility consequence, implementation defect, stale
+  baseline, or out-of-scope disposition;
+- remaining authority and whether the slice is ready for an atomic project checkpoint.
+
+Do not select another slice, approve a campaign plan, mark whole-system requirements satisfied from
+partial coverage, or declare the application complete. The campaign manager owns sequence, durable
+state, independent reviews, checkpoints, resume, and final system closure.
 
 ## Translation discipline
 

@@ -23,7 +23,8 @@ historical comparison or recovery task.
 
 ## Skill routing
 
-`$sysml-reference`, `$sysml-modeling`, and `$sysml-implementation` are the portable MBSwE core.
+`$sysml-reference`, `$sysml-modeling`, `$sysml-implementation-planning`,
+`$sysml-implementation`, and `$sysml-implementation-campaign` are the portable MBSwE core.
 The paths, commands, reading scope, checks, and review rules in this file bind that core to Vellis.
 `$rtg-schema-design` and `$documentation-sync` are optional Vellis domain and repository extensions,
 not dependencies that another project must carry.
@@ -34,13 +35,17 @@ not dependencies that another project must carry.
   diagnosis. Use it for every consequential SysML or KerML choice.
 - `$rtg-schema-design`: RTG meaning, queries, definitions, validation, revision, history, recovery,
   and compatibility.
-- `$sysml-implementation`: consume current model authority, form implementation-ready semantic
-  slices, select bounded realization decisions, implement them, and review conformance evidence.
+- `$sysml-implementation-planning`: consume the complete accepted model and derive a
+  coverage-complete, dependency-ordered campaign of semantic, integration, and closure slices.
+- `$sysml-implementation`: consume one selected semantic slice, select bounded realization
+  decisions, implement it, and review conformance evidence.
+- `$sysml-implementation-campaign`: execute or resume the human-approved multi-slice campaign,
+  coordinate independent review and remediation, checkpoint each slice, and prove system closure.
 - `$documentation-sync`: repository authority, commands, skills, templates, and public guidance.
 
 ## Portable-method boundary
 
-Keep the three core skills reusable as written outside Vellis. They may require abstract capabilities
+Keep the five core skills reusable as written outside Vellis. They may require abstract capabilities
 such as model entry-point discovery, pinned reference search, official validation, project checks,
 and change review, but must not hard-code Vellis paths, `just` commands, RTG or MCP vocabulary,
 Python, Git, persistence, networking, code generation, or a particular application architecture.
@@ -57,6 +62,19 @@ until one exists.
 Run those forward tests manually with fresh agents and do not disclose expected conclusions or prior
 diagnoses. Keep prompts, transcripts, and expected-answer fixtures out of the repository; summarize
 only the scenarios, material findings, and disposition in the task handoff or PR discussion.
+
+For a complete-system implementation, derive or refresh `implementation-campaign.yaml` with
+`$sysml-implementation-planning` and run `just implementation-campaign-check`. Human approval of the
+complete current-baseline plan is required before `$sysml-implementation-campaign` activates a
+slice. Use one writer and one active slice. After implementation, run independent read-only
+authority/conformance and engineering/evidence reviews, remediate to a fixed point, then commit the
+slice and campaign update together. A model or material plan gap, stale baseline, or
+stakeholder-visible feasibility consequence invalidates approval; implementation defects and
+model-preserving realization choices remain campaign work.
+
+For Codex, an accepted campaign may be launched as a long-running goal with campaign completion as
+its stopping condition. Any equivalent continuation harness is acceptable, but it must resume from
+the validated committed campaign and project checkpoint rather than relying on conversation memory.
 
 ## Non-negotiable modeling rules
 
@@ -128,9 +146,11 @@ Before model edits, read `model/README.md`, every current `model/*.sysml` file, 
 and the current diff. Follow the operative workflow and handoff in `$sysml-modeling`.
 
 Before implementation edits, first read the same current authority without taking architecture from
-existing source, then follow `$sysml-implementation`. Use a current model-work handoff when available
-and verify it against the branch; otherwise reconstruct its task-local implementation frame directly
-from the model. Return to model work before coding across an unresolved semantic gap.
+existing source. For complete-system work, follow `$sysml-implementation-planning` and
+`$sysml-implementation-campaign`; for one accepted slice, follow `$sysml-implementation`. Use a
+current model-work handoff when available and verify it against the branch; otherwise reconstruct its
+task-local implementation frame directly from the model. Return to model work before coding across
+an unresolved semantic gap.
 
 ## Resources and checks
 
@@ -157,6 +177,11 @@ tag with the clause and page; the pinned beta documents carry no OMG document nu
 
 Use `uv` and `just`. Run `just setup` and `just model-setup` after cloning. Before completion, run the
 relevant narrow checks and normally `just check`. Keep `.data/` untouched.
+
+`just implementation-campaign-check` validates the committed execution index against the current
+model and language baselines. `just implementation-campaign-status` reports its approval, active or
+next slice, blocker, and closure state. These tools do not resolve SysML semantics and the ledger does
+not replace rereading qualified model authority.
 
 The model selects an MCP tool contract but the repository has no runnable MCP server. Use modeled,
 selected, implemented, and runnable precisely.
