@@ -50,7 +50,9 @@ derives dependency-ordered, evidence-bearing semantic slices. The committed camp
 awaiting human approval until that complete plan is accepted. A continuation harness may then invoke
 `$sysml-implementation-campaign`, which selects one ready slice, uses `$sysml-implementation`, runs
 independent review and remediation to a fixed point, checkpoints the slice with the ledger update,
-and repeats through whole-system runnable closure.
+and repeats through whole-system runnable closure. The complete campaign receives one human
+approval; reviewed routine slice checkpoints continue autonomously unless a model, plan, baseline,
+feasibility, or external-authority boundary requires renewed human direction.
 
 For Codex, launch that approved campaign as a [long-running goal](https://learn.chatgpt.com/use-cases/follow-goals)
 whose objective is campaign completion and whose stopping conditions are the campaign skill's human
@@ -84,16 +86,21 @@ Useful commands:
 - `just model-probe "<snippet>"`: check one SysML snippet against the pinned parser in about six seconds.
 - `just model-reference-check`: prove the generated search corpus still matches its pin.
 - `just skills-check`: validate the repo-local skills and their managed project links.
-- `just implementation-campaign-check`: validate the campaign schema, baseline, dependency graph,
-  approval, evidence, and closure invariants.
+- `just implementation-campaign-check`: validate the campaign schema, baseline, qualified model
+  references, dependency graph, approval, evidence, and closure invariants.
 - `just implementation-campaign-status`: show campaign freshness, approval, active or next slice,
   blockers, and closure status.
+- `just implementation-campaign-baseline`: print the currently observed model, language, and
+  validator digests without changing files.
+- `just implementation-campaign-checkpoint-check`: after a checkpoint commit, prove its identifier,
+  review trailers, evidence, and committed campaign state resolve together.
 - `just check`: run the complete repository gate.
 
 The model and campaign method are selected, but the application implementation remains absent,
 unverified, and not runnable. The model selects a portable MCP tool contract but does not implement
-an MCP server. The current implementation plan selects FastMCP 4.0.0b1, local STDIO, and a future
-documented Python setup path; none is installed or runnable yet. Storage layout, deployment, and
-migration realization remain open. The initial contract assumes one trusted owner-configured client;
-its tools do not implement per-call authorization or decide owner approval. See
+an MCP server. The current implementation plan directly pins FastMCP and FastMCP Slim 4.0.0b1,
+selects local STDIO, and selects a future documented Python setup path; none is installed or runnable
+yet. Storage layout, deployment, and migration realization remain open. The initial contract assumes
+one trusted owner-configured client; its tools do not implement per-call authorization or decide
+owner approval. See
 [CONTRIBUTING.md](CONTRIBUTING.md) for the contribution workflow.

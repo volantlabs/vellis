@@ -128,7 +128,8 @@ model authority before acting.
 The complete plan and every material replan require human approval. A stale baseline, genuine model
 gap, material plan gap, or stakeholder-visible feasibility consequence pauses execution and
 invalidates that approval. Code defects and bounded model-preserving realization choices remain
-autonomous implementation work.
+autonomous implementation work. Approval applies to the complete campaign: independently reviewed
+routine slice checkpoints are recovery boundaries, not repeated human approval gates.
 
 ## Translate gaps back into system meaning
 
@@ -217,7 +218,8 @@ continuation harness.
 After focused evidence passes, independent agents review authority/conformance and
 engineering/evidence. The writer remediates every material finding and repeats both reviews. Only a
 clean fixed-point cycle permits the implementation, evidence, documentation truth, and campaign
-state to checkpoint together.
+state to checkpoint together. A project-bound checkpoint must resolve to that durable combined
+state; an active slice retains the preceding recoverable checkpoint until the new one commits.
 
 After the last planned slice, a separate closure cycle reconstructs complete model coverage, tests
 cross-slice semantics, exercises the selected external boundary from a fresh environment, performs a
@@ -229,7 +231,9 @@ selected boundary, and no blocker.
 
 Vellis binds the portable core through `AGENTS.md`, `model/README.md`, its pinned reference and
 validator tooling, `implementation-campaign.yaml`, and its `just` checks. The campaign is inspectable
-with `just implementation-campaign-check` and `just implementation-campaign-status`.
+with `just implementation-campaign-check` and `just implementation-campaign-status`; its observed
+baseline is available with `just implementation-campaign-baseline`, and committed checkpoints are
+resolved with `just implementation-campaign-checkpoint-check`.
 `$rtg-schema-design` is an optional Vellis domain extension, not part of the portable core.
 
 Within that extension, graph, definitions, validation, query, revision, and history may become

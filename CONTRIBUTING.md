@@ -93,9 +93,33 @@ and model-preserving realization choices remain autonomous implementation work. 
 `just implementation-campaign-status` to inspect resumable state.
 After approval, Codex contributors may launch the campaign as a long-running goal; use campaign
 completion as the stopping condition and the modeled human-authority boundary as the pause condition.
-The current candidate plan pins FastMCP 4.0.0b1, selects local STDIO, and reserves clean macOS
-onboarding through a documented Python setup path for runnable closure; these remain unimplemented
-until their campaign slices complete.
+One accepted complete plan authorizes the dependency-ordered campaign; routine slice completion does
+not create 17 additional human approval gates. Each slice still requires its two independent clean
+reviews before the writer checkpoints it and continues.
+The current candidate plan directly pins FastMCP and FastMCP Slim 4.0.0b1, selects local STDIO, and
+reserves clean macOS onboarding through a documented Python setup path for runnable closure; these
+remain unimplemented until their campaign slices complete.
+
+Vellis checkpoint identifiers bind the portable campaign record to Git without trying to embed a
+commit's own hash:
+
+- approval: `approval:<full-approved-plan-commit-sha>`;
+- slice: `slice:<slice-id>:<approved-plan-short-sha>:<attempt>`;
+- closure: `closure:<approved-plan-short-sha>:<attempt>`.
+
+Start an attempt at `1` and increment it only if a checkpoint for the same slice and approved plan
+already committed. Every checkpoint commit carries `Campaign-Checkpoint: <identifier>`. Approval
+adds `Campaign-Approval: accepted`; slice commits add `Campaign-Authority-Review: clean` and
+`Campaign-Engineering-Review: clean`; final closure adds `Campaign-Closure-Review: clean`. During
+uncommitted active work, retain the preceding campaign checkpoint and leave the active slice's
+checkpoint null. Run `just implementation-campaign-check` before committing and
+`just implementation-campaign-checkpoint-check` afterward. If the post-commit binding fails, do not
+advance; amend the sole unpublished checkpoint commit when safe, otherwise request recovery direction.
+
+Campaign evidence uses `path:<repo-relative-path>#<test-or-section>` for committed artifacts or
+`command:<exact reproducible command>` for rerunnable checks. S001 chooses the product source and
+test layout and extends all repository gates to cover it in that same checkpoint. Product tests use
+temporary data locations and never inspect or write `.data/`.
 
 ## Testing authority
 

@@ -38,6 +38,14 @@ implementation-campaign-check:
 implementation-campaign-status:
     @uv run python tools/implementation_campaign.py status
 
+# Print current model, language, and validator baseline digests without changing the campaign.
+implementation-campaign-baseline:
+    @uv run python tools/implementation_campaign.py baseline
+
+# Resolve durable campaign checkpoint identifiers against reachable Git commits.
+implementation-campaign-checkpoint-check:
+    @uv run python tools/implementation_campaign.py checkpoint-check
+
 # Regenerate managed skill links.
 skills-sync:
     @uv run python tools/sync_agent_skills.py

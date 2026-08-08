@@ -39,12 +39,13 @@ explicitly with `rtg_definition_delta`.
 
 ## FastMCP discipline
 
-The current implementation campaign selects and will pin `fastmcp==4.0.0b1`. Its pre-release status
-is an explicit owner decision for this proving campaign; implementation must use documentation for
-that exact version and must not upgrade opportunistically. It will use typed input and return models
-and keep text and structured content semantically equivalent. FastMCP, Python models, decorators,
-the selected local STDIO transport, and serialization remain realization rather than RTG domain
-meaning.
+The current implementation campaign selects direct pins for `fastmcp==4.0.0b1` and its pre-release
+companion `fastmcp-slim==4.0.0b1`. Their pre-release status is an explicit owner decision for this
+proving campaign; S009 must not enable prereleases globally, select unrelated prereleases, or upgrade
+opportunistically, and it must update the lock and prove `uv sync --locked`. It will use typed input
+and return models and keep text and structured content semantically equivalent. FastMCP, Python
+models, decorators, the selected local STDIO transport, and serialization remain realization rather
+than RTG domain meaning.
 
 FastMCP may represent a parameterless tool with an empty object schema, but that representation does
 not create an empty RTG request concept. The optional selector for `rtg_definition_summary` belongs
@@ -86,12 +87,18 @@ before applying them. Complete non-interactive arguments plus `--yes` support ag
 
 The setup path covers blank or Everyday Life initialization, v2 snapshot plus optional tail, and v1
 preview and exact confirmation. It accepts a configurable data location with a platform-appropriate
-user-data default and can configure Codex, Claude Code, both, or neither. Client configuration is
-user-scoped and goes only through the public `codex mcp` and `claude mcp` commands after preview and
-confirmation; the program never edits their configuration files directly. A matching `vellis`
-entry is a no-op, a differing entry requires explicit replacement, and a missing or unsupported
-client produces copyable commands without failing or undoing valid Vellis initialization. Client
-tool approval settings remain entirely client-owned.
+user-data default; tests use temporary directories, and neither tests nor the runtime default use
+the repository's protected `.data/` directory. It can configure Codex, Claude Code, both, or neither.
+Client configuration is user-scoped and goes only through the public `codex mcp` and `claude mcp`
+commands after preview and confirmation; the program never edits their configuration files directly.
+A matching `vellis` entry is a no-op, a differing entry requires explicit replacement, and a missing
+or unsupported client produces copyable commands without failing or undoing valid Vellis
+initialization. Client tool approval settings remain entirely client-owned.
+
+For the approved macOS closure rehearsal, a matching dry run authorizes replacing only the existing
+disabled Codex `vellis` HTTP entry with the selected STDIO entry and adding the Claude Code STDIO
+entry. Any observed state drift, different destination, unsupported CLI behavior, or permission-policy
+change pauses for human direction. This is bounded execution authority, not implemented behavior.
 
 macOS supplies the first clean-environment runnable evidence, including real Codex and Claude Code
 discovery and invocation. Linux and Windows receive platform-correct commands, path handling,

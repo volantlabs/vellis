@@ -30,6 +30,11 @@ non-goal and confirm the final full review cycle found no new material issue.
 - [ ] Whole-model planning or campaign changes report baseline, human-approval state, resume and
       checkpoint scenarios, independent review findings, and cold-system closure disposition without
       copying model contracts into the campaign record.
+- [ ] Qualified campaign references resolve through the pinned validator; evidence uses committed
+      path or reproducible command references; non-null checkpoints resolve to exactly one reachable
+      commit with the required review trailers.
+- [ ] Campaign approval is identified as one complete-plan gate; routine reviewed slice checkpoints
+      continue autonomously unless an explicit human-authority condition occurs.
 - [ ] Official model validation and `just check` pass.
 - [ ] Adequacy and subtraction reviews found no responsibility stranded in prose and no unsupported
       service, runtime, storage, migration, transport, deployment, or inventory-driven architecture.

@@ -75,12 +75,42 @@ model-preserving realization choices remain campaign work.
 For Codex, an accepted campaign may be launched as a long-running goal with campaign completion as
 its stopping condition. Any equivalent continuation harness is acceptable, but it must resume from
 the validated committed campaign and project checkpoint rather than relying on conversation memory.
+Plan approval is one gate for the complete campaign, not one human gate per slice. Routine reviewed
+slice checkpoints continue autonomously; only the campaign skill's explicit pause conditions return
+to the human.
 
-The current candidate campaign selects `fastmcp==4.0.0b1`, local STDIO, and a future documented
-Python setup path that configures user-scoped Codex or Claude Code only through their public CLIs.
+The current candidate campaign selects direct pins for `fastmcp==4.0.0b1` and
+`fastmcp-slim==4.0.0b1`, local STDIO, and a future documented Python setup path that configures
+user-scoped Codex or Claude Code only through their public CLIs.
 These are selected realization constraints, not model structure or implemented capability. Do not
 upgrade the pre-release pin, add another transport, or edit client configuration files directly
 without renewed review of the selected plan.
+
+## Implementation campaign binding
+
+S001 selects the product package, source root, and product-test layout. In the same first
+product-bearing checkpoint, extend Ruff, basedpyright, pytest, and `just check` to cover all product
+source and tests. Do not create an architecture-only setup slice. Add a dependency and update the
+lock only in the first slice that uses it; S009 directly pins both `fastmcp==4.0.0b1` and
+`fastmcp-slim==4.0.0b1` without globally allowing prereleases.
+
+Campaign evidence references are either `path:<repo-relative-path>#<test-or-section>` or
+`command:<exact reproducible command>`. Do not record prose assertions, absolute paths, transcripts,
+or transient files as evidence. Tests use temporary data directories. A runtime default uses the
+platform's user-data convention, confirms a nonempty resolved destination, and never resolves to the
+repository's `.data/` directory.
+
+Use fresh context-isolated read-only agents for the two required slice reviews; the single writer
+pauses mutation while they inspect the same working state and verifies the diff afterward. An active
+slice has no new checkpoint: `campaign.checkpoint` remains the last committed recovery point until
+the reviewed slice commits. Project checkpoint IDs and required commit trailers are documented in
+`CONTRIBUTING.md`. Run `just implementation-campaign-checkpoint-check` after each checkpoint commit;
+it is intentionally post-commit and therefore not part of `just check`.
+
+At runnable closure, the approved plan authorizes a matching dry run followed by public-CLI changes
+only to the named `vellis` client entries: replace the existing disabled Codex HTTP entry with the
+selected STDIO entry and add the Claude Code STDIO entry. Do not change any client approval policy.
+Pause if the observed entry, destination, CLI behavior, or requested effect differs.
 
 ## Non-negotiable modeling rules
 

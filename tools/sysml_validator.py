@@ -46,6 +46,9 @@ DIAGNOSTIC = re.compile(
     r"(?P<level>ERROR|WARNING):(?P<message>.*?)"
     r"\((?P<cell>\d+)\.sysml line : (?P<line>\d+) column : (?P<column>\d+)\)"
 )
+QUALIFIED_MODEL_REFERENCE = re.compile(
+    r"(?:[A-Za-z_]\w*|'[^'\r\n]+')(?:\s*::\s*(?:[A-Za-z_]\w*|'[^'\r\n]+'))+\Z"
+)
 
 
 @dataclass(frozen=True)
@@ -348,6 +351,55 @@ def _execute_source(client: BlockingKernelClient, source: str) -> list[str]:
         elif message["msg_type"] == "status" and content.get("execution_state") == "idle":
             break
     return diagnostics
+
+
+def unresolved_model_references(references: list[str]) -> list[str]:
+    """Resolve qualified campaign references with the pinned official validator.
+
+    The regular expression is only an injection guard for constructing the probe. Resolution is
+    performed by alias memberships in the complete authored model, not by matching source text.
+    """
+    unique_references = list(dict.fromkeys(references))
+    malformed = [
+        reference
+        for reference in unique_references
+        if QUALIFIED_MODEL_REFERENCE.fullmatch(reference) is None
+    ]
+    resolvable = [reference for reference in unique_references if reference not in malformed]
+    if not resolvable:
+        return malformed
+
+    source, _ = _combined_source(_model_files())
+    first_alias_line = source.count("\n") + 2
+    aliases = [
+        f"    private alias campaignReference{index:04d} for {reference};"
+        for index, reference in enumerate(resolvable, start=1)
+    ]
+    source += "package 'Implementation Campaign Reference Validation' {\n"
+    source += "\n".join(aliases)
+    source += "\n}\n"
+
+    with _kernel_session() as client:
+        diagnostics = _execute_source(client, source)
+
+    unresolved = set(malformed)
+    unrelated: list[str] = []
+    for diagnostic in diagnostics:
+        match = DIAGNOSTIC.search(diagnostic)
+        if match is None or match.group("level") != "ERROR":
+            continue
+        line = int(match.group("line"))
+        index = line - first_alias_line
+        if 0 <= index < len(resolvable):
+            unresolved.add(resolvable[index])
+        else:
+            unrelated.append(diagnostic)
+    if unrelated:
+        raise RuntimeError(
+            "official validation failed outside the generated campaign reference aliases:\n"
+            + "\n".join(unrelated)
+        )
+    return [reference for reference in unique_references if reference in unresolved]
 
 
 # The pinned parser already rejects every one of these -- a separate lint would

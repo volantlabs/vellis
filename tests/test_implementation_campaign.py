@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import copy
 import shutil
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -9,9 +10,70 @@ import yaml
 
 from tools import implementation_campaign, model_layout
 
+PLAN_SHA = "1" * 40
+APPROVAL_CHECKPOINT = f"approval:{PLAN_SHA}"
+
 
 def _campaign() -> dict[str, object]:
     return implementation_campaign.load_campaign(model_layout.IMPLEMENTATION_CAMPAIGN_PATH)
+
+
+def _approve(campaign: dict[str, object]) -> None:
+    campaign["campaign"]["plan_approval"] = {  # type: ignore[index]
+        "status": "accepted",
+        "checkpoint": APPROVAL_CHECKPOINT,
+    }
+    campaign["campaign"]["checkpoint"] = APPROVAL_CHECKPOINT  # type: ignore[index]
+
+
+def _git(root: Path, *arguments: str) -> str:
+    completed = subprocess.run(
+        ["git", *arguments],
+        cwd=root,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    return completed.stdout.strip()
+
+
+def _write_campaign(root: Path, campaign: dict[str, object]) -> None:
+    (root / "implementation-campaign.yaml").write_text(
+        yaml.safe_dump(campaign, sort_keys=False), encoding="utf-8"
+    )
+
+
+def _approval_repository(tmp_path: Path) -> tuple[dict[str, object], str]:
+    _git(tmp_path, "init")
+    _git(tmp_path, "config", "user.email", "campaign@example.invalid")
+    _git(tmp_path, "config", "user.name", "Campaign Test")
+    campaign = copy.deepcopy(_campaign())
+    _write_campaign(tmp_path, campaign)
+    _git(tmp_path, "add", "implementation-campaign.yaml")
+    _git(tmp_path, "commit", "-m", "candidate plan")
+    plan_sha = _git(tmp_path, "rev-parse", "HEAD")
+
+    checkpoint = f"approval:{plan_sha}"
+    campaign["campaign"]["lifecycle"] = "ready"  # type: ignore[index]
+    campaign["campaign"]["plan_approval"] = {  # type: ignore[index]
+        "status": "accepted",
+        "checkpoint": checkpoint,
+    }
+    campaign["campaign"]["checkpoint"] = checkpoint  # type: ignore[index]
+    campaign["slices"][0]["lifecycle"] = "ready"  # type: ignore[index]
+    _write_campaign(tmp_path, campaign)
+    _git(tmp_path, "add", "implementation-campaign.yaml")
+    _git(
+        tmp_path,
+        "commit",
+        "-m",
+        "approve campaign",
+        "-m",
+        f"Campaign-Checkpoint: {checkpoint}",
+        "-m",
+        "Campaign-Approval: accepted",
+    )
+    return campaign, plan_sha
 
 
 def test_committed_campaign_is_current_and_valid() -> None:
@@ -84,13 +146,65 @@ def test_authority_and_slice_links_must_be_bidirectional() -> None:
     assert any("slice links are not bidirectional" in finding for finding in findings)
 
 
+def test_realization_decision_ids_are_campaign_unique() -> None:
+    campaign = copy.deepcopy(_campaign())
+    decisions = [
+        decision
+        for entry in campaign["slices"]  # type: ignore[index]
+        for decision in entry["realization_decisions"]
+    ]
+    decisions[1]["id"] = decisions[0]["id"]
+
+    findings = implementation_campaign.validate_campaign(campaign)
+
+    assert any("duplicate realization decision id" in finding for finding in findings)
+
+
+def test_qualified_model_references_are_resolved_by_the_official_validator() -> None:
+    campaign = copy.deepcopy(_campaign())
+    campaign["authority"][0]["refs"][0]["model_ref"] = "RTG::'Definitely Missing'"  # type: ignore[index]
+
+    findings = implementation_campaign.qualified_model_reference_findings(campaign)
+
+    assert findings == ["qualified model reference does not resolve: RTG::'Definitely Missing'"]
+
+
+def test_evidence_references_are_reproducible_project_references() -> None:
+    campaign = copy.deepcopy(_campaign())
+    campaign["authority"][0]["evidence_refs"] = [  # type: ignore[index]
+        "a prose assertion",
+        "path:/tmp/result.txt#case",
+        "path:missing.txt#case",
+        "command: ",
+    ]
+
+    findings = implementation_campaign.validate_campaign(campaign)
+
+    assert any("must use path: or command:" in finding for finding in findings)
+    assert any("path:<repo-relative-path>" in finding for finding in findings)
+    assert any("does not exist: missing.txt" in finding for finding in findings)
+    assert any("one exact nonempty command" in finding for finding in findings)
+
+
+def test_checkpoint_formats_reject_active_markers_and_wrong_slice_ids() -> None:
+    campaign = copy.deepcopy(_campaign())
+    _approve(campaign)
+    campaign["campaign"]["lifecycle"] = "active"  # type: ignore[index]
+    campaign["campaign"]["checkpoint"] = "slice:S001:active"  # type: ignore[index]
+    campaign["slices"][0]["lifecycle"] = "active"  # type: ignore[index]
+    campaign["slices"][0]["checkpoint"] = f"slice:S002:{PLAN_SHA[:12]}:1"  # type: ignore[index]
+
+    findings = implementation_campaign.validate_campaign(campaign)
+
+    assert any("campaign checkpoint has an unsupported" in finding for finding in findings)
+    assert any("slice S001 checkpoint names S002" in finding for finding in findings)
+    assert any("active slice S001 must retain no checkpoint" in finding for finding in findings)
+
+
 def test_only_one_slice_may_be_active() -> None:
     campaign = copy.deepcopy(_campaign())
     campaign["campaign"]["lifecycle"] = "active"  # type: ignore[index]
-    campaign["campaign"]["plan_approval"] = {  # type: ignore[index]
-        "status": "accepted",
-        "checkpoint": "approval:1",
-    }
+    _approve(campaign)
     campaign["slices"][0]["lifecycle"] = "active"  # type: ignore[index]
     campaign["slices"][1]["lifecycle"] = "active"  # type: ignore[index]
 
@@ -99,18 +213,43 @@ def test_only_one_slice_may_be_active() -> None:
     assert any("at most one slice may be active" in finding for finding in findings)
 
 
-def test_interrupted_active_slice_is_a_valid_resumable_checkpoint() -> None:
+def test_ready_campaign_selects_only_the_lowest_dependency_ready_slice() -> None:
+    campaign = copy.deepcopy(_campaign())
+    _approve(campaign)
+    campaign["campaign"]["lifecycle"] = "ready"  # type: ignore[index]
+    campaign["slices"][1]["lifecycle"] = "ready"  # type: ignore[index]
+
+    findings = implementation_campaign.validate_campaign(campaign)
+
+    assert any(
+        "not the lowest-ordered dependency-ready slice S001" in finding for finding in findings
+    )
+
+
+def test_interrupted_active_slice_retains_the_last_recoverable_checkpoint() -> None:
     campaign = copy.deepcopy(_campaign())
     campaign["campaign"]["lifecycle"] = "active"  # type: ignore[index]
-    campaign["campaign"]["plan_approval"] = {  # type: ignore[index]
-        "status": "accepted",
-        "checkpoint": "approval:1",
-    }
-    campaign["campaign"]["checkpoint"] = "slice:S001:active"  # type: ignore[index]
+    _approve(campaign)
     campaign["slices"][0]["lifecycle"] = "active"  # type: ignore[index]
 
     assert implementation_campaign.validate_campaign(campaign) == []
     assert "Active: S001 " in implementation_campaign._status(campaign)
+
+
+def test_active_campaign_uses_latest_completed_slice_checkpoint() -> None:
+    campaign = copy.deepcopy(_campaign())
+    _approve(campaign)
+    campaign["campaign"]["lifecycle"] = "active"  # type: ignore[index]
+    first = campaign["slices"][0]  # type: ignore[index]
+    first["lifecycle"] = "complete"
+    first["implementation_status"] = "conforming"
+    first["evidence_refs"] = ["path:README.md#development-setup"]
+    first["checkpoint"] = f"slice:S001:{PLAN_SHA[:12]}:1"
+    campaign["slices"][1]["lifecycle"] = "active"  # type: ignore[index]
+
+    findings = implementation_campaign.validate_campaign(campaign)
+
+    assert any("must be the latest recoverable checkpoint" in finding for finding in findings)
 
 
 def test_code_defect_cannot_masquerade_as_a_human_blocker() -> None:
@@ -151,11 +290,8 @@ def test_joint_authority_contributions_remain_partial_until_aggregate_closure() 
 
 def test_complete_slice_requires_conformance_evidence_and_checkpoint() -> None:
     campaign = copy.deepcopy(_campaign())
-    campaign["campaign"]["lifecycle"] = "active"  # type: ignore[index]
-    campaign["campaign"]["plan_approval"] = {  # type: ignore[index]
-        "status": "accepted",
-        "checkpoint": "approval:1",
-    }
+    campaign["campaign"]["lifecycle"] = "ready"  # type: ignore[index]
+    _approve(campaign)
     first = campaign["slices"][0]  # type: ignore[index]
     first["lifecycle"] = "complete"
     first["implementation_status"] = "partial"
@@ -170,10 +306,7 @@ def test_complete_slice_requires_conformance_evidence_and_checkpoint() -> None:
 def test_campaign_completion_requires_full_system_closure() -> None:
     campaign = copy.deepcopy(_campaign())
     campaign["campaign"]["lifecycle"] = "complete"  # type: ignore[index]
-    campaign["campaign"]["plan_approval"] = {  # type: ignore[index]
-        "status": "accepted",
-        "checkpoint": "approval:1",
-    }
+    _approve(campaign)
     campaign["authority"][0]["planned_coverage"] = "partial"  # type: ignore[index]
     campaign["closure"]["authority_coverage"] = "partial"  # type: ignore[index]
 
@@ -238,3 +371,90 @@ def test_status_is_compact_and_deterministic() -> None:
         "Closure: authority=full, integration=absent, runnable=absent",
         "Checkpoint: none",
     ]
+
+
+def test_approval_checkpoint_resolves_to_its_direct_plan_commit(tmp_path: Path) -> None:
+    campaign, _ = _approval_repository(tmp_path)
+
+    assert implementation_campaign.checkpoint_binding_findings(campaign, root=tmp_path) == []
+
+
+def test_slice_checkpoint_requires_both_clean_review_trailers(tmp_path: Path) -> None:
+    campaign, plan_sha = _approval_repository(tmp_path)
+    evidence = tmp_path / "evidence.txt"
+    evidence.write_text("discriminating case\n", encoding="utf-8")
+    checkpoint = f"slice:S001:{plan_sha[:12]}:1"
+    first = campaign["slices"][0]  # type: ignore[index]
+    first["lifecycle"] = "complete"
+    first["implementation_status"] = "conforming"
+    first["evidence_refs"] = ["path:evidence.txt#case"]
+    first["checkpoint"] = checkpoint
+    campaign["campaign"]["checkpoint"] = checkpoint  # type: ignore[index]
+    _write_campaign(tmp_path, campaign)
+    _git(tmp_path, "add", "implementation-campaign.yaml", "evidence.txt")
+    _git(
+        tmp_path,
+        "commit",
+        "-m",
+        "complete S001",
+        "-m",
+        f"Campaign-Checkpoint: {checkpoint}",
+    )
+
+    findings = implementation_campaign.checkpoint_binding_findings(campaign, root=tmp_path)
+
+    assert any("lacks a clean authority review" in finding for finding in findings)
+    assert any("lacks a clean engineering review" in finding for finding in findings)
+
+
+def test_duplicate_checkpoint_trailers_are_not_resumable(tmp_path: Path) -> None:
+    campaign, plan_sha = _approval_repository(tmp_path)
+    checkpoint = f"approval:{plan_sha}"
+    _git(
+        tmp_path,
+        "commit",
+        "--allow-empty",
+        "-m",
+        "duplicate checkpoint",
+        "-m",
+        f"Campaign-Checkpoint: {checkpoint}",
+    )
+
+    findings = implementation_campaign.checkpoint_binding_findings(campaign, root=tmp_path)
+
+    assert any("found 2" in finding for finding in findings)
+
+
+def test_missing_checkpoint_commit_is_not_resumable(tmp_path: Path) -> None:
+    campaign, plan_sha = _approval_repository(tmp_path)
+    checkpoint = f"slice:S001:{plan_sha[:12]}:1"
+    campaign["slices"][0]["checkpoint"] = checkpoint  # type: ignore[index]
+
+    findings = implementation_campaign.checkpoint_binding_findings(campaign, root=tmp_path)
+
+    assert any(checkpoint in finding and "found 0" in finding for finding in findings)
+
+
+def test_closure_checkpoint_resolves_review_and_evidence(tmp_path: Path) -> None:
+    campaign, plan_sha = _approval_repository(tmp_path)
+    evidence = tmp_path / "closure.txt"
+    evidence.write_text("runnable boundary confirmed\n", encoding="utf-8")
+    checkpoint = f"closure:{plan_sha[:12]}:1"
+    campaign["campaign"]["lifecycle"] = "complete"  # type: ignore[index]
+    campaign["campaign"]["checkpoint"] = checkpoint  # type: ignore[index]
+    campaign["closure"]["checkpoint"] = checkpoint  # type: ignore[index]
+    campaign["closure"]["evidence_refs"] = ["path:closure.txt#runnable"]  # type: ignore[index]
+    _write_campaign(tmp_path, campaign)
+    _git(tmp_path, "add", "implementation-campaign.yaml", "closure.txt")
+    _git(
+        tmp_path,
+        "commit",
+        "-m",
+        "close campaign",
+        "-m",
+        f"Campaign-Checkpoint: {checkpoint}",
+        "-m",
+        "Campaign-Closure-Review: clean",
+    )
+
+    assert implementation_campaign.checkpoint_binding_findings(campaign, root=tmp_path) == []

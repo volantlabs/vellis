@@ -157,7 +157,9 @@ authority:
       - {model_ref: "Vellis::'V1 JSON System Snapshot'", source: "model/30-vellis.sysml"}
       - {model_ref: "Vellis::'V1 Import Preview'", source: "model/30-vellis.sysml"}
       - {model_ref: "Vellis::'Begin from Vellis v1 snapshot'", source: "model/30-vellis.sysml"}
+      - {model_ref: "RTGSystem::'Initialize fresh RTG from recovery candidate'", source: "model/20-rtg-system.sysml"}
       - {model_ref: "VellisRequirements::v1SnapshotCompatibility", source: "model/40-requirements.sysml"}
+      - {model_ref: "VellisVerification::v1Compatibility", source: "model/50-verification.sysml"}
     planned_coverage: full
     slice_ids: [S013]
     implementation_status: absent
@@ -287,7 +289,7 @@ slices:
         authority_ids: [A017]
         reversible: false
       - id: D003
-        summary: Cover blank, Everyday Life, v2 snapshot and optional tail, and v1 preview/confirmation; allow a configurable data location with a platform user-data default.
+        summary: Cover blank, Everyday Life, v2 snapshot and optional tail, and v1 preview/confirmation; use temporary test directories and a configurable platform user-data default that never resolves to .data/.
         authority_ids: [A017]
         reversible: false
     blocker: null
@@ -450,7 +452,11 @@ slices:
     evidence_refs: []
     realization_decisions:
       - id: D001
-        summary: Pin fastmcp==4.0.0b1 and expose the ten-tool boundary through local STDIO; HTTP, OAuth, remote hosting, and plugin packaging remain deferred.
+        summary: Pin fastmcp==4.0.0b1 and fastmcp-slim==4.0.0b1 without global prerelease allowance, keep unrelated dependencies stable, update the lock in S009, and prove uv sync --locked.
+        authority_ids: [A013]
+        reversible: false
+      - id: D007
+        summary: Expose the selected ten-tool boundary through local STDIO; HTTP, OAuth, remote hosting, and plugin packaging remain deferred.
         authority_ids: [A013]
         reversible: false
       - id: D004
@@ -602,7 +608,11 @@ slices:
     lifecycle: pending
     implementation_status: absent
     evidence_refs: []
-    realization_decisions: []
+    realization_decisions:
+      - id: D006
+        summary: After a matching dry run, public client CLIs may replace only the existing disabled Codex vellis HTTP entry with STDIO and add Claude vellis; any state drift or permission-policy change requires human direction.
+        authority_ids: [A017]
+        reversible: false
     blocker: null
     checkpoint: null
 closure:
