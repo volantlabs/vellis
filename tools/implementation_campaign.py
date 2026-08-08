@@ -9,6 +9,7 @@ import re
 import subprocess
 import tempfile
 from collections import Counter
+from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 from typing import Any, cast
 
@@ -38,6 +39,12 @@ SLICE_CHECKPOINT = re.compile(
     r"slice:(?P<slice>S[0-9]{3}):(?P<plan>[0-9a-f]{12}):(?P<attempt>[1-9][0-9]*)\Z"
 )
 CLOSURE_CHECKPOINT = re.compile(r"closure:(?P<plan>[0-9a-f]{12}):(?P<attempt>[1-9][0-9]*)\Z")
+
+
+@dataclass(frozen=True)
+class CommitTrailers:
+    values: dict[str, list[str]]
+    raw_lines: tuple[str, ...]
 
 
 class UniqueKeyLoader(yaml.SafeLoader):
@@ -738,7 +745,10 @@ def validate_campaign(
 
 
 def qualified_model_reference_findings(
-    campaign: dict[str, Any], *, model_files: list[Path] | None = None
+    campaign: dict[str, Any],
+    *,
+    model_files: list[Path] | None = None,
+    validator_lock_path: Path = sysml_validator.VALIDATOR_LOCK_PATH,
 ) -> list[str]:
     authority_references = [
         reference["model_ref"]
@@ -749,7 +759,11 @@ def qualified_model_reference_findings(
         reference for entry in campaign["slices"] for reference in entry["verification_refs"]
     ]
     references = [*authority_references, *verification_references]
-    unresolved = sysml_validator.unresolved_model_references(references, model_files=model_files)
+    unresolved = sysml_validator.unresolved_model_references(
+        references,
+        model_files=model_files,
+        validator_lock_path=validator_lock_path,
+    )
     return [f"qualified model reference does not resolve: {reference}" for reference in unresolved]
 
 
@@ -780,7 +794,7 @@ def _git_bytes(root: Path, *arguments: str) -> bytes:
     return completed.stdout
 
 
-def _commit_trailers(root: Path, commit: str) -> dict[str, list[str]]:
+def _commit_trailers(root: Path, commit: str) -> CommitTrailers:
     body = _git(root, "show", "-s", "--format=%B", commit)
     completed = subprocess.run(  # noqa: S603
         ["git", "interpret-trailers", "--parse"],
@@ -797,41 +811,95 @@ def _commit_trailers(root: Path, commit: str) -> dict[str, list[str]]:
         key, separator, value = line.partition(":")
         if separator:
             trailers.setdefault(key.strip(), []).append(value.strip())
-    return trailers
+    body_lines = body.splitlines()
+    final_blank = max(
+        (index for index, line in enumerate(body_lines) if not line.strip()),
+        default=-1,
+    )
+    return CommitTrailers(trailers, tuple(body_lines[final_blank + 1 :]))
 
 
 def _checkpoint_trailer_findings(
     checkpoint: str,
-    trailers: dict[str, list[str]],
+    trailers: CommitTrailers,
     expected: dict[str, str],
 ) -> list[str]:
     findings: list[str] = []
     campaign_trailers: dict[str, list[tuple[str, str]]] = {}
-    for key, values in trailers.items():
+    for key, values in trailers.values.items():
         if key.lower().startswith("campaign-"):
             campaign_trailers.setdefault(key.lower(), []).extend((key, value) for value in values)
     for key, value in expected.items():
         entries = campaign_trailers.get(key.lower(), [])
-        if entries != [(key, value)]:
+        exact_line = f"{key}: {value}"
+        if entries != [(key, value)] or trailers.raw_lines.count(exact_line) != 1:
             findings.append(
                 f"checkpoint {checkpoint} requires exactly one canonical {key}: {value}; "
                 f"found {entries}"
             )
     unexpected = sorted(set(campaign_trailers) - {key.lower() for key in expected})
+    expected_lines = {f"{key}: {value}" for key, value in expected.items()}
+    unexpected_raw = sorted(
+        line
+        for line in trailers.raw_lines
+        if line.partition(":")[0].strip().lower().startswith("campaign-")
+        and line not in expected_lines
+    )
     if unexpected:
         findings.append(
             f"checkpoint {checkpoint} has unexpected campaign trailers: " + ", ".join(unexpected)
         )
+    if unexpected_raw:
+        findings.append(
+            f"checkpoint {checkpoint} has noncanonical campaign trailer lines: "
+            + ", ".join(unexpected_raw)
+        )
     return findings
 
 
-def _trailer_values(trailers: dict[str, list[str]], key: str) -> list[str]:
+def _trailer_values(trailers: CommitTrailers, key: str) -> list[str]:
     return [
         value
-        for actual_key, values in trailers.items()
+        for actual_key, values in trailers.values.items()
         if actual_key.lower() == key.lower()
         for value in values
     ]
+
+
+def _checkpoint_commits(
+    checkpoint: str,
+    commit_trailers: dict[str, CommitTrailers],
+) -> list[str]:
+    return [
+        commit
+        for commit, trailers in commit_trailers.items()
+        if checkpoint in _trailer_values(trailers, "Campaign-Checkpoint")
+    ]
+
+
+def _direct_checkpoint_parent_findings(
+    *,
+    root: Path,
+    commit: str,
+    checkpoint: str,
+    previous_checkpoint: str | None,
+    commit_trailers: dict[str, CommitTrailers],
+) -> list[str]:
+    if previous_checkpoint is None:
+        return [f"checkpoint {checkpoint} does not identify its preceding recovery checkpoint"]
+    previous_commits = _checkpoint_commits(previous_checkpoint, commit_trailers)
+    if len(previous_commits) != 1:
+        return [
+            f"checkpoint {checkpoint} preceding checkpoint {previous_checkpoint} must resolve "
+            f"exactly once; found {len(previous_commits)}"
+        ]
+    parents = _git(root, "rev-list", "--parents", "-n", "1", commit).split()
+    if len(parents) != 2 or parents[1] != previous_commits[0]:
+        return [
+            f"checkpoint {checkpoint} must be a direct single-parent child of preceding "
+            f"checkpoint {previous_checkpoint}"
+        ]
+    return []
 
 
 def _plan_projection(campaign: dict[str, Any]) -> dict[str, Any]:
@@ -989,6 +1057,7 @@ def _committed_campaign_findings(
                 qualified_model_reference_findings(
                     campaign,
                     model_files=authored_model_files(snapshot),
+                    validator_lock_path=(snapshot / "model" / "config" / "validator.lock.json"),
                 )
             )
         return findings
@@ -1030,11 +1099,7 @@ def checkpoint_binding_findings(campaign: dict[str, Any], *, root: Path = ROOT) 
     resolved_plan_keys: set[str] = set()
     approved_plans: dict[str, dict[str, Any] | None] = {}
     for checkpoint in sorted(checkpoints):
-        commits = [
-            commit
-            for commit, trailers in commit_trailers.items()
-            if checkpoint in _trailer_values(trailers, "Campaign-Checkpoint")
-        ]
+        commits = _checkpoint_commits(checkpoint, commit_trailers)
         if len(commits) != 1:
             findings.append(
                 f"checkpoint {checkpoint} must resolve to exactly one reachable commit; "
@@ -1225,6 +1290,27 @@ def checkpoint_binding_findings(campaign: dict[str, Any], *, root: Path = ROOT) 
                 )
             if committed["campaign"]["checkpoint"] != checkpoint:
                 findings.append(f"slice checkpoint {checkpoint} is not the campaign checkpoint")
+            prior_completed = [
+                item
+                for item in committed["slices"]
+                if item["lifecycle"] == "complete"
+                and entry is not None
+                and item["order"] < entry["order"]
+            ]
+            previous_checkpoint = (
+                max(prior_completed, key=lambda item: item["order"])["checkpoint"]
+                if prior_completed
+                else committed["campaign"]["plan_approval"]["checkpoint"]
+            )
+            findings.extend(
+                _direct_checkpoint_parent_findings(
+                    root=root,
+                    commit=commit,
+                    checkpoint=checkpoint,
+                    previous_checkpoint=previous_checkpoint,
+                    commit_trailers=commit_trailers,
+                )
+            )
         elif closure_match is not None:
             findings.extend(
                 _checkpoint_trailer_findings(
@@ -1254,6 +1340,23 @@ def checkpoint_binding_findings(campaign: dict[str, Any], *, root: Path = ROOT) 
                         references=closure["evidence_refs"],
                     )
                 )
+            completed_slices = [
+                item for item in committed["slices"] if item["lifecycle"] == "complete"
+            ]
+            previous_checkpoint = (
+                max(completed_slices, key=lambda item: item["order"])["checkpoint"]
+                if completed_slices
+                else committed["campaign"]["plan_approval"]["checkpoint"]
+            )
+            findings.extend(
+                _direct_checkpoint_parent_findings(
+                    root=root,
+                    commit=commit,
+                    checkpoint=checkpoint,
+                    previous_checkpoint=previous_checkpoint,
+                    commit_trailers=commit_trailers,
+                )
+            )
     return findings
 
 

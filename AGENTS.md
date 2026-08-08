@@ -106,7 +106,10 @@ Use fresh context-isolated read-only agents for the two required slice reviews; 
 pauses mutation while they inspect the same working state and verifies the diff afterward. An active
 slice has no new checkpoint: `campaign.checkpoint` remains the last committed recovery point until
 the reviewed slice commits. The committed current checkpoint is exactly `HEAD`; unexplained later
-commits stop recovery. Any campaign or slice blocker invalidates approval and stops execution.
+commits stop recovery. Each slice checkpoint is a direct single-parent child of the preceding
+recovery checkpoint, and closure is a direct child of the final slice checkpoint; merge, sibling, or
+intermediate commits do not silently join the campaign chain. Any campaign or slice blocker
+invalidates approval and stops execution.
 Project checkpoint IDs, the exact approval transition, and required commit trailers are documented
 in `CONTRIBUTING.md`. Run `just implementation-campaign-checkpoint-check` after each checkpoint
 commit; it is intentionally post-commit and therefore not part of `just check`.

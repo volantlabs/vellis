@@ -221,6 +221,10 @@ clean fixed-point cycle permits the implementation, evidence, documentation trut
 state to checkpoint together. A project-bound checkpoint must resolve to that durable combined
 state; an active slice retains the preceding recoverable checkpoint until the new one commits, and
 the committed current checkpoint is the exact recovery head rather than an older reachable state.
+Slice checkpoints form one direct single-parent chain from approval through the final slice and
+closure, so merges, sibling history, or unexplained intermediate commits cannot be mistaken for
+campaign recovery state. Historical authority resolution uses each checkpoint's committed validator
+pin rather than the current checkout's pin.
 Project checkpoint validation also preserves the approved plan-bearing projection through every
 slice and closure checkpoint. A changed baseline, authority map, coverage contribution, dependency,
 verification reference, or consequential realization decision returns the campaign to planning and

@@ -112,9 +112,10 @@ already committed. Put the required lines together in the commit's final Git tra
 checkpoint carries `Campaign-Checkpoint: <identifier>`. Approval adds
 `Campaign-Approval: accepted`; slice commits add `Campaign-Authority-Review: clean` and
 `Campaign-Engineering-Review: clean`; final closure adds `Campaign-Closure-Review: clean`.
-Each required campaign trailer occurs exactly once with the documented key spelling and value, and
-checkpoint commits carry no campaign trailer belonging to another checkpoint kind. Missing,
-case-variant, duplicate, contradictory, or extra `Campaign-*` trailers invalidate the checkpoint.
+Each required campaign trailer occurs exactly once as the documented `Key: value` line, and
+checkpoint commits carry no campaign trailer belonging to another checkpoint kind. Noncanonical
+separator spacing, case variants, missing, duplicate, contradictory, or extra `Campaign-*` trailers
+invalidate the checkpoint.
 
 The approval commit is a direct child of the reviewed plan commit and changes only
 `implementation-campaign.yaml`: set campaign lifecycle to `ready`, approval to `accepted`, both
@@ -129,8 +130,11 @@ realization decisions requires replanning, a new cold review, and renewed human 
 
 During uncommitted active work, retain the preceding campaign checkpoint and leave the active
 slice's checkpoint null. After a checkpoint commit, the current campaign checkpoint must resolve to
-`HEAD`; any later uncheckpointed commit is unexplained recovery state. Run
-`just implementation-campaign-check` before committing and
+`HEAD`; any later uncheckpointed commit is unexplained recovery state.
+Each slice checkpoint must be the direct single-parent child of the preceding recovery checkpoint;
+closure must be the direct single-parent child of the final slice checkpoint. Do not absorb merges,
+sibling work, or unexplained intermediate commits into the campaign chain.
+Run `just implementation-campaign-check` before committing and
 `just implementation-campaign-checkpoint-check` afterward. If the post-commit binding fails, do not
 advance; amend the sole unpublished checkpoint commit when safe, otherwise request recovery direction.
 
