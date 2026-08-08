@@ -16,6 +16,14 @@ IMPLEMENTATION_CAMPAIGN_SCHEMA_PATH = (
     / "assets"
     / "implementation-campaign.schema.json"
 )
+AUTHORED_MODEL_PACKAGES = {
+    "RTG": "model/10-rtg-domain.sysml",
+    "EverydayLifeStarter": "model/15-everyday-life-starter.sysml",
+    "RTGSystem": "model/20-rtg-system.sysml",
+    "Vellis": "model/30-vellis.sysml",
+    "VellisRequirements": "model/40-requirements.sysml",
+    "VellisVerification": "model/50-verification.sysml",
+}
 SYSML_CACHE_ROOT = ROOT / ".cache" / "sysml"
 VALIDATOR_CACHE_ROOT = SYSML_CACHE_ROOT / "validator"
 

@@ -96,16 +96,19 @@ lock only in the first slice that uses it; S009 directly pins both `fastmcp==4.0
 
 Campaign evidence references are either `path:<repo-relative-path>#<test-or-section>` or
 `command:<exact reproducible command>`. Do not record prose assertions, absolute paths, transcripts,
-or transient files as evidence. Tests use temporary data directories. A runtime default uses the
-platform's user-data convention, confirms a nonempty resolved destination, and never resolves to the
-repository's `.data/` directory.
+or transient files as evidence. Path fragments resolve to Markdown heading anchors or Python test
+nodes. Tests use temporary data directories. A runtime default uses the platform's user-data
+convention, confirms a nonempty resolved destination, and never resolves to the repository's `.data/`
+directory.
 
 Use fresh context-isolated read-only agents for the two required slice reviews; the single writer
 pauses mutation while they inspect the same working state and verifies the diff afterward. An active
 slice has no new checkpoint: `campaign.checkpoint` remains the last committed recovery point until
-the reviewed slice commits. Project checkpoint IDs and required commit trailers are documented in
-`CONTRIBUTING.md`. Run `just implementation-campaign-checkpoint-check` after each checkpoint commit;
-it is intentionally post-commit and therefore not part of `just check`.
+the reviewed slice commits. The committed current checkpoint is exactly `HEAD`; unexplained later
+commits stop recovery. Any campaign or slice blocker invalidates approval and stops execution.
+Project checkpoint IDs, the exact approval transition, and required commit trailers are documented
+in `CONTRIBUTING.md`. Run `just implementation-campaign-checkpoint-check` after each checkpoint
+commit; it is intentionally post-commit and therefore not part of `just check`.
 
 At runnable closure, the approved plan authorizes a matching dry run followed by public-CLI changes
 only to the named `vellis` client entries: replace the existing disabled Codex HTTP entry with the

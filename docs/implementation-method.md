@@ -219,7 +219,8 @@ After focused evidence passes, independent agents review authority/conformance a
 engineering/evidence. The writer remediates every material finding and repeats both reviews. Only a
 clean fixed-point cycle permits the implementation, evidence, documentation truth, and campaign
 state to checkpoint together. A project-bound checkpoint must resolve to that durable combined
-state; an active slice retains the preceding recoverable checkpoint until the new one commits.
+state; an active slice retains the preceding recoverable checkpoint until the new one commits, and
+the committed current checkpoint is the exact recovery head rather than an older reachable state.
 
 After the last planned slice, a separate closure cycle reconstructs complete model coverage, tests
 cross-slice semantics, exercises the selected external boundary from a fresh environment, performs a

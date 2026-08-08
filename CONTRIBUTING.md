@@ -108,18 +108,31 @@ commit's own hash:
 - closure: `closure:<approved-plan-short-sha>:<attempt>`.
 
 Start an attempt at `1` and increment it only if a checkpoint for the same slice and approved plan
-already committed. Every checkpoint commit carries `Campaign-Checkpoint: <identifier>`. Approval
-adds `Campaign-Approval: accepted`; slice commits add `Campaign-Authority-Review: clean` and
-`Campaign-Engineering-Review: clean`; final closure adds `Campaign-Closure-Review: clean`. During
-uncommitted active work, retain the preceding campaign checkpoint and leave the active slice's
-checkpoint null. Run `just implementation-campaign-check` before committing and
+already committed. Put the required lines together in the commit's final Git trailer block. Every
+checkpoint carries `Campaign-Checkpoint: <identifier>`. Approval adds
+`Campaign-Approval: accepted`; slice commits add `Campaign-Authority-Review: clean` and
+`Campaign-Engineering-Review: clean`; final closure adds `Campaign-Closure-Review: clean`.
+
+The approval commit is a direct child of the reviewed plan commit and changes only
+`implementation-campaign.yaml`: set campaign lifecycle to `ready`, approval to `accepted`, both
+approval and campaign checkpoints to `approval:<reviewed-plan-sha>`, and only the lowest-ordered
+dependency-ready slice to `ready`. It may not change authority, coverage, slices, dependencies,
+verification, decisions, blockers, evidence, or any other plan-bearing content. A campaign or slice
+blocker changes approval to `changes-required`, clears its approval checkpoint, and puts the campaign
+in `blocked` or `stale`; execution does not continue through that state.
+
+During uncommitted active work, retain the preceding campaign checkpoint and leave the active
+slice's checkpoint null. After a checkpoint commit, the current campaign checkpoint must resolve to
+`HEAD`; any later uncheckpointed commit is unexplained recovery state. Run
+`just implementation-campaign-check` before committing and
 `just implementation-campaign-checkpoint-check` afterward. If the post-commit binding fails, do not
 advance; amend the sole unpublished checkpoint commit when safe, otherwise request recovery direction.
 
 Campaign evidence uses `path:<repo-relative-path>#<test-or-section>` for committed artifacts or
-`command:<exact reproducible command>` for rerunnable checks. S001 chooses the product source and
-test layout and extends all repository gates to cover it in that same checkpoint. Product tests use
-temporary data locations and never inspect or write `.data/`.
+`command:<exact reproducible command>` for rerunnable checks. A path fragment must resolve to a
+Markdown heading anchor or a Python test node in both the working tree and checkpoint commit. S001
+chooses the product source and test layout and extends all repository gates to cover it in that same
+checkpoint. Product tests use temporary data locations and never inspect or write `.data/`.
 
 ## Testing authority
 
