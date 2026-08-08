@@ -190,6 +190,34 @@ def test_qualified_authority_reference_is_bound_to_its_source_file() -> None:
     assert any("is owned by model/10-rtg-domain.sysml" in finding for finding in findings)
 
 
+def test_authored_model_package_provenance_comes_from_file_content(tmp_path: Path) -> None:
+    shutil.copytree(model_layout.MODEL_ROOT, tmp_path / "model")
+    schema_relative = model_layout.IMPLEMENTATION_CAMPAIGN_SCHEMA_PATH.relative_to(
+        model_layout.ROOT
+    )
+    schema_destination = tmp_path / schema_relative
+    schema_destination.parent.mkdir(parents=True)
+    shutil.copy2(model_layout.IMPLEMENTATION_CAMPAIGN_SCHEMA_PATH, schema_destination)
+    first = tmp_path / "model/10-rtg-domain.sysml"
+    second = tmp_path / "model/15-everyday-life-starter.sysml"
+    first_source = first.read_text(encoding="utf-8")
+    second_source = second.read_text(encoding="utf-8")
+    first.write_text(second_source, encoding="utf-8")
+    second.write_text(first_source, encoding="utf-8")
+    campaign = copy.deepcopy(_campaign())
+    observed = implementation_campaign.observed_baseline(tmp_path)
+    campaign["model_baseline"]["planned"].update(observed)  # type: ignore[index]
+    campaign["model_baseline"]["observed"].update(observed)  # type: ignore[index]
+
+    findings = implementation_campaign.validate_campaign(
+        campaign,
+        root=tmp_path,
+        schema_path=schema_destination,
+    )
+
+    assert any("package provenance mismatch" in finding for finding in findings)
+
+
 def test_realization_decision_ids_are_campaign_unique() -> None:
     campaign = copy.deepcopy(_campaign())
     decisions = [
@@ -232,6 +260,23 @@ def test_evidence_references_are_reproducible_project_references() -> None:
     assert any("does not exist: docs" in finding for finding in findings)
     assert any("evidence fragment does not resolve" in finding for finding in findings)
     assert any("one exact nonempty command" in finding for finding in findings)
+
+
+def test_evidence_path_cannot_escape_through_an_ancestor_symlink(tmp_path: Path) -> None:
+    repository = tmp_path / "repository"
+    external = tmp_path / "external"
+    repository.mkdir()
+    external.mkdir()
+    (external / "case.md").write_text("# Case\n", encoding="utf-8")
+    (repository / "linked").symlink_to(external, target_is_directory=True)
+
+    findings = implementation_campaign._evidence_reference_findings(
+        "path:linked/case.md#case",
+        label="slice.S001.evidence_refs[0]",
+        root=repository,
+    )
+
+    assert any("escapes the repository through a symlink" in finding for finding in findings)
 
 
 def test_checkpoint_formats_reject_active_markers_and_wrong_slice_ids() -> None:
@@ -483,6 +528,20 @@ def test_status_is_compact_and_deterministic() -> None:
     ]
 
 
+def test_status_reports_the_lowest_ordered_slice_blocker() -> None:
+    campaign = copy.deepcopy(_campaign())
+    campaign["slices"][0]["blocker"] = {  # type: ignore[index]
+        "classification": "model gap",
+        "summary": "A named distinction is unresolved.",
+        "authority_ids": ["A001"],
+        "evidence_refs": [],
+    }
+
+    status = implementation_campaign._status(campaign)
+
+    assert "Blocker: S001 model gap: A named distinction is unresolved." in status
+
+
 def test_approval_checkpoint_resolves_to_its_direct_plan_commit(tmp_path: Path) -> None:
     campaign, _ = _approval_repository(tmp_path)
 
@@ -508,6 +567,72 @@ def test_approval_checkpoint_cannot_change_the_reviewed_plan(tmp_path: Path) -> 
     findings = implementation_campaign.checkpoint_binding_findings(campaign, root=tmp_path)
 
     assert any("changed plan-bearing campaign content" in finding for finding in findings)
+
+
+def test_slice_checkpoint_cannot_drift_from_the_approved_plan(tmp_path: Path) -> None:
+    campaign, plan_sha = _approval_repository(tmp_path)
+    evidence = tmp_path / "evidence.md"
+    evidence.write_text("# Case\n\nDiscriminating evidence.\n", encoding="utf-8")
+    checkpoint = f"slice:S001:{plan_sha[:12]}:1"
+    first = campaign["slices"][0]  # type: ignore[index]
+    first["verification_refs"].pop()
+    first["lifecycle"] = "complete"
+    first["implementation_status"] = "conforming"
+    first["evidence_refs"] = ["path:evidence.md#case"]
+    first["checkpoint"] = checkpoint
+    campaign["campaign"]["checkpoint"] = checkpoint  # type: ignore[index]
+    campaign["slices"][1]["lifecycle"] = "ready"  # type: ignore[index]
+    _write_campaign(tmp_path, campaign)
+    _git(tmp_path, "add", "implementation-campaign.yaml", "evidence.md")
+    _git(
+        tmp_path,
+        "commit",
+        "-m",
+        "complete drifted S001",
+        "-m",
+        (
+            f"Campaign-Checkpoint: {checkpoint}\n"
+            "Campaign-Authority-Review: clean\n"
+            "Campaign-Engineering-Review: clean"
+        ),
+    )
+
+    findings = implementation_campaign.checkpoint_binding_findings(campaign, root=tmp_path)
+
+    assert any("changed plan-bearing content after approval" in finding for finding in findings)
+
+
+def test_historical_checkpoint_resolves_its_qualified_references(tmp_path: Path) -> None:
+    campaign, plan_sha = _approval_repository(tmp_path)
+    evidence = tmp_path / "evidence.md"
+    evidence.write_text("# Case\n\nDiscriminating evidence.\n", encoding="utf-8")
+    checkpoint = f"slice:S001:{plan_sha[:12]}:1"
+    first = campaign["slices"][0]  # type: ignore[index]
+    first["verification_refs"][0] = "VellisVerification::'Definitely Missing'"
+    first["lifecycle"] = "complete"
+    first["implementation_status"] = "conforming"
+    first["evidence_refs"] = ["path:evidence.md#case"]
+    first["checkpoint"] = checkpoint
+    campaign["campaign"]["checkpoint"] = checkpoint  # type: ignore[index]
+    campaign["slices"][1]["lifecycle"] = "ready"  # type: ignore[index]
+    _write_campaign(tmp_path, campaign)
+    _git(tmp_path, "add", "implementation-campaign.yaml", "evidence.md")
+    _git(
+        tmp_path,
+        "commit",
+        "-m",
+        "complete S001 with a missing historical reference",
+        "-m",
+        (
+            f"Campaign-Checkpoint: {checkpoint}\n"
+            "Campaign-Authority-Review: clean\n"
+            "Campaign-Engineering-Review: clean"
+        ),
+    )
+
+    findings = implementation_campaign.checkpoint_binding_findings(campaign, root=tmp_path)
+
+    assert any("Definitely Missing" in finding for finding in findings)
 
 
 def test_current_checkpoint_must_be_the_exact_head_recovery_state(tmp_path: Path) -> None:
@@ -544,8 +669,32 @@ def test_slice_checkpoint_requires_both_clean_review_trailers(tmp_path: Path) ->
 
     findings = implementation_campaign.checkpoint_binding_findings(campaign, root=tmp_path)
 
-    assert any("lacks a clean authority review" in finding for finding in findings)
-    assert any("lacks a clean engineering review" in finding for finding in findings)
+    assert any("Campaign-Authority-Review: clean" in finding for finding in findings)
+    assert any("Campaign-Engineering-Review: clean" in finding for finding in findings)
+
+
+def test_checkpoint_rejects_contradictory_campaign_trailers(tmp_path: Path) -> None:
+    campaign, plan_sha = _approval_repository(tmp_path)
+    checkpoint = f"approval:{plan_sha}"
+    _git(
+        tmp_path,
+        "commit",
+        "--amend",
+        "-m",
+        "approve campaign with contradictory attestation",
+        "-m",
+        (
+            f"Campaign-Checkpoint: {checkpoint}\n"
+            "Campaign-Approval: rejected\n"
+            "Campaign-Approval: accepted"
+        ),
+    )
+
+    findings = implementation_campaign.checkpoint_binding_findings(campaign, root=tmp_path)
+
+    assert any(
+        "requires exactly one Campaign-Approval: accepted" in finding for finding in findings
+    )
 
 
 def test_duplicate_checkpoint_trailers_are_not_resumable(tmp_path: Path) -> None:

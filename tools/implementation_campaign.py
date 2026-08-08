@@ -81,6 +81,68 @@ def authored_model_files(root: Path = ROOT) -> list[Path]:
     return files
 
 
+def _sysml_header_tokens(source: str) -> list[str]:
+    """Tokenize enough of a SysML file header to establish project provenance.
+
+    Qualified-reference meaning is still resolved by the pinned validator. This small lexer only
+    enforces this project's one-root-package-per-authored-file convention without trusting a
+    filename map alone.
+    """
+    tokens: list[str] = []
+    index = 0
+    while index < len(source) and len(tokens) < 3:
+        if source[index].isspace():
+            index += 1
+            continue
+        if source.startswith("//", index):
+            newline = source.find("\n", index + 2)
+            index = len(source) if newline == -1 else newline + 1
+            continue
+        if source.startswith("/*", index):
+            end = source.find("*/", index + 2)
+            if end == -1:
+                return []
+            index = end + 2
+            continue
+        if source[index] == "'":
+            end = index + 1
+            while end < len(source):
+                if source[end] == "'" and source[end - 1] != "\\":
+                    break
+                end += 1
+            if end >= len(source):
+                return []
+            tokens.append(source[index + 1 : end])
+            index = end + 1
+            continue
+        match = re.match(r"[A-Za-z_]\w*", source[index:])
+        if match is not None:
+            tokens.append(match.group(0))
+            index += len(match.group(0))
+            continue
+        tokens.append(source[index])
+        index += 1
+    return tokens
+
+
+def _authored_model_package_findings(root: Path) -> list[str]:
+    findings: list[str] = []
+    expected_by_file = {path: package for package, path in AUTHORED_MODEL_PACKAGES.items()}
+    for path in authored_model_files(root):
+        relative = path.relative_to(root).as_posix()
+        tokens = _sysml_header_tokens(path.read_text(encoding="utf-8"))
+        declared = (
+            tokens[1] if len(tokens) >= 3 and tokens[0] == "package" and tokens[2] == "{" else None
+        )
+        expected = expected_by_file.get(relative)
+        if declared != expected:
+            findings.append(
+                f"authored model package provenance mismatch for {relative}: "
+                f"expected {expected or 'no package'}, found {declared or 'no root package'}"
+            )
+    return findings
+
+
 def authority_digest(root: Path = ROOT) -> str:
     entries = [
         {
@@ -220,8 +282,15 @@ def _evidence_reference_findings(reference: str, *, label: str, root: Path) -> l
             or ".." in path.parts
         ):
             return [f"{label} path evidence must be path:<repo-relative-path>#<test-or-section>"]
-        resolved = root / Path(*path.parts)
-        if not resolved.is_file() or resolved.is_symlink():
+        candidate = root / Path(*path.parts)
+        try:
+            resolved_root = root.resolve(strict=True)
+            resolved = candidate.resolve(strict=True)
+        except OSError:
+            return [f"{label} path evidence does not exist: {path_text}"]
+        if not resolved.is_relative_to(resolved_root):
+            return [f"{label} path evidence escapes the repository through a symlink: {path_text}"]
+        if not resolved.is_file() or candidate.is_symlink():
             return [f"{label} path evidence does not exist: {path_text}"]
         try:
             source = resolved.read_text(encoding="utf-8")
@@ -363,6 +432,7 @@ def validate_campaign(
         findings.append("model_baseline.authority_files must equal the sorted authored model files")
     if set(AUTHORED_MODEL_PACKAGES.values()) != set(expected_files):
         findings.append("project model-package provenance must cover every authored model file")
+    findings.extend(_authored_model_package_findings(root))
 
     actual = observed_baseline(root)
     observed = baseline["observed"]
@@ -667,7 +737,9 @@ def validate_campaign(
     return findings
 
 
-def qualified_model_reference_findings(campaign: dict[str, Any]) -> list[str]:
+def qualified_model_reference_findings(
+    campaign: dict[str, Any], *, model_files: list[Path] | None = None
+) -> list[str]:
     authority_references = [
         reference["model_ref"]
         for authority in campaign["authority"]
@@ -677,7 +749,7 @@ def qualified_model_reference_findings(campaign: dict[str, Any]) -> list[str]:
         reference for entry in campaign["slices"] for reference in entry["verification_refs"]
     ]
     references = [*authority_references, *verification_references]
-    unresolved = sysml_validator.unresolved_model_references(references)
+    unresolved = sysml_validator.unresolved_model_references(references, model_files=model_files)
     return [f"qualified model reference does not resolve: {reference}" for reference in unresolved]
 
 
@@ -708,7 +780,7 @@ def _git_bytes(root: Path, *arguments: str) -> bytes:
     return completed.stdout
 
 
-def _commit_trailers(root: Path, commit: str) -> set[str]:
+def _commit_trailers(root: Path, commit: str) -> dict[str, list[str]]:
     body = _git(root, "show", "-s", "--format=%B", commit)
     completed = subprocess.run(  # noqa: S603
         ["git", "interpret-trailers", "--parse"],
@@ -720,7 +792,73 @@ def _commit_trailers(root: Path, commit: str) -> set[str]:
     )
     if completed.returncode != 0:
         raise RuntimeError(f"git interpret-trailers failed: {completed.stderr.strip()}")
-    return set(completed.stdout.splitlines())
+    trailers: dict[str, list[str]] = {}
+    for line in completed.stdout.splitlines():
+        key, separator, value = line.partition(":")
+        if separator:
+            trailers.setdefault(key.strip(), []).append(value.strip())
+    return trailers
+
+
+def _checkpoint_trailer_findings(
+    checkpoint: str,
+    trailers: dict[str, list[str]],
+    expected: dict[str, str],
+) -> list[str]:
+    findings: list[str] = []
+    campaign_trailers = {
+        key: values for key, values in trailers.items() if key.startswith("Campaign-")
+    }
+    for key, value in expected.items():
+        values = campaign_trailers.get(key, [])
+        if values != [value]:
+            findings.append(
+                f"checkpoint {checkpoint} requires exactly one {key}: {value}; found {values}"
+            )
+    unexpected = sorted(set(campaign_trailers) - set(expected))
+    if unexpected:
+        findings.append(
+            f"checkpoint {checkpoint} has unexpected campaign trailers: " + ", ".join(unexpected)
+        )
+    return findings
+
+
+def _plan_projection(campaign: dict[str, Any]) -> dict[str, Any]:
+    """Return immutable plan-bearing content, excluding only execution observations."""
+    return {
+        "schema_version": campaign["schema_version"],
+        "campaign": {
+            "id": campaign["campaign"]["id"],
+            "objective": campaign["campaign"]["objective"],
+        },
+        "model_baseline": campaign["model_baseline"],
+        "authority": [
+            {key: entry[key] for key in ("id", "label", "refs", "planned_coverage", "slice_ids")}
+            for entry in campaign["authority"]
+        ],
+        "slices": [
+            {
+                key: entry[key]
+                for key in (
+                    "id",
+                    "order",
+                    "label",
+                    "kind",
+                    "dependencies",
+                    "authority",
+                    "verification_refs",
+                    "realization_decisions",
+                )
+            }
+            for entry in campaign["slices"]
+        ],
+        "closure": {"authority_coverage": campaign["closure"]["authority_coverage"]},
+    }
+
+
+def _plan_projection_key(campaign: dict[str, Any]) -> str:
+    source = json.dumps(_plan_projection(campaign), sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(source.encode("utf-8")).hexdigest()
 
 
 def _checkpoint_ids(campaign: dict[str, Any]) -> set[str]:
@@ -752,7 +890,13 @@ def _committed_evidence_findings(*, root: Path, commit: str, references: list[st
     return findings
 
 
-def _committed_campaign_findings(campaign: dict[str, Any], *, root: Path, commit: str) -> list[str]:
+def _committed_campaign_findings(
+    campaign: dict[str, Any],
+    *,
+    root: Path,
+    commit: str,
+    resolve_qualified_references: bool = False,
+) -> list[str]:
     schema_relative = IMPLEMENTATION_CAMPAIGN_SCHEMA_PATH.relative_to(ROOT)
     authority_files = campaign.get("model_baseline", {}).get("authority_files", [])
     expected_authority_files = sorted(AUTHORED_MODEL_PACKAGES.values())
@@ -783,11 +927,19 @@ def _committed_campaign_findings(campaign: dict[str, Any], *, root: Path, commit
                 return [
                     f"checkpoint {commit} is missing required committed path {relative}: {error}"
                 ]
-        return validate_campaign(
+        findings = validate_campaign(
             campaign,
             root=snapshot,
             schema_path=snapshot / schema_relative,
         )
+        if not findings and resolve_qualified_references:
+            findings.extend(
+                qualified_model_reference_findings(
+                    campaign,
+                    model_files=authored_model_files(snapshot),
+                )
+            )
+        return findings
 
 
 def _expected_approval_campaign(parent: dict[str, Any], *, checkpoint: str) -> dict[str, Any]:
@@ -823,11 +975,13 @@ def checkpoint_binding_findings(campaign: dict[str, Any], *, root: Path = ROOT) 
         commit: _commit_trailers(root, commit)
         for commit in _git(root, "log", "HEAD", "--format=%H").splitlines()
     }
+    resolved_plan_keys: set[str] = set()
+    approved_plans: dict[str, dict[str, Any] | None] = {}
     for checkpoint in sorted(checkpoints):
         commits = [
             commit
             for commit, trailers in commit_trailers.items()
-            if f"Campaign-Checkpoint: {checkpoint}" in trailers
+            if checkpoint in trailers.get("Campaign-Checkpoint", [])
         ]
         if len(commits) != 1:
             findings.append(
@@ -846,7 +1000,16 @@ def checkpoint_binding_findings(campaign: dict[str, Any], *, root: Path = ROOT) 
         except (RuntimeError, ValueError, yaml.YAMLError) as error:
             findings.append(f"checkpoint {checkpoint} has no readable committed campaign: {error}")
             continue
-        snapshot_findings = _committed_campaign_findings(committed, root=root, commit=commit)
+        plan_key = _plan_projection_key(committed)
+        resolve_references = plan_key not in resolved_plan_keys
+        snapshot_findings = _committed_campaign_findings(
+            committed,
+            root=root,
+            commit=commit,
+            resolve_qualified_references=resolve_references,
+        )
+        if resolve_references:
+            resolved_plan_keys.add(plan_key)
         findings.extend(
             f"checkpoint {checkpoint} committed campaign is invalid: {finding}"
             for finding in snapshot_findings
@@ -856,17 +1019,60 @@ def checkpoint_binding_findings(campaign: dict[str, Any], *, root: Path = ROOT) 
                 f"current campaign checkpoint {checkpoint} resolves to {commit}, not HEAD {head}"
             )
 
+        committed_approval = committed["campaign"]["plan_approval"]
+        if committed_approval["status"] == "accepted":
+            committed_approval_match = APPROVAL_CHECKPOINT.fullmatch(
+                committed_approval["checkpoint"] or ""
+            )
+            if committed_approval_match is None:
+                findings.append(
+                    f"checkpoint {checkpoint} has accepted approval without a valid plan commit"
+                )
+            else:
+                approved_plan_sha = committed_approval_match.group("plan")
+                if approved_plan_sha not in approved_plans:
+                    try:
+                        approved_plans[approved_plan_sha] = load_campaign_text(
+                            _git(
+                                root,
+                                "show",
+                                f"{approved_plan_sha}:implementation-campaign.yaml",
+                            ),
+                            label=f"{approved_plan_sha}:implementation-campaign.yaml",
+                        )
+                    except (RuntimeError, ValueError, yaml.YAMLError) as error:
+                        findings.append(
+                            f"checkpoint {checkpoint} cannot read approved plan "
+                            f"{approved_plan_sha}: {error}"
+                        )
+                        approved_plans[approved_plan_sha] = None
+                approved_plan = approved_plans[approved_plan_sha]
+                if approved_plan is not None and _plan_projection(committed) != _plan_projection(
+                    approved_plan
+                ):
+                    findings.append(
+                        f"checkpoint {checkpoint} changed plan-bearing content after approval"
+                    )
+
         approval_match = APPROVAL_CHECKPOINT.fullmatch(checkpoint)
         slice_match = SLICE_CHECKPOINT.fullmatch(checkpoint)
         closure_match = CLOSURE_CHECKPOINT.fullmatch(checkpoint)
         if approval_match is not None:
+            findings.extend(
+                _checkpoint_trailer_findings(
+                    checkpoint,
+                    trailers,
+                    {
+                        "Campaign-Checkpoint": checkpoint,
+                        "Campaign-Approval": "accepted",
+                    },
+                )
+            )
             parents = _git(root, "rev-list", "--parents", "-n", "1", commit).split()
             if len(parents) != 2 or parents[1] != approval_match.group("plan"):
                 findings.append(
                     f"approval checkpoint {checkpoint} must be directly based on its plan commit"
                 )
-            if "Campaign-Approval: accepted" not in trailers:
-                findings.append(f"approval checkpoint {checkpoint} lacks its approval trailer")
             try:
                 parent = load_campaign_text(
                     _git(
@@ -886,7 +1092,11 @@ def checkpoint_binding_findings(campaign: dict[str, Any], *, root: Path = ROOT) 
                     parent,
                     root=root,
                     commit=approval_match.group("plan"),
+                    resolve_qualified_references=(
+                        _plan_projection_key(parent) not in resolved_plan_keys
+                    ),
                 )
+                resolved_plan_keys.add(_plan_projection_key(parent))
                 findings.extend(
                     f"approved plan {approval_match.group('plan')} is invalid: {finding}"
                     for finding in parent_findings
@@ -931,10 +1141,17 @@ def checkpoint_binding_findings(campaign: dict[str, Any], *, root: Path = ROOT) 
         elif slice_match is not None:
             slice_id = slice_match.group("slice")
             entry = next((item for item in committed["slices"] if item["id"] == slice_id), None)
-            if "Campaign-Authority-Review: clean" not in trailers:
-                findings.append(f"slice checkpoint {checkpoint} lacks a clean authority review")
-            if "Campaign-Engineering-Review: clean" not in trailers:
-                findings.append(f"slice checkpoint {checkpoint} lacks a clean engineering review")
+            findings.extend(
+                _checkpoint_trailer_findings(
+                    checkpoint,
+                    trailers,
+                    {
+                        "Campaign-Checkpoint": checkpoint,
+                        "Campaign-Authority-Review": "clean",
+                        "Campaign-Engineering-Review": "clean",
+                    },
+                )
+            )
             if (
                 entry is None
                 or entry["checkpoint"] != checkpoint
@@ -957,8 +1174,16 @@ def checkpoint_binding_findings(campaign: dict[str, Any], *, root: Path = ROOT) 
             if committed["campaign"]["checkpoint"] != checkpoint:
                 findings.append(f"slice checkpoint {checkpoint} is not the campaign checkpoint")
         elif closure_match is not None:
-            if "Campaign-Closure-Review: clean" not in trailers:
-                findings.append(f"closure checkpoint {checkpoint} lacks a clean closure review")
+            findings.extend(
+                _checkpoint_trailer_findings(
+                    checkpoint,
+                    trailers,
+                    {
+                        "Campaign-Checkpoint": checkpoint,
+                        "Campaign-Closure-Review": "clean",
+                    },
+                )
+            )
             closure = committed["closure"]
             if (
                 committed["campaign"]["lifecycle"] != "complete"
@@ -989,6 +1214,21 @@ def _status(campaign: dict[str, Any]) -> str:
         key=lambda entry: entry["order"],
     )
     blocker = campaign["campaign"]["blocker"]
+    blocker_label = "none"
+    if blocker is not None:
+        blocker_label = blocker["classification"] + ": " + blocker["summary"]
+    else:
+        blocked_slice = min(
+            (entry for entry in slice_entries if entry["blocker"] is not None),
+            key=lambda entry: entry["order"],
+            default=None,
+        )
+        if blocked_slice is not None:
+            slice_blocker = blocked_slice["blocker"]
+            blocker_label = (
+                f"{blocked_slice['id']} {slice_blocker['classification']}: "
+                f"{slice_blocker['summary']}"
+            )
     lines = [
         f"Campaign: {campaign['campaign']['id']}",
         f"Lifecycle: {campaign['campaign']['lifecycle']}",
@@ -997,7 +1237,7 @@ def _status(campaign: dict[str, Any]) -> str:
         "Slices: " + ", ".join(f"{name}={counts[name]}" for name in sorted(counts)),
         f"Active: {active['id'] + ' ' + active['label'] if active else 'none'}",
         f"Next: {ready[0]['id'] + ' ' + ready[0]['label'] if ready else 'none'}",
-        f"Blocker: {blocker['classification'] + ': ' + blocker['summary'] if blocker else 'none'}",
+        f"Blocker: {blocker_label}",
         (
             "Closure: authority="
             f"{campaign['closure']['authority_coverage']}, "

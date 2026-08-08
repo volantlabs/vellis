@@ -96,8 +96,9 @@ lock only in the first slice that uses it; S009 directly pins both `fastmcp==4.0
 
 Campaign evidence references are either `path:<repo-relative-path>#<test-or-section>` or
 `command:<exact reproducible command>`. Do not record prose assertions, absolute paths, transcripts,
-or transient files as evidence. Path fragments resolve to Markdown heading anchors or Python test
-nodes. Tests use temporary data directories. A runtime default uses the platform's user-data
+or transient files as evidence. Path references may not traverse symlinks outside the repository.
+Path fragments resolve to Markdown heading anchors or Python test nodes. Tests use temporary data
+directories. A runtime default uses the platform's user-data
 convention, confirms a nonempty resolved destination, and never resolves to the repository's `.data/`
 directory.
 
@@ -109,6 +110,9 @@ commits stop recovery. Any campaign or slice blocker invalidates approval and st
 Project checkpoint IDs, the exact approval transition, and required commit trailers are documented
 in `CONTRIBUTING.md`. Run `just implementation-campaign-checkpoint-check` after each checkpoint
 commit; it is intentionally post-commit and therefore not part of `just check`.
+After approval, every slice and closure checkpoint must preserve the exact approved plan-bearing
+authority, coverage, dependency, verification, realization-decision, and baseline projection. Plan
+changes require a new candidate plan, cold review, and renewed human approval.
 
 At runnable closure, the approved plan authorizes a matching dry run followed by public-CLI changes
 only to the named `vellis` client entries: replace the existing disabled Codex HTTP entry with the

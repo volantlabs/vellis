@@ -353,7 +353,9 @@ def _execute_source(client: BlockingKernelClient, source: str) -> list[str]:
     return diagnostics
 
 
-def unresolved_model_references(references: list[str]) -> list[str]:
+def unresolved_model_references(
+    references: list[str], *, model_files: list[Path] | None = None
+) -> list[str]:
     """Resolve qualified campaign references with the pinned official validator.
 
     The regular expression is only an injection guard for constructing the probe. Resolution is
@@ -369,7 +371,7 @@ def unresolved_model_references(references: list[str]) -> list[str]:
     if not resolvable:
         return malformed
 
-    source, _ = _combined_source(_model_files())
+    source, _ = _combined_source(model_files if model_files is not None else _model_files())
     first_alias_line = source.count("\n") + 2
     aliases = [
         f"    private alias campaignReference{index:04d} for {reference};"

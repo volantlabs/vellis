@@ -221,6 +221,10 @@ clean fixed-point cycle permits the implementation, evidence, documentation trut
 state to checkpoint together. A project-bound checkpoint must resolve to that durable combined
 state; an active slice retains the preceding recoverable checkpoint until the new one commits, and
 the committed current checkpoint is the exact recovery head rather than an older reachable state.
+Project checkpoint validation also preserves the approved plan-bearing projection through every
+slice and closure checkpoint. A changed baseline, authority map, coverage contribution, dependency,
+verification reference, or consequential realization decision returns the campaign to planning and
+human approval rather than silently changing the execution plan.
 
 After the last planned slice, a separate closure cycle reconstructs complete model coverage, tests
 cross-slice semantics, exercises the selected external boundary from a fresh environment, performs a

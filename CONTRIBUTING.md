@@ -112,6 +112,9 @@ already committed. Put the required lines together in the commit's final Git tra
 checkpoint carries `Campaign-Checkpoint: <identifier>`. Approval adds
 `Campaign-Approval: accepted`; slice commits add `Campaign-Authority-Review: clean` and
 `Campaign-Engineering-Review: clean`; final closure adds `Campaign-Closure-Review: clean`.
+Each required campaign trailer occurs exactly once with the documented value, and checkpoint commits
+carry no campaign trailer belonging to another checkpoint kind. Missing, duplicate, contradictory,
+or extra `Campaign-*` trailers invalidate the checkpoint.
 
 The approval commit is a direct child of the reviewed plan commit and changes only
 `implementation-campaign.yaml`: set campaign lifecycle to `ready`, approval to `accepted`, both
@@ -120,6 +123,9 @@ dependency-ready slice to `ready`. It may not change authority, coverage, slices
 verification, decisions, blockers, evidence, or any other plan-bearing content. A campaign or slice
 blocker changes approval to `changes-required`, clears its approval checkpoint, and puts the campaign
 in `blocked` or `stale`; execution does not continue through that state.
+Every later slice and closure checkpoint preserves that approved plan-bearing projection exactly.
+Changing the baseline, authority map, coverage, slice graph, verification references, or selected
+realization decisions requires replanning, a new cold review, and renewed human approval.
 
 During uncommitted active work, retain the preceding campaign checkpoint and leave the active
 slice's checkpoint null. After a checkpoint commit, the current campaign checkpoint must resolve to
@@ -130,7 +136,8 @@ advance; amend the sole unpublished checkpoint commit when safe, otherwise reque
 
 Campaign evidence uses `path:<repo-relative-path>#<test-or-section>` for committed artifacts or
 `command:<exact reproducible command>` for rerunnable checks. A path fragment must resolve to a
-Markdown heading anchor or a Python test node in both the working tree and checkpoint commit. S001
+Markdown heading anchor or a Python test node in both the working tree and checkpoint commit, and a
+path may not escape the repository through a symlink. S001
 chooses the product source and test layout and extends all repository gates to cover it in that same
 checkpoint. Product tests use temporary data locations and never inspect or write `.data/`.
 
