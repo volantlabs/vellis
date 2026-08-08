@@ -420,12 +420,22 @@ package VellisRequirements {
     requirement def 'Simple Individual Operation' {
         subject system : 'Vellis System';
         doc /*
-         * One owner shall be able to initialize blank, with the recommended
-         * Everyday Life starter, from a compatible v2 snapshot and tail, or from
-         * a confirmed compatible v1 JSON snapshot; use, query, preserve, and
-         * govern one cohesive Vellis system without tenant, organization, role,
-         * cluster, server-fleet, concurrent definition-delta, or required
-         * enterprise-infrastructure administration.
+         * From a clean supported local environment, one owner shall be able to
+         * follow supplied setup guidance to prepare one local Vellis system and
+         * connect one trusted owner-configured MCP agent. The owner shall be able
+         * to initialize blank, with the recommended Everyday Life starter, from a
+         * compatible v2 snapshot and tail, or from a confirmed compatible v1 JSON
+         * snapshot; use, query, preserve, restart, and govern the one cohesive
+         * system; and recover identical canonical memory for a later agent
+         * interaction. Setup and connection failures shall identify the failed
+         * stage, state whether initialization or established memory changed, and
+         * supply an available corrective action. A generic failure without that
+         * minimum guidance shall not be actionable. Such failures shall not corrupt
+         * any already established canonical state; initialization failure shall
+         * establish no partial canonical or activity state.
+         * None of this shall require tenant, organization, role, cluster,
+         * server-fleet, database, concurrent definition-delta, or enterprise-
+         * infrastructure administration.
          */
     }
 

@@ -93,6 +93,9 @@ and model-preserving realization choices remain autonomous implementation work. 
 `just implementation-campaign-status` to inspect resumable state.
 After approval, Codex contributors may launch the campaign as a long-running goal; use campaign
 completion as the stopping condition and the modeled human-authority boundary as the pause condition.
+The current candidate plan pins FastMCP 4.0.0b1, selects local STDIO, and reserves clean macOS
+onboarding through a documented Python setup path for runnable closure; these remain unimplemented
+until their campaign slices complete.
 
 ## Testing authority
 

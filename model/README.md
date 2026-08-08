@@ -26,6 +26,11 @@ not select a server part, FastMCP runtime, storage design, transport, deployment
 generator, or implementation language. Its discovery results, snapshots, and ledgers are semantic
 artifacts, not serialized formats.
 
+The model requires a supported local owner to follow supplied setup guidance, connect one trusted
+MCP agent, recover identical memory after restart, and receive actionable setup or connection
+failure. Framework, script, client-configuration, storage, packaging, and transport mechanics remain
+realization choices; the campaign may select them without turning them into model structure.
+
 The modeled property vocabulary includes RE2 whole-string constraints for string shape without
 selecting a runtime regex engine. Fresh systems may begin blank or, after explicit confirmation,
 with the recommended Everyday Life starter. Snapshot initialization uses the snapshot's definitions;

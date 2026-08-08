@@ -76,6 +76,12 @@ For Codex, an accepted campaign may be launched as a long-running goal with camp
 its stopping condition. Any equivalent continuation harness is acceptable, but it must resume from
 the validated committed campaign and project checkpoint rather than relying on conversation memory.
 
+The current candidate campaign selects `fastmcp==4.0.0b1`, local STDIO, and a future documented
+Python setup path that configures user-scoped Codex or Claude Code only through their public CLIs.
+These are selected realization constraints, not model structure or implemented capability. Do not
+upgrade the pre-release pin, add another transport, or edit client configuration files directly
+without renewed review of the selected plan.
+
 ## Non-negotiable modeling rules
 
 - Begin with owner value and observable behavior. Do not infer architecture from requested nouns,

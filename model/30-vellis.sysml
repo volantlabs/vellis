@@ -57,10 +57,13 @@ package Vellis {
         in attribute freshVocabularyConfirmed [0..1] : ScalarValues::Boolean;
         objective {
             doc /*
-             * Input: either no prior memory with one explicitly confirmed fresh
-             * vocabulary choice, a complete canonical snapshot with an optional
-             * later ledger tail, or a confirmed preview derived from a complete
-             * Vellis v1 snapshot. For a fresh start, present Everyday
+             * Input: one supported local environment and either no prior memory
+             * with one explicitly confirmed fresh vocabulary choice, a complete
+             * canonical snapshot with an optional later ledger tail, or a confirmed
+             * preview derived from a complete Vellis v1 snapshot. Supplied setup
+             * guidance enables the owner to prepare one local system and connect
+             * one trusted owner-configured MCP agent client without administering
+             * product infrastructure. For a fresh start, present Everyday
              * Life as recommended and preselected while retaining blank as an
              * alternative; do not initialize until the owner confirms the
              * selected choice. Success: blank establishes revision 0 with empty
@@ -72,10 +75,15 @@ package Vellis {
              * V1 initialization uses only the exact owner-confirmed candidate
              * and report, preserves its graph and translated definitions at
              * revision 0, and starts a new v2 lineage with no adopted v1 history.
-             * Refusal or failure, including absent or false confirmation,
-             * establishes no partial canonical or activity state. Evidence: the
-             * owner can use the resulting system without tenant, organization,
-             * role, cluster, server-fleet, or infrastructure administration and
+             * Initialization refusal or failure, including absent or false
+             * confirmation, establishes no partial canonical or activity state.
+             * An unsuccessful setup or connection identifies the failed stage,
+             * reports whether initialization or established memory changed, and
+             * supplies an available corrective action; a generic failure without
+             * that minimum guidance is not actionable. It does not corrupt any
+             * already established canonical state. Evidence: the owner
+             * can use the resulting system without tenant, organization, role,
+             * cluster, server-fleet, database, or infrastructure administration and
              * no starter-created people, examples, or other graph objects exist.
              */
         }
@@ -472,11 +480,15 @@ package Vellis {
              * Input: an owner interaction with an external AI agent. Success:
              * provide relevant personal context within the trusted agent's
              * owner-established scope and submit a memory change only after the
-             * owner approves it, so later interactions continue coherently. The
-             * MCP tools neither establish that scope nor decide approval. Refusal
-             * or failure is observable. Evidence: in a later interaction, approved
-             * context from the earlier interaction is available within scope,
-             * while declined or rejected context is not.
+             * owner approves it, so later interactions continue coherently across
+             * agent sessions and Vellis restart. The MCP tools neither establish
+             * that scope nor decide approval. Agent prompting, permissions,
+             * scheduling, inference, and decisions about when to invoke the tools
+             * remain external to Vellis. Refusal or failure is observable.
+             * Evidence: after Vellis restarts, a distinct later agent interaction
+             * can retrieve approved context from the earlier interaction within
+             * scope, while declined, unsubmitted, or rejected context causes no
+             * memory mutation and is not available.
              */
         }
     }

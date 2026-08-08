@@ -403,12 +403,32 @@ package VellisVerification {
         subject system : 'Vellis System';
         objective {
             doc /*
-             * Start once blank, once with the Everyday Life starter, once from a
-             * complete v2 snapshot plus later records, and once from a confirmed
-             * compatible v1 snapshot. Show one owner can query, preserve,
-             * and govern the resulting system and sole definition delta without
-             * tenant, organization, role, cluster, server-fleet, or enterprise-
-             * infrastructure administration and without internal RTG subsystems.
+             * From a clean supported local environment, follow the supplied setup
+             * guidance, connect one trusted owner-configured MCP agent, and
+             * discover exactly the selected ten tools. Confirm the recommended
+             * Everyday Life start, then have a cold agent discover current
+             * definitions, issue a bounded query, and retain one owner-approved
+             * context change. Restart Vellis, begin a distinct later agent session,
+             * and show the same approved context is available at the identically
+             * recovered canonical state. Decline a second proposal and show it
+             * causes no mutation and is not retained. Exercise setup failure before
+             * initialization and show an actionable observation with no partial
+             * canonical or activity state. After memory is established, exercise a
+             * failing subsequent setup attempt and a connection failure; show each
+             * identifies the failed stage, states that established memory remains
+             * unchanged, and supplies an available corrective action. Show the
+             * graph, active definitions, current revision, canonical ledger, and
+             * current definition proposal are identical before and after each
+             * failure. A generic failure lacking the failed stage, state-effect
+             * result, or available corrective action does not pass.
+             * Separately start once blank, once from a complete v2 snapshot plus
+             * later records, and once from a confirmed compatible v1 snapshot.
+             * Show one owner can query, preserve, and govern the resulting system
+             * and sole definition delta without tenant, organization, role,
+             * cluster, server-fleet, database, or enterprise-infrastructure
+             * administration and without internal RTG subsystems. Show agent
+             * prompting, permissions, scheduling, inference, and decisions about
+             * tool invocation remain external to Vellis.
              */
             verify VellisRequirements::simpleIndividualOperation;
         }

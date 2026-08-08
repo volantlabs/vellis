@@ -39,10 +39,12 @@ explicitly with `rtg_definition_delta`.
 
 ## FastMCP discipline
 
-The first implementation PR will verify and pin the latest stable non-prerelease FastMCP version and
-use documentation for that exact major version. It will use typed input and return models and keep
-text and structured content semantically equivalent. FastMCP, Python models, decorators, transport,
-and serialization are realization decisions rather than RTG domain meaning.
+The current implementation campaign selects and will pin `fastmcp==4.0.0b1`. Its pre-release status
+is an explicit owner decision for this proving campaign; implementation must use documentation for
+that exact version and must not upgrade opportunistically. It will use typed input and return models
+and keep text and structured content semantically equivalent. FastMCP, Python models, decorators,
+the selected local STDIO transport, and serialization remain realization rather than RTG domain
+meaning.
 
 FastMCP may represent a parameterless tool with an empty object schema, but that representation does
 not create an empty RTG request concept. The optional selector for `rtg_definition_summary` belongs
@@ -52,8 +54,9 @@ reuse.
 
 Only core MCP tool discovery and invocation are required. Resources, prompts, elicitation, tasks,
 sampling, sessions, notifications, subscriptions, application UI, transforms, tool search,
-authentication, and transport selection remain outside the initial contract. Advisory annotations
-may describe modeled state effects but never enforce authorization, validation, or atomicity.
+authentication, HTTP, remote hosting, and plugin packaging remain outside the initial contract.
+Advisory annotations may describe modeled state effects but never enforce authorization, validation,
+or atomicity.
 
 The initial boundary assumes one trusted, owner-configured MCP client. Tool invocation neither
 establishes nor evaluates per-call authorization. An owner-declined context proposal is never
@@ -72,3 +75,27 @@ The implementation PR must verify two realization-only properties that do not be
 domain model: text and structured content communicate the same typed outcome, and removing or
 changing advisory annotations cannot change authorization, validation, atomicity, or any promised
 failure non-effect.
+
+## Planned local setup path
+
+The application is not implemented yet. The campaign selects a future Python setup program as the
+primary local onboarding path, with the repository README pointing both agents and developers to it
+after it exists. Its interactive mode gathers missing choices, previews every effect, and confirms
+before applying them. Complete non-interactive arguments plus `--yes` support agent-driven setup;
+`--dry-run` changes nothing and prints the resulting initialization and client commands.
+
+The setup path covers blank or Everyday Life initialization, v2 snapshot plus optional tail, and v1
+preview and exact confirmation. It accepts a configurable data location with a platform-appropriate
+user-data default and can configure Codex, Claude Code, both, or neither. Client configuration is
+user-scoped and goes only through the public `codex mcp` and `claude mcp` commands after preview and
+confirmation; the program never edits their configuration files directly. A matching `vellis`
+entry is a no-op, a differing entry requires explicit replacement, and a missing or unsupported
+client produces copyable commands without failing or undoing valid Vellis initialization. Client
+tool approval settings remain entirely client-owned.
+
+macOS supplies the first clean-environment runnable evidence, including real Codex and Claude Code
+discovery and invocation. Linux and Windows receive platform-correct commands, path handling,
+dry-run/configuration tests, and troubleshooting guidance, but are compatibility targets rather than
+initial closure blockers. The client command contracts are documented by
+[OpenAI](https://learn.chatgpt.com/docs/extend/mcp) and
+[Anthropic](https://docs.anthropic.com/en/docs/claude-code/mcp).

@@ -18,12 +18,12 @@ model_baseline:
     - model/40-requirements.sysml
     - model/50-verification.sysml
   planned:
-    authority_sha256: d3efa9d233076c3c3468164e5f77d38da3e50ac28946bc76a7ee83a128df6018
+    authority_sha256: 0dbc79b3e2036ddda8fdd35e8ad4efe4616cdc5c5b89bd08a66c92972c004437
     language_sha256: 054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
     validator_sha256: 1f6f2eb0eb43cf4a2154ef4989a0ed22c871051711c50b2f88399c299cad5bbf
     checkpoint: null
   observed:
-    authority_sha256: d3efa9d233076c3c3468164e5f77d38da3e50ac28946bc76a7ee83a128df6018
+    authority_sha256: 0dbc79b3e2036ddda8fdd35e8ad4efe4616cdc5c5b89bd08a66c92972c004437
     language_sha256: 054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
     validator_sha256: 1f6f2eb0eb43cf4a2154ef4989a0ed22c871051711c50b2f88399c299cad5bbf
     checkpoint: null
@@ -239,7 +239,7 @@ authority:
     implementation_status: absent
     evidence_refs: []
   - id: A017
-    label: Cohesive persistent-context product outcome
+    label: Runnable local onboarding and cohesive persistent-context use
     refs:
       - {model_ref: "Vellis::'Begin using one personal Vellis system'", source: "model/30-vellis.sysml"}
       - {model_ref: "Vellis::'Use AI with persistent personal context'", source: "model/30-vellis.sysml"}
@@ -247,7 +247,7 @@ authority:
       - {model_ref: "VellisRequirements::simpleIndividualOperation", source: "model/40-requirements.sysml"}
       - {model_ref: "VellisVerification::simpleOperation", source: "model/50-verification.sysml"}
     planned_coverage: full
-    slice_ids: [S017]
+    slice_ids: [S001, S009, S017]
     implementation_status: absent
     evidence_refs: []
   - id: A018
@@ -271,15 +271,25 @@ slices:
       - {authority_id: A002, coverage: partial, remaining_slice_ids: [S011, S013]}
       - {authority_id: A003, coverage: partial, remaining_slice_ids: [S002, S004, S007, S010, S011, S013]}
       - {authority_id: A016, coverage: partial, remaining_slice_ids: [S002, S003, S004, S005, S006, S007, S008, S009, S010, S016]}
+      - {authority_id: A017, coverage: partial, remaining_slice_ids: [S009, S017]}
     verification_refs:
       - VellisVerification::graphInvariants
       - VellisVerification::canonicalEquality
       - VellisVerification::stringPatterns
       - VellisVerification::freshInitialization
+      - VellisVerification::simpleOperation
     lifecycle: pending
     implementation_status: absent
     evidence_refs: []
-    realization_decisions: []
+    realization_decisions:
+      - id: D002
+        summary: Use one documented Python setup path with interactive preview and confirmation, complete noninteractive arguments plus --yes, and a no-effect --dry-run mode.
+        authority_ids: [A017]
+        reversible: false
+      - id: D003
+        summary: Cover blank, Everyday Life, v2 snapshot and optional tail, and v1 preview/confirmation; allow a configurable data location with a platform user-data default.
+        authority_ids: [A017]
+        reversible: false
     blocker: null
     checkpoint: null
   - id: S002
@@ -430,13 +440,27 @@ slices:
       - {authority_id: A013, coverage: full, remaining_slice_ids: []}
       - {authority_id: A018, coverage: partial, remaining_slice_ids: [S002, S004, S005, S007, S013]}
       - {authority_id: A016, coverage: partial, remaining_slice_ids: [S001, S002, S003, S004, S005, S006, S007, S008, S010, S016]}
+      - {authority_id: A017, coverage: partial, remaining_slice_ids: [S001, S017]}
     verification_refs:
       - VellisVerification::mcpToolSurface
       - VellisVerification::mcpOutcomes
+      - VellisVerification::simpleOperation
     lifecycle: pending
     implementation_status: absent
     evidence_refs: []
-    realization_decisions: []
+    realization_decisions:
+      - id: D001
+        summary: Pin fastmcp==4.0.0b1 and expose the ten-tool boundary through local STDIO; HTTP, OAuth, remote hosting, and plugin packaging remain deferred.
+        authority_ids: [A013]
+        reversible: false
+      - id: D004
+        summary: Configure user-scoped Codex, Claude Code, both, or neither only through public client CLIs; matching entries are no-ops and differing entries require explicit replacement.
+        authority_ids: [A017]
+        reversible: false
+      - id: D005
+        summary: Missing clients receive copyable commands without failing initialization. macOS supplies real-client closure evidence; Linux and Windows remain tested compatibility targets.
+        authority_ids: [A017]
+        reversible: false
     blocker: null
     checkpoint: null
   - id: S010
@@ -566,11 +590,11 @@ slices:
     checkpoint: null
   - id: S017
     order: 17
-    label: Prove runnable cohesive Vellis and cold reconstruction
+    label: Prove runnable local onboarding, cohesive use, and cold reconstruction
     kind: closure
     dependencies: [S014, S015, S016]
     authority:
-      - {authority_id: A017, coverage: full, remaining_slice_ids: []}
+      - {authority_id: A017, coverage: partial, remaining_slice_ids: [S001, S009]}
     verification_refs:
       - VellisVerification::simpleOperation
       - VellisVerification::ownerControl

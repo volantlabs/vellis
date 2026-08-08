@@ -92,8 +92,8 @@ Useful commands:
 
 The model and campaign method are selected, but the application implementation remains absent,
 unverified, and not runnable. The model selects a portable MCP tool contract but does not implement
-an MCP server. Runtime,
-storage, transport, deployment, and migration realization remain open. The initial contract assumes
-one trusted owner-configured client; its tools do not implement per-call authorization or decide owner
-approval. See
+an MCP server. The current implementation plan selects FastMCP 4.0.0b1, local STDIO, and a future
+documented Python setup path; none is installed or runnable yet. Storage layout, deployment, and
+migration realization remain open. The initial contract assumes one trusted owner-configured client;
+its tools do not implement per-call authorization or decide owner approval. See
 [CONTRIBUTING.md](CONTRIBUTING.md) for the contribution workflow.
