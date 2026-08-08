@@ -110,6 +110,8 @@ commits stop recovery. Each slice checkpoint is a direct single-parent child of 
 recovery checkpoint, and closure is a direct child of the final slice checkpoint; merge, sibling, or
 intermediate commits do not silently join the campaign chain. Any campaign or slice blocker
 invalidates approval and stops execution.
+Checkpoint validation uses raw Git object history and stops when replacement refs or legacy grafts
+could rewrite that view.
 Project checkpoint IDs, the exact approval transition, and required commit trailers are documented
 in `CONTRIBUTING.md`. Run `just implementation-campaign-checkpoint-check` after each checkpoint
 commit; it is intentionally post-commit and therefore not part of `just check`.

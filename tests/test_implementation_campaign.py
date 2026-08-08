@@ -250,6 +250,7 @@ def test_evidence_references_are_reproducible_project_references() -> None:
         "path:docs#case",
         "path:README.md#definitely-not-a-real-section",
         "command: ",
+        "command:just check\rmalicious second display line",
     ]
 
     findings = implementation_campaign.validate_campaign(campaign)
@@ -863,6 +864,61 @@ def test_slice_checkpoint_must_directly_follow_previous_checkpoint(tmp_path: Pat
     findings = implementation_campaign.checkpoint_binding_findings(campaign, root=tmp_path)
 
     assert any("must be a direct single-parent child" in finding for finding in findings)
+
+
+def test_git_replacement_refs_cannot_rewrite_checkpoint_history(tmp_path: Path) -> None:
+    campaign, plan_sha = _approval_repository(tmp_path)
+    approval_commit = _git(tmp_path, "rev-parse", "HEAD")
+    unrelated = tmp_path / "unexplained.txt"
+    unrelated.write_text("not part of a checkpoint\n", encoding="utf-8")
+    _git(tmp_path, "add", "unexplained.txt")
+    _git(tmp_path, "commit", "-m", "unexplained intermediate commit")
+
+    evidence = tmp_path / "evidence.md"
+    evidence.write_text("# Case\n\nDiscriminating evidence.\n", encoding="utf-8")
+    checkpoint = f"slice:S001:{plan_sha[:12]}:1"
+    first = campaign["slices"][0]  # type: ignore[index]
+    first["lifecycle"] = "complete"
+    first["implementation_status"] = "conforming"
+    first["evidence_refs"] = ["path:evidence.md#case"]
+    first["checkpoint"] = checkpoint
+    campaign["campaign"]["checkpoint"] = checkpoint  # type: ignore[index]
+    campaign["slices"][1]["lifecycle"] = "ready"  # type: ignore[index]
+    _write_campaign(tmp_path, campaign)
+    _git(tmp_path, "add", "implementation-campaign.yaml", "evidence.md")
+    _git(
+        tmp_path,
+        "commit",
+        "-m",
+        "complete S001 after unexplained commit",
+        "-m",
+        (
+            f"Campaign-Checkpoint: {checkpoint}\n"
+            "Campaign-Authority-Review: clean\n"
+            "Campaign-Engineering-Review: clean"
+        ),
+    )
+    checkpoint_commit = _git(tmp_path, "rev-parse", "HEAD")
+    _git(tmp_path, "replace", "--graft", checkpoint_commit, approval_commit)
+
+    findings = implementation_campaign.checkpoint_binding_findings(campaign, root=tmp_path)
+
+    assert any("forbids Git replacement refs" in finding for finding in findings)
+    assert any("must be a direct single-parent child" in finding for finding in findings)
+
+
+def test_legacy_git_grafts_are_not_valid_checkpoint_state(tmp_path: Path) -> None:
+    campaign, _ = _approval_repository(tmp_path)
+    git_directory = Path(_git(tmp_path, "rev-parse", "--git-dir"))
+    if not git_directory.is_absolute():
+        git_directory = tmp_path / git_directory
+    grafts = git_directory / "info" / "grafts"
+    grafts.parent.mkdir(parents=True, exist_ok=True)
+    grafts.write_text(f"{_git(tmp_path, 'rev-parse', 'HEAD')}\n", encoding="utf-8")
+
+    findings = implementation_campaign.checkpoint_binding_findings(campaign, root=tmp_path)
+
+    assert any("forbids legacy Git grafts" in finding for finding in findings)
 
 
 def test_slice_checkpoint_cannot_be_a_merge_commit(tmp_path: Path) -> None:

@@ -35,7 +35,8 @@ non-goal and confirm the final full review cycle found no new material issue.
       commit with exactly one canonically spelled, non-contradictory instance of each required review
       trailer; working-tree and historical evidence paths are regular files that do not escape
       through symlinks; checkpoints form one direct single-parent chain; historical references use
-      their committed validator pin; and the current checkpoint is exactly `HEAD`.
+      their committed validator pin; replacement refs and grafts are absent; and the current
+      checkpoint is exactly `HEAD`.
 - [ ] Approval changes only the documented lifecycle/checkpoint/initial-ready fields from the exact
       reviewed parent plan; blockers invalidate approval and prevent ready or active execution.
 - [ ] Every later slice and closure checkpoint preserves the approved plan-bearing projection;

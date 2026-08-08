@@ -5,6 +5,7 @@ import ast
 import copy
 import hashlib
 import json
+import os
 import re
 import subprocess
 import tempfile
@@ -273,7 +274,11 @@ def _evidence_fragment_exists(path: str, source: str, fragment: str) -> bool:
 def _evidence_reference_findings(reference: str, *, label: str, root: Path) -> list[str]:
     if reference.startswith("command:"):
         command = reference.removeprefix("command:")
-        if not command.strip() or command != command.strip() or "\n" in command:
+        if (
+            not command.strip()
+            or command != command.strip()
+            or any(ord(character) < 32 or ord(character) == 127 for character in command)
+        ):
             return [f"{label} command evidence must contain one exact nonempty command"]
         return []
     if reference.startswith("path:"):
@@ -768,9 +773,12 @@ def qualified_model_reference_findings(
 
 
 def _git(root: Path, *arguments: str) -> str:
+    environment = os.environ.copy()
+    environment["GIT_NO_REPLACE_OBJECTS"] = "1"
     completed = subprocess.run(  # noqa: S603
-        ["git", *arguments],
+        ["git", "--no-replace-objects", *arguments],
         cwd=root,
+        env=environment,
         capture_output=True,
         text=True,
         check=False,
@@ -782,9 +790,12 @@ def _git(root: Path, *arguments: str) -> str:
 
 
 def _git_bytes(root: Path, *arguments: str) -> bytes:
+    environment = os.environ.copy()
+    environment["GIT_NO_REPLACE_OBJECTS"] = "1"
     completed = subprocess.run(  # noqa: S603
-        ["git", *arguments],
+        ["git", "--no-replace-objects", *arguments],
         cwd=root,
+        env=environment,
         capture_output=True,
         check=False,
     )
@@ -1091,6 +1102,16 @@ def checkpoint_binding_findings(campaign: dict[str, Any], *, root: Path = ROOT) 
     checkpoints = _checkpoint_ids(campaign)
     if not checkpoints:
         return findings
+    replacement_refs = _git(root, "for-each-ref", "--format=%(refname)", "refs/replace")
+    if replacement_refs:
+        findings.append("campaign checkpoint validation forbids Git replacement refs")
+    common_directory_text = _git(root, "rev-parse", "--git-common-dir")
+    common_directory = Path(common_directory_text)
+    if not common_directory.is_absolute():
+        common_directory = (root / common_directory).resolve()
+    grafts = common_directory / "info" / "grafts"
+    if grafts.is_file() and grafts.stat().st_size > 0:
+        findings.append("campaign checkpoint validation forbids legacy Git grafts")
     head = _git(root, "rev-parse", "HEAD")
     commit_trailers = {
         commit: _commit_trailers(root, commit)

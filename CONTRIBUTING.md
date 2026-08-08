@@ -134,6 +134,8 @@ slice's checkpoint null. After a checkpoint commit, the current campaign checkpo
 Each slice checkpoint must be the direct single-parent child of the preceding recovery checkpoint;
 closure must be the direct single-parent child of the final slice checkpoint. Do not absorb merges,
 sibling work, or unexplained intermediate commits into the campaign chain.
+Checkpoint validation disables Git replacement processing and rejects replacement refs or legacy
+grafts so local history overlays cannot rewrite the recovery chain.
 Run `just implementation-campaign-check` before committing and
 `just implementation-campaign-checkpoint-check` afterward. If the post-commit binding fails, do not
 advance; amend the sole unpublished checkpoint commit when safe, otherwise request recovery direction.
