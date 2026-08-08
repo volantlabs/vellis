@@ -32,8 +32,9 @@ non-goal and confirm the final full review cycle found no new material issue.
       copying model contracts into the campaign record.
 - [ ] Qualified campaign references resolve through the pinned validator; evidence uses committed
       path or reproducible command references; non-null checkpoints resolve to exactly one reachable
-      commit with exactly one of each required, non-contradictory review trailer; evidence paths do
-      not escape through symlinks; and the current checkpoint is exactly `HEAD`.
+      commit with exactly one canonically spelled, non-contradictory instance of each required review
+      trailer; working-tree and historical evidence paths are regular files that do not escape
+      through symlinks; and the current checkpoint is exactly `HEAD`.
 - [ ] Approval changes only the documented lifecycle/checkpoint/initial-ready fields from the exact
       reviewed parent plan; blockers invalidate approval and prevent ready or active execution.
 - [ ] Every later slice and closure checkpoint preserves the approved plan-bearing projection;

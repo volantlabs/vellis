@@ -112,9 +112,9 @@ already committed. Put the required lines together in the commit's final Git tra
 checkpoint carries `Campaign-Checkpoint: <identifier>`. Approval adds
 `Campaign-Approval: accepted`; slice commits add `Campaign-Authority-Review: clean` and
 `Campaign-Engineering-Review: clean`; final closure adds `Campaign-Closure-Review: clean`.
-Each required campaign trailer occurs exactly once with the documented value, and checkpoint commits
-carry no campaign trailer belonging to another checkpoint kind. Missing, duplicate, contradictory,
-or extra `Campaign-*` trailers invalidate the checkpoint.
+Each required campaign trailer occurs exactly once with the documented key spelling and value, and
+checkpoint commits carry no campaign trailer belonging to another checkpoint kind. Missing,
+case-variant, duplicate, contradictory, or extra `Campaign-*` trailers invalidate the checkpoint.
 
 The approval commit is a direct child of the reviewed plan commit and changes only
 `implementation-campaign.yaml`: set campaign lifecycle to `ready`, approval to `accepted`, both

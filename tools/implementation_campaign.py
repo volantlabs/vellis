@@ -806,21 +806,32 @@ def _checkpoint_trailer_findings(
     expected: dict[str, str],
 ) -> list[str]:
     findings: list[str] = []
-    campaign_trailers = {
-        key: values for key, values in trailers.items() if key.startswith("Campaign-")
-    }
+    campaign_trailers: dict[str, list[tuple[str, str]]] = {}
+    for key, values in trailers.items():
+        if key.lower().startswith("campaign-"):
+            campaign_trailers.setdefault(key.lower(), []).extend((key, value) for value in values)
     for key, value in expected.items():
-        values = campaign_trailers.get(key, [])
-        if values != [value]:
+        entries = campaign_trailers.get(key.lower(), [])
+        if entries != [(key, value)]:
             findings.append(
-                f"checkpoint {checkpoint} requires exactly one {key}: {value}; found {values}"
+                f"checkpoint {checkpoint} requires exactly one canonical {key}: {value}; "
+                f"found {entries}"
             )
-    unexpected = sorted(set(campaign_trailers) - set(expected))
+    unexpected = sorted(set(campaign_trailers) - {key.lower() for key in expected})
     if unexpected:
         findings.append(
             f"checkpoint {checkpoint} has unexpected campaign trailers: " + ", ".join(unexpected)
         )
     return findings
+
+
+def _trailer_values(trailers: dict[str, list[str]], key: str) -> list[str]:
+    return [
+        value
+        for actual_key, values in trailers.items()
+        if actual_key.lower() == key.lower()
+        for value in values
+    ]
 
 
 def _plan_projection(campaign: dict[str, Any]) -> dict[str, Any]:
@@ -878,6 +889,10 @@ def _committed_evidence_findings(*, root: Path, commit: str, references: list[st
             continue
         value = reference.removeprefix("path:")
         path, _, fragment = value.partition("#")
+        mode_findings = _committed_regular_path_findings(root=root, commit=commit, path=path)
+        if mode_findings:
+            findings.extend(mode_findings)
+            continue
         try:
             source = _git_bytes(root, "show", f"{commit}:{path}").decode("utf-8")
         except RuntimeError, UnicodeDecodeError:
@@ -888,6 +903,36 @@ def _committed_evidence_findings(*, root: Path, commit: str, references: list[st
                 f"checkpoint {commit} evidence fragment does not resolve: {path}#{fragment}"
             )
     return findings
+
+
+def _committed_path_mode(*, root: Path, commit: str, path: str) -> str | None:
+    records = _git_bytes(root, "ls-tree", "-z", commit, "--", path).split(b"\0")
+    for record in records:
+        metadata, separator, recorded_path = record.partition(b"\t")
+        if not separator or recorded_path.decode("utf-8", errors="surrogateescape") != path:
+            continue
+        mode, _, _ = metadata.partition(b" ")
+        return mode.decode("ascii")
+    return None
+
+
+def _committed_regular_path_findings(*, root: Path, commit: str, path: str) -> list[str]:
+    pure_path = PurePosixPath(path)
+    for depth in range(1, len(pure_path.parts)):
+        ancestor = PurePosixPath(*pure_path.parts[:depth]).as_posix()
+        mode = _committed_path_mode(root=root, commit=commit, path=ancestor)
+        if mode != "040000":
+            return [
+                f"checkpoint {commit} path {path} has non-directory ancestor "
+                f"{ancestor} with mode {mode or 'missing'}"
+            ]
+    mode = _committed_path_mode(root=root, commit=commit, path=path)
+    if mode not in {"100644", "100755"}:
+        return [
+            f"checkpoint {commit} path {path} must be a regular committed file; "
+            f"found mode {mode or 'missing'}"
+        ]
+    return []
 
 
 def _committed_campaign_findings(
@@ -919,6 +964,13 @@ def _committed_campaign_findings(
     with tempfile.TemporaryDirectory(prefix="vellis-campaign-checkpoint-") as temporary:
         snapshot = Path(temporary)
         for relative in dict.fromkeys(required_paths):
+            mode_findings = _committed_regular_path_findings(
+                root=root,
+                commit=commit,
+                path=relative,
+            )
+            if mode_findings:
+                return mode_findings
             destination = snapshot / relative
             destination.parent.mkdir(parents=True, exist_ok=True)
             try:
@@ -981,7 +1033,7 @@ def checkpoint_binding_findings(campaign: dict[str, Any], *, root: Path = ROOT) 
         commits = [
             commit
             for commit, trailers in commit_trailers.items()
-            if checkpoint in trailers.get("Campaign-Checkpoint", [])
+            if checkpoint in _trailer_values(trailers, "Campaign-Checkpoint")
         ]
         if len(commits) != 1:
             findings.append(
