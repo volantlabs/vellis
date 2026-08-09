@@ -203,17 +203,13 @@ def _java_path(runtime: Path) -> Path:
     return mac if mac.exists() else runtime / "bin" / "java"
 
 
-def _setup_validator(
-    validator_lock_path: Path = VALIDATOR_LOCK_PATH,
-) -> tuple[Path, Path, Path]:
-    lock = _json_object(validator_lock_path)
+def _setup_validator() -> tuple[Path, Path, Path]:
+    lock = _json_object(VALIDATOR_LOCK_PATH)
     version = str(lock["implementation_version"])
-    default_lock = validator_lock_path.resolve() == VALIDATOR_LOCK_PATH.resolve()
-    lock_identity = _sha256(validator_lock_path)[:12]
-    destination = VALIDATOR_CACHE_ROOT / (version if default_lock else f"{version}-{lock_identity}")
+    destination = VALIDATOR_CACHE_ROOT / version
     kernel = lock["kernel"]
     if not isinstance(kernel, dict):
-        raise RuntimeError(f"{validator_lock_path}: invalid kernel metadata")
+        raise RuntimeError(f"{VALIDATOR_LOCK_PATH}: invalid kernel metadata")
     kernel_archive = destination / "downloads" / "kernel.zip"
     _download(str(kernel["url"]), str(kernel["sha256"]), kernel_archive)
     kernel_root = destination / "kernel"
@@ -227,7 +223,7 @@ def _setup_validator(
 
     java_lock = lock["java"]
     if not isinstance(java_lock, dict) or not isinstance(java_lock.get("platforms"), dict):
-        raise RuntimeError(f"{validator_lock_path}: invalid Java metadata")
+        raise RuntimeError(f"{VALIDATOR_LOCK_PATH}: invalid Java metadata")
     key = _platform_key()
     artifact = java_lock["platforms"].get(key)
     if not isinstance(artifact, dict):
@@ -290,13 +286,8 @@ def _source_location(spans: list[SourceSpan], line: int) -> tuple[str, int]:
 
 
 @contextmanager
-def _kernel_session(
-    *, validator_lock_path: Path = VALIDATOR_LOCK_PATH
-) -> Iterator[BlockingKernelClient]:
-    if validator_lock_path.resolve() == VALIDATOR_LOCK_PATH.resolve():
-        _, java, jar, library = setup()
-    else:
-        java, jar, library = _setup_validator(validator_lock_path)
+def _kernel_session() -> Iterator[BlockingKernelClient]:
+    _, java, jar, library = setup()
     with tempfile.TemporaryDirectory(prefix="vellis-sysml-") as temporary:
         connection_file = Path(temporary) / "kernel.json"
         write_connection_file(str(connection_file))
@@ -362,12 +353,7 @@ def _execute_source(client: BlockingKernelClient, source: str) -> list[str]:
     return diagnostics
 
 
-def unresolved_model_references(
-    references: list[str],
-    *,
-    model_files: list[Path] | None = None,
-    validator_lock_path: Path = VALIDATOR_LOCK_PATH,
-) -> list[str]:
+def unresolved_model_references(references: list[str]) -> list[str]:
     """Resolve qualified campaign references with the pinned official validator.
 
     The regular expression is only an injection guard for constructing the probe. Resolution is
@@ -383,7 +369,7 @@ def unresolved_model_references(
     if not resolvable:
         return malformed
 
-    source, _ = _combined_source(model_files if model_files is not None else _model_files())
+    source, _ = _combined_source(_model_files())
     first_alias_line = source.count("\n") + 2
     aliases = [
         f"    private alias campaignReference{index:04d} for {reference};"
@@ -393,7 +379,7 @@ def unresolved_model_references(
     source += "\n".join(aliases)
     source += "\n}\n"
 
-    with _kernel_session(validator_lock_path=validator_lock_path) as client:
+    with _kernel_session() as client:
         diagnostics = _execute_source(client, source)
 
     unresolved = set(malformed)

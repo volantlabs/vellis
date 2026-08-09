@@ -16,6 +16,7 @@ Discover the project's local bindings for:
 - campaign-record location, schema, freshness check, status reporting, and approval mechanism;
 - continuation or recurring-task mechanism and its stopping condition;
 - working-state inspection, single-writer ownership, checkpoint creation, and recovery;
+- the project's trust and recovery boundary;
 - implementation, evidence, documentation, and whole-project checks;
 - independent review-agent availability and optional domain skills.
 
@@ -46,8 +47,10 @@ Follow [Execution and resume](references/execution-and-resume.md):
 4. Invoke `$sysml-implementation` with the campaign slice contract. Let it choose the simplest
    conforming realization that respects project constraints and intentional deferrals.
 5. Run focused evidence and project checks.
-6. Obtain independent authority/conformance and engineering/evidence reviews. Remediate every
-   material finding and repeat both reviews after each material correction.
+6. Obtain independent authority/conformance and engineering/evidence reviews. Collect their complete
+   in-scope findings, batch remediation, then run one final independent review pair against the
+   resulting slice. Repeat only when that final pair finds a plausible defect within the project's
+   declared authority, safety, evidence, or ordinary recovery boundary.
 7. Mark the slice complete only when its bounded obligations conform, evidence discriminates the
    nearest plausible wrong implementation, dependencies remain valid, and a checkpoint can include
    implementation, tests, evidence, documentation truth, and record state together.

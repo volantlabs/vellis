@@ -29,7 +29,7 @@ Require it to return implementation status, evidence references, realization dec
 feedback, remaining authority, and checkpoint readiness. Verify the returned references against the
 current model and record rather than copying the executor's prose.
 
-## Review to a fixed point
+## Review to a bounded clean result
 
 Use two independent, context-isolated reviews after focused evidence passes:
 
@@ -40,8 +40,15 @@ Use two independent, context-isolated reviews after focused evidence passes:
    project truth, and the nearest plausible wrong implementation.
 
 Give reviewers the current branch or workspace, model, slice record, and evidence—not prior findings
-or expected conclusions. Remediate material findings and repeat both reviews in full. Read-only
-reviewers may work concurrently; one writer owns remediation and the record.
+or expected conclusions. A material finding must identify a plausible consequence for accepted
+authority, implementation correctness, discriminating evidence, declared safety, or ordinary
+project recovery under the project's stated assumptions. Do not expand the threat model or
+recursively review campaign machinery unless the selected slice changes it.
+
+Collect the complete findings from both reviews, batch remediation, and then run one final
+independent review pair against the resulting slice. Repeat only if that final pair finds another
+in-scope material defect. Read-only reviewers may work concurrently; one writer owns remediation and
+the record.
 
 ## Checkpoint and continue
 

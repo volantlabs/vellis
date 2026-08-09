@@ -5,12 +5,9 @@ import ast
 import copy
 import hashlib
 import json
-import os
 import re
 import subprocess
-import tempfile
 from collections import Counter
-from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 from typing import Any, cast
 
@@ -40,12 +37,6 @@ SLICE_CHECKPOINT = re.compile(
     r"slice:(?P<slice>S[0-9]{3}):(?P<plan>[0-9a-f]{12}):(?P<attempt>[1-9][0-9]*)\Z"
 )
 CLOSURE_CHECKPOINT = re.compile(r"closure:(?P<plan>[0-9a-f]{12}):(?P<attempt>[1-9][0-9]*)\Z")
-
-
-@dataclass(frozen=True)
-class CommitTrailers:
-    values: dict[str, list[str]]
-    raw_lines: tuple[str, ...]
 
 
 class UniqueKeyLoader(yaml.SafeLoader):
@@ -87,68 +78,6 @@ def authored_model_files(root: Path = ROOT) -> list[Path]:
     if not files:
         raise ValueError(f"no authored SysML files found under {root / 'model'}")
     return files
-
-
-def _sysml_header_tokens(source: str) -> list[str]:
-    """Tokenize enough of a SysML file header to establish project provenance.
-
-    Qualified-reference meaning is still resolved by the pinned validator. This small lexer only
-    enforces this project's one-root-package-per-authored-file convention without trusting a
-    filename map alone.
-    """
-    tokens: list[str] = []
-    index = 0
-    while index < len(source) and len(tokens) < 3:
-        if source[index].isspace():
-            index += 1
-            continue
-        if source.startswith("//", index):
-            newline = source.find("\n", index + 2)
-            index = len(source) if newline == -1 else newline + 1
-            continue
-        if source.startswith("/*", index):
-            end = source.find("*/", index + 2)
-            if end == -1:
-                return []
-            index = end + 2
-            continue
-        if source[index] == "'":
-            end = index + 1
-            while end < len(source):
-                if source[end] == "'" and source[end - 1] != "\\":
-                    break
-                end += 1
-            if end >= len(source):
-                return []
-            tokens.append(source[index + 1 : end])
-            index = end + 1
-            continue
-        match = re.match(r"[A-Za-z_]\w*", source[index:])
-        if match is not None:
-            tokens.append(match.group(0))
-            index += len(match.group(0))
-            continue
-        tokens.append(source[index])
-        index += 1
-    return tokens
-
-
-def _authored_model_package_findings(root: Path) -> list[str]:
-    findings: list[str] = []
-    expected_by_file = {path: package for package, path in AUTHORED_MODEL_PACKAGES.items()}
-    for path in authored_model_files(root):
-        relative = path.relative_to(root).as_posix()
-        tokens = _sysml_header_tokens(path.read_text(encoding="utf-8"))
-        declared = (
-            tokens[1] if len(tokens) >= 3 and tokens[0] == "package" and tokens[2] == "{" else None
-        )
-        expected = expected_by_file.get(relative)
-        if declared != expected:
-            findings.append(
-                f"authored model package provenance mismatch for {relative}: "
-                f"expected {expected or 'no package'}, found {declared or 'no root package'}"
-            )
-    return findings
 
 
 def authority_digest(root: Path = ROOT) -> str:
@@ -292,6 +221,7 @@ def _evidence_reference_findings(reference: str, *, label: str, root: Path) -> l
             or "\\" in path_text
             or path.is_absolute()
             or ".." in path.parts
+            or any(ord(character) < 32 or ord(character) == 127 for character in value)
         ):
             return [f"{label} path evidence must be path:<repo-relative-path>#<test-or-section>"]
         candidate = root / Path(*path.parts)
@@ -401,18 +331,61 @@ def _checkpoint_format_findings(campaign: dict[str, Any]) -> list[str]:
         for pattern in (APPROVAL_CHECKPOINT, SLICE_CHECKPOINT, CLOSURE_CHECKPOINT)
     ):
         findings.append("campaign checkpoint has an unsupported project checkpoint format")
-    if campaign["campaign"]["lifecycle"] in {"ready", "active"}:
+    campaign_lifecycle = campaign["campaign"]["lifecycle"]
+    latest_completed = max(completed_entries, key=lambda entry: entry["order"], default=None)
+    latest_completed_checkpoint = (
+        latest_completed["checkpoint"] if latest_completed is not None else None
+    )
+    campaign_slice_match = (
+        SLICE_CHECKPOINT.fullmatch(campaign_checkpoint) if campaign_checkpoint is not None else None
+    )
+    if campaign_slice_match is not None:
+        checkpoint_slice = next(
+            (
+                entry
+                for entry in campaign["slices"]
+                if entry["id"] == campaign_slice_match.group("slice")
+            ),
+            None,
+        )
+        if (
+            checkpoint_slice is None
+            or checkpoint_slice["lifecycle"] != "complete"
+            or checkpoint_slice["checkpoint"] != campaign_checkpoint
+        ):
+            findings.append(
+                "a campaign slice checkpoint must match that completed slice's checkpoint"
+            )
+    if campaign_lifecycle in {"planning", "awaiting-plan-approval"}:
+        if campaign_checkpoint is not None:
+            findings.append("a planning or awaiting-approval campaign may not have a checkpoint")
+    elif campaign_lifecycle in {"ready", "active"}:
         if campaign_checkpoint is None:
             findings.append("an executable campaign requires a recoverable campaign checkpoint")
-        latest_completed = max(completed_entries, key=lambda entry: entry["order"], default=None)
         expected_checkpoint = (
-            latest_completed["checkpoint"] if latest_completed is not None else approval_checkpoint
+            latest_completed_checkpoint
+            if latest_completed_checkpoint is not None
+            else approval_checkpoint
         )
         if campaign_checkpoint != expected_checkpoint:
             findings.append(
                 "a ready or active campaign checkpoint must be the latest recoverable checkpoint"
             )
-    if campaign["campaign"]["lifecycle"] == "complete":
+    elif campaign_lifecycle in {"blocked", "stale"}:
+        if latest_completed_checkpoint is not None:
+            if campaign_checkpoint != latest_completed_checkpoint:
+                findings.append(
+                    "a blocked or stale campaign checkpoint must retain the latest completed slice"
+                )
+        elif (
+            campaign_checkpoint is not None
+            and APPROVAL_CHECKPOINT.fullmatch(campaign_checkpoint) is None
+        ):
+            findings.append(
+                "a blocked or stale campaign without completed slices may retain only its prior "
+                "approval checkpoint"
+            )
+    if campaign_lifecycle == "complete":
         if campaign_checkpoint != closure_checkpoint:
             findings.append("a complete campaign must use its closure checkpoint")
     return findings
@@ -444,7 +417,6 @@ def validate_campaign(
         findings.append("model_baseline.authority_files must equal the sorted authored model files")
     if set(AUTHORED_MODEL_PACKAGES.values()) != set(expected_files):
         findings.append("project model-package provenance must cover every authored model file")
-    findings.extend(_authored_model_package_findings(root))
 
     actual = observed_baseline(root)
     observed = baseline["observed"]
@@ -749,12 +721,7 @@ def validate_campaign(
     return findings
 
 
-def qualified_model_reference_findings(
-    campaign: dict[str, Any],
-    *,
-    model_files: list[Path] | None = None,
-    validator_lock_path: Path = sysml_validator.VALIDATOR_LOCK_PATH,
-) -> list[str]:
+def qualified_model_reference_findings(campaign: dict[str, Any]) -> list[str]:
     authority_references = [
         reference["model_ref"]
         for authority in campaign["authority"]
@@ -764,21 +731,14 @@ def qualified_model_reference_findings(
         reference for entry in campaign["slices"] for reference in entry["verification_refs"]
     ]
     references = [*authority_references, *verification_references]
-    unresolved = sysml_validator.unresolved_model_references(
-        references,
-        model_files=model_files,
-        validator_lock_path=validator_lock_path,
-    )
+    unresolved = sysml_validator.unresolved_model_references(references)
     return [f"qualified model reference does not resolve: {reference}" for reference in unresolved]
 
 
 def _git(root: Path, *arguments: str) -> str:
-    environment = os.environ.copy()
-    environment["GIT_NO_REPLACE_OBJECTS"] = "1"
     completed = subprocess.run(  # noqa: S603
-        ["git", "--no-replace-objects", *arguments],
+        ["git", *arguments],
         cwd=root,
-        env=environment,
         capture_output=True,
         text=True,
         check=False,
@@ -787,130 +747,6 @@ def _git(root: Path, *arguments: str) -> str:
         detail = completed.stderr.strip() or completed.stdout.strip()
         raise RuntimeError(f"git {' '.join(arguments)} failed: {detail}")
     return completed.stdout.strip()
-
-
-def _git_bytes(root: Path, *arguments: str) -> bytes:
-    environment = os.environ.copy()
-    environment["GIT_NO_REPLACE_OBJECTS"] = "1"
-    completed = subprocess.run(  # noqa: S603
-        ["git", "--no-replace-objects", *arguments],
-        cwd=root,
-        env=environment,
-        capture_output=True,
-        check=False,
-    )
-    if completed.returncode != 0:
-        detail = completed.stderr.decode(errors="replace").strip()
-        raise RuntimeError(f"git {' '.join(arguments)} failed: {detail}")
-    return completed.stdout
-
-
-def _commit_trailers(root: Path, commit: str) -> CommitTrailers:
-    body = _git(root, "show", "-s", "--format=%B", commit)
-    completed = subprocess.run(  # noqa: S603
-        ["git", "interpret-trailers", "--parse"],
-        cwd=root,
-        input=body,
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-    if completed.returncode != 0:
-        raise RuntimeError(f"git interpret-trailers failed: {completed.stderr.strip()}")
-    trailers: dict[str, list[str]] = {}
-    for line in completed.stdout.splitlines():
-        key, separator, value = line.partition(":")
-        if separator:
-            trailers.setdefault(key.strip(), []).append(value.strip())
-    body_lines = body.splitlines()
-    final_blank = max(
-        (index for index, line in enumerate(body_lines) if not line.strip()),
-        default=-1,
-    )
-    return CommitTrailers(trailers, tuple(body_lines[final_blank + 1 :]))
-
-
-def _checkpoint_trailer_findings(
-    checkpoint: str,
-    trailers: CommitTrailers,
-    expected: dict[str, str],
-) -> list[str]:
-    findings: list[str] = []
-    campaign_trailers: dict[str, list[tuple[str, str]]] = {}
-    for key, values in trailers.values.items():
-        if key.lower().startswith("campaign-"):
-            campaign_trailers.setdefault(key.lower(), []).extend((key, value) for value in values)
-    for key, value in expected.items():
-        entries = campaign_trailers.get(key.lower(), [])
-        exact_line = f"{key}: {value}"
-        if entries != [(key, value)] or trailers.raw_lines.count(exact_line) != 1:
-            findings.append(
-                f"checkpoint {checkpoint} requires exactly one canonical {key}: {value}; "
-                f"found {entries}"
-            )
-    unexpected = sorted(set(campaign_trailers) - {key.lower() for key in expected})
-    expected_lines = {f"{key}: {value}" for key, value in expected.items()}
-    unexpected_raw = sorted(
-        line
-        for line in trailers.raw_lines
-        if line.partition(":")[0].strip().lower().startswith("campaign-")
-        and line not in expected_lines
-    )
-    if unexpected:
-        findings.append(
-            f"checkpoint {checkpoint} has unexpected campaign trailers: " + ", ".join(unexpected)
-        )
-    if unexpected_raw:
-        findings.append(
-            f"checkpoint {checkpoint} has noncanonical campaign trailer lines: "
-            + ", ".join(unexpected_raw)
-        )
-    return findings
-
-
-def _trailer_values(trailers: CommitTrailers, key: str) -> list[str]:
-    return [
-        value
-        for actual_key, values in trailers.values.items()
-        if actual_key.lower() == key.lower()
-        for value in values
-    ]
-
-
-def _checkpoint_commits(
-    checkpoint: str,
-    commit_trailers: dict[str, CommitTrailers],
-) -> list[str]:
-    return [
-        commit
-        for commit, trailers in commit_trailers.items()
-        if checkpoint in _trailer_values(trailers, "Campaign-Checkpoint")
-    ]
-
-
-def _direct_checkpoint_parent_findings(
-    *,
-    root: Path,
-    commit: str,
-    checkpoint: str,
-    previous_checkpoint: str | None,
-    commit_trailers: dict[str, CommitTrailers],
-) -> list[str]:
-    if previous_checkpoint is None:
-        return [f"checkpoint {checkpoint} does not identify its preceding recovery checkpoint"]
-    previous_commits = _checkpoint_commits(previous_checkpoint, commit_trailers)
-    if len(previous_commits) != 1:
-        return [
-            f"checkpoint {checkpoint} preceding checkpoint {previous_checkpoint} must resolve "
-            f"exactly once; found {len(previous_commits)}"
-        ]
-    parents = _git(root, "rev-list", "--parents", "-n", "1", commit).split()
-    if len(parents) != 2 or parents[1] != previous_commits[0]:
-        return [
-            f"checkpoint {checkpoint} must be a direct single-parent child of preceding "
-            f"checkpoint {previous_checkpoint}"
-        ]
-    return []
 
 
 def _plan_projection(campaign: dict[str, Any]) -> dict[str, Any]:
@@ -946,132 +782,31 @@ def _plan_projection(campaign: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def _plan_projection_key(campaign: dict[str, Any]) -> str:
-    source = json.dumps(_plan_projection(campaign), sort_keys=True, separators=(",", ":"))
-    return hashlib.sha256(source.encode("utf-8")).hexdigest()
+def _git_succeeds(root: Path, *arguments: str) -> bool:
+    completed = subprocess.run(  # noqa: S603
+        ["git", *arguments],
+        cwd=root,
+        capture_output=True,
+        check=False,
+    )
+    return completed.returncode == 0
 
 
-def _checkpoint_ids(campaign: dict[str, Any]) -> set[str]:
-    checkpoints = {
-        campaign["campaign"]["plan_approval"]["checkpoint"],
-        campaign["campaign"]["checkpoint"],
-        campaign["closure"]["checkpoint"],
-        *(entry["checkpoint"] for entry in campaign["slices"]),
-    }
-    return {checkpoint for checkpoint in checkpoints if checkpoint is not None}
-
-
-def _committed_evidence_findings(*, root: Path, commit: str, references: list[str]) -> list[str]:
+def _head_evidence_findings(campaign: dict[str, Any], *, root: Path) -> list[str]:
     findings: list[str] = []
-    for reference in references:
+    for label, reference in _all_evidence_references(campaign):
         if not reference.startswith("path:"):
             continue
         value = reference.removeprefix("path:")
         path, _, fragment = value.partition("#")
-        mode_findings = _committed_regular_path_findings(root=root, commit=commit, path=path)
-        if mode_findings:
-            findings.extend(mode_findings)
-            continue
         try:
-            source = _git_bytes(root, "show", f"{commit}:{path}").decode("utf-8")
-        except RuntimeError, UnicodeDecodeError:
-            findings.append(f"checkpoint {commit} does not contain UTF-8 evidence path {path}")
+            source = _git(root, "show", f"HEAD:{path}")
+        except RuntimeError:
+            findings.append(f"{label} is not committed at HEAD: {path}")
             continue
         if not _evidence_fragment_exists(path, source, fragment):
-            findings.append(
-                f"checkpoint {commit} evidence fragment does not resolve: {path}#{fragment}"
-            )
+            findings.append(f"{label} fragment does not resolve at HEAD: {path}#{fragment}")
     return findings
-
-
-def _committed_path_mode(*, root: Path, commit: str, path: str) -> str | None:
-    records = _git_bytes(root, "ls-tree", "-z", commit, "--", path).split(b"\0")
-    for record in records:
-        metadata, separator, recorded_path = record.partition(b"\t")
-        if not separator or recorded_path.decode("utf-8", errors="surrogateescape") != path:
-            continue
-        mode, _, _ = metadata.partition(b" ")
-        return mode.decode("ascii")
-    return None
-
-
-def _committed_regular_path_findings(*, root: Path, commit: str, path: str) -> list[str]:
-    pure_path = PurePosixPath(path)
-    for depth in range(1, len(pure_path.parts)):
-        ancestor = PurePosixPath(*pure_path.parts[:depth]).as_posix()
-        mode = _committed_path_mode(root=root, commit=commit, path=ancestor)
-        if mode != "040000":
-            return [
-                f"checkpoint {commit} path {path} has non-directory ancestor "
-                f"{ancestor} with mode {mode or 'missing'}"
-            ]
-    mode = _committed_path_mode(root=root, commit=commit, path=path)
-    if mode not in {"100644", "100755"}:
-        return [
-            f"checkpoint {commit} path {path} must be a regular committed file; "
-            f"found mode {mode or 'missing'}"
-        ]
-    return []
-
-
-def _committed_campaign_findings(
-    campaign: dict[str, Any],
-    *,
-    root: Path,
-    commit: str,
-    resolve_qualified_references: bool = False,
-) -> list[str]:
-    schema_relative = IMPLEMENTATION_CAMPAIGN_SCHEMA_PATH.relative_to(ROOT)
-    authority_files = campaign.get("model_baseline", {}).get("authority_files", [])
-    expected_authority_files = sorted(AUTHORED_MODEL_PACKAGES.values())
-    if authority_files != expected_authority_files:
-        return [f"checkpoint {commit} has an unsafe or incomplete authored model file list"]
-    required_paths = [
-        *authority_files,
-        "model/config/language.lock.json",
-        "model/config/validator.lock.json",
-        schema_relative.as_posix(),
-    ]
-    for _, reference in _all_evidence_references(campaign):
-        if not reference.startswith("path:"):
-            continue
-        path_text = reference.removeprefix("path:").partition("#")[0]
-        path = PurePosixPath(path_text)
-        if not path_text or "\\" in path_text or path.is_absolute() or ".." in path.parts:
-            return [f"checkpoint {commit} contains an unsafe evidence path {path_text}"]
-        required_paths.append(path_text)
-    with tempfile.TemporaryDirectory(prefix="vellis-campaign-checkpoint-") as temporary:
-        snapshot = Path(temporary)
-        for relative in dict.fromkeys(required_paths):
-            mode_findings = _committed_regular_path_findings(
-                root=root,
-                commit=commit,
-                path=relative,
-            )
-            if mode_findings:
-                return mode_findings
-            destination = snapshot / relative
-            destination.parent.mkdir(parents=True, exist_ok=True)
-            try:
-                destination.write_bytes(_git_bytes(root, "show", f"{commit}:{relative}"))
-            except RuntimeError as error:
-                return [
-                    f"checkpoint {commit} is missing required committed path {relative}: {error}"
-                ]
-        findings = validate_campaign(
-            campaign,
-            root=snapshot,
-            schema_path=snapshot / schema_relative,
-        )
-        if not findings and resolve_qualified_references:
-            findings.extend(
-                qualified_model_reference_findings(
-                    campaign,
-                    model_files=authored_model_files(snapshot),
-                    validator_lock_path=(snapshot / "model" / "config" / "validator.lock.json"),
-                )
-            )
-        return findings
 
 
 def _expected_approval_campaign(parent: dict[str, Any], *, checkpoint: str) -> dict[str, Any]:
@@ -1098,286 +833,80 @@ def _expected_approval_campaign(parent: dict[str, Any], *, checkpoint: str) -> d
 
 
 def checkpoint_binding_findings(campaign: dict[str, Any], *, root: Path = ROOT) -> list[str]:
+    """Bind the current campaign to ordinary committed recovery state.
+
+    The repository owner, executing agent, Git implementation, and checker are trusted. This check
+    detects accidental dirty state, stale approval, plan drift, and uncommitted evidence; it is not
+    a tamper-resistant audit of historical Git objects.
+    """
     findings: list[str] = []
-    checkpoints = _checkpoint_ids(campaign)
-    if not checkpoints:
+    tracked_state = _git(root, "status", "--porcelain", "--untracked-files=no")
+    if tracked_state:
+        findings.append("checkpoint validation requires a clean tracked working tree and index")
+
+    try:
+        committed = load_campaign_text(
+            _git(root, "show", "HEAD:implementation-campaign.yaml"),
+            label="HEAD:implementation-campaign.yaml",
+        )
+    except (RuntimeError, ValueError, yaml.YAMLError) as error:
+        return [*findings, f"HEAD has no readable implementation campaign: {error}"]
+    if committed != campaign:
+        findings.append("the working campaign does not match the campaign committed at HEAD")
+
+    findings.extend(_head_evidence_findings(campaign, root=root))
+    approval = campaign["campaign"]["plan_approval"]
+    if approval["status"] != "accepted":
         return findings
-    replacement_refs = _git(root, "for-each-ref", "--format=%(refname)", "refs/replace")
-    if replacement_refs:
-        findings.append("campaign checkpoint validation forbids Git replacement refs")
-    common_directory_text = _git(root, "rev-parse", "--git-common-dir")
-    common_directory = Path(common_directory_text)
-    if not common_directory.is_absolute():
-        common_directory = (root / common_directory).resolve()
-    grafts = common_directory / "info" / "grafts"
-    if grafts.is_file() and grafts.stat().st_size > 0:
-        findings.append("campaign checkpoint validation forbids legacy Git grafts")
-    head = _git(root, "rev-parse", "HEAD")
-    commit_trailers = {
-        commit: _commit_trailers(root, commit)
-        for commit in _git(root, "log", "HEAD", "--format=%H").splitlines()
-    }
-    resolved_plan_keys: set[str] = set()
-    approved_plans: dict[str, dict[str, Any] | None] = {}
-    for checkpoint in sorted(checkpoints):
-        commits = _checkpoint_commits(checkpoint, commit_trailers)
-        if len(commits) != 1:
-            findings.append(
-                f"checkpoint {checkpoint} must resolve to exactly one reachable commit; "
-                f"found {len(commits)}"
-            )
-            continue
 
-        commit = commits[0]
-        trailers = commit_trailers[commit]
-        try:
-            committed = load_campaign_text(
-                _git(root, "show", f"{commit}:implementation-campaign.yaml"),
-                label=f"{commit}:implementation-campaign.yaml",
-            )
-        except (RuntimeError, ValueError, yaml.YAMLError) as error:
-            findings.append(f"checkpoint {checkpoint} has no readable committed campaign: {error}")
-            continue
-        plan_key = _plan_projection_key(committed)
-        resolve_references = plan_key not in resolved_plan_keys
-        snapshot_findings = _committed_campaign_findings(
-            committed,
-            root=root,
-            commit=commit,
-            resolve_qualified_references=resolve_references,
+    checkpoint = approval["checkpoint"]
+    match = APPROVAL_CHECKPOINT.fullmatch(checkpoint or "")
+    if match is None:
+        findings.append("accepted approval does not identify a valid approved plan commit")
+        return findings
+    plan_commit = match.group("plan")
+    if not _git_succeeds(root, "cat-file", "-e", f"{plan_commit}^{{commit}}"):
+        findings.append(f"approved plan commit does not exist: {plan_commit}")
+        return findings
+    if not _git_succeeds(root, "merge-base", "--is-ancestor", plan_commit, "HEAD"):
+        findings.append(f"approved plan commit is not an ancestor of HEAD: {plan_commit}")
+        return findings
+
+    try:
+        planned = load_campaign_text(
+            _git(root, "show", f"{plan_commit}:implementation-campaign.yaml"),
+            label=f"{plan_commit}:implementation-campaign.yaml",
         )
-        if resolve_references:
-            resolved_plan_keys.add(plan_key)
-        findings.extend(
-            f"checkpoint {checkpoint} committed campaign is invalid: {finding}"
-            for finding in snapshot_findings
+    except (RuntimeError, ValueError, yaml.YAMLError) as error:
+        findings.append(f"approved plan campaign is unreadable: {error}")
+        return findings
+    if _plan_projection(campaign) != _plan_projection(planned):
+        findings.append("current campaign changed plan-bearing content after approval")
+
+    completed = [entry for entry in campaign["slices"] if entry["lifecycle"] == "complete"]
+    initial_approval = (
+        not completed
+        and campaign["campaign"]["lifecycle"] == "ready"
+        and campaign["campaign"]["checkpoint"] == checkpoint
+    )
+    if initial_approval:
+        parents = _git(root, "rev-list", "--parents", "-n", "1", "HEAD").split()
+        if len(parents) != 2 or parents[1] != plan_commit:
+            findings.append("the initial approval commit must directly follow its approved plan")
+        changed_paths = set(
+            _git(
+                root,
+                "diff-tree",
+                "--no-commit-id",
+                "--name-only",
+                "-r",
+                "HEAD",
+            ).splitlines()
         )
-        if campaign["campaign"]["checkpoint"] == checkpoint and commit != head:
-            findings.append(
-                f"current campaign checkpoint {checkpoint} resolves to {commit}, not HEAD {head}"
-            )
-
-        committed_approval = committed["campaign"]["plan_approval"]
-        if committed_approval["status"] == "accepted":
-            committed_approval_match = APPROVAL_CHECKPOINT.fullmatch(
-                committed_approval["checkpoint"] or ""
-            )
-            if committed_approval_match is None:
-                findings.append(
-                    f"checkpoint {checkpoint} has accepted approval without a valid plan commit"
-                )
-            else:
-                approved_plan_sha = committed_approval_match.group("plan")
-                if approved_plan_sha not in approved_plans:
-                    try:
-                        approved_plans[approved_plan_sha] = load_campaign_text(
-                            _git(
-                                root,
-                                "show",
-                                f"{approved_plan_sha}:implementation-campaign.yaml",
-                            ),
-                            label=f"{approved_plan_sha}:implementation-campaign.yaml",
-                        )
-                    except (RuntimeError, ValueError, yaml.YAMLError) as error:
-                        findings.append(
-                            f"checkpoint {checkpoint} cannot read approved plan "
-                            f"{approved_plan_sha}: {error}"
-                        )
-                        approved_plans[approved_plan_sha] = None
-                approved_plan = approved_plans[approved_plan_sha]
-                if approved_plan is not None and _plan_projection(committed) != _plan_projection(
-                    approved_plan
-                ):
-                    findings.append(
-                        f"checkpoint {checkpoint} changed plan-bearing content after approval"
-                    )
-
-        approval_match = APPROVAL_CHECKPOINT.fullmatch(checkpoint)
-        slice_match = SLICE_CHECKPOINT.fullmatch(checkpoint)
-        closure_match = CLOSURE_CHECKPOINT.fullmatch(checkpoint)
-        if approval_match is not None:
-            findings.extend(
-                _checkpoint_trailer_findings(
-                    checkpoint,
-                    trailers,
-                    {
-                        "Campaign-Checkpoint": checkpoint,
-                        "Campaign-Approval": "accepted",
-                    },
-                )
-            )
-            parents = _git(root, "rev-list", "--parents", "-n", "1", commit).split()
-            if len(parents) != 2 or parents[1] != approval_match.group("plan"):
-                findings.append(
-                    f"approval checkpoint {checkpoint} must be directly based on its plan commit"
-                )
-            try:
-                parent = load_campaign_text(
-                    _git(
-                        root,
-                        "show",
-                        f"{approval_match.group('plan')}:implementation-campaign.yaml",
-                    ),
-                    label=(f"{approval_match.group('plan')}:implementation-campaign.yaml"),
-                )
-            except (RuntimeError, ValueError, yaml.YAMLError) as error:
-                findings.append(
-                    f"approval checkpoint {checkpoint} cannot read its approved plan: {error}"
-                )
-                parent = None
-            if parent is not None:
-                parent_findings = _committed_campaign_findings(
-                    parent,
-                    root=root,
-                    commit=approval_match.group("plan"),
-                    resolve_qualified_references=(
-                        _plan_projection_key(parent) not in resolved_plan_keys
-                    ),
-                )
-                resolved_plan_keys.add(_plan_projection_key(parent))
-                findings.extend(
-                    f"approved plan {approval_match.group('plan')} is invalid: {finding}"
-                    for finding in parent_findings
-                )
-                if (
-                    parent["campaign"]["lifecycle"] != "awaiting-plan-approval"
-                    or parent["campaign"]["plan_approval"]
-                    != {"status": "pending", "checkpoint": None}
-                    or parent["campaign"]["blocker"] is not None
-                ):
-                    findings.append(
-                        f"approval checkpoint {checkpoint} parent is not awaiting clean approval"
-                    )
-                if committed != _expected_approval_campaign(parent, checkpoint=checkpoint):
-                    findings.append(
-                        f"approval checkpoint {checkpoint} changed plan-bearing campaign content"
-                    )
-            changed_paths = set(
-                _git(
-                    root,
-                    "diff-tree",
-                    "--no-commit-id",
-                    "--name-only",
-                    "-r",
-                    commit,
-                ).splitlines()
-            )
-            if changed_paths != {"implementation-campaign.yaml"}:
-                findings.append(
-                    f"approval checkpoint {checkpoint} must change only "
-                    "implementation-campaign.yaml"
-                )
-            if committed["campaign"]["plan_approval"] != {
-                "status": "accepted",
-                "checkpoint": checkpoint,
-            }:
-                findings.append(
-                    f"approval checkpoint {checkpoint} does not record accepted approval"
-                )
-            if committed["campaign"]["checkpoint"] != checkpoint:
-                findings.append(f"approval checkpoint {checkpoint} is not the campaign checkpoint")
-        elif slice_match is not None:
-            slice_id = slice_match.group("slice")
-            entry = next((item for item in committed["slices"] if item["id"] == slice_id), None)
-            findings.extend(
-                _checkpoint_trailer_findings(
-                    checkpoint,
-                    trailers,
-                    {
-                        "Campaign-Checkpoint": checkpoint,
-                        "Campaign-Authority-Review": "clean",
-                        "Campaign-Engineering-Review": "clean",
-                    },
-                )
-            )
-            if (
-                entry is None
-                or entry["checkpoint"] != checkpoint
-                or entry["lifecycle"] != "complete"
-                or entry["implementation_status"] != "conforming"
-                or not entry["evidence_refs"]
-            ):
-                findings.append(
-                    f"slice checkpoint {checkpoint} does not contain a completed conforming "
-                    "slice with evidence"
-                )
-            else:
-                findings.extend(
-                    _committed_evidence_findings(
-                        root=root,
-                        commit=commit,
-                        references=entry["evidence_refs"],
-                    )
-                )
-            if committed["campaign"]["checkpoint"] != checkpoint:
-                findings.append(f"slice checkpoint {checkpoint} is not the campaign checkpoint")
-            prior_completed = [
-                item
-                for item in committed["slices"]
-                if item["lifecycle"] == "complete"
-                and entry is not None
-                and item["order"] < entry["order"]
-            ]
-            previous_checkpoint = (
-                max(prior_completed, key=lambda item: item["order"])["checkpoint"]
-                if prior_completed
-                else committed["campaign"]["plan_approval"]["checkpoint"]
-            )
-            findings.extend(
-                _direct_checkpoint_parent_findings(
-                    root=root,
-                    commit=commit,
-                    checkpoint=checkpoint,
-                    previous_checkpoint=previous_checkpoint,
-                    commit_trailers=commit_trailers,
-                )
-            )
-        elif closure_match is not None:
-            findings.extend(
-                _checkpoint_trailer_findings(
-                    checkpoint,
-                    trailers,
-                    {
-                        "Campaign-Checkpoint": checkpoint,
-                        "Campaign-Closure-Review": "clean",
-                    },
-                )
-            )
-            closure = committed["closure"]
-            if (
-                committed["campaign"]["lifecycle"] != "complete"
-                or committed["campaign"]["checkpoint"] != checkpoint
-                or closure["checkpoint"] != checkpoint
-                or not closure["evidence_refs"]
-            ):
-                findings.append(
-                    f"closure checkpoint {checkpoint} does not contain completed campaign closure"
-                )
-            else:
-                findings.extend(
-                    _committed_evidence_findings(
-                        root=root,
-                        commit=commit,
-                        references=closure["evidence_refs"],
-                    )
-                )
-            completed_slices = [
-                item for item in committed["slices"] if item["lifecycle"] == "complete"
-            ]
-            previous_checkpoint = (
-                max(completed_slices, key=lambda item: item["order"])["checkpoint"]
-                if completed_slices
-                else committed["campaign"]["plan_approval"]["checkpoint"]
-            )
-            findings.extend(
-                _direct_checkpoint_parent_findings(
-                    root=root,
-                    commit=commit,
-                    checkpoint=checkpoint,
-                    previous_checkpoint=previous_checkpoint,
-                    commit_trailers=commit_trailers,
-                )
-            )
+        if changed_paths != {"implementation-campaign.yaml"}:
+            findings.append("the initial approval commit must change only the campaign record")
+        if committed != _expected_approval_campaign(planned, checkpoint=checkpoint):
+            findings.append("the initial approval commit contains changes beyond approval state")
     return findings
 
 

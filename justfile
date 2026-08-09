@@ -42,7 +42,7 @@ implementation-campaign-status:
 implementation-campaign-baseline:
     @uv run python tools/implementation_campaign.py baseline
 
-# Resolve durable campaign checkpoint identifiers against reachable Git commits.
+# Validate clean committed HEAD, approved plan projection, current checkpoint, and current evidence.
 implementation-campaign-checkpoint-check:
     @uv run python tools/implementation_campaign.py checkpoint-check
 

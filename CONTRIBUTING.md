@@ -77,8 +77,9 @@ claim that a standalone plugin already exists.
    Treat Vellis v1 compatibility as confirmed first-use initialization from one complete JSON snapshot,
    never as an existing-system merge or adoption of v1 ledger history.
 6. After focused evidence passes, use fresh read-only agents for separate authority/conformance and
-   engineering/evidence reviews. One writer remediates findings and repeats both reviews after every
-   material correction. When one full cycle finds no new issue, commit that slice's implementation,
+   engineering/evidence reviews. One writer collects both sets of findings and batches all in-scope
+   corrections, then obtains one final independent review pair. Repeat only if that pair finds a
+   plausible failure under the declared project assumptions. Commit the slice's implementation,
    tests, evidence, documentation truth, and campaign update together; then continue to the next
    ready slice.
 7. In the PR, distinguish modeled, selected, implemented, verified, and runnable. Do not claim an
@@ -94,28 +95,22 @@ and model-preserving realization choices remain autonomous implementation work. 
 After approval, Codex contributors may launch the campaign as a long-running goal; use campaign
 completion as the stopping condition and the modeled human-authority boundary as the pause condition.
 One accepted complete plan authorizes the dependency-ordered campaign; routine slice completion does
-not create 17 additional human approval gates. Each slice still requires its two independent clean
-reviews before the writer checkpoints it and continues.
+not create 17 additional human approval gates. Each slice still requires its two independent review
+lenses. Collect both sets of findings, batch all in-scope corrections, then run one final independent
+review pair. Repeat only for a plausible failure under the declared project assumptions; do not
+recursively red-team the campaign process unless the selected slice changes it.
 The current candidate plan directly pins FastMCP and FastMCP Slim 4.0.0b1, selects local STDIO, and
 reserves clean macOS onboarding through a documented Python setup path for runnable closure; these
 remain unimplemented until their campaign slices complete.
 
-Vellis checkpoint identifiers bind the portable campaign record to Git without trying to embed a
-commit's own hash:
+Vellis checkpoint identifiers are navigation labels in the portable campaign record:
 
 - approval: `approval:<full-approved-plan-commit-sha>`;
 - slice: `slice:<slice-id>:<approved-plan-short-sha>:<attempt>`;
 - closure: `closure:<approved-plan-short-sha>:<attempt>`.
 
 Start an attempt at `1` and increment it only if a checkpoint for the same slice and approved plan
-already committed. Put the required lines together in the commit's final Git trailer block. Every
-checkpoint carries `Campaign-Checkpoint: <identifier>`. Approval adds
-`Campaign-Approval: accepted`; slice commits add `Campaign-Authority-Review: clean` and
-`Campaign-Engineering-Review: clean`; final closure adds `Campaign-Closure-Review: clean`.
-Each required campaign trailer occurs exactly once as the documented `Key: value` line, and
-checkpoint commits carry no campaign trailer belonging to another checkpoint kind. Noncanonical
-separator spacing, case variants, missing, duplicate, contradictory, or extra `Campaign-*` trailers
-invalidate the checkpoint.
+already committed. No special Git commit trailers are required.
 
 The approval commit is a direct child of the reviewed plan commit and changes only
 `implementation-campaign.yaml`: set campaign lifecycle to `ready`, approval to `accepted`, both
@@ -129,21 +124,20 @@ Changing the baseline, authority map, coverage, slice graph, verification refere
 realization decisions requires replanning, a new cold review, and renewed human approval.
 
 During uncommitted active work, retain the preceding campaign checkpoint and leave the active
-slice's checkpoint null. After a checkpoint commit, the current campaign checkpoint must resolve to
-`HEAD`; any later uncheckpointed commit is unexplained recovery state.
-Each slice checkpoint must be the direct single-parent child of the preceding recovery checkpoint;
-closure must be the direct single-parent child of the final slice checkpoint. Do not absorb merges,
-sibling work, or unexplained intermediate commits into the campaign chain.
-Checkpoint validation disables Git replacement processing and rejects replacement refs or legacy
-grafts so local history overlays cannot rewrite the recovery chain.
+slice's checkpoint null. Each completed slice uses one ordinary commit containing implementation,
+tests, evidence, documentation truth, and the ledger update. The committed `HEAD` containing the
+current ledger is the recovery state; checkpoint labels help navigate it rather than attest to Git
+history. The project trusts its owner, executing agent, Git implementation, and committed checker.
+It detects accidental dirty state, stale authority, plan drift, missing evidence, and interruption;
+it does not defend against malicious local history or checker rewriting.
 Run `just implementation-campaign-check` before committing and
 `just implementation-campaign-checkpoint-check` afterward. If the post-commit binding fails, do not
 advance; amend the sole unpublished checkpoint commit when safe, otherwise request recovery direction.
 
 Campaign evidence uses `path:<repo-relative-path>#<test-or-section>` for committed artifacts or
 `command:<exact reproducible command>` for rerunnable checks. A path fragment must resolve to a
-Markdown heading anchor or a Python test node in both the working tree and checkpoint commit, and a
-path may not escape the repository through a symlink. S001
+Markdown heading anchor or a Python test node in the current committed state, and a path may not
+escape the repository through a symlink. S001
 chooses the product source and test layout and extends all repository gates to cover it in that same
 checkpoint. Product tests use temporary data locations and never inspect or write `.data/`.
 

@@ -49,7 +49,8 @@ For a complete-system build, `$sysml-implementation-planning` reads the complete
 derives dependency-ordered, evidence-bearing semantic slices. The committed campaign record remains
 awaiting human approval until that complete plan is accepted. A continuation harness may then invoke
 `$sysml-implementation-campaign`, which selects one ready slice, uses `$sysml-implementation`, runs
-independent review and remediation to a fixed point, checkpoints the slice with the ledger update,
+both independent review lenses, batches remediation, runs one final review pair, checkpoints the
+slice with the ledger update,
 and repeats through whole-system runnable closure. The complete campaign receives one human
 approval; reviewed routine slice checkpoints continue autonomously unless a model, plan, baseline,
 feasibility, or external-authority boundary requires renewed human direction.
@@ -92,8 +93,8 @@ Useful commands:
   blockers, and closure status.
 - `just implementation-campaign-baseline`: print the currently observed model, language, and
   validator digests without changing files.
-- `just implementation-campaign-checkpoint-check`: after a checkpoint commit, prove its identifier,
-  review trailers, evidence, and committed campaign state resolve together.
+- `just implementation-campaign-checkpoint-check`: after a checkpoint commit, verify clean tracked
+  state, the committed campaign, approved plan projection, current checkpoint, and current evidence.
 - `just check`: run the complete repository gate.
 
 The model and campaign method are selected, but the application implementation remains absent,

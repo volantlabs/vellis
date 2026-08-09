@@ -67,10 +67,17 @@ For a complete-system implementation, derive or refresh `implementation-campaign
 `$sysml-implementation-planning` and run `just implementation-campaign-check`. Human approval of the
 complete current-baseline plan is required before `$sysml-implementation-campaign` activates a
 slice. Use one writer and one active slice. After implementation, run independent read-only
-authority/conformance and engineering/evidence reviews, remediate to a fixed point, then commit the
-slice and campaign update together. A model or material plan gap, stale baseline, or
+authority/conformance and engineering/evidence reviews, batch in-scope remediation, run one final
+review pair, then commit the slice and campaign update together. A model or material plan gap, stale baseline, or
 stakeholder-visible feasibility consequence invalidates approval; implementation defects and
 model-preserving realization choices remain campaign work.
+
+For each slice, collect complete findings from both review lenses, batch all in-scope corrections,
+then run one final independent review pair against the resulting slice. Repeat only when that final
+pair identifies a plausible failure under the project's declared assumptions. Reviewers evaluate
+the selected slice and its evidence; they do not recursively red-team the campaign mechanism unless
+the slice intentionally changes it. Malicious repository, Git, or checker manipulation is outside
+this trusted-local workflow.
 
 For Codex, an accepted campaign may be launched as a long-running goal with campaign completion as
 its stopping condition. Any equivalent continuation harness is acceptable, but it must resume from
@@ -105,16 +112,15 @@ directory.
 Use fresh context-isolated read-only agents for the two required slice reviews; the single writer
 pauses mutation while they inspect the same working state and verifies the diff afterward. An active
 slice has no new checkpoint: `campaign.checkpoint` remains the last committed recovery point until
-the reviewed slice commits. The committed current checkpoint is exactly `HEAD`; unexplained later
-commits stop recovery. Each slice checkpoint is a direct single-parent child of the preceding
-recovery checkpoint, and closure is a direct child of the final slice checkpoint; merge, sibling, or
-intermediate commits do not silently join the campaign chain. Any campaign or slice blocker
-invalidates approval and stops execution.
-Checkpoint validation uses raw Git object history and stops when replacement refs or legacy grafts
-could rewrite that view.
-Project checkpoint IDs, the exact approval transition, and required commit trailers are documented
-in `CONTRIBUTING.md`. Run `just implementation-campaign-checkpoint-check` after each checkpoint
-commit; it is intentionally post-commit and therefore not part of `just check`.
+the reviewed slice commits. The committed `HEAD` containing the current ledger is the recovery
+state; checkpoint labels are navigation identifiers. Dirty tracked state, a ledger differing from
+`HEAD`, missing current evidence, or approved-plan drift blocks checkpoint validation and automatic
+advance. When a recorded active slice has uncommitted work, inspect it against the last checkpoint;
+resume only changes that explainably continue that slice, and stop on unexplained work. Any campaign
+or slice blocker invalidates approval and stops execution. Project checkpoint IDs and the exact approval
+transition are documented in `CONTRIBUTING.md`. Run
+`just implementation-campaign-checkpoint-check` after each checkpoint commit; it is intentionally
+post-commit and therefore not part of `just check`.
 After approval, every slice and closure checkpoint must preserve the exact approved plan-bearing
 authority, coverage, dependency, verification, realization-decision, and baseline projection. Plan
 changes require a new candidate plan, cold review, and renewed human approval.

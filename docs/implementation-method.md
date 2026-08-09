@@ -184,7 +184,7 @@ may need ordering and fault cases; a real-time controller may need simulation, t
 hardware evidence; scientific software may need units, tolerances, numerical references, and
 reproducibility.
 
-## Review to a fixed point
+## Review to a bounded clean result
 
 After a slice works, walk stimuli and inputs forward through calculations, decisions, state,
 interactions, and effects. Walk each output, state change, physical effect, and failure backward to
@@ -200,9 +200,13 @@ Review, wherever applicable:
 - evidence capable of rejecting the nearest plausible wrong implementation;
 - realization machinery unsupported by the current slice.
 
-Material corrections restart the complete review. A slice is complete only after one full pass finds
-no new conformance, evidence, simplicity, or project-truth issue. Its handoff states precisely what is
-modeled, selected, implemented, verified, runnable, and still deferred.
+Collect complete authority/conformance and engineering/evidence findings, then batch all in-scope
+corrections. Run one final independent review pair against the resulting slice. Repeat only if that
+pair identifies a plausible failure under the project's declared assumptions. Reviewers stay on the
+selected slice and its evidence unless that slice intentionally changes the campaign process. A
+slice is complete only when the final pair finds no material modeled-behavior, authority-coverage,
+evidence, implementation, declared-safety, or ordinary-recovery issue. Its handoff states precisely
+what is modeled, selected, implemented, verified, runnable, and still deferred.
 
 ## Long-running execution and closure
 
@@ -216,16 +220,13 @@ feasibility consequences are explicit pause conditions. Other environments may p
 continuation harness.
 
 After focused evidence passes, independent agents review authority/conformance and
-engineering/evidence. The writer remediates every material finding and repeats both reviews. Only a
-clean fixed-point cycle permits the implementation, evidence, documentation truth, and campaign
-state to checkpoint together. A project-bound checkpoint must resolve to that durable combined
-state; an active slice retains the preceding recoverable checkpoint until the new one commits, and
-the committed current checkpoint is the exact recovery head rather than an older reachable state.
-Slice checkpoints form one direct single-parent chain from approval through the final slice and
-closure, so merges, sibling history, or unexplained intermediate commits cannot be mistaken for
-campaign recovery state. Historical authority resolution uses each checkpoint's committed validator
-pin rather than the current checkout's pin. Project bindings must inspect raw object history and
-reject local replacement or graft overlays that could rewrite the recovery view.
+engineering/evidence. The writer batches every material finding and then obtains one final review
+pair. A clean final pair permits the implementation, evidence, documentation truth, and campaign
+state to checkpoint together in one ordinary commit. An active slice retains the preceding
+recoverable checkpoint until the new one commits. The committed `HEAD` containing the current ledger
+is the recovery state; checkpoint labels are navigation identifiers. Project validation detects
+ordinary dirty state, stale approval, plan drift, missing current evidence, and interruption, while
+trusting the repository owner, executing agent, Git implementation, and committed checker.
 Project checkpoint validation also preserves the approved plan-bearing projection through every
 slice and closure checkpoint. A changed baseline, authority map, coverage contribution, dependency,
 verification reference, or consequential realization decision returns the campaign to planning and

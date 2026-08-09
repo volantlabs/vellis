@@ -30,13 +30,9 @@ non-goal and confirm the final full review cycle found no new material issue.
 - [ ] Whole-model planning or campaign changes report baseline, human-approval state, resume and
       checkpoint scenarios, independent review findings, and cold-system closure disposition without
       copying model contracts into the campaign record.
-- [ ] Qualified campaign references resolve through the pinned validator; evidence uses committed
-      path or reproducible command references; non-null checkpoints resolve to exactly one reachable
-      commit with exactly one canonically spelled, non-contradictory instance of each required review
-      trailer; working-tree and historical evidence paths are regular files that do not escape
-      through symlinks; checkpoints form one direct single-parent chain; historical references use
-      their committed validator pin; replacement refs and grafts are absent; and the current
-      checkpoint is exactly `HEAD`.
+- [ ] Qualified campaign references resolve through the pinned current validator; evidence uses
+      committed path or reproducible command references; the working campaign matches `HEAD` at a
+      checkpoint; the approved plan projection remains unchanged; and current evidence resolves.
 - [ ] Approval changes only the documented lifecycle/checkpoint/initial-ready fields from the exact
       reviewed parent plan; blockers invalidate approval and prevent ready or active execution.
 - [ ] Every later slice and closure checkpoint preserves the approved plan-bearing projection;
@@ -44,6 +40,8 @@ non-goal and confirm the final full review cycle found no new material issue.
       and approved again.
 - [ ] Campaign approval is identified as one complete-plan gate; routine reviewed slice checkpoints
       continue autonomously unless an explicit human-authority condition occurs.
+- [ ] Slice reviews collected both lenses, batched in-scope remediation, and ran one final review
+      pair without expanding the declared project assumptions or recursively reviewing the process.
 - [ ] Official model validation and `just check` pass.
 - [ ] Adequacy and subtraction reviews found no responsibility stranded in prose and no unsupported
       service, runtime, storage, migration, transport, deployment, or inventory-driven architecture.
