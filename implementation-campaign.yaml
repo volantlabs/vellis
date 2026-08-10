@@ -2,12 +2,12 @@ schema_version: "1.0"
 campaign:
   id: vellis-model-implementation
   objective: Realize the complete accepted Vellis model with discriminating evidence and a runnable selected boundary.
-  lifecycle: awaiting-plan-approval
+  lifecycle: ready
   plan_approval:
-    status: pending
-    checkpoint: null
+    status: accepted
+    checkpoint: approval:5a8d92c675d6865bd70fadd0e971bbf959081bea
   blocker: null
-  checkpoint: null
+  checkpoint: approval:5a8d92c675d6865bd70fadd0e971bbf959081bea
 model_baseline:
   status: current
   authority_files:
@@ -450,7 +450,7 @@ slices:
       - VellisVerification::everydayLifeStart
       - VellisVerification::canonicalEquality
       - VellisVerification::stringPatterns
-    lifecycle: pending
+    lifecycle: ready
     implementation_status: partial
     evidence_refs: []
     realization_decisions: []
