@@ -64,7 +64,12 @@ from vellis.outcomes import (
     ValidationScope,
 )
 from vellis.serialization import unreadable_reason
-from vellis.store import AlreadyInitializedError, CanonicalStore, StoreError
+from vellis.store import (
+    AlreadyInitializedError,
+    CanonicalStore,
+    NotInitializedError,
+    StoreError,
+)
 from vellis.validation import assess_graph_conformance
 
 __all__ = ["RTGSystem"]
@@ -199,7 +204,22 @@ class RTGSystem:
         canonical state or revision, and leaves active definitions and the delta alone
         either way.
         """
-        state = self.current_state()
+        try:
+            state = self.current_state()
+        except NotInitializedError as error:
+            # A determinate precondition, like initializing an established RTG: the caller
+            # can act on it. A damaged store cannot be acted on, only reported.
+            return RevisionedOutcome(
+                status=OperationStatus.REJECTED,
+                summary="no canonical state is established; initialize this RTG first",
+                findings=(ValidationFinding(summary=str(error)),),
+            )
+        except StoreError as error:
+            return RevisionedOutcome(
+                status=OperationStatus.FAILED,
+                summary=f"the change could not be applied: {error}",
+                findings=(ValidationFinding(summary=str(error)),),
+            )
         structural = change_findings(change, state.graph)
         if structural:
             return RevisionedOutcome(
@@ -327,14 +347,23 @@ class RTGSystem:
         a discard: clearing a proposal is its own operation, and guessing here would
         throw away work the owner did not ask to lose.
         """
-        state = self.current_state()
+        try:
+            state = self.current_state()
+        except StoreError as error:
+            return DefinitionDeltaResult(
+                status=OperationStatus.FAILED,
+                summary=f"the proposal could not be staged: {error}",
+                findings=(ValidationFinding(summary=str(error)),),
+            )
         current = state.definition_delta
 
         if current is not None and definition_set_equal(proposed, current.proposed_definitions):
             return _delta_result(state, "the proposal is unchanged; no revision was created")
         if current is None and definition_set_equal(proposed, state.active_definitions):
             return _delta_result(
-                state, "the proposal matches the active definitions; nothing was staged"
+                state,
+                "the proposal matches the active definitions; nothing was staged",
+                absent_summary="the proposal matches the active definitions; nothing was staged",
             )
         if current is not None and definition_set_equal(proposed, state.active_definitions):
             return DefinitionDeltaResult(
@@ -367,7 +396,12 @@ class RTGSystem:
                 status=outcome.status, summary=outcome.summary, findings=outcome.findings
             )
         return _delta_result(
-            self.current_state(),
+            CanonicalState(
+                graph=state.graph,
+                active_definitions=state.active_definitions,
+                revision=state.revision + 1,
+                definition_delta=delta,
+            ),
             f"staged the proposal at revision {outcome.resulting_revision}",
             resulting_revision=outcome.resulting_revision,
         )
@@ -379,7 +413,14 @@ class RTGSystem:
         description present, the proposal internally valid, and the graph already
         conforming under it.
         """
-        state = self.current_state()
+        try:
+            state = self.current_state()
+        except StoreError as error:
+            return RevisionedOutcome(
+                status=OperationStatus.FAILED,
+                summary=f"the proposal could not be activated: {error}",
+                findings=(ValidationFinding(summary=str(error)),),
+            )
         if state.definition_delta is None:
             return RevisionedOutcome(
                 status=OperationStatus.REJECTED,
@@ -411,7 +452,14 @@ class RTGSystem:
 
     def discard_definition_delta(self, *, provenance: Provenance) -> RevisionedOutcome:
         """Clear the sole proposal, or report that there is none."""
-        state = self.current_state()
+        try:
+            state = self.current_state()
+        except StoreError as error:
+            return RevisionedOutcome(
+                status=OperationStatus.FAILED,
+                summary=f"the proposal could not be discarded: {error}",
+                findings=(ValidationFinding(summary=str(error)),),
+            )
         if state.definition_delta is None:
             return RevisionedOutcome(
                 status=OperationStatus.REJECTED,
@@ -477,7 +525,16 @@ class RTGSystem:
                 ),
                 findings=(ValidationFinding(summary=unreadable),),
             )
-        self._store.append_transition(record, resulting)
+        try:
+            self._store.append_transition(record, resulting)
+        except StoreError as error:
+            # The store rolls back before re-raising, so nothing was committed and the
+            # status is safely reportable rather than an exception crossing the boundary.
+            return RevisionedOutcome(
+                status=OperationStatus.FAILED,
+                summary=f"the transition could not be committed: {error}",
+                findings=(ValidationFinding(summary=str(error)),),
+            )
         return RevisionedOutcome(
             status=OperationStatus.ACCEPTED,
             summary=f"committed revision {resulting.revision}",
@@ -536,13 +593,17 @@ def _vocabulary_summary(definitions: GraphDefinitionSet) -> str:
 
 
 def _delta_result(
-    state: CanonicalState, summary: str, resulting_revision: int | None = None
+    state: CanonicalState,
+    summary: str,
+    resulting_revision: int | None = None,
+    *,
+    absent_summary: str = "there is no proposal",
 ) -> DefinitionDeltaResult:
     """Return the proposal, or its absence, as the model shapes that answer."""
     if state.definition_delta is None:
         return DefinitionDeltaResult(
             status=OperationStatus.ACCEPTED,
-            summary="there is no proposal",
+            summary=absent_summary,
             evaluated_revision=state.revision,
             resulting_revision=resulting_revision,
         )

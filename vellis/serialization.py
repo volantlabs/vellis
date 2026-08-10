@@ -15,6 +15,7 @@ from vellis.canonical import (
     CanonicalState,
     DefinitionDelta,
     DefinitionDeltaDisposition,
+    canonical_state_equal,
 )
 from vellis.changes import GraphChange
 from vellis.definitions import (
@@ -702,6 +703,8 @@ def unreadable_reason(state: CanonicalState) -> str | None:
         restored = decode_canonical_state(decode_text(encode_text(encode_canonical_state(state))))
     except (DecodeError, ValueError, ArithmeticError, RecursionError) as error:
         return str(error)
-    if restored.revision != state.revision:
-        return "the stored form does not carry the same revision"
+    if not canonical_state_equal(restored, state):
+        # Decodability is not fidelity. A lossy encoding reads back cleanly and means
+        # something else, which is the one failure a revision check cannot see.
+        return "the stored form does not read back as the same canonical state"
     return None

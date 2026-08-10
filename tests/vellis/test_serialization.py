@@ -24,6 +24,7 @@ from vellis.serialization import (
     encode_definition_set,
     encode_graph,
     encode_text,
+    unreadable_reason,
 )
 
 
@@ -261,3 +262,30 @@ def test_a_canonical_change_round_trips_with_its_disposition() -> None:
     assert restored.replacement_graph is None
     assert restored.active_definitions is None
     assert restored.delta_disposition is DefinitionDeltaDisposition.UNCHANGED
+
+
+def test_a_lossy_but_decodable_encoding_is_refused_before_it_is_committed(
+    rich_state: CanonicalState, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Excludes screening decodability alone.
+
+    A revision check cannot see the one failure that matters here: a form that reads back
+    cleanly and means something else. That state would be committed and every later read
+    would return it, with nothing left to compare against.
+    """
+    assert unreadable_reason(rich_state) is None
+
+    import vellis.serialization as serialization
+
+    original = serialization.encode_canonical_state
+
+    def lose_the_delta(state: CanonicalState) -> JsonValue:
+        encoded = original(state)
+        assert isinstance(encoded, dict)
+        return {**encoded, "definitionDelta": None}
+
+    monkeypatch.setattr(serialization, "encode_canonical_state", lose_the_delta)
+    reason = unreadable_reason(rich_state)
+
+    assert reason is not None
+    assert "same canonical state" in reason

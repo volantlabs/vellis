@@ -7,7 +7,7 @@ campaign:
     status: accepted
     checkpoint: approval:5a8d92c675d6865bd70fadd0e971bbf959081bea
   blocker: null
-  checkpoint: approval:5a8d92c675d6865bd70fadd0e971bbf959081bea
+  checkpoint: slice:S004:5a8d92c675d6:1
 model_baseline:
   status: current
   authority_files:
@@ -103,6 +103,9 @@ authority:
       - path:tests/vellis/test_graph_changes.py#test_a_change_whose_result_would_not_conform_is_refused
       - path:tests/vellis/test_graph_changes.py#test_an_effective_no_op_creates_neither_revision_nor_record
       - path:tests/vellis/test_graph_changes.py#test_a_removal_is_permitted_when_the_change_moves_its_dependent_away
+      - path:tests/vellis/test_definition_governance.py#test_a_refused_graph_change_leaves_a_standing_proposal_and_the_revision_alone
+      - path:tests/vellis/test_definition_governance.py#test_replay_carries_a_standing_proposal_across_a_graph_mutation
+      - path:tests/vellis/test_graph_changes.py#test_a_graph_with_no_established_state_cannot_be_changed
   - id: A005
     label: Sole definition proposal governance
     refs:
@@ -450,12 +453,26 @@ slices:
       - VellisVerification::everydayLifeStart
       - VellisVerification::canonicalEquality
       - VellisVerification::stringPatterns
-    lifecycle: ready
-    implementation_status: partial
-    evidence_refs: []
+    lifecycle: complete
+    implementation_status: conforming
+    evidence_refs:
+      - path:tests/vellis/test_definition_governance.py#test_staging_creates_the_sole_proposal_and_advances_one_revision
+      - path:tests/vellis/test_definition_governance.py#test_staging_the_active_set_cannot_implicitly_discard_a_proposal
+      - path:tests/vellis/test_definition_governance.py#test_a_refused_graph_change_leaves_a_standing_proposal_and_the_revision_alone
+      - path:tests/vellis/test_definition_governance.py#test_replay_carries_a_standing_proposal_across_a_graph_mutation
+      - path:tests/vellis/test_definition_governance.py#test_a_delta_write_that_cannot_be_answered_reports_failure
+      - path:tests/vellis/test_definition_governance.py#test_a_commit_that_cannot_be_appended_reports_failure_without_effect
+      - path:tests/vellis/test_definition_governance.py#test_staging_describes_the_commit_it_made_without_reading_the_store_again
+      - path:tests/vellis/test_definition_governance.py#test_the_whole_proposal_can_be_compared_with_focused_active_views
+      - path:tests/vellis/test_definition_governance.py#test_the_whole_arc_replays_from_the_ledger_alone
+      - path:tests/vellis/test_definition_governance.py#test_correcting_a_duplicated_member_of_a_referenced_set_is_a_real_change
+      - path:tests/vellis/test_canonical_equality.py#test_every_definition_discriminator_participates_in_equality
+      - path:tests/vellis/test_serialization.py#test_a_lossy_but_decodable_encoding_is_refused_before_it_is_committed
+      - path:tests/vellis/test_everyday_life_starter.py#test_the_starter_is_governed_like_any_other_vocabulary
+      - command:uv run pytest tests/vellis
     realization_decisions: []
     blocker: null
-    checkpoint: null
+    checkpoint: slice:S004:5a8d92c675d6:1
   - id: S005
     order: 5
     label: Evaluate bounded current graph queries
@@ -469,7 +486,7 @@ slices:
     verification_refs:
       - VellisVerification::semanticQuery
       - VellisVerification::invalidQuery
-    lifecycle: pending
+    lifecycle: ready
     implementation_status: absent
     evidence_refs: []
     realization_decisions: []

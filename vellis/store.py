@@ -55,6 +55,7 @@ __all__ = [
     "AlreadyInitializedError",
     "CanonicalStore",
     "ConcurrentRevisionError",
+    "NotInitializedError",
     "StoreError",
 ]
 
@@ -103,6 +104,14 @@ class StoreError(RuntimeError):
 
 class AlreadyInitializedError(StoreError):
     """Raised when initialization is attempted against established canonical state."""
+
+
+class NotInitializedError(StoreError):
+    """Raised when an operation needs canonical state that was never established.
+
+    Its sibling is ``AlreadyInitializedError``: both are determinate preconditions the
+    caller can act on, not the damaged-store condition the bare ``StoreError`` reports.
+    """
 
 
 class ConcurrentRevisionError(StoreError):
@@ -281,7 +290,7 @@ class CanonicalStore:
             "SELECT revision, established_by, state FROM current_state WHERE id = 0"
         )
         if not isinstance(row, tuple):
-            raise StoreError("no canonical state is established")
+            raise NotInitializedError("no canonical state is established")
         state = self._decode_state(row[2], "current state")
         if state.revision != row[0] or state.revision != row[1]:
             raise StoreError(
@@ -359,7 +368,7 @@ class CanonicalStore:
             ).fetchone()
             if row is None:
                 self._connection.execute("ROLLBACK")
-                raise StoreError("no canonical state is established")
+                raise NotInitializedError("no canonical state is established")
             if row[0] != record.prior_revision:
                 self._connection.execute("ROLLBACK")
                 raise ConcurrentRevisionError(

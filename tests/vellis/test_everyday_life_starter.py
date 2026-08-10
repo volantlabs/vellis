@@ -93,6 +93,9 @@ def test_every_anchor_type_has_exactly_two_profile_rules() -> None:
     [
         ("2026-08-09", True),
         ("2023-02-31", True),
+        ("2024-02-29", True),
+        ("2024-01-00", False),
+        ("2024-01-9", False),
         ("2026-13-01", False),
         ("2026-00-01", False),
         ("2026-01-32", False),

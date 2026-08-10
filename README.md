@@ -100,11 +100,10 @@ Useful commands:
 
 ## Implementation status
 
-Three campaign slices are complete and a fourth is implemented but not yet checkpointed, so the
-application is partially implemented rather than absent. A plan gap found during that fourth slice
-returned the campaign to `awaiting-plan-approval`: the corrected candidate plan is committed and
-waits on human approval before implementation resumes. `just implementation-campaign-status`
-reports exactly where it stands. Use these words precisely:
+Four campaign slices are complete, so the application is partially implemented rather than absent.
+A plan gap found during the fourth returned the campaign to `awaiting-plan-approval`; the corrected
+plan has since been approved and that slice checkpointed under it.
+`just implementation-campaign-status` reports exactly where it stands. Use these words precisely:
 
 - **Implemented and verified.** Canonical graph, definition, and constraint meaning; canonical
   semantic equality over JSON, graphs, definitions, and canonical states; whole-string RE2 property

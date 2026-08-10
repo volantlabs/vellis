@@ -647,6 +647,7 @@ def _definition_variants() -> dict[str, tuple[GraphDefinitionSet, GraphDefinitio
     from vellis.definitions import (
         DirectAssociationMultiplicityConstraint as Association,
     )
+    from vellis.definitions import LinkEnd
 
     def data_type(**overrides: object) -> GraphDefinitionSet:
         fields: dict[str, object] = {
@@ -686,6 +687,26 @@ def _definition_variants() -> dict[str, tuple[GraphDefinitionSet, GraphDefinitio
             anchor_types=base.anchor_types,
             associated_data_types=base.associated_data_types,
             relationship_constraints=(Association(**fields),),  # pyright: ignore[reportArgumentType]
+        )
+
+    def link_rule(**overrides: object) -> GraphDefinitionSet:
+        from vellis.definitions import LinkMultiplicityConstraint as LinkRule
+
+        fields: dict[str, object] = {
+            "link_type_key": "worksOn",
+            "constrained_end": LinkEnd.SOURCE,
+            "constrained_endpoint_type_keys": ("person",),
+            "opposite_endpoint_type_keys": ("project",),
+            "lower_bound": 0,
+            "upper_bound": 5,
+            "description": "A link rule.",
+        }
+        fields.update(overrides)
+        base = _link_type(("person",), ("project",))
+        return GraphDefinitionSet(
+            anchor_types=base.anchor_types,
+            link_types=base.link_types,
+            relationship_constraints=(LinkRule(**fields),),  # pyright: ignore[reportArgumentType]
         )
 
     return {
@@ -740,6 +761,43 @@ def _definition_variants() -> dict[str, tuple[GraphDefinitionSet, GraphDefinitio
         ),
         "rule lower bound": (rule(), rule(lower_bound=1)),
         "rule description": (rule(), rule(description="Another rule.")),
+        "link rule type key": (
+            link_rule(),
+            link_rule(link_type_key="mentions"),
+        ),
+        "link rule constrained end": (
+            link_rule(),
+            link_rule(constrained_end=LinkEnd.TARGET),
+        ),
+        "link rule duplicate constrained endpoint": (
+            link_rule(constrained_endpoint_type_keys=("person", "person")),
+            link_rule(constrained_endpoint_type_keys=("person",)),
+        ),
+        "link rule duplicate opposite endpoint": (
+            link_rule(opposite_endpoint_type_keys=("project", "project")),
+            link_rule(opposite_endpoint_type_keys=("project",)),
+        ),
+        "endpoint description": (
+            _link_type(("person",), ("project",)),
+            GraphDefinitionSet(
+                anchor_types=_link_type(("person",), ("project",)).anchor_types,
+                link_types=(
+                    LinkTypeDefinition(
+                        type_key="worksOn",
+                        endpoint_constraint=EndpointConstraint(
+                            permitted_source_type_keys=("person",),
+                            permitted_target_type_keys=("project",),
+                            description="A different endpoint rule.",
+                        ),
+                        description="A working relationship.",
+                    ),
+                ),
+            ),
+        ),
+        "endpoint duplicate target types": (
+            _link_type(("person",), ("project", "project")),
+            _link_type(("person",), ("project",)),
+        ),
         "duplicate rule": (rule(), _doubled(rule())),
     }
 

@@ -12,7 +12,12 @@ from pathlib import Path
 
 import pytest
 
-from vellis.canonical import Provenance, canonical_state_equal
+from vellis.canonical import (
+    DefinitionDeltaDisposition,
+    Provenance,
+    TransitionKind,
+    canonical_state_equal,
+)
 from vellis.changes import GraphChange
 from vellis.definitions import (
     AnchorTypeDefinition,
@@ -21,9 +26,11 @@ from vellis.definitions import (
     PropertyConstraint,
     definition_set_equal,
 )
-from vellis.graph import Anchor, AssociatedDataObject
+from vellis.discovery import DefinitionInspectionRequest
+from vellis.graph import Anchor, AssociatedDataObject, graph_equal
 from vellis.json_value import JsonKind, normalize
 from vellis.outcomes import OperationStatus, ValidationScope
+from vellis.store import StoreError
 from vellis.system import RTGSystem
 
 PERSON = AnchorTypeDefinition(type_key="person", description="A person the owner knows.")
@@ -78,6 +85,8 @@ def test_there_is_no_proposal_until_one_is_staged(tmp_path: Path) -> None:
         assert result.definition_delta is None
         assert result.assessment is None
         assert result.evaluated_revision == 0
+        # Excludes announcing a proposal that is not there.
+        assert result.summary == "there is no proposal"
     finally:
         system.close()
 
@@ -130,6 +139,10 @@ def test_a_proposal_may_stand_across_other_work(tmp_path: Path) -> None:
         still_there = system.definition_delta()
         assert still_there.definition_delta is not None
         assert definition_set_equal(still_there.definition_delta.proposed_definitions, WIDER)
+        # The assessment follows the graph the change produced rather than pinning the
+        # proposal to the revision it was staged at.
+        assert still_there.assessment is not None
+        assert still_there.evaluated_revision == system.current_state().revision
     finally:
         system.close()
 
@@ -145,6 +158,7 @@ def test_staging_the_active_set_with_no_proposal_is_an_accepted_no_op(tmp_path: 
         assert result.status is OperationStatus.ACCEPTED
         assert result.resulting_revision is None
         assert result.definition_delta is None
+        assert "nothing was staged" in result.summary
         assert canonical_state_equal(system.current_state(), before)
     finally:
         system.close()
@@ -198,15 +212,74 @@ def test_proposal_work_changes_neither_graph_nor_active_definitions(tmp_path: Pa
         before = system.current_state()
 
         assert _stage(system, WIDER).accepted
-        system.definition_delta()
+        assert system.definition_delta().accepted
         assert _stage(system, UNDESCRIBED).accepted
-        system.activate_definition_delta(provenance=_owner())
+        # Refused: an undescribed proposal cannot activate, which is what keeps the
+        # active set still for the comparison below.
+        assert not system.activate_definition_delta(provenance=_owner()).accepted
 
         after = system.current_state()
         assert definition_set_equal(after.active_definitions, before.active_definitions)
-        from vellis.graph import graph_equal
-
         assert graph_equal(after.graph, before.graph)
+    finally:
+        system.close()
+
+
+# --- Nor does a graph change move the proposal -----------------------------------------
+#
+# ``RTGSystem::'Apply graph change'`` promises success leaves "active definitions and the
+# delta unchanged" and that refusal "changes no canonical state or revision". Neither can
+# be shown where no proposal can exist, so the graph-change slice could only watch an
+# absent delta stay absent. These watch a standing one survive.
+
+
+def test_a_refused_graph_change_leaves_a_standing_proposal_and_the_revision_alone(
+    tmp_path: Path,
+) -> None:
+    system = _system(tmp_path)
+    try:
+        assert _stage(system, WIDER).accepted
+        before = system.current_state()
+        assert before.definition_delta is not None
+
+        refused = system.apply_graph_change(
+            GraphChange(anchor_upserts=(Anchor("a-9", "unheard-of", "Nobody"),)),
+            provenance=_owner(),
+        )
+        assert not refused.accepted
+        assert refused.findings
+
+        after = system.current_state()
+        assert canonical_state_equal(after, before)
+        assert after.revision == before.revision
+        assert after.definition_delta is not None
+    finally:
+        system.close()
+
+
+def test_replay_carries_a_standing_proposal_across_a_graph_mutation(tmp_path: Path) -> None:
+    """A mutation that says it left the delta alone must replay as having left it alone.
+
+    The delta-operation arc never produces this record: every step there changes the
+    delta, so ``UNCHANGED`` only ever appears where no proposal exists to preserve.
+    """
+    system = _system(tmp_path)
+    try:
+        assert _stage(system, WIDER).accepted
+        assert system.apply_graph_change(
+            GraphChange(anchor_upserts=(Anchor("a-1", "person", "Ada"),)),
+            provenance=_owner(),
+        ).accepted
+
+        replayed = system.replay()
+        assert canonical_state_equal(system.current_state(), replayed)
+        assert replayed.definition_delta is not None
+        assert definition_set_equal(replayed.definition_delta.proposed_definitions, WIDER)
+
+        # And it survives an activation that follows the mutation.
+        assert system.activate_definition_delta(provenance=_owner()).accepted
+        assert canonical_state_equal(system.current_state(), system.replay())
+        assert definition_set_equal(system.replay().active_definitions, WIDER)
     finally:
         system.close()
 
@@ -355,8 +428,6 @@ def test_activation_without_a_proposal_is_refused(tmp_path: Path) -> None:
 
 
 def test_activation_that_clears_a_delta_is_a_canonical_transition(tmp_path: Path) -> None:
-    from vellis.canonical import DefinitionDeltaDisposition, TransitionKind
-
     system = _system(tmp_path)
     try:
         assert _stage(system, WIDER).accepted
@@ -584,6 +655,140 @@ def test_a_delta_read_that_cannot_be_answered_reports_failure(tmp_path: Path) ->
         assert result.definition_delta is None
         assert result.assessment is None
         assert result.evaluated_revision is None
+    finally:
+        system.close()
+
+
+@pytest.mark.parametrize(
+    ("name", "operate"),
+    (
+        ("stage", lambda system: _stage(system, WIDER)),
+        ("activate", lambda system: system.activate_definition_delta(provenance=_owner())),
+        ("discard", lambda system: system.discard_definition_delta(provenance=_owner())),
+    ),
+)
+def test_a_delta_write_that_cannot_be_answered_reports_failure(
+    tmp_path: Path, name: str, operate
+) -> None:
+    """Excludes a store failure escaping the boundary as an untyped exception.
+
+    Each of the three use cases names a failure outcome whose non-effect is preserved.
+    Nothing has been written when the state cannot be read, so the status is reportable.
+    """
+    system = _system(tmp_path)
+    try:
+        system.store._connection.execute("DROP TABLE current_state")  # noqa: SLF001
+        outcome = operate(system)
+        assert outcome.status is OperationStatus.FAILED, name
+        assert outcome.findings
+        assert outcome.resulting_revision is None
+    finally:
+        system.close()
+
+
+def test_staging_describes_the_commit_it_made_without_reading_the_store_again(
+    tmp_path: Path,
+) -> None:
+    """Excludes describing a commit by re-reading it.
+
+    A read that fails after the write would report failure for work that landed, and the
+    owner's retry would then be an accepted no-op reporting no revision at all — two
+    answers, neither of them the truth. So the first read must succeed and only a later
+    one fail, which is the case the guarded pre-read alone cannot reach.
+    """
+    system = _system(tmp_path)
+    try:
+        original = system.current_state
+        reads = {"count": 0}
+
+        def fail_after_the_first_read():
+            reads["count"] += 1
+            if reads["count"] > 1:
+                raise StoreError("transient read failure")
+            return original()
+
+        system.current_state = fail_after_the_first_read  # type: ignore[method-assign]
+        result = system.set_definition_delta(WIDER, provenance=_owner())
+        system.current_state = original  # type: ignore[method-assign]
+
+        assert result.status is OperationStatus.ACCEPTED
+        assert result.resulting_revision == 1
+        assert result.definition_delta is not None
+        assert definition_set_equal(result.definition_delta.proposed_definitions, WIDER)
+        assert system.current_state().revision == 1
+    finally:
+        system.close()
+
+
+def test_a_commit_that_cannot_be_appended_reports_failure_without_effect(
+    tmp_path: Path,
+) -> None:
+    """The write half: the store rolls back, so the status is reportable, not raised."""
+    system = _system(tmp_path)
+    try:
+        assert _stage(system, WIDER).accepted
+        before = system.current_state()
+        # Occupy the revision the next commit will claim.
+        system.store._connection.execute(  # noqa: SLF001
+            "INSERT INTO canonical_record (established_revision, ordinal, record_kind, "
+            "recorded_at, initiator, summary, payload) "
+            "VALUES (2, 99, 'transition', '2026-01-01T00:00:00Z', 'someone', 'x', '{}')"
+        )
+
+        outcome = system.discard_definition_delta(provenance=_owner())
+        assert outcome.status is OperationStatus.FAILED
+        assert outcome.resulting_revision is None
+        assert canonical_state_equal(system.current_state(), before)
+    finally:
+        system.close()
+
+
+def test_a_structurally_invalid_change_leaves_a_standing_proposal_alone(tmp_path: Path) -> None:
+    """The other refusal branch: refused before the resulting graph is ever assembled."""
+    system = _system(tmp_path)
+    try:
+        assert _stage(system, WIDER).accepted
+        before = system.current_state()
+        ada = Anchor("a-1", "person", "Ada")
+
+        refused = system.apply_graph_change(
+            GraphChange(anchor_upserts=(ada, ada)), provenance=_owner()
+        )
+        assert not refused.accepted
+        assert refused.findings
+
+        assert canonical_state_equal(system.current_state(), before)
+        assert system.current_state().definition_delta is not None
+    finally:
+        system.close()
+
+
+def test_the_whole_proposal_can_be_compared_with_focused_active_views(tmp_path: Path) -> None:
+    """The review use case's evidence clause, and why there is no server-side diff.
+
+    The system returns the proposal whole and the active neighbourhood focused; putting
+    them side by side is the caller's work, and it is enough to see what would change.
+    """
+    system = _system(tmp_path)
+    try:
+        assert _stage(system, WIDER).accepted
+        retrieved = system.definition_delta()
+        assert retrieved.definition_delta is not None
+        proposed = retrieved.definition_delta.proposed_definitions
+
+        active = system.inspect_definitions(
+            DefinitionInspectionRequest(anchor_type_keys=("person",))
+        )
+        assert active.accepted
+        assert active.evaluated_revision == retrieved.evaluated_revision
+
+        # Nothing the system returned is a diff; the comparison is the caller's.
+        proposed_keys = {each.type_key for each in proposed.anchor_types}
+        active_keys = {
+            each.type_key for each in system.current_state().active_definitions.anchor_types
+        }
+        assert proposed_keys - active_keys == {"project"}
+        assert active_keys - proposed_keys == set()
     finally:
         system.close()
 

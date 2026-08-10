@@ -396,12 +396,19 @@ def test_the_graph_is_not_a_valid_endpoint_for_a_link_to_a_link(tmp_path: Path) 
 
 
 def test_a_graph_with_no_established_state_cannot_be_changed(tmp_path: Path) -> None:
-    from vellis.store import StoreError
+    """Reported, not raised: the model asks why the change was not applied.
 
+    Rejected rather than failed — an RTG with no established state is a determinate
+    precondition the owner can act on, the mirror of initializing one that already has
+    state. ``failed`` is reserved for a store that cannot answer at all.
+    """
     system = RTGSystem.open(tmp_path / "vellis.sqlite3")
     try:
-        with pytest.raises(StoreError, match="no canonical state is established"):
-            _apply(system, GraphChange(anchor_upserts=(ADA,)))
+        outcome = _apply(system, GraphChange(anchor_upserts=(ADA,)))
+        assert outcome.status is OperationStatus.REJECTED
+        assert outcome.resulting_revision is None
+        assert any("no canonical state is established" in each.summary for each in outcome.findings)
+        assert not system.is_initialized
     finally:
         system.close()
 
@@ -486,6 +493,23 @@ def _record(kind: TransitionKind, change, prior: int = 0, resulting: int = 1):
         (TransitionKind.GRAPH_MUTATION, "definitions", "changes active definitions"),
         (TransitionKind.GRAPH_MUTATION, "delta", "changes the definition delta"),
         (TransitionKind.DEFINITION_ACTIVATION, "graph", "changes the graph"),
+        (
+            TransitionKind.DEFINITION_ACTIVATION,
+            "activation-keeps-delta",
+            "does not clear the delta",
+        ),
+        (TransitionKind.DEFINITION_DELTA_CHANGE, "delta-unchanged", "leaves the delta unchanged"),
+        (TransitionKind.DEFINITION_DELTA_CHANGE, "delta-with-graph", "changes the graph"),
+        (
+            TransitionKind.DEFINITION_DELTA_CHANGE,
+            "delta-with-definitions",
+            "changes active definitions",
+        ),
+        (
+            TransitionKind.GRAPH_MUTATION,
+            "present-without-delta",
+            "disposition that disagrees",
+        ),
         (TransitionKind.HISTORICAL_RESTORATION, None, "carries no replacement graph"),
     ],
     ids=[
@@ -494,6 +518,11 @@ def _record(kind: TransitionKind, change, prior: int = 0, resulting: int = 1):
         "mutation-changing-definitions",
         "mutation-changing-delta",
         "activation-changing-graph",
+        "activation-keeping-the-delta",
+        "delta-change-leaving-the-delta",
+        "delta-change-touching-the-graph",
+        "delta-change-changing-definitions",
+        "present-disposition-without-a-delta",
         "restoration-without-replacement",
     ],
 )
@@ -526,6 +555,22 @@ def test_a_transition_must_be_replayable_for_its_kind(
             graph_change=GraphChange(anchor_upserts=(ADA,)),
             active_definitions=GraphDefinitionSet(),
             delta_disposition=DefinitionDeltaDisposition.ABSENT,
+        ),
+        "activation-keeps-delta": CanonicalChange(
+            active_definitions=GraphDefinitionSet(),
+        ),
+        "delta-unchanged": CanonicalChange(),
+        "delta-with-graph": CanonicalChange(
+            graph_change=GraphChange(anchor_upserts=(ADA,)),
+            delta_disposition=DefinitionDeltaDisposition.ABSENT,
+        ),
+        "delta-with-definitions": CanonicalChange(
+            active_definitions=GraphDefinitionSet(),
+            delta_disposition=DefinitionDeltaDisposition.ABSENT,
+        ),
+        "present-without-delta": CanonicalChange(
+            graph_change=GraphChange(anchor_upserts=(ADA,)),
+            delta_disposition=DefinitionDeltaDisposition.PRESENT,
         ),
     }
     findings = transition_findings(_record(kind, changes[change]))
