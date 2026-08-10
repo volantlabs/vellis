@@ -7,7 +7,7 @@ campaign:
     status: accepted
     checkpoint: approval:5a8d92c675d6865bd70fadd0e971bbf959081bea
   blocker: null
-  checkpoint: slice:S004:5a8d92c675d6:1
+  checkpoint: slice:S005:5a8d92c675d6:1
 model_baseline:
   status: current
   authority_files:
@@ -486,12 +486,27 @@ slices:
     verification_refs:
       - VellisVerification::semanticQuery
       - VellisVerification::invalidQuery
-    lifecycle: ready
-    implementation_status: absent
-    evidence_refs: []
+    lifecycle: complete
+    implementation_status: conforming
+    evidence_refs:
+      - path:tests/vellis/test_graph_queries.py#test_one_anchor_type_is_queried_broadly
+      - path:tests/vellis/test_graph_queries.py#test_known_uuids_narrow_an_anchor_group
+      - path:tests/vellis/test_graph_queries.py#test_associated_data_selects_by_type_and_direct_association_alone
+      - path:tests/vellis/test_graph_queries.py#test_a_required_link_matches_only_in_its_stated_direction
+      - path:tests/vellis/test_graph_queries.py#test_a_data_condition_selects_only_directly_associated_data
+      - path:tests/vellis/test_graph_queries.py#test_each_comparison_selects_at_its_own_boundary
+      - path:tests/vellis/test_graph_queries.py#test_an_omitted_property_satisfies_neither_equality_nor_inequality
+      - path:tests/vellis/test_graph_queries.py#test_a_row_carries_only_the_requested_projections
+      - path:tests/vellis/test_graph_queries.py#test_identical_projected_tuples_occur_once
+      - path:tests/vellis/test_graph_queries.py#test_alternative_evaluation_orders_produce_equivalent_rows
+      - path:tests/vellis/test_graph_queries.py#test_a_query_visits_no_canonical_record_however_long_the_history
+      - path:tests/vellis/test_invalid_queries.py#test_an_invalid_query_reports_findings_and_returns_no_rows
+      - path:tests/vellis/test_invalid_queries.py#test_a_result_above_its_maximum_is_refused_whole_rather_than_truncated
+      - path:tests/vellis/test_invalid_queries.py#test_no_field_of_a_returned_link_escapes_the_completeness_screen
+      - command:uv run pytest tests/vellis
     realization_decisions: []
     blocker: null
-    checkpoint: null
+    checkpoint: slice:S005:5a8d92c675d6:1
   - id: S006
     order: 6
     label: Record, read, and retain separated activity history
@@ -507,7 +522,7 @@ slices:
     verification_refs:
       - VellisVerification::activitySeparation
       - VellisVerification::validationCoverage
-    lifecycle: pending
+    lifecycle: ready
     implementation_status: absent
     evidence_refs: []
     realization_decisions: []

@@ -63,6 +63,7 @@ from vellis.outcomes import (
     ValidationReport,
     ValidationScope,
 )
+from vellis.query import GraphQuery, GraphQueryResult, evaluate_query
 from vellis.serialization import unreadable_reason
 from vellis.store import (
     AlreadyInitializedError,
@@ -540,6 +541,31 @@ class RTGSystem:
             summary=f"committed revision {resulting.revision}",
             resulting_revision=resulting.revision,
         )
+
+    # --- Query ------------------------------------------------------------------------
+
+    def query_graph(self, query: GraphQuery) -> GraphQueryResult:
+        """Answer one bounded semantic query, or refuse it whole.
+
+        A query changes no canonical state or revision and reads no canonical record.
+        """
+        try:
+            state = self.current_state()
+        except NotInitializedError as error:
+            return GraphQueryResult(
+                status=OperationStatus.REJECTED,
+                summary="no canonical state is established; initialize this RTG first",
+                findings=(ValidationFinding(summary=str(error)),),
+                query=query,
+            )
+        except StoreError as error:
+            return GraphQueryResult(
+                status=OperationStatus.FAILED,
+                summary=f"the query could not be evaluated: {error}",
+                findings=(ValidationFinding(summary=str(error)),),
+                query=query,
+            )
+        return evaluate_query(query, state.active_definitions, state.graph, state.revision)
 
     # --- Assessment -------------------------------------------------------------------
 

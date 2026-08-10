@@ -100,7 +100,8 @@ Useful commands:
 
 ## Implementation status
 
-Four campaign slices are complete, so the application is partially implemented rather than absent.
+Four campaign slices are complete and a fifth is implemented but not yet checkpointed, so the
+application is partially implemented rather than absent.
 A plan gap found during the fourth returned the campaign to `awaiting-plan-approval`; the corrected
 plan has since been approved and that slice checkpointed under it.
 `just implementation-campaign-status` reports exactly where it stands. Use these words precisely:
@@ -119,13 +120,16 @@ plan has since been approved and that slice checkpointed under it.
   carrying the revision it was evaluated at so a caller can tell that the ground moved;
   governance of the one prospective definition set — stage, edit, review, activate, discard —
   where a working proposal may carry findings and activation is what they gate; and the optional
-  Everyday Life starter vocabulary as an ordinary, owner-governable definition set. The last two of
-  these are implemented and tested but belong to a slice that is not yet checkpointed.
+  Everyday Life starter vocabulary as an ordinary, owner-governable definition set; and bounded
+  semantic query over current state — named anchor and associated-data groups, required directed
+  links, structured property comparisons, and a shaped result refused whole rather than truncated
+  when it would exceed the caller's row bound. Semantic query is implemented and tested but belongs
+  to a slice that is not yet checkpointed.
 - **Runnable.** `uv run python -m vellis.setup` prepares one local system. It previews the
   destination and starting vocabulary, asks for confirmation, and accepts `--data-dir`, `--yes`, and
   a no-effect `--dry-run`. It stores memory under the platform's user-data location by default and
   never writes to this repository's ignored `.data/`.
-- **Not implemented yet.** Semantic query, historical definition discovery, activity recording and
+- **Not implemented yet.** Historical query and definition discovery, activity recording and
   history reads, snapshots, ledger-tail replay, historical selection and restore, v1 snapshot
   recovery, and the MCP server. The Everyday Life starter exists as a definition set, but offering
   it as a confirmed first-use choice does not. The model selects a portable
