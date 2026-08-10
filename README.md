@@ -2,7 +2,7 @@
 
 Vellis is an individually owned personal AI system and an open demonstration of model-first software engineering with textual SysML v2.
 
-The repository currently contains the Vellis system model and its development tooling, with no application implementation or generated product source yet. The model covers owner-facing behavior, Reified Type Graph (RTG) graph and query meaning, ledger-authoritative state and scalable history access, canonical equality and string-shape constraints, cold-agent current or historical definition discovery, definition governance, blank or recommended Everyday Life initialization, confirmed first-use import from a Vellis v1 JSON snapshot, snapshots and replay, proactive owner-visible analysis support, a selected ten-tool MCP contract, cohesive system responsibility, requirements, satisfiers, analysis, and verification cases.
+The repository contains the Vellis system model, its development tooling, and the first slices of the application that realizes it; see [Implementation status](#implementation-status) for what is built and what is not. The model covers owner-facing behavior, Reified Type Graph (RTG) graph and query meaning, ledger-authoritative state and scalable history access, canonical equality and string-shape constraints, cold-agent current or historical definition discovery, definition governance, blank or recommended Everyday Life initialization, confirmed first-use import from a Vellis v1 JSON snapshot, snapshots and replay, proactive owner-visible analysis support, a selected ten-tool MCP contract, cohesive system responsibility, requirements, satisfiers, analysis, and verification cases.
 
 ## What is here
 
@@ -46,8 +46,9 @@ is packaged yet; the core skills are written so they can be moved or packaged la
 the Vellis binding into another project.
 
 For a complete-system build, `$sysml-implementation-planning` reads the complete accepted model and
-derives dependency-ordered, evidence-bearing semantic slices. The committed campaign record remains
-awaiting human approval until that complete plan is accepted. A continuation harness may then invoke
+derives dependency-ordered, evidence-bearing semantic slices. The committed campaign record stays
+awaiting human approval until that complete plan is accepted; this repository's plan has been
+accepted and is executing. A continuation harness may then invoke
 `$sysml-implementation-campaign`, which selects one ready slice, uses `$sysml-implementation`, runs
 both independent review lenses, batches remediation, runs one final review pair, checkpoints the
 slice with the ledger update,
@@ -97,11 +98,29 @@ Useful commands:
   state, the committed campaign, approved plan projection, current checkpoint, and current evidence.
 - `just check`: run the complete repository gate.
 
-The model and campaign method are selected, but the application implementation remains absent,
-unverified, and not runnable. The model selects a portable MCP tool contract but does not implement
-an MCP server. The current implementation plan directly pins FastMCP and FastMCP Slim 4.0.0b1,
-selects local STDIO, and selects a future documented Python setup path; none is installed or runnable
-yet. Storage layout, deployment, and migration realization remain open. The initial contract assumes
-one trusted owner-configured client; its tools do not implement per-call authorization or decide
-owner approval. See
-[CONTRIBUTING.md](CONTRIBUTING.md) for the contribution workflow.
+## Implementation status
+
+The approved campaign is under way; its first slice is complete, so the application is partially
+implemented rather than absent. Use these words precisely:
+
+- **Implemented and verified.** Canonical graph, definition, and constraint meaning; canonical
+  semantic equality over JSON, graphs, definitions, and canonical states; whole-string RE2 property
+  patterns evaluated by RE2 itself; assessment of a graph against a definition set; fresh initialization of a blank system
+  at revision 0 with one initial-state record, no transitions, and an empty activity ledger; a
+  durable local store that recovers identical memory across an ordinary restart, commits the
+  canonical record and the current projection as one effect, and refuses a database holding
+  anything else; and a current-state projection reached without traversing canonical history.
+- **Runnable.** `uv run python -m vellis.setup` prepares one local system. It previews the
+  destination and starting vocabulary, asks for confirmation, and accepts `--data-dir`, `--yes`, and
+  a no-effect `--dry-run`. It stores memory under the platform's user-data location by default and
+  never writes to this repository's ignored `.data/`.
+- **Not implemented yet.** Graph change, semantic query, definition-delta governance, the typed
+  validation report and the public parameterless conformance operation, activity and canonical
+  history reads, snapshots, ledger-tail replay, historical selection and restore, the Everyday Life
+  starter, v1 snapshot recovery, and the MCP server. The model selects a portable
+  ten-tool MCP contract; no server exposes it. The campaign directly pins FastMCP and FastMCP Slim
+  4.0.0b1 and selects local STDIO, but neither is installed or runnable yet.
+
+Deployment and migration realization remain open. The initial contract assumes one trusted
+owner-configured client; its tools do not implement per-call authorization or decide owner approval.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the contribution workflow.

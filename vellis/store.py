@@ -1,0 +1,361 @@
+"""Durable local canonical storage.
+
+The model requires canonical history to be complete, ordered, locally durable across
+ordinary process restarts, and append-only, and requires current work to reach the
+current canonical-state projection without traversing history. It deliberately leaves
+storage open.
+
+This realization selects one embedded SQL database file. That choice supplies the
+recoverable atomicity ``VellisRequirements::atomicCanonicalRevision`` requires — the
+appended canonical record and the updated current projection commit as one effect —
+and gives later slices ordered, indexed selection without a linear ledger scan. The
+materialized current projection is the realization the model names as permitted: it is
+a projection of replay through the final canonical record, never parallel authority,
+and one row so no tuple can mix values established by different records.
+
+The projection and the record it derives from are written as one effect and each read
+checks the revision it carries against the row it came from, so an interrupted or
+partial write cannot present a mixed tuple. Content divergence introduced by editing the
+database file directly is not detected: comparing decoded content on every current read
+would traverse a canonical record, which is exactly the work
+``VellisRequirements::historyIndependentCurrentWork`` forbids. Direct external mutation
+of the store file is outside this project's trust boundary, as recorded in AGENTS.md.
+
+Every canonical-record access is counted so conformance evidence for
+``VellisRequirements::historyIndependentCurrentWork`` can observe them directly rather
+than through wall-clock timing.
+"""
+
+from __future__ import annotations
+
+import sqlite3
+from dataclasses import dataclass
+from datetime import datetime
+from pathlib import Path
+
+from vellis.canonical import CanonicalState, InitialStateRecord, Provenance
+from vellis.serialization import (
+    DecodeError,
+    decode_canonical_state,
+    decode_text,
+    encode_canonical_state,
+    encode_text,
+)
+
+__all__ = ["AlreadyInitializedError", "CanonicalStore", "StoreError"]
+
+SCHEMA_VERSION = "1"
+
+# A stable marker so an unrelated database at the store path is refused, not adopted.
+APPLICATION_ID = 0x56454C31  # "VEL1"
+
+_SCHEMA = """
+CREATE TABLE schema_meta (
+    key   TEXT PRIMARY KEY,
+    value TEXT NOT NULL
+);
+CREATE TABLE canonical_record (
+    established_revision INTEGER PRIMARY KEY,
+    ordinal              INTEGER NOT NULL UNIQUE,
+    record_kind          TEXT    NOT NULL,
+    recorded_at          TEXT    NOT NULL,
+    initiator            TEXT    NOT NULL,
+    source               TEXT,
+    summary              TEXT    NOT NULL,
+    payload              TEXT    NOT NULL
+);
+CREATE TABLE activity_record (
+    ordinal     INTEGER PRIMARY KEY AUTOINCREMENT,
+    recorded_at TEXT NOT NULL,
+    payload     TEXT NOT NULL
+);
+CREATE TABLE current_state (
+    id             INTEGER PRIMARY KEY CHECK (id = 0),
+    revision       INTEGER NOT NULL,
+    established_by INTEGER NOT NULL REFERENCES canonical_record (established_revision),
+    state          TEXT    NOT NULL
+);
+"""
+
+
+class StoreError(RuntimeError):
+    """Raised when durable state cannot be read or written safely."""
+
+
+class AlreadyInitializedError(StoreError):
+    """Raised when initialization is attempted against established canonical state."""
+
+
+@dataclass(slots=True)
+class _RecordRow:
+    established_revision: int
+    record_kind: str
+    recorded_at: str
+    initiator: str
+    source: str | None
+    summary: str
+    payload: str
+
+
+class CanonicalStore:
+    """One local canonical store: its ledger, its current projection, and their durability."""
+
+    def __init__(self, path: Path) -> None:
+        self._path = path
+        self._record_reads = 0
+        try:
+            self._connection = sqlite3.connect(path, isolation_level=None)
+        except sqlite3.Error as error:
+            raise StoreError(f"could not open a canonical store at {path}: {error}") from error
+        try:
+            # Screening happens before the pragmas because setting the journal mode
+            # rewrites the file header: refusing a database must leave it untouched.
+            self._screen_database()
+            self._connection.execute("PRAGMA journal_mode = WAL")
+            self._connection.execute("PRAGMA synchronous = FULL")
+            self._connection.execute("PRAGMA foreign_keys = ON")
+            self._ensure_schema()
+        except sqlite3.Error as error:
+            self._connection.close()
+            raise StoreError(f"could not open a canonical store at {path}: {error}") from error
+        except BaseException:
+            self._connection.close()
+            raise
+
+    # --- Lifecycle ------------------------------------------------------------------
+
+    @property
+    def path(self) -> Path:
+        return self._path
+
+    def close(self) -> None:
+        self._connection.close()
+
+    def _screen_database(self) -> None:
+        """Decide whether this file is ours, before anything about it is changed.
+
+        A database can carry a table named ``schema_meta`` without being a Vellis store,
+        so the marker check belongs here too rather than after the pragmas have already
+        rewritten the header.
+        """
+        if self._schema_present():
+            self._check_marker()
+            return
+        self._refuse_foreign_database()
+
+    def _ensure_schema(self) -> None:
+        if self._schema_present():
+            return
+        version_row = (
+            f"INSERT INTO schema_meta (key, value) VALUES ('schema_version', '{SCHEMA_VERSION}');"
+        )
+        try:
+            self._connection.executescript(
+                f"BEGIN IMMEDIATE;PRAGMA application_id = {APPLICATION_ID};"
+                f"{_SCHEMA}{version_row}COMMIT;"
+            )
+        except sqlite3.OperationalError:
+            # Another process created the schema between the check and this statement.
+            self._rollback_quietly()
+            if not self._schema_present():
+                raise
+        self._check_marker()
+
+    def _refuse_foreign_database(self) -> None:
+        """Refuse a database that already holds something other than a Vellis store.
+
+        Without this the schema would be created inside an unrelated database and its
+        own application marker overwritten.
+        """
+        marker = self._connection.execute("PRAGMA application_id").fetchone()
+        if marker is not None and int(marker[0]) not in {0, APPLICATION_ID}:
+            raise StoreError(f"the database at {self._path} belongs to another application")
+        existing = self._connection.execute(
+            "SELECT name FROM sqlite_master WHERE name NOT LIKE 'sqlite_%'"
+        ).fetchall()
+        if existing:
+            names = ", ".join(sorted(str(row[0]) for row in existing))
+            raise StoreError(
+                f"the database at {self._path} already holds other objects ({names}); "
+                "choose a different destination"
+            )
+
+    def _schema_present(self) -> bool:
+        row = self._connection.execute(
+            "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'schema_meta'"
+        ).fetchone()
+        return row is not None
+
+    def _check_marker(self) -> None:
+        row = self._connection.execute(
+            "SELECT value FROM schema_meta WHERE key = 'schema_version'"
+        ).fetchone()
+        if row is None or row[0] != SCHEMA_VERSION:
+            found = "none" if row is None else str(row[0])
+            raise StoreError(
+                f"canonical store at {self._path} has schema version {found}, "
+                f"but this build reads version {SCHEMA_VERSION}"
+            )
+        marker = self._connection.execute("PRAGMA application_id").fetchone()
+        if marker is None or int(marker[0]) != APPLICATION_ID:
+            raise StoreError(f"the database at {self._path} is not a Vellis canonical store")
+        for table in ("canonical_record", "activity_record", "current_state"):
+            present = self._connection.execute(
+                "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?", (table,)
+            ).fetchone()
+            if present is None:
+                raise StoreError(f"canonical store at {self._path} is missing its {table} table")
+
+    # --- Instrumentation ------------------------------------------------------------
+
+    @property
+    def record_reads(self) -> int:
+        """Semantic canonical-record accesses since the last reset."""
+        return self._record_reads
+
+    def reset_instrumentation(self) -> None:
+        self._record_reads = 0
+
+    # --- Current projection ---------------------------------------------------------
+
+    def is_initialized(self) -> bool:
+        """Return whether canonical state exists, without reading any canonical record."""
+        row = self._connection.execute("SELECT 1 FROM current_state WHERE id = 0").fetchone()
+        return row is not None
+
+    def _read_record(self, sql: str, parameters: tuple[object, ...] = ()) -> object:
+        """Run one canonical-record query and count it as a semantic record access.
+
+        Every read of the ledger goes through here, so the instrumentation measures
+        access to the records themselves rather than calls to one convenience method.
+        """
+        self._record_reads += 1
+        return self._connection.execute(sql, parameters).fetchone()
+
+    def current_state(self) -> CanonicalState:
+        """Return the current canonical-state projection.
+
+        This reads the one projection row and no canonical record, so its work does not
+        grow with history length.
+        """
+        row = self._connection.execute(
+            "SELECT revision, established_by, state FROM current_state WHERE id = 0"
+        ).fetchone()
+        if row is None:
+            raise StoreError("no canonical state is established")
+        state = self._decode_state(row[2], "current state")
+        if state.revision != row[0] or state.revision != row[1]:
+            raise StoreError(
+                f"the current projection at {self._path} claims revision {row[0]} established by "
+                f"record {row[1]}, but carries revision {state.revision}"
+            )
+        return state
+
+    # --- Owned history base ---------------------------------------------------------
+
+    def initialize(self, record: InitialStateRecord) -> None:
+        """Establish the owned history base and its projection as one atomic effect.
+
+        Nothing is established when the store already holds canonical state, and a
+        failure part-way through leaves no partial canonical or activity state.
+        """
+        state = record.canonical_state
+        payload = encode_text(encode_canonical_state(state))
+        try:
+            self._connection.execute("BEGIN IMMEDIATE")
+            if self._connection.execute("SELECT 1 FROM current_state WHERE id = 0").fetchone():
+                self._connection.execute("ROLLBACK")
+                raise AlreadyInitializedError(
+                    f"canonical state is already established at {self._path}"
+                )
+            self._connection.execute(
+                "INSERT INTO canonical_record (established_revision, ordinal, record_kind,"
+                " recorded_at, initiator, source, summary, payload)"
+                " VALUES (?, 0, 'initial', ?, ?, ?, ?, ?)",
+                (
+                    record.established_revision,
+                    record.recorded_at.isoformat(),
+                    record.provenance.initiator,
+                    record.provenance.source,
+                    record.initialization_summary,
+                    payload,
+                ),
+            )
+            self._connection.execute(
+                "INSERT INTO current_state (id, revision, established_by, state)"
+                " VALUES (0, ?, ?, ?)",
+                (state.revision, record.established_revision, payload),
+            )
+            self._connection.execute("COMMIT")
+        except AlreadyInitializedError:
+            raise
+        except Exception as error:
+            # Any failure between BEGIN and COMMIT must roll back. Letting one escape
+            # would leave the transaction open and poison every later use of this store.
+            self._rollback_quietly()
+            raise StoreError(f"could not establish canonical state: {error}") from error
+
+    def _rollback_quietly(self) -> None:
+        try:
+            self._connection.execute("ROLLBACK")
+        except sqlite3.Error:
+            pass
+
+    def initial_record(self) -> InitialStateRecord:
+        """Read the owned initial record. This is a semantic canonical-record access."""
+        row = self._read_record(
+            "SELECT established_revision, record_kind, recorded_at, initiator, source, summary,"
+            " payload FROM canonical_record WHERE ordinal = 0"
+        )
+        if row is None:
+            raise StoreError("no initial canonical record is established")
+        assert isinstance(row, tuple)
+        record = _RecordRow(*row)
+        if record.record_kind != "initial":
+            raise StoreError(f"ledger base is a {record.record_kind} record, not an initial record")
+        state = self._decode_state(record.payload, "initial record")
+        if state.revision != record.established_revision:
+            raise StoreError(
+                f"the initial record at {self._path} establishes revision "
+                f"{record.established_revision} but carries revision {state.revision}"
+            )
+        try:
+            recorded_at = datetime.fromisoformat(record.recorded_at)
+        except ValueError as error:
+            raise StoreError(
+                f"the initial record at {self._path} has an unreadable time: {error}"
+            ) from error
+        return InitialStateRecord(
+            canonical_state=state,
+            initialization_summary=record.summary,
+            provenance=Provenance(initiator=record.initiator, source=record.source),
+            recorded_at=recorded_at,
+        )
+
+    def replay(self) -> CanonicalState:
+        """Reconstruct canonical state by replaying through the final canonical record."""
+        return self.initial_record().canonical_state
+
+    def canonical_record_count(self) -> int:
+        """Return how many canonical records the ledger holds.
+
+        This reaches the ledger, so it counts as a semantic record access.
+        """
+        row = self._read_record("SELECT count(*) FROM canonical_record")
+        assert isinstance(row, tuple)
+        return int(row[0])
+
+    def activity_record_count(self) -> int:
+        """Return how many activity records the observational ledger holds."""
+        row = self._connection.execute("SELECT count(*) FROM activity_record").fetchone()
+        return int(row[0])
+
+    def _decode_state(self, payload: object, where: str) -> CanonicalState:
+        if not isinstance(payload, str):
+            raise StoreError(f"stored {where} is not text")
+        try:
+            return decode_canonical_state(decode_text(payload))
+        except (DecodeError, ValueError, ArithmeticError, RecursionError) as error:
+            raise StoreError(f"stored {where} does not decode to canonical meaning: {error}") from (
+                error
+            )

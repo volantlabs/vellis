@@ -26,6 +26,35 @@ def _approve(campaign: dict[str, object]) -> None:
     campaign["campaign"]["checkpoint"] = APPROVAL_CHECKPOINT  # type: ignore[index]
 
 
+def _pending_campaign() -> dict[str, object]:
+    """The committed plan reset to its pre-approval baseline.
+
+    These tests exercise the checker's rules, not the campaign's own progress. Starting
+    from a neutral baseline keeps them meaningful as slices are approved and completed,
+    instead of freezing whichever lifecycle the live record happens to be in.
+    """
+    campaign = copy.deepcopy(_campaign())
+    campaign["campaign"]["lifecycle"] = "awaiting-plan-approval"  # type: ignore[index]
+    campaign["campaign"]["plan_approval"] = {"status": "pending", "checkpoint": None}  # type: ignore[index]
+    campaign["campaign"]["checkpoint"] = None  # type: ignore[index]
+    campaign["campaign"]["blocker"] = None  # type: ignore[index]
+    for entry in campaign["authority"]:  # type: ignore[union-attr]
+        entry["implementation_status"] = "absent"
+        entry["evidence_refs"] = []
+    for entry in campaign["slices"]:  # type: ignore[union-attr]
+        entry["lifecycle"] = "pending"
+        entry["implementation_status"] = "absent"
+        entry["evidence_refs"] = []
+        entry["blocker"] = None
+        entry["checkpoint"] = None
+    closure = campaign["closure"]
+    closure["integration_status"] = "absent"  # type: ignore[index]
+    closure["runnable_status"] = "absent"  # type: ignore[index]
+    closure["evidence_refs"] = []  # type: ignore[index]
+    closure["checkpoint"] = None  # type: ignore[index]
+    return campaign
+
+
 def _git(root: Path, *arguments: str) -> str:
     completed = subprocess.run(
         ["git", *arguments],
@@ -54,7 +83,7 @@ def _approval_repository(tmp_path: Path) -> tuple[dict[str, object], str]:
     schema_destination = tmp_path / schema_relative
     schema_destination.parent.mkdir(parents=True)
     shutil.copy2(model_layout.IMPLEMENTATION_CAMPAIGN_SCHEMA_PATH, schema_destination)
-    campaign = copy.deepcopy(_campaign())
+    campaign = _pending_campaign()
     _write_campaign(tmp_path, campaign)
     _git(tmp_path, "add", ".")
     _git(tmp_path, "commit", "-m", "candidate plan")
@@ -93,7 +122,7 @@ def test_duplicate_yaml_keys_are_rejected(tmp_path: Path) -> None:
 
 
 def test_schema_rejects_unknown_fields() -> None:
-    campaign = copy.deepcopy(_campaign())
+    campaign = _pending_campaign()
     campaign["shadow_specification"] = {}  # type: ignore[index]
 
     findings = implementation_campaign.validate_campaign(campaign)
@@ -102,7 +131,7 @@ def test_schema_rejects_unknown_fields() -> None:
 
 
 def test_schema_rejects_malformed_lifecycle_status() -> None:
-    campaign = copy.deepcopy(_campaign())
+    campaign = _pending_campaign()
     campaign["campaign"]["lifecycle"] = "running"  # type: ignore[index]
 
     findings = implementation_campaign.validate_campaign(campaign)
@@ -111,7 +140,7 @@ def test_schema_rejects_malformed_lifecycle_status() -> None:
 
 
 def test_unapproved_campaign_cannot_enter_execution() -> None:
-    campaign = copy.deepcopy(_campaign())
+    campaign = _pending_campaign()
     campaign["campaign"]["lifecycle"] = "ready"  # type: ignore[index]
     campaign["slices"][0]["lifecycle"] = "ready"  # type: ignore[index]
 
@@ -122,7 +151,7 @@ def test_unapproved_campaign_cannot_enter_execution() -> None:
 
 
 def test_dependencies_must_exist_precede_and_remain_acyclic() -> None:
-    campaign = copy.deepcopy(_campaign())
+    campaign = _pending_campaign()
     first = campaign["slices"][0]  # type: ignore[index]
     second = campaign["slices"][1]  # type: ignore[index]
     first["dependencies"] = [second["id"]]
@@ -136,7 +165,7 @@ def test_dependencies_must_exist_precede_and_remain_acyclic() -> None:
 
 
 def test_authority_and_slice_links_must_be_bidirectional() -> None:
-    campaign = copy.deepcopy(_campaign())
+    campaign = _pending_campaign()
     campaign["authority"][0]["slice_ids"].pop()  # type: ignore[index]
 
     findings = implementation_campaign.validate_campaign(campaign)
@@ -145,7 +174,7 @@ def test_authority_and_slice_links_must_be_bidirectional() -> None:
 
 
 def test_qualified_authority_reference_is_bound_to_its_source_file() -> None:
-    campaign = copy.deepcopy(_campaign())
+    campaign = _pending_campaign()
     campaign["authority"][0]["refs"][0]["source"] = "model/50-verification.sysml"  # type: ignore[index]
 
     findings = implementation_campaign.validate_campaign(campaign)
@@ -154,7 +183,7 @@ def test_qualified_authority_reference_is_bound_to_its_source_file() -> None:
 
 
 def test_realization_decision_ids_are_campaign_unique() -> None:
-    campaign = copy.deepcopy(_campaign())
+    campaign = _pending_campaign()
     decisions = [
         decision
         for entry in campaign["slices"]  # type: ignore[index]
@@ -168,7 +197,7 @@ def test_realization_decision_ids_are_campaign_unique() -> None:
 
 
 def test_qualified_model_references_are_resolved_by_the_official_validator() -> None:
-    campaign = copy.deepcopy(_campaign())
+    campaign = _pending_campaign()
     campaign["authority"][0]["refs"][0]["model_ref"] = "RTG::'Definitely Missing'"  # type: ignore[index]
 
     findings = implementation_campaign.qualified_model_reference_findings(campaign)
@@ -192,7 +221,7 @@ def test_campaign_reference_check_uses_one_validator_session(
 
 
 def test_evidence_references_are_reproducible_project_references() -> None:
-    campaign = copy.deepcopy(_campaign())
+    campaign = _pending_campaign()
     campaign["authority"][0]["evidence_refs"] = [  # type: ignore[index]
         "a prose assertion",
         "path:/tmp/result.txt#case",
@@ -232,7 +261,7 @@ def test_evidence_path_cannot_escape_through_an_ancestor_symlink(tmp_path: Path)
 
 
 def test_checkpoint_formats_reject_active_markers_and_wrong_slice_ids() -> None:
-    campaign = copy.deepcopy(_campaign())
+    campaign = _pending_campaign()
     _approve(campaign)
     campaign["campaign"]["lifecycle"] = "active"  # type: ignore[index]
     campaign["campaign"]["checkpoint"] = "slice:S001:active"  # type: ignore[index]
@@ -247,7 +276,7 @@ def test_checkpoint_formats_reject_active_markers_and_wrong_slice_ids() -> None:
 
 
 def test_awaiting_campaign_cannot_claim_a_recovery_checkpoint() -> None:
-    campaign = copy.deepcopy(_campaign())
+    campaign = _pending_campaign()
     campaign["campaign"]["checkpoint"] = f"slice:S017:{PLAN_SHA[:12]}:1"  # type: ignore[index]
 
     findings = implementation_campaign.validate_campaign(campaign)
@@ -259,7 +288,7 @@ def test_awaiting_campaign_cannot_claim_a_recovery_checkpoint() -> None:
 
 
 def test_blocked_campaign_retains_its_latest_completed_slice_checkpoint() -> None:
-    campaign = copy.deepcopy(_campaign())
+    campaign = _pending_campaign()
     first = campaign["slices"][0]  # type: ignore[index]
     first_checkpoint = f"slice:S001:{PLAN_SHA[:12]}:1"
     first["lifecycle"] = "complete"
@@ -289,7 +318,7 @@ def test_blocked_campaign_retains_its_latest_completed_slice_checkpoint() -> Non
 
 
 def test_only_one_slice_may_be_active() -> None:
-    campaign = copy.deepcopy(_campaign())
+    campaign = _pending_campaign()
     campaign["campaign"]["lifecycle"] = "active"  # type: ignore[index]
     _approve(campaign)
     campaign["slices"][0]["lifecycle"] = "active"  # type: ignore[index]
@@ -301,7 +330,7 @@ def test_only_one_slice_may_be_active() -> None:
 
 
 def test_accepted_approval_must_enter_an_executable_lifecycle() -> None:
-    campaign = copy.deepcopy(_campaign())
+    campaign = _pending_campaign()
     _approve(campaign)
 
     findings = implementation_campaign.validate_campaign(campaign)
@@ -312,7 +341,7 @@ def test_accepted_approval_must_enter_an_executable_lifecycle() -> None:
 
 
 def test_human_authority_blocker_stops_execution_and_invalidates_approval() -> None:
-    campaign = copy.deepcopy(_campaign())
+    campaign = _pending_campaign()
     _approve(campaign)
     campaign["campaign"]["lifecycle"] = "ready"  # type: ignore[index]
     campaign["slices"][0]["lifecycle"] = "ready"  # type: ignore[index]
@@ -331,7 +360,7 @@ def test_human_authority_blocker_stops_execution_and_invalidates_approval() -> N
 
 
 def test_ready_campaign_selects_only_the_lowest_dependency_ready_slice() -> None:
-    campaign = copy.deepcopy(_campaign())
+    campaign = _pending_campaign()
     _approve(campaign)
     campaign["campaign"]["lifecycle"] = "ready"  # type: ignore[index]
     campaign["slices"][1]["lifecycle"] = "ready"  # type: ignore[index]
@@ -344,7 +373,7 @@ def test_ready_campaign_selects_only_the_lowest_dependency_ready_slice() -> None
 
 
 def test_interrupted_active_slice_retains_the_last_recoverable_checkpoint() -> None:
-    campaign = copy.deepcopy(_campaign())
+    campaign = _pending_campaign()
     campaign["campaign"]["lifecycle"] = "active"  # type: ignore[index]
     _approve(campaign)
     campaign["slices"][0]["lifecycle"] = "active"  # type: ignore[index]
@@ -354,7 +383,7 @@ def test_interrupted_active_slice_retains_the_last_recoverable_checkpoint() -> N
 
 
 def test_active_campaign_uses_latest_completed_slice_checkpoint() -> None:
-    campaign = copy.deepcopy(_campaign())
+    campaign = _pending_campaign()
     _approve(campaign)
     campaign["campaign"]["lifecycle"] = "active"  # type: ignore[index]
     first = campaign["slices"][0]  # type: ignore[index]
@@ -370,7 +399,7 @@ def test_active_campaign_uses_latest_completed_slice_checkpoint() -> None:
 
 
 def test_active_campaign_cannot_skip_a_lower_dependency_ready_slice() -> None:
-    campaign = copy.deepcopy(_campaign())
+    campaign = _pending_campaign()
     _approve(campaign)
     campaign["campaign"]["lifecycle"] = "active"  # type: ignore[index]
     first = campaign["slices"][0]  # type: ignore[index]
@@ -387,7 +416,7 @@ def test_active_campaign_cannot_skip_a_lower_dependency_ready_slice() -> None:
 
 
 def test_completed_slice_cannot_skip_lower_ordered_work() -> None:
-    campaign = copy.deepcopy(_campaign())
+    campaign = _pending_campaign()
     second = campaign["slices"][1]  # type: ignore[index]
     second["lifecycle"] = "complete"
     second["implementation_status"] = "conforming"
@@ -402,7 +431,7 @@ def test_completed_slice_cannot_skip_lower_ordered_work() -> None:
 
 
 def test_code_defect_cannot_masquerade_as_a_human_blocker() -> None:
-    campaign = copy.deepcopy(_campaign())
+    campaign = _pending_campaign()
     campaign["campaign"]["lifecycle"] = "blocked"  # type: ignore[index]
     campaign["campaign"]["plan_approval"]["status"] = "changes-required"  # type: ignore[index]
     campaign["campaign"]["blocker"] = {  # type: ignore[index]
@@ -420,7 +449,7 @@ def test_code_defect_cannot_masquerade_as_a_human_blocker() -> None:
 
 
 def test_joint_authority_contributions_remain_partial_until_aggregate_closure() -> None:
-    campaign = copy.deepcopy(_campaign())
+    campaign = _pending_campaign()
     joint_authority = next(entry for entry in campaign["authority"] if len(entry["slice_ids"]) > 1)  # type: ignore[index]
     contributor_id = joint_authority["slice_ids"][0]
     contributor = next(entry for entry in campaign["slices"] if entry["id"] == contributor_id)  # type: ignore[index]
@@ -438,7 +467,7 @@ def test_joint_authority_contributions_remain_partial_until_aggregate_closure() 
 
 
 def test_complete_slice_requires_conformance_evidence_and_checkpoint() -> None:
-    campaign = copy.deepcopy(_campaign())
+    campaign = _pending_campaign()
     campaign["campaign"]["lifecycle"] = "ready"  # type: ignore[index]
     _approve(campaign)
     first = campaign["slices"][0]  # type: ignore[index]
@@ -453,7 +482,7 @@ def test_complete_slice_requires_conformance_evidence_and_checkpoint() -> None:
 
 
 def test_campaign_completion_requires_full_system_closure() -> None:
-    campaign = copy.deepcopy(_campaign())
+    campaign = _pending_campaign()
     campaign["campaign"]["lifecycle"] = "complete"  # type: ignore[index]
     _approve(campaign)
     campaign["authority"][0]["planned_coverage"] = "partial"  # type: ignore[index]
@@ -475,7 +504,7 @@ def test_stale_baseline_blocks_execution_until_replanned(tmp_path: Path) -> None
     language_lock = tmp_path / "model" / "config" / "language.lock.json"
     language_lock.write_text(language_lock.read_text(encoding="utf-8") + "\n", encoding="utf-8")
 
-    campaign = copy.deepcopy(_campaign())
+    campaign = _pending_campaign()
     campaign["model_baseline"]["status"] = "stale"  # type: ignore[index]
     campaign["model_baseline"]["observed"].update(  # type: ignore[index]
         implementation_campaign.observed_baseline(tmp_path)
@@ -506,7 +535,7 @@ def test_stale_baseline_blocks_execution_until_replanned(tmp_path: Path) -> None
 
 
 def test_status_is_compact_and_deterministic() -> None:
-    status = implementation_campaign._status(_campaign())
+    status = implementation_campaign._status(_pending_campaign())
 
     assert status.splitlines() == [
         "Campaign: vellis-model-implementation",
@@ -523,7 +552,7 @@ def test_status_is_compact_and_deterministic() -> None:
 
 
 def test_status_reports_the_lowest_ordered_slice_blocker() -> None:
-    campaign = copy.deepcopy(_campaign())
+    campaign = _pending_campaign()
     campaign["slices"][0]["blocker"] = {  # type: ignore[index]
         "classification": "model gap",
         "summary": "A named distinction is unresolved.",

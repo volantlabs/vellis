@@ -7,7 +7,7 @@ campaign:
     status: accepted
     checkpoint: approval:16c835e15651a29b2574cc748f97956486f99f96
   blocker: null
-  checkpoint: approval:16c835e15651a29b2574cc748f97956486f99f96
+  checkpoint: slice:S001:16c835e15651:1
 model_baseline:
   status: current
   authority_files:
@@ -39,8 +39,18 @@ authority:
       - {model_ref: "VellisRequirements::stringPatternValidation", source: "model/40-requirements.sysml"}
     planned_coverage: full
     slice_ids: [S001, S002, S004, S005, S007, S008, S011, S012, S013]
-    implementation_status: absent
-    evidence_refs: []
+    implementation_status: partial
+    evidence_refs:
+      - path:tests/vellis/test_graph_invariants.py#test_a_conforming_graph_produces_no_findings
+      - path:tests/vellis/test_graph_invariants.py#test_a_type_key_never_changes_an_objects_kind
+      - path:tests/vellis/test_graph_invariants.py#test_present_null_is_not_an_absent_property
+      - path:tests/vellis/test_definition_validity.py#test_type_keys_share_one_namespace_across_kinds
+      - path:tests/vellis/test_canonical_equality.py#test_numbers_compare_by_exact_mathematical_value
+      - path:tests/vellis/test_canonical_equality.py#test_strings_compare_by_code_point_without_normalization
+      - path:tests/vellis/test_string_patterns.py#test_whole_string_match_rejects_prefix_and_suffix
+      - path:tests/vellis/test_string_patterns.py#test_a_permitted_value_its_own_pattern_rejects_is_an_invalid_definition
+      - path:tests/vellis/test_string_patterns.py#test_posix_classes_mean_what_re2_says_they_mean
+      - path:tests/vellis/test_canonical_equality.py#test_system_metadata_participates_in_graph_equality
   - id: A002
     label: Fresh canonical base
     refs:
@@ -50,8 +60,11 @@ authority:
       - {model_ref: "VellisRequirements::freshInitialization", source: "model/40-requirements.sysml"}
     planned_coverage: full
     slice_ids: [S001, S011, S013]
-    implementation_status: absent
-    evidence_refs: []
+    implementation_status: partial
+    evidence_refs:
+      - path:tests/vellis/test_fresh_initialization.py#test_a_fresh_rtg_begins_at_revision_zero
+      - path:tests/vellis/test_fresh_initialization.py#test_an_invalid_initial_definition_set_establishes_no_partial_state
+      - path:tests/vellis/test_fresh_initialization.py#test_initializing_an_established_rtg_is_refused_without_effect
   - id: A003
     label: Canonical transitions, revision, and durable ledger
     refs:
@@ -63,8 +76,14 @@ authority:
       - {model_ref: "VellisRequirements::durableCanonicalHistory", source: "model/40-requirements.sysml"}
     planned_coverage: full
     slice_ids: [S001, S002, S004, S007, S010, S011, S013]
-    implementation_status: absent
-    evidence_refs: []
+    implementation_status: partial
+    evidence_refs:
+      - path:tests/vellis/test_fresh_initialization.py#test_direct_state_the_initial_record_and_replay_all_agree
+      - path:tests/vellis/test_fresh_initialization.py#test_canonical_memory_survives_an_ordinary_restart
+      - path:tests/vellis/test_fresh_initialization.py#test_refusal_after_establishment_leaves_the_record_untouched
+      - path:tests/vellis/test_serialization.py#test_a_complete_canonical_state_round_trips_through_text
+      - path:tests/vellis/test_store_integrity.py#test_a_projection_whose_row_contradicts_its_payload_is_refused
+      - path:tests/vellis/test_store_integrity.py#test_a_rich_vocabulary_survives_an_ordinary_restart
   - id: A004
     label: Explicit conforming graph change
     refs:
@@ -238,8 +257,11 @@ authority:
       - {model_ref: "VellisVerification::historyGrowth", source: "model/50-verification.sysml"}
     planned_coverage: full
     slice_ids: [S001, S002, S003, S004, S005, S006, S007, S008, S009, S010, S016]
-    implementation_status: absent
-    evidence_refs: []
+    implementation_status: partial
+    evidence_refs:
+      - path:tests/vellis/test_current_work.py#test_reading_current_state_visits_no_canonical_record
+      - path:tests/vellis/test_current_work.py#test_current_conformance_assessment_visits_no_canonical_record
+      - path:tests/vellis/test_current_work.py#test_the_instrumentation_counts_a_real_record_access
   - id: A017
     label: Runnable local onboarding and cohesive persistent-context use
     refs:
@@ -250,8 +272,13 @@ authority:
       - {model_ref: "VellisVerification::simpleOperation", source: "model/50-verification.sysml"}
     planned_coverage: full
     slice_ids: [S001, S009, S017]
-    implementation_status: absent
-    evidence_refs: []
+    implementation_status: partial
+    evidence_refs:
+      - path:tests/vellis/test_setup_path.py#test_setup_establishes_one_local_system
+      - path:tests/vellis/test_setup_path.py#test_a_second_attempt_fails_actionably_and_leaves_memory_unchanged
+      - path:tests/vellis/test_setup_path.py#test_a_dry_run_creates_nothing
+      - path:tests/vellis/test_setup_path.py#test_a_destination_named_dot_data_is_refused
+      - path:README.md#implementation-status
   - id: A018
     label: Typed validation across every selected scope
     refs:
@@ -280,9 +307,20 @@ slices:
       - VellisVerification::stringPatterns
       - VellisVerification::freshInitialization
       - VellisVerification::simpleOperation
-    lifecycle: ready
-    implementation_status: absent
-    evidence_refs: []
+    lifecycle: complete
+    implementation_status: conforming
+    evidence_refs:
+      - path:tests/vellis/test_fresh_initialization.py#test_a_fresh_rtg_begins_at_revision_zero
+      - path:tests/vellis/test_fresh_initialization.py#test_direct_state_the_initial_record_and_replay_all_agree
+      - path:tests/vellis/test_fresh_initialization.py#test_canonical_memory_survives_an_ordinary_restart
+      - path:tests/vellis/test_canonical_equality.py#test_canonical_state_equality_includes_delta_presence_and_content
+      - path:tests/vellis/test_graph_invariants.py#test_a_conforming_graph_produces_no_findings
+      - path:tests/vellis/test_string_patterns.py#test_whole_string_match_rejects_prefix_and_suffix
+      - path:tests/vellis/test_current_work.py#test_the_instrumentation_counts_a_real_record_access
+      - path:tests/vellis/test_setup_path.py#test_a_second_attempt_fails_actionably_and_leaves_memory_unchanged
+      - command:uv run pytest tests/vellis
+      - path:tests/vellis/test_serialization.py#test_a_complete_canonical_state_round_trips_through_text
+      - path:tests/vellis/test_store_integrity.py#test_a_projection_whose_row_contradicts_its_payload_is_refused
     realization_decisions:
       - id: D002
         summary: Use one documented Python setup path with interactive preview and confirmation, complete noninteractive arguments plus --yes, and a no-effect --dry-run mode.
@@ -293,7 +331,7 @@ slices:
         authority_ids: [A017]
         reversible: false
     blocker: null
-    checkpoint: null
+    checkpoint: slice:S001:16c835e15651:1
   - id: S002
     order: 2
     label: Commit conforming graph changes atomically
@@ -309,7 +347,7 @@ slices:
       - VellisVerification::atomicTransitions
       - VellisVerification::validationCoverage
       - VellisVerification::graphInvariants
-    lifecycle: pending
+    lifecycle: ready
     implementation_status: absent
     evidence_refs: []
     realization_decisions: []

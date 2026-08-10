@@ -2,7 +2,9 @@
 name = "vellis"
 version = "0.2.0.dev0"
 requires-python = ">=3.14"
-dependencies = []
+dependencies = [
+    "google-re2>=1.1,<2",
+]
 
 [tool.uv]
 package = false
@@ -19,7 +21,7 @@ dev = [
 ]
 
 [tool.basedpyright]
-include = ["tools", "tests"]
+include = ["vellis", "tools", "tests"]
 pythonVersion = "3.14"
 typeCheckingMode = "standard"
 
