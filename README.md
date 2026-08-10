@@ -115,15 +115,18 @@ where it stands. Use these words precisely:
   complete resulting graph validated first and replay reconstructing the same state from the
   ledger alone; the typed graph-conformance report; and current definition discovery — the complete
   shallow anchor vocabulary and the complete focused neighborhood of each selected anchor, each
-  carrying the revision it was evaluated at so a caller can tell that the ground moved.
+  carrying the revision it was evaluated at so a caller can tell that the ground moved;
+  governance of the one prospective definition set — stage, edit, review, activate, discard —
+  where a working proposal may carry findings and activation is what they gate; and the optional
+  Everyday Life starter vocabulary as an ordinary, owner-governable definition set.
 - **Runnable.** `uv run python -m vellis.setup` prepares one local system. It previews the
   destination and starting vocabulary, asks for confirmation, and accepts `--data-dir`, `--yes`, and
   a no-effect `--dry-run`. It stores memory under the platform's user-data location by default and
   never writes to this repository's ignored `.data/`.
-- **Not implemented yet.** Semantic query, definition-delta governance, historical definition
-  discovery, activity recording and history reads, snapshots, ledger-tail replay, historical selection and restore, the Everyday Life
-  starter, v1 snapshot recovery, and the MCP server. Definition-delta validation reports arrive with
-  the delta governance that produces them. The model selects a portable
+- **Not implemented yet.** Semantic query, historical definition discovery, activity recording and
+  history reads, snapshots, ledger-tail replay, historical selection and restore, v1 snapshot
+  recovery, and the MCP server. The Everyday Life starter exists as a definition set, but offering
+  it as a confirmed first-use choice does not. The model selects a portable
   ten-tool MCP contract; no server exposes it. The campaign directly pins FastMCP and FastMCP Slim
   4.0.0b1 and selects local STDIO, but neither is installed or runnable yet.
 

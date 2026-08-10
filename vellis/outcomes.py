@@ -46,6 +46,7 @@ class ValidationScope(Enum):
     """The assessment scopes that currently return reports."""
 
     GRAPH_CONFORMANCE = "graphConformance"
+    DEFINITION_DELTA = "definitionDelta"
 
 
 @dataclass(frozen=True, slots=True)

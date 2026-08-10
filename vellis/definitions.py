@@ -15,7 +15,8 @@ unresolved reference a validation finding rather than an unrepresentable state.
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections import Counter
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from decimal import Decimal
 from enum import Enum
@@ -302,19 +303,43 @@ def _property_constraint_equal(left: PropertyConstraint, right: PropertyConstrai
     )
 
 
-def _by_key[T](items: Sequence[T], attribute: str) -> dict[str, T] | None:
-    """Key ``items`` by a natural-identity attribute, or ``None`` when one repeats.
+def _group[T](items: Sequence[T], identity: Callable[[T], object]) -> dict[object, list[T]]:
+    """Group items by natural identity, keeping duplicates rather than collapsing them.
 
-    Duplicate natural identities are invalid, but a stored set is not revalidated on
-    every read. Returning ``None`` keeps equality from silently collapsing two
-    definitions into one and calling that the same set as a set holding one.
+    A duplicate natural identity is invalid, but a proposal is allowed to carry findings
+    while it is being edited, so equality has to give a sensible answer for one anyway.
+    Grouping keeps two answers right at once: a set with a repeated identity is not equal
+    to one without it, and it is still equal to itself.
     """
-    keyed: dict[str, T] = {}
+    grouped: dict[object, list[T]] = {}
     for item in items:
-        value = getattr(item, attribute)
-        assert isinstance(value, str)
-        keyed[value] = item
-    return keyed if len(keyed) == len(items) else None
+        grouped.setdefault(identity(item), []).append(item)
+    return grouped
+
+
+def _grouped_equal[T](
+    left: Sequence[T],
+    right: Sequence[T],
+    identity: Callable[[T], object],
+    content_equal: Callable[[T, T], bool],
+) -> bool:
+    """Compare two unordered collections by identity, multiplicity, and content."""
+    first = _group(left, identity)
+    second = _group(right, identity)
+    if first.keys() != second.keys():
+        return False
+    for key, items in first.items():
+        remaining = list(second[key])
+        if len(items) != len(remaining):
+            return False
+        for item in items:
+            for index, other in enumerate(remaining):
+                if content_equal(item, other):
+                    del remaining[index]
+                    break
+            else:
+                return False
+    return True
 
 
 def definition_set_equal(left: GraphDefinitionSet, right: GraphDefinitionSet) -> bool:
@@ -334,86 +359,90 @@ def definition_set_equal(left: GraphDefinitionSet, right: GraphDefinitionSet) ->
 
 
 def _anchor_types_equal(left: GraphDefinitionSet, right: GraphDefinitionSet) -> bool:
-    first = _by_key(left.anchor_types, "type_key")
-    second = _by_key(right.anchor_types, "type_key")
-    if first is None or second is None or first.keys() != second.keys():
+    return _grouped_equal(
+        left.anchor_types,
+        right.anchor_types,
+        lambda each: each.type_key,
+        lambda one, other: one.description == other.description,
+    )
+
+
+def _data_type_equal(
+    one: AssociatedDataTypeDefinition, other: AssociatedDataTypeDefinition
+) -> bool:
+    if one.description != other.description:
         return False
-    return all(
-        definition.description == second[key].description for key, definition in first.items()
+    if Counter(one.permitted_anchor_type_keys) != Counter(other.permitted_anchor_type_keys):
+        return False
+    return _grouped_equal(
+        one.property_constraints,
+        other.property_constraints,
+        lambda each: each.property_name,
+        _property_constraint_equal,
     )
 
 
 def _associated_data_types_equal(left: GraphDefinitionSet, right: GraphDefinitionSet) -> bool:
-    first = _by_key(left.associated_data_types, "type_key")
-    second = _by_key(right.associated_data_types, "type_key")
-    if first is None or second is None or first.keys() != second.keys():
-        return False
-    for key, definition in first.items():
-        other = second[key]
-        if definition.description != other.description:
-            return False
-        if frozenset(definition.permitted_anchor_type_keys) != frozenset(
-            other.permitted_anchor_type_keys
-        ):
-            return False
-        properties = _by_key(definition.property_constraints, "property_name")
-        other_properties = _by_key(other.property_constraints, "property_name")
-        if (
-            properties is None
-            or other_properties is None
-            or properties.keys() != other_properties.keys()
-        ):
-            return False
-        for name, constraint in properties.items():
-            if not _property_constraint_equal(constraint, other_properties[name]):
-                return False
-    return True
+    return _grouped_equal(
+        left.associated_data_types,
+        right.associated_data_types,
+        lambda each: each.type_key,
+        _data_type_equal,
+    )
 
 
 def _endpoint_constraint_equal(left: EndpointConstraint, right: EndpointConstraint) -> bool:
     return (
         left.description == right.description
-        and frozenset(left.permitted_source_type_keys)
-        == frozenset(right.permitted_source_type_keys)
-        and frozenset(left.permitted_target_type_keys)
-        == frozenset(right.permitted_target_type_keys)
+        and Counter(left.permitted_source_type_keys) == Counter(right.permitted_source_type_keys)
+        and Counter(left.permitted_target_type_keys) == Counter(right.permitted_target_type_keys)
     )
 
 
 def _link_types_equal(left: GraphDefinitionSet, right: GraphDefinitionSet) -> bool:
-    first = _by_key(left.link_types, "type_key")
-    second = _by_key(right.link_types, "type_key")
-    if first is None or second is None or first.keys() != second.keys():
-        return False
-    for key, definition in first.items():
-        other = second[key]
-        if definition.description != other.description:
-            return False
-        if not _endpoint_constraint_equal(
-            definition.endpoint_constraint, other.endpoint_constraint
-        ):
-            return False
-    return True
+    return _grouped_equal(
+        left.link_types,
+        right.link_types,
+        lambda each: each.type_key,
+        lambda one, other: (
+            one.description == other.description
+            and _endpoint_constraint_equal(one.endpoint_constraint, other.endpoint_constraint)
+        ),
+    )
 
 
 def _relationship_constraints_equal(left: GraphDefinitionSet, right: GraphDefinitionSet) -> bool:
-    first = {relationship_identity(each): each for each in left.relationship_constraints}
-    second = {relationship_identity(each): each for each in right.relationship_constraints}
-    if (
-        len(first) != len(left.relationship_constraints)
-        or len(second) != len(right.relationship_constraints)
-        or first.keys() != second.keys()
-    ):
-        return False
-    for identity, constraint in first.items():
-        other = second[identity]
-        if (
-            constraint.lower_bound != other.lower_bound
-            or constraint.upper_bound != other.upper_bound
-            or constraint.description != other.description
-        ):
+    return _grouped_equal(
+        left.relationship_constraints,
+        right.relationship_constraints,
+        relationship_identity,
+        lambda one, other: (
+            one.lower_bound == other.lower_bound
+            and one.upper_bound == other.upper_bound
+            and one.description == other.description
+            and _participants_equal(one, other)
+        ),
+    )
+
+
+def _participants_equal(one: RelationshipConstraint, other: RelationshipConstraint) -> bool:
+    """Compare the participating type-key lists by multiplicity.
+
+    The natural identity treats these as unordered sets, as the model does, so two rules
+    differing only by a repeated member share an identity. Content comparison still has
+    to see the repeat, or the owner's correction of that typo reads as no change at all.
+    """
+    if isinstance(one, LinkMultiplicityConstraint):
+        if not isinstance(other, LinkMultiplicityConstraint):
             return False
-    return True
+        return Counter(one.constrained_endpoint_type_keys) == Counter(
+            other.constrained_endpoint_type_keys
+        ) and Counter(one.opposite_endpoint_type_keys) == Counter(other.opposite_endpoint_type_keys)
+    if not isinstance(other, DirectAssociationMultiplicityConstraint):
+        return False
+    return Counter(one.anchor_type_keys) == Counter(other.anchor_type_keys) and Counter(
+        one.associated_data_type_keys
+    ) == Counter(other.associated_data_type_keys)
 
 
 # --- Internal validity --------------------------------------------------------------

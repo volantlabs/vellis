@@ -637,10 +637,10 @@ def test_every_graph_discriminator_participates_in_equality(discriminator: str) 
     left, right = _graph_variants()[discriminator]
     assert not graph_equal(left, right)
     assert not graph_equal(right, left)
-    if not discriminator.startswith("duplicate"):
-        # A value carrying duplicate identities is deliberately not equal to itself:
-        # equality fails closed rather than collapsing the duplicates away.
-        assert graph_equal(left, left)
+    # Equality is reflexive even on a value carrying duplicate identities: duplicates
+    # are counted, not collapsed away and not rejected outright.
+    assert graph_equal(left, left)
+    assert graph_equal(right, right)
 
 
 def _definition_variants() -> dict[str, tuple[GraphDefinitionSet, GraphDefinitionSet]]:
@@ -758,8 +758,8 @@ def test_every_definition_discriminator_participates_in_equality(discriminator: 
     left, right = _definition_variants()[discriminator]
     assert not definition_set_equal(left, right)
     assert not definition_set_equal(right, left)
-    if not discriminator.startswith("duplicate"):
-        assert definition_set_equal(left, left)
+    assert definition_set_equal(left, left)
+    assert definition_set_equal(right, right)
 
 
 def test_endpoint_roles_are_compared_separately_not_twice_over() -> None:
@@ -857,3 +857,69 @@ def test_narrowing_a_permitted_value_set_is_not_an_effective_no_op() -> None:
 
     assert not definition_set_equal(permitting("a"), permitting("a", "b"))
     assert not definition_set_equal(permitting("a", "b"), permitting("a"))
+
+
+@pytest.mark.parametrize("discriminator", sorted(_graph_variants()))
+def test_graph_equality_is_reflexive_even_on_an_invalid_graph(discriminator: str) -> None:
+    """A graph carrying duplicate identities must still equal itself.
+
+    Nothing revalidates a stored graph on every read, so a non-reflexive comparison
+    would make the current projection differ from its own replay.
+    """
+    left, right = _graph_variants()[discriminator]
+    assert graph_equal(left, left)
+    assert graph_equal(right, right)
+
+
+@pytest.mark.parametrize("discriminator", sorted(_definition_variants()))
+def test_definition_equality_is_reflexive_even_on_an_invalid_set(discriminator: str) -> None:
+    """The same for definitions, which a working proposal is allowed to leave invalid."""
+    left, right = _definition_variants()[discriminator]
+    assert definition_set_equal(left, left)
+    assert definition_set_equal(right, right)
+
+
+def test_duplicate_counts_are_compared_not_collapsed() -> None:
+    """Two of a thing is not one of it, and is not three of it either."""
+    person = AnchorTypeDefinition(type_key="person", description="A person.")
+
+    def repeated(times: int) -> GraphDefinitionSet:
+        return GraphDefinitionSet(anchor_types=(person,) * times)
+
+    assert definition_set_equal(repeated(2), repeated(2))
+    assert not definition_set_equal(repeated(2), repeated(1))
+    assert not definition_set_equal(repeated(2), repeated(3))
+
+
+def test_duplicates_are_matched_pairwise_not_reused() -> None:
+    """Excludes letting one entry satisfy two duplicates, which makes equality asymmetric.
+
+    Two entries under one identity must find two distinct partners. If a matched partner
+    stayed available, a corrected draft would compare equal to the uncorrected one — and
+    the correction would be silently discarded as an unchanged proposal.
+    """
+    mixed = GraphDefinitionSet(
+        anchor_types=(
+            AnchorTypeDefinition("person", "A person."),
+            AnchorTypeDefinition("person", "A human being."),
+        )
+    )
+    uniform = GraphDefinitionSet(
+        anchor_types=(
+            AnchorTypeDefinition("person", "A person."),
+            AnchorTypeDefinition("person", "A person."),
+        )
+    )
+    assert not definition_set_equal(uniform, mixed)
+    assert not definition_set_equal(mixed, uniform)
+    assert definition_set_equal(mixed, mixed)
+    assert definition_set_equal(uniform, uniform)
+
+
+def test_duplicate_graph_objects_are_matched_pairwise_not_reused() -> None:
+    """The same asymmetry, on the graph side."""
+    mixed = Graph(anchors=(_anchor("a-1", "Ada"), _anchor("a-1", "Grace")))
+    uniform = Graph(anchors=(_anchor("a-1", "Ada"), _anchor("a-1", "Ada")))
+    assert not graph_equal(uniform, mixed)
+    assert not graph_equal(mixed, uniform)
+    assert graph_equal(mixed, mixed)

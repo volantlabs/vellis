@@ -2,8 +2,10 @@
 
 Realizes ``RTGSystem::'RTG System'`` as far as this slice reaches:
 ``RTGSystem::'Initialize fresh RTG'``, ``RTGSystem::'Apply graph change'``,
-``RTGSystem::'Assess graph conformance'``, and the current-state half of
-``RTGSystem::'Discover evaluated graph definitions'``, carrying
+``RTGSystem::'Assess graph conformance'``, the current-state half of
+``RTGSystem::'Discover evaluated graph definitions'``, and the four definition-delta
+operations — ``'Create or edit definition delta'``, ``'Review definition delta'``,
+``'Activate definition delta'``, and ``'Discard definition delta'`` — carrying
 ``VellisRequirements::freshInitialization``,
 ``VellisRequirements::atomicCanonicalRevision``,
 ``VellisRequirements::explicitGraphChangeSet``,
@@ -28,6 +30,8 @@ from vellis.canonical import (
     CanonicalChange,
     CanonicalState,
     CanonicalTransitionRecord,
+    DefinitionDelta,
+    DefinitionDeltaDisposition,
     InitialStateRecord,
     Provenance,
     TransitionKind,
@@ -35,7 +39,11 @@ from vellis.canonical import (
     transition_findings,
 )
 from vellis.changes import GraphChange, apply_change, change_findings
-from vellis.definitions import GraphDefinitionSet, validate_definition_set
+from vellis.definitions import (
+    GraphDefinitionSet,
+    definition_set_equal,
+    validate_definition_set,
+)
 from vellis.discovery import (
     AnchorDefinitionDetail,
     DefinitionInspectionRequest,
@@ -45,6 +53,7 @@ from vellis.discovery import (
     inspection_findings,
     summarize_anchor_types,
 )
+from vellis.governance import DefinitionDeltaResult, assess_proposal
 from vellis.graph import Graph, graph_equal
 from vellis.json_value import unencodable_reason
 from vellis.outcomes import (
@@ -190,13 +199,6 @@ class RTGSystem:
         canonical state or revision, and leaves active definitions and the delta alone
         either way.
         """
-        record_findings = _unstorable_record_text(provenance, None)
-        if record_findings:
-            return RevisionedOutcome(
-                status=OperationStatus.REJECTED,
-                summary="the record's own text cannot be stored; the change was not applied",
-                findings=record_findings,
-            )
         state = self.current_state()
         structural = change_findings(change, state.graph)
         if structural:
@@ -224,43 +226,14 @@ class RTGSystem:
                 status=OperationStatus.ACCEPTED,
                 summary="the change is an effective no-op; no revision was created",
             )
-
-        resulting = CanonicalState(
-            graph=resulting_graph,
+        return self._commit(
+            state,
+            TransitionKind.GRAPH_MUTATION,
+            CanonicalChange(graph_change=change),
             active_definitions=state.active_definitions,
-            revision=state.revision + 1,
-            definition_delta=state.definition_delta,
-        )
-        record = CanonicalTransitionRecord(
-            prior_revision=state.revision,
-            resulting_revision=resulting.revision,
-            kind=TransitionKind.GRAPH_MUTATION,
-            change=CanonicalChange(graph_change=change),
+            graph=resulting_graph,
+            delta=state.definition_delta,
             provenance=provenance,
-            recorded_at=now(),
-        )
-        invalid = transition_findings(record)
-        if invalid:
-            return RevisionedOutcome(
-                status=OperationStatus.REJECTED,
-                summary="the resulting transition could not be replayed; nothing was committed",
-                findings=invalid,
-            )
-        unreadable = unreadable_reason(resulting)
-        if unreadable is not None:
-            return RevisionedOutcome(
-                status=OperationStatus.REJECTED,
-                summary=(
-                    "the resulting state could not be read back after storage, so it was not "
-                    "committed"
-                ),
-                findings=(ValidationFinding(summary=unreadable),),
-            )
-        self._store.append_transition(record, resulting)
-        return RevisionedOutcome(
-            status=OperationStatus.ACCEPTED,
-            summary=f"committed revision {resulting.revision}",
-            resulting_revision=resulting.revision,
         )
 
     # --- Discovery --------------------------------------------------------------------
@@ -329,6 +302,188 @@ class RTGSystem:
             evaluated_revision=state.revision,
         )
 
+    # --- The sole proposal ------------------------------------------------------------
+
+    def definition_delta(self) -> DefinitionDeltaResult:
+        """Return the sole proposal with a current assessment, or normal absence."""
+        try:
+            state = self.current_state()
+        except StoreError as error:
+            return DefinitionDeltaResult(
+                status=OperationStatus.FAILED,
+                summary=f"the proposal could not be retrieved: {error}",
+                findings=(ValidationFinding(summary=str(error)),),
+            )
+        return _delta_result(state, "the current proposal")
+
+    def set_definition_delta(
+        self, proposed: GraphDefinitionSet, *, provenance: Provenance
+    ) -> DefinitionDeltaResult:
+        """Create or replace the sole proposal.
+
+        A proposal that already says what the current one says, or what the active set
+        says when there is no proposal, changes nothing and advances nothing. Offering
+        the active set while a different proposal stands is refused rather than read as
+        a discard: clearing a proposal is its own operation, and guessing here would
+        throw away work the owner did not ask to lose.
+        """
+        state = self.current_state()
+        current = state.definition_delta
+
+        if current is not None and definition_set_equal(proposed, current.proposed_definitions):
+            return _delta_result(state, "the proposal is unchanged; no revision was created")
+        if current is None and definition_set_equal(proposed, state.active_definitions):
+            return _delta_result(
+                state, "the proposal matches the active definitions; nothing was staged"
+            )
+        if current is not None and definition_set_equal(proposed, state.active_definitions):
+            return DefinitionDeltaResult(
+                status=OperationStatus.REJECTED,
+                summary=(
+                    "staging the active definitions would discard the current proposal; use "
+                    "the discard operation to do that deliberately"
+                ),
+                findings=(
+                    ValidationFinding(
+                        summary="a proposal equal to the active set cannot implicitly discard"
+                    ),
+                ),
+            )
+
+        delta = DefinitionDelta(proposed_definitions=proposed)
+        outcome = self._commit(
+            state,
+            TransitionKind.DEFINITION_DELTA_CHANGE,
+            CanonicalChange(
+                delta_disposition=DefinitionDeltaDisposition.PRESENT, definition_delta=delta
+            ),
+            active_definitions=state.active_definitions,
+            graph=state.graph,
+            delta=delta,
+            provenance=provenance,
+        )
+        if not outcome.accepted:
+            return DefinitionDeltaResult(
+                status=outcome.status, summary=outcome.summary, findings=outcome.findings
+            )
+        return _delta_result(
+            self.current_state(),
+            f"staged the proposal at revision {outcome.resulting_revision}",
+            resulting_revision=outcome.resulting_revision,
+        )
+
+    def activate_definition_delta(self, *, provenance: Provenance) -> RevisionedOutcome:
+        """Activate the sole proposal, or preserve everything.
+
+        Activation is the gate the working proposal was allowed to skip: every
+        description present, the proposal internally valid, and the graph already
+        conforming under it.
+        """
+        state = self.current_state()
+        if state.definition_delta is None:
+            return RevisionedOutcome(
+                status=OperationStatus.REJECTED,
+                summary="there is no proposal to activate",
+            )
+        proposed = state.definition_delta.proposed_definitions
+        assessment = assess_proposal(proposed, state.graph, state.revision)
+        if not assessment.conforms:
+            return RevisionedOutcome(
+                status=OperationStatus.REJECTED,
+                summary=(
+                    f"the proposal cannot be activated ({len(assessment.findings)} findings); "
+                    "graph, active definitions, proposal, and revision are unchanged"
+                ),
+                findings=assessment.findings,
+            )
+        return self._commit(
+            state,
+            TransitionKind.DEFINITION_ACTIVATION,
+            CanonicalChange(
+                delta_disposition=DefinitionDeltaDisposition.ABSENT,
+                active_definitions=proposed,
+            ),
+            active_definitions=proposed,
+            graph=state.graph,
+            delta=None,
+            provenance=provenance,
+        )
+
+    def discard_definition_delta(self, *, provenance: Provenance) -> RevisionedOutcome:
+        """Clear the sole proposal, or report that there is none."""
+        state = self.current_state()
+        if state.definition_delta is None:
+            return RevisionedOutcome(
+                status=OperationStatus.REJECTED,
+                summary="there is no proposal to discard",
+            )
+        return self._commit(
+            state,
+            TransitionKind.DEFINITION_DELTA_CHANGE,
+            CanonicalChange(delta_disposition=DefinitionDeltaDisposition.ABSENT),
+            active_definitions=state.active_definitions,
+            graph=state.graph,
+            delta=None,
+            provenance=provenance,
+        )
+
+    def _commit(
+        self,
+        state: CanonicalState,
+        kind: TransitionKind,
+        change: CanonicalChange,
+        *,
+        active_definitions: GraphDefinitionSet,
+        graph: Graph,
+        delta: DefinitionDelta | None,
+        provenance: Provenance,
+    ) -> RevisionedOutcome:
+        """Commit one canonical transition, or refuse without effect."""
+        record_findings = _unstorable_record_text(provenance, None)
+        if record_findings:
+            return RevisionedOutcome(
+                status=OperationStatus.REJECTED,
+                summary="the record's own text cannot be stored; nothing was committed",
+                findings=record_findings,
+            )
+        resulting = CanonicalState(
+            graph=graph,
+            active_definitions=active_definitions,
+            revision=state.revision + 1,
+            definition_delta=delta,
+        )
+        record = CanonicalTransitionRecord(
+            prior_revision=state.revision,
+            resulting_revision=resulting.revision,
+            kind=kind,
+            change=change,
+            provenance=provenance,
+            recorded_at=now(),
+        )
+        invalid = transition_findings(record)
+        if invalid:
+            return RevisionedOutcome(
+                status=OperationStatus.REJECTED,
+                summary="the resulting transition could not be replayed; nothing was committed",
+                findings=invalid,
+            )
+        unreadable = unreadable_reason(resulting)
+        if unreadable is not None:
+            return RevisionedOutcome(
+                status=OperationStatus.REJECTED,
+                summary=(
+                    "the resulting state could not be read back after storage, so it was not "
+                    "committed"
+                ),
+                findings=(ValidationFinding(summary=unreadable),),
+            )
+        self._store.append_transition(record, resulting)
+        return RevisionedOutcome(
+            status=OperationStatus.ACCEPTED,
+            summary=f"committed revision {resulting.revision}",
+            resulting_revision=resulting.revision,
+        )
+
     # --- Assessment -------------------------------------------------------------------
 
     def check(self) -> ValidationReport:
@@ -377,4 +532,27 @@ def _vocabulary_summary(definitions: GraphDefinitionSet) -> str:
         f"{len(definitions.associated_data_types)} associated-data types, "
         f"{len(definitions.link_types)} link types, and "
         f"{len(definitions.relationship_constraints)} relationship constraints"
+    )
+
+
+def _delta_result(
+    state: CanonicalState, summary: str, resulting_revision: int | None = None
+) -> DefinitionDeltaResult:
+    """Return the proposal, or its absence, as the model shapes that answer."""
+    if state.definition_delta is None:
+        return DefinitionDeltaResult(
+            status=OperationStatus.ACCEPTED,
+            summary="there is no proposal",
+            evaluated_revision=state.revision,
+            resulting_revision=resulting_revision,
+        )
+    return DefinitionDeltaResult(
+        status=OperationStatus.ACCEPTED,
+        summary=summary,
+        definition_delta=state.definition_delta,
+        assessment=assess_proposal(
+            state.definition_delta.proposed_definitions, state.graph, state.revision
+        ),
+        evaluated_revision=state.revision,
+        resulting_revision=resulting_revision,
     )

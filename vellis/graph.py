@@ -14,6 +14,7 @@ dangling reference becomes a validation finding rather than an unrepresentable o
 from __future__ import annotations
 
 from collections import Counter
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from enum import Enum
 
@@ -154,64 +155,61 @@ def _properties_equal(left: dict[str, JsonValue], right: dict[str, JsonValue]) -
     return json_equal(dict(left), dict(right))
 
 
-def _anchors_equal(left: Graph, right: Graph) -> bool:
-    first = {each.uuid: each for each in left.anchors}
-    second = {each.uuid: each for each in right.anchors}
-    if (
-        len(first) != len(left.anchors)
-        or len(second) != len(right.anchors)
-        or first.keys() != second.keys()
-    ):
+def _grouped_equal[T: GraphObject](
+    left: tuple[T, ...], right: tuple[T, ...], content_equal: Callable[[T, T], bool]
+) -> bool:
+    """Compare two owned collections by identity, multiplicity, and content.
+
+    Duplicate identities are invalid, but a graph is not revalidated on every read, and
+    equality still has to be reflexive on one — so duplicates are counted rather than
+    collapsed or rejected outright.
+    """
+    first: dict[str, list[T]] = {}
+    second: dict[str, list[T]] = {}
+    for item in left:
+        first.setdefault(item.uuid, []).append(item)
+    for item in right:
+        second.setdefault(item.uuid, []).append(item)
+    if first.keys() != second.keys():
         return False
-    for uuid, anchor in first.items():
-        other = second[uuid]
-        if anchor.type_key != other.type_key or anchor.display_name != other.display_name:
+    for uuid, items in first.items():
+        remaining = list(second[uuid])
+        if len(items) != len(remaining):
             return False
-        if not _metadata_equal(anchor.system_metadata, other.system_metadata):
-            return False
+        for item in items:
+            for index, other in enumerate(remaining):
+                if content_equal(item, other):
+                    del remaining[index]
+                    break
+            else:
+                return False
     return True
 
 
-def _associated_data_equal(left: Graph, right: Graph) -> bool:
-    first = {each.uuid: each for each in left.associated_data}
-    second = {each.uuid: each for each in right.associated_data}
-    if (
-        len(first) != len(left.associated_data)
-        or len(second) != len(right.associated_data)
-        or first.keys() != second.keys()
-    ):
-        return False
-    for uuid, data in first.items():
-        other = second[uuid]
-        if data.type_key != other.type_key:
-            return False
-        if Counter(data.anchor_uuids) != Counter(other.anchor_uuids):
-            return False
-        if not _properties_equal(data.properties, other.properties):
-            return False
-        if not _metadata_equal(data.system_metadata, other.system_metadata):
-            return False
-    return True
+def _anchor_content_equal(one: Anchor, other: Anchor) -> bool:
+    return (
+        one.type_key == other.type_key
+        and one.display_name == other.display_name
+        and _metadata_equal(one.system_metadata, other.system_metadata)
+    )
 
 
-def _links_equal(left: Graph, right: Graph) -> bool:
-    first = {each.uuid: each for each in left.links}
-    second = {each.uuid: each for each in right.links}
-    if (
-        len(first) != len(left.links)
-        or len(second) != len(right.links)
-        or first.keys() != second.keys()
-    ):
-        return False
-    for uuid, link in first.items():
-        other = second[uuid]
-        if link.type_key != other.type_key:
-            return False
-        if link.source_uuid != other.source_uuid or link.target_uuid != other.target_uuid:
-            return False
-        if not _metadata_equal(link.system_metadata, other.system_metadata):
-            return False
-    return True
+def _data_content_equal(one: AssociatedDataObject, other: AssociatedDataObject) -> bool:
+    return (
+        one.type_key == other.type_key
+        and Counter(one.anchor_uuids) == Counter(other.anchor_uuids)
+        and _properties_equal(one.properties, other.properties)
+        and _metadata_equal(one.system_metadata, other.system_metadata)
+    )
+
+
+def _link_content_equal(one: Link, other: Link) -> bool:
+    return (
+        one.type_key == other.type_key
+        and one.source_uuid == other.source_uuid
+        and one.target_uuid == other.target_uuid
+        and _metadata_equal(one.system_metadata, other.system_metadata)
+    )
 
 
 def graph_equal(left: Graph, right: Graph) -> bool:
@@ -221,7 +219,7 @@ def graph_equal(left: Graph, right: Graph) -> bool:
     link endpoint, and ignores order in unordered collections.
     """
     return (
-        _anchors_equal(left, right)
-        and _associated_data_equal(left, right)
-        and _links_equal(left, right)
+        _grouped_equal(left.anchors, right.anchors, _anchor_content_equal)
+        and _grouped_equal(left.associated_data, right.associated_data, _data_content_equal)
+        and _grouped_equal(left.links, right.links, _link_content_equal)
     )

@@ -2,10 +2,10 @@ schema_version: "1.0"
 campaign:
   id: vellis-model-implementation
   objective: Realize the complete accepted Vellis model with discriminating evidence and a runnable selected boundary.
-  lifecycle: ready
+  lifecycle: blocked
   plan_approval:
-    status: accepted
-    checkpoint: approval:16c835e15651a29b2574cc748f97956486f99f96
+    status: changes-required
+    checkpoint: null
   blocker: null
   checkpoint: slice:S003:16c835e15651:1
 model_baseline:
@@ -114,8 +114,16 @@ authority:
       - {model_ref: "VellisRequirements::nonDisruptiveDefinitionWork", source: "model/40-requirements.sysml"}
     planned_coverage: full
     slice_ids: [S004]
-    implementation_status: absent
-    evidence_refs: []
+    implementation_status: partial
+    evidence_refs:
+      - path:tests/vellis/test_definition_governance.py#test_staging_creates_the_sole_proposal_and_advances_one_revision
+      - path:tests/vellis/test_definition_governance.py#test_staging_the_active_set_cannot_implicitly_discard_a_proposal
+      - path:tests/vellis/test_definition_governance.py#test_restaging_the_same_proposal_is_an_accepted_no_op
+      - path:tests/vellis/test_definition_governance.py#test_a_valid_activation_replaces_the_active_set_and_clears_the_proposal
+      - path:tests/vellis/test_definition_governance.py#test_activation_is_blocked_while_any_description_is_empty
+      - path:tests/vellis/test_definition_governance.py#test_discarding_clears_the_proposal_and_commits_one_revision
+      - path:tests/vellis/test_definition_governance.py#test_proposal_work_changes_neither_graph_nor_active_definitions
+      - path:tests/vellis/test_definition_governance.py#test_the_whole_arc_replays_from_the_ledger_alone
   - id: A006
     label: Current and historical definition discovery
     refs:
@@ -432,11 +440,22 @@ slices:
       - VellisVerification::definitionWork
       - VellisVerification::canonicalEquality
       - VellisVerification::stringPatterns
-    lifecycle: ready
-    implementation_status: absent
+    lifecycle: blocked
+    implementation_status: partial
     evidence_refs: []
     realization_decisions: []
-    blocker: null
+    blocker:
+      classification: plan gap
+      summary: >-
+        A005 is planned full with S004 as its only slice, but its cited use case
+        RTGSystem::'Review definition delta' requires one observational record after the
+        outcome. Activity recording is A008 (S006, S007), and S006 does not list A005.
+        A006 and A007 carry the identical clause and are correctly partial with S006
+        remaining. Closing A005 here would claim whole-authority coverage the branch
+        lacks, with the clause unimplemented and owned by no slice.
+      authority_ids: [A005]
+      evidence_refs:
+        - path:tests/vellis/test_definition_governance.py#test_there_is_no_proposal_until_one_is_staged
     checkpoint: null
   - id: S005
     order: 5
