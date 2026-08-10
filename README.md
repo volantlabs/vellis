@@ -100,7 +100,7 @@ Useful commands:
 
 ## Implementation status
 
-Five campaign slices are complete and a sixth is implemented but not yet checkpointed, so the
+Six campaign slices are complete and a seventh is implemented but not yet checkpointed, so the
 application is partially implemented rather than absent.
 A plan gap found during the fourth returned the campaign to `awaiting-plan-approval`; the corrected
 plan has since been approved and that slice checkpointed under it.
@@ -127,13 +127,16 @@ plan has since been approved and that slice checkpointed under it.
   validation, and refused operations leave a bounded record carrying capability, outcome,
   provenance, evaluated revision and scope but no result rows, over which the owner may read a
   bounded interval of either ledger and forget activity without moving anything replay
-  reconstructs. Activity recording and history reads are implemented and tested but belong to a
-  slice that is not yet checkpointed.
+  reconstructs; and canonical snapshots with the reconstruction that rebuilds state from a base and
+  a later contiguous tail, where each record's identity is chained from the one before it and rooted
+  in the ledger's own, so a tail cannot be grafted onto a history it does not belong to. Snapshots
+  and reconstruction are implemented and tested but belong to a slice that is not yet checkpointed.
 - **Runnable.** `uv run python -m vellis.setup` prepares one local system. It previews the
   destination and starting vocabulary, asks for confirmation, and accepts `--data-dir`, `--yes`, and
   a no-effect `--dry-run`. It stores memory under the platform's user-data location by default and
   never writes to this repository's ignored `.data/`.
-- **Not implemented yet.** Historical query and definition discovery, snapshots, ledger-tail replay, historical selection and restore, v1 snapshot
+- **Not implemented yet.** Historical query and definition discovery, snapshot-based
+  initialization, historical selection and restore, v1 snapshot
   recovery, and the MCP server. The Everyday Life starter exists as a definition set, but offering
   it as a confirmed first-use choice does not. The model selects a portable
   ten-tool MCP contract; no server exposes it. The campaign directly pins FastMCP and FastMCP Slim

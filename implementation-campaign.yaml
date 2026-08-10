@@ -7,7 +7,7 @@ campaign:
     status: accepted
     checkpoint: approval:5a8d92c675d6865bd70fadd0e971bbf959081bea
   blocker: null
-  checkpoint: slice:S006:5a8d92c675d6:1
+  checkpoint: slice:S007:5a8d92c675d6:1
 model_baseline:
   status: current
   authority_files:
@@ -174,13 +174,14 @@ authority:
       - {model_ref: "VellisRequirements::boundedHistoryRead", source: "model/40-requirements.sysml"}
     planned_coverage: full
     slice_ids: [S006, S007]
-    implementation_status: partial
+    implementation_status: conforming
     evidence_refs:
       - path:tests/vellis/test_activity_history.py#test_each_read_capability_records_its_own_observation
       - path:tests/vellis/test_activity_history.py#test_an_activity_read_is_selected_before_its_own_record_is_appended
       - path:tests/vellis/test_activity_history.py#test_forgetting_activity_leaves_replayed_state_identical
       - path:tests/vellis/test_activity_history.py#test_a_canonical_read_returns_one_entry_per_record_in_ledger_order
       - path:tests/vellis/test_activity_history.py#test_an_over_broad_or_unbounded_read_is_refused_whole
+      - path:tests/vellis/test_snapshot_replay.py#test_capturing_and_reconstructing_are_observed
   - id: A009
     label: Snapshot, replay, and snapshot-based initialization
     refs:
@@ -193,8 +194,12 @@ authority:
       - {model_ref: "VellisRequirements::replayEquivalence", source: "model/40-requirements.sysml"}
     planned_coverage: full
     slice_ids: [S007, S011]
-    implementation_status: absent
-    evidence_refs: []
+    implementation_status: partial
+    evidence_refs:
+      - path:tests/vellis/test_snapshot_replay.py#test_a_snapshot_captures_the_whole_state_at_its_revision
+      - path:tests/vellis/test_snapshot_replay.py#test_a_snapshot_and_its_later_tail_reconstruct_the_current_state
+      - path:tests/vellis/test_snapshot_replay.py#test_a_tail_cannot_be_grafted_onto_an_identical_looking_base
+      - path:tests/vellis/test_snapshot_replay.py#test_a_tail_whose_result_would_not_conform_is_refused
   - id: A010
     label: Historical selection and restoration
     refs:
@@ -572,12 +577,32 @@ slices:
       - VellisVerification::snapshotReplay
       - VellisVerification::invalidTail
       - VellisVerification::activitySeparation
-    lifecycle: ready
-    implementation_status: absent
-    evidence_refs: []
+    lifecycle: complete
+    implementation_status: conforming
+    evidence_refs:
+      - path:tests/vellis/test_snapshot_replay.py#test_a_snapshot_captures_the_whole_state_at_its_revision
+      - path:tests/vellis/test_snapshot_replay.py#test_a_snapshot_carries_an_in_flight_delta
+      - path:tests/vellis/test_snapshot_replay.py#test_a_snapshot_identifies_the_record_that_established_its_revision
+      - path:tests/vellis/test_snapshot_replay.py#test_capturing_changes_no_canonical_state_revision_or_history
+      - path:tests/vellis/test_snapshot_replay.py#test_a_snapshot_and_its_later_tail_reconstruct_the_current_state
+      - path:tests/vellis/test_snapshot_replay.py#test_an_initial_record_and_its_whole_tail_reconstruct_the_current_state
+      - path:tests/vellis/test_snapshot_replay.py#test_two_ledgers_built_from_identical_content_have_different_identities
+      - path:tests/vellis/test_snapshot_replay.py#test_a_tail_cannot_be_grafted_onto_an_identical_looking_base
+      - path:tests/vellis/test_snapshot_replay.py#test_every_distinguishing_field_participates_in_a_base_identity
+      - path:tests/vellis/test_snapshot_replay.py#test_an_identity_survives_the_store_round_trip
+      - path:tests/vellis/test_snapshot_replay.py#test_a_gapped_duplicated_or_reordered_tail_is_refused
+      - path:tests/vellis/test_snapshot_replay.py#test_a_tail_whose_result_would_not_conform_is_refused
+      - path:tests/vellis/test_snapshot_replay.py#test_capturing_and_reconstructing_are_observed
+      - path:tests/vellis/test_snapshot_replay.py#test_a_tail_whose_interior_came_from_elsewhere_is_refused
+      - path:tests/vellis/test_snapshot_replay.py#test_lineage_alone_separates_two_ledgers_recorded_at_the_same_instant
+      - path:tests/vellis/test_snapshot_replay.py#test_a_captured_identity_folds_the_whole_chain_not_only_the_last_record
+      - path:tests/vellis/test_snapshot_replay.py#test_a_capture_racing_a_commit_is_refused_rather_than_bound_to_the_wrong_record
+      - path:tests/vellis/test_snapshot_replay.py#test_a_structurally_incoherent_change_in_a_tail_is_refused
+      - path:tests/vellis/test_snapshot_replay.py#test_an_activation_whose_definitions_are_invalid_is_refused
+      - command:uv run pytest tests/vellis
     realization_decisions: []
     blocker: null
-    checkpoint: null
+    checkpoint: slice:S007:5a8d92c675d6:1
   - id: S008
     order: 8
     label: Discover and query selected historical state
@@ -593,7 +618,7 @@ slices:
       - VellisVerification::definitionDiscovery
       - VellisVerification::semanticQuery
       - VellisVerification::historicalSelection
-    lifecycle: pending
+    lifecycle: ready
     implementation_status: absent
     evidence_refs: []
     realization_decisions: []

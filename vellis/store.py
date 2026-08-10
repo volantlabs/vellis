@@ -28,6 +28,7 @@ than through wall-clock timing.
 
 from __future__ import annotations
 
+import secrets
 import sqlite3
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -62,7 +63,7 @@ __all__ = [
     "StoreError",
 ]
 
-SCHEMA_VERSION = "1"
+SCHEMA_VERSION = "2"
 
 # The next ledger position. Counting rows would traverse the whole prefix on every
 # commit, which is exactly the work history-independent current operations may not do;
@@ -91,6 +92,10 @@ CREATE TABLE activity_record (
     ordinal     INTEGER PRIMARY KEY AUTOINCREMENT,
     recorded_at TEXT NOT NULL,
     payload     TEXT NOT NULL
+);
+CREATE TABLE ledger (
+    id       INTEGER PRIMARY KEY CHECK (id = 0),
+    identity TEXT    NOT NULL
 );
 CREATE INDEX activity_record_time ON activity_record (recorded_at);
 CREATE INDEX canonical_record_time ON canonical_record (recorded_at);
@@ -237,6 +242,12 @@ class CanonicalStore:
         return row is not None
 
     def _check_marker(self) -> None:
+        # Whose database this is comes first. A version mismatch is a statement about a
+        # Vellis store, and reporting one about a file that is not ours would send the
+        # owner looking for a migration that does not apply.
+        marker = self._connection.execute("PRAGMA application_id").fetchone()
+        if marker is None or int(marker[0]) != APPLICATION_ID:
+            raise StoreError(f"the database at {self._path} is not a Vellis canonical store")
         row = self._connection.execute(
             "SELECT value FROM schema_meta WHERE key = 'schema_version'"
         ).fetchone()
@@ -246,10 +257,7 @@ class CanonicalStore:
                 f"canonical store at {self._path} has schema version {found}, "
                 f"but this build reads version {SCHEMA_VERSION}"
             )
-        marker = self._connection.execute("PRAGMA application_id").fetchone()
-        if marker is None or int(marker[0]) != APPLICATION_ID:
-            raise StoreError(f"the database at {self._path} is not a Vellis canonical store")
-        for table in ("canonical_record", "activity_record", "current_state"):
+        for table in ("canonical_record", "activity_record", "current_state", "ledger"):
             present = self._connection.execute(
                 "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?", (table,)
             ).fetchone()
@@ -355,6 +363,12 @@ class CanonicalStore:
             # A read attempted before the system existed may already have observed itself
             # here, and success promises an empty ledger.
             self._connection.execute("DELETE FROM activity_record")
+            # One value that no other ledger can hold, so a record's identity says which
+            # history it belongs to and not merely what it contains. Two systems seeded
+            # from the same snapshot are otherwise indistinguishable by content alone.
+            self._connection.execute(
+                "INSERT INTO ledger (id, identity) VALUES (0, ?)", (secrets.token_hex(16),)
+            )
             self._connection.execute("COMMIT")
         except AlreadyInitializedError:
             raise
@@ -402,7 +416,7 @@ class CanonicalStore:
                 (
                     record.resulting_revision,
                     record.kind.value,
-                    record.recorded_at.isoformat(),
+                    _stored_time(record.recorded_at),
                     record.provenance.initiator,
                     record.provenance.source,
                     str(record.prior_revision),
@@ -431,25 +445,25 @@ class CanonicalStore:
         records: list[CanonicalTransitionRecord] = []
         for row in rows:
             assert isinstance(row, tuple)
-            record = _RecordRow(*row)
-            try:
-                kind = TransitionKind(record.record_kind)
-                prior = int(record.summary)
-            except ValueError as error:
-                raise StoreError(
-                    f"a canonical record at {self._path} is not a readable transition: {error}"
-                ) from error
-            records.append(
-                CanonicalTransitionRecord(
-                    prior_revision=prior,
-                    resulting_revision=record.established_revision,
-                    kind=kind,
-                    change=self._decode_change(record.payload),
-                    provenance=Provenance(initiator=record.initiator, source=record.source),
-                    recorded_at=self._recorded_at(record.recorded_at),
-                )
-            )
+            records.append(self._transition_from(_RecordRow(*row)))
         return tuple(records)
+
+    def _transition_from(self, record: _RecordRow) -> CanonicalTransitionRecord:
+        try:
+            kind = TransitionKind(record.record_kind)
+            prior = int(record.summary)
+        except ValueError as error:
+            raise StoreError(
+                f"a canonical record at {self._path} is not a readable transition: {error}"
+            ) from error
+        return CanonicalTransitionRecord(
+            prior_revision=prior,
+            resulting_revision=record.established_revision,
+            kind=kind,
+            change=self._decode_change(record.payload),
+            provenance=Provenance(initiator=record.initiator, source=record.source),
+            recorded_at=self._recorded_at(record.recorded_at),
+        )
 
     def _decode_change(self, payload: object) -> CanonicalChange:
         if not isinstance(payload, str):
@@ -468,6 +482,35 @@ class CanonicalStore:
             raise StoreError(
                 f"a canonical record at {self._path} has an unreadable time: {error}"
             ) from error
+
+    def ledger_identity(self) -> str:
+        """Return this ledger's own identity, established with its history base."""
+        row = self._fetchone("SELECT identity FROM ledger WHERE id = 0")
+        if row is None:
+            raise NotInitializedError("no canonical state is established")
+        assert isinstance(row, tuple)
+        return str(row[0])
+
+    def establishing_record(self) -> tuple[int, CanonicalTransitionRecord | None]:
+        """Return the current revision and the transition that established it.
+
+        Read from the projection row in one statement, so the pair cannot disagree the
+        way two separate reads can when another writer commits between them.
+        """
+        row = self._read_record(
+            "SELECT s.revision, r.ordinal, r.established_revision, r.record_kind, r.recorded_at,"
+            " r.initiator, r.source, r.summary, r.payload"
+            " FROM current_state s JOIN canonical_record r"
+            " ON r.established_revision = s.established_by WHERE s.id = 0"
+        )
+        if row is None:
+            raise NotInitializedError("no canonical state is established")
+        assert isinstance(row, tuple)
+        revision, ordinal = int(row[0]), int(row[1])
+        if not ordinal:
+            return revision, None
+        record = _RecordRow(*row[2:])
+        return revision, self._transition_from(record)
 
     def canonical_summaries(
         self, *, start: datetime | None = None, end: datetime | None = None

@@ -80,10 +80,20 @@ from vellis.outcomes import (
     ValidationScope,
 )
 from vellis.query import GraphQuery, GraphQueryResult, evaluate_query
+from vellis.replay import (
+    CanonicalSnapshot,
+    LedgerTail,
+    ReconstructionResult,
+    ReplayRequest,
+    SnapshotResult,
+    reconstruct,
+    record_identity,
+)
 from vellis.serialization import unreadable_reason
 from vellis.store import (
     AlreadyInitializedError,
     CanonicalStore,
+    ConcurrentRevisionError,
     NotInitializedError,
     StoreError,
 )
@@ -762,6 +772,119 @@ class RTGSystem:
             )
         except StoreError:
             return
+
+    # --- Capture and rebuild ------------------------------------------------------------
+
+    def create_snapshot(self, *, provenance: Provenance = UNATTRIBUTED) -> SnapshotResult:
+        """Capture complete canonical state, bound to the record that established it.
+
+        Reads nothing it does not return and changes nothing at all: a capture that moved
+        the revision would be capturing a state that no longer existed by the time it
+        finished.
+        """
+        try:
+            revision, establishing = self._store.establishing_record()
+            state = self.current_state()
+            if state.revision != revision:
+                # Another writer committed between the two reads. A snapshot bound to a
+                # record that established a different revision is not a smaller capture;
+                # it is one of a state that never existed.
+                raise ConcurrentRevisionError(
+                    f"canonical state moved from revision {revision} to {state.revision} "
+                    "while it was being captured"
+                )
+            captured = self._identity_through(establishing)
+        except NotInitializedError as error:
+            result = SnapshotResult(
+                status=OperationStatus.REJECTED,
+                summary="no canonical state is established; initialize this RTG first",
+                findings=(ValidationFinding(summary=str(error)),),
+            )
+        except StoreError as error:
+            result = SnapshotResult(
+                status=OperationStatus.FAILED,
+                summary=f"the snapshot could not be captured: {error}",
+                findings=(ValidationFinding(summary=str(error)),),
+            )
+        else:
+            result = SnapshotResult(
+                status=OperationStatus.ACCEPTED,
+                summary=f"captured revision {state.revision}",
+                snapshot=CanonicalSnapshot(canonical_state=state, captured_through=captured),
+            )
+        self._observe(
+            "snapshot",
+            result.status,
+            scope="complete canonical state",
+            summary=result.summary,
+            provenance=provenance,
+            evaluated_revision=None if result.snapshot is None else result.snapshot.revision,
+        )
+        return result
+
+    def base_identity(self) -> str:
+        """Return the identity of this ledger's own history base."""
+        return record_identity(self._store.initial_record(), follows=self._store.ledger_identity())
+
+    def _identity_through(self, record: CanonicalTransitionRecord | None) -> str:
+        """Walk the chain to the identity of ``record``, or of the base when it is None."""
+        identity = self.base_identity()
+        if record is None:
+            return identity
+        for each in self._store.transitions():
+            identity = record_identity(each, follows=identity)
+            if each.resulting_revision == record.resulting_revision:
+                return identity
+        raise StoreError("the record establishing the current revision is not in the ledger")
+
+    def ledger_tail(self, *, after: int) -> LedgerTail:
+        """Return the contiguous run of transitions following revision ``after``.
+
+        The preceding record is named by its chained identity, so a tail taken from here
+        cannot be joined onto another history that happens to sit at the same revision.
+        An ``after`` no record established is refused rather than answered with a tail
+        that says it follows something it does not.
+        """
+        base = self._store.initial_record()
+        identity = self.base_identity()
+        transitions = self._store.transitions()
+        start: int | None = None
+        preceding = identity
+        if after == base.canonical_state.revision:
+            start = 0
+        for index, each in enumerate(transitions):
+            identity = record_identity(each, follows=identity)
+            if start is None and each.resulting_revision == after:
+                start, preceding = index + 1, identity
+        if start is None:
+            raise ValueError(f"no record in this ledger established revision {after}")
+        return LedgerTail(
+            preceding_record=preceding,
+            transitions=transitions[start:],
+            final_record=identity,
+        )
+
+    def reconstruct_state(
+        self, request: ReplayRequest, *, provenance: Provenance = UNATTRIBUTED
+    ) -> ReconstructionResult:
+        """Rebuild canonical state from a base and an optional tail.
+
+        Live state is neither read nor moved: the answer comes entirely from what the
+        caller supplied, which is what makes it a check of the ledger rather than of
+        this system's memory.
+        """
+        result = reconstruct(request)
+        self._observe(
+            "reconstruction",
+            result.status,
+            scope="a supplied base and tail",
+            summary=result.summary,
+            provenance=provenance,
+            evaluated_revision=(
+                None if result.canonical_state is None else result.canonical_state.revision
+            ),
+        )
+        return result
 
     # --- History ------------------------------------------------------------------------
 

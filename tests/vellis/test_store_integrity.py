@@ -374,12 +374,12 @@ def test_a_store_written_by_a_later_build_is_refused(tmp_path: Path) -> None:
 
     connection = sqlite3.connect(path)
     try:
-        connection.execute("UPDATE schema_meta SET value = '2' WHERE key = 'schema_version'")
+        connection.execute("UPDATE schema_meta SET value = '3' WHERE key = 'schema_version'")
         connection.commit()
     finally:
         connection.close()
 
-    with pytest.raises(StoreError, match="schema version 2"):
+    with pytest.raises(StoreError, match="schema version 3"):
         CanonicalStore(path)
 
 
