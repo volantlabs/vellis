@@ -12,6 +12,7 @@ from tools import implementation_campaign, model_layout, sysml_validator
 
 PLAN_SHA = "1" * 40
 APPROVAL_CHECKPOINT = f"approval:{PLAN_SHA}"
+SUPERSEDED_PLAN_SHORT_SHA = "9" * 12
 
 
 def _campaign() -> dict[str, object]:
@@ -53,6 +54,38 @@ def _pending_campaign() -> dict[str, object]:
     closure["evidence_refs"] = []  # type: ignore[index]
     closure["checkpoint"] = None  # type: ignore[index]
     return campaign
+
+
+def _replanned_campaign() -> dict[str, object]:
+    """A campaign whose first three slices completed under a superseded approved plan.
+
+    Replanning after execution is the case a first approval cannot express. A corrected
+    plan narrows what those slices claimed and moves the remainder into later slices, so
+    the work they committed stays valid and keeps the label it earned.
+    """
+    campaign = _replanned_slices(_pending_campaign())
+    return campaign
+
+
+def _replanned_slices(campaign: dict[str, object]) -> dict[str, object]:
+    for index in range(3):
+        entry = campaign["slices"][index]  # type: ignore[index]
+        entry["lifecycle"] = "complete"
+        entry["implementation_status"] = "conforming"
+        entry["evidence_refs"] = ["command:just check"]
+        entry["checkpoint"] = f"slice:S00{index + 1}:{SUPERSEDED_PLAN_SHORT_SHA}:1"
+    return campaign
+
+
+def _renew(campaign: dict[str, object], *, checkpoint: str = APPROVAL_CHECKPOINT) -> None:
+    """Grant the renewed approval: only the approval state and the next slice move."""
+    campaign["campaign"]["lifecycle"] = "ready"  # type: ignore[index]
+    campaign["campaign"]["plan_approval"] = {  # type: ignore[index]
+        "status": "accepted",
+        "checkpoint": checkpoint,
+    }
+    campaign["campaign"]["checkpoint"] = checkpoint  # type: ignore[index]
+    campaign["slices"][3]["lifecycle"] = "ready"  # type: ignore[index]
 
 
 def _git(root: Path, *arguments: str) -> str:
@@ -101,6 +134,63 @@ def _approval_repository(tmp_path: Path) -> tuple[dict[str, object], str]:
     _git(tmp_path, "add", "implementation-campaign.yaml")
     _git(tmp_path, "commit", "-m", "approve campaign")
     return campaign, plan_sha
+
+
+def _renewed_approval_repository(tmp_path: Path) -> tuple[dict[str, object], str]:
+    """A corrected plan approved again while three slices are already complete."""
+    _git(tmp_path, "init")
+    _git(tmp_path, "config", "user.email", "campaign@example.invalid")
+    _git(tmp_path, "config", "user.name", "Campaign Test")
+    shutil.copytree(model_layout.MODEL_ROOT, tmp_path / "model")
+    schema_relative = model_layout.IMPLEMENTATION_CAMPAIGN_SCHEMA_PATH.relative_to(
+        model_layout.ROOT
+    )
+    schema_destination = tmp_path / schema_relative
+    schema_destination.parent.mkdir(parents=True)
+    shutil.copy2(model_layout.IMPLEMENTATION_CAMPAIGN_SCHEMA_PATH, schema_destination)
+    campaign = _replanned_campaign()
+    _write_campaign(tmp_path, campaign)
+    _git(tmp_path, "add", ".")
+    _git(tmp_path, "commit", "-m", "corrected candidate plan")
+    plan_sha = _git(tmp_path, "rev-parse", "HEAD")
+
+    _renew(campaign, checkpoint=f"approval:{plan_sha}")
+    _write_campaign(tmp_path, campaign)
+    _git(tmp_path, "add", "implementation-campaign.yaml")
+    _git(tmp_path, "commit", "-m", "renew campaign approval")
+    return campaign, plan_sha
+
+
+def test_renewed_approval_commit_binds_the_current_head_to_its_plan(tmp_path: Path) -> None:
+    campaign, _ = _renewed_approval_repository(tmp_path)
+
+    assert implementation_campaign.checkpoint_binding_findings(campaign, root=tmp_path) == []
+
+
+def test_renewed_approval_commit_may_change_only_approval_state(tmp_path: Path) -> None:
+    campaign, _ = _renewed_approval_repository(tmp_path)
+    campaign["slices"][4]["lifecycle"] = "ready"  # type: ignore[index]
+    _write_campaign(tmp_path, campaign)
+    _git(tmp_path, "add", "implementation-campaign.yaml")
+    _git(tmp_path, "commit", "--amend", "-m", "renew campaign approval")
+
+    findings = implementation_campaign.checkpoint_binding_findings(campaign, root=tmp_path)
+
+    assert any("beyond approval state" in finding for finding in findings)
+
+
+def test_renewed_approval_commit_must_directly_follow_its_reviewed_plan(tmp_path: Path) -> None:
+    campaign, _ = _renewed_approval_repository(tmp_path)
+    (tmp_path / "NOTES.md").write_text("# Notes\n", encoding="utf-8")
+    _git(tmp_path, "add", "NOTES.md")
+    _git(tmp_path, "commit", "-m", "interpose an unrelated commit")
+    _write_campaign(tmp_path, campaign)
+    _git(tmp_path, "add", "implementation-campaign.yaml")
+    _git(tmp_path, "commit", "--allow-empty", "-m", "re-record the approval")
+
+    findings = implementation_campaign.checkpoint_binding_findings(campaign, root=tmp_path)
+
+    assert any("must directly follow its approved plan" in finding for finding in findings)
 
 
 def test_committed_campaign_is_current_and_valid() -> None:
@@ -396,6 +486,84 @@ def test_active_campaign_uses_latest_completed_slice_checkpoint() -> None:
     findings = implementation_campaign.validate_campaign(campaign)
 
     assert any("must be the latest recoverable checkpoint" in finding for finding in findings)
+
+
+def test_renewed_approval_keeps_the_checkpoints_completed_slices_earned() -> None:
+    campaign = _replanned_campaign()
+    _renew(campaign)
+
+    assert implementation_campaign.validate_campaign(campaign) == []
+    assert [entry["checkpoint"] for entry in campaign["slices"][:3]] == [  # type: ignore[index]
+        f"slice:S00{index + 1}:{SUPERSEDED_PLAN_SHORT_SHA}:1" for index in range(3)
+    ]
+
+
+def test_renewed_approval_is_the_latest_recoverable_checkpoint_until_a_slice_completes() -> None:
+    campaign = _replanned_campaign()
+    _renew(campaign)
+    campaign["campaign"]["checkpoint"] = campaign["slices"][2]["checkpoint"]  # type: ignore[index]
+
+    findings = implementation_campaign.validate_campaign(campaign)
+
+    assert any("must be the latest recoverable checkpoint" in finding for finding in findings)
+
+
+def test_a_slice_completed_under_a_renewed_plan_may_not_use_the_superseded_one() -> None:
+    campaign = _replanned_campaign()
+    _renew(campaign)
+    fourth = campaign["slices"][3]  # type: ignore[index]
+    fourth["lifecycle"] = "complete"
+    fourth["implementation_status"] = "conforming"
+    fourth["evidence_refs"] = ["command:just check"]
+    fourth["checkpoint"] = f"slice:S004:{SUPERSEDED_PLAN_SHORT_SHA}:1"
+    campaign["campaign"]["checkpoint"] = fourth["checkpoint"]  # type: ignore[index]
+
+    findings = implementation_campaign.validate_campaign(campaign)
+
+    assert any("latest slice checkpoint must use the approved plan" in f for f in findings)
+
+
+def test_a_slice_completed_under_the_renewed_plan_becomes_the_campaign_checkpoint() -> None:
+    campaign = _replanned_campaign()
+    _renew(campaign)
+    fourth = campaign["slices"][3]  # type: ignore[index]
+    fourth["lifecycle"] = "complete"
+    fourth["implementation_status"] = "conforming"
+    fourth["evidence_refs"] = ["command:just check"]
+    fourth["checkpoint"] = f"slice:S004:{PLAN_SHA[:12]}:1"
+    campaign["campaign"]["checkpoint"] = fourth["checkpoint"]  # type: ignore[index]
+    campaign["slices"][4]["lifecycle"] = "ready"  # type: ignore[index]
+
+    assert implementation_campaign.validate_campaign(campaign) == []
+
+
+def test_a_superseded_checkpoint_may_not_follow_one_earned_under_the_renewed_plan() -> None:
+    campaign = _replanned_campaign()
+    _renew(campaign)
+    for index, plan in ((3, PLAN_SHA[:12]), (4, SUPERSEDED_PLAN_SHORT_SHA)):
+        entry = campaign["slices"][index]  # type: ignore[index]
+        entry["lifecycle"] = "complete"
+        entry["implementation_status"] = "conforming"
+        entry["evidence_refs"] = ["command:just check"]
+        entry["checkpoint"] = f"slice:S00{index + 1}:{plan}:1"
+    campaign["campaign"]["checkpoint"] = campaign["slices"][4]["checkpoint"]  # type: ignore[index]
+
+    findings = implementation_campaign.validate_campaign(campaign)
+
+    assert any("slice S005 checkpoint does not use the approved plan commit" in f for f in findings)
+
+
+def test_renewed_approval_readies_only_the_next_dependency_ready_slice() -> None:
+    expected = implementation_campaign._expected_approval_campaign(
+        _replanned_campaign(), checkpoint=APPROVAL_CHECKPOINT
+    )
+
+    assert expected["campaign"]["checkpoint"] == APPROVAL_CHECKPOINT  # type: ignore[index]
+    assert [
+        entry["id"]
+        for entry in expected["slices"]  # type: ignore[union-attr]
+        if entry["lifecycle"] == "ready"
+    ] == ["S004"]
 
 
 def test_active_campaign_cannot_skip_a_lower_dependency_ready_slice() -> None:

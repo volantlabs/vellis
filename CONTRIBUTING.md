@@ -110,7 +110,8 @@ Vellis checkpoint identifiers are navigation labels in the portable campaign rec
 - closure: `closure:<approved-plan-short-sha>:<attempt>`.
 
 Start an attempt at `1` and increment it only if a checkpoint for the same slice and approved plan
-already committed. No special Git commit trailers are required.
+already committed. Attempt numbers are scoped to one slice under one approved plan, so a slice
+reached again under a renewed approval starts at `1`. No special Git commit trailers are required.
 
 The approval commit is a direct child of the reviewed plan commit and changes only
 `implementation-campaign.yaml`: set campaign lifecycle to `ready`, approval to `accepted`, both
@@ -120,6 +121,20 @@ verification, decisions, blockers, evidence, or any other plan-bearing content. 
 blocker changes approval to `changes-required`, clears its approval checkpoint, and puts the campaign
 in `blocked` or `stale`; execution does not continue through that state.
 Every later slice and closure checkpoint preserves that approved plan-bearing projection exactly.
+
+Replanning after slices have completed ends at a renewed approval, which follows the same rule with
+one difference: completed slices keep the checkpoints they earned, including the superseded approved
+plan those labels name. A corrected plan narrows what those slices claimed and moves the remaining
+obligations into later slices; it does not invalidate the work they committed, so re-minting their
+labels would attest to a plan under which they were never reviewed. The renewed approval commit is a
+direct child of the final reviewed candidate, changes only `implementation-campaign.yaml`, and sets
+both approval and campaign checkpoints to `approval:<reviewed-plan-sha>` exactly as a first approval
+does. Until a slice completes under the renewed plan, that approval is the latest recoverable
+campaign checkpoint; the next completed slice then takes its place. Superseded labels are permitted
+only behind the frontier: every slice completed at or after the first one bearing the current
+approved plan must bear it too, and the checkpoint a campaign currently rests on may never name a
+superseded plan.
+
 Changing the baseline, authority map, coverage, slice graph, verification references, or selected
 realization decisions requires replanning, a new cold review, and renewed human approval.
 

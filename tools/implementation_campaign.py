@@ -309,14 +309,40 @@ def _checkpoint_format_findings(campaign: dict[str, Any]) -> list[str]:
         findings.append("closure checkpoint must be closure:<approved-plan-short-sha>:<attempt>")
 
     approved_plan = approval_match.group("plan") if approval_match is not None else None
+    campaign_checkpoint = campaign["campaign"]["checkpoint"]
     if approved_plan is not None:
-        for entry in campaign["slices"]:
-            checkpoint = entry["checkpoint"]
-            match = SLICE_CHECKPOINT.fullmatch(checkpoint) if checkpoint is not None else None
+        # A replan after execution renews approval without invalidating finished work: a slice
+        # completed under a superseded plan keeps the label it earned. Only the frontier moves.
+        # Every slice completed at or after the first one carrying the current plan must carry it
+        # too, so approval cannot silently reopen behind a slice that already advanced.
+        ordered = sorted(
+            (
+                (entry, SLICE_CHECKPOINT.fullmatch(entry["checkpoint"]))
+                for entry in campaign["slices"]
+                if entry["checkpoint"] is not None
+            ),
+            key=lambda pair: pair[0]["order"],
+        )
+        renewed = [
+            index
+            for index, (_, match) in enumerate(ordered)
+            if match is not None and match.group("plan") == approved_plan[:12]
+        ]
+        frontier = min(renewed, default=len(ordered))
+        for entry, match in ordered[frontier:]:
             if match is not None and match.group("plan") != approved_plan[:12]:
                 findings.append(
                     f"slice {entry['id']} checkpoint does not use the approved plan commit"
                 )
+        # The campaign checkpoint names a slice only once one has completed under this approval,
+        # so that slice may never be labelled with a superseded plan.
+        latest_match = (
+            SLICE_CHECKPOINT.fullmatch(campaign_checkpoint)
+            if campaign_checkpoint is not None
+            else None
+        )
+        if latest_match is not None and latest_match.group("plan") != approved_plan[:12]:
+            findings.append("the latest slice checkpoint must use the approved plan commit")
         match = (
             CLOSURE_CHECKPOINT.fullmatch(closure_checkpoint)
             if closure_checkpoint is not None
@@ -325,7 +351,6 @@ def _checkpoint_format_findings(campaign: dict[str, Any]) -> list[str]:
         if match is not None and match.group("plan") != approved_plan[:12]:
             findings.append("closure checkpoint does not use the approved plan commit")
 
-    campaign_checkpoint = campaign["campaign"]["checkpoint"]
     if campaign_checkpoint is not None and not any(
         pattern.fullmatch(campaign_checkpoint)
         for pattern in (APPROVAL_CHECKPOINT, SLICE_CHECKPOINT, CLOSURE_CHECKPOINT)
@@ -336,6 +361,12 @@ def _checkpoint_format_findings(campaign: dict[str, Any]) -> list[str]:
     latest_completed_checkpoint = (
         latest_completed["checkpoint"] if latest_completed is not None else None
     )
+    # Until a slice completes under a renewed approval, the approval itself is the latest
+    # recoverable state: the newest completed slice was checkpointed under the superseded plan.
+    if approved_plan is not None and latest_completed_checkpoint is not None:
+        latest_match = SLICE_CHECKPOINT.fullmatch(latest_completed_checkpoint)
+        if latest_match is not None and latest_match.group("plan") != approved_plan[:12]:
+            latest_completed_checkpoint = None
     campaign_slice_match = (
         SLICE_CHECKPOINT.fullmatch(campaign_checkpoint) if campaign_checkpoint is not None else None
     )
@@ -883,16 +914,21 @@ def checkpoint_binding_findings(campaign: dict[str, Any], *, root: Path = ROOT) 
     if _plan_projection(campaign) != _plan_projection(planned):
         findings.append("current campaign changed plan-bearing content after approval")
 
-    completed = [entry for entry in campaign["slices"] if entry["lifecycle"] == "complete"]
-    initial_approval = (
-        not completed
-        and campaign["campaign"]["lifecycle"] == "ready"
+    # An approval commit — first or renewed after a replan — is the state in which the approval is
+    # itself the campaign checkpoint, because no slice has completed under this plan yet.
+    approval_commit = (
+        campaign["campaign"]["lifecycle"] == "ready"
         and campaign["campaign"]["checkpoint"] == checkpoint
+        and not any(
+            (match := SLICE_CHECKPOINT.fullmatch(entry["checkpoint"] or "")) is not None
+            and match.group("plan") == plan_commit[:12]
+            for entry in campaign["slices"]
+        )
     )
-    if initial_approval:
+    if approval_commit:
         parents = _git(root, "rev-list", "--parents", "-n", "1", "HEAD").split()
         if len(parents) != 2 or parents[1] != plan_commit:
-            findings.append("the initial approval commit must directly follow its approved plan")
+            findings.append("the approval commit must directly follow its approved plan")
         changed_paths = set(
             _git(
                 root,
@@ -904,9 +940,9 @@ def checkpoint_binding_findings(campaign: dict[str, Any], *, root: Path = ROOT) 
             ).splitlines()
         )
         if changed_paths != {"implementation-campaign.yaml"}:
-            findings.append("the initial approval commit must change only the campaign record")
+            findings.append("the approval commit must change only the campaign record")
         if committed != _expected_approval_campaign(planned, checkpoint=checkpoint):
-            findings.append("the initial approval commit contains changes beyond approval state")
+            findings.append("the approval commit contains changes beyond approval state")
     return findings
 
 
