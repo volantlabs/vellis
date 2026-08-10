@@ -100,8 +100,9 @@ Useful commands:
 
 ## Implementation status
 
-The approved campaign is under way; its first slice is complete, so the application is partially
-implemented rather than absent. Use these words precisely:
+The approved campaign is under way and several slices are complete, so the application is
+partially implemented rather than absent. `just implementation-campaign-status` reports exactly
+where it stands. Use these words precisely:
 
 - **Implemented and verified.** Canonical graph, definition, and constraint meaning; canonical
   semantic equality over JSON, graphs, definitions, and canonical states; whole-string RE2 property
@@ -112,13 +113,15 @@ implemented rather than absent. Use these words precisely:
   anything else; a current-state projection reached without traversing canonical history;
   explicit graph changes committed atomically as contiguous canonical transitions, with the
   complete resulting graph validated first and replay reconstructing the same state from the
-  ledger alone; and the typed graph-conformance report.
+  ledger alone; the typed graph-conformance report; and current definition discovery — the complete
+  shallow anchor vocabulary and the complete focused neighborhood of each selected anchor, each
+  carrying the revision it was evaluated at so a caller can tell that the ground moved.
 - **Runnable.** `uv run python -m vellis.setup` prepares one local system. It previews the
   destination and starting vocabulary, asks for confirmation, and accepts `--data-dir`, `--yes`, and
   a no-effect `--dry-run`. It stores memory under the platform's user-data location by default and
   never writes to this repository's ignored `.data/`.
-- **Not implemented yet.** Semantic query, definition-delta governance, activity recording and
-  history reads, snapshots, ledger-tail replay, historical selection and restore, the Everyday Life
+- **Not implemented yet.** Semantic query, definition-delta governance, historical definition
+  discovery, activity recording and history reads, snapshots, ledger-tail replay, historical selection and restore, the Everyday Life
   starter, v1 snapshot recovery, and the MCP server. Definition-delta validation reports arrive with
   the delta governance that produces them. The model selects a portable
   ten-tool MCP contract; no server exposes it. The campaign directly pins FastMCP and FastMCP Slim

@@ -1,8 +1,9 @@
 """The one cohesive RTG semantic and transactional boundary.
 
 Realizes ``RTGSystem::'RTG System'`` as far as this slice reaches:
-``RTGSystem::'Initialize fresh RTG'``, ``RTGSystem::'Apply graph change'``, and
-``RTGSystem::'Assess graph conformance'``, carrying
+``RTGSystem::'Initialize fresh RTG'``, ``RTGSystem::'Apply graph change'``,
+``RTGSystem::'Assess graph conformance'``, and the current-state half of
+``RTGSystem::'Discover evaluated graph definitions'``, carrying
 ``VellisRequirements::freshInitialization``,
 ``VellisRequirements::atomicCanonicalRevision``,
 ``VellisRequirements::explicitGraphChangeSet``,
@@ -35,6 +36,15 @@ from vellis.canonical import (
 )
 from vellis.changes import GraphChange, apply_change, change_findings
 from vellis.definitions import GraphDefinitionSet, validate_definition_set
+from vellis.discovery import (
+    AnchorDefinitionDetail,
+    DefinitionInspectionRequest,
+    DefinitionInspectionResult,
+    DefinitionSummaryResult,
+    anchor_neighborhood,
+    inspection_findings,
+    summarize_anchor_types,
+)
 from vellis.graph import Graph, graph_equal
 from vellis.json_value import unencodable_reason
 from vellis.outcomes import (
@@ -45,7 +55,7 @@ from vellis.outcomes import (
     ValidationScope,
 )
 from vellis.serialization import unreadable_reason
-from vellis.store import AlreadyInitializedError, CanonicalStore
+from vellis.store import AlreadyInitializedError, CanonicalStore, StoreError
 from vellis.validation import assess_graph_conformance
 
 __all__ = ["RTGSystem"]
@@ -251,6 +261,72 @@ class RTGSystem:
             status=OperationStatus.ACCEPTED,
             summary=f"committed revision {resulting.revision}",
             resulting_revision=resulting.revision,
+        )
+
+    # --- Discovery --------------------------------------------------------------------
+
+    def definition_summary(self) -> DefinitionSummaryResult:
+        """Return every anchor type active at the current state.
+
+        A caller reads this first and an inspection second; both carry the revision they
+        were evaluated at, which is how a caller notices that the definitions moved
+        between the two reads.
+        """
+        try:
+            state = self.current_state()
+        except StoreError as error:
+            return DefinitionSummaryResult(
+                status=OperationStatus.FAILED,
+                summary=f"the definition summary could not be returned completely: {error}",
+                findings=(ValidationFinding(summary=str(error)),),
+            )
+        return DefinitionSummaryResult(
+            status=OperationStatus.ACCEPTED,
+            summary=f"{len(state.active_definitions.anchor_types)} active anchor types",
+            anchor_types=summarize_anchor_types(state.active_definitions),
+            evaluated_revision=state.revision,
+            delta_present=state.definition_delta is not None,
+        )
+
+    def inspect_definitions(
+        self, request: DefinitionInspectionRequest
+    ) -> DefinitionInspectionResult:
+        """Return the complete active neighborhood of each selected anchor type.
+
+        An unknown or duplicated selection yields findings and nothing else — not the
+        details that happened to resolve — because a partial answer would read as a
+        complete one.
+        """
+        try:
+            state = self.current_state()
+        except StoreError as error:
+            return DefinitionInspectionResult(
+                status=OperationStatus.FAILED,
+                summary=f"the selection could not be answered completely: {error}",
+                request=request,
+                findings=(ValidationFinding(summary=str(error)),),
+            )
+        findings = inspection_findings(request, state.active_definitions)
+        if findings:
+            return DefinitionInspectionResult(
+                status=OperationStatus.REJECTED,
+                summary=(
+                    f"the selection could not be answered ({len(findings)} findings); no "
+                    "details were returned"
+                ),
+                request=request,
+                findings=findings,
+            )
+        details: tuple[AnchorDefinitionDetail, ...] = tuple(
+            anchor_neighborhood(type_key, state.active_definitions)
+            for type_key in request.anchor_type_keys
+        )
+        return DefinitionInspectionResult(
+            status=OperationStatus.ACCEPTED,
+            summary=f"{len(details)} anchor neighborhoods",
+            request=request,
+            anchor_details=details,
+            evaluated_revision=state.revision,
         )
 
     # --- Assessment -------------------------------------------------------------------

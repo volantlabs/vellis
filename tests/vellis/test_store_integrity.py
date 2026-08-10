@@ -444,3 +444,25 @@ def test_a_stored_number_outside_the_decimal_range_is_a_store_error(tmp_path: Pa
             store.current_state()
     finally:
         store.close()
+
+
+def test_a_failed_read_is_reported_as_a_store_error_not_a_driver_exception(
+    tmp_path: Path,
+) -> None:
+    """Callers handle StoreError; a driver exception would become a traceback instead."""
+    path = tmp_path / "vellis.sqlite3"
+    _established(path)
+    store = CanonicalStore(path)
+    try:
+        store._connection.execute("DROP TABLE current_state")  # noqa: SLF001
+        with pytest.raises(StoreError, match="could not read"):
+            store.current_state()
+        with pytest.raises(StoreError, match="could not read"):
+            store.is_initialized()
+        store._connection.execute("DROP TABLE canonical_record")  # noqa: SLF001
+        with pytest.raises(StoreError, match="could not read"):
+            store.initial_record()
+        with pytest.raises(StoreError, match="could not read"):
+            store.transitions()
+    finally:
+        store.close()

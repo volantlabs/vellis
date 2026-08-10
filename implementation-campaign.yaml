@@ -7,7 +7,7 @@ campaign:
     status: accepted
     checkpoint: approval:16c835e15651a29b2574cc748f97956486f99f96
   blocker: null
-  checkpoint: slice:S002:16c835e15651:1
+  checkpoint: slice:S003:16c835e15651:1
 model_baseline:
   status: current
   authority_files:
@@ -125,8 +125,14 @@ authority:
       - {model_ref: "VellisRequirements::agentDefinitionDiscoverability", source: "model/40-requirements.sysml"}
     planned_coverage: full
     slice_ids: [S003, S006, S008]
-    implementation_status: absent
-    evidence_refs: []
+    implementation_status: partial
+    evidence_refs:
+      - path:tests/vellis/test_definition_discovery.py#test_a_cold_agent_reads_the_whole_anchor_vocabulary
+      - path:tests/vellis/test_definition_discovery.py#test_a_neighborhood_is_complete_for_its_anchor
+      - path:tests/vellis/test_definition_discovery.py#test_an_anchor_grounded_by_several_data_types_gets_all_of_them
+      - path:tests/vellis/test_definition_discovery.py#test_a_neighborhood_omits_unrelated_definitions
+      - path:tests/vellis/test_definition_discovery.py#test_an_unanswerable_selection_returns_findings_and_no_details
+      - path:tests/vellis/test_definition_discovery.py#test_a_revision_that_moved_between_the_two_reads_is_visible_to_the_caller
   - id: A007
     label: Current and historical semantic graph query
     refs:
@@ -272,6 +278,7 @@ authority:
       - path:tests/vellis/test_current_work.py#test_current_conformance_assessment_visits_no_canonical_record
       - path:tests/vellis/test_current_work.py#test_the_instrumentation_counts_a_real_record_access
       - path:tests/vellis/test_graph_changes.py#test_committing_costs_the_same_whatever_the_history_length
+      - path:tests/vellis/test_definition_discovery.py#test_discovery_reads_no_canonical_record
   - id: A017
     label: Runnable local onboarding and cohesive persistent-context use
     refs:
@@ -388,12 +395,27 @@ slices:
       - {authority_id: A016, coverage: partial, remaining_slice_ids: [S001, S002, S004, S005, S006, S007, S008, S009, S010, S016]}
     verification_refs:
       - VellisVerification::definitionDiscovery
-    lifecycle: ready
-    implementation_status: absent
-    evidence_refs: []
+    lifecycle: complete
+    implementation_status: conforming
+    evidence_refs:
+      - path:tests/vellis/test_definition_discovery.py#test_a_cold_agent_reads_the_whole_anchor_vocabulary
+      - path:tests/vellis/test_definition_discovery.py#test_a_summary_that_cannot_be_returned_completely_returns_nothing
+      - path:tests/vellis/test_definition_discovery.py#test_a_neighborhood_is_complete_for_its_anchor
+      - path:tests/vellis/test_definition_discovery.py#test_a_neighborhood_omits_unrelated_definitions
+      - path:tests/vellis/test_definition_discovery.py#test_an_anchor_grounded_by_several_data_types_gets_all_of_them
+      - path:tests/vellis/test_definition_discovery.py#test_a_rule_brings_the_link_type_it_names_with_it
+      - path:tests/vellis/test_definition_discovery.py#test_a_rule_counted_at_the_data_end_binds_every_object_of_that_type
+      - path:tests/vellis/test_definition_discovery.py#test_another_anchors_association_rule_is_excluded_even_on_a_shared_data_type
+      - path:tests/vellis/test_definition_discovery.py#test_an_unanswerable_selection_returns_findings_and_no_details
+      - path:tests/vellis/test_definition_discovery.py#test_an_inspection_that_cannot_be_answered_returns_no_details
+      - path:tests/vellis/test_definition_discovery.py#test_a_revision_that_moved_between_the_two_reads_is_visible_to_the_caller
+      - path:tests/vellis/test_definition_discovery.py#test_the_summary_reports_a_delta_that_is_present
+      - path:tests/vellis/test_definition_discovery.py#test_discovery_changes_no_canonical_state
+      - path:tests/vellis/test_definition_discovery.py#test_discovery_reads_no_canonical_record
+      - command:uv run pytest tests/vellis
     realization_decisions: []
     blocker: null
-    checkpoint: null
+    checkpoint: slice:S003:16c835e15651:1
   - id: S004
     order: 4
     label: Govern the sole definition proposal
@@ -410,7 +432,7 @@ slices:
       - VellisVerification::definitionWork
       - VellisVerification::canonicalEquality
       - VellisVerification::stringPatterns
-    lifecycle: pending
+    lifecycle: ready
     implementation_status: absent
     evidence_refs: []
     realization_decisions: []

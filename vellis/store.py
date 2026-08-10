@@ -243,8 +243,24 @@ class CanonicalStore:
 
     def is_initialized(self) -> bool:
         """Return whether canonical state exists, without reading any canonical record."""
-        row = self._connection.execute("SELECT 1 FROM current_state WHERE id = 0").fetchone()
-        return row is not None
+        return self._fetchone("SELECT 1 FROM current_state WHERE id = 0") is not None
+
+    def _fetchone(self, sql: str, parameters: tuple[object, ...] = ()) -> object:
+        """Run one read, reporting a database failure as a store error.
+
+        Callers of this store handle :class:`StoreError`; letting a driver exception out
+        would turn an operation that should report a failure into a traceback.
+        """
+        try:
+            return self._connection.execute(sql, parameters).fetchone()
+        except sqlite3.Error as error:
+            raise StoreError(f"could not read from the store at {self._path}: {error}") from error
+
+    def _fetchall(self, sql: str, parameters: tuple[object, ...] = ()) -> list[object]:
+        try:
+            return list(self._connection.execute(sql, parameters).fetchall())
+        except sqlite3.Error as error:
+            raise StoreError(f"could not read from the store at {self._path}: {error}") from error
 
     def _read_record(self, sql: str, parameters: tuple[object, ...] = ()) -> object:
         """Run one canonical-record query and count it as a semantic record access.
@@ -253,7 +269,7 @@ class CanonicalStore:
         access to the records themselves rather than calls to one convenience method.
         """
         self._record_reads += 1
-        return self._connection.execute(sql, parameters).fetchone()
+        return self._fetchone(sql, parameters)
 
     def current_state(self) -> CanonicalState:
         """Return the current canonical-state projection.
@@ -261,10 +277,10 @@ class CanonicalStore:
         This reads the one projection row and no canonical record, so its work does not
         grow with history length.
         """
-        row = self._connection.execute(
+        row = self._fetchone(
             "SELECT revision, established_by, state FROM current_state WHERE id = 0"
-        ).fetchone()
-        if row is None:
+        )
+        if not isinstance(row, tuple):
             raise StoreError("no canonical state is established")
         state = self._decode_state(row[2], "current state")
         if state.revision != row[0] or state.revision != row[1]:
@@ -377,13 +393,14 @@ class CanonicalStore:
 
     def transitions(self) -> tuple[CanonicalTransitionRecord, ...]:
         """Read every transition in ledger order. Each is a semantic record access."""
-        rows = self._connection.execute(
+        rows = self._fetchall(
             "SELECT established_revision, record_kind, recorded_at, initiator, source, summary,"
             " payload FROM canonical_record WHERE ordinal > 0 ORDER BY ordinal"
-        ).fetchall()
+        )
         self._record_reads += len(rows)
         records: list[CanonicalTransitionRecord] = []
         for row in rows:
+            assert isinstance(row, tuple)
             record = _RecordRow(*row)
             try:
                 kind = TransitionKind(record.record_kind)
@@ -465,7 +482,8 @@ class CanonicalStore:
 
     def activity_record_count(self) -> int:
         """Return how many activity records the observational ledger holds."""
-        row = self._connection.execute("SELECT count(*) FROM activity_record").fetchone()
+        row = self._fetchone("SELECT count(*) FROM activity_record")
+        assert isinstance(row, tuple)
         return int(row[0])
 
     def _decode_state(self, payload: object, where: str) -> CanonicalState:
