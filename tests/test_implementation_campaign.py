@@ -270,6 +270,73 @@ def test_a_blocked_campaign_may_not_retain_an_unreachable_approval(tmp_path: Pat
     assert any("retained approval commit does not exist" in finding for finding in findings)
 
 
+def _block_at(campaign: dict[str, object], *, checkpoint: str) -> None:
+    campaign["campaign"]["lifecycle"] = "blocked"  # type: ignore[index]
+    campaign["campaign"]["plan_approval"] = {"status": "changes-required", "checkpoint": None}  # type: ignore[index]
+    campaign["campaign"]["blocker"] = {  # type: ignore[index]
+        "classification": "model gap",
+        "summary": "A named distinction is unresolved.",
+        "authority_ids": ["A001"],
+        "evidence_refs": [],
+    }
+    campaign["slices"][3]["lifecycle"] = "pending"  # type: ignore[index]
+    campaign["campaign"]["checkpoint"] = checkpoint  # type: ignore[index]
+
+
+def test_a_blocked_campaign_may_retain_an_approval_granted_after_its_completed_slices(
+    tmp_path: Path,
+) -> None:
+    campaign, plan_sha = _renewed_approval_repository(tmp_path)
+    _block_at(campaign, checkpoint=f"approval:{plan_sha}")
+    _write_campaign(tmp_path, campaign)
+    _git(tmp_path, "add", "implementation-campaign.yaml")
+    _git(tmp_path, "commit", "-m", "block the campaign")
+
+    assert implementation_campaign.checkpoint_binding_findings(campaign, root=tmp_path) == []
+
+
+def test_a_blocked_campaign_may_not_retain_an_approval_its_slices_ran_past(
+    tmp_path: Path,
+) -> None:
+    campaign, plan_sha = _renewed_approval_repository(tmp_path)
+    completed = f"slice:S004:{plan_sha[:12]}:1"
+    _complete_fourth_slice(campaign, checkpoint=completed)
+    campaign["campaign"]["checkpoint"] = completed  # type: ignore[index]
+    _write_campaign(tmp_path, campaign)
+    _git(tmp_path, "add", "implementation-campaign.yaml")
+    _git(tmp_path, "commit", "-m", "complete S004")
+    # Falling back to the approval now points recovery behind S004's own commit.
+    _block_at(campaign, checkpoint=f"approval:{plan_sha}")
+    campaign["slices"][3]["lifecycle"] = "complete"  # type: ignore[index]
+    _write_campaign(tmp_path, campaign)
+    _git(tmp_path, "add", "implementation-campaign.yaml")
+    _git(tmp_path, "commit", "-m", "block the campaign")
+
+    findings = implementation_campaign.checkpoint_binding_findings(campaign, root=tmp_path)
+
+    assert any("retained approval predates completed slices: S004" in f for f in findings)
+
+
+def test_a_blocked_campaign_may_not_retain_an_approval_off_the_current_history(
+    tmp_path: Path,
+) -> None:
+    campaign, plan_sha = _renewed_approval_repository(tmp_path)
+    _git(tmp_path, "checkout", "-q", "-b", "aside", plan_sha)
+    (tmp_path / "NOTES.md").write_text("# Notes\n", encoding="utf-8")
+    _git(tmp_path, "add", "NOTES.md")
+    _git(tmp_path, "commit", "-m", "an approval on another branch")
+    aside = _git(tmp_path, "rev-parse", "HEAD")
+    _git(tmp_path, "checkout", "-q", "-")
+    _block_at(campaign, checkpoint=f"approval:{aside}")
+    _write_campaign(tmp_path, campaign)
+    _git(tmp_path, "add", "implementation-campaign.yaml")
+    _git(tmp_path, "commit", "-m", "block the campaign")
+
+    findings = implementation_campaign.checkpoint_binding_findings(campaign, root=tmp_path)
+
+    assert any("retained approval commit is not an ancestor of HEAD" in f for f in findings)
+
+
 def test_a_second_replan_distinguishes_each_generation_of_completed_slices(
     tmp_path: Path,
 ) -> None:
@@ -319,17 +386,51 @@ def test_a_second_replan_distinguishes_each_generation_of_completed_slices(
 
 
 def test_renewed_approval_commit_must_directly_follow_its_reviewed_plan(tmp_path: Path) -> None:
-    campaign, _ = _renewed_approval_repository(tmp_path)
+    campaign, plan_sha = _renewed_approval_repository(tmp_path)
+    _git(tmp_path, "reset", "--hard", plan_sha)
     (tmp_path / "NOTES.md").write_text("# Notes\n", encoding="utf-8")
     _git(tmp_path, "add", "NOTES.md")
     _git(tmp_path, "commit", "-m", "interpose an unrelated commit")
     _write_campaign(tmp_path, campaign)
     _git(tmp_path, "add", "implementation-campaign.yaml")
-    _git(tmp_path, "commit", "--allow-empty", "-m", "re-record the approval")
+    _git(tmp_path, "commit", "-m", "grant approval one commit too late")
 
     findings = implementation_campaign.checkpoint_binding_findings(campaign, root=tmp_path)
 
     assert any("must directly follow its approved plan" in finding for finding in findings)
+
+
+def test_an_ordinary_commit_while_ready_is_not_judged_as_the_approval(tmp_path: Path) -> None:
+    """The window between approval and the next slice is not commit-frozen.
+
+    The record still rests on its approval checkpoint here, so a predicate reading only
+    the record would judge every later commit as the approval it is not.
+    """
+    campaign, _ = _renewed_approval_repository(tmp_path)
+    (tmp_path / "NOTES.md").write_text("# Notes\n", encoding="utf-8")
+    _git(tmp_path, "add", "NOTES.md")
+    _git(tmp_path, "commit", "-m", "fix documentation while the campaign waits")
+
+    assert implementation_campaign.checkpoint_binding_findings(campaign, root=tmp_path) == []
+
+
+def test_an_approval_commit_may_not_decline_the_rules_by_claiming_another_lifecycle(
+    tmp_path: Path,
+) -> None:
+    campaign, plan_sha = _renewed_approval_repository(tmp_path)
+    _git(tmp_path, "reset", "--hard", plan_sha)
+    _renew(campaign, checkpoint=f"approval:{plan_sha}")
+    campaign["campaign"]["lifecycle"] = "active"  # type: ignore[index]
+    campaign["slices"][3]["lifecycle"] = "active"  # type: ignore[index]
+    (tmp_path / "src.py").write_text("# unreviewed implementation\n", encoding="utf-8")
+    _write_campaign(tmp_path, campaign)
+    _git(tmp_path, "add", ".")
+    _git(tmp_path, "commit", "-m", "approve and start work in one commit")
+
+    findings = implementation_campaign.checkpoint_binding_findings(campaign, root=tmp_path)
+
+    assert any("must change only the campaign record" in finding for finding in findings)
+    assert any("beyond approval state" in finding for finding in findings)
 
 
 def test_committed_campaign_is_current_and_valid() -> None:

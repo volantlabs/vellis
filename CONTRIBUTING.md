@@ -133,7 +133,10 @@ both approval and campaign checkpoints to `approval:<reviewed-plan-sha>` exactly
 does, and readies only the next dependency-ready slice. Until a slice completes under the renewed
 plan, that approval is the latest recoverable campaign checkpoint; the next completed slice then
 takes its place, using the renewed plan's short sha and attempt `1`. A campaign that blocks before
-that happens keeps the approval as its checkpoint rather than falling back across the replan.
+that happens may keep the approval as its checkpoint rather than falling back across the replan; it
+may also retain the last completed slice, whose label still names the superseded plan. Both are
+recoverable states, so both are permitted — but a retained approval must be one granted after that
+slice, never the approval the slice itself was completed under.
 
 The approved plan commit is the approval commit's direct parent, and its
 `implementation-campaign.yaml` is the reviewed candidate record. Those are usually the same commit.
@@ -145,14 +148,16 @@ Two gates divide this work, and the split matters:
 
 - `just implementation-campaign-check` reads only the record. It cannot know when a slice completed,
   so it bounds the superseded region rather than locating it: every slice completed at or after the
-  first one bearing the current approved plan must bear it too, and the checkpoint a campaign rests
-  on may never name a superseded plan. The bound is silent while no completed slice yet bears the
+  first one bearing the current approved plan must bear it too, and a campaign that is ready or
+  active may never rest on a slice checkpoint naming a superseded plan. The bound is silent while no completed slice yet bears the
   current plan, so a slice mislabelled in that window passes this gate — and so does every later one
   until some slice adopts the current plan. Only the second gate closes that.
 - `just implementation-campaign-checkpoint-check` reads the approved plan commit, whose own record
   says which slices were already complete when it was reviewed. That is the boundary: anything
   finished since must checkpoint against this plan, and anything finished before must keep its label
-  byte for byte. It also resolves the approval a blocked campaign still rests on. Run it after every
+  byte for byte. It also resolves the approval a blocked campaign still rests on, and identifies the
+  approval commit by what it changed rather than by what the record claims, so an ordinary commit
+  landing while the campaign waits is not judged as one. Run it after every
   checkpoint commit, including the approval, before advancing; it is the only automated detector for
   a mislabelled slice, and it is not part of `just check`, so skipping it loses the check entirely.
 

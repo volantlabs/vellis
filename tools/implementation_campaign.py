@@ -1001,13 +1001,21 @@ def checkpoint_binding_findings(campaign: dict[str, Any], *, root: Path = ROOT) 
 
     # An approval commit — first or renewed after a replan — is the state in which the approval is
     # itself the campaign checkpoint. A commit that also completes a slice still claims that state,
-    # so it is judged by these rules rather than escaping them.
-    approval_commit = (
-        campaign["campaign"]["lifecycle"] == "ready"
-        and campaign["campaign"]["checkpoint"] == checkpoint
-    )
-    if approval_commit:
-        parents = _git(root, "rev-list", "--parents", "-n", "1", "HEAD").split()
+    # so it is judged by these rules rather than escaping them. Which commit granted the approval is
+    # read from what changed, not from fields the commit writes about itself: a commit claiming a
+    # different lifecycle would otherwise decline the very rules that bound it, and an ordinary
+    # commit landing while the campaign rests on its approval would be judged as one.
+    parents = _git(root, "rev-list", "--parents", "-n", "1", "HEAD").split()
+    granted = approval
+    if len(parents) == 2:
+        try:
+            granted = load_campaign_text(
+                _git(root, "show", f"{parents[1]}:implementation-campaign.yaml"),
+                label=f"{parents[1]}:implementation-campaign.yaml",
+            )["campaign"]["plan_approval"]
+        except RuntimeError, ValueError, yaml.YAMLError, KeyError:
+            granted = None
+    if granted != approval:
         if len(parents) != 2 or parents[1] != plan_commit:
             findings.append("the approval commit must directly follow its approved plan")
         changed_paths = set(
