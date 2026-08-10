@@ -301,6 +301,8 @@ def _checkpoint_format_findings(campaign: dict[str, Any]) -> list[str]:
             findings.append(f"slice {entry['id']} checkpoint names {match.group('slice')}")
         if entry["lifecycle"] == "active" and checkpoint is not None:
             findings.append(f"active slice {entry['id']} must retain no checkpoint before commit")
+        elif entry["lifecycle"] != "complete" and checkpoint is not None:
+            findings.append(f"only a complete slice may carry a checkpoint: {entry['id']}")
         if entry["lifecycle"] == "complete" and checkpoint is not None:
             completed_entries.append(entry)
 
@@ -314,35 +316,39 @@ def _checkpoint_format_findings(campaign: dict[str, Any]) -> list[str]:
         # A replan after execution renews approval without invalidating finished work: a slice
         # completed under a superseded plan keeps the label it earned. Only the frontier moves.
         # Every slice completed at or after the first one carrying the current plan must carry it
-        # too, so approval cannot silently reopen behind a slice that already advanced.
+        # too, so approval cannot silently reopen behind a slice that already advanced. The record
+        # alone cannot say which slices predate the renewal, so this bounds the superseded region
+        # rather than locating it; checkpoint_binding_findings closes it against the approved plan.
         ordered = sorted(
             (
                 (entry, SLICE_CHECKPOINT.fullmatch(entry["checkpoint"]))
                 for entry in campaign["slices"]
-                if entry["checkpoint"] is not None
+                if entry["lifecycle"] == "complete" and entry["checkpoint"] is not None
             ),
             key=lambda pair: pair[0]["order"],
         )
-        renewed = [
-            index
-            for index, (_, match) in enumerate(ordered)
-            if match is not None and match.group("plan") == approved_plan[:12]
+        renewed_positions = [
+            position
+            for position, (_, slice_match) in enumerate(ordered)
+            if slice_match is not None and slice_match.group("plan") == approved_plan[:12]
         ]
-        frontier = min(renewed, default=len(ordered))
-        for entry, match in ordered[frontier:]:
-            if match is not None and match.group("plan") != approved_plan[:12]:
+        for entry, slice_match in ordered[min(renewed_positions, default=len(ordered)) :]:
+            if slice_match is not None and slice_match.group("plan") != approved_plan[:12]:
                 findings.append(
                     f"slice {entry['id']} checkpoint does not use the approved plan commit"
                 )
         # The campaign checkpoint names a slice only once one has completed under this approval,
         # so that slice may never be labelled with a superseded plan.
-        latest_match = (
+        campaign_plan_match = (
             SLICE_CHECKPOINT.fullmatch(campaign_checkpoint)
             if campaign_checkpoint is not None
             else None
         )
-        if latest_match is not None and latest_match.group("plan") != approved_plan[:12]:
-            findings.append("the latest slice checkpoint must use the approved plan commit")
+        if (
+            campaign_plan_match is not None
+            and campaign_plan_match.group("plan") != approved_plan[:12]
+        ):
+            findings.append("the campaign checkpoint must use the approved plan commit")
         match = (
             CLOSURE_CHECKPOINT.fullmatch(closure_checkpoint)
             if closure_checkpoint is not None
@@ -403,15 +409,19 @@ def _checkpoint_format_findings(campaign: dict[str, Any]) -> list[str]:
                 "a ready or active campaign checkpoint must be the latest recoverable checkpoint"
             )
     elif campaign_lifecycle in {"blocked", "stale"}:
+        # Blocking clears the approval, so the plan identifier is no longer available to say which
+        # completed slices predate it. Retaining a prior approval stays legal for the same reason
+        # it does while ready: a campaign blocked after a renewal has advanced past its last slice.
+        retained_approval = (
+            campaign_checkpoint is not None
+            and APPROVAL_CHECKPOINT.fullmatch(campaign_checkpoint) is not None
+        )
         if latest_completed_checkpoint is not None:
-            if campaign_checkpoint != latest_completed_checkpoint:
+            if campaign_checkpoint != latest_completed_checkpoint and not retained_approval:
                 findings.append(
                     "a blocked or stale campaign checkpoint must retain the latest completed slice"
                 )
-        elif (
-            campaign_checkpoint is not None
-            and APPROVAL_CHECKPOINT.fullmatch(campaign_checkpoint) is None
-        ):
+        elif campaign_checkpoint is not None and not retained_approval:
             findings.append(
                 "a blocked or stale campaign without completed slices may retain only its prior "
                 "approval checkpoint"
@@ -914,14 +924,36 @@ def checkpoint_binding_findings(campaign: dict[str, Any], *, root: Path = ROOT) 
     if _plan_projection(campaign) != _plan_projection(planned):
         findings.append("current campaign changed plan-bearing content after approval")
 
+    # The approved plan's own record says which slices were already complete when it was reviewed.
+    # That is the boundary the working record cannot supply: everything finished since then belongs
+    # to this plan and must say so, and everything finished before it keeps the label it earned.
+    inherited = {
+        entry["id"]: entry["checkpoint"]
+        for entry in planned["slices"]
+        if entry["lifecycle"] == "complete"
+    }
+    for entry in campaign["slices"]:
+        if entry["lifecycle"] != "complete" or entry["checkpoint"] is None:
+            continue
+        if entry["id"] not in inherited:
+            slice_match = SLICE_CHECKPOINT.fullmatch(entry["checkpoint"])
+            if slice_match is not None and slice_match.group("plan") != plan_commit[:12]:
+                findings.append(
+                    f"slice {entry['id']} completed under this approval but checkpoints "
+                    "against a superseded plan"
+                )
+        elif entry["checkpoint"] != inherited[entry["id"]]:
+            findings.append(
+                f"slice {entry['id']} completed before this approval and may not be re-minted"
+            )
+
     # An approval commit — first or renewed after a replan — is the state in which the approval is
     # itself the campaign checkpoint, because no slice has completed under this plan yet.
     approval_commit = (
         campaign["campaign"]["lifecycle"] == "ready"
         and campaign["campaign"]["checkpoint"] == checkpoint
         and not any(
-            (match := SLICE_CHECKPOINT.fullmatch(entry["checkpoint"] or "")) is not None
-            and match.group("plan") == plan_commit[:12]
+            entry["lifecycle"] == "complete" and entry["id"] not in inherited
             for entry in campaign["slices"]
         )
     )

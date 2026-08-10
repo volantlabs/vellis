@@ -126,14 +126,30 @@ Replanning after slices have completed ends at a renewed approval, which follows
 one difference: completed slices keep the checkpoints they earned, including the superseded approved
 plan those labels name. A corrected plan narrows what those slices claimed and moves the remaining
 obligations into later slices; it does not invalidate the work they committed, so re-minting their
-labels would attest to a plan under which they were never reviewed. The renewed approval commit is a
-direct child of the final reviewed candidate, changes only `implementation-campaign.yaml`, and sets
+labels would attest to a plan under which they were never reviewed. The renewed approval commit sets
 both approval and campaign checkpoints to `approval:<reviewed-plan-sha>` exactly as a first approval
-does. Until a slice completes under the renewed plan, that approval is the latest recoverable
-campaign checkpoint; the next completed slice then takes its place. Superseded labels are permitted
-only behind the frontier: every slice completed at or after the first one bearing the current
-approved plan must bear it too, and the checkpoint a campaign currently rests on may never name a
-superseded plan.
+does, and readies only the next dependency-ready slice. Until a slice completes under the renewed
+plan, that approval is the latest recoverable campaign checkpoint; the next completed slice then
+takes its place, using the renewed plan's short sha and attempt `1`. A campaign that blocks before
+that happens keeps the approval as its checkpoint rather than falling back across the replan.
+
+The approved plan commit is the approval commit's direct parent, and its
+`implementation-campaign.yaml` is the reviewed candidate record. Those are usually the same commit.
+When review is followed by a commit that leaves the campaign record untouched — a checker or
+documentation fix, say — that later commit carries the reviewed plan forward unchanged and is the
+one to approve; naming the earlier commit instead fails the parent check.
+
+Two gates divide this work, and the split matters:
+
+- `just implementation-campaign-check` reads only the record. It cannot know when a slice completed,
+  so it bounds the superseded region rather than locating it: every slice completed at or after the
+  first one bearing the current approved plan must bear it too, and the checkpoint a campaign rests
+  on may never name a superseded plan. A slice completed immediately after a renewal is not yet
+  covered by that bound.
+- `just implementation-campaign-checkpoint-check` reads the approved plan commit, whose own record
+  says which slices were already complete when it was reviewed. That is the boundary: anything
+  finished since must checkpoint against this plan, and anything finished before must keep its label
+  byte for byte. Run it after every checkpoint commit, including the approval, before advancing.
 
 Changing the baseline, authority map, coverage, slice graph, verification references, or selected
 realization decisions requires replanning, a new cold review, and renewed human approval.
