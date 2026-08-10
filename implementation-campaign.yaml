@@ -7,7 +7,7 @@ campaign:
     status: accepted
     checkpoint: approval:5a8d92c675d6865bd70fadd0e971bbf959081bea
   blocker: null
-  checkpoint: slice:S007:5a8d92c675d6:1
+  checkpoint: slice:S008:5a8d92c675d6:1
 model_baseline:
   status: current
   authority_files:
@@ -136,8 +136,9 @@ authority:
       - {model_ref: "VellisRequirements::agentDefinitionDiscoverability", source: "model/40-requirements.sysml"}
     planned_coverage: full
     slice_ids: [S003, S006, S008]
-    implementation_status: partial
+    implementation_status: conforming
     evidence_refs:
+      - path:tests/vellis/test_historical_selection.py#test_a_cold_agent_discovers_definitions_later_retired
       - path:tests/vellis/test_definition_discovery.py#test_a_cold_agent_reads_the_whole_anchor_vocabulary
       - path:tests/vellis/test_definition_discovery.py#test_a_neighborhood_is_complete_for_its_anchor
       - path:tests/vellis/test_definition_discovery.py#test_an_anchor_grounded_by_several_data_types_gets_all_of_them
@@ -154,8 +155,9 @@ authority:
       - {model_ref: "VellisRequirements::querySafety", source: "model/40-requirements.sysml"}
     planned_coverage: full
     slice_ids: [S005, S006, S008]
-    implementation_status: partial
+    implementation_status: conforming
     evidence_refs:
+      - path:tests/vellis/test_historical_selection.py#test_a_query_at_a_selected_revision_sees_that_state
       - path:tests/vellis/test_graph_queries.py#test_one_anchor_type_is_queried_broadly
       - path:tests/vellis/test_graph_queries.py#test_a_required_link_matches_only_in_its_stated_direction
       - path:tests/vellis/test_graph_queries.py#test_each_comparison_selects_at_its_own_boundary
@@ -618,12 +620,26 @@ slices:
       - VellisVerification::definitionDiscovery
       - VellisVerification::semanticQuery
       - VellisVerification::historicalSelection
-    lifecycle: ready
-    implementation_status: absent
-    evidence_refs: []
+    lifecycle: complete
+    implementation_status: conforming
+    evidence_refs:
+      - path:tests/vellis/test_historical_selection.py#test_a_query_at_a_selected_revision_sees_that_state
+      - path:tests/vellis/test_historical_selection.py#test_a_query_uses_the_definitions_in_force_at_the_selected_revision
+      - path:tests/vellis/test_historical_selection.py#test_a_time_resolves_to_the_greatest_revision_at_or_before_it
+      - path:tests/vellis/test_historical_selection.py#test_a_summarys_resolved_revision_can_be_reused_for_inspection_and_query
+      - path:tests/vellis/test_historical_selection.py#test_a_cold_agent_discovers_definitions_later_retired
+      - path:tests/vellis/test_historical_selection.py#test_the_vocabulary_at_a_revision_is_the_one_in_force_then
+      - path:tests/vellis/test_historical_selection.py#test_a_historical_summary_reports_delta_presence_at_that_state
+      - path:tests/vellis/test_historical_selection.py#test_an_unresolved_selection_returns_no_content_and_no_evaluated_revision
+      - path:tests/vellis/test_historical_selection.py#test_a_historical_inspection_returns_no_partial_details
+      - path:tests/vellis/test_historical_selection.py#test_a_historical_summary_skips_the_graph_work_between_definition_changes
+      - path:tests/vellis/test_historical_selection.py#test_resolving_a_time_selector_does_not_walk_the_ledger
+      - path:tests/vellis/test_historical_selection.py#test_delta_retrieval_answers_about_now_however_far_back_was_just_read
+      - path:tests/vellis/test_historical_selection.py#test_a_store_that_cannot_answer_a_historical_read_reports_a_failure
+      - command:uv run pytest tests/vellis
     realization_decisions: []
     blocker: null
-    checkpoint: null
+    checkpoint: slice:S008:5a8d92c675d6:1
   - id: S009
     order: 9
     label: Expose the selected MCP tool contract
@@ -638,7 +654,7 @@ slices:
       - VellisVerification::mcpToolSurface
       - VellisVerification::mcpOutcomes
       - VellisVerification::simpleOperation
-    lifecycle: pending
+    lifecycle: ready
     implementation_status: absent
     evidence_refs: []
     realization_decisions:

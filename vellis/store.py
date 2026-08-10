@@ -99,6 +99,7 @@ CREATE TABLE ledger (
 );
 CREATE INDEX activity_record_time ON activity_record (recorded_at);
 CREATE INDEX canonical_record_time ON canonical_record (recorded_at);
+CREATE INDEX canonical_record_kind ON canonical_record (record_kind, established_revision);
 CREATE TABLE current_state (
     id             INTEGER PRIMARY KEY CHECK (id = 0),
     revision       INTEGER NOT NULL,
@@ -511,6 +512,72 @@ class CanonicalStore:
             return revision, None
         record = _RecordRow(*row[2:])
         return revision, self._transition_from(record)
+
+    def revision_at(self, moment: datetime) -> int | None:
+        """Return the greatest committed revision recorded at or before ``moment``.
+
+        Written to seek the time index rather than aggregate over it. An ``max()`` with a
+        time predicate looks equivalent and is not: it walks the revision key downward
+        until the predicate passes, so the cost is everything committed *after* the
+        answer — worst exactly where this capability is used, reading an old state.
+
+        The tie-break is on revision, because the requirement asks for the greatest
+        committed revision at or before an instant, and two records can share one.
+        """
+        row = self._read_record(
+            "SELECT established_revision FROM canonical_record WHERE recorded_at <= ?"
+            " ORDER BY recorded_at DESC, established_revision DESC LIMIT 1",
+            (_stored_time(moment),),
+        )
+        return None if row is None else int(row[0])  # pyright: ignore[reportIndexIssue]
+
+    def has_revision(self, revision: int) -> bool:
+        """Whether some record in this ledger established ``revision``."""
+        row = self._read_record(
+            "SELECT 1 FROM canonical_record WHERE established_revision = ?", (revision,)
+        )
+        return row is not None
+
+    def transitions_through(self, revision: int) -> tuple[CanonicalTransitionRecord, ...]:
+        """Read the transitions establishing revisions up to and including ``revision``."""
+        rows = self._fetchall(
+            "SELECT established_revision, record_kind, recorded_at, initiator, source, summary,"
+            " payload FROM canonical_record WHERE ordinal > 0 AND established_revision <= ?"
+            " ORDER BY ordinal",
+            (revision,),
+        )
+        self._record_reads += len(rows)
+        records: list[CanonicalTransitionRecord] = []
+        for row in rows:
+            assert isinstance(row, tuple)
+            records.append(self._transition_from(_RecordRow(*row)))
+        return tuple(records)
+
+    def definition_transitions_through(
+        self, revision: int
+    ) -> tuple[CanonicalTransitionRecord, ...]:
+        """Read only the transitions up to ``revision`` that changed definitions.
+
+        Graph mutations are excluded in the query rather than skipped afterwards, so
+        answering "what was the vocabulary then" does not cost the graph work that
+        happened in between — which is the difference the requirement asks for.
+
+        Stated as what to leave out rather than what to include: a kind added later is
+        then read by default and answers for itself, instead of being silently dropped
+        from every historical vocabulary until someone remembers this list.
+        """
+        rows = self._fetchall(
+            "SELECT established_revision, record_kind, recorded_at, initiator, source, summary,"
+            " payload FROM canonical_record WHERE ordinal > 0 AND established_revision <= ?"
+            " AND record_kind != ? ORDER BY ordinal",
+            (revision, TransitionKind.GRAPH_MUTATION.value),
+        )
+        self._record_reads += len(rows)
+        records: list[CanonicalTransitionRecord] = []
+        for row in rows:
+            assert isinstance(row, tuple)
+            records.append(self._transition_from(_RecordRow(*row)))
+        return tuple(records)
 
     def canonical_summaries(
         self, *, start: datetime | None = None, end: datetime | None = None

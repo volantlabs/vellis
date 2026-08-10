@@ -50,8 +50,10 @@ from vellis.canonical import (
     DefinitionDeltaDisposition,
     InitialStateRecord,
     Provenance,
+    ReplayError,
     TransitionKind,
     now,
+    replay,
     transition_findings,
 )
 from vellis.changes import GraphChange, apply_change, change_findings
@@ -71,6 +73,13 @@ from vellis.discovery import (
 )
 from vellis.governance import DefinitionDeltaResult, assess_proposal
 from vellis.graph import Graph, graph_equal
+from vellis.history import (
+    EvaluatedDefinitions,
+    HistoricalSelection,
+    RevisionSelection,
+    definitions_through,
+    selection_findings,
+)
 from vellis.json_value import unencodable_reason
 from vellis.outcomes import (
     OperationStatus,
@@ -306,14 +315,28 @@ class RTGSystem:
     # --- Discovery --------------------------------------------------------------------
 
     def definition_summary(
-        self, *, provenance: Provenance = UNATTRIBUTED
+        self,
+        *,
+        selection: HistoricalSelection | None = None,
+        provenance: Provenance = UNATTRIBUTED,
     ) -> DefinitionSummaryResult:
-        """Return every anchor type active at the current state.
+        """Return every anchor type active at the current or a selected state.
 
         A caller reads this first and an inspection second; both carry the revision they
         were evaluated at, which is how a caller notices that the definitions moved
         between the two reads.
         """
+        if selection is not None:
+            result = self._historical_summary(selection)
+            self._observe(
+                "definitionSummary",
+                result.status,
+                scope="every active anchor type at a selected state",
+                summary=result.summary,
+                provenance=provenance,
+                evaluated_revision=result.evaluated_revision,
+            )
+            return result
         try:
             state = self.current_state()
         except StoreError as error:
@@ -348,15 +371,19 @@ class RTGSystem:
         return result
 
     def inspect_definitions(
-        self, request: DefinitionInspectionRequest, *, provenance: Provenance = UNATTRIBUTED
+        self,
+        request: DefinitionInspectionRequest,
+        *,
+        selection: HistoricalSelection | None = None,
+        provenance: Provenance = UNATTRIBUTED,
     ) -> DefinitionInspectionResult:
-        """Return the complete active neighborhood of each selected anchor type.
+        """Return the complete neighborhood of each selected anchor type, then or now.
 
         An unknown or duplicated selection yields findings and nothing else — not the
         details that happened to resolve — because a partial answer would read as a
         complete one.
         """
-        result = self._inspect(request)
+        result = self._inspect(request, selection)
         self._observe(
             "definitionInspection",
             result.status,
@@ -367,7 +394,11 @@ class RTGSystem:
         )
         return result
 
-    def _inspect(self, request: DefinitionInspectionRequest) -> DefinitionInspectionResult:
+    def _inspect(
+        self, request: DefinitionInspectionRequest, selection: HistoricalSelection | None = None
+    ) -> DefinitionInspectionResult:
+        if selection is not None:
+            return self._historical_inspection(request, selection)
         try:
             state = self.current_state()
         except StoreError as error:
@@ -672,12 +703,29 @@ class RTGSystem:
     # --- Query ------------------------------------------------------------------------
 
     def query_graph(
-        self, query: GraphQuery, *, provenance: Provenance = UNATTRIBUTED
+        self,
+        query: GraphQuery,
+        *,
+        selection: HistoricalSelection | None = None,
+        provenance: Provenance = UNATTRIBUTED,
     ) -> GraphQueryResult:
         """Answer one bounded semantic query, or refuse it whole.
 
-        A query changes no canonical state or revision and reads no canonical record.
+        A query changes no canonical state or revision. A current query reads no canonical
+        record either; a historical one replays the transitions it needs, which is the
+        cost the model permits reconstruction and denies current work.
         """
+        if selection is not None:
+            result = self._historical_query(query, selection)
+            self._observe(
+                "query",
+                result.status,
+                scope=_query_scope(query),
+                summary=result.summary,
+                provenance=provenance,
+                evaluated_revision=result.evaluated_revision,
+            )
+            return result
         try:
             state = self.current_state()
         except NotInitializedError as error:
@@ -772,6 +820,153 @@ class RTGSystem:
             )
         except StoreError:
             return
+
+    # --- Reading a state that has passed ------------------------------------------------
+
+    def _resolve(self, selection: HistoricalSelection) -> tuple[int, tuple[ValidationFinding, ...]]:
+        """Resolve a selector to the revision it names, or say why it does not name one."""
+        findings = selection_findings(selection)
+        if findings:
+            return 0, findings
+        if isinstance(selection, RevisionSelection):
+            if not self._store.has_revision(selection.revision):
+                return 0, (
+                    ValidationFinding(
+                        summary=(
+                            f"no record in this ledger established revision {selection.revision}"
+                        )
+                    ),
+                )
+            return selection.revision, ()
+        resolved = self._store.revision_at(selection.time)
+        if resolved is None:
+            return 0, (
+                ValidationFinding(
+                    summary=(
+                        f"nothing had been committed at or before {selection.time.isoformat()}"
+                    )
+                ),
+            )
+        return resolved, ()
+
+    def _definitions_at(self, revision: int) -> EvaluatedDefinitions:
+        """Rebuild the vocabulary at one revision without replaying graph work."""
+        return definitions_through(
+            self._store.initial_record().canonical_state,
+            self._store.definition_transitions_through(revision),
+        )
+
+    def _state_at(self, revision: int) -> CanonicalState:
+        """Rebuild complete state at one revision. A graph needs its transitions."""
+        base = self._store.initial_record()
+        return replay(base, self._store.transitions_through(revision))
+
+    def _historical_summary(self, selection: HistoricalSelection) -> DefinitionSummaryResult:
+        try:
+            return self._summary_at(selection)
+        except StoreError as error:
+            # A historical read answers the way a current one does. Letting a store fault
+            # escape here would make the same fault an outcome on one path and a traceback
+            # on the other, and would leave the observation unwritten.
+            return DefinitionSummaryResult(
+                status=OperationStatus.FAILED,
+                summary=f"the selected state could not be read: {error}",
+                findings=(ValidationFinding(summary=str(error)),),
+            )
+
+    def _summary_at(self, selection: HistoricalSelection) -> DefinitionSummaryResult:
+        revision, findings = self._resolve(selection)
+        if findings:
+            return DefinitionSummaryResult(
+                status=OperationStatus.REJECTED,
+                summary=f"the selected state could not be resolved ({len(findings)} findings)",
+                findings=findings,
+            )
+        evaluated = self._definitions_at(revision)
+        return DefinitionSummaryResult(
+            status=OperationStatus.ACCEPTED,
+            summary=(
+                f"{len(evaluated.active_definitions.anchor_types)} anchor types at "
+                f"revision {revision}"
+            ),
+            anchor_types=summarize_anchor_types(evaluated.active_definitions),
+            evaluated_revision=revision,
+            delta_present=evaluated.delta_present,
+        )
+
+    def _historical_inspection(
+        self, request: DefinitionInspectionRequest, selection: HistoricalSelection
+    ) -> DefinitionInspectionResult:
+        try:
+            return self._inspection_at(request, selection)
+        except StoreError as error:
+            return DefinitionInspectionResult(
+                status=OperationStatus.FAILED,
+                summary=f"the selected state could not be read: {error}",
+                request=request,
+                findings=(ValidationFinding(summary=str(error)),),
+            )
+
+    def _inspection_at(
+        self, request: DefinitionInspectionRequest, selection: HistoricalSelection
+    ) -> DefinitionInspectionResult:
+        revision, findings = self._resolve(selection)
+        if findings:
+            return DefinitionInspectionResult(
+                status=OperationStatus.REJECTED,
+                summary=f"the selected state could not be resolved ({len(findings)} findings)",
+                request=request,
+                findings=findings,
+            )
+        definitions = self._definitions_at(revision).active_definitions
+        findings = inspection_findings(request, definitions)
+        if findings:
+            return DefinitionInspectionResult(
+                status=OperationStatus.REJECTED,
+                summary=(
+                    f"the selection could not be answered ({len(findings)} findings); "
+                    "no details were returned"
+                ),
+                request=request,
+                findings=findings,
+            )
+        return DefinitionInspectionResult(
+            status=OperationStatus.ACCEPTED,
+            summary=f"{len(request.anchor_type_keys)} anchor neighborhoods at revision {revision}",
+            request=request,
+            anchor_details=tuple(
+                anchor_neighborhood(type_key, definitions) for type_key in request.anchor_type_keys
+            ),
+            evaluated_revision=revision,
+        )
+
+    def _historical_query(
+        self, query: GraphQuery, selection: HistoricalSelection
+    ) -> GraphQueryResult:
+        try:
+            return self._query_at(query, selection)
+        except (StoreError, ReplayError) as error:
+            # A ledger that cannot be replayed is a failure to answer, not an answer.
+            return GraphQueryResult(
+                status=OperationStatus.FAILED,
+                summary=f"the selected state could not be reconstructed: {error}",
+                query=query,
+                findings=(ValidationFinding(summary=str(error)),),
+            )
+
+    def _query_at(self, query: GraphQuery, selection: HistoricalSelection) -> GraphQueryResult:
+        revision, findings = self._resolve(selection)
+        if findings:
+            return GraphQueryResult(
+                status=OperationStatus.REJECTED,
+                summary=f"the selected state could not be resolved ({len(findings)} findings)",
+                query=query,
+                findings=findings,
+            )
+        state = self._state_at(revision)
+        # The same evaluation as current state, against the definitions in force then.
+        # A query means what it means; only the state it is asked of changes.
+        return evaluate_query(query, state.active_definitions, state.graph, revision)
 
     # --- Capture and rebuild ------------------------------------------------------------
 
