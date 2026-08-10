@@ -100,9 +100,11 @@ Useful commands:
 
 ## Implementation status
 
-The approved campaign is under way and several slices are complete, so the application is
-partially implemented rather than absent. `just implementation-campaign-status` reports exactly
-where it stands. Use these words precisely:
+Three campaign slices are complete and a fourth is implemented but not yet checkpointed, so the
+application is partially implemented rather than absent. A plan gap found during that fourth slice
+returned the campaign to `awaiting-plan-approval`: the corrected candidate plan is committed and
+waits on human approval before implementation resumes. `just implementation-campaign-status`
+reports exactly where it stands. Use these words precisely:
 
 - **Implemented and verified.** Canonical graph, definition, and constraint meaning; canonical
   semantic equality over JSON, graphs, definitions, and canonical states; whole-string RE2 property
@@ -118,7 +120,8 @@ where it stands. Use these words precisely:
   carrying the revision it was evaluated at so a caller can tell that the ground moved;
   governance of the one prospective definition set — stage, edit, review, activate, discard —
   where a working proposal may carry findings and activation is what they gate; and the optional
-  Everyday Life starter vocabulary as an ordinary, owner-governable definition set.
+  Everyday Life starter vocabulary as an ordinary, owner-governable definition set. The last two of
+  these are implemented and tested but belong to a slice that is not yet checkpointed.
 - **Runnable.** `uv run python -m vellis.setup` prepares one local system. It previews the
   destination and starting vocabulary, asks for confirmation, and accepts `--data-dir`, `--yes`, and
   a no-effect `--dry-run`. It stores memory under the platform's user-data location by default and
