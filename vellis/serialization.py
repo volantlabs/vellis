@@ -10,7 +10,13 @@ from __future__ import annotations
 
 from decimal import Decimal
 
-from vellis.canonical import CanonicalState, DefinitionDelta
+from vellis.canonical import (
+    CanonicalChange,
+    CanonicalState,
+    DefinitionDelta,
+    DefinitionDeltaDisposition,
+)
+from vellis.changes import GraphChange
 from vellis.definitions import (
     AnchorTypeDefinition,
     AssociatedDataTypeDefinition,
@@ -45,6 +51,8 @@ __all__ = [
     "decode_graph",
     "encode_canonical_state",
     "encode_definition_set",
+    "decode_canonical_change",
+    "encode_canonical_change",
     "encode_graph",
     "encode_text",
 ]
@@ -109,7 +117,7 @@ def _strings(value: JsonValue, where: str) -> tuple[str, ...]:
     return tuple(_string(each, f"{where} member") for each in _array(value, where))
 
 
-def _enum[E: (JsonKind, LinkEnd, DirectAssociationEnd)](
+def _enum[E: (JsonKind, LinkEnd, DirectAssociationEnd, DefinitionDeltaDisposition)](
     enum_type: type[E], value: JsonValue, where: str
 ) -> E:
     text = _string(value, where)
@@ -501,6 +509,131 @@ def decode_definition_set(value: JsonValue) -> GraphDefinitionSet:
         associated_data_types=tuple(associated_data_types),
         link_types=tuple(link_types),
         relationship_constraints=relationships,
+    )
+
+
+# --- Graph changes ------------------------------------------------------------------
+
+
+def _encode_anchor(anchor: Anchor) -> JsonValue:
+    return {
+        "uuid": anchor.uuid,
+        "typeKey": anchor.type_key,
+        "displayName": anchor.display_name,
+        "systemMetadata": _encode_metadata(anchor.system_metadata),
+    }
+
+
+def _encode_associated_data(data: AssociatedDataObject) -> JsonValue:
+    return {
+        "uuid": data.uuid,
+        "typeKey": data.type_key,
+        "anchorUuids": list(data.anchor_uuids),
+        "properties": dict(data.properties),
+        "systemMetadata": _encode_metadata(data.system_metadata),
+    }
+
+
+def _encode_link(link: Link) -> JsonValue:
+    return {
+        "uuid": link.uuid,
+        "typeKey": link.type_key,
+        "sourceUuid": link.source_uuid,
+        "targetUuid": link.target_uuid,
+        "systemMetadata": _encode_metadata(link.system_metadata),
+    }
+
+
+def encode_graph_change(change: GraphChange) -> JsonValue:
+    """Encode the semantic upserts and removals a transition carries."""
+    return {
+        "anchorUpserts": [_encode_anchor(each) for each in change.anchor_upserts],
+        "associatedDataUpserts": [
+            _encode_associated_data(each) for each in change.associated_data_upserts
+        ],
+        "linkUpserts": [_encode_link(each) for each in change.link_upserts],
+        "anchorRemovals": list(change.anchor_removals),
+        "associatedDataRemovals": list(change.associated_data_removals),
+        "linkRemovals": list(change.link_removals),
+    }
+
+
+def decode_graph_change(value: JsonValue) -> GraphChange:
+    """Decode a graph change."""
+    members = _object(value, "graph change")
+    where = "graph change"
+    graph = decode_graph(
+        {
+            "anchors": _member(members, "anchorUpserts", where),
+            "associatedData": _member(members, "associatedDataUpserts", where),
+            "links": _member(members, "linkUpserts", where),
+        }
+    )
+    return GraphChange(
+        anchor_upserts=graph.anchors,
+        associated_data_upserts=graph.associated_data,
+        link_upserts=graph.links,
+        anchor_removals=_strings(_member(members, "anchorRemovals", where), f"{where} anchors"),
+        associated_data_removals=_strings(
+            _member(members, "associatedDataRemovals", where), f"{where} associated data"
+        ),
+        link_removals=_strings(_member(members, "linkRemovals", where), f"{where} links"),
+    )
+
+
+def encode_canonical_change(change: CanonicalChange) -> JsonValue:
+    """Encode one transition's replay-sufficient change."""
+    delta: JsonValue = None
+    if change.definition_delta is not None:
+        delta = {
+            "proposedDefinitions": encode_definition_set(
+                change.definition_delta.proposed_definitions
+            )
+        }
+    return {
+        "deltaDisposition": change.delta_disposition.value,
+        "graphChange": (
+            None if change.graph_change is None else encode_graph_change(change.graph_change)
+        ),
+        "replacementGraph": (
+            None if change.replacement_graph is None else encode_graph(change.replacement_graph)
+        ),
+        "activeDefinitions": (
+            None
+            if change.active_definitions is None
+            else encode_definition_set(change.active_definitions)
+        ),
+        "definitionDelta": delta,
+    }
+
+
+def decode_canonical_change(value: JsonValue) -> CanonicalChange:
+    """Decode one transition's replay-sufficient change."""
+    members = _object(value, "canonical change")
+    where = "canonical change"
+    raw_delta = _member(members, "definitionDelta", where)
+    delta: DefinitionDelta | None = None
+    if raw_delta is not None:
+        delta = DefinitionDelta(
+            proposed_definitions=decode_definition_set(
+                _member(_object(raw_delta, "definition delta"), "proposedDefinitions", where)
+            )
+        )
+    raw_graph_change = _member(members, "graphChange", where)
+    raw_replacement = _member(members, "replacementGraph", where)
+    raw_definitions = _member(members, "activeDefinitions", where)
+    return CanonicalChange(
+        delta_disposition=_enum(
+            DefinitionDeltaDisposition,
+            _member(members, "deltaDisposition", where),
+            f"{where} deltaDisposition",
+        ),
+        graph_change=None if raw_graph_change is None else decode_graph_change(raw_graph_change),
+        replacement_graph=None if raw_replacement is None else decode_graph(raw_replacement),
+        active_definitions=(
+            None if raw_definitions is None else decode_definition_set(raw_definitions)
+        ),
+        definition_delta=delta,
     )
 
 

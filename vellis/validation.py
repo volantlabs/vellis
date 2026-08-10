@@ -3,10 +3,9 @@
 Realizes the graph-facing obligations of ``VellisRequirements::graphInvariants`` and
 ``VellisRequirements::stringPatternValidation``.
 
-This is the assessment capability, not ``RTGSystem::'Assess graph conformance'``. That
-use case additionally requires a typed report at the current revision and one appended
-observational record, and belongs to the typed-validation authority a later slice
-carries.
+This is the assessment capability itself. ``RTGSystem::'Assess graph conformance'``
+wraps it in ``RTGSystem.check``, which adds the typed report at the current revision;
+the observational record that use case also owes waits for the activity ledger.
 
 Assessment owns no canonical state: it reads a graph and a definition set and returns
 findings. A non-conforming graph is a described subject, not an execution failure.

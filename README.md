@@ -109,15 +109,18 @@ implemented rather than absent. Use these words precisely:
   at revision 0 with one initial-state record, no transitions, and an empty activity ledger; a
   durable local store that recovers identical memory across an ordinary restart, commits the
   canonical record and the current projection as one effect, and refuses a database holding
-  anything else; and a current-state projection reached without traversing canonical history.
+  anything else; a current-state projection reached without traversing canonical history;
+  explicit graph changes committed atomically as contiguous canonical transitions, with the
+  complete resulting graph validated first and replay reconstructing the same state from the
+  ledger alone; and the typed graph-conformance report.
 - **Runnable.** `uv run python -m vellis.setup` prepares one local system. It previews the
   destination and starting vocabulary, asks for confirmation, and accepts `--data-dir`, `--yes`, and
   a no-effect `--dry-run`. It stores memory under the platform's user-data location by default and
   never writes to this repository's ignored `.data/`.
-- **Not implemented yet.** Graph change, semantic query, definition-delta governance, the typed
-  validation report and the public parameterless conformance operation, activity and canonical
+- **Not implemented yet.** Semantic query, definition-delta governance, activity recording and
   history reads, snapshots, ledger-tail replay, historical selection and restore, the Everyday Life
-  starter, v1 snapshot recovery, and the MCP server. The model selects a portable
+  starter, v1 snapshot recovery, and the MCP server. Definition-delta validation reports arrive with
+  the delta governance that produces them. The model selects a portable
   ten-tool MCP contract; no server exposes it. The campaign directly pins FastMCP and FastMCP Slim
   4.0.0b1 and selects local STDIO, but neither is installed or runnable yet.
 

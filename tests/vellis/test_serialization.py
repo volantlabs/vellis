@@ -212,3 +212,52 @@ def test_a_number_outside_the_decimal_range_is_a_json_error() -> None:
         loads("1e1000000000000000000")
     with pytest.raises(JsonValueError, match="malformed JSON text"):
         loads('{"a": -1e1000000000000000000}')
+
+
+def _sample_change():
+    from vellis.changes import GraphChange
+    from vellis.graph import Anchor, AssociatedDataObject, Link, SystemMetadata
+
+    return GraphChange(
+        anchor_upserts=(
+            Anchor(
+                uuid="a-1",
+                type_key="person",
+                display_name="Ada",
+                system_metadata=SystemMetadata(members={"live": True, "origin": "import"}),
+            ),
+        ),
+        associated_data_upserts=(
+            AssociatedDataObject(
+                uuid="d-1",
+                type_key="note",
+                anchor_uuids=("a-1", "a-2"),
+                properties={"title": normalize("First"), "rating": normalize(4)},
+            ),
+        ),
+        link_upserts=(Link(uuid="l-1", type_key="worksOn", source_uuid="a-1", target_uuid="a-2"),),
+        anchor_removals=("a-9",),
+        associated_data_removals=("d-9",),
+        link_removals=("l-9",),
+    )
+
+
+def test_a_graph_change_round_trips_with_every_command_kind() -> None:
+    """A transition is only replay-sufficient if its change survives storage intact."""
+    from vellis.serialization import decode_graph_change, encode_graph_change
+
+    original = _sample_change()
+    restored = decode_graph_change(decode_text(encode_text(encode_graph_change(original))))
+    assert restored == original
+
+
+def test_a_canonical_change_round_trips_with_its_disposition() -> None:
+    from vellis.canonical import CanonicalChange, DefinitionDeltaDisposition
+    from vellis.serialization import decode_canonical_change, encode_canonical_change
+
+    original = CanonicalChange(graph_change=_sample_change())
+    restored = decode_canonical_change(decode_text(encode_text(encode_canonical_change(original))))
+    assert restored.graph_change == original.graph_change
+    assert restored.replacement_graph is None
+    assert restored.active_definitions is None
+    assert restored.delta_disposition is DefinitionDeltaDisposition.UNCHANGED

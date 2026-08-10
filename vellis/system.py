@@ -1,16 +1,18 @@
 """The one cohesive RTG semantic and transactional boundary.
 
 Realizes ``RTGSystem::'RTG System'`` as far as this slice reaches:
-``RTGSystem::'Initialize fresh RTG'``, carrying
+``RTGSystem::'Initialize fresh RTG'``, ``RTGSystem::'Apply graph change'``, and
+``RTGSystem::'Assess graph conformance'``, carrying
 ``VellisRequirements::freshInitialization``,
+``VellisRequirements::atomicCanonicalRevision``,
+``VellisRequirements::explicitGraphChangeSet``,
 ``VellisRequirements::definitionCardinality``, and the current-state projection that
 ``VellisRequirements::historyIndependentCurrentWork`` constrains.
 
-The public parameterless conformance operation and its typed report belong to the
-typed-validation authority a later slice carries, so they are not exposed here.
-Assessing a graph against a definition set is available as a function in
-``vellis.validation``; wrapping it in an operation that also appends an observational
-record is that later slice's work.
+An accepted change is validated whole before it is committed: the resulting graph must
+conform, not merely the objects the change touched, because a change can break an
+invariant between objects it never mentions. The observational activity record these
+operations also owe is the work of the slice that establishes the activity ledger.
 
 Query, validation, history, and recovery are capabilities of this one boundary rather
 than independently existing subsystems, so they are methods here rather than injected
@@ -21,13 +23,30 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from vellis.canonical import CanonicalState, InitialStateRecord, Provenance, now
+from vellis.canonical import (
+    CanonicalChange,
+    CanonicalState,
+    CanonicalTransitionRecord,
+    InitialStateRecord,
+    Provenance,
+    TransitionKind,
+    now,
+    transition_findings,
+)
+from vellis.changes import GraphChange, apply_change, change_findings
 from vellis.definitions import GraphDefinitionSet, validate_definition_set
-from vellis.graph import Graph
+from vellis.graph import Graph, graph_equal
 from vellis.json_value import unencodable_reason
-from vellis.outcomes import OperationStatus, RevisionedOutcome, ValidationFinding
+from vellis.outcomes import (
+    OperationStatus,
+    RevisionedOutcome,
+    ValidationFinding,
+    ValidationReport,
+    ValidationScope,
+)
 from vellis.serialization import unreadable_reason
 from vellis.store import AlreadyInitializedError, CanonicalStore
+from vellis.validation import assess_graph_conformance
 
 __all__ = ["RTGSystem"]
 
@@ -150,14 +169,116 @@ class RTGSystem:
             resulting_revision=0,
         )
 
+    # --- Change -----------------------------------------------------------------------
+
+    def apply_graph_change(
+        self, change: GraphChange, *, provenance: Provenance
+    ) -> RevisionedOutcome:
+        """Validate a change whole, then commit it as one revision.
+
+        An effective no-op is accepted and advances nothing. A refusal changes no
+        canonical state or revision, and leaves active definitions and the delta alone
+        either way.
+        """
+        record_findings = _unstorable_record_text(provenance, None)
+        if record_findings:
+            return RevisionedOutcome(
+                status=OperationStatus.REJECTED,
+                summary="the record's own text cannot be stored; the change was not applied",
+                findings=record_findings,
+            )
+        state = self.current_state()
+        structural = change_findings(change, state.graph)
+        if structural:
+            return RevisionedOutcome(
+                status=OperationStatus.REJECTED,
+                summary=(
+                    f"the change was not applied ({len(structural)} findings); no canonical "
+                    "state or revision changed"
+                ),
+                findings=structural,
+            )
+        resulting_graph = apply_change(state.graph, change)
+        conformance = assess_graph_conformance(resulting_graph, state.active_definitions)
+        if conformance:
+            return RevisionedOutcome(
+                status=OperationStatus.REJECTED,
+                summary=(
+                    f"the resulting graph would not conform ({len(conformance)} findings); no "
+                    "canonical state or revision changed"
+                ),
+                findings=conformance,
+            )
+        if graph_equal(resulting_graph, state.graph):
+            return RevisionedOutcome(
+                status=OperationStatus.ACCEPTED,
+                summary="the change is an effective no-op; no revision was created",
+            )
+
+        resulting = CanonicalState(
+            graph=resulting_graph,
+            active_definitions=state.active_definitions,
+            revision=state.revision + 1,
+            definition_delta=state.definition_delta,
+        )
+        record = CanonicalTransitionRecord(
+            prior_revision=state.revision,
+            resulting_revision=resulting.revision,
+            kind=TransitionKind.GRAPH_MUTATION,
+            change=CanonicalChange(graph_change=change),
+            provenance=provenance,
+            recorded_at=now(),
+        )
+        invalid = transition_findings(record)
+        if invalid:
+            return RevisionedOutcome(
+                status=OperationStatus.REJECTED,
+                summary="the resulting transition could not be replayed; nothing was committed",
+                findings=invalid,
+            )
+        unreadable = unreadable_reason(resulting)
+        if unreadable is not None:
+            return RevisionedOutcome(
+                status=OperationStatus.REJECTED,
+                summary=(
+                    "the resulting state could not be read back after storage, so it was not "
+                    "committed"
+                ),
+                findings=(ValidationFinding(summary=unreadable),),
+            )
+        self._store.append_transition(record, resulting)
+        return RevisionedOutcome(
+            status=OperationStatus.ACCEPTED,
+            summary=f"committed revision {resulting.revision}",
+            resulting_revision=resulting.revision,
+        )
+
+    # --- Assessment -------------------------------------------------------------------
+
+    def check(self) -> ValidationReport:
+        """Assess the current graph against the current active definitions.
+
+        The assessment changes no canonical state or revision and reads no canonical
+        record; a false ``conforms`` describes the graph, it does not report a failure.
+        """
+        state = self.current_state()
+        findings = assess_graph_conformance(state.graph, state.active_definitions)
+        return ValidationReport(
+            scope=ValidationScope.GRAPH_CONFORMANCE,
+            conforms=not findings,
+            evaluated_revision=state.revision,
+            findings=findings,
+        )
+
 
 def _unstorable_record_text(
-    provenance: Provenance, initialization_summary: str
+    provenance: Provenance, initialization_summary: str | None
 ) -> tuple[ValidationFinding, ...]:
     """Report record text that cannot be encoded.
 
-    The definition set is screened by its own validity check; the record carries text of
-    its own, and it reaches the same store.
+    The definition set and the canonical state are screened by their own checks; a
+    record carries text of its own, and it reaches the same store. Every operation that
+    writes a record screens it, not only the first one.
     """
     fields = (
         ("initialization summary", initialization_summary),

@@ -33,18 +33,37 @@ from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 
-from vellis.canonical import CanonicalState, InitialStateRecord, Provenance
+from vellis.canonical import (
+    CanonicalChange,
+    CanonicalState,
+    CanonicalTransitionRecord,
+    InitialStateRecord,
+    Provenance,
+    TransitionKind,
+)
 from vellis.serialization import (
     DecodeError,
+    decode_canonical_change,
     decode_canonical_state,
     decode_text,
+    encode_canonical_change,
     encode_canonical_state,
     encode_text,
 )
 
-__all__ = ["AlreadyInitializedError", "CanonicalStore", "StoreError"]
+__all__ = [
+    "AlreadyInitializedError",
+    "CanonicalStore",
+    "ConcurrentRevisionError",
+    "StoreError",
+]
 
 SCHEMA_VERSION = "1"
+
+# The next ledger position. Counting rows would traverse the whole prefix on every
+# commit, which is exactly the work history-independent current operations may not do;
+# ordinal is UNIQUE, so taking its maximum is an index seek instead.
+NEXT_ORDINAL_SQL = "SELECT ifnull(max(ordinal), -1) + 1 FROM canonical_record"
 
 # A stable marker so an unrelated database at the store path is refused, not adopted.
 APPLICATION_ID = 0x56454C31  # "VEL1"
@@ -84,6 +103,10 @@ class StoreError(RuntimeError):
 
 class AlreadyInitializedError(StoreError):
     """Raised when initialization is attempted against established canonical state."""
+
+
+class ConcurrentRevisionError(StoreError):
+    """Raised when the revision a change was prepared against is no longer current."""
 
 
 @dataclass(slots=True)
@@ -301,6 +324,104 @@ class CanonicalStore:
         except sqlite3.Error:
             pass
 
+    def append_transition(
+        self, record: CanonicalTransitionRecord, resulting_state: CanonicalState
+    ) -> None:
+        """Append one transition and update the projection as one recoverable effect.
+
+        The appended record and the updated projection commit together, so no reader can
+        observe a revision established by one without the state established by the other.
+        The prior revision is re-checked inside the transaction, so two writers cannot
+        both believe they are advancing from it.
+        """
+        payload = encode_text(encode_canonical_state(resulting_state))
+        change = encode_text(encode_canonical_change(record.change))
+        try:
+            self._connection.execute("BEGIN IMMEDIATE")
+            row = self._connection.execute(
+                "SELECT revision FROM current_state WHERE id = 0"
+            ).fetchone()
+            if row is None:
+                self._connection.execute("ROLLBACK")
+                raise StoreError("no canonical state is established")
+            if row[0] != record.prior_revision:
+                self._connection.execute("ROLLBACK")
+                raise ConcurrentRevisionError(
+                    f"the current revision is {row[0]}, not {record.prior_revision}"
+                )
+            self._connection.execute(
+                "INSERT INTO canonical_record (established_revision, ordinal, record_kind,"
+                " recorded_at, initiator, source, summary, payload)"
+                f" VALUES (?, ({NEXT_ORDINAL_SQL}), ?, ?, ?, ?, ?, ?)",
+                (
+                    record.resulting_revision,
+                    record.kind.value,
+                    record.recorded_at.isoformat(),
+                    record.provenance.initiator,
+                    record.provenance.source,
+                    str(record.prior_revision),
+                    change,
+                ),
+            )
+            self._connection.execute(
+                "UPDATE current_state SET revision = ?, established_by = ?, state = ? WHERE id = 0",
+                (resulting_state.revision, record.resulting_revision, payload),
+            )
+            self._connection.execute("COMMIT")
+        except StoreError:
+            self._rollback_quietly()
+            raise
+        except Exception as error:
+            self._rollback_quietly()
+            raise StoreError(f"could not append the transition: {error}") from error
+
+    def transitions(self) -> tuple[CanonicalTransitionRecord, ...]:
+        """Read every transition in ledger order. Each is a semantic record access."""
+        rows = self._connection.execute(
+            "SELECT established_revision, record_kind, recorded_at, initiator, source, summary,"
+            " payload FROM canonical_record WHERE ordinal > 0 ORDER BY ordinal"
+        ).fetchall()
+        self._record_reads += len(rows)
+        records: list[CanonicalTransitionRecord] = []
+        for row in rows:
+            record = _RecordRow(*row)
+            try:
+                kind = TransitionKind(record.record_kind)
+                prior = int(record.summary)
+            except ValueError as error:
+                raise StoreError(
+                    f"a canonical record at {self._path} is not a readable transition: {error}"
+                ) from error
+            records.append(
+                CanonicalTransitionRecord(
+                    prior_revision=prior,
+                    resulting_revision=record.established_revision,
+                    kind=kind,
+                    change=self._decode_change(record.payload),
+                    provenance=Provenance(initiator=record.initiator, source=record.source),
+                    recorded_at=self._recorded_at(record.recorded_at),
+                )
+            )
+        return tuple(records)
+
+    def _decode_change(self, payload: object) -> CanonicalChange:
+        if not isinstance(payload, str):
+            raise StoreError("a stored canonical change is not text")
+        try:
+            return decode_canonical_change(decode_text(payload))
+        except (DecodeError, ValueError, ArithmeticError, RecursionError) as error:
+            raise StoreError(
+                f"a stored canonical change does not decode to canonical meaning: {error}"
+            ) from error
+
+    def _recorded_at(self, text: str) -> datetime:
+        try:
+            return datetime.fromisoformat(text)
+        except ValueError as error:
+            raise StoreError(
+                f"a canonical record at {self._path} has an unreadable time: {error}"
+            ) from error
+
     def initial_record(self) -> InitialStateRecord:
         """Read the owned initial record. This is a semantic canonical-record access."""
         row = self._read_record(
@@ -319,12 +440,7 @@ class CanonicalStore:
                 f"the initial record at {self._path} establishes revision "
                 f"{record.established_revision} but carries revision {state.revision}"
             )
-        try:
-            recorded_at = datetime.fromisoformat(record.recorded_at)
-        except ValueError as error:
-            raise StoreError(
-                f"the initial record at {self._path} has an unreadable time: {error}"
-            ) from error
+        recorded_at = self._recorded_at(record.recorded_at)
         return InitialStateRecord(
             canonical_state=state,
             initialization_summary=record.summary,
@@ -334,7 +450,9 @@ class CanonicalStore:
 
     def replay(self) -> CanonicalState:
         """Reconstruct canonical state by replaying through the final canonical record."""
-        return self.initial_record().canonical_state
+        from vellis.canonical import replay as replay_records
+
+        return replay_records(self.initial_record(), self.transitions())
 
     def canonical_record_count(self) -> int:
         """Return how many canonical records the ledger holds.

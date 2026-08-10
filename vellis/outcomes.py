@@ -1,11 +1,12 @@
 """Operation outcomes, validation findings, and reports.
 
-Realizes ``RTG::'Operation Status'``, ``RTG::'Validation Finding'``, and
+Realizes ``RTG::'Operation Status'``, ``RTG::'Validation Finding'``,
+``RTG::'Validation Report'``, ``RTG::'Validation Scope'``, and
 ``RTG::'Revisioned Outcome'``.
 
-``RTG::'Validation Report'`` and the parameterless public check operation belong to the
-typed-validation authority that later slices carry, so they are deliberately absent
-here: this slice reports findings, and the slice that owns reports will wrap them.
+Only the assessment scopes that currently return reports are named. Scopes arrive with
+the operations that produce them, so the enumeration stays a description of what exists
+rather than a promise of what might.
 
 The model gives a finding references to the definitions and graph objects it
 implicates. This realization carries their natural identities instead of the objects
@@ -22,6 +23,8 @@ __all__ = [
     "OperationStatus",
     "RevisionedOutcome",
     "ValidationFinding",
+    "ValidationReport",
+    "ValidationScope",
 ]
 
 
@@ -37,6 +40,12 @@ class OperationStatus(Enum):
     ACCEPTED = "accepted"
     REJECTED = "rejected"
     FAILED = "failed"
+
+
+class ValidationScope(Enum):
+    """The assessment scopes that currently return reports."""
+
+    GRAPH_CONFORMANCE = "graphConformance"
 
 
 @dataclass(frozen=True, slots=True)
@@ -64,3 +73,17 @@ class RevisionedOutcome:
     @property
     def accepted(self) -> bool:
         return self.status is OperationStatus.ACCEPTED
+
+
+@dataclass(frozen=True, slots=True)
+class ValidationReport:
+    """The successful result of an assessment.
+
+    A false ``conforms`` value describes the assessed subject; it is not an execution
+    failure, and it owns no canonical state of its own.
+    """
+
+    scope: ValidationScope
+    conforms: bool
+    evaluated_revision: int
+    findings: tuple[ValidationFinding, ...] = ()
