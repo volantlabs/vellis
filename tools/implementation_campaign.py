@@ -332,7 +332,8 @@ def _checkpoint_format_findings(campaign: dict[str, Any]) -> list[str]:
             for position, (_, slice_match) in enumerate(ordered)
             if slice_match is not None and slice_match.group("plan") == approved_plan[:12]
         ]
-        for entry, slice_match in ordered[min(renewed_positions, default=len(ordered)) :]:
+        frontier = min(renewed_positions, default=len(ordered))
+        for entry, slice_match in ordered[frontier:]:
             if slice_match is not None and slice_match.group("plan") != approved_plan[:12]:
                 findings.append(
                     f"slice {entry['id']} checkpoint does not use the approved plan commit"
@@ -412,9 +413,21 @@ def _checkpoint_format_findings(campaign: dict[str, Any]) -> list[str]:
         # Blocking clears the approval, so the plan identifier is no longer available to say which
         # completed slices predate it. Retaining a prior approval stays legal for the same reason
         # it does while ready: a campaign blocked after a renewal has advanced past its last slice.
-        retained_approval = (
-            campaign_checkpoint is not None
-            and APPROVAL_CHECKPOINT.fullmatch(campaign_checkpoint) is not None
+        # Only an approval granted after the newest completed slice qualifies. An approval naming
+        # the plan that slice already bears predates it, so resting there would fall backward.
+        retained_match = (
+            APPROVAL_CHECKPOINT.fullmatch(campaign_checkpoint)
+            if campaign_checkpoint is not None
+            else None
+        )
+        latest_plan_match = (
+            SLICE_CHECKPOINT.fullmatch(latest_completed_checkpoint)
+            if latest_completed_checkpoint is not None
+            else None
+        )
+        retained_approval = retained_match is not None and (
+            latest_plan_match is None
+            or retained_match.group("plan")[:12] != latest_plan_match.group("plan")
         )
         if latest_completed_checkpoint is not None:
             if campaign_checkpoint != latest_completed_checkpoint and not retained_approval:
@@ -873,6 +886,41 @@ def _expected_approval_campaign(parent: dict[str, Any], *, checkpoint: str) -> d
     return expected
 
 
+def _retained_approval_findings(campaign: dict[str, Any], *, root: Path) -> list[str]:
+    """Resolve the approval a blocked or stale campaign still rests on.
+
+    Its own approval is cleared, so nothing in the record can say whether that sha names a
+    reachable plan or one the campaign has already advanced past.
+    """
+    checkpoint = campaign["campaign"]["checkpoint"]
+    match = APPROVAL_CHECKPOINT.fullmatch(checkpoint) if checkpoint is not None else None
+    if match is None:
+        return []
+    retained = match.group("plan")
+    if not _git_succeeds(root, "cat-file", "-e", f"{retained}^{{commit}}"):
+        return [f"retained approval commit does not exist: {retained}"]
+    if not _git_succeeds(root, "merge-base", "--is-ancestor", retained, "HEAD"):
+        return [f"retained approval commit is not an ancestor of HEAD: {retained}"]
+    try:
+        planned = load_campaign_text(
+            _git(root, "show", f"{retained}:implementation-campaign.yaml"),
+            label=f"{retained}:implementation-campaign.yaml",
+        )
+    except (RuntimeError, ValueError, yaml.YAMLError) as error:
+        return [f"retained approval campaign is unreadable: {error}"]
+    inherited = {entry["id"] for entry in planned["slices"] if entry["lifecycle"] == "complete"}
+    ahead = [
+        entry["id"]
+        for entry in campaign["slices"]
+        if entry["lifecycle"] == "complete" and entry["id"] not in inherited
+    ]
+    if ahead:
+        return [
+            "retained approval predates completed slices: " + ", ".join(sorted(ahead)),
+        ]
+    return []
+
+
 def checkpoint_binding_findings(campaign: dict[str, Any], *, root: Path = ROOT) -> list[str]:
     """Bind the current campaign to ordinary committed recovery state.
 
@@ -898,6 +946,10 @@ def checkpoint_binding_findings(campaign: dict[str, Any], *, root: Path = ROOT) 
     findings.extend(_head_evidence_findings(campaign, root=root))
     approval = campaign["campaign"]["plan_approval"]
     if approval["status"] != "accepted":
+        # Blocking clears the approval but a campaign blocked after a renewal still rests on it.
+        # The record can no longer resolve that sha, so check here that it names real recovery
+        # state rather than a plan the campaign never reached.
+        findings.extend(_retained_approval_findings(campaign, root=root))
         return findings
 
     checkpoint = approval["checkpoint"]
@@ -948,14 +1000,11 @@ def checkpoint_binding_findings(campaign: dict[str, Any], *, root: Path = ROOT) 
             )
 
     # An approval commit — first or renewed after a replan — is the state in which the approval is
-    # itself the campaign checkpoint, because no slice has completed under this plan yet.
+    # itself the campaign checkpoint. A commit that also completes a slice still claims that state,
+    # so it is judged by these rules rather than escaping them.
     approval_commit = (
         campaign["campaign"]["lifecycle"] == "ready"
         and campaign["campaign"]["checkpoint"] == checkpoint
-        and not any(
-            entry["lifecycle"] == "complete" and entry["id"] not in inherited
-            for entry in campaign["slices"]
-        )
     )
     if approval_commit:
         parents = _git(root, "rev-list", "--parents", "-n", "1", "HEAD").split()

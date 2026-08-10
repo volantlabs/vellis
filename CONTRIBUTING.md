@@ -110,8 +110,10 @@ Vellis checkpoint identifiers are navigation labels in the portable campaign rec
 - closure: `closure:<approved-plan-short-sha>:<attempt>`.
 
 Start an attempt at `1` and increment it only if a checkpoint for the same slice and approved plan
-already committed. Attempt numbers are scoped to one slice under one approved plan, so a slice
-reached again under a renewed approval starts at `1`. No special Git commit trailers are required.
+already committed. Attempt numbers are scoped to one slice under one approved plan, so a slice that
+is still pending when a renewed plan is approved starts at `1` under that plan. A slice that was
+already complete keeps its checkpoint untouched; re-running it means reopening it in the candidate
+record before approval, not a second attempt. No special Git commit trailers are required.
 
 The approval commit is a direct child of the reviewed plan commit and changes only
 `implementation-campaign.yaml`: set campaign lifecycle to `ready`, approval to `accepted`, both
@@ -144,12 +146,19 @@ Two gates divide this work, and the split matters:
 - `just implementation-campaign-check` reads only the record. It cannot know when a slice completed,
   so it bounds the superseded region rather than locating it: every slice completed at or after the
   first one bearing the current approved plan must bear it too, and the checkpoint a campaign rests
-  on may never name a superseded plan. A slice completed immediately after a renewal is not yet
-  covered by that bound.
+  on may never name a superseded plan. The bound is silent while no completed slice yet bears the
+  current plan, so a slice mislabelled in that window passes this gate — and so does every later one
+  until some slice adopts the current plan. Only the second gate closes that.
 - `just implementation-campaign-checkpoint-check` reads the approved plan commit, whose own record
   says which slices were already complete when it was reviewed. That is the boundary: anything
   finished since must checkpoint against this plan, and anything finished before must keep its label
-  byte for byte. Run it after every checkpoint commit, including the approval, before advancing.
+  byte for byte. It also resolves the approval a blocked campaign still rests on. Run it after every
+  checkpoint commit, including the approval, before advancing; it is the only automated detector for
+  a mislabelled slice, and it is not part of `just check`, so skipping it loses the check entirely.
+
+Before granting approval, confirm that the candidate record's completed slices — which ones, and the
+exact checkpoint each carries — are the work actually finished. That set becomes the permanent
+boundary both gates consult, and no later check can question it.
 
 Changing the baseline, authority map, coverage, slice graph, verification references, or selected
 realization decisions requires replanning, a new cold review, and renewed human approval.

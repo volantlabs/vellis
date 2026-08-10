@@ -237,6 +237,87 @@ def test_a_slice_completed_before_the_renewal_may_not_be_re_minted(tmp_path: Pat
     assert any("may not be re-minted" in finding for finding in findings)
 
 
+def test_an_approval_commit_may_not_also_complete_a_slice(tmp_path: Path) -> None:
+    campaign, plan_sha = _renewed_approval_repository(tmp_path)
+    _complete_fourth_slice(campaign, checkpoint=f"slice:S004:{plan_sha[:12]}:1")
+    _write_campaign(tmp_path, campaign)
+    _git(tmp_path, "add", "implementation-campaign.yaml")
+    _git(tmp_path, "commit", "--amend", "-m", "renew approval and complete S004")
+
+    findings = implementation_campaign.checkpoint_binding_findings(campaign, root=tmp_path)
+
+    assert any("beyond approval state" in finding for finding in findings)
+
+
+def test_a_blocked_campaign_may_not_retain_an_unreachable_approval(tmp_path: Path) -> None:
+    campaign, _ = _renewed_approval_repository(tmp_path)
+    campaign["campaign"]["lifecycle"] = "blocked"  # type: ignore[index]
+    campaign["campaign"]["plan_approval"] = {"status": "changes-required", "checkpoint": None}  # type: ignore[index]
+    campaign["campaign"]["blocker"] = {  # type: ignore[index]
+        "classification": "model gap",
+        "summary": "A named distinction is unresolved.",
+        "authority_ids": ["A001"],
+        "evidence_refs": [],
+    }
+    campaign["slices"][3]["lifecycle"] = "pending"  # type: ignore[index]
+    campaign["campaign"]["checkpoint"] = f"approval:{'a' * 40}"  # type: ignore[index]
+    _write_campaign(tmp_path, campaign)
+    _git(tmp_path, "add", "implementation-campaign.yaml")
+    _git(tmp_path, "commit", "-m", "block the campaign")
+
+    findings = implementation_campaign.checkpoint_binding_findings(campaign, root=tmp_path)
+
+    assert any("retained approval commit does not exist" in finding for finding in findings)
+
+
+def test_a_second_replan_distinguishes_each_generation_of_completed_slices(
+    tmp_path: Path,
+) -> None:
+    """Three plan generations: the first two stay frozen, work since the third must be current."""
+    campaign, first_plan = _renewed_approval_repository(tmp_path)
+    second_checkpoint = f"slice:S004:{first_plan[:12]}:1"
+    _complete_fourth_slice(campaign, checkpoint=second_checkpoint)
+    campaign["campaign"]["checkpoint"] = second_checkpoint  # type: ignore[index]
+    _write_campaign(tmp_path, campaign)
+    _git(tmp_path, "add", "implementation-campaign.yaml")
+    _git(tmp_path, "commit", "-m", "complete S004 under the second plan")
+
+    campaign["campaign"]["lifecycle"] = "awaiting-plan-approval"  # type: ignore[index]
+    campaign["campaign"]["plan_approval"] = {"status": "pending", "checkpoint": None}  # type: ignore[index]
+    campaign["campaign"]["checkpoint"] = None  # type: ignore[index]
+    campaign["slices"][4]["lifecycle"] = "pending"  # type: ignore[index]
+    _write_campaign(tmp_path, campaign)
+    _git(tmp_path, "add", "implementation-campaign.yaml")
+    _git(tmp_path, "commit", "-m", "third candidate plan")
+    third_plan = _git(tmp_path, "rev-parse", "HEAD")
+
+    _renew(campaign, checkpoint=f"approval:{third_plan}")
+    campaign["slices"][3]["lifecycle"] = "complete"  # type: ignore[index]
+    campaign["slices"][4]["lifecycle"] = "ready"  # type: ignore[index]
+    _write_campaign(tmp_path, campaign)
+    _git(tmp_path, "add", "implementation-campaign.yaml")
+    _git(tmp_path, "commit", "-m", "renew approval on the third plan")
+
+    assert implementation_campaign.checkpoint_binding_findings(campaign, root=tmp_path) == []
+
+    # A slice finished under generation three may not wear generation two's label.
+    fifth = campaign["slices"][4]  # type: ignore[index]
+    fifth["lifecycle"] = "complete"
+    fifth["implementation_status"] = "conforming"
+    fifth["evidence_refs"] = ["command:just check"]
+    fifth["checkpoint"] = f"slice:S005:{first_plan[:12]}:1"
+    campaign["campaign"]["checkpoint"] = fifth["checkpoint"]  # type: ignore[index]
+    _write_campaign(tmp_path, campaign)
+    _git(tmp_path, "add", "implementation-campaign.yaml")
+    _git(tmp_path, "commit", "-m", "complete S005 against a superseded plan")
+
+    findings = implementation_campaign.checkpoint_binding_findings(campaign, root=tmp_path)
+
+    assert any("S005 completed under this approval but checkpoints" in f for f in findings)
+    # Generation two's own label stays frozen rather than being read as a re-mint.
+    assert not any("may not be re-minted" in finding for finding in findings)
+
+
 def test_renewed_approval_commit_must_directly_follow_its_reviewed_plan(tmp_path: Path) -> None:
     campaign, _ = _renewed_approval_repository(tmp_path)
     (tmp_path / "NOTES.md").write_text("# Notes\n", encoding="utf-8")
@@ -653,6 +734,38 @@ def test_only_a_complete_slice_may_carry_a_checkpoint() -> None:
     findings = implementation_campaign.validate_campaign(campaign)
 
     assert any("only a complete slice may carry a checkpoint: S005" in f for f in findings)
+
+
+def _block(campaign: dict[str, object]) -> None:
+    campaign["campaign"]["lifecycle"] = "blocked"  # type: ignore[index]
+    campaign["campaign"]["plan_approval"] = {"status": "changes-required", "checkpoint": None}  # type: ignore[index]
+    campaign["campaign"]["blocker"] = {  # type: ignore[index]
+        "classification": "model gap",
+        "summary": "A named distinction is unresolved.",
+        "authority_ids": ["A001"],
+        "evidence_refs": [],
+    }
+    campaign["slices"][3]["lifecycle"] = "pending"  # type: ignore[index]
+
+
+def test_a_campaign_blocked_after_a_renewal_keeps_the_approval_it_reached() -> None:
+    campaign = _replanned_campaign()
+    _renew(campaign)
+    _block(campaign)
+
+    assert implementation_campaign.validate_campaign(campaign) == []
+
+
+def test_a_blocked_campaign_may_not_fall_back_behind_its_completed_slices() -> None:
+    campaign = _replanned_campaign()
+    _renew(campaign)
+    _block(campaign)
+    # The approval those three slices were completed under; resting here loses the replan.
+    campaign["campaign"]["checkpoint"] = f"approval:{SUPERSEDED_PLAN_SHORT_SHA}{'0' * 28}"  # type: ignore[index]
+
+    findings = implementation_campaign.validate_campaign(campaign)
+
+    assert any("must retain the latest completed slice" in finding for finding in findings)
 
 
 def test_renewed_approval_readies_only_the_next_dependency_ready_slice() -> None:

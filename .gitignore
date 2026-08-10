@@ -13,3 +13,6 @@ build/
 .config/
 .cursor/
 .vscode/
+
+# Transient MCP browser session artifacts
+.playwright-mcp/
