@@ -297,11 +297,24 @@ def test_each_transition_is_contiguous_and_advances_exactly_one_revision(
 
 
 def test_replay_reconstructs_the_same_state_without_activity_history(tmp_path: Path) -> None:
+    """Replay reads the canonical ledger and nothing else.
+
+    Observations exist by now, so this shows they are not consulted rather than that
+    they are absent: emptying the activity ledger changes nothing replay reconstructs.
+    """
     system = _populated(tmp_path)
     try:
         _apply(system, GraphChange(link_removals=("l-1",)))
-        assert canonical_state_equal(system.current_state(), system.replay())
+        system.check()
+        assert system.store.activity_record_count() > 0
+        before = system.replay()
+        assert canonical_state_equal(system.current_state(), before)
+
+        system.store._connection.execute("DELETE FROM activity_record")  # noqa: SLF001
+        system.store._connection.commit()  # noqa: SLF001
+
         assert system.store.activity_record_count() == 0
+        assert canonical_state_equal(system.replay(), before)
     finally:
         system.close()
 

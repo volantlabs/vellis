@@ -8,13 +8,16 @@ store raises rather than silently reconstructing a different canonical meaning.
 
 from __future__ import annotations
 
+from datetime import datetime
 from decimal import Decimal
 
+from vellis.activity import ActivityRecord
 from vellis.canonical import (
     CanonicalChange,
     CanonicalState,
     DefinitionDelta,
     DefinitionDeltaDisposition,
+    Provenance,
     canonical_state_equal,
 )
 from vellis.changes import GraphChange
@@ -42,6 +45,7 @@ from vellis.json_value import (
     dumps,
     loads,
 )
+from vellis.outcomes import OperationStatus
 
 __all__ = [
     "DecodeError",
@@ -676,6 +680,50 @@ def decode_canonical_state(value: JsonValue) -> CanonicalState:
         active_definitions=decode_definition_set(_member(members, "activeDefinitions", where)),
         revision=_int(_member(members, "revision", where), f"{where} revision"),
         definition_delta=delta,
+    )
+
+
+def encode_activity_record(record: ActivityRecord) -> JsonValue:
+    """Encode one observation.
+
+    Stored beside the canonical ledger rather than inside it, so this shares the encoder
+    module without ever reaching a canonical decoder.
+    """
+    return {
+        "capability": record.capability,
+        "outcomeCategory": record.outcome_category.value,
+        "semanticScope": record.semantic_scope,
+        "summary": record.summary,
+        "recordedAt": record.recorded_at.isoformat(),
+        "initiator": record.provenance.initiator,
+        "source": record.provenance.source,
+        "evaluatedRevision": (
+            None if record.evaluated_revision is None else Decimal(record.evaluated_revision)
+        ),
+    }
+
+
+def decode_activity_record(value: JsonValue) -> ActivityRecord:
+    """Decode one observation."""
+    where = "activity record"
+    members = _object(value, where)
+    return ActivityRecord(
+        capability=_string(_member(members, "capability", where), f"{where} capability"),
+        outcome_category=OperationStatus(
+            _string(_member(members, "outcomeCategory", where), f"{where} outcome")
+        ),
+        semantic_scope=_string(_member(members, "semanticScope", where), f"{where} scope"),
+        summary=_string(_member(members, "summary", where), f"{where} summary"),
+        recorded_at=datetime.fromisoformat(
+            _string(_member(members, "recordedAt", where), f"{where} time")
+        ),
+        provenance=Provenance(
+            initiator=_string(_member(members, "initiator", where), f"{where} initiator"),
+            source=_optional_string(_member(members, "source", where), f"{where} source"),
+        ),
+        evaluated_revision=_optional_int(
+            _member(members, "evaluatedRevision", where), f"{where} evaluated revision"
+        ),
     )
 
 

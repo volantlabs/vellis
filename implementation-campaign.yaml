@@ -7,7 +7,7 @@ campaign:
     status: accepted
     checkpoint: approval:5a8d92c675d6865bd70fadd0e971bbf959081bea
   blocker: null
-  checkpoint: slice:S005:5a8d92c675d6:1
+  checkpoint: slice:S006:5a8d92c675d6:1
 model_baseline:
   status: current
   authority_files:
@@ -174,8 +174,13 @@ authority:
       - {model_ref: "VellisRequirements::boundedHistoryRead", source: "model/40-requirements.sysml"}
     planned_coverage: full
     slice_ids: [S006, S007]
-    implementation_status: absent
-    evidence_refs: []
+    implementation_status: partial
+    evidence_refs:
+      - path:tests/vellis/test_activity_history.py#test_each_read_capability_records_its_own_observation
+      - path:tests/vellis/test_activity_history.py#test_an_activity_read_is_selected_before_its_own_record_is_appended
+      - path:tests/vellis/test_activity_history.py#test_forgetting_activity_leaves_replayed_state_identical
+      - path:tests/vellis/test_activity_history.py#test_a_canonical_read_returns_one_entry_per_record_in_ledger_order
+      - path:tests/vellis/test_activity_history.py#test_an_over_broad_or_unbounded_read_is_refused_whole
   - id: A009
     label: Snapshot, replay, and snapshot-based initialization
     refs:
@@ -528,12 +533,28 @@ slices:
     verification_refs:
       - VellisVerification::activitySeparation
       - VellisVerification::validationCoverage
-    lifecycle: ready
-    implementation_status: absent
-    evidence_refs: []
+    lifecycle: complete
+    implementation_status: conforming
+    evidence_refs:
+      - path:tests/vellis/test_activity_history.py#test_each_read_capability_records_its_own_observation
+      - path:tests/vellis/test_activity_history.py#test_a_failed_read_is_recorded_as_a_failure
+      - path:tests/vellis/test_activity_history.py#test_an_accepted_mutation_is_canonical_authority_not_an_observation
+      - path:tests/vellis/test_activity_history.py#test_an_activity_read_is_selected_before_its_own_record_is_appended
+      - path:tests/vellis/test_activity_history.py#test_an_activity_summary_copies_no_result_rows_or_payloads
+      - path:tests/vellis/test_activity_history.py#test_forgetting_activity_leaves_replayed_state_identical
+      - path:tests/vellis/test_activity_history.py#test_only_records_before_the_boundary_are_forgotten
+      - path:tests/vellis/test_activity_history.py#test_a_refused_retention_preserves_every_preexisting_record
+      - path:tests/vellis/test_activity_history.py#test_a_retention_boundary_in_another_zone_forgets_the_same_records
+      - path:tests/vellis/test_activity_history.py#test_a_canonical_read_returns_one_entry_per_record_in_ledger_order
+      - path:tests/vellis/test_activity_history.py#test_canonical_bounds_are_inclusive_at_both_ends
+      - path:tests/vellis/test_activity_history.py#test_a_result_never_mixes_the_two_entry_families
+      - path:tests/vellis/test_activity_history.py#test_an_over_broad_or_unbounded_read_is_refused_whole
+      - path:tests/vellis/test_activity_history.py#test_a_bounded_canonical_read_does_not_walk_the_records_before_it
+      - path:tests/vellis/test_graph_changes.py#test_replay_reconstructs_the_same_state_without_activity_history
+      - command:uv run pytest tests/vellis
     realization_decisions: []
     blocker: null
-    checkpoint: null
+    checkpoint: slice:S006:5a8d92c675d6:1
   - id: S007
     order: 7
     label: Capture and replay canonical state
@@ -551,7 +572,7 @@ slices:
       - VellisVerification::snapshotReplay
       - VellisVerification::invalidTail
       - VellisVerification::activitySeparation
-    lifecycle: pending
+    lifecycle: ready
     implementation_status: absent
     evidence_refs: []
     realization_decisions: []

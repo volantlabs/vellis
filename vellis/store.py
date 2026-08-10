@@ -30,9 +30,10 @@ from __future__ import annotations
 
 import sqlite3
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 
+from vellis.activity import ActivityRecord
 from vellis.canonical import (
     CanonicalChange,
     CanonicalState,
@@ -43,9 +44,11 @@ from vellis.canonical import (
 )
 from vellis.serialization import (
     DecodeError,
+    decode_activity_record,
     decode_canonical_change,
     decode_canonical_state,
     decode_text,
+    encode_activity_record,
     encode_canonical_change,
     encode_canonical_state,
     encode_text,
@@ -89,6 +92,8 @@ CREATE TABLE activity_record (
     recorded_at TEXT NOT NULL,
     payload     TEXT NOT NULL
 );
+CREATE INDEX activity_record_time ON activity_record (recorded_at);
+CREATE INDEX canonical_record_time ON canonical_record (recorded_at);
 CREATE TABLE current_state (
     id             INTEGER PRIMARY KEY CHECK (id = 0),
     revision       INTEGER NOT NULL,
@@ -96,6 +101,19 @@ CREATE TABLE current_state (
     state          TEXT    NOT NULL
 );
 """
+
+
+def _stored_time(moment: datetime) -> str:
+    """Render one instant so that text order is instant order.
+
+    The activity ledger is selected and pruned by comparing this column, and ISO-8601
+    text only sorts by instant when every value carries the same offset. A caller's
+    bound in another zone would otherwise silently select — or delete — the wrong
+    interval, which on the retention path means losing history the owner meant to keep.
+    """
+    if moment.tzinfo is None:
+        raise StoreError(f"a time bound must say which zone it is in: {moment.isoformat()}")
+    return moment.astimezone(UTC).isoformat()
 
 
 class StoreError(RuntimeError):
@@ -322,7 +340,7 @@ class CanonicalStore:
                 " VALUES (?, 0, 'initial', ?, ?, ?, ?, ?)",
                 (
                     record.established_revision,
-                    record.recorded_at.isoformat(),
+                    _stored_time(record.recorded_at),
                     record.provenance.initiator,
                     record.provenance.source,
                     record.initialization_summary,
@@ -334,6 +352,9 @@ class CanonicalStore:
                 " VALUES (0, ?, ?, ?)",
                 (state.revision, record.established_revision, payload),
             )
+            # A read attempted before the system existed may already have observed itself
+            # here, and success promises an empty ledger.
+            self._connection.execute("DELETE FROM activity_record")
             self._connection.execute("COMMIT")
         except AlreadyInitializedError:
             raise
@@ -448,6 +469,49 @@ class CanonicalStore:
                 f"a canonical record at {self._path} has an unreadable time: {error}"
             ) from error
 
+    def canonical_summaries(
+        self, *, start: datetime | None = None, end: datetime | None = None
+    ) -> tuple[tuple[int, int | None, str | None, str, str | None, str, datetime], ...]:
+        """Read canonical records for review over an inclusive interval.
+
+        Selects on the indexed time column and reads only the columns an owner-facing
+        entry needs, so a narrow window costs the window rather than the ledger. The
+        replay payload is not read at all: review is not authority, and decoding every
+        change to project a summary would make a bounded read cost the whole history.
+        """
+        clauses: list[str] = []
+        parameters: list[object] = []
+        if start is not None:
+            clauses.append("recorded_at >= ?")
+            parameters.append(_stored_time(start))
+        if end is not None:
+            clauses.append("recorded_at <= ?")
+            parameters.append(_stored_time(end))
+        where = f" WHERE {' AND '.join(clauses)}" if clauses else ""
+        rows = self._fetchall(
+            "SELECT established_revision, ordinal, record_kind, summary, initiator, source,"
+            f" recorded_at FROM canonical_record{where} ORDER BY ordinal",
+            tuple(parameters),
+        )
+        self._record_reads += len(rows)
+        summaries: list[tuple[int, int | None, str | None, str, str | None, str, datetime]] = []
+        for row in rows:
+            assert isinstance(row, tuple)
+            revision, ordinal, kind, summary, initiator, source, recorded_at = row
+            prior = int(summary) if ordinal else None
+            summaries.append(
+                (
+                    int(revision),
+                    prior,
+                    None if not ordinal else str(kind),
+                    str(initiator),
+                    None if source is None else str(source),
+                    "" if ordinal else str(summary),
+                    self._recorded_at(str(recorded_at)),
+                )
+            )
+        return tuple(summaries)
+
     def initial_record(self) -> InitialStateRecord:
         """Read the owned initial record. This is a semantic canonical-record access."""
         row = self._read_record(
@@ -488,6 +552,62 @@ class CanonicalStore:
         row = self._read_record("SELECT count(*) FROM canonical_record")
         assert isinstance(row, tuple)
         return int(row[0])
+
+    # --- The observational ledger ------------------------------------------------------
+    #
+    # Kept apart from the canonical ledger in every direction: its own table, its own
+    # reader, and no path from it into replay. Retention deletes here and nowhere else.
+
+    def append_activity(self, record: ActivityRecord) -> None:
+        """Append one observation. Never part of a canonical transaction."""
+        payload = encode_text(encode_activity_record(record))
+        try:
+            self._connection.execute(
+                "INSERT INTO activity_record (recorded_at, payload) VALUES (?, ?)",
+                (_stored_time(record.recorded_at), payload),
+            )
+        except sqlite3.Error as error:
+            raise StoreError(f"could not append the activity record: {error}") from error
+
+    def activity_records(
+        self, *, start: datetime | None = None, end: datetime | None = None
+    ) -> tuple[ActivityRecord, ...]:
+        """Read observations in ledger order over an inclusive interval."""
+        clauses: list[str] = []
+        parameters: list[object] = []
+        if start is not None:
+            clauses.append("recorded_at >= ?")
+            parameters.append(_stored_time(start))
+        if end is not None:
+            clauses.append("recorded_at <= ?")
+            parameters.append(_stored_time(end))
+        where = f" WHERE {' AND '.join(clauses)}" if clauses else ""
+        rows = self._fetchall(
+            f"SELECT payload FROM activity_record{where} ORDER BY ordinal", tuple(parameters)
+        )
+        records: list[ActivityRecord] = []
+        for row in rows:
+            assert isinstance(row, tuple)
+            payload = row[0]
+            if not isinstance(payload, str):
+                raise StoreError("a stored activity record is not text")
+            try:
+                records.append(decode_activity_record(decode_text(payload)))
+            except (DecodeError, ValueError, ArithmeticError, RecursionError) as error:
+                raise StoreError(
+                    f"a stored activity record does not decode to an observation: {error}"
+                ) from error
+        return tuple(records)
+
+    def remove_activity_before(self, boundary: datetime) -> int:
+        """Remove observations recorded before ``boundary``, returning how many went."""
+        try:
+            cursor = self._connection.execute(
+                "DELETE FROM activity_record WHERE recorded_at < ?", (_stored_time(boundary),)
+            )
+        except sqlite3.Error as error:
+            raise StoreError(f"could not apply the retention decision: {error}") from error
+        return cursor.rowcount
 
     def activity_record_count(self) -> int:
         """Return how many activity records the observational ledger holds."""
