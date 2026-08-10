@@ -154,8 +154,14 @@ authority:
       - {model_ref: "VellisRequirements::querySafety", source: "model/40-requirements.sysml"}
     planned_coverage: full
     slice_ids: [S005, S006, S008]
-    implementation_status: absent
-    evidence_refs: []
+    implementation_status: partial
+    evidence_refs:
+      - path:tests/vellis/test_graph_queries.py#test_one_anchor_type_is_queried_broadly
+      - path:tests/vellis/test_graph_queries.py#test_a_required_link_matches_only_in_its_stated_direction
+      - path:tests/vellis/test_graph_queries.py#test_each_comparison_selects_at_its_own_boundary
+      - path:tests/vellis/test_graph_queries.py#test_a_row_carries_only_the_requested_projections
+      - path:tests/vellis/test_invalid_queries.py#test_an_invalid_query_reports_findings_and_returns_no_rows
+      - path:tests/vellis/test_invalid_queries.py#test_a_result_above_its_maximum_is_refused_whole_rather_than_truncated
   - id: A008
     label: Separated activity and bounded owner history
     refs:
