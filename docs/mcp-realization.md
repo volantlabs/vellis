@@ -1,7 +1,7 @@
-# Future MCP realization
+# MCP realization
 
-This note is non-normative. The SysML model selects the agent-visible RTG behavior; it does not yet
-implement an MCP server.
+This note is non-normative. The SysML model selects the agent-visible RTG behavior; `vellis/mcp.py`
+exposes it over local standard input and output.
 
 ## Agent path
 

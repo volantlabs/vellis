@@ -14,8 +14,22 @@ import json
 from collections.abc import Mapping, Sequence
 from decimal import Decimal, InvalidOperation
 from enum import Enum
+from typing import Annotated
 
-type JsonValue = None | bool | Decimal | str | list[JsonValue] | dict[str, JsonValue]
+from pydantic import WithJsonSchema
+
+# A stored number is a JSON number. The default schema for an exact decimal describes a
+# string, which would tell an agent the wrong thing about what it is holding and what it
+# may write back; the annotation says what the model says. Only the published shape is
+# affected — every comparison and every stored form still works in exact decimal.
+type JsonValue = (
+    None
+    | bool
+    | Annotated[Decimal, WithJsonSchema({"type": "number"})]
+    | str
+    | list[JsonValue]
+    | dict[str, JsonValue]
+)
 
 # Stored integers must satisfy abs(value) < 10 ** this exponent. The write-side validity
 # check and the decoder both use it, so the two directions describe exactly the same set

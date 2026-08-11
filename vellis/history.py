@@ -37,6 +37,7 @@ from vellis.outcomes import ValidationFinding
 
 __all__ = [
     "EvaluatedDefinitions",
+    "MAXIMUM_REVISION",
     "HistoricalSelection",
     "RevisionSelection",
     "TimeSelection",
@@ -61,6 +62,9 @@ class TimeSelection:
 
 HistoricalSelection = RevisionSelection | TimeSelection
 
+# The largest revision a ledger can bind, which is what the store can hold in one column.
+MAXIMUM_REVISION = 2**63 - 1
+
 
 @dataclass(frozen=True, slots=True)
 class EvaluatedDefinitions:
@@ -72,7 +76,12 @@ class EvaluatedDefinitions:
 
 def selection_findings(selection: HistoricalSelection) -> tuple[ValidationFinding, ...]:
     """Return every reason a selector cannot be resolved before the ledger is consulted."""
-    if isinstance(selection, RevisionSelection) and selection.revision < 0:
+    if isinstance(selection, RevisionSelection) and not (
+        0 <= selection.revision <= MAXIMUM_REVISION
+    ):
+        # Bounded rather than merely non-negative: a number no ledger could hold is an
+        # unknown revision, and asking the store about it would fail on the way in rather
+        # than answer.
         return (
             ValidationFinding(
                 summary=f"a revision selector names a committed revision, not {selection.revision}"

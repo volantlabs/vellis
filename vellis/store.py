@@ -33,6 +33,7 @@ import sqlite3
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
+from threading import RLock
 
 from vellis.activity import ActivityRecord
 from vellis.canonical import (
@@ -160,7 +161,12 @@ class CanonicalStore:
         self._path = path
         self._record_reads = 0
         try:
-            self._connection = sqlite3.connect(path, isolation_level=None)
+            # One owner, one process, one connection — but not necessarily one thread:
+            # a tool boundary answers on whichever worker it is called from. The
+            # connection is shared across them and every operation takes the lock, so
+            # access stays serialized without a pool or a connection per caller.
+            self._connection = sqlite3.connect(path, isolation_level=None, check_same_thread=False)
+            self._lock = RLock()
         except sqlite3.Error as error:
             raise StoreError(f"could not open a canonical store at {path}: {error}") from error
         try:
@@ -288,13 +294,15 @@ class CanonicalStore:
         would turn an operation that should report a failure into a traceback.
         """
         try:
-            return self._connection.execute(sql, parameters).fetchone()
+            with self._lock:
+                return self._connection.execute(sql, parameters).fetchone()
         except sqlite3.Error as error:
             raise StoreError(f"could not read from the store at {self._path}: {error}") from error
 
     def _fetchall(self, sql: str, parameters: tuple[object, ...] = ()) -> list[object]:
         try:
-            return list(self._connection.execute(sql, parameters).fetchall())
+            with self._lock:
+                return list(self._connection.execute(sql, parameters).fetchall())
         except sqlite3.Error as error:
             raise StoreError(f"could not read from the store at {self._path}: {error}") from error
 
@@ -336,48 +344,49 @@ class CanonicalStore:
         """
         state = record.canonical_state
         payload = encode_text(encode_canonical_state(state))
-        try:
-            self._connection.execute("BEGIN IMMEDIATE")
-            if self._connection.execute("SELECT 1 FROM current_state WHERE id = 0").fetchone():
-                self._connection.execute("ROLLBACK")
-                raise AlreadyInitializedError(
-                    f"canonical state is already established at {self._path}"
+        with self._lock:
+            try:
+                self._connection.execute("BEGIN IMMEDIATE")
+                if self._connection.execute("SELECT 1 FROM current_state WHERE id = 0").fetchone():
+                    self._connection.execute("ROLLBACK")
+                    raise AlreadyInitializedError(
+                        f"canonical state is already established at {self._path}"
+                    )
+                self._connection.execute(
+                    "INSERT INTO canonical_record (established_revision, ordinal, record_kind,"
+                    " recorded_at, initiator, source, summary, payload)"
+                    " VALUES (?, 0, 'initial', ?, ?, ?, ?, ?)",
+                    (
+                        record.established_revision,
+                        _stored_time(record.recorded_at),
+                        record.provenance.initiator,
+                        record.provenance.source,
+                        record.initialization_summary,
+                        payload,
+                    ),
                 )
-            self._connection.execute(
-                "INSERT INTO canonical_record (established_revision, ordinal, record_kind,"
-                " recorded_at, initiator, source, summary, payload)"
-                " VALUES (?, 0, 'initial', ?, ?, ?, ?, ?)",
-                (
-                    record.established_revision,
-                    _stored_time(record.recorded_at),
-                    record.provenance.initiator,
-                    record.provenance.source,
-                    record.initialization_summary,
-                    payload,
-                ),
-            )
-            self._connection.execute(
-                "INSERT INTO current_state (id, revision, established_by, state)"
-                " VALUES (0, ?, ?, ?)",
-                (state.revision, record.established_revision, payload),
-            )
-            # A read attempted before the system existed may already have observed itself
-            # here, and success promises an empty ledger.
-            self._connection.execute("DELETE FROM activity_record")
-            # One value that no other ledger can hold, so a record's identity says which
-            # history it belongs to and not merely what it contains. Two systems seeded
-            # from the same snapshot are otherwise indistinguishable by content alone.
-            self._connection.execute(
-                "INSERT INTO ledger (id, identity) VALUES (0, ?)", (secrets.token_hex(16),)
-            )
-            self._connection.execute("COMMIT")
-        except AlreadyInitializedError:
-            raise
-        except Exception as error:
-            # Any failure between BEGIN and COMMIT must roll back. Letting one escape
-            # would leave the transaction open and poison every later use of this store.
-            self._rollback_quietly()
-            raise StoreError(f"could not establish canonical state: {error}") from error
+                self._connection.execute(
+                    "INSERT INTO current_state (id, revision, established_by, state)"
+                    " VALUES (0, ?, ?, ?)",
+                    (state.revision, record.established_revision, payload),
+                )
+                # A read attempted before the system existed may already have observed itself
+                # here, and success promises an empty ledger.
+                self._connection.execute("DELETE FROM activity_record")
+                # One value that no other ledger can hold, so a record's identity says which
+                # history it belongs to and not merely what it contains. Two systems seeded
+                # from the same snapshot are otherwise indistinguishable by content alone.
+                self._connection.execute(
+                    "INSERT INTO ledger (id, identity) VALUES (0, ?)", (secrets.token_hex(16),)
+                )
+                self._connection.execute("COMMIT")
+            except AlreadyInitializedError:
+                raise
+            except Exception as error:
+                # Any failure between BEGIN and COMMIT must roll back. Letting one escape
+                # would leave the transaction open and poison every later use of this store.
+                self._rollback_quietly()
+                raise StoreError(f"could not establish canonical state: {error}") from error
 
     def _rollback_quietly(self) -> None:
         try:
@@ -397,44 +406,46 @@ class CanonicalStore:
         """
         payload = encode_text(encode_canonical_state(resulting_state))
         change = encode_text(encode_canonical_change(record.change))
-        try:
-            self._connection.execute("BEGIN IMMEDIATE")
-            row = self._connection.execute(
-                "SELECT revision FROM current_state WHERE id = 0"
-            ).fetchone()
-            if row is None:
-                self._connection.execute("ROLLBACK")
-                raise NotInitializedError("no canonical state is established")
-            if row[0] != record.prior_revision:
-                self._connection.execute("ROLLBACK")
-                raise ConcurrentRevisionError(
-                    f"the current revision is {row[0]}, not {record.prior_revision}"
+        with self._lock:
+            try:
+                self._connection.execute("BEGIN IMMEDIATE")
+                row = self._connection.execute(
+                    "SELECT revision FROM current_state WHERE id = 0"
+                ).fetchone()
+                if row is None:
+                    self._connection.execute("ROLLBACK")
+                    raise NotInitializedError("no canonical state is established")
+                if row[0] != record.prior_revision:
+                    self._connection.execute("ROLLBACK")
+                    raise ConcurrentRevisionError(
+                        f"the current revision is {row[0]}, not {record.prior_revision}"
+                    )
+                self._connection.execute(
+                    "INSERT INTO canonical_record (established_revision, ordinal, record_kind,"
+                    " recorded_at, initiator, source, summary, payload)"
+                    f" VALUES (?, ({NEXT_ORDINAL_SQL}), ?, ?, ?, ?, ?, ?)",
+                    (
+                        record.resulting_revision,
+                        record.kind.value,
+                        _stored_time(record.recorded_at),
+                        record.provenance.initiator,
+                        record.provenance.source,
+                        str(record.prior_revision),
+                        change,
+                    ),
                 )
-            self._connection.execute(
-                "INSERT INTO canonical_record (established_revision, ordinal, record_kind,"
-                " recorded_at, initiator, source, summary, payload)"
-                f" VALUES (?, ({NEXT_ORDINAL_SQL}), ?, ?, ?, ?, ?, ?)",
-                (
-                    record.resulting_revision,
-                    record.kind.value,
-                    _stored_time(record.recorded_at),
-                    record.provenance.initiator,
-                    record.provenance.source,
-                    str(record.prior_revision),
-                    change,
-                ),
-            )
-            self._connection.execute(
-                "UPDATE current_state SET revision = ?, established_by = ?, state = ? WHERE id = 0",
-                (resulting_state.revision, record.resulting_revision, payload),
-            )
-            self._connection.execute("COMMIT")
-        except StoreError:
-            self._rollback_quietly()
-            raise
-        except Exception as error:
-            self._rollback_quietly()
-            raise StoreError(f"could not append the transition: {error}") from error
+                self._connection.execute(
+                    "UPDATE current_state SET revision = ?, established_by = ?,"
+                    " state = ? WHERE id = 0",
+                    (resulting_state.revision, record.resulting_revision, payload),
+                )
+                self._connection.execute("COMMIT")
+            except StoreError:
+                self._rollback_quietly()
+                raise
+            except Exception as error:
+                self._rollback_quietly()
+                raise StoreError(f"could not append the transition: {error}") from error
 
     def transitions(self) -> tuple[CanonicalTransitionRecord, ...]:
         """Read every transition in ledger order. Each is a semantic record access."""
@@ -672,10 +683,11 @@ class CanonicalStore:
         """Append one observation. Never part of a canonical transaction."""
         payload = encode_text(encode_activity_record(record))
         try:
-            self._connection.execute(
-                "INSERT INTO activity_record (recorded_at, payload) VALUES (?, ?)",
-                (_stored_time(record.recorded_at), payload),
-            )
+            with self._lock:
+                self._connection.execute(
+                    "INSERT INTO activity_record (recorded_at, payload) VALUES (?, ?)",
+                    (_stored_time(record.recorded_at), payload),
+                )
         except sqlite3.Error as error:
             raise StoreError(f"could not append the activity record: {error}") from error
 
@@ -712,9 +724,10 @@ class CanonicalStore:
     def remove_activity_before(self, boundary: datetime) -> int:
         """Remove observations recorded before ``boundary``, returning how many went."""
         try:
-            cursor = self._connection.execute(
-                "DELETE FROM activity_record WHERE recorded_at < ?", (_stored_time(boundary),)
-            )
+            with self._lock:
+                cursor = self._connection.execute(
+                    "DELETE FROM activity_record WHERE recorded_at < ?", (_stored_time(boundary),)
+                )
         except sqlite3.Error as error:
             raise StoreError(f"could not apply the retention decision: {error}") from error
         return cursor.rowcount

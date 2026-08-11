@@ -100,7 +100,7 @@ Useful commands:
 
 ## Implementation status
 
-Seven campaign slices are complete and an eighth is implemented but not yet checkpointed, so the
+Eight campaign slices are complete and a ninth is implemented but not yet checkpointed, so the
 application is partially implemented rather than absent.
 A plan gap found during the fourth returned the campaign to `awaiting-plan-approval`; the corrected
 plan has since been approved and that slice checkpointed under it.
@@ -131,17 +131,20 @@ plan has since been approved and that slice checkpointed under it.
   a later contiguous tail, where each record's identity is chained from the one before it and rooted
   in the ledger's own, so a tail cannot be grafted onto a history it does not belong to; and
   historical selection, where a revision or a time takes discovery and query back to a committed
-  state and answers with the meaning that state had. Historical selection is implemented and tested
-  but belongs to a slice that is not yet checkpointed.
+  state and answers with the meaning that state had; and the selected ten-tool MCP boundary —
+  exactly the modeled tool names, typed both ways, where a semantic refusal stays distinct from
+  malformed input and from an unexpected failure and every promised non-effect holds on the far
+  side. The MCP boundary is implemented and tested but belongs to a slice that is not yet
+  checkpointed.
 - **Runnable.** `uv run python -m vellis.setup` prepares one local system. It previews the
   destination and starting vocabulary, asks for confirmation, and accepts `--data-dir`, `--yes`, and
   a no-effect `--dry-run`. It stores memory under the platform's user-data location by default and
-  never writes to this repository's ignored `.data/`.
-- **Not implemented yet.** Snapshot-based initialization, historical restore, v1 snapshot
-  recovery, and the MCP server. The Everyday Life starter exists as a definition set, but offering
-  it as a confirmed first-use choice does not. The model selects a portable
-  ten-tool MCP contract; no server exposes it. The campaign directly pins FastMCP and FastMCP Slim
-  4.0.0b1 and selects local STDIO, but neither is installed or runnable yet.
+  never writes to this repository's ignored `.data/`. `uv run python -m vellis` then serves that
+  memory over local standard input and output, and refuses rather than creating one.
+- **Not implemented yet.** Snapshot-based initialization, historical restore, and v1 snapshot
+  recovery. The Everyday Life starter exists as a definition set, but offering it as a confirmed
+  first-use choice does not. No client is configured to launch the server; that is runnable
+  closure. FastMCP and FastMCP Slim are pinned at 4.0.0b1 and installed.
 
 Deployment and migration realization remain open. The initial contract assumes one trusted
 owner-configured client; its tools do not implement per-call authorization or decide owner approval.

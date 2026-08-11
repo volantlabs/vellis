@@ -383,7 +383,7 @@ class RTGSystem:
         details that happened to resolve — because a partial answer would read as a
         complete one.
         """
-        result = self._inspect(request, selection)
+        result = self._inspect(request, selection or request.historical_selection)
         self._observe(
             "definitionInspection",
             result.status,
@@ -686,6 +686,15 @@ class RTGSystem:
             )
         try:
             self._store.append_transition(record, resulting)
+        except ConcurrentRevisionError as error:
+            # Another writer got there first. The request was well formed and nothing was
+            # committed, so this is a refusal the caller can act on by reading and
+            # retrying — not a report that something broke.
+            return RevisionedOutcome(
+                status=OperationStatus.REJECTED,
+                summary="canonical state moved while this change was being committed",
+                findings=(ValidationFinding(summary=str(error)),),
+            )
         except StoreError as error:
             # The store rolls back before re-raising, so nothing was committed and the
             # status is safely reportable rather than an exception crossing the boundary.
@@ -715,8 +724,9 @@ class RTGSystem:
         record either; a historical one replays the transitions it needs, which is the
         cost the model permits reconstruction and denies current work.
         """
-        if selection is not None:
-            result = self._historical_query(query, selection)
+        chosen = selection or query.historical_selection
+        if chosen is not None:
+            result = self._historical_query(query, chosen)
             self._observe(
                 "query",
                 result.status,
@@ -1113,12 +1123,15 @@ class RTGSystem:
 
     def _read_history(self, query: HistoryQuery) -> HistoryResult:
         try:
-            revision = self.current_state().revision
             entries = (
                 _canonical_entries(self, query)
                 if query.kind is HistoryKind.CANONICAL
                 else _activity_entries(self, query)
             )
+            # After the entries, not before: a commit landing between the two reads would
+            # otherwise produce a result claiming one revision while carrying records from
+            # another, which is a state the ledger never held.
+            revision = self.current_state().revision
         except NotInitializedError as error:
             return HistoryResult(
                 status=OperationStatus.REJECTED,

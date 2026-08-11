@@ -54,6 +54,7 @@ from vellis.definitions import (
     LinkTypeDefinition,
     RelationshipConstraint,
 )
+from vellis.history import HistoricalSelection
 from vellis.outcomes import OperationStatus, ValidationFinding
 
 __all__ = [
@@ -103,9 +104,14 @@ class DefinitionSummaryResult:
 
 @dataclass(frozen=True, slots=True)
 class DefinitionInspectionRequest:
-    """A non-empty unique selection of anchor type keys."""
+    """A non-empty unique selection of anchor type keys, at one evaluated state.
+
+    The selector rides inside the request because the model puts it there: an inspection
+    is one question about one state, not a question plus a separate context.
+    """
 
     anchor_type_keys: tuple[str, ...]
+    historical_selection: HistoricalSelection | None = None
 
 
 @dataclass(frozen=True, slots=True)

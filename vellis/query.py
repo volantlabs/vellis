@@ -31,6 +31,7 @@ from enum import Enum
 
 from vellis.definitions import AssociatedDataTypeDefinition, GraphDefinitionSet
 from vellis.graph import Anchor, AssociatedDataObject, Graph, Link, LinkEndpoint
+from vellis.history import HistoricalSelection
 from vellis.json_value import JsonKind, JsonValue, json_equal, json_kind, unencodable_reason
 from vellis.outcomes import OperationStatus, ValidationFinding
 
@@ -189,6 +190,12 @@ class GraphQuery:
     maximum_rows: int
     required_links: tuple[RequiredLink, ...] = ()
     data_conditions: tuple[AssociatedDataCondition, ...] = ()
+    historical_selection: HistoricalSelection | None = None
+    """Absent evaluates current state; present evaluates the state it names.
+
+    Part of the question rather than beside it, so one query object means one complete
+    request whichever state it is asked of.
+    """
 
 
 # --- What a query answers with -------------------------------------------------------

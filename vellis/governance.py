@@ -34,7 +34,19 @@ from vellis.outcomes import (
 )
 from vellis.validation import assess_graph_conformance
 
-__all__ = ["DefinitionDeltaResult", "assess_proposal"]
+__all__ = ["DefinitionDeltaResult", "SetDefinitionDeltaRequest", "assess_proposal"]
+
+
+@dataclass(frozen=True, slots=True)
+class SetDefinitionDeltaRequest:
+    """What an owner offers as the next vocabulary.
+
+    A named request rather than a bare definition set, because that is what the model
+    declares the operation takes — and a request is the thing a later field would be
+    added to.
+    """
+
+    proposed_definitions: GraphDefinitionSet
 
 
 @dataclass(frozen=True, slots=True)

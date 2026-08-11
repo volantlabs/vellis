@@ -3,6 +3,11 @@ name = "vellis"
 version = "0.2.0.dev0"
 requires-python = ">=3.14"
 dependencies = [
+    # Pinned exactly, without a global prerelease allowance: the selected boundary is a
+    # beta and the campaign records that choice, so a floating range would let it move
+    # without anyone deciding to.
+    "fastmcp==4.0.0b1",
+    "fastmcp-slim==4.0.0b1",
     "google-re2>=1.1,<2",
 ]
 

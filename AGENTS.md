@@ -237,5 +237,5 @@ model and language baselines. `just implementation-campaign-status` reports its 
 next slice, blocker, and closure state. These tools do not resolve SysML semantics and the ledger does
 not replace rereading qualified model authority.
 
-The model selects an MCP tool contract but the repository has no runnable MCP server. Use modeled,
-selected, implemented, and runnable precisely.
+The repository exposes the selected MCP tool contract over local standard input and output; no
+client is configured to launch it yet. Use modeled, selected, implemented, and runnable precisely.

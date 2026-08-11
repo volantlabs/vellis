@@ -7,7 +7,7 @@ campaign:
     status: accepted
     checkpoint: approval:5a8d92c675d6865bd70fadd0e971bbf959081bea
   blocker: null
-  checkpoint: slice:S008:5a8d92c675d6:1
+  checkpoint: slice:S009:5a8d92c675d6:1
 model_baseline:
   status: current
   authority_files:
@@ -261,8 +261,13 @@ authority:
       - {model_ref: "VellisRequirements::mcpOutcomeIntegrity", source: "model/40-requirements.sysml"}
     planned_coverage: full
     slice_ids: [S009]
-    implementation_status: absent
-    evidence_refs: []
+    implementation_status: conforming
+    evidence_refs:
+      - path:tests/vellis/test_mcp_boundary.py#test_exactly_the_selected_ten_tools_are_discoverable
+      - path:tests/vellis/test_mcp_boundary.py#test_only_operations_with_semantic_input_take_a_typed_input
+      - path:tests/vellis/test_mcp_boundary.py#test_a_semantic_rejection_arrives_as_a_typed_result
+      - path:tests/vellis/test_mcp_boundary.py#test_a_stored_number_arrives_as_a_number
+      - path:tests/vellis/test_mcp_boundary.py#test_a_rejected_mutation_preserves_its_promised_non_effect
   - id: A014
     label: Owner governance and safe failure
     refs:
@@ -654,9 +659,26 @@ slices:
       - VellisVerification::mcpToolSurface
       - VellisVerification::mcpOutcomes
       - VellisVerification::simpleOperation
-    lifecycle: ready
-    implementation_status: absent
-    evidence_refs: []
+    lifecycle: complete
+    implementation_status: conforming
+    evidence_refs:
+      - path:tests/vellis/test_mcp_boundary.py#test_exactly_the_selected_ten_tools_are_discoverable
+      - path:tests/vellis/test_mcp_boundary.py#test_every_tool_returns_typed_object_meaning
+      - path:tests/vellis/test_mcp_boundary.py#test_only_operations_with_semantic_input_take_a_typed_input
+      - path:tests/vellis/test_mcp_boundary.py#test_the_summary_carries_its_optional_selector_directly
+      - path:tests/vellis/test_mcp_boundary.py#test_every_tool_is_reachable_through_core_invocation_alone
+      - path:tests/vellis/test_mcp_boundary.py#test_a_semantic_rejection_arrives_as_a_typed_result
+      - path:tests/vellis/test_mcp_boundary.py#test_malformed_input_forms_no_domain_request
+      - path:tests/vellis/test_mcp_boundary.py#test_a_rejected_mutation_preserves_its_promised_non_effect
+      - path:tests/vellis/test_mcp_boundary.py#test_a_stored_number_arrives_as_a_number
+      - path:tests/vellis/test_mcp_boundary.py#test_a_large_integer_arrives_exactly
+      - path:tests/vellis/test_mcp_boundary.py#test_a_number_the_wire_cannot_carry_is_a_typed_refusal
+      - path:tests/vellis/test_mcp_boundary.py#test_an_object_read_through_the_boundary_can_be_written_back_whole
+      - path:tests/vellis/test_mcp_boundary.py#test_every_tool_records_the_agent_that_called_it
+      - path:tests/vellis/test_mcp_boundary.py#test_no_tool_gates_on_an_approval_it_invented
+      - path:tests/vellis/test_mcp_boundary.py#test_two_writers_racing_leave_one_rejection_and_no_lost_change
+      - command:uv sync --locked
+      - command:uv run pytest tests/vellis
     realization_decisions:
       - id: D001
         summary: Pin fastmcp==4.0.0b1 and fastmcp-slim==4.0.0b1 without global prerelease allowance, keep unrelated dependencies stable, update the lock in S009, and prove uv sync --locked.
@@ -675,7 +697,7 @@ slices:
         authority_ids: [A017]
         reversible: false
     blocker: null
-    checkpoint: null
+    checkpoint: slice:S009:5a8d92c675d6:1
   - id: S010
     order: 10
     label: Restore selected history as a new transition
@@ -689,7 +711,7 @@ slices:
       - VellisVerification::restoreHistory
       - VellisVerification::atomicTransitions
       - VellisVerification::durableHistory
-    lifecycle: pending
+    lifecycle: ready
     implementation_status: absent
     evidence_refs: []
     realization_decisions: []
