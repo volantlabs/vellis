@@ -7,7 +7,7 @@ campaign:
     status: accepted
     checkpoint: approval:5a8d92c675d6865bd70fadd0e971bbf959081bea
   blocker: null
-  checkpoint: slice:S010:5a8d92c675d6:1
+  checkpoint: slice:S011:5a8d92c675d6:1
 model_baseline:
   status: current
   authority_files:
@@ -196,12 +196,14 @@ authority:
       - {model_ref: "VellisRequirements::replayEquivalence", source: "model/40-requirements.sysml"}
     planned_coverage: full
     slice_ids: [S007, S011]
-    implementation_status: partial
+    implementation_status: conforming
     evidence_refs:
       - path:tests/vellis/test_snapshot_replay.py#test_a_snapshot_captures_the_whole_state_at_its_revision
       - path:tests/vellis/test_snapshot_replay.py#test_a_snapshot_and_its_later_tail_reconstruct_the_current_state
       - path:tests/vellis/test_snapshot_replay.py#test_a_tail_cannot_be_grafted_onto_an_identical_looking_base
       - path:tests/vellis/test_snapshot_replay.py#test_a_tail_whose_result_would_not_conform_is_refused
+      - path:tests/vellis/test_snapshot_initialization.py#test_a_snapshot_and_its_tail_establish_the_replayed_state
+      - path:tests/vellis/test_snapshot_initialization.py#test_the_new_ledger_claims_no_earlier_transitions
   - id: A010
     label: Historical selection and restoration
     refs:
@@ -747,12 +749,25 @@ slices:
     verification_refs:
       - VellisVerification::snapshotReplay
       - VellisVerification::freshInitialization
-    lifecycle: ready
-    implementation_status: absent
-    evidence_refs: []
+    lifecycle: complete
+    implementation_status: conforming
+    evidence_refs:
+      - path:tests/vellis/test_snapshot_initialization.py#test_a_snapshot_establishes_the_state_it_captured
+      - path:tests/vellis/test_snapshot_initialization.py#test_a_snapshot_and_its_tail_establish_the_replayed_state
+      - path:tests/vellis/test_snapshot_initialization.py#test_the_outcome_reports_the_revision_it_established
+      - path:tests/vellis/test_snapshot_initialization.py#test_the_new_ledger_claims_no_earlier_transitions
+      - path:tests/vellis/test_snapshot_initialization.py#test_query_and_replay_agree_with_the_supplied_state
+      - path:tests/vellis/test_snapshot_initialization.py#test_an_in_flight_proposal_travels_with_the_snapshot
+      - path:tests/vellis/test_snapshot_initialization.py#test_no_starting_vocabulary_is_overlaid
+      - path:tests/vellis/test_snapshot_initialization.py#test_a_snapshot_founded_ledger_survives_an_ordinary_restart
+      - path:tests/vellis/test_snapshot_initialization.py#test_a_snapshot_founded_ledger_can_itself_be_captured_and_tailed
+      - path:tests/vellis/test_snapshot_initialization.py#test_a_selection_below_the_base_names_no_record
+      - path:tests/vellis/test_snapshot_initialization.py#test_a_base_revision_no_ledger_could_hold_establishes_nothing
+      - path:tests/vellis/test_snapshot_initialization.py#test_a_tail_from_another_ledger_establishes_nothing
+      - command:uv run pytest tests/vellis
     realization_decisions: []
     blocker: null
-    checkpoint: null
+    checkpoint: slice:S011:5a8d92c675d6:1
   - id: S012
     order: 12
     label: Confirm blank or Everyday Life first use
@@ -764,7 +779,7 @@ slices:
       - {authority_id: A012, coverage: partial, remaining_slice_ids: [S004, S011, S013, S014]}
     verification_refs:
       - VellisVerification::everydayLifeStart
-    lifecycle: pending
+    lifecycle: ready
     implementation_status: absent
     evidence_refs: []
     realization_decisions: []

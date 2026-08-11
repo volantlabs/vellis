@@ -60,7 +60,6 @@ from vellis.changes import GraphChange, apply_change, change_findings
 from vellis.definitions import (
     GraphDefinitionSet,
     definition_set_equal,
-    validate_definition_set,
 )
 from vellis.discovery import (
     AnchorDefinitionDetail,
@@ -74,6 +73,7 @@ from vellis.discovery import (
 from vellis.governance import DefinitionDeltaResult, assess_proposal
 from vellis.graph import Graph, graph_equal
 from vellis.history import (
+    MAXIMUM_REVISION,
     EvaluatedDefinitions,
     HistoricalSelection,
     RevisionSelection,
@@ -97,6 +97,7 @@ from vellis.replay import (
     SnapshotResult,
     reconstruct,
     record_identity,
+    state_findings,
 )
 from vellis.serialization import unreadable_reason
 from vellis.store import (
@@ -171,6 +172,30 @@ class RTGSystem:
         transitions, and an empty activity ledger. Refusal establishes no partial
         canonical or activity state.
         """
+        return self._establish(
+            CanonicalState(
+                graph=Graph(),
+                active_definitions=initial_definitions,
+                revision=0,
+                definition_delta=None,
+            ),
+            provenance=provenance,
+            initialization_summary=initialization_summary,
+        )
+
+    def _establish(
+        self,
+        state: CanonicalState,
+        *,
+        provenance: Provenance,
+        initialization_summary: str,
+    ) -> RevisionedOutcome:
+        """Write one initial record and its projection, or establish nothing.
+
+        Shared by both ways of starting, because what it means to have a history base is
+        the same either way: one record containing the whole of it, and no claim about
+        anything before.
+        """
         record_findings = _unstorable_record_text(provenance, initialization_summary)
         if record_findings:
             return RevisionedOutcome(
@@ -180,22 +205,32 @@ class RTGSystem:
                 ),
                 findings=record_findings,
             )
-        findings = validate_definition_set(initial_definitions, require_descriptions=True)
-        if findings:
+        if not 0 <= state.revision <= MAXIMUM_REVISION:
+            # A base outside what a revision can be would be a history nothing could
+            # name: below zero no selector reaches it, and above the ledger's range the
+            # next transition could never be written.
             return RevisionedOutcome(
                 status=OperationStatus.REJECTED,
                 summary=(
-                    f"the initial definition set is not internally valid "
-                    f"({len(findings)} findings); no canonical state was established"
+                    f"revision {state.revision} is not one a ledger can hold; no canonical "
+                    "state was established"
                 ),
-                findings=findings,
+                findings=(
+                    ValidationFinding(
+                        summary=f"a history base names a committed revision, not {state.revision}"
+                    ),
+                ),
             )
-        state = CanonicalState(
-            graph=Graph(),
-            active_definitions=initial_definitions,
-            revision=0,
-            definition_delta=None,
-        )
+        unsound = state_findings(state)
+        if unsound:
+            return RevisionedOutcome(
+                status=OperationStatus.REJECTED,
+                summary=(
+                    f"the state is not one this system could have committed "
+                    f"({len(unsound)} findings); no canonical state was established"
+                ),
+                findings=unsound,
+            )
         unreadable = unreadable_reason(state)
         if unreadable is not None:
             return RevisionedOutcome(
@@ -213,9 +248,15 @@ class RTGSystem:
         )
         try:
             self._store.initialize(record)
-        except AlreadyInitializedError:
-            # The store decides this inside its own transaction, so this is the only
-            # check on the path; a pre-check here would be a second, racier one.
+        except StoreError as error:
+            if not isinstance(error, AlreadyInitializedError):
+                return RevisionedOutcome(
+                    status=OperationStatus.FAILED,
+                    summary=f"no canonical state was established: {error}",
+                    findings=(ValidationFinding(summary=str(error)),),
+                )
+            # The store decides "already established" inside its own transaction, so this
+            # is the only check on the path; a pre-check here would be a second, racier one.
             return RevisionedOutcome(
                 status=OperationStatus.REJECTED,
                 summary=(
@@ -230,8 +271,42 @@ class RTGSystem:
             )
         return RevisionedOutcome(
             status=OperationStatus.ACCEPTED,
-            summary=f"established revision 0 with {_vocabulary_summary(initial_definitions)}",
-            resulting_revision=0,
+            summary=(
+                f"established revision {state.revision} with "
+                f"{_vocabulary_summary(state.active_definitions)}"
+            ),
+            resulting_revision=state.revision,
+        )
+
+    def initialize_from_snapshot(
+        self,
+        request: ReplayRequest,
+        *,
+        provenance: Provenance,
+        initialization_summary: str,
+    ) -> RevisionedOutcome:
+        """Begin a new lineage from a state that already existed somewhere else.
+
+        The reconstructed state becomes this system's history base at the revision it
+        reached, not at zero. Renumbering it would claim the transitions that produced it,
+        and this ledger does not have them; keeping the revision says plainly that the
+        history starts partway through.
+
+        No starting vocabulary is offered or overlaid. A snapshot already carries one, and
+        a fresh-start choice on top of it would be answering a question the owner already
+        answered.
+        """
+        result = reconstruct(request)
+        if result.canonical_state is None:
+            return RevisionedOutcome(
+                status=result.status,
+                summary=result.summary,
+                findings=result.findings,
+            )
+        return self._establish(
+            result.canonical_state,
+            provenance=provenance,
+            initialization_summary=initialization_summary,
         )
 
     # --- Change -----------------------------------------------------------------------

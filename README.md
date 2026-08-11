@@ -100,7 +100,7 @@ Useful commands:
 
 ## Implementation status
 
-Nine campaign slices are complete and a tenth is implemented but not yet checkpointed, so the
+Ten campaign slices are complete and an eleventh is implemented but not yet checkpointed, so the
 application is partially implemented rather than absent.
 A plan gap found during the fourth returned the campaign to `awaiting-plan-approval`; the corrected
 plan has since been approved and that slice checkpointed under it.
@@ -136,13 +136,16 @@ plan has since been approved and that slice checkpointed under it.
   malformed input and from an unexpected failure and every promised non-effect holds on the far
   side; and restoration, which makes a past state current again as one new revision without
   rewriting anything earlier, and refuses while a proposal is in flight rather than discarding it.
-  Restoration is implemented and tested but belongs to a slice that is not yet checkpointed.
+  and beginning a new lineage from a snapshot and its tail, whose history starts at the revision
+  that state reached rather than at zero, because renumbering it would claim transitions this
+  ledger does not have. Snapshot-based initialization is implemented and tested but belongs to a
+  slice that is not yet checkpointed.
 - **Runnable.** `uv run python -m vellis.setup` prepares one local system. It previews the
   destination and starting vocabulary, asks for confirmation, and accepts `--data-dir`, `--yes`, and
   a no-effect `--dry-run`. It stores memory under the platform's user-data location by default and
   never writes to this repository's ignored `.data/`. `uv run python -m vellis` then serves that
   memory over local standard input and output, and refuses rather than creating one.
-- **Not implemented yet.** Snapshot-based initialization and v1 snapshot recovery. The Everyday Life starter exists as a definition set, but offering it as a confirmed
+- **Not implemented yet.** V1 snapshot recovery. The Everyday Life starter exists as a definition set, but offering it as a confirmed
   first-use choice does not. No client is configured to launch the server; that is runnable
   closure. FastMCP and FastMCP Slim are pinned at 4.0.0b1 and installed.
 

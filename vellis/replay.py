@@ -55,6 +55,7 @@ __all__ = [
     "SnapshotResult",
     "reconstruct",
     "record_identity",
+    "state_findings",
 ]
 
 
@@ -170,7 +171,7 @@ def reconstruct(request: ReplayRequest) -> ReconstructionResult:
         state = request.initial.canonical_state
         base_identity = request.base_identity or ""
 
-    unsound = _state_findings(state)
+    unsound = state_findings(state)
     if unsound:
         return _refused(unsound)
 
@@ -217,7 +218,7 @@ def reconstruct(request: ReplayRequest) -> ReconstructionResult:
         # Every intermediate state, not only the last. The commit path validates what each
         # change would produce, so a tail that passes through a state no commit could have
         # written is not a smaller reconstruction — it is one of a history that never was.
-        unsound = _state_findings(state)
+        unsound = state_findings(state)
         if unsound:
             return _refused(unsound)
         base_identity = record_identity(record, follows=base_identity)
@@ -268,7 +269,7 @@ def _base_findings(request: ReplayRequest) -> tuple[ValidationFinding, ...]:
     return ()
 
 
-def _state_findings(state: CanonicalState) -> tuple[ValidationFinding, ...]:
+def state_findings(state: CanonicalState) -> tuple[ValidationFinding, ...]:
     """Return every reason ``state`` is not one this system could have committed.
 
     The same two questions the write paths ask: is the vocabulary internally valid, and
