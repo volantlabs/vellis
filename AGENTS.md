@@ -86,10 +86,11 @@ Plan approval is one gate for the complete campaign, not one human gate per slic
 slice checkpoints continue autonomously; only the campaign skill's explicit pause conditions return
 to the human.
 
-The current candidate campaign selects direct pins for `fastmcp==4.0.0b1` and
-`fastmcp-slim==4.0.0b1`, local STDIO, and a future documented Python setup path that configures
-user-scoped Codex or Claude Code only through their public CLIs.
-These are selected realization constraints, not model structure or implemented capability. Do not
+The approved campaign selects direct pins for `fastmcp==4.0.0b1` and `fastmcp-slim==4.0.0b1`,
+local STDIO, and a documented Python setup path that configures user-scoped Codex or Claude Code
+only through their public CLIs. The pins, the STDIO boundary, and the setup path's fresh start are
+implemented; client configuration is not.
+These are selected realization constraints, not model structure. Do not
 upgrade the pre-release pin, add another transport, or edit client configuration files directly
 without renewed review of the selected plan.
 

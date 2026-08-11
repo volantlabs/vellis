@@ -11,12 +11,12 @@ The repository contains the Vellis system model, its development tooling, and th
 - [`docs/modeling-method.md`](docs/modeling-method.md): the use-case-first model-as-code method.
 - [`docs/implementation-method.md`](docs/implementation-method.md): the bidirectional path from
   accepted model meaning to code and conformance evidence.
-- [`docs/mcp-realization.md`](docs/mcp-realization.md): non-normative guidance for a future FastMCP realization.
+- [`docs/mcp-realization.md`](docs/mcp-realization.md): non-normative guidance for the FastMCP realization.
 - [`model/config/`](model/config/): checksum pins for the specifications, model libraries, and validator. The searchable corpus is generated from them into an ignored cache, never committed.
 - [`.agents/skills/`](.agents/skills/): a portable SysML v2 MBSwE core plus Vellis-specific domain
   and repository extensions.
 - [`implementation-campaign.yaml`](implementation-campaign.yaml): the baseline-bound current plan
-  and execution/evidence index for the future application build; it is not product authority.
+  and execution/evidence index for the application build; it is not product authority.
 - [`tools/`](tools/): the pinned validator, reference search, skill checks, and campaign validation.
 
 `just model-setup` builds a searchable SysML v2 reference layer into an ignored cache: the pinned
@@ -100,7 +100,7 @@ Useful commands:
 
 ## Implementation status
 
-Ten campaign slices are complete and an eleventh is implemented but not yet checkpointed, so the
+Eleven campaign slices are complete and a twelfth is implemented but not yet checkpointed, so the
 application is partially implemented rather than absent.
 A plan gap found during the fourth returned the campaign to `awaiting-plan-approval`; the corrected
 plan has since been approved and that slice checkpointed under it.
@@ -108,8 +108,9 @@ plan has since been approved and that slice checkpointed under it.
 
 - **Implemented and verified.** Canonical graph, definition, and constraint meaning; canonical
   semantic equality over JSON, graphs, definitions, and canonical states; whole-string RE2 property
-  patterns evaluated by RE2 itself; assessment of a graph against a definition set; fresh initialization of a blank system
-  at revision 0 with one initial-state record, no transitions, and an empty activity ledger; a
+  patterns evaluated by RE2 itself; assessment of a graph against a definition set; fresh
+  initialization from a supplied initial definition set at revision 0 with one initial-state
+  record, no transitions, and an empty activity ledger; a
   durable local store that recovers identical memory across an ordinary restart, commits the
   canonical record and the current projection as one effect, and refuses a database holding
   anything else; a current-state projection reached without traversing canonical history;
@@ -135,19 +136,24 @@ plan has since been approved and that slice checkpointed under it.
   exactly the modeled tool names, typed both ways, where a semantic refusal stays distinct from
   malformed input and from an unexpected failure and every promised non-effect holds on the far
   side; and restoration, which makes a past state current again as one new revision without
-  rewriting anything earlier, and refuses while a proposal is in flight rather than discarding it.
+  rewriting anything earlier, and refuses while a proposal is in flight rather than discarding it;
   and beginning a new lineage from a snapshot and its tail, whose history starts at the revision
   that state reached rather than at zero, because renumbering it would claim transitions this
-  ledger does not have. Snapshot-based initialization is implemented and tested but belongs to a
-  slice that is not yet checkpointed.
+  ledger does not have. The confirmed first-use vocabulary choice — blank or the Everyday Life
+  starter, both named, the starter recommended and preselected, and neither established until the
+  owner confirms — is implemented and tested but belongs to a slice that is not yet checkpointed.
 - **Runnable.** `uv run python -m vellis.setup` prepares one local system. It previews the
-  destination and starting vocabulary, asks for confirmation, and accepts `--data-dir`, `--yes`, and
-  a no-effect `--dry-run`. It stores memory under the platform's user-data location by default and
-  never writes to this repository's ignored `.data/`. `uv run python -m vellis` then serves that
-  memory over local standard input and output, and refuses rather than creating one.
-- **Not implemented yet.** V1 snapshot recovery. The Everyday Life starter exists as a definition set, but offering it as a confirmed
-  first-use choice does not. No client is configured to launch the server; that is runnable
-  closure. FastMCP and FastMCP Slim are pinned at 4.0.0b1 and installed.
+  destination and, unless it can already see that the destination will not do, offers both starting
+  vocabularies with the Everyday Life starter preselected — that offer belongs to the slice above that is not yet
+  checkpointed. It asks for confirmation, and accepts
+  `--data-dir`, `--vocabulary`, `--yes`, and a no-effect `--dry-run` that still reports a
+  destination it can already see will not do. It stores memory under the
+  platform's user-data location by default and never writes to this repository's ignored `.data/`.
+  `uv run python -m vellis` then serves that memory over local standard input and output, and
+  refuses rather than creating one.
+- **Not implemented yet.** V1 snapshot recovery, and starting the setup command from a v2 snapshot —
+  a snapshot lineage can be begun through the library but not through setup. No client is configured
+  to launch the server; that is runnable closure. FastMCP and FastMCP Slim are pinned at 4.0.0b1 and installed.
 
 Deployment and migration realization remain open. The initial contract assumes one trusted
 owner-configured client; its tools do not implement per-call authorization or decide owner approval.

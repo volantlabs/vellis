@@ -99,9 +99,10 @@ not create 17 additional human approval gates. Each slice still requires its two
 lenses. Collect both sets of findings, batch all in-scope corrections, then run one final independent
 review pair. Repeat only for a plausible failure under the declared project assumptions; do not
 recursively red-team the campaign process unless the selected slice changes it.
-The current candidate plan directly pins FastMCP and FastMCP Slim 4.0.0b1, selects local STDIO, and
-reserves clean macOS onboarding through a documented Python setup path for runnable closure; these
-remain unimplemented until their campaign slices complete.
+The approved plan directly pins FastMCP and FastMCP Slim 4.0.0b1, selects local STDIO, and reserves
+clean macOS onboarding through a documented Python setup path for runnable closure. The pins, the
+STDIO boundary, and the setup path's fresh start are implemented; starting from a snapshot or from
+v1, and configuring a client to launch the server, remain for later slices.
 
 Vellis checkpoint identifiers are navigation labels in the portable campaign record:
 

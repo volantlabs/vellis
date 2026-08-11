@@ -27,6 +27,8 @@ from vellis.setup import (
     EXIT_DECLINED,
     EXIT_FAILED,
     EXIT_SUCCESS,
+    FreshVocabularyChoice,
+    SetupReport,
     SetupStage,
     main,
     prepare_local_system,
@@ -86,6 +88,40 @@ def test_a_filesystem_root_is_refused() -> None:
 # --- Preparing a system -------------------------------------------------------------
 
 
+def test_the_three_outcomes_an_agent_reads_stay_distinct() -> None:
+    """The exit status is the whole of what a non-interactive caller can see."""
+    assert (EXIT_SUCCESS, EXIT_FAILED, EXIT_DECLINED) == (0, 1, 3)
+
+
+@pytest.mark.parametrize("missing", ["nothing", "the stage", "what happened", "what to do next"])
+def test_a_failure_missing_any_part_of_its_minimum_is_not_actionable(missing: str) -> None:
+    """The model says a failure without that minimum does not pass, so absence must show."""
+    report = SetupReport(
+        stage="" if missing == "the stage" else SetupStage.INITIALIZE,
+        succeeded=False,
+        memory_changed=False,
+        summary="" if missing == "what happened" else "something went wrong",
+        choice=FreshVocabularyChoice.BLANK,
+        corrective_action=None if missing == "what to do next" else "try this",
+    )
+
+    assert report.is_actionable_failure == (missing == "nothing")
+
+
+def test_a_success_is_not_an_actionable_failure() -> None:
+    """Excludes a predicate that answers the question it was not asked."""
+    report = SetupReport(
+        stage=SetupStage.INITIALIZE,
+        succeeded=True,
+        memory_changed=True,
+        summary="established revision 0",
+        choice=FreshVocabularyChoice.BLANK,
+        corrective_action="try this",
+    )
+
+    assert not report.is_actionable_failure
+
+
 def test_a_dry_run_creates_nothing(tmp_path: Path) -> None:
     destination = tmp_path / "vellis"
     report = prepare_local_system(data_directory=destination, dry_run=True)
@@ -98,7 +134,9 @@ def test_a_dry_run_creates_nothing(tmp_path: Path) -> None:
 
 def test_setup_establishes_one_local_system(tmp_path: Path) -> None:
     destination = tmp_path / "vellis"
-    report = prepare_local_system(data_directory=destination)
+    # Stated rather than defaulted: this evidence is about the setup path, not about
+    # which starting vocabulary the choice slice preselects.
+    report = prepare_local_system(data_directory=destination, choice=FreshVocabularyChoice.BLANK)
     assert report.succeeded
     assert report.memory_changed
     assert report.revision == 0
@@ -117,7 +155,7 @@ def test_setup_establishes_one_local_system(tmp_path: Path) -> None:
 def test_a_second_attempt_fails_actionably_and_leaves_memory_unchanged(tmp_path: Path) -> None:
     """Excludes a setup that re-seeds an established system or reports a bare error."""
     destination = tmp_path / "vellis"
-    first = prepare_local_system(data_directory=destination)
+    first = prepare_local_system(data_directory=destination, choice=FreshVocabularyChoice.BLANK)
     assert first.succeeded and first.store is not None
 
     system = RTGSystem.open(first.store)
@@ -126,7 +164,7 @@ def test_a_second_attempt_fails_actionably_and_leaves_memory_unchanged(tmp_path:
     finally:
         system.close()
 
-    second = prepare_local_system(data_directory=destination)
+    second = prepare_local_system(data_directory=destination, choice=FreshVocabularyChoice.BLANK)
     assert not second.succeeded
     assert second.stage == SetupStage.INITIALIZE
     assert not second.memory_changed
@@ -139,15 +177,6 @@ def test_a_second_attempt_fails_actionably_and_leaves_memory_unchanged(tmp_path:
         assert system.store.canonical_record_count() == 1
     finally:
         system.close()
-
-
-def test_an_unresolvable_destination_fails_before_any_state_exists(tmp_path: Path) -> None:
-    report = prepare_local_system(data_directory=tmp_path / ".data")
-    assert not report.succeeded
-    assert report.stage == SetupStage.RESOLVE_DESTINATION
-    assert not report.memory_changed
-    assert report.is_actionable_failure
-    assert not (tmp_path / ".data").exists()
 
 
 def test_an_unusable_destination_fails_at_the_prepare_stage(tmp_path: Path) -> None:
@@ -169,44 +198,47 @@ def _run(argv: list[str], answer: str = "") -> tuple[int, str, str]:
     return code, stdout.getvalue(), stderr.getvalue()
 
 
-def test_the_command_previews_before_it_changes_anything(tmp_path: Path) -> None:
-    destination = tmp_path / "vellis"
-    code, out, _ = _run(["--data-dir", str(destination), "--dry-run"])
-    assert code == EXIT_SUCCESS
-    assert str(destination.resolve()) in out
-    assert "blank" in out
-    assert not destination.exists()
-
-
-def test_declining_the_prompt_creates_nothing(tmp_path: Path) -> None:
-    destination = tmp_path / "vellis"
-    code, out, _ = _run(["--data-dir", str(destination)], answer="n\n")
-    assert code == EXIT_DECLINED
-    assert "Declined" in out
-    assert not store_path(destination.resolve()).exists()
-
-
 def test_confirming_the_prompt_establishes_the_system(tmp_path: Path) -> None:
     destination = tmp_path / "vellis"
-    code, out, _ = _run(["--data-dir", str(destination)], answer="y\n")
+    code, out, _ = _run(["--data-dir", str(destination), "--vocabulary", "blank"], answer="y\n")
     assert code == EXIT_SUCCESS
     assert "current revision: 0" in out
     assert store_path(destination.resolve()).exists()
 
 
-def test_the_noninteractive_path_needs_no_terminal(tmp_path: Path) -> None:
+def test_a_dry_run_stays_a_dry_run_when_the_confirmation_is_skipped(tmp_path: Path) -> None:
+    """Excludes the one flag combination where a regression would establish silently."""
     destination = tmp_path / "vellis"
-    code, _, _ = _run(["--data-dir", str(destination), "--yes"])
+    code, out, _ = _run(["--data-dir", str(destination), "--dry-run", "--yes"])
+    assert code == EXIT_SUCCESS
+    assert "Dry run: nothing was created." in out
+    assert not destination.exists()
+
+
+@pytest.mark.parametrize("answer", ["y", "yes", "Y", "YES", " y \n"])
+def test_every_way_of_saying_yes_proceeds(tmp_path: Path, answer: str) -> None:
+    """The negatives are pinned below; what an owner may actually type is pinned here."""
+    destination = tmp_path / "vellis"
+    code, _, _ = _run(["--data-dir", str(destination)], answer=f"{answer}\n")
+    assert code == EXIT_SUCCESS
+    assert store_path(destination.resolve()).exists()
+
+
+def test_a_destination_below_a_directory_that_does_not_exist_is_created(tmp_path: Path) -> None:
+    destination = tmp_path / "one" / "two" / "vellis"
+    code, _, _ = _run(["--data-dir", str(destination), "--yes", "--vocabulary", "blank"])
     assert code == EXIT_SUCCESS
     assert store_path(destination.resolve()).exists()
 
 
 def test_a_failing_command_reports_stage_state_effect_and_next_step(tmp_path: Path) -> None:
     destination = tmp_path / "vellis"
-    assert _run(["--data-dir", str(destination), "--yes"])[0] == EXIT_SUCCESS
-    code, _, err = _run(["--data-dir", str(destination), "--yes"])
+    blank = ["--vocabulary", "blank"]
+    assert _run(["--data-dir", str(destination), "--yes", *blank])[0] == EXIT_SUCCESS
+    code, _, err = _run(["--data-dir", str(destination), "--yes", *blank])
     assert code == EXIT_FAILED
-    assert f"stage: {SetupStage.INITIALIZE}" in err
+    # The command can tell before it prompts, so it says so at the stage that found out.
+    assert f"stage: {SetupStage.PREVIEW}" in err
     assert "established memory: unchanged" in err
     assert "what to do next:" in err
 

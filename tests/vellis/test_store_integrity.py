@@ -19,7 +19,7 @@ from conftest import build_rich_definitions
 
 from vellis.canonical import Provenance
 from vellis.definitions import GraphDefinitionSet
-from vellis.store import APPLICATION_ID, CanonicalStore, StoreError
+from vellis.store import APPLICATION_ID, CanonicalStore, NotADatabaseError, StoreError
 from vellis.system import RTGSystem
 
 
@@ -142,7 +142,7 @@ def test_a_file_that_is_not_a_database_reports_a_store_error(tmp_path: Path) -> 
     path = tmp_path / "vellis.sqlite3"
     path.write_text("this is not a database\n", encoding="utf-8")
 
-    with pytest.raises(StoreError, match="could not open a canonical store"):
+    with pytest.raises(NotADatabaseError, match="is not a database"):
         CanonicalStore(path)
 
 

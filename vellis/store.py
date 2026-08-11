@@ -18,8 +18,10 @@ checks the revision it carries against the row it came from, so an interrupted o
 partial write cannot present a mixed tuple. Content divergence introduced by editing the
 database file directly is not detected: comparing decoded content on every current read
 would traverse a canonical record, which is exactly the work
-``VellisRequirements::historyIndependentCurrentWork`` forbids. Direct external mutation
-of the store file is outside this project's trust boundary, as recorded in AGENTS.md.
+``VellisRequirements::historyIndependentCurrentWork`` forbids. A store file edited from
+outside is therefore screened, not trusted: what this module can tell about such a file —
+that it is not a database, that it belongs to something else, that it is a store this
+build cannot read — it says, and content divergence below that is out of reach.
 
 Every canonical-record access is counted so conformance evidence for
 ``VellisRequirements::historyIndependentCurrentWork`` can observe them directly rather
@@ -30,10 +32,12 @@ from __future__ import annotations
 
 import secrets
 import sqlite3
+from contextlib import closing
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from threading import RLock
+from urllib.parse import quote
 
 from vellis.activity import ActivityRecord
 from vellis.canonical import (
@@ -60,8 +64,12 @@ __all__ = [
     "AlreadyInitializedError",
     "CanonicalStore",
     "ConcurrentRevisionError",
+    "ForeignDatabaseError",
+    "NotADatabaseError",
     "NotInitializedError",
     "StoreError",
+    "UnreadableStoreError",
+    "holds_established_memory",
 ]
 
 SCHEMA_VERSION = "2"
@@ -70,6 +78,14 @@ SCHEMA_VERSION = "2"
 # commit, which is exactly the work history-independent current operations may not do;
 # ordinal is UNIQUE, so taking its maximum is an index seek instead.
 NEXT_ORDINAL_SQL = "SELECT ifnull(max(ordinal), -1) + 1 FROM canonical_record"
+
+# Whether canonical state exists. One statement, so a caller asking before it may create
+# anything and the store asking during a commit are asking exactly the same question.
+INITIALIZED_SQL = "SELECT 1 FROM current_state WHERE id = 0"
+
+# What every SQLite database begins with, so a file that is not one can be told apart
+# from a database this attempt merely could not open.
+SQLITE_MAGIC = b"SQLite format 3\x00"
 
 # A stable marker so an unrelated database at the store path is refused, not adopted.
 APPLICATION_ID = 0x56454C31  # "VEL1"
@@ -127,6 +143,33 @@ class StoreError(RuntimeError):
     """Raised when durable state cannot be read or written safely."""
 
 
+class NotADatabaseError(StoreError):
+    """Raised when the file at a store path is not a database at all.
+
+    Whose file it is stays unknown — a store whose header was destroyed looks the same as
+    something that was never ours — so the way out says nothing about ownership: put that
+    file somewhere else, or use a different destination.
+    """
+
+
+class ForeignDatabaseError(StoreError):
+    """Raised when a database at a store path belongs to something other than Vellis.
+
+    Nothing of the owner's is at stake, so the way out is a different destination — which
+    is exactly the advice that would be wrong for a store that is theirs.
+    """
+
+
+class UnreadableStoreError(StoreError):
+    """Raised when a file is a canonical store that this build cannot read.
+
+    Distinct from a bare :class:`StoreError` about a database that belongs to something
+    else: this one is somebody's memory. What to do about it — a build that reads it, a
+    restore, a migration — is not what to do about a destination that was never ours, and
+    telling an owner to go and use a different directory would leave their memory behind.
+    """
+
+
 class AlreadyInitializedError(StoreError):
     """Raised when initialization is attempted against established canonical state."""
 
@@ -154,11 +197,144 @@ class _RecordRow:
     payload: str
 
 
+def _schema_present(connection: sqlite3.Connection) -> bool:
+    row = connection.execute(
+        "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'schema_meta'"
+    ).fetchone()
+    return row is not None
+
+
+def _refuse_foreign_database(connection: sqlite3.Connection, path: Path) -> None:
+    """Refuse a database that already holds something other than a Vellis store.
+
+    Without this the schema would be created inside an unrelated database and its
+    own application marker overwritten.
+    """
+    marker = connection.execute("PRAGMA application_id").fetchone()
+    if marker is not None and int(marker[0]) not in {0, APPLICATION_ID}:
+        raise ForeignDatabaseError(f"the database at {path} belongs to another application")
+    existing = connection.execute(
+        "SELECT name FROM sqlite_master WHERE name NOT LIKE 'sqlite_%'"
+    ).fetchall()
+    if not existing:
+        return
+    names = ", ".join(sorted(str(row[0]) for row in existing))
+    if marker is not None and int(marker[0]) == APPLICATION_ID:
+        # Our own marker over our own tables: this is somebody's store with a piece
+        # missing, not a stranger's database, and its owner may not be sent elsewhere.
+        raise UnreadableStoreError(
+            f"canonical store at {path} is missing its schema_meta table, "
+            f"though it still holds {names}"
+        )
+    raise ForeignDatabaseError(
+        f"the database at {path} already holds other objects ({names}); "
+        "choose a different destination"
+    )
+
+
+def _screen_database(connection: sqlite3.Connection, path: Path) -> bool:
+    """Decide whether this file may be used, and report whether it is already a store.
+
+    Refuses anything that belongs to something else, before the file is changed at all.
+    A database can carry a table named ``schema_meta`` without being a Vellis store, so
+    the marker check belongs here rather than after the pragmas have already rewritten
+    the header.
+
+    One rule, used by the store when it opens a file and by anyone asking what is already
+    at a path. Two rules would eventually disagree, and then a destination would be
+    refused by one and adopted by the other. They still look at the file differently — one
+    opens it to write, the other only to read — so they can differ about what is there,
+    but not about what would be allowed.
+    """
+    if _schema_present(connection):
+        _screen_marker(connection, path)
+        return True
+    _refuse_foreign_database(connection, path)
+    return False
+
+
+def _screen_marker(connection: sqlite3.Connection, path: Path) -> None:
+    """Refuse a database that is not a canonical store this build reads."""
+    # Whose database this is comes first. A version mismatch is a statement about a
+    # Vellis store, and reporting one about a file that is not ours would send the
+    # owner looking for a migration that does not apply.
+    marker = connection.execute("PRAGMA application_id").fetchone()
+    if marker is None or int(marker[0]) != APPLICATION_ID:
+        raise ForeignDatabaseError(f"the database at {path} is not a Vellis canonical store")
+    row = connection.execute(
+        "SELECT value FROM schema_meta WHERE key = 'schema_version'"
+    ).fetchone()
+    if row is None or row[0] != SCHEMA_VERSION:
+        found = "none" if row is None else str(row[0])
+        raise UnreadableStoreError(
+            f"canonical store at {path} has schema version {found}, "
+            f"but this build reads version {SCHEMA_VERSION}"
+        )
+    for table in ("canonical_record", "activity_record", "current_state", "ledger"):
+        present = connection.execute(
+            "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?", (table,)
+        ).fetchone()
+        if present is None:
+            raise UnreadableStoreError(f"canonical store at {path} is missing its {table} table")
+
+
+def holds_established_memory(path: Path) -> bool:
+    """Report whether a store at ``path`` already holds canonical state, changing nothing.
+
+    A caller can ask this before it has permission to change anything at all — a preview
+    that promises no effect has to be able to keep that promise — so the file is opened
+    immutably. That reads the database and nothing beside it: no index file is made, no
+    write-ahead log is finished, and a path with no file at it is never opened.
+
+    Reading a database immutably means reading it as it stands. A store another process is
+    writing may therefore be unreadable, which is reported as such rather than as an
+    answer. It may also be short of commits still sitting in its write-ahead log, and
+    those this cannot see: such a store can answer that it holds nothing. Finishing the
+    log would mean writing to it, which is the one thing a caller asking this may not do,
+    so the cost is left where it is cheapest — the operation that follows opens the file
+    properly, refuses, and says so, and nothing is established either way.
+    """
+    if not path.exists():
+        return False
+    if _is_not_a_database(path):
+        raise NotADatabaseError(f"the file at {path} is not a database")
+    try:
+        # The path is escaped because a URI reads '?' and '#' in it as its own
+        # punctuation, and would otherwise open some truncated path nobody named.
+        with closing(
+            sqlite3.connect(f"file:{quote(str(path))}?mode=ro&immutable=1", uri=True)
+        ) as connection:
+            if not _screen_database(connection, path):
+                return False
+            return connection.execute(INITIALIZED_SQL).fetchone() is not None
+    except sqlite3.Error as error:
+        raise StoreError(f"could not read the store at {path}: {error}") from error
+
+
+def _is_not_a_database(path: Path) -> bool:
+    """Say whether a non-empty file is something other than a SQLite database.
+
+    Read from the file rather than from a failed open, because opening it says only that
+    this attempt did not work — which is also what a busy or unreadable store says, and
+    those two deserve different answers.
+    """
+    try:
+        with path.open("rb") as handle:
+            header = handle.read(len(SQLITE_MAGIC))
+    except OSError:
+        return False
+    return bool(header) and not header.startswith(SQLITE_MAGIC)
+
+
 class CanonicalStore:
     """One local canonical store: its ledger, its current projection, and their durability."""
 
     def __init__(self, path: Path) -> None:
         self._path = path
+        if _is_not_a_database(path):
+            # Told apart here rather than from a failed open, so this refusal reads the
+            # same whether a caller asked what was at the path or went to use it.
+            raise NotADatabaseError(f"the file at {path} is not a database")
         self._record_reads = 0
         try:
             # One owner, one process, one connection — but not necessarily one thread:
@@ -172,7 +348,7 @@ class CanonicalStore:
         try:
             # Screening happens before the pragmas because setting the journal mode
             # rewrites the file header: refusing a database must leave it untouched.
-            self._screen_database()
+            _screen_database(self._connection, path)
             self._connection.execute("PRAGMA journal_mode = WAL")
             self._connection.execute("PRAGMA synchronous = FULL")
             self._connection.execute("PRAGMA foreign_keys = ON")
@@ -193,20 +369,8 @@ class CanonicalStore:
     def close(self) -> None:
         self._connection.close()
 
-    def _screen_database(self) -> None:
-        """Decide whether this file is ours, before anything about it is changed.
-
-        A database can carry a table named ``schema_meta`` without being a Vellis store,
-        so the marker check belongs here too rather than after the pragmas have already
-        rewritten the header.
-        """
-        if self._schema_present():
-            self._check_marker()
-            return
-        self._refuse_foreign_database()
-
     def _ensure_schema(self) -> None:
-        if self._schema_present():
+        if _schema_present(self._connection):
             return
         version_row = (
             f"INSERT INTO schema_meta (key, value) VALUES ('schema_version', '{SCHEMA_VERSION}');"
@@ -219,57 +383,9 @@ class CanonicalStore:
         except sqlite3.OperationalError:
             # Another process created the schema between the check and this statement.
             self._rollback_quietly()
-            if not self._schema_present():
+            if not _schema_present(self._connection):
                 raise
-        self._check_marker()
-
-    def _refuse_foreign_database(self) -> None:
-        """Refuse a database that already holds something other than a Vellis store.
-
-        Without this the schema would be created inside an unrelated database and its
-        own application marker overwritten.
-        """
-        marker = self._connection.execute("PRAGMA application_id").fetchone()
-        if marker is not None and int(marker[0]) not in {0, APPLICATION_ID}:
-            raise StoreError(f"the database at {self._path} belongs to another application")
-        existing = self._connection.execute(
-            "SELECT name FROM sqlite_master WHERE name NOT LIKE 'sqlite_%'"
-        ).fetchall()
-        if existing:
-            names = ", ".join(sorted(str(row[0]) for row in existing))
-            raise StoreError(
-                f"the database at {self._path} already holds other objects ({names}); "
-                "choose a different destination"
-            )
-
-    def _schema_present(self) -> bool:
-        row = self._connection.execute(
-            "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'schema_meta'"
-        ).fetchone()
-        return row is not None
-
-    def _check_marker(self) -> None:
-        # Whose database this is comes first. A version mismatch is a statement about a
-        # Vellis store, and reporting one about a file that is not ours would send the
-        # owner looking for a migration that does not apply.
-        marker = self._connection.execute("PRAGMA application_id").fetchone()
-        if marker is None or int(marker[0]) != APPLICATION_ID:
-            raise StoreError(f"the database at {self._path} is not a Vellis canonical store")
-        row = self._connection.execute(
-            "SELECT value FROM schema_meta WHERE key = 'schema_version'"
-        ).fetchone()
-        if row is None or row[0] != SCHEMA_VERSION:
-            found = "none" if row is None else str(row[0])
-            raise StoreError(
-                f"canonical store at {self._path} has schema version {found}, "
-                f"but this build reads version {SCHEMA_VERSION}"
-            )
-        for table in ("canonical_record", "activity_record", "current_state", "ledger"):
-            present = self._connection.execute(
-                "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?", (table,)
-            ).fetchone()
-            if present is None:
-                raise StoreError(f"canonical store at {self._path} is missing its {table} table")
+        _screen_marker(self._connection, self._path)
 
     # --- Instrumentation ------------------------------------------------------------
 
@@ -285,7 +401,7 @@ class CanonicalStore:
 
     def is_initialized(self) -> bool:
         """Return whether canonical state exists, without reading any canonical record."""
-        return self._fetchone("SELECT 1 FROM current_state WHERE id = 0") is not None
+        return self._fetchone(INITIALIZED_SQL) is not None
 
     def _fetchone(self, sql: str, parameters: tuple[object, ...] = ()) -> object:
         """Run one read, reporting a database failure as a store error.
@@ -347,7 +463,7 @@ class CanonicalStore:
         with self._lock:
             try:
                 self._connection.execute("BEGIN IMMEDIATE")
-                if self._connection.execute("SELECT 1 FROM current_state WHERE id = 0").fetchone():
+                if self._connection.execute(INITIALIZED_SQL).fetchone():
                     self._connection.execute("ROLLBACK")
                     raise AlreadyInitializedError(
                         f"canonical state is already established at {self._path}"

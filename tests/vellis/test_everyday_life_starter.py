@@ -4,7 +4,8 @@ Supports S004's contribution to the starter authority: the vocabulary exists, is
 internally valid, matches the modeled counts, and behaves like any other definition set
 under governance — including the date patterns, which constrain lexical shape only.
 
-Offering it as a first-use choice belongs to the slice that owns that choice.
+Offering it as a first-use choice is a separate obligation, evidenced in
+``test_fresh_vocabulary_choice.py``.
 """
 
 from __future__ import annotations

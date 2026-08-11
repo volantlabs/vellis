@@ -35,8 +35,8 @@ such extension, not as the assumed shape of the method. The repository does not 
 plugin, but the core should move to stateless, interactive, distributed, embedded, numerical, and
 safety-relevant software projects without inheriting Vellis commands or vocabulary.
 
-A first-time owner may start from a blank personal vocabulary or explicitly confirm the modeled,
-recommended Everyday Life starter. The starter accelerates a useful beginning without becoming a
+A first-time owner is offered a blank personal vocabulary or the modeled, recommended Everyday Life
+starter, and explicitly confirms whichever they choose. The starter accelerates a useful beginning without becoming a
 universal platform ontology: selected definitions become ordinary owner-governed meaning, and an
 existing or restored system is never silently overlaid.
 

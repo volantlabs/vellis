@@ -7,7 +7,7 @@ campaign:
     status: accepted
     checkpoint: approval:5a8d92c675d6865bd70fadd0e971bbf959081bea
   blocker: null
-  checkpoint: slice:S011:5a8d92c675d6:1
+  checkpoint: slice:S012:5a8d92c675d6:1
 model_baseline:
   status: current
   authority_files:
@@ -52,6 +52,7 @@ authority:
       - path:tests/vellis/test_string_patterns.py#test_posix_classes_mean_what_re2_says_they_mean
       - path:tests/vellis/test_canonical_equality.py#test_system_metadata_participates_in_graph_equality
       - path:tests/vellis/test_graph_changes.py#test_a_change_whose_result_would_not_conform_is_refused
+      - path:tests/vellis/test_fresh_vocabulary_choice.py#test_the_confirmed_alternative_establishes_nothing_but_an_empty_vocabulary
   - id: A002
     label: Fresh canonical base
     refs:
@@ -66,6 +67,8 @@ authority:
       - path:tests/vellis/test_fresh_initialization.py#test_a_fresh_rtg_begins_at_revision_zero
       - path:tests/vellis/test_fresh_initialization.py#test_an_invalid_initial_definition_set_establishes_no_partial_state
       - path:tests/vellis/test_fresh_initialization.py#test_initializing_an_established_rtg_is_refused_without_effect
+      - path:tests/vellis/test_fresh_vocabulary_choice.py#test_either_choice_leaves_one_fresh_canonical_base
+      - path:tests/vellis/test_fresh_vocabulary_choice.py#test_the_record_says_which_vocabulary_was_started
   - id: A003
     label: Canonical transitions, revision, and durable ledger
     refs:
@@ -251,6 +254,14 @@ authority:
       - path:tests/vellis/test_everyday_life_starter.py#test_the_starter_is_internally_valid
       - path:tests/vellis/test_everyday_life_starter.py#test_the_starter_carries_no_graph_data
       - path:tests/vellis/test_everyday_life_starter.py#test_the_starter_is_governed_like_any_other_vocabulary
+      - path:tests/vellis/test_fresh_vocabulary_choice.py#test_the_choice_set_is_exactly_the_modeled_pair
+      - path:tests/vellis/test_fresh_vocabulary_choice.py#test_the_offer_names_both_choices_and_preselects_the_recommendation
+      - path:tests/vellis/test_fresh_vocabulary_choice.py#test_the_offer_marks_the_requested_alternative
+      - path:tests/vellis/test_fresh_vocabulary_choice.py#test_nothing_is_established_until_the_owner_confirms
+      - path:tests/vellis/test_fresh_vocabulary_choice.py#test_the_confirmed_recommendation_establishes_the_starter
+      - path:tests/vellis/test_fresh_vocabulary_choice.py#test_the_confirmed_alternative_establishes_nothing_but_an_empty_vocabulary
+      - path:tests/vellis/test_fresh_vocabulary_choice.py#test_an_interrupted_first_attempt_is_still_a_beginning
+      - path:tests/vellis/test_fresh_vocabulary_choice.py#test_an_established_system_keeps_the_vocabulary_it_has
   - id: A013
     label: Selected ten-tool MCP boundary
     refs:
@@ -779,12 +790,26 @@ slices:
       - {authority_id: A012, coverage: partial, remaining_slice_ids: [S004, S011, S013, S014]}
     verification_refs:
       - VellisVerification::everydayLifeStart
-    lifecycle: ready
-    implementation_status: absent
-    evidence_refs: []
+    lifecycle: complete
+    implementation_status: conforming
+    evidence_refs:
+      - path:tests/vellis/test_fresh_vocabulary_choice.py#test_the_choice_set_is_exactly_the_modeled_pair
+      - path:tests/vellis/test_fresh_vocabulary_choice.py#test_an_unmodeled_vocabulary_is_refused
+      - path:tests/vellis/test_fresh_vocabulary_choice.py#test_the_offer_names_both_choices_and_preselects_the_recommendation
+      - path:tests/vellis/test_fresh_vocabulary_choice.py#test_the_offer_marks_the_requested_alternative
+      - path:tests/vellis/test_fresh_vocabulary_choice.py#test_the_offer_is_shown_before_the_noninteractive_path_establishes
+      - path:tests/vellis/test_fresh_vocabulary_choice.py#test_the_offer_precedes_the_confirmation_on_the_path_that_establishes
+      - path:tests/vellis/test_fresh_vocabulary_choice.py#test_nothing_is_established_until_the_owner_confirms
+      - path:tests/vellis/test_fresh_vocabulary_choice.py#test_the_confirmed_recommendation_establishes_the_starter
+      - path:tests/vellis/test_fresh_vocabulary_choice.py#test_the_confirmed_alternative_establishes_nothing_but_an_empty_vocabulary
+      - path:tests/vellis/test_fresh_vocabulary_choice.py#test_the_record_says_which_vocabulary_was_started
+      - path:tests/vellis/test_fresh_vocabulary_choice.py#test_either_choice_leaves_one_fresh_canonical_base
+      - path:tests/vellis/test_fresh_vocabulary_choice.py#test_an_interrupted_first_attempt_is_still_a_beginning
+      - path:tests/vellis/test_fresh_vocabulary_choice.py#test_an_established_system_keeps_the_vocabulary_it_has
+      - command:uv run pytest tests/vellis
     realization_decisions: []
     blocker: null
-    checkpoint: null
+    checkpoint: slice:S012:5a8d92c675d6:1
   - id: S013
     order: 13
     label: Preview and confirm V1 first-use recovery
@@ -801,7 +826,7 @@ slices:
       - VellisVerification::v1Compatibility
       - VellisVerification::semanticQuery
       - VellisVerification::snapshotReplay
-    lifecycle: pending
+    lifecycle: ready
     implementation_status: absent
     evidence_refs: []
     realization_decisions: []

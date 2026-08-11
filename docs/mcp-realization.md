@@ -77,18 +77,20 @@ domain model: text and structured content communicate the same typed outcome, an
 changing advisory annotations cannot change authorization, validation, atomicity, or any promised
 failure non-effect.
 
-## Planned local setup path
+## Local setup path
 
-The application is not implemented yet. The campaign selects a future Python setup program as the
-primary local onboarding path, with the repository README pointing both agents and developers to it
-after it exists. Its interactive mode gathers missing choices, previews every effect, and confirms
-before applying them. Complete non-interactive arguments plus `--yes` support agent-driven setup;
-`--dry-run` changes nothing and prints the resulting initialization and client commands.
+The campaign selects a Python setup program as the primary local onboarding path, with the
+repository README pointing both agents and developers to it. It previews every effect and confirms
+before applying it, and complete non-interactive arguments plus `--yes` support agent-driven setup;
+`--dry-run` changes nothing.
 
-The setup path covers blank or Everyday Life initialization, v2 snapshot plus optional tail, and v1
-preview and exact confirmation. It accepts a configurable data location with a platform-appropriate
-user-data default; tests use temporary directories, and neither tests nor the runtime default use
-the repository's protected `.data/` directory. It can configure Codex, Claude Code, both, or neither.
+The setup path selects blank or Everyday Life initialization, v2 snapshot plus optional tail, and v1
+preview and exact confirmation. Only the fresh-vocabulary start is implemented; snapshot
+initialization, v1 recovery, and everything about client configuration below are selected rather
+than implemented, and README states where the implementation stands. It accepts a configurable data
+location with a platform-appropriate user-data default; tests use temporary directories, and neither
+tests nor the runtime default use the repository's protected `.data/` directory. It can configure
+Codex, Claude Code, both, or neither.
 Client configuration is user-scoped and goes only through the public `codex mcp` and `claude mcp`
 commands after preview and confirmation; the program never edits their configuration files directly.
 A matching `vellis` entry is a no-op, a differing entry requires explicit replacement, and a missing
