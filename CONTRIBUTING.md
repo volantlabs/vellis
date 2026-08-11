@@ -101,8 +101,8 @@ review pair. Repeat only for a plausible failure under the declared project assu
 recursively red-team the campaign process unless the selected slice changes it.
 The approved plan directly pins FastMCP and FastMCP Slim 4.0.0b1, selects local STDIO, and reserves
 clean macOS onboarding through a documented Python setup path for runnable closure. The pins, the
-STDIO boundary, and the setup path's fresh start are implemented; starting from a snapshot or from
-v1, and configuring a client to launch the server, remain for later slices.
+STDIO boundary, and the setup path's fresh start and v1 recovery are implemented; starting from a
+v2 snapshot, and configuring a client to launch the server, remain for later slices.
 
 Vellis checkpoint identifiers are navigation labels in the portable campaign record:
 

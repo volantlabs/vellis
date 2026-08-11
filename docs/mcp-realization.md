@@ -85,9 +85,9 @@ before applying it, and complete non-interactive arguments plus `--yes` support 
 `--dry-run` changes nothing.
 
 The setup path selects blank or Everyday Life initialization, v2 snapshot plus optional tail, and v1
-preview and exact confirmation. Only the fresh-vocabulary start is implemented; snapshot
-initialization, v1 recovery, and everything about client configuration below are selected rather
-than implemented, and README states where the implementation stands. It accepts a configurable data
+preview and exact confirmation. The fresh-vocabulary start and v1 preview and confirmation are
+implemented; snapshot initialization and everything about client configuration below are selected
+rather than implemented, and README states where the implementation stands. It accepts a configurable data
 location with a platform-appropriate user-data default; tests use temporary directories, and neither
 tests nor the runtime default use the repository's protected `.data/` directory. It can configure
 Codex, Claude Code, both, or neither.

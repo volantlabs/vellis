@@ -7,7 +7,7 @@ campaign:
     status: accepted
     checkpoint: approval:5a8d92c675d6865bd70fadd0e971bbf959081bea
   blocker: null
-  checkpoint: slice:S012:5a8d92c675d6:1
+  checkpoint: slice:S013:5a8d92c675d6:1
 model_baseline:
   status: current
   authority_files:
@@ -235,8 +235,43 @@ authority:
       - {model_ref: "VellisVerification::v1Compatibility", source: "model/50-verification.sysml"}
     planned_coverage: full
     slice_ids: [S013]
-    implementation_status: absent
-    evidence_refs: []
+    implementation_status: conforming
+    evidence_refs:
+      - path:tests/vellis/test_v1_recovery.py#test_live_graph_content_arrives_exactly_as_v1_stored_it
+      - path:tests/vellis/test_v1_recovery.py#test_a_record_that_does_not_say_it_is_live_is_live
+      - path:tests/vellis/test_v1_recovery.py#test_non_live_content_is_left_behind_and_named
+      - path:tests/vellis/test_v1_recovery.py#test_only_an_unnamed_anchor_is_given_a_recovered_name
+      - path:tests/vellis/test_v1_recovery.py#test_definitions_translate_by_natural_identity_and_drop_v1_bookkeeping
+      - path:tests/vellis/test_v1_recovery.py#test_a_pattern_keeps_the_values_v1_let_through
+      - path:tests/vellis/test_v1_recovery.py#test_a_refinement_v2_cannot_say_is_removed_rather_than_approximated
+      - path:tests/vellis/test_v1_recovery.py#test_a_property_of_several_kinds_narrows_to_what_the_values_say
+      - path:tests/vellis/test_v1_recovery.py#test_a_kind_is_not_read_off_values_v1_would_not_have_allowed
+      - path:tests/vellis/test_v1_recovery.py#test_a_permitted_value_v1s_own_pattern_rejected_is_not_carried_across
+      - path:tests/vellis/test_v1_recovery.py#test_a_grounding_by_a_soft_deleted_anchor_is_left_out_with_that_anchor
+      - path:tests/vellis/test_v1_recovery.py#test_a_fact_group_left_with_no_live_anchor_at_all_is_refused
+      - path:tests/vellis/test_v1_recovery.py#test_a_floor_over_a_required_join_is_not_carried_as_a_floor_over_a_type
+      - path:tests/vellis/test_v1_recovery.py#test_a_floor_over_several_anchor_types_is_kept_when_each_of_them_requires_what_it_counts
+      - path:tests/vellis/test_v1_recovery.py#test_two_floors_over_one_thing_ask_for_what_the_stricter_of_them_asked
+      - path:tests/vellis/test_v1_recovery.py#test_two_v1_rules_nothing_can_satisfy_at_once_say_so_in_the_owners_terms
+      - path:tests/vellis/test_v1_recovery.py#test_a_count_over_a_query_that_asked_for_a_summary_is_not_newly_enforced
+      - path:tests/vellis/test_v1_recovery.py#test_a_count_whose_floor_was_not_carried_is_not_reported_as_carried_whole
+      - path:tests/vellis/test_v1_recovery.py#test_a_section_that_cannot_be_read_does_not_make_the_owners_content_wrong
+      - path:tests/vellis/test_v1_recovery.py#test_a_link_whose_endpoint_is_not_live_is_refused_rather_than_repaired
+      - path:tests/vellis/test_v1_recovery.py#test_one_property_holding_two_kinds_is_refused
+      - path:tests/vellis/test_v1_recovery.py#test_two_objects_sharing_one_identity_are_refused
+      - path:tests/vellis/test_v1_recovery.py#test_the_report_says_exactly_what_this_import_costs
+      - path:tests/vellis/test_v1_recovery.py#test_a_confirmed_import_establishes_one_new_lineage
+      - path:tests/vellis/test_v1_recovery.py#test_a_recovered_system_answers_for_what_was_imported
+      - path:tests/vellis/test_v1_recovery.py#test_no_starting_vocabulary_is_overlaid_on_a_recovered_system
+      - path:tests/vellis/test_v1_recovery.py#test_the_owner_sees_every_finding_before_confirming
+      - path:tests/vellis/test_v1_recovery.py#test_declining_a_recovery_establishes_nothing
+      - path:tests/vellis/test_v1_recovery.py#test_a_snapshot_that_changed_after_the_preview_is_not_the_one_confirmed
+      - path:tests/vellis/test_v1_recovery.py#test_a_recovery_into_an_established_system_is_refused
+      - path:tests/vellis/test_v1_recovery.py#test_a_snapshot_that_cannot_be_recovered_establishes_nothing
+      - path:tests/vellis/test_v1_recovery.py#test_a_dry_run_recovery_shows_the_report_and_creates_nothing
+      - path:tests/vellis/test_v1_recovery.py#test_the_permanent_record_says_what_was_recovered_and_from_where
+      - path:tests/vellis/test_v1_recovery.py#test_a_file_that_is_not_a_snapshot_says_which_way_it_is_not
+      - command:uv run pytest tests/vellis
   - id: A012
     label: Optional confirmed Everyday Life start
     refs:
@@ -826,12 +861,47 @@ slices:
       - VellisVerification::v1Compatibility
       - VellisVerification::semanticQuery
       - VellisVerification::snapshotReplay
-    lifecycle: ready
-    implementation_status: absent
-    evidence_refs: []
+    lifecycle: complete
+    implementation_status: conforming
+    evidence_refs:
+      - path:tests/vellis/test_v1_recovery.py#test_live_graph_content_arrives_exactly_as_v1_stored_it
+      - path:tests/vellis/test_v1_recovery.py#test_a_record_that_does_not_say_it_is_live_is_live
+      - path:tests/vellis/test_v1_recovery.py#test_non_live_content_is_left_behind_and_named
+      - path:tests/vellis/test_v1_recovery.py#test_only_an_unnamed_anchor_is_given_a_recovered_name
+      - path:tests/vellis/test_v1_recovery.py#test_definitions_translate_by_natural_identity_and_drop_v1_bookkeeping
+      - path:tests/vellis/test_v1_recovery.py#test_a_pattern_keeps_the_values_v1_let_through
+      - path:tests/vellis/test_v1_recovery.py#test_a_refinement_v2_cannot_say_is_removed_rather_than_approximated
+      - path:tests/vellis/test_v1_recovery.py#test_a_property_of_several_kinds_narrows_to_what_the_values_say
+      - path:tests/vellis/test_v1_recovery.py#test_a_kind_is_not_read_off_values_v1_would_not_have_allowed
+      - path:tests/vellis/test_v1_recovery.py#test_a_permitted_value_v1s_own_pattern_rejected_is_not_carried_across
+      - path:tests/vellis/test_v1_recovery.py#test_a_grounding_by_a_soft_deleted_anchor_is_left_out_with_that_anchor
+      - path:tests/vellis/test_v1_recovery.py#test_a_fact_group_left_with_no_live_anchor_at_all_is_refused
+      - path:tests/vellis/test_v1_recovery.py#test_a_floor_over_a_required_join_is_not_carried_as_a_floor_over_a_type
+      - path:tests/vellis/test_v1_recovery.py#test_a_floor_over_several_anchor_types_is_kept_when_each_of_them_requires_what_it_counts
+      - path:tests/vellis/test_v1_recovery.py#test_two_floors_over_one_thing_ask_for_what_the_stricter_of_them_asked
+      - path:tests/vellis/test_v1_recovery.py#test_two_v1_rules_nothing_can_satisfy_at_once_say_so_in_the_owners_terms
+      - path:tests/vellis/test_v1_recovery.py#test_a_count_over_a_query_that_asked_for_a_summary_is_not_newly_enforced
+      - path:tests/vellis/test_v1_recovery.py#test_a_count_whose_floor_was_not_carried_is_not_reported_as_carried_whole
+      - path:tests/vellis/test_v1_recovery.py#test_a_section_that_cannot_be_read_does_not_make_the_owners_content_wrong
+      - path:tests/vellis/test_v1_recovery.py#test_a_link_whose_endpoint_is_not_live_is_refused_rather_than_repaired
+      - path:tests/vellis/test_v1_recovery.py#test_one_property_holding_two_kinds_is_refused
+      - path:tests/vellis/test_v1_recovery.py#test_two_objects_sharing_one_identity_are_refused
+      - path:tests/vellis/test_v1_recovery.py#test_the_report_says_exactly_what_this_import_costs
+      - path:tests/vellis/test_v1_recovery.py#test_a_confirmed_import_establishes_one_new_lineage
+      - path:tests/vellis/test_v1_recovery.py#test_a_recovered_system_answers_for_what_was_imported
+      - path:tests/vellis/test_v1_recovery.py#test_no_starting_vocabulary_is_overlaid_on_a_recovered_system
+      - path:tests/vellis/test_v1_recovery.py#test_the_owner_sees_every_finding_before_confirming
+      - path:tests/vellis/test_v1_recovery.py#test_declining_a_recovery_establishes_nothing
+      - path:tests/vellis/test_v1_recovery.py#test_a_snapshot_that_changed_after_the_preview_is_not_the_one_confirmed
+      - path:tests/vellis/test_v1_recovery.py#test_a_recovery_into_an_established_system_is_refused
+      - path:tests/vellis/test_v1_recovery.py#test_a_snapshot_that_cannot_be_recovered_establishes_nothing
+      - path:tests/vellis/test_v1_recovery.py#test_a_dry_run_recovery_shows_the_report_and_creates_nothing
+      - path:tests/vellis/test_v1_recovery.py#test_the_permanent_record_says_what_was_recovered_and_from_where
+      - path:tests/vellis/test_v1_recovery.py#test_a_file_that_is_not_a_snapshot_says_which_way_it_is_not
+      - command:uv run pytest tests/vellis
     realization_decisions: []
     blocker: null
-    checkpoint: null
+    checkpoint: slice:S013:5a8d92c675d6:1
   - id: S014
     order: 14
     label: Assemble owner-controlled personal-memory workflows
@@ -844,7 +914,7 @@ slices:
       - VellisVerification::ownerControl
       - VellisVerification::observableFailure
       - VellisVerification::everydayLifeStart
-    lifecycle: pending
+    lifecycle: ready
     implementation_status: absent
     evidence_refs: []
     realization_decisions: []

@@ -88,8 +88,8 @@ to the human.
 
 The approved campaign selects direct pins for `fastmcp==4.0.0b1` and `fastmcp-slim==4.0.0b1`,
 local STDIO, and a documented Python setup path that configures user-scoped Codex or Claude Code
-only through their public CLIs. The pins, the STDIO boundary, and the setup path's fresh start are
-implemented; client configuration is not.
+only through their public CLIs. The pins, the STDIO boundary, and the setup path's fresh start and
+v1 recovery are implemented; client configuration is not.
 These are selected realization constraints, not model structure. Do not
 upgrade the pre-release pin, add another transport, or edit client configuration files directly
 without renewed review of the selected plan.

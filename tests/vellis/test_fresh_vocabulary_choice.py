@@ -476,7 +476,7 @@ def test_previewing_a_destination_that_holds_a_store_changes_nothing(tmp_path: P
 
     assert code == EXIT_FAILED
     assert out.splitlines() == [
-        "Vellis setup cannot prepare a system at this destination.",
+        "Vellis setup cannot prepare a system here.",
         f"  destination:  {destination.resolve()}",
         f"  memory store: {store_path(destination.resolve())}",
         "  this destination already holds memory; setup cannot start it again.",

@@ -14,9 +14,13 @@ as recommended and preselected, and establishes neither one until the owner conf
 Where setup reaches a definite answer about a destination — prior state, a stranger's
 database, a store this build cannot read, a file that is not a database — no starting
 vocabulary is offered at all. Where it cannot tell, the offer stands and the operation,
-which opens the file properly, is the one that decides. Snapshot
-initialization and confirmed v1 recovery are separate owner-visible choices that arrive
-with their own slices; setup does not offer a choice it cannot honor.
+which opens the file properly, is the one that decides.
+
+``--from-v1`` realizes the owner-facing half of ``Vellis::'Begin from Vellis v1 snapshot'``:
+a snapshot brings its own vocabulary, so no starting vocabulary is offered, and what the
+recovery would establish and what it costs are shown in full before it is confirmed.
+Beginning from a v2 snapshot is a separate owner-visible choice that arrives with its own
+slice; setup does not offer a choice it cannot honor.
 """
 
 from __future__ import annotations
@@ -31,6 +35,7 @@ from typing import TextIO
 from vellis.canonical import Provenance
 from vellis.definitions import GraphDefinitionSet
 from vellis.everyday_life import everyday_life_starter
+from vellis.json_value import JsonValueError, loads
 from vellis.outcomes import OperationStatus
 from vellis.paths import DestinationError, resolve_data_directory, store_path
 from vellis.store import (
@@ -42,6 +47,12 @@ from vellis.store import (
     holds_established_memory,
 )
 from vellis.system import RTGSystem
+from vellis.v1 import (
+    ImportPreview,
+    SnapshotError,
+    analyze_v1_snapshot,
+    recovery_summary,
+)
 
 __all__ = [
     "RECOMMENDED_VOCABULARY",
@@ -138,8 +149,9 @@ class SetupReport:
     succeeded: bool
     memory_changed: bool
     summary: str
-    # Carried without a default so no report can silently substitute the recommendation
-    # for the choice its owner actually made.
+    # The starting vocabulary this run asked for. Carried without a default so no report
+    # can silently substitute the recommendation for the choice its owner actually made.
+    # A recovery brings its own vocabulary and establishes none of this one.
     choice: FreshVocabularyChoice
     corrective_action: str | None = None
     destination: Path | None = None
@@ -163,13 +175,18 @@ def prepare_local_system(
     dry_run: bool = False,
     initiator: str = "owner",
     choice: FreshVocabularyChoice = RECOMMENDED_VOCABULARY,
+    recovery: ImportPreview | None = None,
     environ: dict[str, str] | None = None,
 ) -> SetupReport:
-    """Prepare one local Vellis system with the starting vocabulary it is given.
+    """Prepare one local Vellis system with the start it is given.
 
     The confirmation the model requires is the documented command's; this establishes what
     a caller asks for. ``choice`` defaults to the recommendation because that is what an
     owner who says nothing is offered, not because anything here has been agreed to.
+
+    A ``recovery`` preview begins from a Vellis v1 system instead. It carries its own
+    vocabulary, so no starting vocabulary is chosen or overlaid; ``choice`` then says only
+    what the report names, and establishes nothing.
 
     With ``dry_run`` the destination is resolved and reported and nothing is created. What
     is already at that destination is the command's question, not this one's: a dry run
@@ -215,7 +232,7 @@ def prepare_local_system(
             destination=destination,
             store=store_file,
         )
-    return _initialize(destination, store_file, initiator, choice)
+    return _initialize(destination, store_file, initiator, choice, recovery)
 
 
 def _revision_if_readable(system: RTGSystem) -> int | None:
@@ -232,7 +249,11 @@ def _revision_if_readable(system: RTGSystem) -> int | None:
 
 
 def _initialize(
-    destination: Path, store_file: Path, initiator: str, choice: FreshVocabularyChoice
+    destination: Path,
+    store_file: Path,
+    initiator: str,
+    choice: FreshVocabularyChoice,
+    recovery: ImportPreview | None = None,
 ) -> SetupReport:
     try:
         store = CanonicalStore(store_file)
@@ -251,11 +272,19 @@ def _initialize(
         )
     system = RTGSystem(store)
     try:
-        outcome = system.initialize_fresh(
-            choice.definitions,
-            provenance=Provenance(initiator=initiator, source="vellis setup"),
-            initialization_summary=choice.established_summary,
-        )
+        if recovery is None:
+            outcome = system.initialize_fresh(
+                choice.definitions,
+                provenance=Provenance(initiator=initiator, source="vellis setup"),
+                initialization_summary=choice.established_summary,
+            )
+        else:
+            outcome = system.initialize_from_recovery(
+                recovery.candidate.graph,
+                recovery.candidate.active_definitions,
+                provenance=Provenance(initiator=initiator, source="vellis setup: v1 recovery"),
+                initialization_summary=recovery_summary(recovery),
+            )
         if outcome.status is not OperationStatus.ACCEPTED:
             # Refused because this is already a system, or refused for some other reason
             # with nothing established. Telling the second owner to use the system they
@@ -339,16 +368,28 @@ class _Existing:
     corrective_action: str
 
 
-def _write_preview(report: SetupReport, stream: TextIO, *, existing: _Existing | None) -> None:
-    if existing is None:
+def _write_preview(
+    report: SetupReport,
+    stream: TextIO,
+    *,
+    existing: _Existing | None,
+    recovered: ImportPreview | None = None,
+    snapshot: str | None = None,
+) -> None:
+    stopped = existing is not None or snapshot is not None or _refused(recovered)
+    if not stopped:
         print("Vellis setup will prepare one local personal system.", file=stream)
     else:
         # Said before the destination rather than after it: an owner reading down the
         # transcript should not be told a system will be prepared and then untold it.
-        print("Vellis setup cannot prepare a system at this destination.", file=stream)
+        print("Vellis setup cannot prepare a system here.", file=stream)
     print(f"  destination:  {report.destination}", file=stream)
     print(f"  memory store: {report.store}", file=stream)
-    if existing is None:
+    if snapshot is not None:
+        print(f"  this snapshot cannot be read: {snapshot}", file=stream)
+    elif recovered is not None:
+        _write_recovery(recovered, stream)
+    elif existing is None:
         _write_offer(report.choice, stream)
     else:
         # A starting vocabulary is chosen only where there is nothing yet. Offering one
@@ -388,6 +429,23 @@ def _existing_memory(store_file: Path) -> _Existing | None:
         summary="this destination already holds memory; setup cannot start it again.",
         corrective_action=ALREADY_ESTABLISHED,
     )
+
+
+def _refused(recovered: ImportPreview | None) -> bool:
+    """Say whether a recovery has already been decided against."""
+    return recovered is not None and not recovered.is_acceptable
+
+
+def _write_recovery(preview: ImportPreview, stream: TextIO) -> None:
+    """Show the exact candidate and report an owner is being asked to confirm.
+
+    Every finding is printed, not a count and not a sample. An owner confirming an import
+    is agreeing to what it costs as much as to what it keeps, and a cost they were not
+    shown is one they did not agree to.
+    """
+    print("  starting from a Vellis v1 snapshot:", file=stream)
+    for finding in preview.report.findings:
+        print(f"    {finding.disposition.value}: {finding.summary}", file=stream)
 
 
 def _write_offer(selected: FreshVocabularyChoice, stream: TextIO) -> None:
@@ -458,16 +516,27 @@ def main(
         "destination that will not do rather than pretending otherwise",
     )
     parser.add_argument(
+        "--from-v1",
+        default=None,
+        help=(
+            "begin from a Vellis v1 JSON system snapshot instead of a starting vocabulary; "
+            "setup shows exactly what it would recover and what that costs before it is "
+            "confirmed"
+        ),
+    )
+    parser.add_argument(
         "--vocabulary",
         choices=[each.value for each in FreshVocabularyChoice],
-        default=RECOMMENDED_VOCABULARY.value,
+        default=None,
         help=(
             "the starting vocabulary; defaults to the recommended Everyday Life starter, "
             "with blank fully supported"
         ),
     )
     arguments = parser.parse_args(argv)
-    choice = FreshVocabularyChoice(arguments.vocabulary)
+    if arguments.from_v1 is not None and arguments.vocabulary is not None:
+        parser.error("a v1 snapshot carries its own vocabulary, so --vocabulary says nothing")
+    choice = FreshVocabularyChoice(arguments.vocabulary or RECOMMENDED_VOCABULARY.value)
 
     preview = prepare_local_system(data_directory=arguments.data_dir, dry_run=True, choice=choice)
     if not preview.succeeded:
@@ -476,7 +545,30 @@ def main(
     # A preview that succeeded resolved a destination, so it knows where the store goes.
     assert preview.store is not None
     existing = _existing_memory(preview.store)
-    _write_preview(preview, out, existing=existing)
+    recovered: ImportPreview | None = None
+    unreadable_snapshot: str | None = None
+    if arguments.from_v1 is not None and existing is None:
+        try:
+            recovered = _read_v1_snapshot(str(arguments.from_v1))
+        except SnapshotError as unreadable:
+            unreadable_snapshot = str(unreadable)
+    _write_preview(
+        preview, out, existing=existing, recovered=recovered, snapshot=unreadable_snapshot
+    )
+    if unreadable_snapshot is not None:
+        _write_report(
+            replace(
+                preview,
+                succeeded=False,
+                summary=f"this snapshot cannot be read: {unreadable_snapshot}",
+                corrective_action=(
+                    "check that --from-v1 names a complete Vellis v1 system snapshot; the "
+                    "destination is untouched either way"
+                ),
+            ),
+            error,
+        )
+        return EXIT_FAILED
     if existing is not None:
         # Setup already knows this destination will not do, and knows the way out. Going
         # on would ask an owner to confirm an operation that has already been decided
@@ -487,6 +579,22 @@ def main(
                 succeeded=False,
                 summary=existing.summary,
                 corrective_action=existing.corrective_action,
+            ),
+            error,
+        )
+        return EXIT_FAILED
+    if _refused(recovered):
+        # Every reason this import would be refused is already in the report above, so
+        # there is nothing to confirm and nothing an answer could change.
+        _write_report(
+            replace(
+                preview,
+                succeeded=False,
+                summary="this snapshot cannot be recovered as it stands",
+                corrective_action=(
+                    "the conditions above have to be resolved in the v1 system and a new "
+                    "snapshot taken; nothing here was changed"
+                ),
             ),
             error,
         )
@@ -504,9 +612,46 @@ def main(
             print("Declined; nothing was created.", file=out)
             return EXIT_DECLINED
 
-    report = prepare_local_system(data_directory=arguments.data_dir, choice=choice)
+    if recovered is not None:
+        # Read again rather than trusting what was shown. The owner confirmed one exact
+        # candidate and report; a snapshot that changed since is a different import that
+        # nobody has seen, let alone agreed to.
+        try:
+            confirmed = _read_v1_snapshot(str(arguments.from_v1))
+        except SnapshotError:
+            confirmed = None
+        if confirmed is None or confirmed.source_identity != recovered.source_identity:
+            _write_report(
+                replace(
+                    preview,
+                    succeeded=False,
+                    summary="the snapshot changed after it was previewed",
+                    corrective_action=(
+                        "run setup again to preview and confirm the snapshot as it now "
+                        "stands; nothing here was changed"
+                    ),
+                ),
+                error,
+            )
+            return EXIT_FAILED
+
+    report = prepare_local_system(
+        data_directory=arguments.data_dir, choice=choice, recovery=recovered
+    )
     _write_report(report, out if report.succeeded else error)
     return EXIT_SUCCESS if report.succeeded else EXIT_FAILED
+
+
+def _read_v1_snapshot(path: str) -> ImportPreview:
+    """Read and analyze one v1 snapshot document, or say why it cannot be read."""
+    try:
+        text = Path(path).read_text(encoding="utf-8")
+    except (OSError, UnicodeError) as error:
+        raise SnapshotError(f"could not read {path}: {error}") from error
+    try:
+        return analyze_v1_snapshot(loads(text))
+    except JsonValueError as error:
+        raise SnapshotError(f"{path} does not hold JSON this can read: {error}") from error
 
 
 if __name__ == "__main__":

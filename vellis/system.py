@@ -309,6 +309,36 @@ class RTGSystem:
             initialization_summary=initialization_summary,
         )
 
+    def initialize_from_recovery(
+        self,
+        graph: Graph,
+        active_definitions: GraphDefinitionSet,
+        *,
+        provenance: Provenance,
+        initialization_summary: str,
+    ) -> RevisionedOutcome:
+        """Begin at revision 0 from content recovered somewhere Vellis cannot replay.
+
+        Unlike a snapshot of this system's own kind, a recovery candidate carries no
+        history to inherit: what came before it happened in a system whose ledger this one
+        never had and could not read. So the lineage starts at zero — not because the
+        content is new, but because this is the first thing that ever happened here.
+
+        The graph arrives unchanged. Whether it can be held at all was settled while the
+        candidate was formed, and is asked again here for the same reason every other
+        write asks: what establishes state decides whether it may.
+        """
+        return self._establish(
+            CanonicalState(
+                graph=graph,
+                active_definitions=active_definitions,
+                revision=0,
+                definition_delta=None,
+            ),
+            provenance=provenance,
+            initialization_summary=initialization_summary,
+        )
+
     # --- Change -----------------------------------------------------------------------
 
     def apply_graph_change(

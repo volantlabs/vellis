@@ -100,8 +100,8 @@ Useful commands:
 
 ## Implementation status
 
-Eleven campaign slices are complete and a twelfth is implemented but not yet checkpointed, so the
-application is partially implemented rather than absent.
+Thirteen campaign slices are complete, so the application is partially implemented rather than
+absent.
 A plan gap found during the fourth returned the campaign to `awaiting-plan-approval`; the corrected
 plan has since been approved and that slice checkpointed under it.
 `just implementation-campaign-status` reports exactly where it stands. Use these words precisely:
@@ -141,19 +141,24 @@ plan has since been approved and that slice checkpointed under it.
   that state reached rather than at zero, because renumbering it would claim transitions this
   ledger does not have. The confirmed first-use vocabulary choice — blank or the Everyday Life
   starter, both named, the starter recommended and preselected, and neither established until the
-  owner confirms — is implemented and tested but belongs to a slice that is not yet checkpointed.
+  owner confirms — is implemented and verified. Confirmed first use from a Vellis v1 snapshot —
+  live v1 content arriving exactly as it was stored, every simplification and omission named
+  before the owner agrees to it, and a new lineage at revision 0 that claims none of the v1
+  system's history — is implemented and verified.
 - **Runnable.** `uv run python -m vellis.setup` prepares one local system. It previews the
   destination and, unless it can already see that the destination will not do, offers both starting
-  vocabularies with the Everyday Life starter preselected — that offer belongs to the slice above that is not yet
-  checkpointed. It asks for confirmation, and accepts
+  vocabularies with the Everyday Life starter preselected. It asks for confirmation, and accepts
   `--data-dir`, `--vocabulary`, `--yes`, and a no-effect `--dry-run` that still reports a
-  destination it can already see will not do. It stores memory under the
+  destination it can already see will not do. `--from-v1` begins from a Vellis v1 JSON system
+  snapshot instead; the snapshot carries the vocabulary, so passing `--vocabulary` as well is
+  refused rather than ignored, and the snapshot is read again at confirmation, so one that
+  changed after it was previewed is not the one that was agreed to. It stores memory under the
   platform's user-data location by default and never writes to this repository's ignored `.data/`.
   `uv run python -m vellis` then serves that memory over local standard input and output, and
   refuses rather than creating one.
-- **Not implemented yet.** V1 snapshot recovery, and starting the setup command from a v2 snapshot —
-  a snapshot lineage can be begun through the library but not through setup. No client is configured
-  to launch the server; that is runnable closure. FastMCP and FastMCP Slim are pinned at 4.0.0b1 and installed.
+- **Not implemented yet.** Starting the setup command from a v2 snapshot — a snapshot lineage can
+  be begun through the library but not through setup. No client is configured to launch the server;
+  that is runnable closure. FastMCP and FastMCP Slim are pinned at 4.0.0b1 and installed.
 
 Deployment and migration realization remain open. The initial contract assumes one trusted
 owner-configured client; its tools do not implement per-call authorization or decide owner approval.
