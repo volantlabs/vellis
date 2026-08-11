@@ -1219,6 +1219,107 @@ class RTGSystem:
         )
         return outcome
 
+    # --- Going back ---------------------------------------------------------------------
+
+    def restore_historical_state(
+        self, selection: HistoricalSelection, *, provenance: Provenance
+    ) -> RevisionedOutcome:
+        """Make a past state current again, as one new revision.
+
+        Restoration moves forward, not back. The selected state is committed as the next
+        revision and everything already in the ledger stays exactly where it is — so
+        going back is itself a thing that happened, and an owner can go back from it.
+
+        A proposal in flight blocks it. The restored state carries no delta, so restoring
+        over one would discard work the owner never asked to lose; refusing says so
+        instead of deciding for them.
+        """
+        outcome = self._restore(selection, provenance=provenance)
+        self._observe_outcome(
+            "restoration",
+            outcome.status,
+            scope=_selection_scope(selection),
+            summary=outcome.summary,
+            provenance=provenance,
+            evaluated_revision=outcome.resulting_revision,
+        )
+        return outcome
+
+    def _restore(
+        self, selection: HistoricalSelection, *, provenance: Provenance
+    ) -> RevisionedOutcome:
+        """Commit a past state as the next revision, or refuse without touching anything.
+
+        The delta check comes first because it is decidable from state already in hand:
+        refusing for a reason already known should not cost a replay of the whole tail.
+        """
+        try:
+            state = self.current_state()
+        except NotInitializedError as error:
+            return RevisionedOutcome(
+                status=OperationStatus.REJECTED,
+                summary="no canonical state is established; initialize this RTG first",
+                findings=(ValidationFinding(summary=str(error)),),
+            )
+        except StoreError as error:
+            return RevisionedOutcome(
+                status=OperationStatus.FAILED,
+                summary=f"the current state could not be read: {error}",
+                findings=(ValidationFinding(summary=str(error)),),
+            )
+
+        if state.definition_delta is not None:
+            return RevisionedOutcome(
+                status=OperationStatus.REJECTED,
+                summary=(
+                    "a proposal is in flight; restoring would discard it, so activate or "
+                    "discard it first"
+                ),
+                findings=(
+                    ValidationFinding(summary="restoration requires no in-flight definition delta"),
+                ),
+            )
+
+        revision, findings = self._resolve(selection)
+        if findings:
+            return RevisionedOutcome(
+                status=OperationStatus.REJECTED,
+                summary=f"the selected state could not be resolved ({len(findings)} findings)",
+                findings=findings,
+            )
+        try:
+            historical = self._state_at(revision)
+        except (StoreError, ReplayError) as error:
+            return RevisionedOutcome(
+                status=OperationStatus.FAILED,
+                summary=f"the selected state could not be reconstructed: {error}",
+                findings=(ValidationFinding(summary=str(error)),),
+            )
+
+        if graph_equal(historical.graph, state.graph) and definition_set_equal(
+            historical.active_definitions, state.active_definitions
+        ):
+            # Already there. Every other family treats a change that changes nothing as an
+            # accepted no-op, and a revision recording that nothing happened is a record
+            # of nothing.
+            return RevisionedOutcome(
+                status=OperationStatus.ACCEPTED,
+                summary=f"revision {revision} is already the current state; nothing was restored",
+            )
+        return self._commit(
+            state,
+            TransitionKind.HISTORICAL_RESTORATION,
+            CanonicalChange(
+                replacement_graph=historical.graph,
+                active_definitions=historical.active_definitions,
+                delta_disposition=DefinitionDeltaDisposition.ABSENT,
+            ),
+            active_definitions=historical.active_definitions,
+            graph=historical.graph,
+            delta=None,
+            provenance=provenance,
+        )
+
     # --- Assessment -------------------------------------------------------------------
 
     def check(self, *, provenance: Provenance = UNATTRIBUTED) -> ValidationReport:
@@ -1275,6 +1376,13 @@ def _change_scope(change: GraphChange) -> str:
     )
     named = ", ".join(f"{count} {label}" for count, label in counts if count)
     return named or "nothing"
+
+
+def _selection_scope(selection: HistoricalSelection) -> str:
+    """Name the state a restoration went back to, without copying it."""
+    if isinstance(selection, RevisionSelection):
+        return f"revision {selection.revision}"
+    return f"the state at {selection.time.isoformat()}"
 
 
 def _query_scope(query: GraphQuery) -> str:

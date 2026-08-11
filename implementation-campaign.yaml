@@ -7,7 +7,7 @@ campaign:
     status: accepted
     checkpoint: approval:5a8d92c675d6865bd70fadd0e971bbf959081bea
   blocker: null
-  checkpoint: slice:S009:5a8d92c675d6:1
+  checkpoint: slice:S010:5a8d92c675d6:1
 model_baseline:
   status: current
   authority_files:
@@ -211,8 +211,13 @@ authority:
       - {model_ref: "VellisRequirements::historicalRestoreSemantics", source: "model/40-requirements.sysml"}
     planned_coverage: full
     slice_ids: [S008, S010]
-    implementation_status: absent
-    evidence_refs: []
+    implementation_status: conforming
+    evidence_refs:
+      - path:tests/vellis/test_historical_selection.py#test_a_query_at_a_selected_revision_sees_that_state
+      - path:tests/vellis/test_historical_selection.py#test_a_time_resolves_to_the_greatest_revision_at_or_before_it
+      - path:tests/vellis/test_historical_restore.py#test_restoring_takes_the_vocabulary_back_as_well_as_the_graph
+      - path:tests/vellis/test_historical_restore.py#test_every_earlier_record_is_left_exactly_as_it_was
+      - path:tests/vellis/test_historical_restore.py#test_a_proposal_in_flight_blocks_restoration
   - id: A011
     label: Confirmed V1 first-use compatibility
     refs:
@@ -711,12 +716,23 @@ slices:
       - VellisVerification::restoreHistory
       - VellisVerification::atomicTransitions
       - VellisVerification::durableHistory
-    lifecycle: ready
-    implementation_status: absent
-    evidence_refs: []
+    lifecycle: complete
+    implementation_status: conforming
+    evidence_refs:
+      - path:tests/vellis/test_historical_restore.py#test_restoring_commits_the_selected_state_as_a_new_revision
+      - path:tests/vellis/test_historical_restore.py#test_every_earlier_record_is_left_exactly_as_it_was
+      - path:tests/vellis/test_historical_restore.py#test_restoring_takes_the_vocabulary_back_as_well_as_the_graph
+      - path:tests/vellis/test_historical_restore.py#test_the_committed_record_carries_the_historical_vocabulary
+      - path:tests/vellis/test_historical_restore.py#test_a_proposal_in_flight_blocks_restoration
+      - path:tests/vellis/test_historical_restore.py#test_restoring_the_state_already_current_creates_neither_revision_nor_record
+      - path:tests/vellis/test_historical_restore.py#test_an_unresolvable_selection_changes_nothing
+      - path:tests/vellis/test_historical_restore.py#test_a_ledger_that_cannot_be_replayed_reports_a_failure
+      - path:tests/vellis/test_historical_restore.py#test_a_restoration_survives_an_ordinary_restart
+      - path:tests/vellis/test_historical_restore.py#test_a_refused_restoration_replays_nothing
+      - command:uv run pytest tests/vellis
     realization_decisions: []
     blocker: null
-    checkpoint: null
+    checkpoint: slice:S010:5a8d92c675d6:1
   - id: S011
     order: 11
     label: Begin a fresh lineage from snapshot and tail
@@ -731,7 +747,7 @@ slices:
     verification_refs:
       - VellisVerification::snapshotReplay
       - VellisVerification::freshInitialization
-    lifecycle: pending
+    lifecycle: ready
     implementation_status: absent
     evidence_refs: []
     realization_decisions: []
