@@ -42,7 +42,9 @@ file's existence, a prior agent's assertion, or partial implementation.
 Follow [Execution and resume](references/execution-and-resume.md):
 
 1. Restore the last validated checkpoint and reconcile any interrupted active-slice changes.
-2. Select the lowest-ordered dependency-ready slice. Permit one active slice and one writer.
+2. Select the lowest-ordered dependency-ready slice and mark it active before implementation,
+   evidence, or documentation mutation begins. Retain the preceding campaign checkpoint and leave
+   the active slice without a new checkpoint. Permit one active slice and one writer.
 3. Reread its qualified authority and transitive semantic dependencies from the current model.
 4. Invoke `$sysml-implementation` with the campaign slice contract. Let it choose the simplest
    conforming realization that respects project constraints and intentional deferrals.
@@ -57,9 +59,12 @@ Follow [Execution and resume](references/execution-and-resume.md):
 8. Create that checkpoint, then continue to the next ready slice without waiting for routine human
    code review.
 
-Treat implementation defects and bounded realization decisions as autonomous campaign work. Record
-consequential realization decisions, but do not block merely because several code structures are
-semantically equivalent.
+Treat implementation defects and bounded realization decisions as autonomous campaign work. An
+approved record's selected realization constraints need not enumerate every bounded choice the
+executor later makes. Preserve task-time choices in the realization, evidence, and handoff; add one
+to the record only when project approval semantics permit it without rewriting the accepted plan.
+Replan only when the choice changes stakeholder-visible meaning or an intentionally selected
+boundary, and do not block merely because several code structures are semantically equivalent.
 
 ## Pause and replan
 

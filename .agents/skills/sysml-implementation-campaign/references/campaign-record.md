@@ -50,8 +50,16 @@ Keep these dimensions separate:
 ## Evidence, decisions, blockers, and checkpoints
 
 Use evidence references to point to project artifacts or commands; do not copy their payloads.
-Record only consequential realization decisions needed for later conformance or resume, with the
-authority they preserve. Checkpoints are opaque project-bound identifiers.
+Evidence on an aggregate authority must remain attributable to one of its declared contributing
+slices. An artifact may be created before the slice that ultimately cites it, but aggregate evidence
+must not become a side channel for claiming authority omitted from the slice contract.
+
+Distinguish realization constraints selected by the accepted campaign from bounded task-time choices
+the model and plan intentionally leave open. Record only consequential decisions needed for later
+conformance or resume, with the authority they preserve. When project approval freezes the record's
+decision projection, preserve an ordinary task-time choice in code, evidence, and the slice handoff
+rather than rewriting the accepted plan. Escalate only if its consequence changes stakeholder-visible
+meaning or an intentionally selected boundary. Checkpoints are opaque project-bound identifiers.
 
 Classify blockers as `language question`, `model gap`, `plan gap`, `feasibility consequence`, `stale
 baseline`, or `external dependency`. Implementation defects and ordinary realization decisions are

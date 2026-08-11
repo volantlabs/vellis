@@ -102,8 +102,12 @@ without inventing system meaning.
 Run the project's narrow and broad checks. Confirm generated artifacts are fresh, public claims match
 what is implemented and runnable, and user-owned or out-of-scope data remained outside the work.
 
-After any material correction, repeat the complete review sequence. Finish only after one full pass
-finds no new material issue.
+After any material correction, repeat the complete review sequence. Finish after one full pass finds
+no new material issue, even if it offers non-blocking observations. Require every material finding to
+name a plausible consequence within accepted authority, selected boundaries, declared assumptions,
+or ordinary malformed-input and recovery behavior. Stylistic preferences, alternative truthful
+wording, speculative inputs outside those boundaries, duplicated evidence, and extra hardening with
+no such consequence do not block completion or trigger another pass.
 
 ## Classify divergence
 

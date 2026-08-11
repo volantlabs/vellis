@@ -44,7 +44,7 @@ Maintain three visibly different sources of decisions:
    chosen.
 3. **Task realization decisions:** the smallest concrete choices needed to make this slice work.
 
-For a consequential task decision, record:
+For a consequential task decision, record in the task-local plan or handoff:
 
 - model constraints it must preserve;
 - project facts and measured scale that make the decision necessary;
@@ -53,9 +53,13 @@ For a consequential task decision, record:
 - reversibility and consequence of changing it;
 - whether it changes model meaning. Usually it should not.
 
-Keep this reasoning in the plan or configured review record unless the project deliberately uses
-another decision artifact. Do not create speculative interfaces or configuration to preserve every
-alternative at runtime. An open engineering choice is not a product variability requirement.
+Keep this reasoning in the task-local plan, realization, evidence, or configured handoff. Do not
+assume that an accepted campaign record is an exhaustive decision log: a project may freeze its
+plan-selected decision projection at approval. In that case, do not rewrite it for an ordinary
+bounded choice made during execution. Replan only if the choice changes stakeholder-visible meaning
+or an intentionally selected boundary. Do not create speculative interfaces or configuration to
+preserve every alternative at runtime. An open engineering choice is not a product variability
+requirement.
 
 Check current primary documentation before selecting a dependency or coding against a framework,
 language, device, or platform. Treat affordances as feasibility constraints. If the easiest
