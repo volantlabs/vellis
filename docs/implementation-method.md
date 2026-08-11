@@ -201,23 +201,44 @@ Review, wherever applicable:
 - realization machinery unsupported by the current slice.
 
 Collect complete authority/conformance and engineering/evidence findings, then batch all in-scope
-corrections. Run one final independent review pair against the resulting slice. Repeat only if that
-pair identifies a plausible failure under the project's declared assumptions. Reviewers stay on the
-selected slice and its evidence unless that slice intentionally changes the campaign process. A
-slice is complete only when the final pair finds no material modeled-behavior, authority-coverage,
-evidence, implementation, declared-safety, or ordinary-recovery issue. Its handoff states precisely
-what is modeled, selected, implemented, verified, runnable, and still deferred.
+corrections and sweep the same root cause once. Run one final independent review pair against the
+resulting slice. Repeat only if that pair identifies a plausible failure under the project's declared
+assumptions. Reviewers receive fixed lens prompts without earlier findings or expected conclusions;
+they do not invent new mutants, fuzz spaces, attack models, or speculative input boundaries solely
+to prolong discovery. After three consecutive non-clean final pairs, perform one bounded root-cause
+audit before another pair. The count never excuses a material defect.
+
+Reviewers stay on the selected slice and its evidence unless that slice intentionally changes the
+campaign process. A slice is complete only when the final pair finds no material modeled-behavior,
+authority-coverage, evidence, implementation, declared-safety, or ordinary-recovery issue. Its
+compact handoff states the checkpoint, checks, review counts, elapsed time, and any pause reason;
+reproducible project artifacts carry the technical detail instead of reviewer transcripts.
+
+Use targeted checks while implementing and remediating. Normally run the full project gate once
+before the initial pair and once against the remediated state before the final pair; rerun it sooner
+only when the change or project binding makes that evidence necessary.
 
 ## Long-running execution and closure
 
-A continuation harness repeatedly invokes the campaign manager, but durable meaning does not depend
-on one conversation. The validated campaign record and project checkpoints identify the exact
-baseline, active or next slice, evidence, decisions, and blockers. One writer owns one active slice.
-In Codex, the approved campaign is suitable for a
-[long-running goal](https://learn.chatgpt.com/use-cases/follow-goals): completion is the verifiable
-stopping condition, while model gaps, material plan gaps, stale baselines, and stakeholder-visible
-feasibility consequences are explicit pause conditions. Other environments may provide an equivalent
-continuation harness.
+A continuation harness may keep one inexpensive, context-light manager alive, but durable meaning
+does not depend on that conversation. On each cycle the manager validates the campaign and project
+checkpoint, obtains one machine-readable disposition, and launches one fresh worker for the named
+slice or closure item. The worker owns the only writer role, executes exactly that item, obtains its
+fresh read-only reviews, checkpoints or pauses, returns a compact result, and terminates. The manager
+never implements, reviews, or consumes reviewer transcripts; it independently revalidates the
+checkpoint before dispatching the next fresh worker.
+
+The disposition binds campaign identity, project revision, worktree condition, current checkpoint,
+and selected work to a state token. A worker rechecks that token before mutation, so activation or
+other intervening work invalidates stale duplicate dispatch. Explainable active-slice work resumes in
+a fresh worker; unexplained dirty state stops. The manager waits directly while a worker is live and
+uses a timed retry only for transient launcher or quota failure. Three identical failures against one
+state token stop rather than loop indefinitely.
+
+This structure is provider-neutral. A non-normative Vellis trial may use Claude Sonnet Medium for the
+manager and fresh Opus 5 Medium workers, with Opus 5 Low as a manager substitute. Model choice does
+not affect authority or approval. Optional timing, review-count, check-count, and harness-usage
+telemetry remains outside model authority and the approved campaign projection.
 
 After focused evidence passes, independent agents review authority/conformance and
 engineering/evidence. The writer batches every material finding and then obtains one final review

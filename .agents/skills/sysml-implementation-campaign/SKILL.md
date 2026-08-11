@@ -37,9 +37,15 @@ Read [Campaign record](references/campaign-record.md). Do not implement unless:
 If no complete plan exists, invoke `$sysml-implementation-planning`. Never infer approval from a
 file's existence, a prior agent's assertion, or partial implementation.
 
-## Execution loop
+## Supervision and execution
 
-Follow [Execution and resume](references/execution-and-resume.md):
+For multi-slice autonomy, first read [Campaign supervision](references/campaign-supervision.md).
+Keep a long-running manager context thin and dispatch each slice or closure attempt to a fresh
+worker. The manager trusts validated durable state, not its transcript; it never implements,
+reviews, or consumes reviewer transcripts. A worker executes exactly one selected work item,
+returns a compact result, and stops.
+
+The slice worker follows [Execution and resume](references/execution-and-resume.md):
 
 1. Restore the last validated checkpoint and reconcile any interrupted active-slice changes.
 2. Select the lowest-ordered dependency-ready slice and mark it active before implementation,
@@ -48,16 +54,19 @@ Follow [Execution and resume](references/execution-and-resume.md):
 3. Reread its qualified authority and transitive semantic dependencies from the current model.
 4. Invoke `$sysml-implementation` with the campaign slice contract. Let it choose the simplest
    conforming realization that respects project constraints and intentional deferrals.
-5. Run focused evidence and project checks.
+5. Run focused evidence and project checks. Prefer targeted checks during implementation and
+   remediation; normally run the whole-project gate once before the initial review pair and once
+   against the remediated state before the final pair.
 6. Obtain independent authority/conformance and engineering/evidence reviews. Collect their complete
    in-scope findings, batch remediation, then run one final independent review pair against the
    resulting slice. Repeat only when that final pair finds a plausible defect within the project's
-   declared authority, safety, evidence, or ordinary recovery boundary.
+   declared authority, safety, evidence, or ordinary recovery boundary. After three consecutive
+   non-clean final pairs, perform a bounded root-cause audit before requesting another pair.
 7. Mark the slice complete only when its bounded obligations conform, evidence discriminates the
    nearest plausible wrong implementation, dependencies remain valid, and a checkpoint can include
    implementation, tests, evidence, documentation truth, and record state together.
-8. Create that checkpoint, then continue to the next ready slice without waiting for routine human
-   code review.
+8. Create that checkpoint, return the compact worker result, and terminate. The manager independently
+   validates the checkpoint before it dispatches the next ready slice without routine human review.
 
 Treat implementation defects and bounded realization decisions as autonomous campaign work. An
 approved record's selected realization constraints need not enumerate every bounded choice the
@@ -96,8 +105,12 @@ a completed application.
   template use.
 - [Execution and resume](references/execution-and-resume.md): slice selection, interruption recovery,
   review, remediation, and checkpointing.
+- [Campaign supervision](references/campaign-supervision.md): context-light management, one-work-item
+  workers, dispatch, retry, and compact handoffs.
 - [System closure](references/system-closure.md): full coverage, integration, runnable evidence, and
   cold reconstruction.
 - [Campaign schema](assets/implementation-campaign.schema.json): portable machine contract.
 - [Campaign template](assets/implementation-campaign.template.yaml): neutral starting artifact to
   populate from accepted model authority.
+- [Worker-result schema](assets/campaign-worker-result.schema.json): compact manager handoff without
+  review transcripts.

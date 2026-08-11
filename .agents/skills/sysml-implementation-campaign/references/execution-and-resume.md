@@ -35,6 +35,11 @@ current model and record rather than copying the executor's prose.
 
 Use two independent, context-isolated reviews after focused evidence passes:
 
+Before generating their frames, put the current slice-attributable evidence references into the
+working active-slice record without advancing implementation status, lifecycle, or checkpoint. Make
+each reference resolve and name the nearest plausible wrong implementation it excludes. This gives
+both reviewers the same evidence surface without copying command output or findings into prompts.
+
 1. **Authority and conformance:** verify baseline, slice scope, model meaning, partial/full coverage,
    dependencies, acceptance and failure non-effects, and absence of a model or plan gap.
 2. **Engineering and evidence:** inspect implementation correctness, failure handling, numerical or
@@ -47,6 +52,14 @@ authority, implementation correctness, discriminating evidence, declared safety,
 project recovery under the project's stated assumptions. Do not expand the threat model or
 recursively review campaign machinery unless the selected slice changes it.
 
+Give each lens a fixed task. The authority lens follows qualified meaning, coverage, dependencies,
+outcomes, and non-effects. The engineering lens follows the realization, declared input and failure
+boundaries, and whether evidence rejects the nearest plausible wrong implementation. Do not ask
+either reviewer to invent new mutants, fuzz spaces, attack models, or speculative inputs merely to
+find something novel. Use generative, mutation, security, safety, timing, load, or fault campaigns
+only when selected verification calls for them or a concrete material finding motivates one bounded
+reproducer.
+
 Require reviewers to separate material findings from optional observations. A pair is clean when it
 finds no material defect; stylistic preferences, alternative truthful wording, speculative inputs
 outside the accepted or selected boundary, duplicated evidence, and additional hardening without a
@@ -55,11 +68,16 @@ material only when it is false, omits required meaning, or could cause a promise
 misunderstood. An edge case is material only when the model, a selected realization boundary,
 ordinary malformed-input handling, or declared project assumptions admit it.
 
-Collect the complete findings from both reviews, batch remediation, and then run one final
-independent review pair against the resulting slice. Repeat only if that final pair finds another
-in-scope material defect. Do not substitute a numerical severity threshold or a demand for zero
-observations: disposition follows plausible consequence. Read-only reviewers may work concurrently;
-one writer owns remediation and the record.
+Collect the complete findings from both reviews, batch remediation, and perform a focused sweep for
+the same root cause before running one final independent review pair against the resulting slice.
+Repeat only if that final pair finds another in-scope material defect. After three consecutive
+non-clean final pairs, stop launching immediate pairs: summarize the recurring defect class, audit
+that boundary once, add the smallest discriminating evidence, and only then request another fresh
+pair. Review count never permits ignoring a material defect or creates a human authority gate.
+
+Do not substitute a numerical severity threshold or a demand for zero observations: disposition
+follows plausible consequence. Read-only reviewers may work concurrently; one writer owns
+remediation and the record.
 
 ## Checkpoint and continue
 
@@ -69,11 +87,13 @@ When both reviews produce no material finding:
 - record campaign evidence only against authority contributions declared for this slice. An artifact
   produced earlier may support a later slice, but cite it when that later slice closes the authority;
   do not use aggregate evidence to bypass the approved slice contract;
-- run required focused and whole-project checks;
+- confirm required focused and whole-project checks passed on the current state; do not rerun an
+  unchanged broad gate solely because a read-only review completed;
 - ensure documentation claims distinguish modeled, selected, implemented, verified, and runnable;
 - checkpoint implementation, evidence, and record state as one recoverable effect;
-- record the checkpoint identifier and select the next dependency-ready slice.
+- record the checkpoint identifier and return the compact worker result without selecting or
+  activating the next slice.
 
 If interruption occurs before the checkpoint, leave the slice active and resume it from inspected
-working state. If interruption occurs after the checkpoint, the committed record selects the next
-work. Never mark a slice complete before its checkpoint exists.
+working state. If interruption occurs after the checkpoint, the committed record lets the manager
+select the next work. Never mark a slice complete before its checkpoint exists.

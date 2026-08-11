@@ -109,6 +109,13 @@ or ordinary malformed-input and recovery behavior. Stylistic preferences, altern
 wording, speculative inputs outside those boundaries, duplicated evidence, and extra hardening with
 no such consequence do not block completion or trigger another pass.
 
+Batch all findings from a pass and sweep once for the same root cause before repeating it. Do not ask
+a review to build novel mutants, expand fuzz spaces, invent attack models, or search speculative
+inputs solely to prolong discovery. Use those techniques when verification or declared risk selects
+them, or when one concrete material finding needs a bounded reproducer. After three consecutive
+non-clean final passes, perform one explicit root-cause audit before another fresh pass; the count
+does not excuse a material defect or create a new human approval gate.
+
 ## Classify divergence
 
 Do not resolve every discrepancy in code. Classify it first:

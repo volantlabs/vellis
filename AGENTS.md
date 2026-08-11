@@ -66,31 +66,35 @@ only the scenarios, material findings, and disposition in the task handoff or PR
 For a complete-system implementation, derive or refresh `implementation-campaign.yaml` with
 `$sysml-implementation-planning` and run `just implementation-campaign-check`. Human approval of the
 complete current-baseline plan is required before `$sysml-implementation-campaign` activates a
-slice. Use one writer and one active slice. After implementation, run independent read-only
+slice. Use one thin manager, one fresh worker per slice, one writer, and one active slice. The manager
+uses `just implementation-campaign-dispatch`, waits for the worker, consumes only its compact result,
+and independently validates its checkpoint; it never implements, reviews, or reads reviewer
+transcripts. After implementation, run independent read-only
 authority/conformance and engineering/evidence reviews, batch in-scope remediation, run one final
 review pair, then commit the slice and campaign update together. A model or material plan gap, stale baseline, or
 stakeholder-visible feasibility consequence invalidates approval; implementation defects and
 model-preserving realization choices remain campaign work.
 
 For each slice, collect complete findings from both review lenses, batch all in-scope corrections,
-then run one final independent review pair against the resulting slice. Repeat only when that final
-pair identifies a plausible failure under the project's declared assumptions. Reviewers evaluate
-the selected slice and its evidence; they do not recursively red-team the campaign mechanism unless
-the slice intentionally changes it. Malicious repository, Git, or checker manipulation is outside
-this trusted-local workflow.
+and sweep the same root cause before one final independent review pair against the resulting slice.
+Repeat only when that final pair identifies a plausible failure under the project's declared
+assumptions. After three consecutive non-clean final pairs, perform one bounded root-cause audit
+before another pair. Reviewers do not invent mutants, fuzz spaces, threat models, or speculative
+input boundaries merely to find something new. Reviewers evaluate the selected slice and its evidence;
+they do not recursively red-team the campaign mechanism unless the slice intentionally changes it.
+Malicious repository, Git, or checker manipulation is outside this trusted-local workflow.
 
-For Codex, an accepted campaign may be launched as a long-running goal with campaign completion as
-its stopping condition. Any equivalent continuation harness is acceptable, but it must resume from
-the validated committed campaign and project checkpoint rather than relying on conversation memory.
-Plan approval is one gate for the complete campaign, not one human gate per slice. Routine reviewed
-slice checkpoints continue autonomously; only the campaign skill's explicit pause conditions return
-to the human.
+An accepted campaign may use any continuation harness that keeps the manager context thin and
+resumes from the validated committed campaign and project checkpoint rather than conversation
+memory. Each fresh worker executes exactly one slice or closure item and stops. Plan approval is one
+gate for the complete campaign, not one human gate per slice. Routine reviewed slice checkpoints
+continue autonomously; only the campaign skill's explicit pause conditions return to the human.
 
 The approved campaign selects direct pins for `fastmcp==4.0.0b1` and `fastmcp-slim==4.0.0b1`,
 local STDIO, and a documented Python setup path that configures user-scoped Codex or Claude Code
-only through their public CLIs. The pins, the STDIO boundary, and the setup path's fresh start and
-v1 recovery are implemented; client configuration is not.
-These are selected realization constraints, not model structure. Do not
+only through their public CLIs. These are selected realization constraints, not model structure;
+read current implementation and runnable status from `implementation-campaign.yaml` and the README.
+Do not
 upgrade the pre-release pin, add another transport, or edit client configuration files directly
 without renewed review of the selected plan.
 
@@ -125,6 +129,13 @@ post-commit and therefore not part of `just check`.
 After approval, every slice and closure checkpoint must preserve the exact approved plan-bearing
 authority, coverage, dependency, verification, realization-decision, and baseline projection. Plan
 changes require a new candidate plan, cold review, and renewed human approval.
+
+Generate each review prompt with `just implementation-campaign-review-frame <slice> <lens>` after
+the slice is active. The frame deliberately excludes prior findings. Workers validate their compact
+result with `just implementation-campaign-worker-result-check <path>`; managers do not accept raw
+review output. Store timing, review-count, check-count, and optional harness-usage telemetry only in
+the ignored `.cache/implementation-campaign/` area. Telemetry never establishes conformance or
+authorizes advancement.
 
 At runnable closure, the approved plan authorizes a matching dry run followed by public-CLI changes
 only to the named `vellis` client entries: replace the existing disabled Codex HTTP entry with the
@@ -235,8 +246,9 @@ relevant narrow checks and normally `just check`. Keep `.data/` untouched.
 
 `just implementation-campaign-check` validates the committed execution index against the current
 model and language baselines. `just implementation-campaign-status` reports its approval, active or
-next slice, blocker, and closure state. These tools do not resolve SysML semantics and the ledger does
-not replace rereading qualified model authority.
+next slice, blocker, and closure state. `just implementation-campaign-dispatch` emits the manager's
+machine-readable next action and durable state token without changing files. These tools do not
+resolve SysML semantics and the ledger does not replace rereading qualified model authority.
 
 The repository exposes the selected MCP tool contract over local standard input and output; no
 client is configured to launch it yet. Use modeled, selected, implemented, and runnable precisely.

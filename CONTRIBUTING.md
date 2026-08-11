@@ -78,10 +78,12 @@ claim that a standalone plugin already exists.
    never as an existing-system merge or adoption of v1 ledger history.
 6. After focused evidence passes, use fresh read-only agents for separate authority/conformance and
    engineering/evidence reviews. One writer collects both sets of findings and batches all in-scope
-   corrections, then obtains one final independent review pair. Repeat only if that pair finds a
-   plausible failure under the declared project assumptions. Commit the slice's implementation,
-   tests, evidence, documentation truth, and campaign update together; then continue to the next
-   ready slice.
+   corrections, then sweeps the same root cause and obtains one final independent review pair.
+   Repeat only if that pair finds a plausible failure under the declared project assumptions. After
+   three consecutive non-clean final pairs, perform one bounded root-cause audit before another pair;
+   do not ask reviewers to invent mutants or speculative inputs merely to continue discovery. Commit
+   the slice's implementation, tests, evidence, documentation truth, and campaign update together;
+   return the compact worker result and stop without selecting the next slice.
 7. In the PR, distinguish modeled, selected, implemented, verified, and runnable. Do not claim an
    entire requirement satisfied or verification case passed from a partially covered slice. Return
    reproducible implementation evidence to model work only for a model gap or demonstrated
@@ -92,13 +94,27 @@ invalidates campaign approval and requires human review before work resumes. Ord
 and model-preserving realization choices remain autonomous implementation work. Use
 `just implementation-campaign-check` before any campaign checkpoint and
 `just implementation-campaign-status` to inspect resumable state.
-After approval, Codex contributors may launch the campaign as a long-running goal; use campaign
-completion as the stopping condition and the modeled human-authority boundary as the pause condition.
-One accepted complete plan authorizes the dependency-ordered campaign; routine slice completion does
-not create 17 additional human approval gates. Each slice still requires its two independent review
-lenses. Collect both sets of findings, batch all in-scope corrections, then run one final independent
-review pair. Repeat only for a plausible failure under the declared project assumptions; do not
-recursively red-team the campaign process unless the selected slice changes it.
+After approval, use a thin long-running manager that runs
+`just implementation-campaign-dispatch`, launches one fresh worker for the named slice or closure
+item, waits for it, consumes only a compact validated result, and rechecks the committed checkpoint.
+The manager never implements, reviews, or reads reviewer transcripts. One accepted complete plan
+authorizes the dependency-ordered campaign; routine slice completion does not create 17 additional
+human approval gates. Each worker stops after one checkpoint or declared pause. Any harness and
+provider may realize these roles as long as durable state and the one-writer boundary remain intact.
+
+For this repository's initial harness trial, using Claude Sonnet at medium reasoning for the manager
+and fresh Opus 5 Medium workers is a non-normative cost/conformance configuration; Opus 5 Low is an
+acceptable manager substitute. Provider and model choice are not part of the portable method or the
+approved implementation plan.
+
+The manager passes the dispatch `state_token` to its worker. Before mutation, the worker reruns
+`just implementation-campaign-dispatch 0 <state-token>`; a changed token stops stale or duplicate
+work. After activation,
+generate each fixed review prompt with `just implementation-campaign-review-frame <slice> <lens>`.
+Validate the compact handoff with `just implementation-campaign-worker-result-check <path>` and put
+optional JSONL timing, review-count, check-count, and harness-usage telemetry under the ignored
+`.cache/implementation-campaign/` directory. Wait ten minutes only after transient launcher or quota
+failure when no child is live, and stop after three identical failures against one state token.
 The approved plan directly pins FastMCP and FastMCP Slim 4.0.0b1, selects local STDIO, and reserves
 clean macOS onboarding through a documented Python setup path for runnable closure. The pins, the
 STDIO boundary, and the setup path's fresh start and v1 recovery are implemented; starting from a

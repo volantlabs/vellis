@@ -67,7 +67,8 @@ safety- or security-relevant software without requiring concerns those systems d
    required. Verify non-effects at the authority they promise to preserve.
 8. Run [Conformance and feedback](references/conformance-review.md). Review plan conformance, model
    meaning in code, evidence strength, realization leakage, and subtraction separately. Fix material
-   findings and repeat the whole review sequence until one full pass finds none.
+   findings in a batch, sweep the same root cause once, and repeat the whole review sequence until
+   one full pass finds none. Do not extend review merely to invent new mutants or speculative inputs.
 9. Update explanatory documentation and status claims through the project's configured workflow only
    when they changed. Distinguish modeled,
    selected, implemented, verified, and runnable. Hand back implemented meaning, model references,
@@ -94,8 +95,9 @@ Return:
 - remaining authority and whether the slice is ready for an atomic project checkpoint.
 
 Do not select another slice, approve a campaign plan, mark whole-system requirements satisfied from
-partial coverage, or declare the application complete. The campaign manager owns sequence, durable
-state, independent reviews, checkpoints, resume, and final system closure.
+partial coverage, or declare the application complete. Return after this slice's checkpoint or pause;
+the campaign manager owns sequence, durable state, independent reviews, resume, and final system
+closure.
 
 ## Translation discipline
 

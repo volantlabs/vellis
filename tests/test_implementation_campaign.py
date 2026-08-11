@@ -1154,3 +1154,200 @@ def test_closure_checkpoint_binds_complete_current_state(tmp_path: Path) -> None
 
     assert implementation_campaign.validate_campaign(campaign, root=tmp_path) == []
     assert implementation_campaign.checkpoint_binding_findings(campaign, root=tmp_path) == []
+
+
+def test_dispatch_launches_only_the_ready_slice_and_binds_a_state_token(tmp_path: Path) -> None:
+    campaign, _ = _approval_repository(tmp_path)
+
+    packet = implementation_campaign.dispatch_packet(campaign, root=tmp_path)
+
+    assert packet["action"] == "launch-slice"
+    assert packet["work_item"] == "S001"
+    assert packet["worktree"]["status"] == "clean"
+    assert len(packet["state_token"]) == 64
+
+
+def test_dispatch_token_changes_when_the_ready_slice_becomes_active(tmp_path: Path) -> None:
+    campaign, _ = _approval_repository(tmp_path)
+    first = implementation_campaign.dispatch_packet(campaign, root=tmp_path)
+    campaign["campaign"]["lifecycle"] = "active"  # type: ignore[index]
+    campaign["slices"][0]["lifecycle"] = "active"  # type: ignore[index]
+    _write_campaign(tmp_path, campaign)
+    _git(tmp_path, "add", "implementation-campaign.yaml")
+    _git(tmp_path, "commit", "-m", "activate S001")
+
+    second = implementation_campaign.dispatch_packet(campaign, root=tmp_path)
+
+    assert second["action"] == "resume-slice"
+    assert second["work_item"] == "S001"
+    assert second["state_token"] != first["state_token"]
+
+
+def test_dispatch_resumes_dirty_work_only_for_an_active_slice(tmp_path: Path) -> None:
+    campaign, _ = _approval_repository(tmp_path)
+    campaign["campaign"]["lifecycle"] = "active"  # type: ignore[index]
+    campaign["slices"][0]["lifecycle"] = "active"  # type: ignore[index]
+    _write_campaign(tmp_path, campaign)
+    _git(tmp_path, "add", "implementation-campaign.yaml")
+    _git(tmp_path, "commit", "-m", "activate S001")
+    (tmp_path / "work.py").write_text("# active work\n", encoding="utf-8")
+
+    packet = implementation_campaign.dispatch_packet(campaign, root=tmp_path)
+
+    assert packet["action"] == "resume-slice"
+    assert "active-slice-has-working-state" in packet["reason_codes"]
+
+
+def test_dispatch_token_changes_when_dirty_work_changes(tmp_path: Path) -> None:
+    campaign, _ = _approval_repository(tmp_path)
+    campaign["campaign"]["lifecycle"] = "active"  # type: ignore[index]
+    campaign["slices"][0]["lifecycle"] = "active"  # type: ignore[index]
+    _write_campaign(tmp_path, campaign)
+    _git(tmp_path, "add", "implementation-campaign.yaml")
+    _git(tmp_path, "commit", "-m", "activate S001")
+    work = tmp_path / "work.py"
+    work.write_text("first\n", encoding="utf-8")
+    first = implementation_campaign.dispatch_packet(campaign, root=tmp_path)
+
+    work.write_text("second\n", encoding="utf-8")
+    second = implementation_campaign.dispatch_packet(campaign, root=tmp_path)
+
+    assert first["state_token"] != second["state_token"]
+
+
+def test_dispatch_stops_on_dirty_state_without_an_active_slice(tmp_path: Path) -> None:
+    campaign, _ = _approval_repository(tmp_path)
+    (tmp_path / "unexplained.py").write_text("# unexplained\n", encoding="utf-8")
+
+    packet = implementation_campaign.dispatch_packet(campaign, root=tmp_path)
+
+    assert packet["action"] == "stop-dirty"
+    assert packet["work_item"] is None
+
+
+def test_dispatch_stops_after_three_identical_launcher_failures(tmp_path: Path) -> None:
+    campaign, _ = _approval_repository(tmp_path)
+
+    packet = implementation_campaign.dispatch_packet(campaign, root=tmp_path, identical_failures=3)
+
+    assert packet["action"] == "await-human"
+    assert "identical-failure-limit-reached" in packet["reason_codes"]
+
+
+def test_dispatch_reports_invalid_campaign_state_without_selecting_work(tmp_path: Path) -> None:
+    campaign, _ = _approval_repository(tmp_path)
+
+    packet = implementation_campaign.dispatch_packet(
+        campaign, root=tmp_path, validation_findings=["broken campaign"]
+    )
+
+    assert packet["action"] == "stop-invalid"
+    assert packet["work_item"] is None
+    assert packet["errors"] == ["broken campaign"]
+
+
+def test_dispatch_awaits_human_when_approval_is_not_accepted(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    campaign, _ = _approval_repository(tmp_path)
+    campaign["campaign"]["plan_approval"] = {  # type: ignore[index]
+        "status": "pending",
+        "checkpoint": None,
+    }
+    monkeypatch.setattr(
+        implementation_campaign, "checkpoint_binding_findings", lambda *_a, **_k: []
+    )
+
+    packet = implementation_campaign.dispatch_packet(campaign, root=tmp_path)
+
+    assert packet["action"] == "await-human"
+    assert "approval-required" in packet["reason_codes"]
+
+
+@pytest.mark.parametrize(
+    ("lifecycle", "expected_action"),
+    (("ready", "launch-closure"), ("complete", "complete")),
+)
+def test_dispatch_distinguishes_closure_from_completed_campaign(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    lifecycle: str,
+    expected_action: str,
+) -> None:
+    campaign, _ = _approval_repository(tmp_path)
+    campaign["campaign"]["lifecycle"] = lifecycle  # type: ignore[index]
+    for entry in campaign["slices"]:  # type: ignore[index]
+        entry["lifecycle"] = "complete"
+    monkeypatch.setattr(
+        implementation_campaign, "checkpoint_binding_findings", lambda *_a, **_k: []
+    )
+
+    packet = implementation_campaign.dispatch_packet(campaign, root=tmp_path)
+
+    assert packet["action"] == expected_action
+    assert packet["work_item"] == "closure"
+
+
+def test_review_frames_are_lens_specific_and_contain_no_review_history() -> None:
+    campaign = _pending_campaign()
+    _approve(campaign)
+    campaign["campaign"]["lifecycle"] = "active"  # type: ignore[index]
+    campaign["slices"][0]["lifecycle"] = "active"  # type: ignore[index]
+
+    authority = implementation_campaign.review_frame(campaign, slice_id="S001", lens="authority")
+    engineering = implementation_campaign.review_frame(
+        campaign, slice_id="S001", lens="engineering"
+    )
+
+    assert "qualified model meaning" in authority
+    assert "implementation correctness" in engineering
+    assert "S001" in authority and "S001" in engineering
+    assert "previous reviewer" not in authority.lower()
+    assert "expected conclusion" not in engineering.lower()
+    assert "invent novel mutants" in authority
+
+
+def test_worker_result_contract_is_compact_and_rejects_transcripts() -> None:
+    result = {
+        "schema_version": 1,
+        "campaign_id": "example",
+        "work_item": "S014",
+        "outcome": "checkpointed",
+        "checkpoint": "slice:S014:123456789abc:1",
+        "checks": [{"name": "project gate", "outcome": "passed"}],
+        "review_pairs": 2,
+        "material_findings": [
+            {"pair": 1, "authority": 1, "engineering": 0},
+            {"pair": 2, "authority": 0, "engineering": 0},
+        ],
+        "elapsed_seconds": 42,
+        "reason": None,
+    }
+
+    assert implementation_campaign.worker_result_findings(result) == []
+
+    result["reviewer_transcript"] = "large hidden context"
+    findings = implementation_campaign.worker_result_findings(result)
+    assert any("Additional properties" in finding for finding in findings)
+
+
+def test_checkpointed_worker_result_requires_both_review_pairs() -> None:
+    result = {
+        "schema_version": 1,
+        "campaign_id": "example",
+        "work_item": "S014",
+        "outcome": "checkpointed",
+        "checkpoint": "slice:S014:123456789abc:1",
+        "checks": [{"name": "project gate", "outcome": "passed"}],
+        "review_pairs": 1,
+        "material_findings": [{"pair": 1, "authority": 0, "engineering": 0}],
+        "elapsed_seconds": 42,
+        "reason": None,
+    }
+
+    findings = implementation_campaign.worker_result_findings(result)
+
+    assert any(
+        "review_pairs" in finding and "less than the minimum of 2" in finding
+        for finding in findings
+    )

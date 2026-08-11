@@ -48,6 +48,10 @@ Each slice must:
 - contain nominal and applicable alternate, failed, boundary, or counterexample evidence;
 - reach a selected software, user, device, physical, or environmental boundary when one exists;
 - preserve every unified identity, state, transaction, timing, safety, or recovery boundary it uses;
+- identify consequential accepted, malformed, refused, interrupted, concurrent, recovery, safety,
+  security, timing, numerical, physical, or resource boundaries that its evidence and reviewers must
+  exercise, while explicitly excluding inapplicable ones;
+- state assumptions whose change would alter a plausible failure or the evidence needed to reject it;
 - leave unrelated and intentionally deferred meaning outside the slice.
 
 Use `semantic` for an independently valuable behavior, `integration` only for modeled meaning that

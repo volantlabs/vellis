@@ -37,6 +37,15 @@ SLICE_CHECKPOINT = re.compile(
     r"slice:(?P<slice>S[0-9]{3}):(?P<plan>[0-9a-f]{12}):(?P<attempt>[1-9][0-9]*)\Z"
 )
 CLOSURE_CHECKPOINT = re.compile(r"closure:(?P<plan>[0-9a-f]{12}):(?P<attempt>[1-9][0-9]*)\Z")
+WORKER_RESULT_SCHEMA_PATH = (
+    ROOT
+    / ".agents"
+    / "skills"
+    / "sysml-implementation-campaign"
+    / "assets"
+    / "campaign-worker-result.schema.json"
+)
+REVIEW_LENSES = ("authority", "engineering")
 
 
 class UniqueKeyLoader(yaml.SafeLoader):
@@ -1079,19 +1088,359 @@ def _status(campaign: dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
+def _worktree_condition(root: Path) -> dict[str, Any]:
+    all_changes = _git(root, "status", "--porcelain=v1", "-z", "--untracked-files=all")
+    entries = [entry for entry in all_changes.split("\0") if entry]
+    tracked_changes = _git(root, "status", "--porcelain", "--untracked-files=no")
+    digest = hashlib.sha256()
+    digest.update(all_changes.encode("utf-8"))
+    digest.update(_git(root, "diff", "--binary").encode("utf-8"))
+    digest.update(_git(root, "diff", "--cached", "--binary").encode("utf-8"))
+    for entry in entries:
+        if not entry.startswith("?? "):
+            continue
+        path = root / entry[3:]
+        if path.is_symlink():
+            digest.update(str(path.readlink()).encode("utf-8"))
+        elif path.is_file():
+            with path.open("rb") as stream:
+                for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+                    digest.update(chunk)
+    return {
+        "status": "dirty" if all_changes else "clean",
+        "tracked_changes": bool(tracked_changes),
+        "untracked_changes": any(entry.startswith("?? ") for entry in entries),
+        "fingerprint": digest.hexdigest(),
+    }
+
+
+def _state_token(campaign: dict[str, Any], *, root: Path, worktree: dict[str, Any]) -> str:
+    active = next(
+        (entry["id"] for entry in campaign["slices"] if entry["lifecycle"] == "active"),
+        None,
+    )
+    ready = sorted(
+        (entry["order"], entry["id"])
+        for entry in campaign["slices"]
+        if entry["lifecycle"] == "ready"
+    )
+    identity = {
+        "head": _git(root, "rev-parse", "HEAD"),
+        "branch": _git(root, "branch", "--show-current") or None,
+        "campaign_id": campaign["campaign"]["id"],
+        "lifecycle": campaign["campaign"]["lifecycle"],
+        "checkpoint": campaign["campaign"]["checkpoint"],
+        "active": active,
+        "ready": ready,
+        "worktree": worktree,
+    }
+    canonical = json.dumps(identity, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    return hashlib.sha256(canonical).hexdigest()
+
+
+def dispatch_packet(
+    campaign: dict[str, Any],
+    *,
+    root: Path = ROOT,
+    validation_findings: list[str] | None = None,
+    identical_failures: int = 0,
+) -> dict[str, Any]:
+    """Return one deterministic manager disposition without mutating campaign state."""
+    findings = list(validation_findings or [])
+    worktree = _worktree_condition(root)
+    active = next((entry for entry in campaign["slices"] if entry["lifecycle"] == "active"), None)
+    ready = min(
+        (entry for entry in campaign["slices"] if entry["lifecycle"] == "ready"),
+        key=lambda entry: entry["order"],
+        default=None,
+    )
+    all_slices_complete = all(entry["lifecycle"] == "complete" for entry in campaign["slices"])
+
+    action = "stop-invalid"
+    work_item: str | None = None
+    reason_codes: list[str] = []
+    if findings:
+        reason_codes.append("validation-failed")
+    elif worktree["status"] == "clean":
+        findings.extend(checkpoint_binding_findings(campaign, root=root))
+        if findings:
+            reason_codes.append("checkpoint-validation-failed")
+
+    if not findings:
+        lifecycle = campaign["campaign"]["lifecycle"]
+        approval = campaign["campaign"]["plan_approval"]["status"]
+        baseline = campaign["model_baseline"]["status"]
+        if active is not None:
+            action = "resume-slice"
+            work_item = active["id"]
+            reason_codes.append(
+                "active-slice-has-working-state"
+                if worktree["status"] == "dirty"
+                else "active-slice-interrupted"
+            )
+        elif worktree["status"] == "dirty":
+            action = "stop-dirty"
+            reason_codes.append("dirty-state-has-no-active-slice")
+        elif lifecycle == "complete":
+            action = "complete"
+            work_item = "closure"
+            reason_codes.append("campaign-complete")
+        elif (
+            approval != "accepted"
+            or baseline != "current"
+            or lifecycle
+            in {
+                "awaiting-plan-approval",
+                "blocked",
+                "stale",
+            }
+        ):
+            action = "await-human"
+            if approval != "accepted":
+                reason_codes.append("approval-required")
+            if baseline != "current":
+                reason_codes.append("baseline-not-current")
+            if lifecycle in {"blocked", "stale"}:
+                reason_codes.append("campaign-blocked")
+        elif ready is not None:
+            action = "launch-slice"
+            work_item = ready["id"]
+            reason_codes.append("dependency-ready-slice")
+        elif all_slices_complete:
+            action = "launch-closure"
+            work_item = "closure"
+            reason_codes.append("all-slices-complete")
+        else:
+            findings.append(
+                "campaign has no active, ready, blocked, complete, or closure-ready work"
+            )
+            reason_codes.append("no-dispatchable-state")
+
+    token = _state_token(campaign, root=root, worktree=worktree)
+    if action in {"launch-slice", "resume-slice", "launch-closure"} and identical_failures >= 3:
+        action = "await-human"
+        reason_codes.append("identical-failure-limit-reached")
+
+    return {
+        "schema_version": 1,
+        "campaign_id": campaign["campaign"]["id"],
+        "git": {
+            "branch": _git(root, "branch", "--show-current") or None,
+            "head": _git(root, "rev-parse", "HEAD"),
+        },
+        "worktree": worktree,
+        "checkpoint": campaign["campaign"]["checkpoint"],
+        "state_token": token,
+        "action": action,
+        "work_item": work_item,
+        "reason_codes": reason_codes,
+        "errors": findings,
+    }
+
+
+def review_frame(campaign: dict[str, Any], *, slice_id: str, lens: str) -> str:
+    """Build a project-bound, finding-free prompt for one read-only review lens."""
+    if lens not in REVIEW_LENSES:
+        raise ValueError(f"unknown review lens: {lens}")
+    try:
+        selected = next(entry for entry in campaign["slices"] if entry["id"] == slice_id)
+    except StopIteration as error:
+        raise ValueError(f"unknown campaign slice: {slice_id}") from error
+    if selected["lifecycle"] != "active":
+        raise ValueError(f"review frame requires an active slice: {slice_id}")
+
+    authority_by_id = {entry["id"]: entry for entry in campaign["authority"]}
+    authority_lines: list[str] = []
+    for contribution in selected["authority"]:
+        authority = authority_by_id[contribution["authority_id"]]
+        remainder = ", ".join(contribution["remaining_slice_ids"]) or "none"
+        authority_lines.append(
+            f"- {authority['id']} {authority['label']}: {contribution['coverage']}; "
+            f"remaining slices: {remainder}"
+        )
+        authority_lines.extend(
+            f"  - {reference['model_ref']} ({reference['source']})"
+            for reference in authority["refs"]
+        )
+
+    decision_lines = [
+        f"- {decision['id']}: {decision['summary']}"
+        for decision in selected["realization_decisions"]
+    ] or ["- none"]
+    evidence_lines = [f"- {reference}" for reference in selected["evidence_refs"]] or ["- none"]
+    verification_lines = [f"- {reference}" for reference in selected["verification_refs"]] or [
+        "- none"
+    ]
+    dependency_lines = [f"- {dependency}" for dependency in selected["dependencies"]] or ["- none"]
+
+    lens_task = {
+        "authority": (
+            "Trace qualified model meaning, slice scope, dependencies, full/partial coverage, "
+            "promised outcomes and non-effects, and whether any genuine model or plan gap remains."
+        ),
+        "engineering": (
+            "Inspect implementation correctness, declared input and failure boundaries, evidence "
+            "discrimination, applicable numerical/temporal/recovery behavior, and unnecessary "
+            "realization machinery."
+        ),
+    }[lens]
+    return "\n".join(
+        [
+            f"# Read-only {lens} review for {slice_id}",
+            "",
+            "Work independently from the current workspace. Read and obey AGENTS.md and the named",
+            "model sources. Do not mutate files, inspect protected user data, or assume",
+            "conversation history. Treat local repository and checkpoint machinery as trusted",
+            "unless the slice intentionally changes it.",
+            "",
+            f"Slice: {selected['label']} ({selected['kind']})",
+            f"Model baseline status: {campaign['model_baseline']['status']}",
+            f"Campaign checkpoint: {campaign['campaign']['checkpoint'] or 'none'}",
+            "",
+            "## Lens",
+            "",
+            lens_task,
+            "",
+            "## Dependencies",
+            "",
+            *dependency_lines,
+            "",
+            "## Qualified authority and coverage",
+            "",
+            *authority_lines,
+            "",
+            "## Verification references",
+            "",
+            *verification_lines,
+            "",
+            "## Selected realization decisions",
+            "",
+            *decision_lines,
+            "",
+            "## Current campaign evidence",
+            "",
+            *evidence_lines,
+            "",
+            "## Materiality and response",
+            "",
+            "Report a material finding only when it names a plausible consequence within the",
+            "qualified authority, selected boundaries, declared project assumptions, or ordinary",
+            "malformed-input and recovery behavior. Do not invent novel mutants, fuzz spaces,",
+            "attack models, or speculative inputs merely to find something new.",
+            "Style preferences, alternate truthful wording, duplicated evidence, and unselected",
+            "hardening are optional observations and do not make the review non-clean.",
+            "",
+            "Return complete material findings first. Give each consequence and reproducible",
+            "evidence, then optional observations. Say explicitly when no material findings exist.",
+        ]
+    )
+
+
+def worker_result_findings(result: Any) -> list[str]:
+    schema = _schema(WORKER_RESULT_SCHEMA_PATH)
+    findings = [
+        f"{_json_path(error.absolute_path)}: {error.message}"
+        for error in sorted(
+            Draft202012Validator(schema).iter_errors(result),
+            key=lambda error: (list(error.absolute_path), error.message),
+        )
+    ]
+    if isinstance(result, dict):
+        review_pairs = result.get("review_pairs")
+        material_findings = result.get("material_findings")
+        if isinstance(review_pairs, int) and isinstance(material_findings, list):
+            pairs: list[int] = []
+            for item in material_findings:
+                if not isinstance(item, dict):
+                    continue
+                pair = item.get("pair")
+                if isinstance(pair, int):
+                    pairs.append(pair)
+            if pairs and max(pairs) > review_pairs:
+                findings.append("material_findings names a pair beyond review_pairs")
+            if len(material_findings) != review_pairs:
+                findings.append("material_findings must report counts for every review pair")
+            if pairs and sorted(pairs) != list(range(1, review_pairs + 1)):
+                findings.append("material_findings pair numbers must be unique and contiguous")
+    return findings
+
+
+def _unreadable_dispatch_packet(error: Exception, *, root: Path = ROOT) -> dict[str, Any]:
+    worktree = _worktree_condition(root)
+    head = _git(root, "rev-parse", "HEAD")
+    branch = _git(root, "branch", "--show-current") or None
+    identity = json.dumps(
+        {"head": head, "branch": branch, "worktree": worktree},
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    return {
+        "schema_version": 1,
+        "campaign_id": None,
+        "git": {"branch": branch, "head": head},
+        "worktree": worktree,
+        "checkpoint": None,
+        "state_token": hashlib.sha256(identity).hexdigest(),
+        "action": "stop-invalid",
+        "work_item": None,
+        "reason_codes": ["campaign-unreadable"],
+        "errors": [str(error)],
+    }
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Validate and inspect the implementation campaign")
-    parser.add_argument("command", choices=("check", "status", "baseline", "checkpoint-check"))
+    parser.add_argument(
+        "command",
+        choices=(
+            "check",
+            "status",
+            "baseline",
+            "checkpoint-check",
+            "dispatch",
+            "review-frame",
+            "worker-result-check",
+        ),
+    )
     parser.add_argument(
         "--campaign",
         type=Path,
         default=IMPLEMENTATION_CAMPAIGN_PATH,
         help="campaign YAML path",
     )
+    parser.add_argument("--slice", help="slice ID for review-frame")
+    parser.add_argument("--lens", choices=REVIEW_LENSES, help="review-frame lens")
+    parser.add_argument("--result", type=Path, help="worker result JSON path")
+    parser.add_argument(
+        "--expect-state-token",
+        help="reject a dispatch if durable state no longer matches this token",
+    )
+    parser.add_argument(
+        "--identical-failures",
+        type=int,
+        default=0,
+        help="consecutive launcher failures against the current state token",
+    )
     arguments = parser.parse_args()
 
     if arguments.command == "baseline":
         print(yaml.safe_dump(observed_baseline(), sort_keys=True).strip())
+        return 0
+
+    if arguments.command == "worker-result-check":
+        if arguments.result is None:
+            parser.error("worker-result-check requires --result")
+        try:
+            result = json.loads(arguments.result.read_text(encoding="utf-8"))
+            result_findings = worker_result_findings(result)
+        except (OSError, ValueError, json.JSONDecodeError) as error:
+            print(f"ERROR {error}")
+            return 1
+        if result_findings:
+            for finding in result_findings:
+                print(f"ERROR {finding}")
+            return 1
+        print("Implementation campaign worker result is valid.")
         return 0
 
     try:
@@ -1102,14 +1451,39 @@ def main() -> int:
         if not findings and arguments.command == "checkpoint-check":
             findings.extend(checkpoint_binding_findings(campaign))
     except (OSError, RuntimeError, ValueError, json.JSONDecodeError, yaml.YAMLError) as error:
+        if arguments.command == "dispatch":
+            print(json.dumps(_unreadable_dispatch_packet(error), indent=2, sort_keys=True))
+            return 1
         print(f"ERROR {error}")
         return 1
+
+    if arguments.command == "dispatch":
+        packet = dispatch_packet(
+            campaign,
+            validation_findings=findings,
+            identical_failures=arguments.identical_failures,
+        )
+        expected = arguments.expect_state_token
+        if expected is not None and expected != packet["state_token"]:
+            packet["action"] = "stop-invalid"
+            packet["reason_codes"].append("stale-dispatch-token")
+            packet["errors"].append("durable state changed after dispatch")
+        print(json.dumps(packet, indent=2, sort_keys=True))
+        return 1 if packet["action"] == "stop-invalid" else 0
 
     if findings:
         for finding in findings:
             print(f"ERROR {finding}")
         return 1
-    if arguments.command == "status":
+    if arguments.command == "review-frame":
+        if arguments.slice is None or arguments.lens is None:
+            parser.error("review-frame requires --slice and --lens")
+        try:
+            print(review_frame(campaign, slice_id=arguments.slice, lens=arguments.lens))
+        except ValueError as error:
+            print(f"ERROR {error}")
+            return 1
+    elif arguments.command == "status":
         print(_status(campaign))
     elif arguments.command == "checkpoint-check":
         print("Implementation campaign checkpoints resolve to committed project state.")

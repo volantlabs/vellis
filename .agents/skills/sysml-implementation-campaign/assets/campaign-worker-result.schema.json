@@ -1,0 +1,81 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/sysml-implementation-campaign-worker-result.schema.json",
+  "title": "Implementation campaign worker result",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "campaign_id",
+    "work_item",
+    "outcome",
+    "checkpoint",
+    "checks",
+    "review_pairs",
+    "material_findings",
+    "elapsed_seconds",
+    "reason"
+  ],
+  "properties": {
+    "schema_version": {"const": 1},
+    "campaign_id": {"type": "string", "minLength": 1},
+    "work_item": {"type": "string", "pattern": "^(S[0-9]{3}|closure)$"},
+    "outcome": {"enum": ["checkpointed", "paused", "failed"]},
+    "checkpoint": {"type": ["string", "null"], "minLength": 1},
+    "checks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "outcome"],
+        "properties": {
+          "name": {"type": "string", "minLength": 1},
+          "outcome": {"enum": ["passed", "failed", "not-run"]}
+        }
+      }
+    },
+    "review_pairs": {"type": "integer", "minimum": 0},
+    "material_findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["pair", "authority", "engineering"],
+        "properties": {
+          "pair": {"type": "integer", "minimum": 1},
+          "authority": {"type": "integer", "minimum": 0},
+          "engineering": {"type": "integer", "minimum": 0}
+        }
+      }
+    },
+    "elapsed_seconds": {"type": "number", "minimum": 0},
+    "usage": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "input_tokens": {"type": "integer", "minimum": 0},
+        "output_tokens": {"type": "integer", "minimum": 0},
+        "cache_read_tokens": {"type": "integer", "minimum": 0},
+        "cache_write_tokens": {"type": "integer", "minimum": 0},
+        "cost_usd": {"type": "number", "minimum": 0}
+      }
+    },
+    "reason": {"type": ["string", "null"], "minLength": 1}
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"outcome": {"const": "checkpointed"}}},
+      "then": {
+        "properties": {
+          "checkpoint": {"type": "string", "minLength": 1},
+          "checks": {"minItems": 1},
+          "review_pairs": {"minimum": 2},
+          "reason": {"type": "null"}
+        }
+      },
+      "else": {
+        "properties": {"reason": {"type": "string", "minLength": 1}}
+      }
+    }
+  ]
+}

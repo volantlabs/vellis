@@ -20,6 +20,8 @@ prior diagnosis.
   layers.
 - Confirm every slice is implementable and independently reviewable after its dependencies complete.
 - Confirm each slice has discriminating evidence and an observable boundary.
+- Confirm each slice exposes consequential assumptions, input and failure boundaries, state and
+  recovery obligations, and review risks without demanding irrelevant quality concerns.
 - Confirm integration and closure slices exist only where assembled behavior has additional modeled
   obligations.
 - Confirm the order retires consequential uncertainty before irreversible realization.

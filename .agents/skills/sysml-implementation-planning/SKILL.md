@@ -40,7 +40,9 @@ authority before existing source structure.
    boundaries.
 5. Cut the graph into the smallest end-to-end `semantic`, `integration`, and `closure` slices that
    produce discriminating evidence. Toolchain or realization setup belongs inside the first slice
-   that needs it; do not create an architecture-only slice.
+   that needs it; do not create an architecture-only slice. For each slice, expose the consequential
+   input and failure boundary, state or recovery obligations, declared assumptions, and review risks
+   that evidence must discriminate so execution does not discover its contract incrementally.
 6. Order dependency-ready slices by modeled prerequisites, then by risk retirement and reversible
    learning. Record an explicit order so a campaign manager does not improvise priority later.
 7. Map every implementation-bearing authority reference to one or more slices. A slice may cover an

@@ -49,17 +49,14 @@ For a complete-system build, `$sysml-implementation-planning` reads the complete
 derives dependency-ordered, evidence-bearing semantic slices. The committed campaign record stays
 awaiting human approval until that complete plan is accepted; this repository's plan has been
 accepted and is executing. A continuation harness may then invoke
-`$sysml-implementation-campaign`, which selects one ready slice, uses `$sysml-implementation`, runs
-both independent review lenses, batches remediation, runs one final review pair, checkpoints the
-slice with the ledger update,
-and repeats through whole-system runnable closure. The complete campaign receives one human
+`$sysml-implementation-campaign` through a thin manager. The manager reads one machine disposition,
+launches a fresh worker for exactly that slice, waits, and independently validates its checkpoint.
+The worker uses `$sysml-implementation`, runs both bounded review lenses, batches remediation, runs
+one final review pair, returns a compact result without reviewer transcripts, and stops. The manager
+then repeats through whole-system runnable closure. The complete campaign receives one human
 approval; reviewed routine slice checkpoints continue autonomously unless a model, plan, baseline,
-feasibility, or external-authority boundary requires renewed human direction.
-
-For Codex, launch that approved campaign as a [long-running goal](https://learn.chatgpt.com/use-cases/follow-goals)
-whose objective is campaign completion and whose stopping conditions are the campaign skill's human
-authority boundaries. An equivalent continuation harness may be used elsewhere; the committed
-campaign record, rather than one agent conversation, remains the resume authority.
+feasibility, or external-authority boundary requires renewed human direction. The committed campaign
+record, rather than any manager conversation, remains the resume authority.
 
 When an accepted semantic slice is ready for code, model work emits a compact handoff of qualified
 authority, in-scope obligations, authority coverage, remaining obligations, decisive examples,
@@ -92,6 +89,12 @@ Useful commands:
   references, dependency graph, approval, evidence, and closure invariants.
 - `just implementation-campaign-status`: show campaign freshness, approval, active or next slice,
   blockers, and closure status.
+- `just implementation-campaign-dispatch`: emit the manager's machine-readable action, selected work
+  item, checkpoint, worktree condition, Git identity, reason codes, and state token without mutation.
+- `just implementation-campaign-review-frame <slice> <lens>`: generate one fixed, finding-free prompt
+  for the active slice's `authority` or `engineering` review lens.
+- `just implementation-campaign-worker-result-check <path>`: validate a compact worker handoff that
+  contains counts and checkpoint state rather than review transcripts.
 - `just implementation-campaign-baseline`: print the currently observed model, language, and
   validator digests without changing files.
 - `just implementation-campaign-checkpoint-check`: after a checkpoint commit, verify clean tracked

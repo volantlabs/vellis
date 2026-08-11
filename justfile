@@ -38,6 +38,18 @@ implementation-campaign-check:
 implementation-campaign-status:
     @uv run python tools/implementation_campaign.py status
 
+# Emit one machine-readable manager disposition without changing campaign state.
+implementation-campaign-dispatch identical_failures="0" expected_state_token="":
+    @expected={{quote(expected_state_token)}}; if test -n "$expected"; then uv run python tools/implementation_campaign.py dispatch --identical-failures {{quote(identical_failures)}} --expect-state-token "$expected"; else uv run python tools/implementation_campaign.py dispatch --identical-failures {{quote(identical_failures)}}; fi
+
+# Generate one finding-free, project-bound review prompt for an active slice.
+implementation-campaign-review-frame slice lens:
+    @uv run python tools/implementation_campaign.py review-frame --slice {{quote(slice)}} --lens {{quote(lens)}}
+
+# Validate a compact campaign worker result before a manager consumes it.
+implementation-campaign-worker-result-check result:
+    @uv run python tools/implementation_campaign.py worker-result-check --result {{quote(result)}}
+
 # Print current model, language, and validator baseline digests without changing the campaign.
 implementation-campaign-baseline:
     @uv run python tools/implementation_campaign.py baseline

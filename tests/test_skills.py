@@ -53,6 +53,21 @@ def test_implementation_skill_routing_distinguishes_plan_slice_and_campaign() ->
     assert "long-running autonomous implementation" in campaign.split("---", 2)[1]
 
 
+def test_campaign_skill_separates_thin_manager_from_one_item_workers() -> None:
+    skill_root = model_layout.ROOT / ".agents" / "skills" / "sysml-implementation-campaign"
+    campaign = (skill_root / "SKILL.md").read_text(encoding="utf-8")
+    supervision = (skill_root / "references" / "campaign-supervision.md").read_text(
+        encoding="utf-8"
+    )
+    execution = (skill_root / "references" / "execution-and-resume.md").read_text(encoding="utf-8")
+
+    assert "manager context thin" in campaign
+    assert "does not implement" in supervision
+    assert "exactly one selected slice or closure contract" in supervision
+    assert "without selecting or\n  activating the next slice" in execution
+    assert "three consecutive\nnon-clean final pairs" in execution
+
+
 def test_new_portable_skills_do_not_embed_project_bindings() -> None:
     skill_root = model_layout.ROOT / ".agents" / "skills"
     forbidden = (

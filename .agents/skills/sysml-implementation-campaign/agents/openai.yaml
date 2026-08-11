@@ -1,6 +1,6 @@
 interface:
   display_name: "SysML Implementation Campaign"
-  short_description: "Run resumable model-first build campaigns"
-  default_prompt: "Use $sysml-implementation-campaign to execute and resume the approved model-derived campaign."
+  short_description: "Supervise resumable model-first build campaigns"
+  default_prompt: "Use $sysml-implementation-campaign to supervise the approved model-derived campaign with fresh one-work-item workers."
 policy:
   allow_implicit_invocation: true
