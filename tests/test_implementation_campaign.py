@@ -46,11 +46,17 @@ def _pending_campaign() -> dict[str, object]:
         entry["lifecycle"] = "pending"
         entry["implementation_status"] = "absent"
         entry["evidence_refs"] = []
+        for decision in entry["realization_decisions"]:
+            decision["implementation_status"] = "absent"
+            decision["evidence_refs"] = []
         entry["blocker"] = None
         entry["checkpoint"] = None
     closure = campaign["closure"]
     closure["integration_status"] = "absent"  # type: ignore[index]
     closure["runnable_status"] = "absent"  # type: ignore[index]
+    for decision in closure["realization_decisions"]:  # type: ignore[index]
+        decision["implementation_status"] = "absent"
+        decision["evidence_refs"] = []
     closure["evidence_refs"] = []  # type: ignore[index]
     closure["checkpoint"] = None  # type: ignore[index]
     return campaign
@@ -73,6 +79,9 @@ def _replanned_slices(campaign: dict[str, object]) -> dict[str, object]:
         entry["lifecycle"] = "complete"
         entry["implementation_status"] = "conforming"
         entry["evidence_refs"] = ["command:just check"]
+        for decision in entry["realization_decisions"]:
+            decision["implementation_status"] = "conforming"
+            decision["evidence_refs"] = ["command:just check"]
         entry["checkpoint"] = f"slice:S00{index + 1}:{SUPERSEDED_PLAN_SHORT_SHA}:1"
     return campaign
 
@@ -103,6 +112,19 @@ def _write_campaign(root: Path, campaign: dict[str, object]) -> None:
     (root / "implementation-campaign.yaml").write_text(
         yaml.safe_dump(campaign, sort_keys=False), encoding="utf-8"
     )
+
+
+def _conform_owned_decisions(entry: dict[str, object], evidence: str) -> None:
+    """Close every decision owned by a test fixture work item with attributable evidence."""
+    evidence_refs = entry["evidence_refs"]
+    assert isinstance(evidence_refs, list)
+    if evidence not in evidence_refs:
+        evidence_refs.append(evidence)
+    decisions = entry["realization_decisions"]
+    assert isinstance(decisions, list)
+    for decision in decisions:
+        decision["implementation_status"] = "conforming"
+        decision["evidence_refs"] = [evidence]
 
 
 def _approval_repository(tmp_path: Path) -> tuple[dict[str, object], str]:
@@ -184,6 +206,9 @@ def _complete_fourth_slice(campaign: dict[str, object], *, checkpoint: str) -> N
     fourth["lifecycle"] = "complete"
     fourth["implementation_status"] = "conforming"
     fourth["evidence_refs"] = ["command:just check"]
+    for decision in fourth["realization_decisions"]:
+        decision["implementation_status"] = "conforming"
+        decision["evidence_refs"] = ["command:just check"]
     fourth["checkpoint"] = checkpoint
     campaign["slices"][4]["lifecycle"] = "ready"  # type: ignore[index]
     _reconcile_settled_authority(campaign)
@@ -201,6 +226,9 @@ def _finished_campaign() -> dict[str, object]:
         entry["lifecycle"] = "complete"
         entry["implementation_status"] = "conforming"
         entry["evidence_refs"] = ["command:just check"]
+        for decision in entry["realization_decisions"]:
+            decision["implementation_status"] = "conforming"
+            decision["evidence_refs"] = ["command:just check"]
         entry["checkpoint"] = f"slice:{entry['id']}:{PLAN_SHA[:12]}:1"
     _reconcile_settled_authority(campaign)
     campaign["campaign"]["lifecycle"] = "ready"  # type: ignore[index]
@@ -665,6 +693,92 @@ def test_realization_decision_ids_are_campaign_unique() -> None:
     assert any("duplicate realization decision id" in finding for finding in findings)
 
 
+def test_completed_slice_cannot_hide_an_open_selected_decision() -> None:
+    campaign = _finished_campaign()
+    decision = campaign["slices"][0]["realization_decisions"][0]  # type: ignore[index]
+    decision["implementation_status"] = "absent"
+    decision["evidence_refs"] = []
+
+    findings = implementation_campaign.validate_campaign(campaign)
+
+    assert any("complete slice S001 decision D002 must be conforming" in f for f in findings)
+    assert any("complete slice S001 decision D002 requires evidence" in f for f in findings)
+
+
+def test_decision_evidence_must_be_attributable_to_its_owner() -> None:
+    campaign = _pending_campaign()
+    decision = campaign["slices"][0]["realization_decisions"][0]  # type: ignore[index]
+    decision["implementation_status"] = "conforming"
+    decision["evidence_refs"] = ["command:just check"]
+
+    findings = implementation_campaign.validate_campaign(campaign)
+
+    assert any("decision D002 evidence must also be slice evidence" in f for f in findings)
+
+
+def test_decision_authority_must_resolve_and_belong_to_the_owning_slice() -> None:
+    campaign = _pending_campaign()
+    decision = campaign["slices"][0]["realization_decisions"][0]  # type: ignore[index]
+    decision["authority_ids"] = ["A999"]
+
+    findings = implementation_campaign.validate_campaign(campaign)
+
+    assert any("decision has unknown authority A999" in f for f in findings)
+
+    decision["authority_ids"] = ["A013"]
+    findings = implementation_campaign.validate_campaign(campaign)
+    assert any("names authority A013 outside the slice contribution" in f for f in findings)
+
+
+def test_closure_decision_evidence_must_be_closure_attributable() -> None:
+    campaign = _pending_campaign()
+    decision = campaign["closure"]["realization_decisions"][0]  # type: ignore[index]
+    decision["implementation_status"] = "conforming"
+    decision["evidence_refs"] = ["command:just check"]
+
+    findings = implementation_campaign.validate_campaign(campaign)
+
+    assert any(
+        "closure decision D003 evidence must also be closure evidence" in f for f in findings
+    )
+
+
+def test_closure_decision_ids_share_the_campaign_namespace() -> None:
+    campaign = _pending_campaign()
+    campaign["closure"]["realization_decisions"][0]["id"] = "D002"  # type: ignore[index]
+
+    findings = implementation_campaign.validate_campaign(campaign)
+
+    assert any("duplicate realization decision id: D002" in f for f in findings)
+
+
+def test_plan_projection_freezes_decision_owner_but_not_execution_state() -> None:
+    campaign = _pending_campaign()
+    progressed = copy.deepcopy(campaign)
+    decision = progressed["slices"][0]["realization_decisions"][0]  # type: ignore[index]
+    decision["implementation_status"] = "conforming"
+    decision["evidence_refs"] = ["command:just check"]
+
+    assert implementation_campaign._plan_projection(progressed) == (
+        implementation_campaign._plan_projection(campaign)
+    )
+
+    moved = copy.deepcopy(campaign)
+    decision = moved["slices"][0]["realization_decisions"].pop()  # type: ignore[index]
+    moved["closure"]["realization_decisions"].append(decision)  # type: ignore[index]
+    assert implementation_campaign._plan_projection(moved) != (
+        implementation_campaign._plan_projection(campaign)
+    )
+
+    changed_intent = copy.deepcopy(campaign)
+    changed_intent["slices"][0]["realization_decisions"][0]["evidence_intent"] = [  # type: ignore[index]
+        "Exclude a different wrong realization."
+    ]
+    assert implementation_campaign._plan_projection(changed_intent) != (
+        implementation_campaign._plan_projection(campaign)
+    )
+
+
 def test_qualified_model_references_are_resolved_by_the_official_validator() -> None:
     campaign = _pending_campaign()
     campaign["authority"][0]["refs"][0]["model_ref"] = "RTG::'Definitely Missing'"  # type: ignore[index]
@@ -763,6 +877,7 @@ def test_blocked_campaign_retains_its_latest_completed_slice_checkpoint() -> Non
     first["lifecycle"] = "complete"
     first["implementation_status"] = "conforming"
     first["evidence_refs"] = ["path:README.md#development-setup"]
+    _conform_owned_decisions(first, "path:README.md#development-setup")
     first["checkpoint"] = first_checkpoint
     campaign["campaign"]["lifecycle"] = "blocked"  # type: ignore[index]
     campaign["campaign"]["plan_approval"] = {  # type: ignore[index]
@@ -859,6 +974,7 @@ def test_active_campaign_uses_latest_completed_slice_checkpoint() -> None:
     first["lifecycle"] = "complete"
     first["implementation_status"] = "conforming"
     first["evidence_refs"] = ["path:README.md#development-setup"]
+    _conform_owned_decisions(first, "path:README.md#development-setup")
     first["checkpoint"] = f"slice:S001:{PLAN_SHA[:12]}:1"
     campaign["slices"][1]["lifecycle"] = "active"  # type: ignore[index]
 
@@ -1025,6 +1141,7 @@ def test_active_campaign_cannot_skip_a_lower_dependency_ready_slice() -> None:
     first["lifecycle"] = "complete"
     first["implementation_status"] = "conforming"
     first["evidence_refs"] = ["path:README.md#development-setup"]
+    _conform_owned_decisions(first, "path:README.md#development-setup")
     first["checkpoint"] = f"slice:S001:{PLAN_SHA[:12]}:1"
     campaign["campaign"]["checkpoint"] = first["checkpoint"]  # type: ignore[index]
     campaign["slices"][2]["lifecycle"] = "active"  # type: ignore[index]
@@ -1161,10 +1278,14 @@ def test_status_is_compact_and_deterministic() -> None:
         "Lifecycle: awaiting-plan-approval",
         "Baseline: current",
         "Plan approval: pending",
-        "Slices: pending=17",
+        "Slices: pending=18",
         "Active: none",
         "Next: none",
         "Blocker: none",
+        (
+            "Open decisions: D002@S001, D001@S009, D007@S009, D004@S018, "
+            "D005@S018, D003@closure, D006@closure"
+        ),
         "Closure: authority=full, integration=absent, runnable=absent",
         "Checkpoint: none",
     ]
@@ -1232,6 +1353,7 @@ def test_slice_checkpoint_uses_ordinary_commit_without_special_trailers(tmp_path
     first["lifecycle"] = "complete"
     first["implementation_status"] = "conforming"
     first["evidence_refs"] = ["path:evidence.md#case"]
+    _conform_owned_decisions(first, "path:evidence.md#case")
     first["checkpoint"] = checkpoint
     campaign["campaign"]["checkpoint"] = checkpoint  # type: ignore[index]
     campaign["slices"][1]["lifecycle"] = "ready"  # type: ignore[index]
@@ -1252,6 +1374,7 @@ def test_current_checkpoint_requires_committed_evidence(tmp_path: Path) -> None:
     first["lifecycle"] = "complete"
     first["implementation_status"] = "conforming"
     first["evidence_refs"] = ["path:evidence.md#case"]
+    _conform_owned_decisions(first, "path:evidence.md#case")
     first["checkpoint"] = checkpoint
     campaign["campaign"]["checkpoint"] = checkpoint  # type: ignore[index]
     campaign["slices"][1]["lifecycle"] = "ready"  # type: ignore[index]
@@ -1272,6 +1395,7 @@ def test_closure_checkpoint_binds_complete_current_state(tmp_path: Path) -> None
         entry["lifecycle"] = "complete"
         entry["implementation_status"] = "conforming"
         entry["evidence_refs"] = ["path:evidence.md#case"]
+        _conform_owned_decisions(entry, "path:evidence.md#case")
         entry["checkpoint"] = f"slice:{entry['id']}:{plan_sha[:12]}:1"
     for authority in campaign["authority"]:  # type: ignore[index]
         authority["implementation_status"] = "conforming"
@@ -1282,6 +1406,7 @@ def test_closure_checkpoint_binds_complete_current_state(tmp_path: Path) -> None
     campaign["closure"]["integration_status"] = "conforming"  # type: ignore[index]
     campaign["closure"]["runnable_status"] = "conforming"  # type: ignore[index]
     campaign["closure"]["evidence_refs"] = ["path:evidence.md#case"]  # type: ignore[index]
+    _conform_owned_decisions(campaign["closure"], "path:evidence.md#case")  # type: ignore[arg-type]
     campaign["closure"]["checkpoint"] = checkpoint  # type: ignore[index]
     _write_campaign(tmp_path, campaign)
     _git(tmp_path, "add", "implementation-campaign.yaml", "evidence.md")
@@ -1423,6 +1548,41 @@ def test_dispatch_distinguishes_closure_from_completed_campaign(
     assert packet["work_item"] == "closure"
 
 
+def test_dispatch_cannot_launch_closure_past_an_open_slice_decision(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    campaign, _ = _approval_repository(tmp_path)
+    for entry in campaign["slices"]:  # type: ignore[index]
+        entry["lifecycle"] = "complete"
+        entry["implementation_status"] = "conforming"
+        entry["evidence_refs"] = ["command:just check"]
+        _conform_owned_decisions(entry, "command:just check")
+    decision = campaign["slices"][0]["realization_decisions"][0]  # type: ignore[index]
+    decision["implementation_status"] = "partial"
+    decision["evidence_refs"] = []
+    findings = implementation_campaign.validate_campaign(campaign)
+    monkeypatch.setattr(
+        implementation_campaign, "checkpoint_binding_findings", lambda *_a, **_k: []
+    )
+
+    packet = implementation_campaign.dispatch_packet(
+        campaign, root=tmp_path, validation_findings=findings
+    )
+
+    assert packet["action"] == "stop-invalid"
+    assert "validation-failed" in packet["reason_codes"]
+
+
+def test_complete_campaign_requires_closure_owned_decisions() -> None:
+    campaign = _finished_campaign()
+    campaign["campaign"]["lifecycle"] = "complete"  # type: ignore[index]
+
+    findings = implementation_campaign.validate_campaign(campaign)
+
+    assert any("requires closure decision D006 conforming" in f for f in findings)
+    assert any("requires closure decision D006 evidence" in f for f in findings)
+
+
 def test_review_frames_are_lens_specific_and_contain_no_review_history() -> None:
     campaign = _pending_campaign()
     _approve(campaign)
@@ -1440,6 +1600,25 @@ def test_review_frames_are_lens_specific_and_contain_no_review_history() -> None
     assert "previous reviewer" not in authority.lower()
     assert "expected conclusion" not in engineering.lower()
     assert "invent novel mutants" in authority
+    assert "Decisions this slice must close" in authority
+    assert "D002 (absent)" in authority
+
+
+def test_slice_review_frame_separates_owned_and_inherited_decisions() -> None:
+    campaign = _pending_campaign()
+    campaign["slices"][-1]["lifecycle"] = "active"  # type: ignore[index]
+
+    frame = implementation_campaign.review_frame(campaign, slice_id="S018", lens="engineering")
+
+    assert "Decisions this slice must close" in frame
+    assert "D004 (absent)" in frame and "D005 (absent)" in frame
+    assert "Inherited decisions this slice must preserve" in frame
+    assert "D002 (absent from S001)" in frame
+    assert "D001 (absent from S009)" in frame
+    assert "Decision-attributable evidence" in frame
+    assert "Planned decision evidence intent" in frame
+    assert "Closure decisions still awaiting execution" in frame
+    assert "D006 (absent)" in frame
 
 
 def test_the_closure_work_item_gets_a_frame_of_its_own() -> None:

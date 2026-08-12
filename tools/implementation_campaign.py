@@ -272,6 +272,14 @@ def _all_evidence_references(campaign: dict[str, Any]) -> list[tuple[str, str]]:
             (f"slice.{entry['id']}.evidence_refs[{index}]", reference)
             for index, reference in enumerate(entry["evidence_refs"])
         )
+        for decision in entry["realization_decisions"]:
+            references.extend(
+                (
+                    f"slice.{entry['id']}.decision.{decision['id']}.evidence_refs[{index}]",
+                    reference,
+                )
+                for index, reference in enumerate(decision["evidence_refs"])
+            )
         if entry["blocker"] is not None:
             references.extend(
                 (f"slice.{entry['id']}.blocker.evidence_refs[{index}]", reference)
@@ -281,6 +289,11 @@ def _all_evidence_references(campaign: dict[str, Any]) -> list[tuple[str, str]]:
         (f"closure.evidence_refs[{index}]", reference)
         for index, reference in enumerate(campaign["closure"]["evidence_refs"])
     )
+    for decision in campaign["closure"]["realization_decisions"]:
+        references.extend(
+            (f"closure.decision.{decision['id']}.evidence_refs[{index}]", reference)
+            for index, reference in enumerate(decision["evidence_refs"])
+        )
     return references
 
 
@@ -532,9 +545,11 @@ def validate_campaign(
     for duplicate in _duplicates(orders):
         findings.append(f"duplicate slice order: {duplicate}")
     slices = {entry["id"]: entry for entry in slice_entries}
-    decision_ids = [
-        decision["id"] for entry in slice_entries for decision in entry["realization_decisions"]
-    ]
+    closure = campaign["closure"]
+    decisions = [
+        decision for entry in slice_entries for decision in entry["realization_decisions"]
+    ] + closure["realization_decisions"]
+    decision_ids = [decision["id"] for decision in decisions]
     for duplicate in _duplicates(decision_ids):
         findings.append(f"duplicate realization decision id: {duplicate}")
 
@@ -613,6 +628,33 @@ def validate_campaign(
                     findings.append(
                         f"slice {slice_id} decision has unknown authority {authority_id}"
                     )
+                elif authority_id not in contribution_ids:
+                    findings.append(
+                        f"slice {slice_id} decision {decision['id']} names authority "
+                        f"{authority_id} outside the slice contribution"
+                    )
+            if not set(decision["evidence_refs"]).issubset(entry["evidence_refs"]):
+                findings.append(
+                    f"slice {slice_id} decision {decision['id']} evidence must also be "
+                    "slice evidence"
+                )
+            if decision["implementation_status"] == "conforming" and not decision["evidence_refs"]:
+                findings.append(
+                    f"conforming slice {slice_id} decision {decision['id']} requires evidence"
+                )
+
+    for decision in closure["realization_decisions"]:
+        for authority_id in decision["authority_ids"]:
+            if authority_id not in authority_by_id:
+                findings.append(
+                    f"closure decision {decision['id']} has unknown authority {authority_id}"
+                )
+        if not set(decision["evidence_refs"]).issubset(closure["evidence_refs"]):
+            findings.append(
+                f"closure decision {decision['id']} evidence must also be closure evidence"
+            )
+        if decision["implementation_status"] == "conforming" and not decision["evidence_refs"]:
+            findings.append(f"conforming closure decision {decision['id']} requires evidence")
 
     findings.extend(_cycle_findings(slices))
 
@@ -790,6 +832,15 @@ def validate_campaign(
                 findings.append(f"complete slice {slice_id} requires a checkpoint")
             if entry["blocker"] is not None:
                 findings.append(f"complete slice {slice_id} may not have a blocker")
+            for decision in entry["realization_decisions"]:
+                if decision["implementation_status"] != "conforming":
+                    findings.append(
+                        f"complete slice {slice_id} decision {decision['id']} must be conforming"
+                    )
+                if not decision["evidence_refs"]:
+                    findings.append(
+                        f"complete slice {slice_id} decision {decision['id']} requires evidence"
+                    )
             skipped = [
                 candidate["id"]
                 for candidate in slice_entries
@@ -801,7 +852,6 @@ def validate_campaign(
                 )
 
     planned_full = all(entry["planned_coverage"] == "full" for entry in authorities)
-    closure = campaign["closure"]
     expected_closure_coverage = "full" if planned_full else "partial"
     if closure["authority_coverage"] != expected_closure_coverage:
         findings.append(
@@ -827,6 +877,15 @@ def validate_campaign(
             findings.append("a complete campaign requires conforming integration status")
         if closure["runnable_status"] != "conforming":
             findings.append("a complete campaign requires a conforming runnable boundary")
+        for decision in closure["realization_decisions"]:
+            if decision["implementation_status"] != "conforming":
+                findings.append(
+                    f"a complete campaign requires closure decision {decision['id']} conforming"
+                )
+            if not decision["evidence_refs"]:
+                findings.append(
+                    f"a complete campaign requires closure decision {decision['id']} evidence"
+                )
         if not closure["evidence_refs"]:
             findings.append("a complete campaign requires closure evidence")
         if closure["checkpoint"] is None:
@@ -878,21 +937,50 @@ def _plan_projection(campaign: dict[str, Any]) -> dict[str, Any]:
         ],
         "slices": [
             {
-                key: entry[key]
-                for key in (
-                    "id",
-                    "order",
-                    "label",
-                    "kind",
-                    "dependencies",
-                    "authority",
-                    "verification_refs",
-                    "realization_decisions",
-                )
+                **{
+                    key: entry[key]
+                    for key in (
+                        "id",
+                        "order",
+                        "label",
+                        "kind",
+                        "dependencies",
+                        "authority",
+                        "verification_refs",
+                    )
+                },
+                "realization_decisions": [
+                    {
+                        key: decision[key]
+                        for key in (
+                            "id",
+                            "summary",
+                            "authority_ids",
+                            "reversible",
+                            "evidence_intent",
+                        )
+                    }
+                    for decision in entry["realization_decisions"]
+                ],
             }
             for entry in campaign["slices"]
         ],
-        "closure": {"authority_coverage": campaign["closure"]["authority_coverage"]},
+        "closure": {
+            "authority_coverage": campaign["closure"]["authority_coverage"],
+            "realization_decisions": [
+                {
+                    key: decision[key]
+                    for key in (
+                        "id",
+                        "summary",
+                        "authority_ids",
+                        "reversible",
+                        "evidence_intent",
+                    )
+                }
+                for decision in campaign["closure"]["realization_decisions"]
+            ],
+        },
     }
 
 
@@ -1104,6 +1192,17 @@ def _status(campaign: dict[str, Any]) -> str:
         key=lambda entry: entry["order"],
     )
     blocker = campaign["campaign"]["blocker"]
+    open_decisions = [
+        f"{decision['id']}@{entry['id']}"
+        for entry in slice_entries
+        for decision in entry["realization_decisions"]
+        if decision["implementation_status"] != "conforming"
+    ]
+    open_decisions.extend(
+        f"{decision['id']}@closure"
+        for decision in campaign["closure"]["realization_decisions"]
+        if decision["implementation_status"] != "conforming"
+    )
     blocker_label = "none"
     if blocker is not None:
         blocker_label = blocker["classification"] + ": " + blocker["summary"]
@@ -1128,6 +1227,7 @@ def _status(campaign: dict[str, Any]) -> str:
         f"Active: {active['id'] + ' ' + active['label'] if active else 'none'}",
         f"Next: {ready[0]['id'] + ' ' + ready[0]['label'] if ready else 'none'}",
         f"Blocker: {blocker_label}",
+        "Open decisions: " + (", ".join(open_decisions) if open_decisions else "none"),
         (
             "Closure: authority="
             f"{campaign['closure']['authority_coverage']}, "
@@ -1318,10 +1418,24 @@ def _closure_review_frame(campaign: dict[str, Any], *, lens: str) -> str:
         if blocker is not None
         else ["- none"]
     )
-    decision_lines = [
-        f"- {decision['id']}: {decision['summary']}"
+    inherited_decision_lines = [
+        f"- {decision['id']} ({decision['implementation_status']}): {decision['summary']}"
         for entry in campaign["slices"]
         for decision in entry["realization_decisions"]
+    ] or ["- none"]
+    owned_decision_lines = [
+        f"- {decision['id']} ({decision['implementation_status']}): {decision['summary']}"
+        for decision in closure["realization_decisions"]
+    ] or ["- none"]
+    decision_evidence_lines = [
+        f"- {decision['id']}: {reference}"
+        for decision in closure["realization_decisions"]
+        for reference in decision["evidence_refs"]
+    ] or ["- none"]
+    decision_intent_lines = [
+        f"- {decision['id']}: {intent}"
+        for decision in closure["realization_decisions"]
+        for intent in decision["evidence_intent"]
     ] or ["- none"]
     lens_task = {
         "authority": (
@@ -1365,9 +1479,21 @@ def _closure_review_frame(campaign: dict[str, Any], *, lens: str) -> str:
             f"- runnable status: {closure['runnable_status']}",
             f"- closure checkpoint: {closure['checkpoint'] or 'none'}",
             "",
-            "## Selected realization decisions",
+            "## Decisions already closed by slices and preserved at closure",
             "",
-            *decision_lines,
+            *inherited_decision_lines,
+            "",
+            "## Decisions closure must close",
+            "",
+            *owned_decision_lines,
+            "",
+            "## Decision-attributable closure evidence",
+            "",
+            *decision_evidence_lines,
+            "",
+            "## Planned decision evidence intent",
+            "",
+            *decision_intent_lines,
             "",
             "## Recorded campaign blocker",
             "",
@@ -1387,7 +1513,9 @@ def _closure_review_frame(campaign: dict[str, Any], *, lens: str) -> str:
             "hardening are optional observations and do not make the review non-clean.",
             "",
             "Return complete material findings first. Give each consequence and reproducible",
-            "evidence, then optional observations. Say explicitly when no material findings exist.",
+            "evidence, then optional observations. Disposition every decision closure owns;",
+            "aggregate authority or nearby evidence does not substitute for decision evidence.",
+            "Say explicitly when no material findings exist.",
         ]
     )
 
@@ -1423,9 +1551,40 @@ def review_frame(campaign: dict[str, Any], *, slice_id: str, lens: str) -> str:
             for reference in authority["refs"]
         )
 
-    decision_lines = [
-        f"- {decision['id']}: {decision['summary']}"
+    owned_decision_lines = [
+        f"- {decision['id']} ({decision['implementation_status']}): {decision['summary']}"
         for decision in selected["realization_decisions"]
+    ] or ["- none"]
+    decision_evidence_lines = [
+        f"- {decision['id']}: {reference}"
+        for decision in selected["realization_decisions"]
+        for reference in decision["evidence_refs"]
+    ] or ["- none"]
+    decision_intent_lines = [
+        f"- {decision['id']}: {intent}"
+        for decision in selected["realization_decisions"]
+        for intent in decision["evidence_intent"]
+    ] or ["- none"]
+    slices = {entry["id"]: entry for entry in campaign["slices"]}
+    inherited_ids: set[str] = set()
+    frontier = list(selected["dependencies"])
+    while frontier:
+        dependency_id = frontier.pop()
+        if dependency_id in inherited_ids:
+            continue
+        inherited_ids.add(dependency_id)
+        frontier.extend(slices[dependency_id]["dependencies"])
+    inherited_decision_lines = [
+        f"- {decision['id']} ({decision['implementation_status']} from {entry['id']}): "
+        f"{decision['summary']}"
+        for entry in campaign["slices"]
+        if entry["id"] in inherited_ids
+        for decision in entry["realization_decisions"]
+    ] or ["- none"]
+    closure_decision_lines = [
+        f"- {decision['id']} ({decision['implementation_status']}): {decision['summary']}"
+        for decision in campaign["closure"]["realization_decisions"]
+        if decision["implementation_status"] != "conforming"
     ] or ["- none"]
     evidence_lines = [f"- {reference}" for reference in selected["evidence_refs"]] or ["- none"]
     verification_lines = [f"- {reference}" for reference in selected["verification_refs"]] or [
@@ -1473,9 +1632,25 @@ def review_frame(campaign: dict[str, Any], *, slice_id: str, lens: str) -> str:
             "",
             *verification_lines,
             "",
-            "## Selected realization decisions",
+            "## Decisions this slice must close",
             "",
-            *decision_lines,
+            *owned_decision_lines,
+            "",
+            "## Decision-attributable evidence",
+            "",
+            *decision_evidence_lines,
+            "",
+            "## Planned decision evidence intent",
+            "",
+            *decision_intent_lines,
+            "",
+            "## Inherited decisions this slice must preserve",
+            "",
+            *inherited_decision_lines,
+            "",
+            "## Closure decisions still awaiting execution",
+            "",
+            *closure_decision_lines,
             "",
             "## Current campaign evidence",
             "",
@@ -1491,7 +1666,9 @@ def review_frame(campaign: dict[str, Any], *, slice_id: str, lens: str) -> str:
             "hardening are optional observations and do not make the review non-clean.",
             "",
             "Return complete material findings first. Give each consequence and reproducible",
-            "evidence, then optional observations. Say explicitly when no material findings exist.",
+            "evidence, then optional observations. Disposition every decision this slice owns;",
+            "aggregate authority or nearby evidence does not substitute for decision evidence.",
+            "Say explicitly when no material findings exist.",
         ]
     )
 

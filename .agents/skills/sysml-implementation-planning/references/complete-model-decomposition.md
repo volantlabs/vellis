@@ -74,3 +74,24 @@ Order slices first by semantic dependency. Among independent ready slices, place
 that retires the most consequential uncertainty or feasibility risk with the least irreversible
 realization. Give each slice a stable identifier and unique integer order. Initial campaigns use a
 single writer even when the graph contains independent branches.
+
+## Assign selected realization decisions
+
+Treat each selected realization decision as an execution obligation, not a note. Place it on the
+one slice that must realize and prove it, or on closure when decisive evidence requires the assembled
+system or an authorized external effect. A dependent slice inherits completed decisions as
+constraints to preserve; it does not silently become their completion owner.
+
+Keep each decision narrow enough for one owner. Split a choice that requires independently
+checkpointed effects. Do not place future behavior on an early slice merely because the choice was
+made there, and do not use authority evidence as a substitute for decision-attributable evidence.
+
+For each decision, map the owning work item's verification references and evidence intent to the
+nearest plausible wrong realization they must exclude. Runtime `evidence_refs` start empty and name
+only evidence that actually exists; do not preload them with prospective claims. Keep intentionally
+unselected choices, explicit deferrals, and non-goals in the work-item boundary rather than encoding
+them as absent selected decisions.
+
+For closure-owned external effects, plan how a fresh closure attempt observes whether each effect is
+absent, partial, matching, or conflicting after interruption. Require an idempotent or explicitly
+reconcilable public boundary, and split effects that cannot share one safe recovery owner.

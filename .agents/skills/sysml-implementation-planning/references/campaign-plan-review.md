@@ -25,6 +25,15 @@ prior diagnosis.
 - Confirm integration and closure slices exist only where assembled behavior has additional modeled
   obligations.
 - Confirm the order retires consequential uncertainty before irreversible realization.
+- Reconstruct a decision-to-work-item matrix. Confirm every selected realization decision has one
+  owner that can realize it, name discriminating evidence, and close it without relying on a later
+  unowned effect. Confirm dependent work preserves inherited decisions without re-owning them.
+- For each decision, trace the owning work item's verification references and evidence intent to a
+  plausible wrong realization. Confirm execution evidence starts empty rather than masquerading as
+  planned proof, and that deliberately unselected choices remain deferrals or non-goals rather than
+  absent selected decisions.
+- For closure-owned external effects, confirm a fresh attempt can observe and safely reconcile
+  absent, partial, matching, or conflicting state after interruption.
 
 ## Subtraction and authority boundary
 
@@ -46,4 +55,5 @@ issue.
 
 A final cold reviewer must be able to identify the next slice, reread all authority it depends on,
 explain why earlier slices are prerequisites, state what evidence will close it, and name the
-whole-system completion conditions without prior conversation.
+whole-system completion conditions without prior conversation. It must also distinguish decisions
+the work item owns from decisions it merely inherits.

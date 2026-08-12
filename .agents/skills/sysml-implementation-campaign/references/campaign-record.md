@@ -58,14 +58,21 @@ Distinguish realization constraints selected by the accepted campaign from bound
 the model and plan intentionally leave open. Record only consequential decisions needed for later
 conformance or resume, with the authority they preserve. When project approval freezes the record's
 decision projection, preserve an ordinary task-time choice in code, evidence, and the slice handoff
-rather than rewriting the accepted plan. Escalate only if its consequence changes stakeholder-visible
-meaning or an intentionally selected boundary. Checkpoints are opaque project-bound identifiers.
+rather than rewriting the accepted plan. Every selected decision belongs to one slice or closure
+work item and carries implementation status plus evidence attributable to that owner. Its identity,
+meaning, authority links, reversibility, evidence intent, and owner are plan-bearing; status and
+evidence references are execution state. Evidence intent names the nearest plausible wrong
+realizations that the owner's eventual evidence must exclude without pretending that prospective
+evidence already exists. A dependent work item preserves inherited decisions but does not close them.
+Escalate only if its consequence changes stakeholder-visible meaning or an intentionally selected
+boundary. Checkpoints are opaque project-bound identifiers.
 
 Classify blockers as `language question`, `model gap`, `plan gap`, `feasibility consequence`, `stale
 baseline`, or `external dependency`. Implementation defects and ordinary realization decisions are
 campaign work, not blockers. An out-of-scope request is a disposition outside the blocker taxonomy.
 
-A completed slice requires conforming bounded implementation, discriminating evidence, completed
-dependencies, no blocker, and a checkpoint. Campaign completion additionally requires current
+A completed slice requires conforming bounded implementation, discriminating evidence, every owned
+decision conforming with evidence, completed dependencies, no blocker, and a checkpoint. Campaign
+completion additionally requires every closure-owned decision conforming with evidence, current
 baseline, accepted plan, full aggregate authority coverage, all slices complete, conforming
 integration and runnable-boundary status, closure evidence, and a final checkpoint.

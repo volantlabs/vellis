@@ -129,12 +129,11 @@ the server as a subprocess is exercised end to end, including the exact command 
 register. Configuring a client on this machine to launch it remains runnable closure, and changes
 that client's own configuration rather than this repository.
 
-That plan is not currently approved. Closure found that its client-configuration half — the setup
-program registering Codex or Claude Code — was never built, recorded a plan gap, and left approval
-at `changes-required` with the campaign `blocked`; `just implementation-campaign-status` reports it,
-and `docs/mcp-realization.md` states the open decision and the commands an owner can run meanwhile.
-Read the plan text above as what was selected, not as live authorization, until a renewed plan is
-approved.
+That selected client-configuration behavior was not built by its original owners. Closure caught the
+escaped implementation defect after all original slices had checkpointed, so the reviewed candidate
+plan preserves the choice and allocates it to corrective slice S018, with the live dry run and
+registration retained at closure. The candidate is not executable until renewed human approval;
+`just implementation-campaign-status` reports the open decisions and their owners.
 
 Vellis checkpoint identifiers are navigation labels in the portable campaign record:
 
@@ -156,6 +155,16 @@ verification, decisions, blockers, evidence, or any other plan-bearing content. 
 blocker changes approval to `changes-required`, clears its approval checkpoint, and puts the campaign
 in `blocked` or `stale`; execution does not continue through that state.
 Every later slice and closure checkpoint preserves that approved plan-bearing projection exactly.
+
+For the current corrective candidate, the approval transition readies only S018. S001 through S017
+retain their existing checkpoints. S018 owns the missing selected setup behavior; closure owns the
+authorized live client transition. The approval does not itself authorize external client mutation:
+that occurs only at the approved closure step after its dry run exactly matches the expected state.
+The candidate preserves the prior `integration_status: conforming` evidence across the seventeen
+completed slices because the escaped obligation changes A017 and the runnable client boundary, which
+both remain `partial`; S018's `integration` kind sequences its cross-boundary work but does not turn
+the unimplemented runnable effect into a claim that prior integration evidence failed. Fresh closure
+must nevertheless recheck integration after S018 before campaign completion.
 
 Replanning after slices have completed ends at a renewed approval, which follows the same rule with
 one difference: completed slices keep the checkpoints they earned, including the superseded approved
@@ -200,6 +209,13 @@ boundary both gates consult, and no later check can question it.
 
 Changing the baseline, authority map, coverage, slice graph, verification references, or selected
 realization decisions requires replanning, a new cold review, and renewed human approval.
+
+A selected realization decision records one completion owner and advances through explicit
+implementation status and reproducible evidence. Ownership, the selected choice, and its evidence
+intent are plan-bearing; status and evidence references may advance during execution. A completed slice may not leave one of its owned
+decisions open, and closure may not complete with an open closure-owned decision. If an already
+checkpointed owner omitted a selected decision, add a corrective work item through renewed planning;
+do not reopen the choice unless new evidence changes its stakeholder-visible consequence.
 
 During uncommitted active work, retain the preceding campaign checkpoint and leave the active
 slice's checkpoint null. Each completed slice uses one ordinary commit containing implementation,

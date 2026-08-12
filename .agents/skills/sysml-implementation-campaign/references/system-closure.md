@@ -14,6 +14,9 @@ the final planned slice.
   authority, or mixed-source state.
 - Run every model-derived integration, analysis, simulation, inspection, demonstration, hardware,
   or end-to-end verification required for current claims.
+- Reconcile every selected realization decision. Confirm slice-owned decisions are conforming with
+  attributable evidence, preserve them through integration, and execute and evidence decisions
+  owned by closure.
 
 ## Runnable boundary
 
@@ -35,3 +38,22 @@ Set integration and runnable-boundary status to `conforming`, attach decisive ev
 final checkpoint only after one complete closure review finds no material issue. Campaign status may
 then become `complete`. If any accepted authority remains absent, partial, conflicting, stale, or not
 evaluated, keep the campaign open or blocked and state the exact disposition.
+
+When renewed planning adds corrective work after an earlier closure attempt, downgrade each closure
+dimension whose established evidence the correction actually invalidates. Slice kind alone does not
+decide that roll-up: preserve a previously evidenced dimension when the corrective obligation belongs
+to another dimension, while keeping the affected authority and runnable or integration status openly
+partial. Rerun closure after the corrective work before campaign completion.
+
+If closure finds selected behavior missing from an unfinished owner, return to that work item. If
+the owner was incorrectly checkpointed complete, preserve the decision and create a corrective
+work item through renewed planning, whether or not unrelated approved work remains. Call the missing
+behavior an escaped implementation defect and the absent corrective allocation a plan repair; do
+not reopen the decision unless evidence changes stakeholder-visible meaning or the selected boundary.
+
+Treat every closure attempt as fresh after interruption. Before an external effect, establish how
+the selected public boundary reports absent, partial, matching, or conflicting state. On retry,
+observe that state again and reconcile only an authorized idempotent remainder; never infer failure
+or success from the prior process exit. Pause on an effect that cannot be safely distinguished or
+repeated. `launch-closure` names this fresh reconciliation attempt; a separate conversation-memory
+`resume-closure` action is unnecessary.

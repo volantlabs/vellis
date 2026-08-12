@@ -26,6 +26,8 @@ Pass the slice executor:
 - completed semantic dependencies;
 - applicable verification or analysis references;
 - selected project constraints, explicit non-goals, and intentionally open realization choices.
+- selected decisions this slice must close, their current status and evidence, and inherited
+  decisions from completed dependencies that it must preserve.
 
 Require it to return implementation status, evidence references, realization decisions, classified
 feedback, remaining authority, and checkpoint readiness. Verify the returned references against the
@@ -68,6 +70,11 @@ material only when it is false, omits required meaning, or could cause a promise
 misunderstood. An edge case is material only when the model, a selected realization boundary,
 ordinary malformed-input handling, or declared project assumptions admit it.
 
+Require both lenses to disposition every decision the slice owns. A conforming authority row,
+nearby evidence, or inherited constraint does not establish that an owned decision was realized.
+Missing selected behavior is an implementation defect. Do not ask the human to choose again unless
+new evidence changes stakeholder-visible meaning or the selected boundary.
+
 Collect the complete findings from both reviews, batch remediation, and perform a focused sweep for
 the same root cause before running one final independent review pair against the resulting slice.
 Repeat only if that final pair finds another in-scope material defect. After three consecutive
@@ -87,6 +94,7 @@ record.
 When both reviews produce no material finding:
 
 - update the slice and affected aggregate authority status;
+- set every owned decision to conforming with evidence that is also attributable to this slice;
 - record campaign evidence only against authority contributions declared for this slice. An artifact
   produced earlier may support a later slice, but cite it when that later slice closes the authority;
   do not use aggregate evidence to bypass the approved slice contract;
@@ -100,3 +108,7 @@ When both reviews produce no material finding:
 If interruption occurs before the checkpoint, leave the slice active and resume it from inspected
 working state. If interruption occurs after the checkpoint, the committed record lets the manager
 select the next work. Never mark a slice complete before its checkpoint exists.
+
+If a missing selected behavior is discovered after its owner checkpointed complete, preserve the
+selection and return to planning for a corrective work item even when unrelated approved slices
+remain. Do not absorb the defect into a convenient dependent slice or reopen the owner choice.

@@ -1,4 +1,4 @@
-schema_version: "1.0"
+schema_version: "1.1"
 campaign:
   id: model-implementation
   objective: Implement the complete accepted model and produce conforming system evidence.
@@ -54,5 +54,6 @@ closure:
   authority_coverage: full
   integration_status: absent
   runnable_status: absent
+  realization_decisions: []
   evidence_refs: []
   checkpoint: null

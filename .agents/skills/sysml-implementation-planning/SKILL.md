@@ -43,11 +43,16 @@ authority before existing source structure.
    that needs it; do not create an architecture-only slice. For each slice, expose the consequential
    input and failure boundary, state or recovery obligations, declared assumptions, and review risks
    that evidence must discriminate so execution does not discover its contract incrementally.
+   Give every selected realization decision one evidence-bearing completion owner: a slice or
+   closure. Split a decision that no single work item can close, or assign its assembled proof to
+   closure; never attach it early merely to remember it.
 6. Order dependency-ready slices by modeled prerequisites, then by risk retirement and reversible
    learning. Record an explicit order so a campaign manager does not improvise priority later.
 7. Map every implementation-bearing authority reference to one or more slices. A slice may cover an
    authority element partially, but the accepted whole plan must cover its complete meaning across
    the campaign and identify where the remainder closes.
+   Separately map every selected realization decision to its completion owner and discriminating
+   evidence.
 8. Only after the model-derived plan exists, inspect current source and evidence to set the existing
    implementation status and impact. Do not reshape slices to mirror accidental source topology.
 9. Run [Campaign-plan review](references/campaign-plan-review.md), fix material findings, and repeat
@@ -64,6 +69,10 @@ Produce or refresh the project's configured campaign record with:
 - full or partial per-slice coverage contributions and complete aggregate planned coverage;
 - stable slice IDs, kind, order, dependencies, verification references, lifecycle, and status;
 - concise consequential realization decisions, blockers, evidence references, and checkpoints;
+- one completion owner, implementation status, and attributable evidence for each selected
+  realization decision;
+- plan-bearing decision evidence intent that names the plausible wrong realization to exclude while
+  leaving runtime evidence references empty until the proof exists;
 - whole-system integration, runnable-boundary, and cold-reconstruction closure intent.
 
 Use only enough labels to navigate back to authority. Do not copy requirement prose, acceptance

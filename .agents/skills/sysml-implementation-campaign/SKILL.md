@@ -65,7 +65,8 @@ The slice worker follows [Execution and resume](references/execution-and-resume.
    each reviewer once and await it through a blocking join or serialized foreground execution; never
    keep the worker alive with timers, polling, or overlapping wait tasks.
 7. Mark the slice complete only when its bounded obligations conform, evidence discriminates the
-   nearest plausible wrong implementation, dependencies remain valid, and a checkpoint can include
+   nearest plausible wrong implementation, every realization decision it owns is individually
+   conforming with attributable evidence, dependencies remain valid, and a checkpoint can include
    implementation, tests, evidence, documentation truth, and record state together.
 8. Create that checkpoint, return the compact worker result, and terminate. The manager independently
    validates the checkpoint before it dispatches the next ready slice without routine human review.
@@ -76,6 +77,9 @@ executor later makes. Preserve task-time choices in the realization, evidence, a
 to the record only when project approval semantics permit it without rewriting the accepted plan.
 Replan only when the choice changes stakeholder-visible meaning or an intentionally selected
 boundary, and do not block merely because several code structures are semantically equivalent.
+An already-selected behavior found missing is an implementation defect, not an invitation to reopen
+the choice. If its owner was incorrectly checkpointed complete, preserve the decision and add a
+corrective work item through renewed planning, whether or not unrelated approved work remains.
 
 ## Pause and replan
 

@@ -61,6 +61,12 @@ stop on unexplained changes. For transient launcher or quota failure, wait only 
 live. Stop after three identical failures against the same state token; do not retry unchanged state
 indefinitely. Projects may choose the delay and continuation harness.
 
+`launch-closure` also covers a fresh attempt after an interrupted closure. The new worker rereads
+durable project state and independently observes any selected external effects through their public
+boundary, then applies only a safe authorized remainder. It never relies on the prior worker's
+transcript or assumes that process failure means an external effect failed. Pause when partial state
+cannot be distinguished or reconciled safely.
+
 ## Keep handoffs compact
 
 The result reports the work item, outcome, checkpoint, executed checks, review-pair and material-

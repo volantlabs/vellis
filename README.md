@@ -47,9 +47,10 @@ the Vellis binding into another project.
 
 For a complete-system build, `$sysml-implementation-planning` reads the complete accepted model and
 derives dependency-ordered, evidence-bearing semantic slices. The committed campaign record stays
-awaiting human approval until that complete plan is accepted; this repository's plan was accepted,
-ran to the end of its seventeen slices, and is now paused at closure on a plan gap the owner has to
-settle. A continuation harness may then invoke
+awaiting human approval until that complete plan is accepted. Vellis completed its seventeen
+original slices, then closure exposed an unimplemented selected realization decision. A reviewed
+candidate preserves that choice and adds corrective slice S018; it now awaits renewed approval. A
+continuation harness may then invoke
 `$sysml-implementation-campaign` through a thin manager. The manager reads one machine disposition,
 launches a fresh worker for exactly that slice, waits, and independently validates its checkpoint.
 The worker uses `$sysml-implementation`, runs both bounded review lenses, batches remediation, runs
@@ -89,7 +90,7 @@ Useful commands:
 - `just implementation-campaign-check`: validate the campaign schema, baseline, qualified model
   references, dependency graph, approval, evidence, and closure invariants.
 - `just implementation-campaign-status`: show campaign freshness, approval, active or next slice,
-  blockers, and closure status.
+  blockers, closure status, and open realization-decision IDs with their owners.
 - `just implementation-campaign-dispatch`: emit the manager's machine-readable action, selected work
   item, checkpoint, worktree condition, Git identity, reason codes, and state token without mutation.
 - `just implementation-campaign-review-frame <work-item> <lens>`: generate one fixed, finding-free
@@ -104,20 +105,16 @@ Useful commands:
 
 ## Implementation status
 
-All seventeen campaign slices are complete. Whole-system closure ran after them and did not finish.
-It reconciled every aggregate authority row against its contributing slices — seventeen of the
-eighteen now read `conforming` — and found integration across those slices exercised and conforming.
-It then blocked on the last one. The superseded plan puts MCP client configuration in the setup
-program, nothing implements it, and the repository says elsewhere that registering a client is the
-owner's own user-scoped action; deciding which of those is true is a plan question rather than an
-implementation detail, so `A017` and the runnable boundary both read `partial` — the STDIO boundary
-and the exact command an owner would register are exercised, the registration itself is not.
-Meanwhile the owner can close that boundary by hand: see
-[MCP realization](docs/mcp-realization.md#client-configuration) for the exact commands and the open
-decision. Read this section for what each capability's status is rather than treating a completed
-slice list as a completed system. A plan gap found during the fourth slice returned the campaign to
-`awaiting-plan-approval`; the corrected plan was approved and that slice checkpointed under it.
-`just implementation-campaign-status` reports exactly where it stands. Use these words precisely:
+All seventeen original campaign slices are complete. Whole-system closure reconciled the aggregate
+authority rows and integration evidence, then found that selected decisions D004 and D005 had never
+been realized. That is an escaped implementation defect, not a new owner choice. The reviewed
+candidate plan preserves the setup-program/public-CLI approach, adds corrective slice S018, and
+retains the authorized live transition as closure decision D006. Until renewed approval and that
+work, `A017` and runnable closure remain `partial`; the already-established cross-slice integration
+evidence remains `conforming`. See
+[MCP realization](docs/mcp-realization.md#client-configuration) for the selected boundary and manual
+fallback. `just implementation-campaign-status` reports the pending slice and open decision owners.
+Use these words precisely:
 
 - **Implemented and verified.** Canonical graph, definition, and constraint meaning; canonical
   semantic equality over JSON, graphs, definitions, and canonical states; whole-string RE2 property
@@ -230,12 +227,12 @@ slice list as a completed system. A plan gap found during the fourth slice retur
   selected ten tools and reaches the memory setup established, across separate sessions and
   processes — a real client library over the real transport, though not yet one of the owner's own
   configured clients.
-- **Not implemented, and blocked on a decision.** No client on this machine is configured to launch
-  the server, and nothing here configures one. The superseded plan says the setup program does it
-  through the public `codex mcp` and `claude mcp` commands; that behavior was never built, so the
-  plan and the code disagree and closure stopped rather than guessing which way to settle it.
-  [MCP realization](docs/mcp-realization.md#client-configuration) carries the commands an owner can
-  run in the meantime. FastMCP and FastMCP Slim are pinned at 4.0.0b1 and installed.
+- **Selected but not yet implemented.** No client on this machine is configured to launch the
+  server, and the setup program does not yet configure one. Corrective slice S018 is the pending
+  owner of that already-selected public-CLI behavior; closure owns the later matching dry run and
+  live registration. [MCP realization](docs/mcp-realization.md#client-configuration) carries manual
+  fallback commands for unavailable clients. FastMCP and FastMCP Slim are pinned at 4.0.0b1 and
+  installed.
 
 Deployment and migration realization remain open. The initial contract assumes one trusted
 owner-configured client; its tools do not implement per-call authorization or decide owner approval.

@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "urn:sysml-implementation-campaign:schema:1.0",
+  "$id": "urn:sysml-implementation-campaign:schema:1.1",
   "title": "Model-derived implementation campaign",
   "type": "object",
   "additionalProperties": false,
@@ -14,7 +14,7 @@
   ],
   "properties": {
     "schema_version": {
-      "const": "1.0"
+      "const": "1.1"
     },
     "campaign": {
       "$ref": "#/$defs/campaign"
@@ -347,7 +347,10 @@
         "id",
         "summary",
         "authority_ids",
-        "reversible"
+        "reversible",
+        "evidence_intent",
+        "implementation_status",
+        "evidence_refs"
       ],
       "properties": {
         "id": {
@@ -363,6 +366,22 @@
         },
         "reversible": {
           "type": "boolean"
+        },
+        "evidence_intent": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 240
+          }
+        },
+        "implementation_status": {
+          "$ref": "#/$defs/implementation_status"
+        },
+        "evidence_refs": {
+          "$ref": "#/$defs/reference_list"
         }
       }
     },
@@ -452,6 +471,7 @@
         "authority_coverage",
         "integration_status",
         "runnable_status",
+        "realization_decisions",
         "evidence_refs",
         "checkpoint"
       ],
@@ -467,6 +487,12 @@
         },
         "runnable_status": {
           "$ref": "#/$defs/implementation_status"
+        },
+        "realization_decisions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/realization_decision"
+          }
         },
         "evidence_refs": {
           "$ref": "#/$defs/reference_list"

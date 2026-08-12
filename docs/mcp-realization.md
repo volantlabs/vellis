@@ -98,15 +98,14 @@ anything in this repository. Whichever way that happens, it goes through the pub
 no-op, a differing entry is replaced only deliberately, and client tool approval settings stay
 entirely client-owned.
 
-Who does it is currently unsettled, and closure stopped on that. The superseded plan's realization
-decisions D004 and D005 put it in the setup program — configuring Codex, Claude Code, both, or
-neither, and printing copyable commands when a client is missing. No such behavior exists:
-`grep -rn "codex mcp\|claude mcp" vellis` returns nothing, and no test exercises it. So the dry run
-that plan's closure step names has nothing to run, and authority A017 reads `partial`. Resolving
-that — build it, or record that the owner does it unaided — is a plan decision rather than an
-implementation detail, so the campaign is blocked on it.
+The selected owner of this behavior is the setup program. Closure exposed that decisions D004 and
+D005 were never implemented even though their original work items had checkpointed. The reviewed
+candidate campaign preserves that selection, assigns the missing behavior to corrective slice S018,
+and assigns the matching live dry run and registration to closure decision D006. Until renewed
+approval and execution, authority A017 and runnable closure remain `partial`.
 
-Either way the owner can close the runnable boundary by hand today. Establish a system first with
+The commands below are a fallback when a supported client CLI is unavailable, not the selected
+primary workflow and not evidence that campaign closure has occurred. Establish a system first with
 `uv run python -m vellis.setup`, then, with `VELLIS` standing for the absolute path of this clone:
 
 ```sh
@@ -132,9 +131,14 @@ setup put the system somewhere other than its default, and list again afterwards
 state drift, different destination, unsupported CLI behavior, or permission-policy change stops for
 the owner's direction instead.
 
-macOS is to supply the first clean-environment runnable evidence, including real Codex and Claude
-Code discovery and invocation; none of that is recorded yet. Linux and Windows are compatibility
-targets rather than initial closure blockers, and what they receive depends on the same unsettled
-decision. The client command contracts are documented by
+After approved S018 checkpoints, macOS is to supply the first clean-environment runnable evidence,
+including real Codex and Claude Code discovery and invocation. Closure may perform the live change
+only when the first public-CLI dry run observes exactly the authorized transition. After an
+interruption, an entry already matching the enabled user-scoped STDIO destination is an idempotent
+no-op and closure may apply only the remaining authorized transition. Conflicting or unparseable
+state, another destination, unsupported behavior, or any approval-policy consequence pauses before
+further mutation. Linux and Windows are compatibility targets rather than initial closure blockers.
+The client command contracts are
+documented by
 [OpenAI](https://learn.chatgpt.com/docs/extend/mcp) and
 [Anthropic](https://docs.anthropic.com/en/docs/claude-code/mcp).

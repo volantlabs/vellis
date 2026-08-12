@@ -125,6 +125,15 @@ realization decisions, blockers, approval, and checkpoints. It contains no copie
 stories, tasks, estimates, architecture, or serialized model. A fresh agent must reread the cited
 model authority before acting.
 
+Every selected realization decision has one evidence-bearing completion owner: a slice, or closure
+when the effect is intentionally deferred until the runnable system boundary. The selected meaning,
+authority links, reversibility, and ownership are frozen with the approved plan; implementation
+status and evidence advance during execution. Plan-bearing evidence intent names the nearest wrong
+realization each decision's eventual proof must exclude without claiming prospective evidence.
+Planning reconstructs both the authority-coverage map and a decision-to-work-item matrix. Reviews
+disposition each owned decision separately—nearby tests or a conforming authority row cannot
+substitute for its evidence.
+
 The complete plan and every material replan require human approval. A stale baseline, genuine model
 gap, material plan gap, or stakeholder-visible feasibility consequence pauses execution and
 invalidates that approval. Code defects and bounded model-preserving realization choices remain
@@ -258,6 +267,11 @@ Project checkpoint validation also preserves the approved plan-bearing projectio
 slice and closure checkpoint. A changed baseline, authority map, coverage contribution, dependency,
 verification reference, or consequential realization decision returns the campaign to planning and
 human approval rather than silently changing the execution plan.
+
+When closure discovers that a selected decision was omitted, resume its owner if that work item is
+unfinished. If the owner was already checkpointed complete, preserve the selection and add a
+corrective work item through renewed planning. Reopen the owner choice only when new evidence changes
+stakeholder-visible meaning or the selected realization boundary.
 
 After the last planned slice, a separate closure cycle reconstructs complete model coverage, tests
 cross-slice semantics, exercises the selected external boundary from a fresh environment, performs a
