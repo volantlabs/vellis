@@ -7,7 +7,7 @@ campaign:
     status: accepted
     checkpoint: approval:5a8d92c675d6865bd70fadd0e971bbf959081bea
   blocker: null
-  checkpoint: slice:S013:5a8d92c675d6:1
+  checkpoint: slice:S014:5a8d92c675d6:1
 model_baseline:
   status: current
   authority_files:
@@ -281,7 +281,7 @@ authority:
       - {model_ref: "VellisRequirements::recommendedEverydayLifeStart", source: "model/40-requirements.sysml"}
     planned_coverage: full
     slice_ids: [S004, S011, S012, S013, S014]
-    implementation_status: partial
+    implementation_status: conforming
     evidence_refs:
       - path:tests/vellis/test_everyday_life_starter.py#test_the_starter_matches_the_modeled_counts
       - path:tests/vellis/test_everyday_life_starter.py#test_every_starter_type_key_and_description_is_the_modeled_one
@@ -297,6 +297,11 @@ authority:
       - path:tests/vellis/test_fresh_vocabulary_choice.py#test_the_confirmed_alternative_establishes_nothing_but_an_empty_vocabulary
       - path:tests/vellis/test_fresh_vocabulary_choice.py#test_an_interrupted_first_attempt_is_still_a_beginning
       - path:tests/vellis/test_fresh_vocabulary_choice.py#test_an_established_system_keeps_the_vocabulary_it_has
+      - path:tests/vellis/test_everyday_life_starter.py#test_the_starter_date_pattern_constrains_shape_not_the_calendar
+      - path:tests/vellis/test_everyday_life_starter.py#test_a_date_property_rejects_a_misshapen_value_in_a_real_change
+      - path:tests/vellis/test_snapshot_initialization.py#test_no_starting_vocabulary_is_overlaid
+      - path:tests/vellis/test_v1_recovery.py#test_no_starting_vocabulary_is_overlaid_on_a_recovered_system
+      - path:tests/vellis/test_owner_workflows.py#test_an_established_system_reaches_the_starter_only_through_ordinary_governance
   - id: A013
     label: Selected ten-tool MCP boundary
     refs:
@@ -342,8 +347,30 @@ authority:
       - {model_ref: "VellisRequirements::observableFailure", source: "model/40-requirements.sysml"}
     planned_coverage: full
     slice_ids: [S014]
-    implementation_status: absent
-    evidence_refs: []
+    implementation_status: conforming
+    evidence_refs:
+      - path:tests/vellis/test_owner_workflows.py#test_every_way_of_looking_at_memory_leaves_it_exactly_as_it_was
+      - path:tests/vellis/test_owner_workflows.py#test_reviewing_both_histories_shows_what_happened_without_joining_it
+      - path:tests/vellis/test_owner_workflows.py#test_a_cold_agent_reaches_a_query_from_discovery_alone
+      - path:tests/vellis/test_owner_workflows.py#test_assessing_memory_reports_on_the_current_revision_and_changes_nothing
+      - path:tests/vellis/test_owner_workflows.py#test_context_the_owner_declined_is_never_retained
+      - path:tests/vellis/test_owner_workflows.py#test_context_the_owner_approved_is_recovered_by_a_later_session
+      - path:tests/vellis/test_owner_workflows.py#test_approved_context_that_does_not_conform_is_not_retained
+      - path:tests/vellis/test_owner_workflows.py#test_correcting_memory_leaves_what_it_corrected_in_history
+      - path:tests/vellis/test_owner_workflows.py#test_forgetting_memory_removes_it_from_what_memory_now_says
+      - path:tests/vellis/test_owner_workflows.py#test_a_proposal_the_owner_leaves_staged_is_still_there_afterwards
+      - path:tests/vellis/test_owner_workflows.py#test_a_proposal_is_reviewed_for_readable_meaning_before_it_can_be_activated
+      - path:tests/vellis/test_owner_workflows.py#test_a_discarded_proposal_leaves_the_vocabulary_it_would_have_changed
+      - path:tests/vellis/test_owner_workflows.py#test_exploring_prior_memory_uses_the_vocabulary_that_state_had
+      - path:tests/vellis/test_owner_workflows.py#test_forgetting_activity_history_leaves_canonical_memory_exactly_where_it_was
+      - path:tests/vellis/test_owner_workflows.py#test_the_owner_can_prove_recovery_without_moving_live_memory
+      - path:tests/vellis/test_owner_workflows.py#test_restoring_a_past_state_makes_it_current_without_rewriting_anything
+      - path:tests/vellis/test_owner_workflows.py#test_a_refusal_reaches_the_caller_and_moves_nothing
+      - path:tests/vellis/test_owner_workflows.py#test_a_result_larger_than_the_owner_asked_for_is_refused_whole
+      - path:tests/vellis/test_owner_workflows.py#test_the_owner_only_operations_refuse_observably_too
+      - path:tests/vellis/test_owner_workflows.py#test_a_restoration_refuses_rather_than_discarding_a_proposal_in_flight
+      - path:tests/vellis/test_owner_workflows.py#test_an_execution_failure_is_reported_and_leaves_memory_intact
+      - command:uv run pytest tests/vellis
   - id: A015
     label: Incremental owner-visible improvement support
     refs:
@@ -914,12 +941,35 @@ slices:
       - VellisVerification::ownerControl
       - VellisVerification::observableFailure
       - VellisVerification::everydayLifeStart
-    lifecycle: ready
-    implementation_status: absent
-    evidence_refs: []
+    lifecycle: complete
+    implementation_status: conforming
+    evidence_refs:
+      - path:tests/vellis/test_owner_workflows.py#test_every_way_of_looking_at_memory_leaves_it_exactly_as_it_was
+      - path:tests/vellis/test_owner_workflows.py#test_reviewing_both_histories_shows_what_happened_without_joining_it
+      - path:tests/vellis/test_owner_workflows.py#test_a_cold_agent_reaches_a_query_from_discovery_alone
+      - path:tests/vellis/test_owner_workflows.py#test_assessing_memory_reports_on_the_current_revision_and_changes_nothing
+      - path:tests/vellis/test_owner_workflows.py#test_context_the_owner_declined_is_never_retained
+      - path:tests/vellis/test_owner_workflows.py#test_context_the_owner_approved_is_recovered_by_a_later_session
+      - path:tests/vellis/test_owner_workflows.py#test_approved_context_that_does_not_conform_is_not_retained
+      - path:tests/vellis/test_owner_workflows.py#test_correcting_memory_leaves_what_it_corrected_in_history
+      - path:tests/vellis/test_owner_workflows.py#test_forgetting_memory_removes_it_from_what_memory_now_says
+      - path:tests/vellis/test_owner_workflows.py#test_a_proposal_the_owner_leaves_staged_is_still_there_afterwards
+      - path:tests/vellis/test_owner_workflows.py#test_a_proposal_is_reviewed_for_readable_meaning_before_it_can_be_activated
+      - path:tests/vellis/test_owner_workflows.py#test_a_discarded_proposal_leaves_the_vocabulary_it_would_have_changed
+      - path:tests/vellis/test_owner_workflows.py#test_exploring_prior_memory_uses_the_vocabulary_that_state_had
+      - path:tests/vellis/test_owner_workflows.py#test_an_established_system_reaches_the_starter_only_through_ordinary_governance
+      - path:tests/vellis/test_owner_workflows.py#test_forgetting_activity_history_leaves_canonical_memory_exactly_where_it_was
+      - path:tests/vellis/test_owner_workflows.py#test_the_owner_can_prove_recovery_without_moving_live_memory
+      - path:tests/vellis/test_owner_workflows.py#test_restoring_a_past_state_makes_it_current_without_rewriting_anything
+      - path:tests/vellis/test_owner_workflows.py#test_a_refusal_reaches_the_caller_and_moves_nothing
+      - path:tests/vellis/test_owner_workflows.py#test_a_result_larger_than_the_owner_asked_for_is_refused_whole
+      - path:tests/vellis/test_owner_workflows.py#test_the_owner_only_operations_refuse_observably_too
+      - path:tests/vellis/test_owner_workflows.py#test_a_restoration_refuses_rather_than_discarding_a_proposal_in_flight
+      - path:tests/vellis/test_owner_workflows.py#test_an_execution_failure_is_reported_and_leaves_memory_intact
+      - command:uv run pytest tests/vellis
     realization_decisions: []
     blocker: null
-    checkpoint: null
+    checkpoint: slice:S014:5a8d92c675d6:1
   - id: S015
     order: 15
     label: Support incremental owner-visible improvement
@@ -929,7 +979,7 @@ slices:
       - {authority_id: A015, coverage: full, remaining_slice_ids: []}
     verification_refs:
       - VellisVerification::improvementAnalysis
-    lifecycle: pending
+    lifecycle: ready
     implementation_status: absent
     evidence_refs: []
     realization_decisions: []

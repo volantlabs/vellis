@@ -103,7 +103,7 @@ Useful commands:
 
 ## Implementation status
 
-Thirteen campaign slices are complete, so the application is partially implemented rather than
+Fourteen campaign slices are complete, so the application is partially implemented rather than
 absent.
 A plan gap found during the fourth returned the campaign to `awaiting-plan-approval`; the corrected
 plan has since been approved and that slice checkpointed under it.
@@ -147,7 +147,20 @@ plan has since been approved and that slice checkpointed under it.
   owner confirms — is implemented and verified. Confirmed first use from a Vellis v1 snapshot —
   live v1 content arriving exactly as it was stored, every simplification and omission named
   before the owner agrees to it, and a new lineage at revision 0 that claims none of the v1
-  system's history — is implemented and verified.
+  system's history — is implemented and verified. These capabilities are also verified as the
+  owner-governed workflows they compose into: nothing an agent uses to look at memory is capable
+  of retaining anything, and a proposal the owner declines never becomes a call, so canonical
+  memory afterwards is indistinguishable from memory that was never asked — Vellis does not decide
+  approval, and a submitted change is retained if it conforms, whoever asked for it. Approved
+  context outlives the session that wrote it, corrections and forgetting leave the state they
+  changed reachable in history, a
+  vocabulary proposal can be staged across other work and restarts and is gated at activation
+  rather than at staging, forgetting activity moves nothing replay reads, and an established
+  system reaches the Everyday Life vocabulary only through ordinary definition governance. Every
+  refusal and every execution failure in those workflows reaches the caller and leaves graph,
+  definitions, delta, revision, and canonical history where they were. The owner-only operations —
+  activity retention, snapshots, the recovery check, and restoration — are verified at the system
+  boundary that realizes them; no owner-facing command carries them yet.
 - **Runnable.** `uv run python -m vellis.setup` prepares one local system. It previews the
   destination and, unless it can already see that the destination will not do, offers both starting
   vocabularies with the Everyday Life starter preselected. It asks for confirmation, and accepts

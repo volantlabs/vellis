@@ -218,6 +218,6 @@ When tests and model structure were introduced together, review the model indepe
 purpose, accepted and refused examples, state effects, and decisive evidence. Passing tests or parser
 acceptance cannot substitute for that semantic review.
 
-Do not introduce realization machinery without a current modeled need. The repository has no product
-runtime or generated product source today. The model selects an MCP tool contract, but no MCP server
-is implemented or runnable.
+Do not introduce realization machinery without a current modeled need. Product source under
+`vellis/` is authored, not generated. The selected MCP tool contract is implemented and runnable over
+local standard input and output; no client is configured to launch it yet.
