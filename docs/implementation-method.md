@@ -228,6 +228,12 @@ fresh read-only reviews, checkpoints or pauses, returns a compact result, and te
 never implements, reviews, or consumes reviewer transcripts; it independently revalidates the
 checkpoint before dispatching the next fresh worker.
 
+Each child is launched once. A parent awaits child work through a harness-native blocking join, or
+runs independent children sequentially when such a join is unavailable. Concurrent execution is an
+optimization, not a conformance condition. Shell sleeps, timers, repeated status checks, background
+no-ops, monitors, and overlapping wait tasks must not be used to spend model turns keeping a parent
+alive.
+
 The disposition binds campaign identity, project revision, worktree condition, current checkpoint,
 and selected work to a state token. A worker rechecks that token before mutation, so activation or
 other intervening work invalidates stale duplicate dispatch. Explainable active-slice work resumes in

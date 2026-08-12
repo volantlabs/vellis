@@ -76,8 +76,11 @@ that boundary once, add the smallest discriminating evidence, and only then requ
 pair. Review count never permits ignoring a material defect or creates a human authority gate.
 
 Do not substitute a numerical severity threshold or a demand for zero observations: disposition
-follows plausible consequence. Read-only reviewers may work concurrently; one writer owns
-remediation and the record.
+follows plausible consequence. Launch each reviewer exactly once per pair. Read-only reviewers may
+work concurrently only when the harness can await both through one blocking join; otherwise run them
+sequentially in the foreground. Never use shell sleeps, timers, repeated status checks, background
+no-ops, monitors, or overlapping waits to keep the worker alive. One writer owns remediation and the
+record.
 
 ## Checkpoint and continue
 

@@ -105,7 +105,11 @@ provider may realize these roles as long as durable state and the one-writer bou
 For this repository's initial harness trial, using Claude Sonnet at medium reasoning for the manager
 and fresh Opus 5 Medium workers is a non-normative cost/conformance configuration; Opus 5 Low is an
 acceptable manager substitute. Provider and model choice are not part of the portable method or the
-approved implementation plan.
+approved implementation plan. Claude workers launch reviewer `Agent` calls once in foreground mode
+with `run_in_background: false`. They may issue both calls in one turn only when the harness blocks
+until both return; otherwise they run the lenses sequentially. They never poll reviewer work with
+background shell commands, sleeps, monitors, or overlapping timers. Without a direct join, use at
+most one foreground five-minute wait followed by one status check.
 
 The manager passes the dispatch `state_token` to its worker. Before mutation, the worker reruns
 `just implementation-campaign-dispatch 0 <state-token>`; a changed token stops stale or duplicate

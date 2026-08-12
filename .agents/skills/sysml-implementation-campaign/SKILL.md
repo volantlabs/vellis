@@ -61,7 +61,9 @@ The slice worker follows [Execution and resume](references/execution-and-resume.
    in-scope findings, batch remediation, then run one final independent review pair against the
    resulting slice. Repeat only when that final pair finds a plausible defect within the project's
    declared authority, safety, evidence, or ordinary recovery boundary. After three consecutive
-   non-clean final pairs, perform a bounded root-cause audit before requesting another pair.
+   non-clean final pairs, perform a bounded root-cause audit before requesting another pair. Launch
+   each reviewer once and await it through a blocking join or serialized foreground execution; never
+   keep the worker alive with timers, polling, or overlapping wait tasks.
 7. Mark the slice complete only when its bounded obligations conform, evidence discriminates the
    nearest plausible wrong implementation, dependencies remain valid, and a checkpoint can include
    implementation, tests, evidence, documentation truth, and record state together.

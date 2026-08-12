@@ -137,6 +137,14 @@ review output. Store timing, review-count, check-count, and optional harness-usa
 the ignored `.cache/implementation-campaign/` area. Telemetry never establishes conformance or
 authorizes advancement.
 
+For Claude Code campaign workers, launch each reviewer `Agent` exactly once in foreground mode with
+`run_in_background: false`. Submit both calls in one assistant turn only when the harness blocks until
+both return; otherwise run them sequentially. Never await reviewers with background `Bash`, `sleep`,
+`Monitor`, repeated status checks, or overlapping timers. If no direct join exists, permit at most
+one foreground `sleep 300` at a time followed by one status check; start another only after the first
+has completed. When the launcher can control the worker environment, prefer
+`CLAUDE_CODE_DISABLE_BACKGROUND_TASKS=1`.
+
 At runnable closure, the approved plan authorizes a matching dry run followed by public-CLI changes
 only to the named `vellis` client entries: replace the existing disabled Codex HTTP entry with the
 selected STDIO entry and add the Claude Code STDIO entry. Do not change any client approval policy.

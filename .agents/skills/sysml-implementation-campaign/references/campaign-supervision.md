@@ -25,6 +25,18 @@ The worker consumes exactly one selected slice or closure contract, uses the pro
 mechanism, performs implementation and review, creates at most that work item's checkpoint, returns
 one compact result, and terminates. It never selects or starts the following slice.
 
+## Await child work without polling
+
+Launch each child once. Prefer a harness-native blocking join. Run independent children concurrently
+only when one blocking join can await all of them; otherwise run them sequentially in the foreground.
+Concurrency is an optimization, not a conformance requirement.
+
+Do not spend model turns preserving parent liveness. Never simulate waiting with shell sleeps,
+timers, repeated status checks, background no-ops, monitors, or overlapping wait tasks. If a harness
+offers only asynchronous children, yield once to its event-driven completion mechanism without
+polling. If it offers no completion event, use one bounded foreground wait at a time and inspect
+state once after that wait completes. A timeout is a recovery boundary, not a heartbeat.
+
 ## Dispatch and recovery
 
 Require a dispatch result to identify the campaign, durable project state, worktree condition,
