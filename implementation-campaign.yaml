@@ -7,7 +7,7 @@ campaign:
     status: accepted
     checkpoint: approval:5a8d92c675d6865bd70fadd0e971bbf959081bea
   blocker: null
-  checkpoint: slice:S016:5a8d92c675d6:1
+  checkpoint: slice:S017:5a8d92c675d6:1
 model_baseline:
   status: current
   authority_files:
@@ -440,13 +440,33 @@ authority:
       - {model_ref: "VellisVerification::simpleOperation", source: "model/50-verification.sysml"}
     planned_coverage: full
     slice_ids: [S001, S009, S017]
-    implementation_status: partial
+    implementation_status: conforming
     evidence_refs:
       - path:tests/vellis/test_setup_path.py#test_setup_establishes_one_local_system
       - path:tests/vellis/test_setup_path.py#test_a_second_attempt_fails_actionably_and_leaves_memory_unchanged
       - path:tests/vellis/test_setup_path.py#test_a_dry_run_creates_nothing
       - path:tests/vellis/test_setup_path.py#test_a_destination_named_dot_data_is_refused
+      - path:tests/vellis/test_setup_path.py#test_a_starting_vocabulary_beside_a_snapshot_is_refused_not_ignored
+      - path:tests/vellis/test_setup_path.py#test_two_starting_inputs_are_refused
+      - path:tests/vellis/test_setup_path.py#test_a_snapshot_that_changed_after_it_was_previewed_is_not_the_one_confirmed
+      - path:tests/vellis/test_cohesive_use.py#test_a_blank_start_establishes_one_empty_system
+      - path:tests/vellis/test_cohesive_use.py#test_the_recommended_everyday_life_start_is_offered_and_confirmed
+      - path:tests/vellis/test_cohesive_use.py#test_a_start_from_a_snapshot_and_later_records_establishes_that_state
+      - path:tests/vellis/test_cohesive_use.py#test_a_start_from_a_snapshot_offers_no_starting_vocabulary
+      - path:tests/vellis/test_cohesive_use.py#test_a_start_from_a_confirmed_v1_snapshot_begins_a_new_lineage
+      - path:tests/vellis/test_cohesive_use.py#test_a_preserved_memory_begins_another_system_at_the_state_it_reached
+      - path:tests/vellis/test_cohesive_use.py#test_a_client_launched_server_serves_exactly_the_selected_ten_tools
+      - path:tests/vellis/test_cohesive_use.py#test_approved_context_outlives_the_session_and_the_process
+      - path:tests/vellis/test_cohesive_use.py#test_a_second_proposal_the_owner_declines_is_not_retained
+      - path:tests/vellis/test_cohesive_use.py#test_the_owner_governs_the_sole_proposal_through_the_launched_client
+      - path:tests/vellis/test_cohesive_use.py#test_a_setup_failure_before_initialization_establishes_nothing
+      - path:tests/vellis/test_cohesive_use.py#test_a_later_setup_attempt_is_actionable_and_moves_nothing
+      - path:tests/vellis/test_cohesive_use.py#test_a_connection_failure_names_its_stage_state_effect_and_next_step
+      - path:tests/vellis/test_cohesive_use.py#test_a_connection_to_an_unusable_destination_fails_at_the_destination_stage
+      - path:tests/vellis/test_cohesive_use.py#test_setup_and_the_server_resolve_the_same_destination
+      - path:tests/vellis/test_cohesive_use.py#test_the_documented_commands_ask_for_nothing_an_owner_would_have_to_administer
       - path:README.md#implementation-status
+      - command:uv run pytest tests/vellis
   - id: A018
     label: Typed validation across every selected scope
     refs:
@@ -1087,16 +1107,57 @@ slices:
       - VellisVerification::simpleOperation
       - VellisVerification::ownerControl
       - VellisVerification::mcpToolSurface
-    lifecycle: ready
-    implementation_status: absent
-    evidence_refs: []
+    lifecycle: complete
+    implementation_status: conforming
+    evidence_refs:
+      - path:tests/vellis/test_cohesive_use.py#test_a_blank_start_establishes_one_empty_system
+      - path:tests/vellis/test_cohesive_use.py#test_the_recommended_everyday_life_start_is_offered_and_confirmed
+      - path:tests/vellis/test_cohesive_use.py#test_a_start_from_a_snapshot_and_later_records_establishes_that_state
+      - path:tests/vellis/test_cohesive_use.py#test_a_start_from_a_snapshot_offers_no_starting_vocabulary
+      - path:tests/vellis/test_cohesive_use.py#test_a_start_from_a_confirmed_v1_snapshot_begins_a_new_lineage
+      - path:tests/vellis/test_cohesive_use.py#test_a_client_launched_server_serves_exactly_the_selected_ten_tools
+      - path:tests/vellis/test_cohesive_use.py#test_approved_context_outlives_the_session_and_the_process
+      - path:tests/vellis/test_cohesive_use.py#test_a_second_proposal_the_owner_declines_is_not_retained
+      - path:tests/vellis/test_cohesive_use.py#test_the_owner_governs_the_sole_proposal_through_the_launched_client
+      - path:tests/vellis/test_cohesive_use.py#test_a_setup_failure_before_initialization_establishes_nothing
+      - path:tests/vellis/test_cohesive_use.py#test_a_later_setup_attempt_is_actionable_and_moves_nothing
+      - path:tests/vellis/test_cohesive_use.py#test_a_connection_failure_names_its_stage_state_effect_and_next_step
+      - path:tests/vellis/test_cohesive_use.py#test_a_connection_to_an_unusable_destination_fails_at_the_destination_stage
+      - path:tests/vellis/test_cohesive_use.py#test_setup_and_the_server_resolve_the_same_destination
+      - path:tests/vellis/test_cohesive_use.py#test_the_documented_commands_ask_for_nothing_an_owner_would_have_to_administer
+      - path:tests/vellis/test_cohesive_use.py#test_a_preserved_memory_begins_another_system_at_the_state_it_reached
+      - path:tests/vellis/test_cohesive_use.py#test_preserving_a_destination_that_holds_no_memory_is_actionable
+      - path:tests/vellis/test_cohesive_use.py#test_preserving_to_a_path_that_cannot_be_written_is_actionable
+      - path:tests/vellis/test_cohesive_use.py#test_preserving_says_both_halves_of_what_it_did
+      - path:tests/vellis/test_cohesive_use.py#test_preserving_a_memory_this_account_cannot_write_says_so
+      - path:tests/vellis/test_cohesive_use.py#test_preserving_never_writes_over_something_already_there
+      - path:tests/vellis/test_cohesive_use.py#test_the_way_out_of_an_unestablished_destination_names_that_destination
+      - path:tests/vellis/test_cohesive_use.py#test_a_preserve_failure_after_the_capture_says_the_capture_happened
+      - path:tests/vellis/test_cohesive_use.py#test_a_failure_before_the_capture_claims_no_observation
+      - path:tests/vellis/test_snapshot_document.py#test_a_document_reconstructs_the_state_it_captured
+      - path:tests/vellis/test_snapshot_document.py#test_a_tail_of_several_transition_kinds_replays_to_the_same_state
+      - path:tests/vellis/test_snapshot_document.py#test_a_record_field_the_identity_digests_is_carried_not_defaulted
+      - path:tests/vellis/test_snapshot_document.py#test_a_tail_cannot_be_carried_onto_another_ledgers_snapshot
+      - path:tests/vellis/test_snapshot_document.py#test_a_document_that_reconstructs_nothing_usable_is_a_start_with_findings
+      - path:tests/vellis/test_snapshot_document.py#test_a_capture_with_nothing_after_it_writes_no_tail
+      - path:tests/vellis/test_snapshot_document.py#test_a_document_carrying_an_empty_tail_is_malformed_not_merely_unusable
+      - path:tests/vellis/test_setup_path.py#test_a_starting_vocabulary_beside_a_snapshot_is_refused_not_ignored
+      - path:tests/vellis/test_setup_path.py#test_two_starting_inputs_are_refused
+      - path:tests/vellis/test_snapshot_document.py#test_a_revision_no_ledger_could_hold_is_refused_by_the_analysis
+      - path:tests/vellis/test_snapshot_document.py#test_a_start_names_the_proposal_it_would_establish
+      - path:tests/vellis/test_setup_path.py#test_a_snapshot_document_holding_a_value_that_is_not_one_is_an_actionable_failure
+      - path:tests/vellis/test_setup_path.py#test_a_snapshot_revision_no_ledger_could_hold_creates_no_destination
+      - path:tests/vellis/test_setup_path.py#test_a_file_that_is_not_a_snapshot_document_is_an_actionable_failure
+      - path:tests/vellis/test_setup_path.py#test_a_snapshot_that_changed_after_it_was_previewed_is_not_the_one_confirmed
+      - path:README.md#implementation-status
+      - command:uv run pytest tests/vellis
     realization_decisions:
       - id: D006
         summary: After a matching dry run, public client CLIs may replace only the existing disabled Codex vellis HTTP entry with STDIO and add Claude vellis; any state drift or permission-policy change requires human direction.
         authority_ids: [A017]
         reversible: false
     blocker: null
-    checkpoint: null
+    checkpoint: slice:S017:5a8d92c675d6:1
 closure:
   authority_coverage: full
   integration_status: absent

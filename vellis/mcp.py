@@ -65,9 +65,26 @@ from vellis.outcomes import (
     ValidationScope,
 )
 from vellis.query import GraphQuery, GraphQueryResult
+from vellis.store import StoreError
 from vellis.system import RTGSystem
 
-__all__ = ["TOOL_NAMES", "build_server"]
+__all__ = ["TOOL_NAMES", "ServeError", "build_server", "serve"]
+
+
+class ServeError(RuntimeError):
+    """Raised when the boundary cannot serve a memory at the requested destination.
+
+    Carries a corrective action rather than only a message. A client that cannot start
+    the server is one of the two failures ``VellisVerification::simpleOperation`` requires
+    to be actionable, and a bare exception string is exactly the generic failure it says
+    does not pass.
+    """
+
+    def __init__(self, summary: str, corrective_action: str) -> None:
+        super().__init__(summary)
+        self.summary = summary
+        self.corrective_action = corrective_action
+
 
 # The selected surface, in the order the model declares it. Named here so a test can hold
 # the boundary to exactly this set rather than to whatever happens to be registered.
@@ -302,17 +319,42 @@ def serve(path: Path, *, name: str = "vellis") -> None:
         # Opening would create one. A server that quietly established a memory would be
         # making the owner's decision for them, and on a mistyped path it would make it
         # in the wrong place.
-        raise SystemExit(
-            f"no Vellis memory is established at {path}. Run `python -m vellis.setup` first."
+        raise ServeError(
+            f"no Vellis memory is established at {path}",
+            # The destination is named in the advice, not only in the diagnosis. A bare
+            # "run setup" would establish a system at the default location, which is not
+            # this one, and the next launch would fail exactly as this one did.
+            f"run `python -m vellis.setup --data-dir {path.parent}` to begin one here, or "
+            "point --data-dir at the directory that already holds your system",
         )
-    system = RTGSystem.open(path)
     try:
-        if not system.is_initialized:
+        system = RTGSystem.open(path)
+    except StoreError as error:
+        # Whatever is at that path, this could not open it as one owner's memory. Nothing
+        # was written; the destination is exactly as it was found.
+        raise ServeError(
+            f"the memory at {path} could not be opened: {error}",
+            "check that this account can read and write that file and the directory "
+            "holding it, and that --data-dir names your Vellis system's directory",
+        ) from error
+    try:
+        try:
+            established = system.is_initialized
+        except StoreError as error:
+            raise ServeError(
+                f"the memory at {path} could not be read: {error}",
+                "check that this account can read and write that file, and that nothing "
+                "else is holding it open",
+            ) from error
+        if not established:
             # The ten tools read and change a memory; none of them makes one. Starting
             # here would leave every first call refusing for a reason the surface cannot
             # express, so this says the one useful thing instead.
-            raise SystemExit(
-                f"no Vellis memory is established at {path}. Run `python -m vellis.setup` first."
+            raise ServeError(
+                f"no Vellis memory is established at {path}",
+                f"run `python -m vellis.setup --data-dir {path.parent}` to begin one "
+                "here, or point --data-dir at the directory that already holds your "
+                "system",
             )
         build_server(system, name=name).run(transport="stdio")
     finally:

@@ -19,8 +19,12 @@ which opens the file properly, is the one that decides.
 ``--from-v1`` realizes the owner-facing half of ``Vellis::'Begin from Vellis v1 snapshot'``:
 a snapshot brings its own vocabulary, so no starting vocabulary is offered, and what the
 recovery would establish and what it costs are shown in full before it is confirmed.
-Beginning from a v2 snapshot is a separate owner-visible choice that arrives with its own
-slice; setup does not offer a choice it cannot honor.
+
+``--from-snapshot`` is the third starting input the use case names: a complete canonical
+snapshot with an optional later ledger tail. It also carries its own vocabulary, and the
+lineage it establishes begins at the revision that state reached rather than at zero.
+Exactly one starting input may be given, because two would leave which memory was
+established up to the order the options happen to be read in.
 """
 
 from __future__ import annotations
@@ -38,6 +42,11 @@ from vellis.everyday_life import everyday_life_starter
 from vellis.json_value import JsonValueError, loads
 from vellis.outcomes import OperationStatus
 from vellis.paths import DestinationError, resolve_data_directory, store_path
+from vellis.snapshot_document import (
+    SnapshotStart,
+    analyze_snapshot_document,
+    start_summary,
+)
 from vellis.store import (
     CanonicalStore,
     ForeignDatabaseError,
@@ -73,6 +82,14 @@ ALREADY_ESTABLISHED = (
 # has to be undone first, and the destination is still the one they asked for.
 NOTHING_STARTED = (
     "remove nothing; run setup again, and if it still fails choose a different --data-dir"
+)
+
+# What an owner can do about a snapshot that does not reconstruct. The document is the
+# thing at fault, and it came from a system that can produce another one; the destination
+# was never touched, so there is nothing here to undo.
+SNAPSHOT_NOT_USABLE = (
+    "take a fresh snapshot and tail from the system this came from and run setup again "
+    "with those; nothing here was changed"
 )
 
 EXIT_SUCCESS = 0
@@ -176,6 +193,7 @@ def prepare_local_system(
     initiator: str = "owner",
     choice: FreshVocabularyChoice = RECOMMENDED_VOCABULARY,
     recovery: ImportPreview | None = None,
+    snapshot: SnapshotStart | None = None,
     environ: dict[str, str] | None = None,
 ) -> SetupReport:
     """Prepare one local Vellis system with the start it is given.
@@ -184,14 +202,17 @@ def prepare_local_system(
     a caller asks for. ``choice`` defaults to the recommendation because that is what an
     owner who says nothing is offered, not because anything here has been agreed to.
 
-    A ``recovery`` preview begins from a Vellis v1 system instead. It carries its own
-    vocabulary, so no starting vocabulary is chosen or overlaid; ``choice`` then says only
-    what the report names, and establishes nothing.
+    A ``recovery`` preview begins from a Vellis v1 system instead, and a ``snapshot``
+    start begins from a canonical snapshot of a v2 one. Both carry their own vocabulary,
+    so no starting vocabulary is chosen or overlaid; ``choice`` then says only what the
+    report names, and establishes nothing. At most one may be given.
 
     With ``dry_run`` the destination is resolved and reported and nothing is created. What
     is already at that destination is the command's question, not this one's: a dry run
     here says where a system would go, and the command says whether one can.
     """
+    if recovery is not None and snapshot is not None:
+        raise ValueError("a system begins from one starting input, not a v1 snapshot and a v2 one")
     try:
         destination = resolve_data_directory(data_directory, environ=environ)
     except DestinationError as error:
@@ -217,6 +238,20 @@ def prepare_local_system(
             store=store_file,
             choice=choice,
         )
+    if snapshot is not None and not snapshot.is_acceptable:
+        # Refused before the destination is even created. Reconstruction already decided
+        # this document cannot become a state, and the reasons are the ones an owner was
+        # shown; going on would leave a directory behind for a system that never began.
+        return SetupReport(
+            stage=SetupStage.PREVIEW,
+            succeeded=False,
+            memory_changed=False,
+            summary=snapshot.reconstruction.summary,
+            choice=choice,
+            corrective_action=SNAPSHOT_NOT_USABLE,
+            destination=destination,
+            store=store_file,
+        )
     try:
         destination.mkdir(parents=True, exist_ok=True)
     except OSError as error:
@@ -232,7 +267,7 @@ def prepare_local_system(
             destination=destination,
             store=store_file,
         )
-    return _initialize(destination, store_file, initiator, choice, recovery)
+    return _initialize(destination, store_file, initiator, choice, recovery, snapshot)
 
 
 def _revision_if_readable(system: RTGSystem) -> int | None:
@@ -254,6 +289,7 @@ def _initialize(
     initiator: str,
     choice: FreshVocabularyChoice,
     recovery: ImportPreview | None = None,
+    snapshot: SnapshotStart | None = None,
 ) -> SetupReport:
     try:
         store = CanonicalStore(store_file)
@@ -272,7 +308,13 @@ def _initialize(
         )
     system = RTGSystem(store)
     try:
-        if recovery is None:
+        if snapshot is not None:
+            outcome = system.initialize_from_snapshot(
+                snapshot.request,
+                provenance=Provenance(initiator=initiator, source="vellis setup: snapshot"),
+                initialization_summary=start_summary(snapshot),
+            )
+        elif recovery is None:
             outcome = system.initialize_fresh(
                 choice.definitions,
                 provenance=Provenance(initiator=initiator, source="vellis setup"),
@@ -374,9 +416,15 @@ def _write_preview(
     *,
     existing: _Existing | None,
     recovered: ImportPreview | None = None,
-    snapshot: str | None = None,
+    started_from: SnapshotStart | None = None,
+    unreadable: str | None = None,
 ) -> None:
-    stopped = existing is not None or snapshot is not None or _refused(recovered)
+    stopped = (
+        existing is not None
+        or unreadable is not None
+        or _refused(recovered)
+        or (started_from is not None and not started_from.is_acceptable)
+    )
     if not stopped:
         print("Vellis setup will prepare one local personal system.", file=stream)
     else:
@@ -385,8 +433,10 @@ def _write_preview(
         print("Vellis setup cannot prepare a system here.", file=stream)
     print(f"  destination:  {report.destination}", file=stream)
     print(f"  memory store: {report.store}", file=stream)
-    if snapshot is not None:
-        print(f"  this snapshot cannot be read: {snapshot}", file=stream)
+    if unreadable is not None:
+        print(f"  this snapshot cannot be read: {unreadable}", file=stream)
+    elif started_from is not None:
+        _write_snapshot_start(started_from, stream)
     elif recovered is not None:
         _write_recovery(recovered, stream)
     elif existing is None:
@@ -448,6 +498,27 @@ def _write_recovery(preview: ImportPreview, stream: TextIO) -> None:
         print(f"    {finding.disposition.value}: {finding.summary}", file=stream)
 
 
+def _write_snapshot_start(start: SnapshotStart, stream: TextIO) -> None:
+    """Show what beginning from this canonical snapshot would establish, or why it cannot.
+
+    The revision is stated because it is the surprising part: the new lineage starts where
+    that state got to, not at zero, and an owner should learn that here rather than from a
+    history that appears to be missing its beginning.
+    """
+    print("  starting from a Vellis canonical snapshot:", file=stream)
+    state = start.canonical_state
+    if state is None:
+        for finding in start.reconstruction.findings:
+            print(f"    blocking: {finding.summary}", file=stream)
+        return
+    print(f"    the new lineage begins at revision {state.revision}", file=stream)
+    print(f"    later transitions replayed: {start.tail_length}", file=stream)
+    # Everything the permanent record will say this start established, said before it is
+    # agreed to. An owner should not learn from their own history that they accepted more
+    # than the preview named.
+    print(f"    what it establishes: {start_summary(start)}", file=stream)
+
+
 def _write_offer(selected: FreshVocabularyChoice, stream: TextIO) -> None:
     """Name the complete choice set, marking the one that is selected.
 
@@ -502,7 +573,10 @@ def main(
     parser.add_argument(
         "--data-dir",
         default=None,
-        help="where this system lives; defaults to the platform's user-data location",
+        help=(
+            "where this system lives; defaults to VELLIS_DATA_DIR when it is set, and "
+            "otherwise to the platform's user-data location"
+        ),
     )
     parser.add_argument(
         "--yes",
@@ -525,6 +599,14 @@ def main(
         ),
     )
     parser.add_argument(
+        "--from-snapshot",
+        default=None,
+        help=(
+            "begin from a Vellis canonical snapshot document instead of a starting "
+            "vocabulary; the new lineage begins at the revision that state reached"
+        ),
+    )
+    parser.add_argument(
         "--vocabulary",
         choices=[each.value for each in FreshVocabularyChoice],
         default=None,
@@ -534,8 +616,15 @@ def main(
         ),
     )
     arguments = parser.parse_args(argv)
-    if arguments.from_v1 is not None and arguments.vocabulary is not None:
-        parser.error("a v1 snapshot carries its own vocabulary, so --vocabulary says nothing")
+    if arguments.from_v1 is not None and arguments.from_snapshot is not None:
+        parser.error(
+            "a system begins from one starting input; pass --from-v1 or --from-snapshot, not both"
+        )
+    if arguments.vocabulary is not None:
+        if arguments.from_v1 is not None:
+            parser.error("a v1 snapshot carries its own vocabulary, so --vocabulary says nothing")
+        if arguments.from_snapshot is not None:
+            parser.error("a snapshot carries its own vocabulary, so --vocabulary says nothing")
     choice = FreshVocabularyChoice(arguments.vocabulary or RECOMMENDED_VOCABULARY.value)
 
     preview = prepare_local_system(data_directory=arguments.data_dir, dry_run=True, choice=choice)
@@ -546,14 +635,31 @@ def main(
     assert preview.store is not None
     existing = _existing_memory(preview.store)
     recovered: ImportPreview | None = None
+    started_from: SnapshotStart | None = None
     unreadable_snapshot: str | None = None
-    if arguments.from_v1 is not None and existing is None:
-        try:
-            recovered = _read_v1_snapshot(str(arguments.from_v1))
-        except SnapshotError as unreadable:
-            unreadable_snapshot = str(unreadable)
+    unreadable_option = "--from-v1"
+    # Only when the destination is free. A destination that already holds memory has
+    # already decided this run, and reading a snapshot to describe an import that cannot
+    # happen would put a candidate on the screen beside a refusal of it.
+    if existing is None:
+        if arguments.from_v1 is not None:
+            try:
+                recovered = _read_v1_snapshot(str(arguments.from_v1))
+            except SnapshotError as unreadable:
+                unreadable_snapshot = str(unreadable)
+        elif arguments.from_snapshot is not None:
+            unreadable_option = "--from-snapshot"
+            try:
+                started_from = _read_snapshot_document(str(arguments.from_snapshot))
+            except SnapshotError as unreadable:
+                unreadable_snapshot = str(unreadable)
     _write_preview(
-        preview, out, existing=existing, recovered=recovered, snapshot=unreadable_snapshot
+        preview,
+        out,
+        existing=existing,
+        recovered=recovered,
+        started_from=started_from,
+        unreadable=unreadable_snapshot,
     )
     if unreadable_snapshot is not None:
         _write_report(
@@ -562,8 +668,13 @@ def main(
                 succeeded=False,
                 summary=f"this snapshot cannot be read: {unreadable_snapshot}",
                 corrective_action=(
-                    "check that --from-v1 names a complete Vellis v1 system snapshot; the "
-                    "destination is untouched either way"
+                    f"check that {unreadable_option} names a complete "
+                    + (
+                        "Vellis v1 system snapshot"
+                        if unreadable_option == "--from-v1"
+                        else "Vellis canonical snapshot document"
+                    )
+                    + "; the destination is untouched either way"
                 ),
             ),
             error,
@@ -595,6 +706,19 @@ def main(
                     "the conditions above have to be resolved in the v1 system and a new "
                     "snapshot taken; nothing here was changed"
                 ),
+            ),
+            error,
+        )
+        return EXIT_FAILED
+    if started_from is not None and not started_from.is_acceptable:
+        # Reconstruction refused it, and every reason is already above. There is nothing
+        # here an answer could change.
+        _write_report(
+            replace(
+                preview,
+                succeeded=False,
+                summary=started_from.reconstruction.summary,
+                corrective_action=SNAPSHOT_NOT_USABLE,
             ),
             error,
         )
@@ -635,8 +759,43 @@ def main(
             )
             return EXIT_FAILED
 
+    if started_from is not None:
+        # The same re-read, for the same reason: the owner agreed to begin at one exact
+        # reconstructed state, and a document that changed since describes another one.
+        try:
+            confirmed_start = _read_snapshot_document(str(arguments.from_snapshot))
+        except SnapshotError:
+            confirmed_start = None
+        if (
+            confirmed_start is None
+            or confirmed_start.source_identity != started_from.source_identity
+        ):
+            # A document that is gone and one that is different are both "not the one that
+            # was confirmed", but saying the second about the first would describe
+            # something that did not happen.
+            _write_report(
+                replace(
+                    preview,
+                    succeeded=False,
+                    summary=(
+                        "the snapshot could no longer be read after it was previewed"
+                        if confirmed_start is None
+                        else "the snapshot changed after it was previewed"
+                    ),
+                    corrective_action=(
+                        "run setup again to preview and confirm the snapshot as it now "
+                        "stands; nothing here was changed"
+                    ),
+                ),
+                error,
+            )
+            return EXIT_FAILED
+
     report = prepare_local_system(
-        data_directory=arguments.data_dir, choice=choice, recovery=recovered
+        data_directory=arguments.data_dir,
+        choice=choice,
+        recovery=recovered,
+        snapshot=started_from,
     )
     _write_report(report, out if report.succeeded else error)
     return EXIT_SUCCESS if report.succeeded else EXIT_FAILED
@@ -652,6 +811,35 @@ def _read_v1_snapshot(path: str) -> ImportPreview:
         return analyze_v1_snapshot(loads(text))
     except JsonValueError as error:
         raise SnapshotError(f"{path} does not hold JSON this can read: {error}") from error
+
+
+def _read_snapshot_document(path: str) -> SnapshotStart:
+    """Read and reconstruct one canonical snapshot document, or say why it cannot be read.
+
+    A document that is not one at all raises; a document that is one and reconstructs to
+    nothing usable comes back as a start carrying its findings. The difference matters to
+    an owner: the first is the wrong file, the second is the right file with something
+    wrong in it that the system it came from can be asked about.
+    """
+    try:
+        text = Path(path).read_text(encoding="utf-8")
+    except (OSError, UnicodeError) as error:
+        raise SnapshotError(f"could not read {path}: {error}") from error
+    try:
+        return analyze_snapshot_document(loads(text))
+    except JsonValueError as error:
+        raise SnapshotError(f"{path} does not hold JSON this can read: {error}") from error
+    except (ValueError, ArithmeticError, RecursionError) as error:
+        # Wider than ``DecodeError`` on purpose. The state decoders build domain values as
+        # they go, and those raise their own errors — metadata that is not Boolean, a
+        # number no stored value could be — none of which are decode errors and all of
+        # which mean the same thing here: this file is not a document this can read. The
+        # store's own decode path catches exactly this family for exactly this reason,
+        # and a narrower catch here would let one of them out as a traceback where the
+        # model requires a named stage and a corrective action.
+        raise SnapshotError(f"{path} is not a Vellis canonical snapshot document: {error}") from (
+            error
+        )
 
 
 if __name__ == "__main__":

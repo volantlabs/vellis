@@ -121,8 +121,11 @@ optional JSONL timing, review-count, check-count, and harness-usage telemetry un
 failure when no child is live, and stop after three identical failures against one state token.
 The approved plan directly pins FastMCP and FastMCP Slim 4.0.0b1, selects local STDIO, and reserves
 clean macOS onboarding through a documented Python setup path for runnable closure. The pins, the
-STDIO boundary, and the setup path's fresh start and v1 recovery are implemented; starting from a
-v2 snapshot, and configuring a client to launch the server, remain for later slices.
+STDIO boundary, and the setup path's three starting inputs — a confirmed fresh vocabulary, a
+canonical snapshot document, and a confirmed v1 snapshot — are implemented, and a client launching
+the server as a subprocess is exercised end to end. Configuring a client on this machine to launch
+it remains runnable closure, and changes that client's own configuration rather than this
+repository.
 
 Vellis checkpoint identifiers are navigation labels in the portable campaign record:
 
@@ -220,4 +223,5 @@ acceptance cannot substitute for that semantic review.
 
 Do not introduce realization machinery without a current modeled need. Product source under
 `vellis/` is authored, not generated. The selected MCP tool contract is implemented and runnable over
-local standard input and output; no client is configured to launch it yet.
+local standard input and output, and a real client launching it over that transport is exercised;
+no client on this machine is configured to launch it yet.

@@ -11,6 +11,7 @@ Every case uses a temporary destination; none touches the platform default.
 from __future__ import annotations
 
 import io
+from decimal import Decimal
 from pathlib import Path
 
 import pytest
@@ -297,3 +298,176 @@ def test_only_an_explicit_yes_proceeds(tmp_path: Path, answer: str) -> None:
     assert code == EXIT_DECLINED
     assert "Declined" in out
     assert not store_path(destination.resolve()).exists()
+
+
+# --- Beginning from a canonical snapshot ----------------------------------------------
+
+
+def _snapshot_document(tmp_path: Path, name: str = "snapshot.json") -> Path:
+    """One document holding a real capture, written where an owner would bring it.
+
+    It carries one anchor, so the document has stored graph content for the cases below
+    to reach; an empty graph would leave whole decode branches unexercised.
+    """
+    from vellis.canonical import Provenance
+    from vellis.changes import GraphChange
+    from vellis.everyday_life import everyday_life_starter
+    from vellis.graph import Anchor
+    from vellis.snapshot_document import write_snapshot_document
+
+    source = RTGSystem.open(tmp_path / f"source-{name}.sqlite3")
+    try:
+        owner = Provenance(initiator="owner")
+        assert source.initialize_fresh(
+            everyday_life_starter(), provenance=owner, initialization_summary="a fresh start"
+        ).accepted
+        assert source.apply_graph_change(
+            GraphChange(anchor_upserts=(Anchor("a-1", "life.person", "Ada"),)), provenance=owner
+        ).accepted
+        captured = source.create_snapshot(provenance=owner)
+        assert captured.snapshot is not None
+        document = tmp_path / name
+        write_snapshot_document(document, captured.snapshot)
+        return document
+    finally:
+        source.close()
+
+
+@pytest.mark.parametrize(
+    "extra",
+    [["--vocabulary", "blank"], ["--vocabulary", "everydayLifeStarter"]],
+    ids=["blank", "starter"],
+)
+def test_a_starting_vocabulary_beside_a_snapshot_is_refused_not_ignored(
+    tmp_path: Path, extra: list[str]
+) -> None:
+    """A snapshot answers the vocabulary question; accepting both would silently pick one."""
+    document = _snapshot_document(tmp_path)
+    with pytest.raises(SystemExit):
+        _run(["--data-dir", str(tmp_path / "new"), "--from-snapshot", str(document), *extra])
+
+
+def test_two_starting_inputs_are_refused(tmp_path: Path) -> None:
+    """Excludes the option order deciding which memory an owner ends up with."""
+    document = _snapshot_document(tmp_path)
+    with pytest.raises(SystemExit):
+        _run(
+            [
+                "--data-dir",
+                str(tmp_path / "new"),
+                "--from-snapshot",
+                str(document),
+                "--from-v1",
+                str(document),
+            ]
+        )
+
+
+def test_a_file_that_is_not_a_snapshot_document_is_an_actionable_failure(
+    tmp_path: Path,
+) -> None:
+    not_one = tmp_path / "notes.json"
+    not_one.write_text('{"hello": "world"}', encoding="utf-8")
+
+    code, _, err = _run(
+        ["--data-dir", str(tmp_path / "new"), "--from-snapshot", str(not_one), "--yes"]
+    )
+
+    assert code == EXIT_FAILED
+    assert "what to do next:" in err
+    assert "--from-snapshot" in err
+    assert not (tmp_path / "new").exists()
+
+
+def test_a_snapshot_that_changed_after_it_was_previewed_is_not_the_one_confirmed(
+    tmp_path: Path,
+) -> None:
+    """The owner agreed to one exact reconstructed state, not to whatever the file holds.
+
+    Confirming re-reads the document, so a file rewritten between the preview and the
+    answer is a different start that nobody has seen.
+    """
+    document = _snapshot_document(tmp_path)
+    replacement = _snapshot_document(tmp_path, name="other.json")
+    destination = tmp_path / "new"
+
+    stdout, stderr = io.StringIO(), io.StringIO()
+
+    class _SwapOnRead(io.StringIO):
+        """Answers yes, and rewrites the document while the owner is answering."""
+
+        def readline(self, size: int = -1) -> str:
+            document.write_text(replacement.read_text(encoding="utf-8"), encoding="utf-8")
+            return "y\n"
+
+    code = main(
+        ["--data-dir", str(destination), "--from-snapshot", str(document)],
+        stdout=stdout,
+        stderr=stderr,
+        stdin=_SwapOnRead(),
+    )
+
+    assert code == EXIT_FAILED
+    assert "the snapshot changed after it was previewed" in stderr.getvalue()
+    assert not store_path(destination.resolve()).exists()
+
+
+def test_a_snapshot_document_holding_a_value_that_is_not_one_is_an_actionable_failure(
+    tmp_path: Path,
+) -> None:
+    """Excludes a traceback where the model requires a stage and a corrective action.
+
+    The state decoders build domain values as they read, and those refuse in their own
+    words rather than as decode errors. A file whose stored metadata is a number is a
+    file this cannot read, and has to arrive as that answer.
+    """
+    from vellis.json_value import dumps, loads
+
+    document = _snapshot_document(tmp_path)
+    content = loads(document.read_text(encoding="utf-8"))
+    assert isinstance(content, dict)
+    snapshot = content["snapshot"]
+    assert isinstance(snapshot, dict)
+    state = snapshot["canonicalState"]
+    assert isinstance(state, dict)
+    graph = state["graph"]
+    assert isinstance(graph, dict)
+    anchors = graph["anchors"]
+    assert isinstance(anchors, list) and anchors
+    anchor = anchors[0]
+    assert isinstance(anchor, dict)
+    anchor["systemMetadata"] = {"live": Decimal(5)}
+    document.write_text(dumps(content), encoding="utf-8")
+    destination = tmp_path / "new"
+
+    code, _, err = _run(["--data-dir", str(destination), "--from-snapshot", str(document), "--yes"])
+
+    assert code == EXIT_FAILED
+    assert "what to do next:" in err
+    assert not destination.exists()
+
+
+def test_a_snapshot_revision_no_ledger_could_hold_creates_no_destination(tmp_path: Path) -> None:
+    """Refused before the question is put, so nothing is created to be cleaned up."""
+    from vellis.json_value import dumps, loads
+
+    document = _snapshot_document(tmp_path)
+    content = loads(document.read_text(encoding="utf-8"))
+    assert isinstance(content, dict)
+    snapshot = content["snapshot"]
+    assert isinstance(snapshot, dict)
+    state = snapshot["canonicalState"]
+    assert isinstance(state, dict)
+    state["revision"] = Decimal(-3)
+    document.write_text(dumps(content), encoding="utf-8")
+    destination = tmp_path / "new"
+
+    code, out, err = _run(
+        ["--data-dir", str(destination), "--from-snapshot", str(document), "--yes"]
+    )
+
+    assert code == EXIT_FAILED
+    assert "Vellis setup cannot prepare a system here." in out
+    assert "not one a ledger can hold" in out
+    assert "what to do next:" in err
+    assert not destination.exists()

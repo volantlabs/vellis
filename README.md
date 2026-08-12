@@ -2,7 +2,7 @@
 
 Vellis is an individually owned personal AI system and an open demonstration of model-first software engineering with textual SysML v2.
 
-The repository contains the Vellis system model, its development tooling, and the first slices of the application that realizes it; see [Implementation status](#implementation-status) for what is built and what is not. The model covers owner-facing behavior, Reified Type Graph (RTG) graph and query meaning, ledger-authoritative state and scalable history access, canonical equality and string-shape constraints, cold-agent current or historical definition discovery, definition governance, blank or recommended Everyday Life initialization, confirmed first-use import from a Vellis v1 JSON snapshot, snapshots and replay, proactive owner-visible analysis support, a selected ten-tool MCP contract, cohesive system responsibility, requirements, satisfiers, analysis, and verification cases.
+The repository contains the Vellis system model, its development tooling, and the application that realizes it; see [Implementation status](#implementation-status) for what is built and what is not. The model covers owner-facing behavior, Reified Type Graph (RTG) graph and query meaning, ledger-authoritative state and scalable history access, canonical equality and string-shape constraints, cold-agent current or historical definition discovery, definition governance, blank or recommended Everyday Life initialization, confirmed first-use import from a Vellis v1 JSON snapshot, snapshots and replay, proactive owner-visible analysis support, a selected ten-tool MCP contract, cohesive system responsibility, requirements, satisfiers, analysis, and verification cases.
 
 ## What is here
 
@@ -103,8 +103,10 @@ Useful commands:
 
 ## Implementation status
 
-Sixteen campaign slices are complete, so the application is partially implemented rather than
-absent.
+All seventeen campaign slices are complete. Whole-system closure is a separate step and is still
+open: it reconciles the campaign record's aggregate authority status, exercises integration, and
+configures a client on this machine to launch the server. Until it finishes, read this section for
+what each capability's status is rather than treating a completed slice list as a completed system.
 A plan gap found during the fourth returned the campaign to `awaiting-plan-approval`; the corrected
 plan has since been approved and that slice checkpointed under it.
 `just implementation-campaign-status` reports exactly where it stands. Use these words precisely:
@@ -160,7 +162,8 @@ plan has since been approved and that slice checkpointed under it.
   refusal and every execution failure in those workflows reaches the caller and leaves graph,
   definitions, delta, revision, and canonical history where they were. The owner-only operations —
   activity retention, snapshots, the recovery check, and restoration — are verified at the system
-  boundary that realizes them; no owner-facing command carries them yet. Support for incremental
+  boundary that realizes them; of those, only preserving a snapshot has an owner-facing command,
+  because that document is one of the inputs setup takes. Support for incremental
   owner-visible improvement analysis is verified the same way: an externally scheduled agent reads
   explicit bounded intervals of both ledgers, discovers the vocabulary those states had, asks
   bounded current and historical questions, and continues a later run from the interval it already
@@ -170,7 +173,16 @@ plan has since been approved and that slice checkpointed under it.
   change, the agent rediscovers current definitions — a delta replaces the whole vocabulary, and a
   change is written in concepts that may have been retired since — and rechecks current facts,
   because the owner may have fixed the thing already; and every finding is traceable to the
-  bounded observations and exact evaluated revisions it came from.
+  bounded observations and exact evaluated revisions it came from. Finally, that these compose
+  into one cohesive system an individual can run is itself verified end to end: each of the three
+  starting inputs the model names — blank or the confirmed Everyday Life starter, a canonical
+  snapshot with its later records, and a confirmed v1 snapshot — establishes its own system; a
+  client launching the server as an ordinary subprocess discovers exactly the ten tools, learns the
+  vocabulary cold, asks a bounded question and retains one approved change; and a later session in
+  a new process finds that memory at the state replay reconstructs. A failed start, a second start
+  over an established system, and a client that cannot connect each name the stage that failed,
+  say that established memory is unchanged, and give an available next step, with graph,
+  definitions, delta, revision, and canonical ledger identical either side of the failure.
 - **Characterized, not budgeted.** What this realization's work responds to is measured in semantic
   record accesses, along each dimension separately: current summary, inspection, query, conformance
   assessment, delta retrieval, and change validation read no record of either ledger however long
@@ -190,15 +202,27 @@ plan has since been approved and that slice checkpointed under it.
   vocabularies with the Everyday Life starter preselected. It asks for confirmation, and accepts
   `--data-dir`, `--vocabulary`, `--yes`, and a no-effect `--dry-run` that still reports a
   destination it can already see will not do. `--from-v1` begins from a Vellis v1 JSON system
-  snapshot instead; the snapshot carries the vocabulary, so passing `--vocabulary` as well is
-  refused rather than ignored, and the snapshot is read again at confirmation, so one that
-  changed after it was previewed is not the one that was agreed to. It stores memory under the
-  platform's user-data location by default and never writes to this repository's ignored `.data/`.
+  snapshot instead, and `--from-snapshot` from a Vellis canonical snapshot document — a complete
+  capture with an optional later ledger tail, which
+  `uv run python -m vellis.preserve --out FILE` writes from an established system, leaving its
+  canonical memory and revision where they were and recording the capture in its activity history.
+  Each carries its own vocabulary, so passing `--vocabulary` as well
+  is refused rather than ignored, and only one starting input may be given; each is read again at
+  confirmation, so one that changed after it was previewed is not the one that was agreed to. A
+  snapshot start says before it is confirmed which revision the new lineage will begin at, because
+  that is the revision the captured state reached rather than zero. Setup stores memory under
+  `VELLIS_DATA_DIR` when that is set and otherwise under the platform's user-data location, and
+  never writes to this repository's ignored `.data/`.
   `uv run python -m vellis` then serves that memory over local standard input and output, and
-  refuses rather than creating one.
-- **Not implemented yet.** Starting the setup command from a v2 snapshot — a snapshot lineage can
-  be begun through the library but not through setup. No client is configured to launch the server;
-  that is runnable closure. FastMCP and FastMCP Slim are pinned at 4.0.0b1 and installed.
+  refuses rather than creating one; a client that cannot start it is told which stage failed, that
+  established memory is unchanged, and what to do next, in the same shape setup uses. Both commands
+  resolve the same destination, so a system established at a configured location is the one the
+  server serves. A real MCP client launching that command as a subprocess discovers exactly the
+  selected ten tools and reaches the memory setup established, across separate sessions and
+  processes.
+- **Not implemented yet.** No client on this machine is configured to launch the server; that is
+  runnable closure, and it changes a client's own configuration rather than anything here. FastMCP
+  and FastMCP Slim are pinned at 4.0.0b1 and installed.
 
 Deployment and migration realization remain open. The initial contract assumes one trusted
 owner-configured client; its tools do not implement per-call authorization or decide owner approval.
