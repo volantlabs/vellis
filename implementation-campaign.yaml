@@ -7,7 +7,7 @@ campaign:
     status: accepted
     checkpoint: approval:5a8d92c675d6865bd70fadd0e971bbf959081bea
   blocker: null
-  checkpoint: slice:S014:5a8d92c675d6:1
+  checkpoint: slice:S015:5a8d92c675d6:1
 model_baseline:
   status: current
   authority_files:
@@ -379,8 +379,21 @@ authority:
       - {model_ref: "VellisVerification::improvementAnalysis", source: "model/50-verification.sysml"}
     planned_coverage: full
     slice_ids: [S015]
-    implementation_status: absent
-    evidence_refs: []
+    implementation_status: conforming
+    evidence_refs:
+      - path:tests/vellis/test_improvement_analysis.py#test_a_run_reads_explicit_bounded_intervals_of_both_ledgers
+      - path:tests/vellis/test_improvement_analysis.py#test_an_interval_holding_more_than_the_run_asked_for_is_refused_whole
+      - path:tests/vellis/test_improvement_analysis.py#test_a_bounded_finding_query_refuses_rather_than_reporting_half_the_cleanup
+      - path:tests/vellis/test_improvement_analysis.py#test_a_later_run_continues_from_where_the_last_one_stopped
+      - path:tests/vellis/test_improvement_analysis.py#test_vellis_keeps_no_schedule_and_no_continuation_point
+      - path:tests/vellis/test_improvement_analysis.py#test_every_finding_names_the_bounded_observations_it_came_from
+      - path:tests/vellis/test_improvement_analysis.py#test_unused_vocabulary_takes_a_discovery_and_a_query_together
+      - path:tests/vellis/test_improvement_analysis.py#test_repeated_failures_are_readable_without_having_changed_anything
+      - path:tests/vellis/test_improvement_analysis.py#test_a_delta_is_built_from_rediscovered_current_definitions
+      - path:tests/vellis/test_improvement_analysis.py#test_a_cleanup_change_is_rechecked_against_current_state_before_it_is_proposed
+      - path:tests/vellis/test_improvement_analysis.py#test_a_declined_proposal_leaves_memory_as_though_it_were_never_asked
+      - path:tests/vellis/test_improvement_analysis.py#test_an_approved_cleanup_reaches_memory_as_one_ordinary_change
+      - command:uv run pytest tests/vellis
   - id: A016
     label: Current, historical, and replay work characterization
     refs:
@@ -979,12 +992,25 @@ slices:
       - {authority_id: A015, coverage: full, remaining_slice_ids: []}
     verification_refs:
       - VellisVerification::improvementAnalysis
-    lifecycle: ready
-    implementation_status: absent
-    evidence_refs: []
+    lifecycle: complete
+    implementation_status: conforming
+    evidence_refs:
+      - path:tests/vellis/test_improvement_analysis.py#test_a_run_reads_explicit_bounded_intervals_of_both_ledgers
+      - path:tests/vellis/test_improvement_analysis.py#test_an_interval_holding_more_than_the_run_asked_for_is_refused_whole
+      - path:tests/vellis/test_improvement_analysis.py#test_a_bounded_finding_query_refuses_rather_than_reporting_half_the_cleanup
+      - path:tests/vellis/test_improvement_analysis.py#test_a_later_run_continues_from_where_the_last_one_stopped
+      - path:tests/vellis/test_improvement_analysis.py#test_vellis_keeps_no_schedule_and_no_continuation_point
+      - path:tests/vellis/test_improvement_analysis.py#test_every_finding_names_the_bounded_observations_it_came_from
+      - path:tests/vellis/test_improvement_analysis.py#test_unused_vocabulary_takes_a_discovery_and_a_query_together
+      - path:tests/vellis/test_improvement_analysis.py#test_repeated_failures_are_readable_without_having_changed_anything
+      - path:tests/vellis/test_improvement_analysis.py#test_a_delta_is_built_from_rediscovered_current_definitions
+      - path:tests/vellis/test_improvement_analysis.py#test_a_cleanup_change_is_rechecked_against_current_state_before_it_is_proposed
+      - path:tests/vellis/test_improvement_analysis.py#test_a_declined_proposal_leaves_memory_as_though_it_were_never_asked
+      - path:tests/vellis/test_improvement_analysis.py#test_an_approved_cleanup_reaches_memory_as_one_ordinary_change
+      - command:uv run pytest tests/vellis
     realization_decisions: []
     blocker: null
-    checkpoint: null
+    checkpoint: slice:S015:5a8d92c675d6:1
   - id: S016
     order: 16
     label: Characterize current, historical, and replay work
@@ -997,7 +1023,7 @@ slices:
       - VellisVerification::historicalSelectionScaling
       - VellisVerification::replayCharacterization
       - VellisVerification::historyGrowth
-    lifecycle: pending
+    lifecycle: ready
     implementation_status: absent
     evidence_refs: []
     realization_decisions: []

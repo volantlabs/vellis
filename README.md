@@ -103,7 +103,7 @@ Useful commands:
 
 ## Implementation status
 
-Fourteen campaign slices are complete, so the application is partially implemented rather than
+Fifteen campaign slices are complete, so the application is partially implemented rather than
 absent.
 A plan gap found during the fourth returned the campaign to `awaiting-plan-approval`; the corrected
 plan has since been approved and that slice checkpointed under it.
@@ -160,7 +160,17 @@ plan has since been approved and that slice checkpointed under it.
   refusal and every execution failure in those workflows reaches the caller and leaves graph,
   definitions, delta, revision, and canonical history where they were. The owner-only operations —
   activity retention, snapshots, the recovery check, and restoration — are verified at the system
-  boundary that realizes them; no owner-facing command carries them yet.
+  boundary that realizes them; no owner-facing command carries them yet. Support for incremental
+  owner-visible improvement analysis is verified the same way: an externally scheduled agent reads
+  explicit bounded intervals of both ledgers, discovers the vocabulary those states had, asks
+  bounded current and historical questions, and continues a later run from the interval it already
+  processed. Vellis supplies no scheduler, job registry, worker, or inference of its own — nothing
+  happens that the agent did not ask for, and where to continue from is the agent's own state
+  rather than anything Vellis stores. Before proposing either a definition delta or a graph
+  change, the agent rediscovers current definitions — a delta replaces the whole vocabulary, and a
+  change is written in concepts that may have been retired since — and rechecks current facts,
+  because the owner may have fixed the thing already; and every finding is traceable to the
+  bounded observations and exact evaluated revisions it came from.
 - **Runnable.** `uv run python -m vellis.setup` prepares one local system. It previews the
   destination and, unless it can already see that the destination will not do, offers both starting
   vocabularies with the Everyday Life starter preselected. It asks for confirmation, and accepts
