@@ -114,18 +114,27 @@ most one foreground five-minute wait followed by one status check.
 The manager passes the dispatch `state_token` to its worker. Before mutation, the worker reruns
 `just implementation-campaign-dispatch 0 <state-token>`; a changed token stops stale or duplicate
 work. After activation,
-generate each fixed review prompt with `just implementation-campaign-review-frame <slice> <lens>`.
+generate each fixed review prompt with
+`just implementation-campaign-review-frame <work-item> <lens>`, naming the active slice or
+`closure`.
 Validate the compact handoff with `just implementation-campaign-worker-result-check <path>` and put
 optional JSONL timing, review-count, check-count, and harness-usage telemetry under the ignored
 `.cache/implementation-campaign/` directory. Wait ten minutes only after transient launcher or quota
 failure when no child is live, and stop after three identical failures against one state token.
-The approved plan directly pins FastMCP and FastMCP Slim 4.0.0b1, selects local STDIO, and reserves
-clean macOS onboarding through a documented Python setup path for runnable closure. The pins, the
-STDIO boundary, and the setup path's three starting inputs — a confirmed fresh vocabulary, a
-canonical snapshot document, and a confirmed v1 snapshot — are implemented, and a client launching
-the server as a subprocess is exercised end to end. Configuring a client on this machine to launch
-it remains runnable closure, and changes that client's own configuration rather than this
-repository.
+The campaign's plan directly pins FastMCP and FastMCP Slim 4.0.0b1, selects local STDIO, and
+reserves clean macOS onboarding through a documented Python setup path for runnable closure. The
+pins, the STDIO boundary, and the setup path's three starting inputs — a confirmed fresh vocabulary,
+a canonical snapshot document, and a confirmed v1 snapshot — are implemented, and a client launching
+the server as a subprocess is exercised end to end, including the exact command an owner would
+register. Configuring a client on this machine to launch it remains runnable closure, and changes
+that client's own configuration rather than this repository.
+
+That plan is not currently approved. Closure found that its client-configuration half — the setup
+program registering Codex or Claude Code — was never built, recorded a plan gap, and left approval
+at `changes-required` with the campaign `blocked`; `just implementation-campaign-status` reports it,
+and `docs/mcp-realization.md` states the open decision and the commands an owner can run meanwhile.
+Read the plan text above as what was selected, not as live authorization, until a renewed plan is
+approved.
 
 Vellis checkpoint identifiers are navigation labels in the portable campaign record:
 

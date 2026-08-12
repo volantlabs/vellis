@@ -86,25 +86,55 @@ before applying it, and complete non-interactive arguments plus `--yes` support 
 
 The setup path selects blank or Everyday Life initialization, v2 snapshot plus optional tail, and v1
 preview and exact confirmation. All three starting inputs are implemented, and a companion command
-writes the snapshot document the second one takes; everything about client configuration below is
-selected rather than implemented, and README states where the implementation stands. It accepts a configurable data
+writes the snapshot document the second one takes. It accepts a configurable data
 location with a platform-appropriate user-data default; tests use temporary directories, and neither
-tests nor the runtime default use the repository's protected `.data/` directory. It can configure
-Codex, Claude Code, both, or neither.
-Client configuration is user-scoped and goes only through the public `codex mcp` and `claude mcp`
-commands after preview and confirmation; the program never edits their configuration files directly.
-A matching `vellis` entry is a no-op, a differing entry requires explicit replacement, and a missing
-or unsupported client produces copyable commands without failing or undoing valid Vellis
-initialization. Client tool approval settings remain entirely client-owned.
+tests nor the runtime default use the repository's protected `.data/` directory.
 
-For the approved macOS closure rehearsal, a matching dry run authorizes replacing only the existing
-disabled Codex `vellis` HTTP entry with the selected STDIO entry and adding the Claude Code STDIO
-entry. Any observed state drift, different destination, unsupported CLI behavior, or permission-policy
-change pauses for human direction. This is bounded execution authority, not implemented behavior.
+## Client configuration
 
-macOS supplies the first clean-environment runnable evidence, including real Codex and Claude Code
-discovery and invocation. Linux and Windows receive platform-correct commands, path handling,
-dry-run/configuration tests, and troubleshooting guidance, but are compatibility targets rather than
-initial closure blockers. The client command contracts are documented by
+Registering Vellis with an MCP client changes that client's own user-scoped state rather than
+anything in this repository. Whichever way that happens, it goes through the public `codex mcp` and
+`claude mcp` commands and never edits a configuration file directly, a matching `vellis` entry is a
+no-op, a differing entry is replaced only deliberately, and client tool approval settings stay
+entirely client-owned.
+
+Who does it is currently unsettled, and closure stopped on that. The superseded plan's realization
+decisions D004 and D005 put it in the setup program — configuring Codex, Claude Code, both, or
+neither, and printing copyable commands when a client is missing. No such behavior exists:
+`grep -rn "codex mcp\|claude mcp" vellis` returns nothing, and no test exercises it. So the dry run
+that plan's closure step names has nothing to run, and authority A017 reads `partial`. Resolving
+that — build it, or record that the owner does it unaided — is a plan decision rather than an
+implementation detail, so the campaign is blocked on it.
+
+Either way the owner can close the runnable boundary by hand today. Establish a system first with
+`uv run python -m vellis.setup`, then, with `VELLIS` standing for the absolute path of this clone:
+
+```sh
+VELLIS=/absolute/path/to/this/clone
+
+codex mcp list                       # what is registered now
+codex mcp remove vellis              # only if that list shows a vellis entry that differs
+codex mcp add vellis -- uv --directory "$VELLIS" run python -m vellis
+
+claude mcp list                      # what is registered now
+claude mcp remove vellis             # only if that list shows a vellis entry that differs
+claude mcp add --scope user vellis -- uv --directory "$VELLIS" run python -m vellis
+```
+
+The two `list` commands come first because they, not this page, are what say where the entries
+actually stand: skip both the `remove` and the `add` for a client whose `vellis` entry already
+matches, and skip only the `remove` for one that has no entry at all. Codex is user-scoped already,
+which is why only `claude mcp add` carries `--scope user`. `--directory` is what makes the launch
+work from wherever the client starts it, since the module is resolved out of this project, so
+`VELLIS` has to be a real absolute path before either `add` runs — neither CLI checks the command it
+stores, and a wrong one fails at launch instead. Add `--data-dir DESTINATION` after `-m vellis` when
+setup put the system somewhere other than its default, and list again afterwards to confirm. Any
+state drift, different destination, unsupported CLI behavior, or permission-policy change stops for
+the owner's direction instead.
+
+macOS is to supply the first clean-environment runnable evidence, including real Codex and Claude
+Code discovery and invocation; none of that is recorded yet. Linux and Windows are compatibility
+targets rather than initial closure blockers, and what they receive depends on the same unsettled
+decision. The client command contracts are documented by
 [OpenAI](https://learn.chatgpt.com/docs/extend/mcp) and
 [Anthropic](https://docs.anthropic.com/en/docs/claude-code/mcp).

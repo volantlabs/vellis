@@ -42,9 +42,9 @@ implementation-campaign-status:
 implementation-campaign-dispatch identical_failures="0" expected_state_token="":
     @expected={{quote(expected_state_token)}}; if test -n "$expected"; then uv run python tools/implementation_campaign.py dispatch --identical-failures {{quote(identical_failures)}} --expect-state-token "$expected"; else uv run python tools/implementation_campaign.py dispatch --identical-failures {{quote(identical_failures)}}; fi
 
-# Generate one finding-free, project-bound review prompt for an active slice.
-implementation-campaign-review-frame slice lens:
-    @uv run python tools/implementation_campaign.py review-frame --slice {{quote(slice)}} --lens {{quote(lens)}}
+# Generate one finding-free, project-bound review prompt for an active slice or for closure.
+implementation-campaign-review-frame work_item lens:
+    @uv run python tools/implementation_campaign.py review-frame --slice {{quote(work_item)}} --lens {{quote(lens)}}
 
 # Validate a compact campaign worker result before a manager consumes it.
 implementation-campaign-worker-result-check result:

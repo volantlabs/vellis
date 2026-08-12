@@ -46,6 +46,7 @@ WORKER_RESULT_SCHEMA_PATH = (
     / "campaign-worker-result.schema.json"
 )
 REVIEW_LENSES = ("authority", "engineering")
+CLOSURE_WORK_ITEM = "closure"
 
 
 class UniqueKeyLoader(yaml.SafeLoader):
@@ -615,6 +616,16 @@ def validate_campaign(
 
     findings.extend(_cycle_findings(slices))
 
+    blocked_authority_ids = {
+        authority_id
+        for blocker in (
+            campaign["campaign"]["blocker"],
+            *(entry["blocker"] for entry in slice_entries),
+        )
+        if blocker is not None
+        for authority_id in blocker["authority_ids"]
+    }
+
     for authority in authorities:
         authority_id = authority["id"]
         unknown_slices = set(authority["slice_ids"]) - set(slices)
@@ -627,6 +638,46 @@ def validate_campaign(
         }
         if contributed_by != set(authority["slice_ids"]):
             findings.append(f"authority {authority_id} slice links are not bidirectional")
+        # An aggregate row is a roll-up of its contributors, and nothing else reconciles it. A
+        # campaign that has run every contributor of a fully planned authority to completion has
+        # nothing left to wait for, so a roll-up still reading unevaluated, absent, or partial
+        # there understates finished work rather than describing it.
+        #
+        # Pausing is the one time saying "unfinished" is the honest thing to do — but "state the
+        # exact disposition" means naming which authority, so a blocked or stale campaign gets
+        # that latitude only where a blocker actually names the row. Anywhere else the
+        # understatement is the same defect it would be while executing, and a paused record does
+        # not become a place to quietly park settled work. Replanning is exempt outright: a
+        # planning or awaiting-approval campaign has no blocker to name anything with, and newly
+        # modelled authority has to go somewhere before anyone evaluates it. Partial planned
+        # coverage is never settled by completion, because the plan never intended to close it.
+        #
+        # Overstatement is wrong in every lifecycle and gets no exemption at all, in either of its
+        # two shapes: conforming while a contributor is still open, and conforming while a blocker
+        # says that very authority is what the campaign stopped on.
+        settled = bool(authority["slice_ids"]) and all(
+            slice_id in slices and slices[slice_id]["lifecycle"] == "complete"
+            for slice_id in authority["slice_ids"]
+        )
+        status = authority["implementation_status"]
+        lifecycle = campaign["campaign"]["lifecycle"]
+        unfinished = status in {"not evaluated", "absent", "partial"}
+        if settled and unfinished and authority["planned_coverage"] == "full":
+            if lifecycle in {"ready", "active", "complete"}:
+                findings.append(
+                    f"authority {authority_id} is {status} with every contributing slice complete"
+                )
+            elif lifecycle in {"blocked", "stale"} and authority_id not in blocked_authority_ids:
+                findings.append(
+                    f"authority {authority_id} is {status} with every contributing slice complete "
+                    "and no blocker naming it"
+                )
+        if not settled and status == "conforming":
+            findings.append(
+                f"authority {authority_id} is conforming with an incomplete contributing slice"
+            )
+        if status == "conforming" and authority_id in blocked_authority_ids:
+            findings.append(f"authority {authority_id} is conforming and blocked at the same time")
 
     active = [entry for entry in slice_entries if entry["lifecycle"] == "active"]
     if len(active) > 1:
@@ -1183,7 +1234,7 @@ def dispatch_packet(
             reason_codes.append("dirty-state-has-no-active-slice")
         elif lifecycle == "complete":
             action = "complete"
-            work_item = "closure"
+            work_item = CLOSURE_WORK_ITEM
             reason_codes.append("campaign-complete")
         elif (
             approval != "accepted"
@@ -1208,7 +1259,7 @@ def dispatch_packet(
             reason_codes.append("dependency-ready-slice")
         elif all_slices_complete:
             action = "launch-closure"
-            work_item = "closure"
+            work_item = CLOSURE_WORK_ITEM
             reason_codes.append("all-slices-complete")
         else:
             findings.append(
@@ -1238,10 +1289,119 @@ def dispatch_packet(
     }
 
 
+def _closure_review_frame(campaign: dict[str, Any], *, lens: str) -> str:
+    """Frame the whole-system closure item rather than one slice.
+
+    Closure has no slice row to read, so its frame is the aggregate: every authority entry
+    with its rolled-up status, the three closure dimensions, and whatever blocker the
+    campaign is resting on. It stays finding-free for the same reason a slice frame does.
+    """
+    if any(entry["lifecycle"] != "complete" for entry in campaign["slices"]):
+        raise ValueError("review frame requires every slice complete: closure")
+
+    authority_lines = [
+        f"- {entry['id']} {entry['label']}: planned {entry['planned_coverage']}; "
+        f"status {entry['implementation_status']}; slices: " + ", ".join(entry["slice_ids"])
+        for entry in campaign["authority"]
+    ]
+    closure = campaign["closure"]
+    evidence_lines = [f"- {reference}" for reference in closure["evidence_refs"]] or ["- none"]
+    # A recorded blocker carries the closure writer's own diagnosis and prescribed resolution, and
+    # handing that prose to both lenses is exactly the prior finding a fixed frame excludes. Its
+    # classification and the authority it names are state a reviewer needs; the summary is not.
+    blocker = campaign["campaign"]["blocker"]
+    blocker_lines = (
+        [
+            f"- classification: {blocker['classification']}",
+            "- authority: " + (", ".join(blocker["authority_ids"]) or "none"),
+        ]
+        if blocker is not None
+        else ["- none"]
+    )
+    decision_lines = [
+        f"- {decision['id']}: {decision['summary']}"
+        for entry in campaign["slices"]
+        for decision in entry["realization_decisions"]
+    ] or ["- none"]
+    lens_task = {
+        "authority": (
+            "Trace whether the aggregate authority universe is complete against the current "
+            "model, whether every rolled-up status and coverage claim is true of the work "
+            "actually finished, and whether any genuine model or plan gap remains open."
+        ),
+        "engineering": (
+            "Inspect whether integration across slices holds, whether the closure evidence "
+            "discriminates the nearest wrong result, whether the runnable-boundary and "
+            "documentation claims match what a cold reader can reproduce, and whether any "
+            "obsolete scaffolding or unsupported capability claim survives."
+        ),
+    }[lens]
+    return "\n".join(
+        [
+            f"# Read-only {lens} review for closure",
+            "",
+            "Work independently from the current workspace. Read and obey AGENTS.md and the named",
+            "model sources. Do not mutate files, inspect protected user data, or assume",
+            "conversation history. Treat local repository and checkpoint machinery as trusted",
+            "unless closure intentionally changes it.",
+            "",
+            "Work item: whole-system closure after the last planned slice",
+            f"Campaign lifecycle: {campaign['campaign']['lifecycle']}",
+            f"Model baseline status: {campaign['model_baseline']['status']}",
+            f"Campaign checkpoint: {campaign['campaign']['checkpoint'] or 'none'}",
+            "",
+            "## Lens",
+            "",
+            lens_task,
+            "",
+            "## Aggregate authority and rolled-up status",
+            "",
+            *authority_lines,
+            "",
+            "## Closure dimensions",
+            "",
+            f"- authority coverage: {closure['authority_coverage']}",
+            f"- integration status: {closure['integration_status']}",
+            f"- runnable status: {closure['runnable_status']}",
+            f"- closure checkpoint: {closure['checkpoint'] or 'none'}",
+            "",
+            "## Selected realization decisions",
+            "",
+            *decision_lines,
+            "",
+            "## Recorded campaign blocker",
+            "",
+            *blocker_lines,
+            "",
+            "## Current closure evidence",
+            "",
+            *evidence_lines,
+            "",
+            "## Materiality and response",
+            "",
+            "Report a material finding only when it names a plausible consequence within the",
+            "qualified authority, selected boundaries, declared project assumptions, or ordinary",
+            "malformed-input and recovery behavior. Do not invent novel mutants, fuzz spaces,",
+            "attack models, or speculative inputs merely to find something new.",
+            "Style preferences, alternate truthful wording, duplicated evidence, and unselected",
+            "hardening are optional observations and do not make the review non-clean.",
+            "",
+            "Return complete material findings first. Give each consequence and reproducible",
+            "evidence, then optional observations. Say explicitly when no material findings exist.",
+        ]
+    )
+
+
 def review_frame(campaign: dict[str, Any], *, slice_id: str, lens: str) -> str:
-    """Build a project-bound, finding-free prompt for one read-only review lens."""
+    """Build a project-bound, finding-free prompt for one read-only review lens.
+
+    Dispatch names two kinds of work item, so this names the same two. ``closure`` is the
+    whole-system item that follows the last slice; every other value is a slice ID.
+    """
     if lens not in REVIEW_LENSES:
         raise ValueError(f"unknown review lens: {lens}")
+    if slice_id == CLOSURE_WORK_ITEM:
+        return _closure_review_frame(campaign, lens=lens)
     try:
         selected = next(entry for entry in campaign["slices"] if entry["id"] == slice_id)
     except StopIteration as error:
@@ -1408,7 +1568,7 @@ def main() -> int:
         default=IMPLEMENTATION_CAMPAIGN_PATH,
         help="campaign YAML path",
     )
-    parser.add_argument("--slice", help="slice ID for review-frame")
+    parser.add_argument("--slice", help=f"slice ID, or {CLOSURE_WORK_ITEM!r}, for review-frame")
     parser.add_argument("--lens", choices=REVIEW_LENSES, help="review-frame lens")
     parser.add_argument("--result", type=Path, help="worker result JSON path")
     parser.add_argument(

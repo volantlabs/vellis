@@ -186,6 +186,62 @@ def _complete_fourth_slice(campaign: dict[str, object], *, checkpoint: str) -> N
     fourth["evidence_refs"] = ["command:just check"]
     fourth["checkpoint"] = checkpoint
     campaign["slices"][4]["lifecycle"] = "ready"  # type: ignore[index]
+    _reconcile_settled_authority(campaign)
+
+
+def _finished_campaign() -> dict[str, object]:
+    """An approved campaign whose every slice has completed and whose roll-ups agree.
+
+    This is the state closure runs in, and the one the settled-roll-up rule speaks about.
+    It validates cleanly, so a test can move exactly one value and see what the checker
+    makes of it.
+    """
+    campaign = _pending_campaign()
+    for entry in campaign["slices"]:  # type: ignore[union-attr]
+        entry["lifecycle"] = "complete"
+        entry["implementation_status"] = "conforming"
+        entry["evidence_refs"] = ["command:just check"]
+        entry["checkpoint"] = f"slice:{entry['id']}:{PLAN_SHA[:12]}:1"
+    _reconcile_settled_authority(campaign)
+    campaign["campaign"]["lifecycle"] = "ready"  # type: ignore[index]
+    campaign["campaign"]["plan_approval"] = {  # type: ignore[index]
+        "status": "accepted",
+        "checkpoint": APPROVAL_CHECKPOINT,
+    }
+    campaign["campaign"]["checkpoint"] = campaign["slices"][-1]["checkpoint"]  # type: ignore[index]
+    return campaign
+
+
+def _blocked_campaign() -> dict[str, object]:
+    """A finished campaign that stopped, with its blocker naming A001."""
+    campaign = _finished_campaign()
+    campaign["campaign"]["lifecycle"] = "blocked"  # type: ignore[index]
+    campaign["campaign"]["plan_approval"] = {"status": "changes-required", "checkpoint": None}  # type: ignore[index]
+    campaign["campaign"]["checkpoint"] = campaign["slices"][-1]["checkpoint"]  # type: ignore[index]
+    campaign["campaign"]["blocker"] = {  # type: ignore[index]
+        "classification": "plan gap",
+        "summary": "the runnable boundary is unsettled",
+        "authority_ids": ["A001"],
+        "evidence_refs": ["command:just check"],
+    }
+    return campaign
+
+
+def _reconcile_settled_authority(campaign: dict[str, object]) -> None:
+    """Roll up any authority whose contributing slices have all completed.
+
+    Completing a slice can settle an aggregate row, and a real campaign reconciles it in
+    the same checkpoint. These fixtures are about checkpoint labelling, so they do it here
+    rather than leaving a stale roll-up the checker would rightly report.
+    """
+    lifecycles = {
+        entry["id"]: entry["lifecycle"]
+        for entry in campaign["slices"]  # type: ignore[union-attr]
+    }
+    for entry in campaign["authority"]:  # type: ignore[union-attr]
+        if all(lifecycles[slice_id] == "complete" for slice_id in entry["slice_ids"]):
+            entry["implementation_status"] = "conforming"
+            entry["evidence_refs"] = ["command:just check"]
 
 
 def test_a_slice_finished_since_the_renewal_must_checkpoint_against_the_renewed_plan(
@@ -503,6 +559,89 @@ def test_authority_and_slice_links_must_be_bidirectional() -> None:
     assert any("slice links are not bidirectional" in finding for finding in findings)
 
 
+def test_a_settled_authority_may_not_stay_unevaluated_absent_or_partial() -> None:
+    """Nothing but closure reconciles a roll-up, so the checker has to notice a stale one.
+
+    Five aggregate rows sat at ``partial`` after every slice contributing to them had
+    completed and been reviewed. Each slice was right about its own contribution and no
+    rule compared them, so the record understated finished work until closure read it.
+    """
+    campaign = _finished_campaign()
+    campaign["authority"][0]["implementation_status"] = "partial"  # type: ignore[index]
+    campaign["authority"][1]["implementation_status"] = "conflicting"  # type: ignore[index]
+
+    findings = implementation_campaign.validate_campaign(campaign)
+
+    assert any(
+        "authority A001 is partial with every contributing slice complete" in finding
+        for finding in findings
+    )
+    assert not any("authority A002" in finding for finding in findings)
+
+
+def test_a_paused_campaign_may_say_an_authority_is_still_unfinished() -> None:
+    """Stating the exact open disposition is the whole point of pausing.
+
+    The settled-roll-up rule exists to stop an executing campaign from understating work it
+    already finished. A campaign that has stopped is doing the opposite: naming what is not
+    done. Closure's own guidance requires that a campaign with authority still absent,
+    partial, or unevaluated stay open and say so.
+    """
+    campaign = _blocked_campaign()
+    campaign["authority"][0]["implementation_status"] = "partial"  # type: ignore[index]
+
+    assert implementation_campaign.validate_campaign(campaign) == []
+
+
+def test_a_pause_excuses_only_the_authority_its_blocker_names() -> None:
+    """Otherwise a blocked record becomes somewhere to park settled work unnoticed.
+
+    Stating the exact disposition is what earns the latitude, so the latitude reaches
+    exactly as far as the statement does. A second row quietly reverted to partial under
+    the same blocker is the original defect wearing a pause.
+    """
+    campaign = _blocked_campaign()
+    campaign["authority"][0]["implementation_status"] = "partial"  # type: ignore[index]
+    campaign["authority"][1]["implementation_status"] = "partial"  # type: ignore[index]
+
+    findings = implementation_campaign.validate_campaign(campaign)
+
+    assert findings == [
+        "authority A002 is partial with every contributing slice complete and no blocker naming it"
+    ]
+
+
+def test_an_authority_a_blocker_names_may_not_also_read_conforming() -> None:
+    """The record cannot both stop on an authority and claim it conforms."""
+    campaign = _blocked_campaign()
+    campaign["authority"][0]["implementation_status"] = "conforming"  # type: ignore[index]
+
+    findings = implementation_campaign.validate_campaign(campaign)
+
+    assert findings == ["authority A001 is conforming and blocked at the same time"]
+
+
+def test_partly_planned_authority_is_not_settled_by_finishing_its_slices() -> None:
+    campaign = _finished_campaign()
+    campaign["authority"][0]["planned_coverage"] = "partial"  # type: ignore[index]
+    campaign["authority"][0]["implementation_status"] = "partial"  # type: ignore[index]
+    campaign["closure"]["authority_coverage"] = "partial"  # type: ignore[index]
+
+    assert implementation_campaign.validate_campaign(campaign) == []
+
+
+def test_a_conforming_authority_needs_every_contributing_slice_complete() -> None:
+    campaign = _pending_campaign()
+    campaign["authority"][0]["implementation_status"] = "conforming"  # type: ignore[index]
+
+    findings = implementation_campaign.validate_campaign(campaign)
+
+    assert any(
+        "authority A001 is conforming with an incomplete contributing slice" in finding
+        for finding in findings
+    )
+
+
 def test_qualified_authority_reference_is_bound_to_its_source_file() -> None:
     campaign = _pending_campaign()
     campaign["authority"][0]["refs"][0]["source"] = "model/50-verification.sysml"  # type: ignore[index]
@@ -766,13 +905,9 @@ def test_a_slice_completed_under_a_renewed_plan_may_not_use_the_superseded_one()
 def test_a_slice_completed_under_the_renewed_plan_becomes_the_campaign_checkpoint() -> None:
     campaign = _replanned_campaign()
     _renew(campaign)
-    fourth = campaign["slices"][3]  # type: ignore[index]
-    fourth["lifecycle"] = "complete"
-    fourth["implementation_status"] = "conforming"
-    fourth["evidence_refs"] = ["command:just check"]
-    fourth["checkpoint"] = f"slice:S004:{PLAN_SHA[:12]}:1"
-    campaign["campaign"]["checkpoint"] = fourth["checkpoint"]  # type: ignore[index]
-    campaign["slices"][4]["lifecycle"] = "ready"  # type: ignore[index]
+    checkpoint = f"slice:S004:{PLAN_SHA[:12]}:1"
+    _complete_fourth_slice(campaign, checkpoint=checkpoint)
+    campaign["campaign"]["checkpoint"] = checkpoint  # type: ignore[index]
 
     assert implementation_campaign.validate_campaign(campaign) == []
 
@@ -1305,6 +1440,66 @@ def test_review_frames_are_lens_specific_and_contain_no_review_history() -> None
     assert "previous reviewer" not in authority.lower()
     assert "expected conclusion" not in engineering.lower()
     assert "invent novel mutants" in authority
+
+
+def test_the_closure_work_item_gets_a_frame_of_its_own() -> None:
+    """Dispatch names ``closure`` as a work item, so a frame has to exist for it.
+
+    Closure is not a slice, and asking for one by that name used to fail as an unknown
+    slice ID, leaving the item the campaign ends on with no way to generate its two fixed
+    review prompts.
+    """
+    campaign = _finished_campaign()
+
+    authority = implementation_campaign.review_frame(campaign, slice_id="closure", lens="authority")
+    engineering = implementation_campaign.review_frame(
+        campaign, slice_id="closure", lens="engineering"
+    )
+
+    assert "aggregate authority universe" in authority
+    assert "integration across slices" in engineering
+    assert "runnable status:" in authority and "runnable status:" in engineering
+    assert "A018" in authority
+    assert "D006" in engineering
+    assert "invent novel mutants" in engineering
+    assert "previous reviewer" not in authority.lower()
+    assert "expected conclusion" not in engineering.lower()
+
+
+def test_a_closure_frame_renders_a_blockers_shape_but_not_its_summary() -> None:
+    """A blocker summary is the writer's own reading, and a fixed frame does not repeat it.
+
+    Both lenses read the same frame, so quoting the diagnosis and its prescribed resolution
+    into it is how one opinion becomes two agreeing ones. Classification and the authority
+    named are state; the prose is a finding.
+
+    This bounds what the frame itself writes, and nothing more. A reviewer following the
+    frame's own evidence references and AGENTS.md will still read the campaign's recorded
+    status in the repository's own words, which is what truthful documentation is for; the
+    frame is not a way to keep a reviewer from finding out where the campaign stands.
+    """
+    campaign = _finished_campaign()
+    campaign["campaign"]["lifecycle"] = "blocked"  # type: ignore[index]
+    campaign["campaign"]["plan_approval"] = {"status": "changes-required", "checkpoint": None}  # type: ignore[index]
+    campaign["campaign"]["blocker"] = {  # type: ignore[index]
+        "classification": "plan gap",
+        "summary": "the sky is falling and the only fix is to rewrite S009",
+        "authority_ids": ["A017"],
+        "evidence_refs": ["command:just check"],
+    }
+
+    for lens in ("authority", "engineering"):
+        frame = implementation_campaign.review_frame(campaign, slice_id="closure", lens=lens)
+        assert "classification: plan gap" in frame
+        assert "A017" in frame
+        assert "the sky is falling" not in frame
+
+
+def test_a_closure_frame_needs_every_slice_finished_first() -> None:
+    campaign = _pending_campaign()
+
+    with pytest.raises(ValueError, match="requires every slice complete"):
+        implementation_campaign.review_frame(campaign, slice_id="closure", lens="authority")
 
 
 def test_worker_result_contract_is_compact_and_rejects_transcripts() -> None:

@@ -47,8 +47,9 @@ the Vellis binding into another project.
 
 For a complete-system build, `$sysml-implementation-planning` reads the complete accepted model and
 derives dependency-ordered, evidence-bearing semantic slices. The committed campaign record stays
-awaiting human approval until that complete plan is accepted; this repository's plan has been
-accepted and is executing. A continuation harness may then invoke
+awaiting human approval until that complete plan is accepted; this repository's plan was accepted,
+ran to the end of its seventeen slices, and is now paused at closure on a plan gap the owner has to
+settle. A continuation harness may then invoke
 `$sysml-implementation-campaign` through a thin manager. The manager reads one machine disposition,
 launches a fresh worker for exactly that slice, waits, and independently validates its checkpoint.
 The worker uses `$sysml-implementation`, runs both bounded review lenses, batches remediation, runs
@@ -91,8 +92,8 @@ Useful commands:
   blockers, and closure status.
 - `just implementation-campaign-dispatch`: emit the manager's machine-readable action, selected work
   item, checkpoint, worktree condition, Git identity, reason codes, and state token without mutation.
-- `just implementation-campaign-review-frame <slice> <lens>`: generate one fixed, finding-free prompt
-  for the active slice's `authority` or `engineering` review lens.
+- `just implementation-campaign-review-frame <work-item> <lens>`: generate one fixed, finding-free
+  prompt for the `authority` or `engineering` review lens of the active slice, or of `closure`.
 - `just implementation-campaign-worker-result-check <path>`: validate a compact worker handoff that
   contains counts and checkpoint state rather than review transcripts.
 - `just implementation-campaign-baseline`: print the currently observed model, language, and
@@ -103,12 +104,19 @@ Useful commands:
 
 ## Implementation status
 
-All seventeen campaign slices are complete. Whole-system closure is a separate step and is still
-open: it reconciles the campaign record's aggregate authority status, exercises integration, and
-configures a client on this machine to launch the server. Until it finishes, read this section for
-what each capability's status is rather than treating a completed slice list as a completed system.
-A plan gap found during the fourth returned the campaign to `awaiting-plan-approval`; the corrected
-plan has since been approved and that slice checkpointed under it.
+All seventeen campaign slices are complete. Whole-system closure ran after them and did not finish.
+It reconciled every aggregate authority row against its contributing slices — seventeen of the
+eighteen now read `conforming` — and found integration across those slices exercised and conforming.
+It then blocked on the last one. The superseded plan puts MCP client configuration in the setup
+program, nothing implements it, and the repository says elsewhere that registering a client is the
+owner's own user-scoped action; deciding which of those is true is a plan question rather than an
+implementation detail, so `A017` and the runnable boundary both read `partial` — the STDIO boundary
+and the exact command an owner would register are exercised, the registration itself is not.
+Meanwhile the owner can close that boundary by hand: see
+[MCP realization](docs/mcp-realization.md#client-configuration) for the exact commands and the open
+decision. Read this section for what each capability's status is rather than treating a completed
+slice list as a completed system. A plan gap found during the fourth slice returned the campaign to
+`awaiting-plan-approval`; the corrected plan was approved and that slice checkpointed under it.
 `just implementation-campaign-status` reports exactly where it stands. Use these words precisely:
 
 - **Implemented and verified.** Canonical graph, definition, and constraint meaning; canonical
@@ -213,16 +221,21 @@ plan has since been approved and that slice checkpointed under it.
   that is the revision the captured state reached rather than zero. Setup stores memory under
   `VELLIS_DATA_DIR` when that is set and otherwise under the platform's user-data location, and
   never writes to this repository's ignored `.data/`.
-  `uv run python -m vellis` then serves that memory over local standard input and output, and
-  refuses rather than creating one; a client that cannot start it is told which stage failed, that
-  established memory is unchanged, and what to do next, in the same shape setup uses. Both commands
+  `uv run python -m vellis` then serves that memory over local standard input and output; pointed at
+  a destination holding no established memory it refuses rather than creating one, and a client that
+  cannot start it is told which stage failed, that established memory is unchanged, and what to do
+  next, in the same shape setup uses. Both commands
   resolve the same destination, so a system established at a configured location is the one the
-  server serves. A real MCP client launching that command as a subprocess discovers exactly the
+  server serves. An MCP client launching that command as a subprocess discovers exactly the
   selected ten tools and reaches the memory setup established, across separate sessions and
-  processes.
-- **Not implemented yet.** No client on this machine is configured to launch the server; that is
-  runnable closure, and it changes a client's own configuration rather than anything here. FastMCP
-  and FastMCP Slim are pinned at 4.0.0b1 and installed.
+  processes — a real client library over the real transport, though not yet one of the owner's own
+  configured clients.
+- **Not implemented, and blocked on a decision.** No client on this machine is configured to launch
+  the server, and nothing here configures one. The superseded plan says the setup program does it
+  through the public `codex mcp` and `claude mcp` commands; that behavior was never built, so the
+  plan and the code disagree and closure stopped rather than guessing which way to settle it.
+  [MCP realization](docs/mcp-realization.md#client-configuration) carries the commands an owner can
+  run in the meantime. FastMCP and FastMCP Slim are pinned at 4.0.0b1 and installed.
 
 Deployment and migration realization remain open. The initial contract assumes one trusted
 owner-configured client; its tools do not implement per-call authorization or decide owner approval.

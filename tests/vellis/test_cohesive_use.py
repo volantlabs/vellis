@@ -363,6 +363,47 @@ async def test_a_client_launched_server_serves_exactly_the_selected_ten_tools(
 
 
 @pytest.mark.anyio
+async def test_the_command_an_owner_registers_is_the_one_that_launches(
+    established: Path,
+    tmp_path: Path,
+) -> None:
+    """The documented client entry, run as the owner's client would run it.
+
+    The other tests here launch the module with this interpreter from the repository,
+    which proves the server but not the string an owner is told to register. That string
+    is different in every part that can break: ``uv`` rather than a Python already chosen,
+    ``--directory`` rather than an inherited working directory, and a client whose cwd is
+    somewhere else entirely. If it drifts — a renamed entry point, a dropped flag, a
+    project ``uv`` can no longer resolve — nothing else in the suite would notice, and the
+    owner would find out from a client that fails to start.
+    """
+    documented = Client(
+        StdioTransport(
+            command="uv",
+            args=[
+                "--directory",
+                str(REPOSITORY_ROOT),
+                "run",
+                "python",
+                "-m",
+                "vellis",
+                "--data-dir",
+                str(established),
+            ],
+            cwd=str(tmp_path),
+            env={**os.environ},
+        )
+    )
+    async with documented as agent:
+        discovered = await agent.list_tools()
+        people = await _call(agent, "rtg_query", _people_query())
+
+    assert sorted(each.name for each in discovered) == sorted(TOOL_NAMES)
+    # Not merely up: serving the memory setup established, from a cwd that is not the clone.
+    assert people["status"] == "accepted"
+
+
+@pytest.mark.anyio
 async def test_approved_context_outlives_the_session_and_the_process(
     established: Path,
 ) -> None:

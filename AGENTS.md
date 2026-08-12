@@ -90,13 +90,18 @@ memory. Each fresh worker executes exactly one slice or closure item and stops. 
 gate for the complete campaign, not one human gate per slice. Routine reviewed slice checkpoints
 continue autonomously; only the campaign skill's explicit pause conditions return to the human.
 
-The approved campaign selects direct pins for `fastmcp==4.0.0b1` and `fastmcp-slim==4.0.0b1`,
+The campaign selects direct pins for `fastmcp==4.0.0b1` and `fastmcp-slim==4.0.0b1`,
 local STDIO, and a documented Python setup path that configures user-scoped Codex or Claude Code
 only through their public CLIs. These are selected realization constraints, not model structure;
 read current implementation and runnable status from `implementation-campaign.yaml` and the README.
 Do not
 upgrade the pre-release pin, add another transport, or edit client configuration files directly
 without renewed review of the selected plan.
+
+The client-configuration half of that selection was never built, and closure blocked on it, so plan
+approval currently reads `changes-required`. Whether the setup program configures clients at all is
+the open question; treat this paragraph as a record of what the superseded plan selected rather than
+as live authority, and build nothing under it until a renewed plan is approved.
 
 ## Implementation campaign binding
 
@@ -130,8 +135,8 @@ After approval, every slice and closure checkpoint must preserve the exact appro
 authority, coverage, dependency, verification, realization-decision, and baseline projection. Plan
 changes require a new candidate plan, cold review, and renewed human approval.
 
-Generate each review prompt with `just implementation-campaign-review-frame <slice> <lens>` after
-the slice is active. The frame deliberately excludes prior findings. Workers validate their compact
+Generate each review prompt with `just implementation-campaign-review-frame <work-item> <lens>`
+after the slice is active, or with `closure` once every slice is complete. The frame deliberately excludes prior findings. Workers validate their compact
 result with `just implementation-campaign-worker-result-check <path>`; managers do not accept raw
 review output. Store timing, review-count, check-count, and optional harness-usage telemetry only in
 the ignored `.cache/implementation-campaign/` area. Telemetry never establishes conformance or
@@ -145,10 +150,15 @@ one foreground `sleep 300` at a time followed by one status check; start another
 has completed. When the launcher can control the worker environment, prefer
 `CLAUDE_CODE_DISABLE_BACKGROUND_TASKS=1`.
 
-At runnable closure, the approved plan authorizes a matching dry run followed by public-CLI changes
-only to the named `vellis` client entries: replace the existing disabled Codex HTTP entry with the
-selected STDIO entry and add the Claude Code STDIO entry. Do not change any client approval policy.
-Pause if the observed entry, destination, CLI behavior, or requested effect differs.
+That authorization is suspended, and no agent acts on it. The superseded plan let runnable closure
+run a matching dry run and then change only the named `vellis` client entries through the public
+CLIs — replacing the disabled Codex HTTP entry with the selected STDIO entry and adding the Claude
+Code STDIO entry, never touching a client approval policy, pausing on any observed difference. The
+dry run it depends on does not exist, and the change is user-scoped, irreversible, and outside this
+repository, so it is the owner's to make. Reading that configuration is fine; do not run `codex mcp
+add`, `codex mcp remove`, `claude mcp add`, `claude mcp remove`, or anything else that changes it.
+`docs/mcp-realization.md` carries the commands for the owner to run, and a renewed plan decides who
+performs the step from here.
 
 ## Non-negotiable modeling rules
 
