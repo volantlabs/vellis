@@ -98,11 +98,20 @@ anything in this repository. Whichever way that happens, it goes through the pub
 no-op, a differing entry is replaced only deliberately, and client tool approval settings stay
 entirely client-owned.
 
-The selected owner of this behavior is the setup program. Closure exposed that decisions D004 and
-D005 were never implemented even though their original work items had checkpointed. The reviewed
-candidate campaign preserves that selection, assigns the missing behavior to corrective slice S018,
-and assigns the matching live dry run and registration to closure decision D006. Until renewed
-approval and execution, authority A017 and runnable closure remain `partial`.
+The selected owner of this behavior is the setup program. Repeating `--client codex` or
+`--client claude` selects either or both clients; omitting `--client` selects neither. Setup previews
+the public inspection and mutation commands before confirmation, treats a matching entry as a no-op,
+and requires `--replace-client CLIENT` before replacing a differing entry. Matching includes the
+enabled user scope, STDIO command and arguments, and an empty launch environment; another transport,
+destination-bearing environment, scope, or enabled state is a difference. Client inspection and
+connection outcomes are reported separately from memory initialization, with an exact client-only
+retry command. An unavailable client gets a platform-correct copyable command without undoing
+established memory. Linux and Windows command rendering, paths containing spaces, and non-default
+destinations have fake-client evidence.
+
+Corrective slice S018 implements decisions D004 and D005 without touching live client state. The
+matching live dry run and registration remain closure decision D006, so authority A017 and runnable
+closure remain `partial` until that boundary is exercised.
 
 The commands below are a fallback when a supported client CLI is unavailable, not the selected
 primary workflow and not evidence that campaign closure has occurred. Establish a system first with

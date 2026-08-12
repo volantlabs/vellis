@@ -30,6 +30,7 @@ established up to the order the options happen to be read in.
 from __future__ import annotations
 
 import argparse
+import os
 from collections.abc import Sequence
 from dataclasses import dataclass, replace
 from enum import Enum
@@ -37,6 +38,16 @@ from pathlib import Path
 from typing import TextIO
 
 from vellis.canonical import Provenance
+from vellis.client_setup import (
+    ClientAction,
+    ClientKind,
+    ClientOutcome,
+    ClientPlan,
+    ClientState,
+    apply_plans,
+    plan_clients,
+    render_command,
+)
 from vellis.definitions import GraphDefinitionSet
 from vellis.everyday_life import everyday_life_starter
 from vellis.json_value import JsonValueError, loads
@@ -66,6 +77,7 @@ from vellis.v1 import (
 __all__ = [
     "RECOMMENDED_VOCABULARY",
     "FreshVocabularyChoice",
+    "ClientKind",
     "SetupReport",
     "SetupStage",
     "main",
@@ -408,6 +420,7 @@ class _Existing:
 
     summary: str
     corrective_action: str
+    established: bool = False
 
 
 def _write_preview(
@@ -418,14 +431,21 @@ def _write_preview(
     recovered: ImportPreview | None = None,
     started_from: SnapshotStart | None = None,
     unreadable: str | None = None,
+    connect_existing: bool = False,
+    configure_clients: bool = False,
 ) -> None:
     stopped = (
-        existing is not None
+        (existing is not None and not connect_existing)
         or unreadable is not None
         or _refused(recovered)
         or (started_from is not None and not started_from.is_acceptable)
     )
-    if not stopped:
+    if connect_existing:
+        print(
+            "Vellis setup will leave established memory unchanged and configure selected clients.",
+            file=stream,
+        )
+    elif not stopped:
         print("Vellis setup will prepare one local personal system.", file=stream)
     else:
         # Said before the destination rather than after it: an owner reading down the
@@ -446,7 +466,15 @@ def _write_preview(
         # here would be offering something setup will refuse a moment later, and taking a
         # confirmation for it would be taking it under a false description.
         print(f"  {existing.summary}", file=stream)
-    print("  nothing outside that directory is read or changed.", file=stream)
+    if configure_clients:
+        print(
+            "  memory setup reads or changes only that directory; selected client "
+            "inspection reads user-scoped MCP state through public CLIs, and after "
+            "confirmation their public CLIs may change only the named vellis entries.",
+            file=stream,
+        )
+    else:
+        print("  nothing outside that directory is read or changed.", file=stream)
 
 
 def _existing_memory(store_file: Path) -> _Existing | None:
@@ -478,6 +506,7 @@ def _existing_memory(store_file: Path) -> _Existing | None:
     return _Existing(
         summary="this destination already holds memory; setup cannot start it again.",
         corrective_action=ALREADY_ESTABLISHED,
+        established=True,
     )
 
 
@@ -552,6 +581,53 @@ def _write_report(report: SetupReport, stream: TextIO) -> None:
     print(f"  what to do next: {report.corrective_action}", file=stream)
 
 
+def _write_client_preview(plans: Sequence[ClientPlan], stream: TextIO) -> None:
+    if not plans:
+        return
+    print("  MCP clients:", file=stream)
+    for plan in plans:
+        print(
+            f"    {plan.client.value}: {plan.state.value}; planned action: {plan.action.value}",
+            file=stream,
+        )
+        print(f"      inspect: {render_command(plan.inspection_argv)}", file=stream)
+        if plan.remove_argv is not None:
+            print(f"      remove:  {render_command(plan.remove_argv)}", file=stream)
+        if plan.action in {ClientAction.ADD, ClientAction.REPLACE, ClientAction.MANUAL}:
+            print(f"      add:     {plan.manual_command}", file=stream)
+        print(f"      {plan.detail}", file=stream)
+
+
+def _write_client_outcomes(
+    outcomes: Sequence[ClientOutcome], stream: TextIO, *, destination: Path
+) -> None:
+    for outcome in outcomes:
+        status = "configured" if outcome.succeeded else "not configured"
+        effect = "changed" if outcome.changed else "unchanged"
+        print(f"MCP client {outcome.plan.client.value}: {status}", file=stream)
+        print(f"  client configuration: {effect}", file=stream)
+        print("  established memory: unchanged", file=stream)
+        print(f"  result: {outcome.detail}", file=stream)
+        if not outcome.succeeded:
+            retry = [
+                "uv",
+                "--directory",
+                str(Path(__file__).resolve().parent.parent),
+                "run",
+                "python",
+                "-m",
+                "vellis.setup",
+                "--data-dir",
+                str(destination),
+                "--client",
+                outcome.plan.client.value,
+                "--yes",
+            ]
+            if outcome.plan.state is ClientState.DIFFERING:
+                retry.extend(("--replace-client", outcome.plan.client.value))
+            print(f"  what to do next: {render_command(retry)}", file=stream)
+
+
 def main(
     argv: Sequence[str] | None = None,
     *,
@@ -615,6 +691,26 @@ def main(
             "with blank fully supported"
         ),
     )
+    parser.add_argument(
+        "--client",
+        action="append",
+        choices=[client.value for client in ClientKind],
+        default=[],
+        help=(
+            "configure this supported MCP client after initialization; repeat for both "
+            "Codex and Claude Code, or omit to configure neither"
+        ),
+    )
+    parser.add_argument(
+        "--replace-client",
+        action="append",
+        choices=[client.value for client in ClientKind],
+        default=[],
+        help=(
+            "deliberately replace this selected client's differing vellis entry; repeat "
+            "when replacing both"
+        ),
+    )
     arguments = parser.parse_args(argv)
     if arguments.from_v1 is not None and arguments.from_snapshot is not None:
         parser.error(
@@ -625,6 +721,10 @@ def main(
             parser.error("a v1 snapshot carries its own vocabulary, so --vocabulary says nothing")
         if arguments.from_snapshot is not None:
             parser.error("a snapshot carries its own vocabulary, so --vocabulary says nothing")
+    selected_clients = tuple(ClientKind(value) for value in arguments.client)
+    replaced_clients = tuple(ClientKind(value) for value in arguments.replace_client)
+    if not set(replaced_clients).issubset(selected_clients):
+        parser.error("--replace-client requires the same client to be selected with --client")
     choice = FreshVocabularyChoice(arguments.vocabulary or RECOMMENDED_VOCABULARY.value)
 
     preview = prepare_local_system(data_directory=arguments.data_dir, dry_run=True, choice=choice)
@@ -653,6 +753,16 @@ def main(
                 started_from = _read_snapshot_document(str(arguments.from_snapshot))
             except SnapshotError as unreadable:
                 unreadable_snapshot = str(unreadable)
+    explicit_start = any(
+        value is not None
+        for value in (arguments.from_v1, arguments.from_snapshot, arguments.vocabulary)
+    )
+    client_only_retry = (
+        existing is not None
+        and existing.established
+        and bool(selected_clients)
+        and not explicit_start
+    )
     _write_preview(
         preview,
         out,
@@ -660,6 +770,8 @@ def main(
         recovered=recovered,
         started_from=started_from,
         unreadable=unreadable_snapshot,
+        connect_existing=client_only_retry,
+        configure_clients=bool(selected_clients),
     )
     if unreadable_snapshot is not None:
         _write_report(
@@ -680,7 +792,7 @@ def main(
             error,
         )
         return EXIT_FAILED
-    if existing is not None:
+    if existing is not None and not client_only_retry:
         # Setup already knows this destination will not do, and knows the way out. Going
         # on would ask an owner to confirm an operation that has already been decided
         # against, which is not a confirmation of anything.
@@ -723,6 +835,15 @@ def main(
             error,
         )
         return EXIT_FAILED
+    assert preview.destination is not None
+    explicit_destination = arguments.data_dir is not None or "VELLIS_DATA_DIR" in os.environ
+    client_plans = plan_clients(
+        clients=selected_clients,
+        replace_clients=replaced_clients,
+        project_directory=Path(__file__).resolve().parent.parent,
+        data_directory=preview.destination if explicit_destination else None,
+    )
+    _write_client_preview(client_plans, out)
     if arguments.dry_run:
         print("Dry run: nothing was created.", file=out)
         return EXIT_SUCCESS
@@ -735,6 +856,17 @@ def main(
         if answer not in {"y", "yes"}:
             print("Declined; nothing was created.", file=out)
             return EXIT_DECLINED
+
+    if client_only_retry:
+        client_outcomes = apply_plans(client_plans)
+        _write_client_outcomes(
+            client_outcomes,
+            out if all(outcome.succeeded for outcome in client_outcomes) else error,
+            destination=preview.destination,
+        )
+        return (
+            EXIT_SUCCESS if all(outcome.succeeded for outcome in client_outcomes) else EXIT_FAILED
+        )
 
     if recovered is not None:
         # Read again rather than trusting what was shown. The owner confirmed one exact
@@ -798,7 +930,15 @@ def main(
         snapshot=started_from,
     )
     _write_report(report, out if report.succeeded else error)
-    return EXIT_SUCCESS if report.succeeded else EXIT_FAILED
+    if not report.succeeded:
+        return EXIT_FAILED
+    client_outcomes = apply_plans(client_plans)
+    _write_client_outcomes(
+        client_outcomes,
+        out if all(outcome.succeeded for outcome in client_outcomes) else error,
+        destination=preview.destination,
+    )
+    return EXIT_SUCCESS if all(outcome.succeeded for outcome in client_outcomes) else EXIT_FAILED
 
 
 def _read_v1_snapshot(path: str) -> ImportPreview:

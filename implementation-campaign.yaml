@@ -7,7 +7,7 @@ campaign:
     status: accepted
     checkpoint: approval:c7acd9d2ac9f8601eba1cd5cbccb7f6a0f299ca6
   blocker: null
-  checkpoint: approval:c7acd9d2ac9f8601eba1cd5cbccb7f6a0f299ca6
+  checkpoint: slice:S018:c7acd9d2ac9f:1
 model_baseline:
   status: current
   authority_files:
@@ -440,7 +440,7 @@ authority:
       - {model_ref: "VellisVerification::simpleOperation", source: "model/50-verification.sysml"}
     planned_coverage: full
     slice_ids: [S001, S009, S017, S018]
-    implementation_status: partial
+    implementation_status: conforming
     evidence_refs:
       - path:tests/vellis/test_setup_path.py#test_setup_establishes_one_local_system
       - path:tests/vellis/test_setup_path.py#test_a_second_attempt_fails_actionably_and_leaves_memory_unchanged
@@ -466,6 +466,17 @@ authority:
       - path:tests/vellis/test_cohesive_use.py#test_a_connection_to_an_unusable_destination_fails_at_the_destination_stage
       - path:tests/vellis/test_cohesive_use.py#test_setup_and_the_server_resolve_the_same_destination
       - path:tests/vellis/test_cohesive_use.py#test_the_documented_commands_ask_for_nothing_an_owner_would_have_to_administer
+      - path:tests/vellis/test_client_setup.py#test_each_or_both_clients_use_only_the_public_cli_argument_arrays
+      - path:tests/vellis/test_client_setup.py#test_a_differing_entry_requires_that_clients_explicit_replacement_flag
+      - path:tests/vellis/test_client_setup.py#test_a_disabled_codex_http_entry_is_a_replaceable_difference
+      - path:tests/vellis/test_client_setup.py#test_a_launch_environment_makes_an_otherwise_matching_entry_differ
+      - path:tests/vellis/test_client_setup.py#test_a_claude_http_entry_is_a_replaceable_difference
+      - path:tests/vellis/test_client_setup.py#test_a_project_scoped_claude_entry_is_replaced_only_when_explicitly_selected
+      - path:tests/vellis/test_client_setup.py#test_missing_client_reports_a_copyable_command_without_undoing_memory
+      - path:tests/vellis/test_client_setup.py#test_an_ambiguous_inspection_error_is_not_mistaken_for_absence
+      - path:tests/vellis/test_client_setup.py#test_an_unexecutable_client_is_reported_instead_of_raising
+      - path:tests/vellis/test_client_setup.py#test_claude_output_without_scope_is_reported_as_unparseable
+      - path:tests/vellis/test_client_setup.py#test_linux_and_windows_render_paths_and_non_default_destinations_without_loss
       - path:README.md#implementation-status
       - command:uv run pytest tests/vellis
   - id: A018
@@ -1197,9 +1208,28 @@ slices:
       - {authority_id: A017, coverage: partial, remaining_slice_ids: [S001, S009, S017]}
     verification_refs:
       - VellisVerification::simpleOperation
-    lifecycle: ready
-    implementation_status: absent
-    evidence_refs: []
+    lifecycle: complete
+    implementation_status: conforming
+    evidence_refs:
+      - path:tests/vellis/test_client_setup.py#test_neither_client_executes_no_public_cli
+      - path:tests/vellis/test_client_setup.py#test_each_or_both_clients_use_only_the_public_cli_argument_arrays
+      - path:tests/vellis/test_client_setup.py#test_a_matching_entry_is_an_idempotent_no_op
+      - path:tests/vellis/test_client_setup.py#test_a_differing_entry_requires_that_clients_explicit_replacement_flag
+      - path:tests/vellis/test_client_setup.py#test_a_disabled_codex_http_entry_is_a_replaceable_difference
+      - path:tests/vellis/test_client_setup.py#test_a_launch_environment_makes_an_otherwise_matching_entry_differ
+      - path:tests/vellis/test_client_setup.py#test_a_claude_http_entry_is_a_replaceable_difference
+      - path:tests/vellis/test_client_setup.py#test_a_project_scoped_claude_entry_is_replaced_only_when_explicitly_selected
+      - path:tests/vellis/test_client_setup.py#test_an_ambiguous_inspection_error_is_not_mistaken_for_absence
+      - path:tests/vellis/test_client_setup.py#test_an_unexecutable_client_is_reported_instead_of_raising
+      - path:tests/vellis/test_client_setup.py#test_claude_output_without_scope_is_reported_as_unparseable
+      - path:tests/vellis/test_client_setup.py#test_missing_client_reports_a_copyable_command_without_undoing_memory
+      - path:tests/vellis/test_client_setup.py#test_unparseable_inspection_is_separate_from_successful_initialization
+      - path:tests/vellis/test_client_setup.py#test_dry_run_inspects_but_mutates_neither_memory_nor_clients
+      - path:tests/vellis/test_client_setup.py#test_linux_and_windows_render_paths_and_non_default_destinations_without_loss
+      - path:README.md#implementation-status
+      - path:docs/mcp-realization.md#client-configuration
+      - command:uv run pytest tests/vellis/test_client_setup.py
+      - command:just check
     realization_decisions:
       - id: D004
         summary: Configure user-scoped Codex, Claude Code, both, or neither only through public client CLIs; matching entries are no-ops and differing entries require explicit replacement.
@@ -1208,8 +1238,17 @@ slices:
         evidence_intent:
           - Exclude direct configuration-file access and wrong scope by recording only subprocess argument arrays for public Codex and Claude CLI inspection and mutation.
           - Exclude implicit selection or replacement by proving neither, each, and both clients; matching no-op; and differing-entry refusal unless that client is explicitly selected for replacement.
-        implementation_status: absent
-        evidence_refs: []
+        implementation_status: conforming
+        evidence_refs:
+          - path:tests/vellis/test_client_setup.py#test_neither_client_executes_no_public_cli
+          - path:tests/vellis/test_client_setup.py#test_each_or_both_clients_use_only_the_public_cli_argument_arrays
+          - path:tests/vellis/test_client_setup.py#test_a_matching_entry_is_an_idempotent_no_op
+          - path:tests/vellis/test_client_setup.py#test_a_differing_entry_requires_that_clients_explicit_replacement_flag
+          - path:tests/vellis/test_client_setup.py#test_a_disabled_codex_http_entry_is_a_replaceable_difference
+          - path:tests/vellis/test_client_setup.py#test_a_launch_environment_makes_an_otherwise_matching_entry_differ
+          - path:tests/vellis/test_client_setup.py#test_a_claude_http_entry_is_a_replaceable_difference
+          - path:tests/vellis/test_client_setup.py#test_a_project_scoped_claude_entry_is_replaced_only_when_explicitly_selected
+          - path:tests/vellis/test_client_setup.py#test_an_ambiguous_inspection_error_is_not_mistaken_for_absence
       - id: D005
         summary: Missing clients receive copyable commands without failing initialization; Linux and Windows command rendering remain tested compatibility targets without claiming live-client closure.
         authority_ids: [A017]
@@ -1217,10 +1256,15 @@ slices:
         evidence_intent:
           - Exclude client absence or malformed inspection rolling back established memory by proving actionable manual commands, separately reported client outcomes, and preserved initialization.
           - Exclude platform-specific quoting or path loss with Linux and Windows command rendering, paths containing spaces, and non-default destinations without claiming live closure.
-        implementation_status: absent
-        evidence_refs: []
+        implementation_status: conforming
+        evidence_refs:
+          - path:tests/vellis/test_client_setup.py#test_missing_client_reports_a_copyable_command_without_undoing_memory
+          - path:tests/vellis/test_client_setup.py#test_unparseable_inspection_is_separate_from_successful_initialization
+          - path:tests/vellis/test_client_setup.py#test_an_unexecutable_client_is_reported_instead_of_raising
+          - path:tests/vellis/test_client_setup.py#test_claude_output_without_scope_is_reported_as_unparseable
+          - path:tests/vellis/test_client_setup.py#test_linux_and_windows_render_paths_and_non_default_destinations_without_loss
     blocker: null
-    checkpoint: null
+    checkpoint: slice:S018:c7acd9d2ac9f:1
 closure:
   authority_coverage: full
   integration_status: conforming

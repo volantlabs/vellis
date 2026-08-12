@@ -130,10 +130,10 @@ register. Configuring a client on this machine to launch it remains runnable clo
 that client's own configuration rather than this repository.
 
 That selected client-configuration behavior was not built by its original owners. Closure caught the
-escaped implementation defect after all original slices had checkpointed, so the reviewed candidate
+escaped implementation defect after all original slices had checkpointed, so the renewed approved
 plan preserves the choice and allocates it to corrective slice S018, with the live dry run and
-registration retained at closure. The candidate is not executable until renewed human approval;
-`just implementation-campaign-status` reports the open decisions and their owners.
+registration retained at closure. `just implementation-campaign-status` reports the open decisions
+and their owners.
 
 Vellis checkpoint identifiers are navigation labels in the portable campaign record:
 

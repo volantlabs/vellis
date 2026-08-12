@@ -98,11 +98,9 @@ Do not
 upgrade the pre-release pin, add another transport, or edit client configuration files directly
 without renewed review of the selected plan.
 
-The client-configuration half of that selection was never built, and closure exposed that escaped
-implementation defect after its original owners had already checkpointed. The selected approach is
-not reopened: the reviewed candidate campaign assigns the missing behavior to corrective slice S018
-and the live client transition to closure. Build nothing under that candidate until renewed human
-approval.
+Closure exposed the client-configuration half of that selection as an escaped implementation defect
+after its original owners had already checkpointed. The renewed approved campaign assigns the setup
+behavior to corrective slice S018 and keeps the live client transition in closure.
 
 ## Implementation campaign binding
 
@@ -157,14 +155,15 @@ one foreground `sleep 300` at a time followed by one status check; start another
 has completed. When the launcher can control the worker environment, prefer
 `CLAUDE_CODE_DISABLE_BACKGROUND_TASKS=1`.
 
-External client mutation remains suspended until the corrective plan is approved and S018 has
-checkpointed. Its closure-owned D006 preserves the prior authorization: after an exact matching dry
-run, closure may change only the named `vellis` entries through public CLIs—replacing the disabled
-Codex HTTP entry with the selected STDIO entry and adding the Claude Code user-scoped STDIO entry.
+External client mutation is closure-only; S018 implements and tests the behavior with fake public
+CLI executables and temporary Vellis destinations. Closure-owned D006 preserves the prior
+authorization: after an exact matching dry run, closure may change only the named `vellis` entries
+through public CLIs—replacing the disabled Codex HTTP entry with the selected STDIO entry and adding
+the Claude Code user-scoped STDIO entry.
 On a fresh attempt after interruption, either already-matching enabled user-scoped entry is an
 idempotent no-op and only the remaining authorized transition may run. Conflicting or unparseable
 state, another destination, unsupported behavior, or any approval-policy consequence pauses before
-further mutation. Until those gates pass, reading configuration is fine but do not run `codex mcp
+further mutation. Outside that closure step, reading configuration is fine but do not run `codex mcp
 add`, `codex mcp remove`, `claude mcp add`, `claude mcp remove`, or any other mutating client command.
 
 ## Non-negotiable modeling rules

@@ -105,15 +105,13 @@ Useful commands:
 
 ## Implementation status
 
-All seventeen original campaign slices are complete. Whole-system closure reconciled the aggregate
-authority rows and integration evidence, then found that selected decisions D004 and D005 had never
-been realized. That is an escaped implementation defect, not a new owner choice. The reviewed
-candidate plan preserves the setup-program/public-CLI approach, adds corrective slice S018, and
-retains the authorized live transition as closure decision D006. Until renewed approval and that
-work, `A017` and runnable closure remain `partial`; the already-established cross-slice integration
-evidence remains `conforming`. See
+All seventeen original campaign slices and corrective slice S018 are complete. Whole-system closure
+had found that selected decisions D004 and D005 were never realized; S018 now implements their
+setup-program/public-CLI behavior with fake-client evidence. The authorized live transition remains
+closure decision D006, so `A017` and runnable closure remain `partial` while the already-established
+cross-slice integration evidence remains `conforming`. See
 [MCP realization](docs/mcp-realization.md#client-configuration) for the selected boundary and manual
-fallback. `just implementation-campaign-status` reports the pending slice and open decision owners.
+fallback. `just implementation-campaign-status` reports the remaining closure decision.
 Use these words precisely:
 
 - **Implemented and verified.** Canonical graph, definition, and constraint meaning; canonical
@@ -206,7 +204,10 @@ Use these words precisely:
   destination and, unless it can already see that the destination will not do, offers both starting
   vocabularies with the Everyday Life starter preselected. It asks for confirmation, and accepts
   `--data-dir`, `--vocabulary`, `--yes`, and a no-effect `--dry-run` that still reports a
-  destination it can already see will not do. `--from-v1` begins from a Vellis v1 JSON system
+  destination it can already see will not do. Repeating `--client codex` or `--client claude`
+  selects either or both supported clients; omitting it selects neither, and
+  `--replace-client CLIENT` is required before a differing entry can be replaced. `--from-v1`
+  begins from a Vellis v1 JSON system
   snapshot instead, and `--from-snapshot` from a Vellis canonical snapshot document — a complete
   capture with an optional later ledger tail, which
   `uv run python -m vellis.preserve --out FILE` writes from an established system, leaving its
@@ -226,11 +227,13 @@ Use these words precisely:
   server serves. An MCP client launching that command as a subprocess discovers exactly the
   selected ten tools and reaches the memory setup established, across separate sessions and
   processes — a real client library over the real transport, though not yet one of the owner's own
-  configured clients.
-- **Selected but not yet implemented.** No client on this machine is configured to launch the
-  server, and the setup program does not yet configure one. Corrective slice S018 is the pending
-  owner of that already-selected public-CLI behavior; closure owns the later matching dry run and
-  live registration. [MCP realization](docs/mcp-realization.md#client-configuration) carries manual
+  configured clients. Setup inspects and configures selected user-scoped Codex and Claude Code
+  entries only through their public CLIs. Matching entries are no-ops; differing entries require
+  explicit replacement; and an unavailable client reports a platform-correct copyable fallback
+  without undoing initialized memory.
+- **Implemented but not live-closed.** No live client transition has run on this machine. Closure
+  owns the exact dry run, authorized registration, reread, and bounded real-client invocation in
+  decision D006. [MCP realization](docs/mcp-realization.md#client-configuration) carries manual
   fallback commands for unavailable clients. FastMCP and FastMCP Slim are pinned at 4.0.0b1 and
   installed.
 
