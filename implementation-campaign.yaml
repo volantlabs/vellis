@@ -2,20 +2,12 @@ schema_version: "1.1"
 campaign:
   id: vellis-model-implementation
   objective: Realize the complete accepted Vellis model with discriminating evidence and a runnable selected boundary.
-  lifecycle: blocked
+  lifecycle: awaiting-plan-approval
   plan_approval:
-    status: changes-required
+    status: pending
     checkpoint: null
-  blocker:
-    classification: external dependency
-    summary: The registered Codex STDIO entry launched, but its bounded read-only Vellis MCP invocation was cancelled under the client's existing approval policy; closure may not change that policy, and D006 cannot conform until both real-client invocations succeed.
-    authority_ids: [A017]
-    evidence_refs:
-      - command:codex mcp get vellis --json
-      - command:claude mcp get vellis
-      - command:uv run python -m vellis.setup --client codex --replace-client codex --client claude --yes --dry-run
-      - command:codex exec --ephemeral --sandbox read-only -C . 'Call vellis rtg_definition_summary once with current state; call no other tool; return status and revision.'
-  checkpoint: approval:1f3a008214264bd30e79dd643d66cb9396141427
+  blocker: null
+  checkpoint: null
 model_baseline:
   status: current
   authority_files:
@@ -448,7 +440,7 @@ authority:
       - {model_ref: "VellisVerification::simpleOperation", source: "model/50-verification.sysml"}
     planned_coverage: full
     slice_ids: [S001, S009, S017, S018]
-    implementation_status: partial
+    implementation_status: conforming
     evidence_refs:
       - path:tests/vellis/test_setup_path.py#test_setup_establishes_one_local_system
       - path:tests/vellis/test_setup_path.py#test_a_second_attempt_fails_actionably_and_leaves_memory_unchanged
