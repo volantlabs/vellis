@@ -7,7 +7,7 @@ campaign:
     status: accepted
     checkpoint: approval:5a8d92c675d6865bd70fadd0e971bbf959081bea
   blocker: null
-  checkpoint: slice:S015:5a8d92c675d6:1
+  checkpoint: slice:S016:5a8d92c675d6:1
 model_baseline:
   status: current
   authority_files:
@@ -405,13 +405,31 @@ authority:
       - {model_ref: "VellisVerification::historyGrowth", source: "model/50-verification.sysml"}
     planned_coverage: full
     slice_ids: [S001, S002, S003, S004, S005, S006, S007, S008, S009, S010, S016]
-    implementation_status: partial
+    implementation_status: conforming
     evidence_refs:
       - path:tests/vellis/test_current_work.py#test_reading_current_state_visits_no_canonical_record
       - path:tests/vellis/test_current_work.py#test_current_conformance_assessment_visits_no_canonical_record
       - path:tests/vellis/test_current_work.py#test_the_instrumentation_counts_a_real_record_access
       - path:tests/vellis/test_graph_changes.py#test_committing_costs_the_same_whatever_the_history_length
       - path:tests/vellis/test_definition_discovery.py#test_discovery_reads_no_canonical_record
+      - path:tests/vellis/test_work_characterization.py#test_every_named_current_operation_visits_no_record_of_either_ledger
+      - path:tests/vellis/test_work_characterization.py#test_current_work_costs_the_same_behind_a_thirty_revision_longer_history
+      - path:tests/vellis/test_work_characterization.py#test_committing_neither_traverses_nor_rewrites_the_prefix_behind_it
+      - path:tests/vellis/test_work_characterization.py#test_appending_activity_visits_no_canonical_record_and_reconstructs_nothing
+      - path:tests/vellis/test_work_characterization.py#test_a_narrow_canonical_interval_costs_the_interval_whatever_precedes_it
+      - path:tests/vellis/test_work_characterization.py#test_a_narrow_activity_interval_costs_the_interval_whatever_precedes_it
+      - path:tests/vellis/test_work_characterization.py#test_resolving_a_revision_or_a_time_does_not_depend_on_ledger_length
+      - path:tests/vellis/test_work_characterization.py#test_a_historical_vocabulary_does_not_pay_for_unrelated_graph_transitions
+      - path:tests/vellis/test_work_characterization.py#test_replay_visits_exactly_its_required_tail_and_reaches_the_same_state
+      - path:tests/vellis/test_work_characterization.py#test_restoring_a_past_state_costs_the_tail_it_has_to_replay
+      - path:tests/vellis/test_work_characterization.py#test_an_ordinary_restart_does_not_depend_on_the_required_tail
+      - path:tests/vellis/test_history_growth.py#test_the_characterization_covers_every_dimension_the_analysis_names
+      - path:tests/vellis/test_history_growth.py#test_current_work_responds_to_no_dimension_of_history
+      - path:tests/vellis/test_history_growth.py#test_selection_work_is_the_interval_and_only_the_interval
+      - path:tests/vellis/test_history_growth.py#test_replay_responds_to_ledger_length_and_required_tail_alone
+      - path:tests/vellis/test_history_growth.py#test_storage_grows_with_both_ledgers_including_the_one_reading_grows
+      - command:uv run pytest tests/vellis
+      - command:uv run pytest tests/vellis/test_history_growth.py -s
   - id: A017
     label: Runnable local onboarding and cohesive persistent-context use
     refs:
@@ -1023,12 +1041,41 @@ slices:
       - VellisVerification::historicalSelectionScaling
       - VellisVerification::replayCharacterization
       - VellisVerification::historyGrowth
-    lifecycle: ready
-    implementation_status: absent
-    evidence_refs: []
+    lifecycle: complete
+    implementation_status: conforming
+    evidence_refs:
+      - path:tests/vellis/test_work_characterization.py#test_the_two_histories_carry_the_same_current_state_at_different_lengths
+      - path:tests/vellis/test_work_characterization.py#test_every_named_current_operation_visits_no_record_of_either_ledger
+      - path:tests/vellis/test_work_characterization.py#test_current_work_costs_the_same_behind_a_thirty_revision_longer_history
+      - path:tests/vellis/test_work_characterization.py#test_current_work_still_grows_with_the_things_it_is_allowed_to_grow_with
+      - path:tests/vellis/test_work_characterization.py#test_a_returned_result_is_bounded_by_what_was_asked_for_not_by_history
+      - path:tests/vellis/test_work_characterization.py#test_committing_neither_traverses_nor_rewrites_the_prefix_behind_it
+      - path:tests/vellis/test_work_characterization.py#test_one_commit_appends_one_record_and_moves_the_projection_together
+      - path:tests/vellis/test_work_characterization.py#test_a_commit_survives_an_ordinary_restart_at_either_history_length
+      - path:tests/vellis/test_work_characterization.py#test_appending_activity_visits_no_canonical_record_and_reconstructs_nothing
+      - path:tests/vellis/test_work_characterization.py#test_observation_does_not_get_more_expensive_as_observations_accumulate
+      - path:tests/vellis/test_work_characterization.py#test_a_narrow_canonical_interval_costs_the_interval_whatever_precedes_it
+      - path:tests/vellis/test_work_characterization.py#test_a_narrow_activity_interval_costs_the_interval_whatever_precedes_it
+      - path:tests/vellis/test_work_characterization.py#test_resolving_a_revision_or_a_time_does_not_depend_on_ledger_length
+      - path:tests/vellis/test_work_characterization.py#test_a_historical_vocabulary_does_not_pay_for_unrelated_graph_transitions
+      - path:tests/vellis/test_work_characterization.py#test_a_historical_graph_does_pay_for_its_transitions
+      - path:tests/vellis/test_work_characterization.py#test_replay_visits_exactly_its_required_tail_and_reaches_the_same_state
+      - path:tests/vellis/test_work_characterization.py#test_restoring_a_past_state_costs_the_tail_it_has_to_replay
+      - path:tests/vellis/test_work_characterization.py#test_an_ordinary_restart_does_not_depend_on_the_required_tail
+      - path:tests/vellis/test_history_growth.py#test_the_characterization_covers_every_dimension_the_analysis_names
+      - path:tests/vellis/test_history_growth.py#test_every_measure_carries_its_unit_in_its_own_name
+      - path:tests/vellis/test_history_growth.py#test_current_work_responds_to_no_dimension_of_history
+      - path:tests/vellis/test_history_growth.py#test_selection_work_is_the_interval_and_only_the_interval
+      - path:tests/vellis/test_history_growth.py#test_replay_responds_to_ledger_length_and_required_tail_alone
+      - path:tests/vellis/test_history_growth.py#test_definition_density_adds_replay_records
+      - path:tests/vellis/test_history_growth.py#test_storage_grows_with_both_ledgers_including_the_one_reading_grows
+      - path:tests/vellis/test_history_growth.py#test_forgetting_activity_bounds_further_growth_without_returning_the_file
+      - path:tests/vellis/test_history_growth.py#test_every_duration_was_actually_timed
+      - command:uv run pytest tests/vellis
+      - command:uv run pytest tests/vellis/test_history_growth.py -s
     realization_decisions: []
     blocker: null
-    checkpoint: null
+    checkpoint: slice:S016:5a8d92c675d6:1
   - id: S017
     order: 17
     label: Prove runnable local onboarding, cohesive use, and cold reconstruction
@@ -1040,7 +1087,7 @@ slices:
       - VellisVerification::simpleOperation
       - VellisVerification::ownerControl
       - VellisVerification::mcpToolSurface
-    lifecycle: pending
+    lifecycle: ready
     implementation_status: absent
     evidence_refs: []
     realization_decisions:

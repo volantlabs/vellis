@@ -12,8 +12,11 @@ Algorithms, storage layouts, transports, protocols, frameworks, deployment choic
 Vellis treats one durable canonical ledger as the authority for personal memory while keeping current
 work independent of accumulated history and bounded historical selection efficient. Materialized
 projections, indexes, caches, checkpoints, snapshot cadence, and persistence technology remain
-implementation choices rather than modeled subsystems. Representative measurements will inform
-later numerical performance budgets.
+implementation choices rather than modeled subsystems. The current realization is characterized
+along each of those dimensions — what its work responds to and what it ignores — and that
+characterization deliberately sets no numerical latency, startup, or storage budget, because there
+is not yet a chosen runtime, a hardware profile, or a representative owner's data to set one
+against.
 
 The central experiment is whether a sufficiently specified model in a standard language can replace
 a pile of tickets and informal prose as the stable source of truth for autonomous agentic

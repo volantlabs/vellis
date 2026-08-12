@@ -336,6 +336,7 @@ class CanonicalStore:
             # same whether a caller asked what was at the path or went to use it.
             raise NotADatabaseError(f"the file at {path} is not a database")
         self._record_reads = 0
+        self._activity_reads = 0
         try:
             # One owner, one process, one connection — but not necessarily one thread:
             # a tool boundary answers on whichever worker it is called from. The
@@ -394,8 +395,20 @@ class CanonicalStore:
         """Semantic canonical-record accesses since the last reset."""
         return self._record_reads
 
+    @property
+    def activity_reads(self) -> int:
+        """Semantic activity-record accesses since the last reset.
+
+        Counted separately from canonical accesses because the two ledgers answer
+        different questions and the bound on selecting an interval is claimed of each of
+        them. One counter over both would let a linear walk of one hide behind a narrow
+        read of the other.
+        """
+        return self._activity_reads
+
     def reset_instrumentation(self) -> None:
         self._record_reads = 0
+        self._activity_reads = 0
 
     # --- Current projection ---------------------------------------------------------
 
@@ -823,6 +836,7 @@ class CanonicalStore:
         rows = self._fetchall(
             f"SELECT payload FROM activity_record{where} ORDER BY ordinal", tuple(parameters)
         )
+        self._activity_reads += len(rows)
         records: list[ActivityRecord] = []
         for row in rows:
             assert isinstance(row, tuple)

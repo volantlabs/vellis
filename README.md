@@ -103,7 +103,7 @@ Useful commands:
 
 ## Implementation status
 
-Fifteen campaign slices are complete, so the application is partially implemented rather than
+Sixteen campaign slices are complete, so the application is partially implemented rather than
 absent.
 A plan gap found during the fourth returned the campaign to `awaiting-plan-approval`; the corrected
 plan has since been approved and that slice checkpointed under it.
@@ -171,6 +171,20 @@ plan has since been approved and that slice checkpointed under it.
   change is written in concepts that may have been retired since — and rechecks current facts,
   because the owner may have fixed the thing already; and every finding is traceable to the
   bounded observations and exact evaluated revisions it came from.
+- **Characterized, not budgeted.** What this realization's work responds to is measured in semantic
+  record accesses, along each dimension separately: current summary, inspection, query, conformance
+  assessment, delta retrieval, and change validation read no record of either ledger however long
+  the history behind them; a commit appends one record at the end without reading or rewriting the
+  prefix, and observing is observational; a bounded interval of either ledger costs the interval
+  and seeks to it rather than walking what precedes it; a historical vocabulary costs its
+  definition-changing records rather than the graph transitions between them, while a historical
+  graph is charged the replay the model exempts; replay costs its required tail while an ordinary
+  restart does not; restoring a past state costs the tail it has to replay and not the records
+  after it; and storage grows with both ledgers, including the observational one that every read
+  adds to. Forgetting activity removes those records and bounds what comes next, but the file keeps
+  the size it reached rather than returning pages to the disk. No numerical latency, startup, or
+  storage budget is claimed or met: choosing one needs a runtime, a hardware profile, and a
+  representative owner's data that do not exist yet.
 - **Runnable.** `uv run python -m vellis.setup` prepares one local system. It previews the
   destination and, unless it can already see that the destination will not do, offers both starting
   vocabularies with the Everyday Life starter preselected. It asks for confirmation, and accepts
