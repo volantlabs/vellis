@@ -49,7 +49,9 @@ For a complete-system build, `$sysml-implementation-planning` reads the complete
 derives dependency-ordered, evidence-bearing semantic slices. The committed campaign record stays
 awaiting human approval until that complete plan is accepted. Vellis completed its seventeen
 original slices, then closure exposed an unimplemented selected realization decision. A reviewed
-candidate preserves that choice and adds corrective slice S018; it now awaits renewed approval. A
+candidate preserved that choice and added corrective slice S018. After renewed approval and S018,
+closure paused at the selected external boundary because Codex's existing approval policy cancelled
+the required bounded read-only MCP invocation. A
 continuation harness may then invoke
 `$sysml-implementation-campaign` through a thin manager. The manager reads one machine disposition,
 launches a fresh worker for exactly that slice, waits, and independently validates its checkpoint.
@@ -108,7 +110,9 @@ Useful commands:
 All seventeen original campaign slices and corrective slice S018 are complete. Whole-system closure
 had found that selected decisions D004 and D005 were never realized; S018 now implements their
 setup-program/public-CLI behavior with fake-client evidence. The authorized live transition remains
-closure decision D006, so `A017` and runnable closure remain `partial` while the already-established
+closure decision D006. Its exact dry run and registrations succeeded, but the required Codex
+read-only invocation was cancelled by the client's existing approval policy; closure may not change
+that policy. Therefore `A017` and runnable closure remain `partial` while the already-established
 cross-slice integration evidence remains `conforming`. See
 [MCP realization](docs/mcp-realization.md#client-configuration) for the selected boundary and manual
 fallback. `just implementation-campaign-status` reports the remaining closure decision.
@@ -226,14 +230,15 @@ Use these words precisely:
   resolve the same destination, so a system established at a configured location is the one the
   server serves. An MCP client launching that command as a subprocess discovers exactly the
   selected ten tools and reaches the memory setup established, across separate sessions and
-  processes — a real client library over the real transport, though not yet one of the owner's own
-  configured clients. Setup inspects and configures selected user-scoped Codex and Claude Code
+  processes — a real client library over the real transport. Setup inspects and configures selected
+  user-scoped Codex and Claude Code
   entries only through their public CLIs. Matching entries are no-ops; differing entries require
   explicit replacement; and an unavailable client reports a platform-correct copyable fallback
   without undoing initialized memory.
-- **Implemented but not live-closed.** No live client transition has run on this machine. Closure
-  owns the exact dry run, authorized registration, reread, and bounded real-client invocation in
-  decision D006. [MCP realization](docs/mcp-realization.md#client-configuration) carries manual
+- **Implemented but not live-closed.** Closure ran the exact authorized dry run and registration,
+  then reread both matching entries. The bounded Codex invocation was cancelled under the client's
+  existing approval policy, so closure paused without changing that policy and D006 remains open.
+  [MCP realization](docs/mcp-realization.md#client-configuration) carries manual
   fallback commands for unavailable clients. FastMCP and FastMCP Slim are pinned at 4.0.0b1 and
   installed.
 
