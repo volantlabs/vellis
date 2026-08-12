@@ -109,11 +109,14 @@ retry command. An unavailable client gets a platform-correct copyable command wi
 established memory. Linux and Windows command rendering, paths containing spaces, and non-default
 destinations have fake-client evidence.
 
-Corrective slice S018 implements decisions D004 and D005. Closure decision D006 then ran the matching
-live dry run, applied only the authorized registrations, and reread both matching entries. Codex's
-existing approval policy cancelled the required bounded read-only MCP invocation, so closure paused
-without changing that policy. Authority A017 and runnable closure remain `partial` until both real
-clients complete the bounded invocation.
+Corrective slice S018 implements decisions D004 and D005. Closure decision D006 then reran the
+matching live dry run and reread both matching entries. A direct MCP exercise covered all ten public
+tools, restored the active starter vocabulary, removed its synthetic graph data, and left no staged
+proposal, but that live session is not reproducible campaign evidence for either named client.
+Claude Code could not begin its required bounded read-only MCP invocation because its OAuth session
+had expired and could not be refreshed. Closure therefore paused without changing client policy.
+Authority A017 and runnable closure remain `partial` until both real clients complete attributable,
+reproducible bounded invocations.
 
 The commands below are a fallback when a supported client CLI is unavailable, not the selected
 primary workflow and not evidence that campaign closure has occurred. Establish a system first with

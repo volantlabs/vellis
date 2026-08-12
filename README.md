@@ -50,8 +50,9 @@ derives dependency-ordered, evidence-bearing semantic slices. The committed camp
 awaiting human approval until that complete plan is accepted. Vellis completed its seventeen
 original slices, then closure exposed an unimplemented selected realization decision. A reviewed
 candidate preserved that choice and added corrective slice S018. After renewed approval and S018,
-closure paused at the selected external boundary because Codex's existing approval policy cancelled
-the required bounded read-only MCP invocation. A
+closure confirmed both matching registrations, then paused at the selected external boundary
+because Claude Code's expired OAuth session prevented its bounded read-only MCP invocation. Both
+real-client invocations remain required as reproducible closure evidence. A
 continuation harness may then invoke
 `$sysml-implementation-campaign` through a thin manager. The manager reads one machine disposition,
 launches a fresh worker for exactly that slice, waits, and independently validates its checkpoint.
@@ -110,9 +111,11 @@ Useful commands:
 All seventeen original campaign slices and corrective slice S018 are complete. Whole-system closure
 had found that selected decisions D004 and D005 were never realized; S018 now implements their
 setup-program/public-CLI behavior with fake-client evidence. The authorized live transition remains
-closure decision D006. Its exact dry run and registrations succeeded, but the required Codex
-read-only invocation was cancelled by the client's existing approval policy; closure may not change
-that policy. Therefore `A017` and runnable closure remain `partial` while the already-established
+closure decision D006. Its exact dry run and registrations succeeded, and the refreshed
+client registration state matches the selected boundary. Claude Code's expired OAuth session
+prevented its bounded read-only invocation; closure may not change client policy. Both real-client
+invocations remain required as reproducible closure evidence. Therefore `A017` and runnable closure
+remain `partial` while the already-established
 cross-slice integration evidence remains `conforming`. See
 [MCP realization](docs/mcp-realization.md#client-configuration) for the selected boundary and manual
 fallback. `just implementation-campaign-status` reports the remaining closure decision.
@@ -235,9 +238,13 @@ Use these words precisely:
   entries only through their public CLIs. Matching entries are no-ops; differing entries require
   explicit replacement; and an unavailable client reports a platform-correct copyable fallback
   without undoing initialized memory.
-- **Implemented but not live-closed.** Closure ran the exact authorized dry run and registration,
-  then reread both matching entries. The bounded Codex invocation was cancelled under the client's
-  existing approval policy, so closure paused without changing that policy and D006 remains open.
+- **Implemented but not live-closed.** Closure reran the exact authorized dry run and reread both
+  matching entries. Its direct MCP exercise restored the starter vocabulary, removed its synthetic
+  graph data, and left the canonical graph conforming with no proposal staged, but that live session
+  is not reproducible campaign evidence for either named client. Claude Code could not begin its
+  bounded read-only invocation because its OAuth session had expired and could not be refreshed, so
+  closure paused without changing client policy. Both real-client invocations remain reproducibly
+  open under D006.
   [MCP realization](docs/mcp-realization.md#client-configuration) carries manual
   fallback commands for unavailable clients. FastMCP and FastMCP Slim are pinned at 4.0.0b1 and
   installed.

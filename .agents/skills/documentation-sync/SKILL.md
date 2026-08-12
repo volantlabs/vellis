@@ -20,7 +20,9 @@ Bias toward small, claim-driven documentation changes. Do not turn a model edit 
   `$sysml-implementation`, and `$sysml-implementation-campaign` are a portable core. Vellis paths,
   commands, RTG vocabulary, and repository workflow belong in project bindings or optional domain
   skills rather than those core instructions.
-- There are currently no generated Vellis product views, runtime sources, or implementation artifacts.
+- Vellis product runtime source under `vellis/` is authored rather than generated. There are no
+  generated Vellis product views or runtime sources; current implementation artifacts and tests must
+  remain subordinate to the model authority.
 
 Keep detailed workflow heuristics and agent failure patterns in the applicable skills. Keep
 `AGENTS.md` to safety, routing, authority, and short non-negotiable rules; keep public method documents

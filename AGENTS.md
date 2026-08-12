@@ -274,5 +274,7 @@ next slice, blocker, and closure state. `just implementation-campaign-dispatch` 
 machine-readable next action and durable state token without changing files. These tools do not
 resolve SysML semantics and the ledger does not replace rereading qualified model authority.
 
-The repository exposes the selected MCP tool contract over local standard input and output; no
-client is configured to launch it yet. Use modeled, selected, implemented, and runnable precisely.
+The repository exposes the selected MCP tool contract over local standard input and output. Matching
+user-scoped Codex and Claude Code entries are configured to launch it, while live closure remains
+partial until both named clients have reproducible bounded invocation evidence. Use modeled,
+selected, implemented, verified, and runnable precisely.
