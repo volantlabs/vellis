@@ -511,9 +511,13 @@ work_items:
           - VellisRequirements::replayEquivalence
           - VellisRequirements::historicalRestoreSemantics
           - VellisRequirements::freshInitialization
-          - VellisRequirements::v1SnapshotCompatibility
         coverage: full
         remaining_work_item_ids: []
+      - refs:
+          - VellisRequirements::v1SnapshotCompatibility
+        coverage: partial
+        remaining_work_item_ids:
+          - W006
     approval:
       status: not-required
       reason: Streamed NDJSON and temporary SQLite reconstruction are owner-selected realizations of accepted complete lifecycle meaning.
@@ -548,6 +552,8 @@ work_items:
           - VellisRequirements::mcpAgentToolContract
           - VellisRequirements::mcpOutcomeIntegrity
           - VellisRequirements::simpleIndividualOperation
+          - VellisRequirements::v1SnapshotCompatibility
+          - VellisRequirements::freshInitialization
         coverage: full
         remaining_work_item_ids: []
     approval:

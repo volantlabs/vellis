@@ -31,6 +31,7 @@ from __future__ import annotations
 from dataclasses import replace
 from datetime import datetime
 from pathlib import Path
+from typing import TextIO
 
 from vellis.activity import (
     ActivityHistoryEntry,
@@ -112,6 +113,7 @@ from vellis.store import (
     ProposalState,
     StoreError,
 )
+from vellis.streaming import SnapshotMetadata, export_ndjson
 
 __all__ = ["UNATTRIBUTED", "RTGSystem"]
 
@@ -256,7 +258,7 @@ class RTGSystem:
         )
         try:
             self._store.initialize(record)
-        except StoreError as error:
+        except (StoreError, OSError) as error:
             if not isinstance(error, AlreadyInitializedError):
                 return RevisionedOutcome(
                     status=OperationStatus.FAILED,
@@ -1247,6 +1249,31 @@ class RTGSystem:
 
     # --- Capture and rebuild ------------------------------------------------------------
 
+    def export_snapshot(
+        self, output: TextIO, *, batch_size: int = 256, provenance: Provenance = UNATTRIBUTED
+    ) -> SnapshotMetadata:
+        """Stream one complete normalized snapshot without constructing canonical state."""
+        try:
+            metadata = export_ndjson(self._store.path, output, batch_size=batch_size)
+        except (StoreError, OSError) as error:
+            self._observe(
+                "snapshot",
+                OperationStatus.FAILED,
+                scope="complete canonical state",
+                summary=f"the snapshot could not be streamed: {error}",
+                provenance=provenance,
+            )
+            raise
+        self._observe(
+            "snapshot",
+            OperationStatus.ACCEPTED,
+            scope="complete canonical state",
+            summary=f"streamed revision {metadata.revision}",
+            provenance=provenance,
+            evaluated_revision=metadata.revision,
+        )
+        return metadata
+
     def create_snapshot(self, *, provenance: Provenance = UNATTRIBUTED) -> SnapshotResult:
         """Capture complete canonical state, bound to the record that established it.
 
@@ -1511,6 +1538,28 @@ class RTGSystem:
         The delta check comes first because it is decidable from state already in hand:
         refusing for a reason already known should not cost a replay of the whole tail.
         """
+        try:
+            proposal = self._store.proposal_state()
+        except StoreError as error:
+            return RevisionedOutcome(
+                (
+                    OperationStatus.REJECTED
+                    if isinstance(error, NotInitializedError)
+                    else OperationStatus.FAILED
+                ),
+                f"the current proposal state could not be read: {error}",
+                findings=(ValidationFinding(summary=str(error)),),
+            )
+        if proposal.proposed_definition_identity is not None:
+            return RevisionedOutcome(
+                OperationStatus.REJECTED,
+                "an in-flight definition delta blocks restoration",
+                findings=(
+                    ValidationFinding(
+                        summary="activate or discard the in-flight definition delta first"
+                    ),
+                ),
+            )
         revision, findings = self._resolve(selection)
         if findings:
             return RevisionedOutcome(

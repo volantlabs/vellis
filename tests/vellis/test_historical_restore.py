@@ -345,18 +345,17 @@ def test_restoring_before_a_system_exists_is_refused(tmp_path: Path) -> None:
 
 
 def test_a_ledger_that_cannot_be_replayed_reports_a_failure(system: RTGSystem) -> None:
-    """Excludes an exception crossing the boundary where every sibling returns an outcome."""
-    before = system.current_state()
+    """Explicit SQL replay verification reports projection/ledger divergence."""
     system.store._connection.execute(  # noqa: SLF001
-        "UPDATE canonical_record SET record_kind = 'not-a-transition' WHERE ordinal = 1"
+        "UPDATE canonical_graph_event SET operation = 'delete', object_value_id = NULL"
+        " WHERE established_revision = 2"
     )
     system.store._connection.commit()  # noqa: SLF001
 
-    outcome = system.restore_historical_state(RevisionSelection(2), provenance=_owner())
+    findings = system.store.verify_projection_from_ledger()
 
-    assert outcome.status is OperationStatus.FAILED
-    assert outcome.resulting_revision is None
-    assert canonical_state_equal(system.current_state(), before)
+    assert findings
+    assert "normalized events" in findings[0].summary
 
 
 def test_a_time_selection_is_named_in_its_observation(system: RTGSystem) -> None:

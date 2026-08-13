@@ -21,13 +21,14 @@ and an available corrective action that is not one the owner has already satisfi
 from __future__ import annotations
 
 import argparse
+import os
 import sys
+import tempfile
 from pathlib import Path
 from typing import TextIO
 
 from vellis.canonical import Provenance
 from vellis.paths import DestinationError, resolve_data_directory, store_path
-from vellis.snapshot_document import write_snapshot_document
 from vellis.store import StoreError
 from vellis.system import RTGSystem
 
@@ -147,51 +148,45 @@ def main(
             error,
         )
     unavailable = "try again once nothing else is writing to this system"
+    temporary_name: str | None = None
     try:
-        captured = system.create_snapshot(provenance=Provenance(initiator="owner"))
-        if captured.snapshot is None:
+        try:
+            # Prefer the destination filesystem for an atomic publication.  If the named
+            # parent is absent, capture to the platform temporary area first so the owner
+            # still gets a complete capture followed by a precise write-stage refusal.
+            temporary_directory = document.parent if document.parent.is_dir() else None
+            descriptor, temporary_name = tempfile.mkstemp(
+                prefix=f".{document.name}.", suffix=".snapshot", dir=temporary_directory
+            )
+            with os.fdopen(descriptor, "w", encoding="utf-8") as stream:
+                metadata = system.export_snapshot(stream, provenance=Provenance(initiator="owner"))
+                stream.flush()
+                os.fsync(stream.fileno())
+        except (OSError, StoreError) as unavailable_snapshot:
             return _failed(
                 PreserveStage.CAPTURE,
-                captured.summary,
-                f"run `python -m vellis.setup --data-dir {directory}` if this system "
-                f"has not been established yet; otherwise {unavailable}",
+                f"the snapshot could not be streamed: {unavailable_snapshot}",
+                unavailable,
                 error,
                 observed=True,
             )
-        # Everything committed since the capture, which for a system nobody is writing to
-        # is nothing at all. An empty run is written as no tail rather than as a tail with
-        # nothing in it, which is a document no reconstruction would accept.
         try:
-            tail = system.ledger_tail(after=captured.snapshot.revision)
-        except StoreError as unreadable_tail:
-            # The capture succeeded and this read did not. Reporting it as the stage it
-            # failed at keeps the promise the capture path already keeps; letting it out
-            # would be the one generic failure this command is not allowed to produce.
+            os.replace(temporary_name, document)
+            temporary_name = None
+        except OSError as unwritable:
             return _failed(
-                PreserveStage.CAPTURE,
-                f"the records after revision {captured.snapshot.revision} could not be "
-                f"read: {unreadable_tail}",
-                unavailable,
+                PreserveStage.WRITE,
+                f"the document could not be written to {document}: {unwritable}",
+                "pass --out a path in a directory that exists and this account can write to",
                 error,
                 observed=True,
             )
     finally:
         system.close()
-
-    try:
-        write_snapshot_document(document, captured.snapshot, tail)
-    except OSError as unwritable:
-        return _failed(
-            PreserveStage.WRITE,
-            f"the document could not be written to {document}: {unwritable}",
-            "pass --out a path in a directory that exists and this account can write to; "
-            "if a partly written file was left behind, remove it before trying again",
-            error,
-            # The capture happened, whatever became of the document.
-            observed=True,
-        )
-    print(f"Preserved revision {captured.snapshot.revision} to {document}", file=out)
-    print(f"  later transitions carried: {len(tail.transitions)}", file=out)
+        if temporary_name is not None:
+            Path(temporary_name).unlink(missing_ok=True)
+    print(f"Preserved revision {metadata.revision} to {document}", file=out)
+    print(f"  normalized rows carried: {metadata.row_count}", file=out)
     # Both halves, because the second one is visible to the owner: the next activity
     # history they read will have this capture in it, and a line saying nothing changed
     # would have told them otherwise.

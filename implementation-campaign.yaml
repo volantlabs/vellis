@@ -426,7 +426,7 @@ authority:
       - path:tests/vellis/test_work_characterization.py#test_resolving_a_revision_or_a_time_does_not_depend_on_ledger_length
       - path:tests/vellis/test_work_characterization.py#test_a_historical_vocabulary_does_not_pay_for_unrelated_graph_transitions
       - path:tests/vellis/test_work_characterization.py#test_replay_visits_exactly_its_required_tail_and_reaches_the_same_state
-      - path:tests/vellis/test_work_characterization.py#test_restoring_a_past_state_costs_the_tail_it_has_to_replay
+      - path:tests/vellis/test_work_characterization.py#test_restoring_a_past_state_uses_set_difference_not_ledger_replay
       - path:tests/vellis/test_work_characterization.py#test_an_ordinary_restart_does_not_depend_on_the_required_tail
       - path:tests/vellis/test_history_growth.py#test_the_characterization_covers_every_dimension_the_analysis_names
       - path:tests/vellis/test_history_growth.py#test_current_work_responds_to_no_dimension_of_history
@@ -1131,7 +1131,7 @@ slices:
       - path:tests/vellis/test_work_characterization.py#test_a_historical_vocabulary_does_not_pay_for_unrelated_graph_transitions
       - path:tests/vellis/test_work_characterization.py#test_a_historical_query_uses_intervals_not_transition_replay
       - path:tests/vellis/test_work_characterization.py#test_replay_visits_exactly_its_required_tail_and_reaches_the_same_state
-      - path:tests/vellis/test_work_characterization.py#test_restoring_a_past_state_costs_the_tail_it_has_to_replay
+      - path:tests/vellis/test_work_characterization.py#test_restoring_a_past_state_uses_set_difference_not_ledger_replay
       - path:tests/vellis/test_work_characterization.py#test_an_ordinary_restart_does_not_depend_on_the_required_tail
       - path:tests/vellis/test_history_growth.py#test_the_characterization_covers_every_dimension_the_analysis_names
       - path:tests/vellis/test_history_growth.py#test_every_measure_carries_its_unit_in_its_own_name

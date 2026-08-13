@@ -97,8 +97,10 @@ from vellis.normalized import (
     json_storage_value,
     load_definition_set,
     load_object_value,
+    normalized_state_identity,
     object_identity,
     semantic_identity,
+    semantic_row_summary,
 )
 from vellis.outcomes import (
     OperationStatus,
@@ -173,7 +175,10 @@ CREATE TABLE canonical_record (
     summary              TEXT    NOT NULL,
     prior_revision       INTEGER,
     record_identity      TEXT    NOT NULL UNIQUE,
-    prior_record_identity TEXT
+    prior_record_identity TEXT,
+    content_identity     TEXT    NOT NULL,
+    resulting_state_identity TEXT,
+    event_identity TEXT
 );
 CREATE TABLE activity_record (
     ordinal     INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -1047,6 +1052,21 @@ class CanonicalStore:
         except BaseException:
             self._connection.close()
             raise
+
+    @classmethod
+    def _borrowed_connection(cls, connection: sqlite3.Connection) -> CanonicalStore:
+        """Use the SQL conformance engine inside an owning transaction without closing it."""
+        store = cls.__new__(cls)
+        store._path = Path("<borrowed-transaction>")
+        store._connection = connection
+        store._lock = RLock()
+        store._record_reads = 0
+        store._activity_reads = 0
+        store._current_projection_decodes = 0
+        store._current_graph_decodes = 0
+        store._current_graph_object_decodes = 0
+        store._current_definition_decodes = 0
+        return store
 
     # --- Lifecycle ------------------------------------------------------------------
 
@@ -2508,9 +2528,9 @@ class CanonicalStore:
         self._connection.execute(
             "INSERT INTO canonical_record (established_revision, ordinal, record_kind,"
             " recorded_at, initiator, source, summary, prior_revision, record_identity,"
-            " prior_record_identity) VALUES (?, ("
+            " prior_record_identity, content_identity) VALUES (?, ("
             + NEXT_ORDINAL_SQL
-            + "), ?, ?, ?, ?, ?, ?, ?, ?)",
+            + "), ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 resulting_revision,
                 TransitionKind.DEFINITION_DELTA_CHANGE.value,
@@ -2521,6 +2541,7 @@ class CanonicalStore:
                 prior_revision,
                 record_identity,
                 str(previous[0]),
+                content,
             ),
         )
         self._connection.execute(
@@ -2553,6 +2574,7 @@ class CanonicalStore:
             " proposed_definition_set_id) VALUES (?, NULL, 'present', ?)",
             (resulting_revision, proposed_identity),
         )
+        self._seal_record_identity_unlocked(resulting_revision)
 
     def _current_assessment_unlocked(
         self,
@@ -3770,6 +3792,7 @@ class CanonicalStore:
                 ).fetchone()
                 assert previous is not None and ledger is not None
                 recorded_at = now()
+                content_identity = semantic_identity((proposed, overlay, assessment_id))
                 record_identity = self._record_identity(
                     str(ledger[0]),
                     str(previous[0]),
@@ -3779,14 +3802,14 @@ class CanonicalStore:
                     provenance.initiator,
                     provenance.source,
                     str(revision),
-                    semantic_identity((proposed, overlay, assessment_id)),
+                    content_identity,
                 )
                 self._connection.execute(
                     "INSERT INTO canonical_record (established_revision, ordinal, record_kind,"
                     " recorded_at, initiator, source, summary, prior_revision, record_identity,"
-                    " prior_record_identity) VALUES (?, ("
+                    " prior_record_identity, content_identity) VALUES (?, ("
                     + NEXT_ORDINAL_SQL
-                    + "), ?, ?, ?, ?, ?, ?, ?, ?)",
+                    + "), ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                     (
                         resulting,
                         TransitionKind.DEFINITION_ACTIVATION.value,
@@ -3797,6 +3820,7 @@ class CanonicalStore:
                         revision,
                         record_identity,
                         str(previous[0]),
+                        content_identity,
                     ),
                 )
                 entries = self._connection.execute(
@@ -3843,6 +3867,7 @@ class CanonicalStore:
                     " effective_entry_count = NULL, identity = NULL WHERE id = 0",
                     ("0" * 64,),
                 )
+                self._seal_record_identity_unlocked(resulting)
                 self._connection.execute("COMMIT")
                 return RevisionedOutcome(
                     OperationStatus.ACCEPTED,
@@ -3897,10 +3922,11 @@ class CanonicalStore:
                     (selected_revision, selected_revision),
                 )
                 difference = self._connection.execute(
-                    "SELECT uuid, object_value_id FROM restore_target"
-                    " EXCEPT SELECT uuid, object_value_id FROM current_graph_object"
-                    " UNION ALL SELECT uuid, object_value_id FROM current_graph_object"
-                    " EXCEPT SELECT uuid, object_value_id FROM restore_target LIMIT 1"
+                    "SELECT uuid, object_value_id FROM (SELECT uuid, object_value_id"
+                    " FROM restore_target EXCEPT SELECT uuid, object_value_id"
+                    " FROM current_graph_object) UNION ALL SELECT uuid, object_value_id"
+                    " FROM (SELECT uuid, object_value_id FROM current_graph_object"
+                    " EXCEPT SELECT uuid, object_value_id FROM restore_target) LIMIT 1"
                 ).fetchone()
                 if difference is None and str(head[1]) == str(target_definition[0]):
                     self._connection.execute("ROLLBACK")
@@ -3919,6 +3945,9 @@ class CanonicalStore:
                 ).fetchone()
                 assert previous is not None and ledger is not None
                 recorded_at = now()
+                content_identity = semantic_identity(
+                    ("restore", selected_revision, str(target_definition[0]))
+                )
                 record_identity = self._record_identity(
                     str(ledger[0]),
                     str(previous[0]),
@@ -3928,14 +3957,14 @@ class CanonicalStore:
                     provenance.initiator,
                     provenance.source,
                     str(revision),
-                    semantic_identity(("restore", selected_revision, str(target_definition[0]))),
+                    content_identity,
                 )
                 self._connection.execute(
                     "INSERT INTO canonical_record (established_revision, ordinal, record_kind,"
                     " recorded_at, initiator, source, summary, prior_revision, record_identity,"
-                    " prior_record_identity) VALUES (?, ("
+                    " prior_record_identity, content_identity) VALUES (?, ("
                     + NEXT_ORDINAL_SQL
-                    + "), ?, ?, ?, ?, ?, ?, ?, ?)",
+                    + "), ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                     (
                         resulting,
                         TransitionKind.HISTORICAL_RESTORATION.value,
@@ -3946,6 +3975,7 @@ class CanonicalStore:
                         revision,
                         record_identity,
                         str(previous[0]),
+                        content_identity,
                     ),
                 )
                 events = self._connection.execute(
@@ -3983,6 +4013,7 @@ class CanonicalStore:
                     "INSERT INTO canonical_definition_event VALUES (?, ?, 'absent', NULL)",
                     (resulting, target_definition[0]),
                 )
+                self._seal_record_identity_unlocked(resulting)
                 self._connection.execute("COMMIT")
                 return RevisionedOutcome(
                     OperationStatus.ACCEPTED,
@@ -4262,6 +4293,9 @@ class CanonicalStore:
                         self._connection, state.definition_delta.proposed_definitions
                     )
                 )
+                content_identity = semantic_identity(
+                    (_graph_identity(state.graph), active_identity, proposed_identity)
+                )
                 record_identity = self._record_identity(
                     ledger_identity,
                     None,
@@ -4271,14 +4305,13 @@ class CanonicalStore:
                     record.provenance.initiator,
                     record.provenance.source,
                     record.initialization_summary,
-                    semantic_identity(
-                        (_graph_identity(state.graph), active_identity, proposed_identity)
-                    ),
+                    content_identity,
                 )
                 self._connection.execute(
                     "INSERT INTO canonical_record (established_revision, ordinal, record_kind,"
                     " recorded_at, initiator, source, summary, prior_revision, record_identity,"
-                    " prior_record_identity) VALUES (?, 0, 'initial', ?, ?, ?, ?, NULL, ?, NULL)",
+                    " prior_record_identity, content_identity)"
+                    " VALUES (?, 0, 'initial', ?, ?, ?, ?, NULL, ?, NULL, ?)",
                     (
                         record.established_revision,
                         _stored_time(record.recorded_at),
@@ -4286,6 +4319,7 @@ class CanonicalStore:
                         record.provenance.source,
                         record.initialization_summary,
                         record_identity,
+                        content_identity,
                     ),
                 )
                 self._connection.execute(
@@ -4313,6 +4347,7 @@ class CanonicalStore:
                         proposed_identity,
                     ),
                 )
+                self._seal_record_identity_unlocked(state.revision)
                 # A read attempted before the system existed may already have observed itself
                 # here, and success promises an empty ledger.
                 self._connection.execute("DELETE FROM activity_record")
@@ -4355,6 +4390,128 @@ class CanonicalStore:
                 summary,
                 content_identity,
             )
+        )
+
+    def _record_event_identity_unlocked(self, revision: int, kind: str) -> str:
+        """Derive one bounded commitment from normalized events, never an assertion."""
+        graph_events = semantic_row_summary(
+            (
+                int(occurrence),
+                str(operation),
+                str(object_kind),
+                str(uuid),
+                None if identity is None else str(identity),
+            )
+            for occurrence, operation, object_kind, uuid, identity in self._connection.execute(
+                "SELECT g.occurrence, g.operation, g.object_kind, g.uuid, v.content_identity"
+                " FROM canonical_graph_event AS g LEFT JOIN object_value AS v"
+                " ON v.id = g.object_value_id WHERE g.established_revision = ?"
+                " ORDER BY g.occurrence",
+                (revision,),
+            )
+        )
+        proposal_events = semantic_row_summary(
+            (
+                int(occurrence),
+                str(operation),
+                str(object_kind),
+                str(uuid),
+                None if identity is None else str(identity),
+            )
+            for occurrence, operation, object_kind, uuid, identity in self._connection.execute(
+                "SELECT p.occurrence, p.operation, p.object_kind, p.uuid, v.content_identity"
+                " FROM canonical_proposal_event AS p LEFT JOIN object_value AS v"
+                " ON v.id = p.object_value_id WHERE p.established_revision = ?"
+                " ORDER BY p.occurrence",
+                (revision,),
+            )
+        )
+        definition_proposal_events = semantic_row_summary(
+            (
+                int(occurrence),
+                str(entity_kind),
+                str(natural_key),
+                str(operation),
+                None if value_set_id is None else str(value_set_id),
+            )
+            for (
+                occurrence,
+                entity_kind,
+                natural_key,
+                operation,
+                value_set_id,
+            ) in self._connection.execute(
+                "SELECT occurrence, entity_kind, natural_key, operation, value_set_id"
+                " FROM canonical_definition_proposal_event WHERE established_revision = ?"
+                " ORDER BY occurrence",
+                (revision,),
+            )
+        )
+        definition_event = self._connection.execute(
+            "SELECT active_definition_set_id, delta_disposition, proposed_definition_set_id"
+            " FROM canonical_definition_event WHERE established_revision = ?",
+            (revision,),
+        ).fetchone()
+        base_graph: tuple[int, str] = (0, "0" * 64)
+        if kind == "initial":
+            base_graph = semantic_row_summary(
+                (str(uuid), str(identity))
+                for uuid, identity in self._connection.execute(
+                    "SELECT p.uuid, v.content_identity FROM graph_presence_interval AS p"
+                    " JOIN object_value AS v ON v.id = p.object_value_id"
+                    " WHERE p.valid_from_revision = ? ORDER BY p.uuid",
+                    (revision,),
+                )
+            )
+        return semantic_identity(
+            (
+                "canonicalEvents",
+                kind,
+                base_graph,
+                graph_events,
+                proposal_events,
+                definition_proposal_events,
+                None if definition_event is None else tuple(definition_event),
+            )
+        )
+
+    def _seal_record_identity_unlocked(self, revision: int) -> None:
+        row = self._connection.execute(
+            "SELECT r.record_kind, r.recorded_at, r.initiator, r.source, r.summary,"
+            " r.prior_record_identity, l.identity FROM canonical_record AS r CROSS JOIN ledger AS l"
+            " WHERE r.established_revision = ? AND l.id = 0",
+            (revision,),
+        ).fetchone()
+        if row is None:
+            raise StoreError(f"revision {revision} has no record to seal")
+        kind, recorded_at, initiator, source, summary, prior_identity, ledger_identity = row
+        resulting_state_identity = normalized_state_identity(self._connection)
+        event_identity = self._record_event_identity_unlocked(revision, str(kind))
+        content_identity = semantic_identity(
+            ("canonicalRecordContent", event_identity, resulting_state_identity)
+        )
+        record_identity = self._record_identity(
+            str(ledger_identity),
+            None if prior_identity is None else str(prior_identity),
+            revision,
+            str(kind),
+            self._recorded_at(str(recorded_at)),
+            str(initiator),
+            None if source is None else str(source),
+            str(summary),
+            content_identity,
+        )
+        self._connection.execute(
+            "UPDATE canonical_record SET content_identity = ?, record_identity = ?,"
+            " resulting_state_identity = ?, event_identity = ?"
+            " WHERE established_revision = ?",
+            (
+                content_identity,
+                record_identity,
+                resulting_state_identity,
+                event_identity,
+                revision,
+            ),
         )
 
     def _replace_current_graph_unlocked(self, graph: Graph, revision: int) -> None:
@@ -4463,6 +4620,7 @@ class CanonicalStore:
                 if previous is None or ledger_row is None:
                     raise StoreError("the canonical ledger has no identity-bearing base")
                 prior_identity = str(previous[0])
+                content_identity = _change_identity(record.change)
                 record_identity = self._record_identity(
                     str(ledger_row[0]),
                     prior_identity,
@@ -4472,13 +4630,13 @@ class CanonicalStore:
                     record.provenance.initiator,
                     record.provenance.source,
                     str(record.prior_revision),
-                    _change_identity(record.change),
+                    content_identity,
                 )
                 self._connection.execute(
                     "INSERT INTO canonical_record (established_revision, ordinal, record_kind,"
                     " recorded_at, initiator, source, summary, prior_revision, record_identity,"
-                    " prior_record_identity)"
-                    f" VALUES (?, ({NEXT_ORDINAL_SQL}), ?, ?, ?, ?, ?, ?, ?, ?)",
+                    " prior_record_identity, content_identity)"
+                    f" VALUES (?, ({NEXT_ORDINAL_SQL}), ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                     (
                         record.resulting_revision,
                         record.kind.value,
@@ -4489,6 +4647,7 @@ class CanonicalStore:
                         record.prior_revision,
                         record_identity,
                         prior_identity,
+                        content_identity,
                     ),
                 )
                 self._connection.execute(
@@ -4534,6 +4693,7 @@ class CanonicalStore:
                         proposed_identity,
                     ),
                 )
+                self._seal_record_identity_unlocked(record.resulting_revision)
                 self._connection.execute("COMMIT")
             except StoreError:
                 self._rollback_quietly()
@@ -5049,6 +5209,253 @@ class CanonicalStore:
         with self._lock:
             try:
                 self._connection.execute("BEGIN")
+                findings: list[ValidationFinding] = []
+                ledger = self._connection.execute(
+                    "SELECT identity FROM ledger WHERE id = 0"
+                ).fetchone()
+                previous_revision: int | None = None
+                previous_identity: str | None = None
+                record_count = 0
+                allowed_kinds = {kind.value for kind in TransitionKind}
+                for row in self._connection.execute(
+                    "SELECT ordinal, established_revision, record_kind, recorded_at, initiator,"
+                    " source, summary, prior_revision, record_identity, prior_record_identity,"
+                    " content_identity, resulting_state_identity, event_identity"
+                    " FROM canonical_record ORDER BY ordinal"
+                ):
+                    (
+                        ordinal,
+                        revision,
+                        kind,
+                        recorded_at,
+                        initiator,
+                        source,
+                        summary,
+                        prior_revision,
+                        record_identity,
+                        prior_record_identity,
+                        content_identity,
+                        resulting_state_identity,
+                        event_identity,
+                    ) = row
+                    ordinal, revision = int(ordinal), int(revision)
+                    structural_error: str | None = None
+                    if ordinal != record_count:
+                        structural_error = "canonical record ordinals are not contiguous"
+                    elif ordinal == 0 and (
+                        kind != "initial"
+                        or prior_revision is not None
+                        or prior_record_identity is not None
+                    ):
+                        structural_error = (
+                            "canonical history does not begin with one initial record"
+                        )
+                    elif ordinal > 0 and (
+                        kind not in allowed_kinds
+                        or previous_revision is None
+                        or revision != previous_revision + 1
+                        or prior_revision != previous_revision
+                        or prior_record_identity != previous_identity
+                    ):
+                        structural_error = "canonical transition lineage is not contiguous"
+                    if ledger is None:
+                        structural_error = "canonical history has no ledger identity"
+                    else:
+                        actual_event = self._record_event_identity_unlocked(revision, str(kind))
+                        actual_content = semantic_identity(
+                            (
+                                "canonicalRecordContent",
+                                actual_event,
+                                str(resulting_state_identity),
+                            )
+                        )
+                        if actual_event != str(event_identity) or actual_content != str(
+                            content_identity
+                        ):
+                            structural_error = (
+                                "canonical record content does not match its normalized events"
+                            )
+                        expected_identity = self._record_identity(
+                            str(ledger[0]),
+                            None if prior_record_identity is None else str(prior_record_identity),
+                            revision,
+                            str(kind),
+                            self._recorded_at(str(recorded_at)),
+                            str(initiator),
+                            None if source is None else str(source),
+                            str(summary),
+                            str(content_identity),
+                        )
+                        if expected_identity != str(record_identity):
+                            structural_error = (
+                                "canonical record identity does not bind its content and lineage"
+                            )
+                    event_counts: dict[str, int] = {}
+                    for table in (
+                        "canonical_graph_event",
+                        "canonical_proposal_event",
+                        "canonical_definition_proposal_event",
+                    ):
+                        event_row = self._connection.execute(
+                            f"SELECT count(*), min(occurrence), max(occurrence) FROM {table}"
+                            " WHERE established_revision = ?",
+                            (revision,),
+                        ).fetchone()
+                        assert event_row is not None
+                        event_count = int(event_row[0])
+                        event_counts[table] = event_count
+                        if event_count and (
+                            int(event_row[1]) != 0 or int(event_row[2]) != event_count - 1
+                        ):
+                            structural_error = (
+                                "canonical event occurrences are not complete and contiguous"
+                            )
+                    definition_event = self._connection.execute(
+                        "SELECT active_definition_set_id, delta_disposition,"
+                        " proposed_definition_set_id FROM canonical_definition_event"
+                        " WHERE established_revision = ?",
+                        (revision,),
+                    ).fetchone()
+                    if definition_event is None:
+                        structural_error = "canonical record has no definition disposition event"
+                    elif kind == "initial":
+                        if definition_event[0] is None or definition_event[1] not in {
+                            "absent",
+                            "present",
+                        }:
+                            structural_error = "initial record has incompatible definition events"
+                    elif kind == TransitionKind.GRAPH_MUTATION.value:
+                        if (
+                            event_counts["canonical_proposal_event"]
+                            or event_counts["canonical_definition_proposal_event"]
+                            or tuple(definition_event) != (None, "unchanged", None)
+                        ):
+                            structural_error = "graph mutation has incompatible event families"
+                    elif kind == TransitionKind.DEFINITION_DELTA_CHANGE.value:
+                        if event_counts["canonical_graph_event"] or definition_event[0] is not None:
+                            structural_error = (
+                                "definition-delta change has incompatible event families"
+                            )
+                    elif kind in {
+                        TransitionKind.DEFINITION_ACTIVATION.value,
+                        TransitionKind.HISTORICAL_RESTORATION.value,
+                    }:
+                        if (
+                            event_counts["canonical_proposal_event"]
+                            or event_counts["canonical_definition_proposal_event"]
+                            or definition_event[0] is None
+                            or tuple(definition_event[1:]) != ("absent", None)
+                        ):
+                            structural_error = (
+                                "activation or restoration has incompatible event families"
+                            )
+                    if structural_error is not None:
+                        findings.append(ValidationFinding(summary=structural_error))
+                        break
+                    previous_revision = revision
+                    previous_identity = str(record_identity)
+                    record_count += 1
+                head_record = self._connection.execute(
+                    "SELECT h.revision, r.record_identity, r.resulting_state_identity"
+                    " FROM state_head AS h"
+                    " JOIN canonical_record AS r ON r.established_revision = h.established_by"
+                    " WHERE h.id = 0"
+                ).fetchone()
+                if not findings and (
+                    record_count == 0
+                    or head_record is None
+                    or int(head_record[0]) != previous_revision
+                    or str(head_record[1]) != previous_identity
+                    or str(head_record[2]) != normalized_state_identity(self._connection)
+                ):
+                    findings.append(
+                        ValidationFinding(
+                            summary=(
+                                "the state head is not established by the final canonical record"
+                            )
+                        )
+                    )
+                invalid_event = self._connection.execute(
+                    "SELECT g.uuid FROM canonical_graph_event AS g"
+                    " LEFT JOIN object_value AS v ON v.id = g.object_value_id"
+                    " WHERE g.operation NOT IN ('upsert', 'delete')"
+                    " OR (g.operation = 'upsert' AND (v.id IS NULL OR v.uuid != g.uuid"
+                    " OR v.object_kind != g.object_kind))"
+                    " OR (g.operation = 'delete' AND g.object_value_id IS NOT NULL) LIMIT 1"
+                ).fetchone()
+                if not findings and invalid_event is not None:
+                    findings.append(
+                        ValidationFinding(
+                            summary="a canonical graph event is invalid or kind-incompatible",
+                            implicated_objects=(str(invalid_event[0]),),
+                        )
+                    )
+                invalid_proposal_event = self._connection.execute(
+                    "SELECT e.uuid FROM canonical_proposal_event AS e"
+                    " LEFT JOIN object_value AS v ON v.id = e.object_value_id WHERE"
+                    " e.operation NOT IN ('upsert', 'delete', 'unstage')"
+                    " OR e.object_kind NOT IN ('anchor', 'associatedData', 'link')"
+                    " OR (e.operation = 'upsert' AND (v.id IS NULL OR v.uuid != e.uuid"
+                    " OR v.object_kind != e.object_kind))"
+                    " OR (e.operation IN ('delete', 'unstage')"
+                    " AND e.object_value_id IS NOT NULL) LIMIT 1"
+                ).fetchone()
+                if not findings and invalid_proposal_event is not None:
+                    findings.append(
+                        ValidationFinding(
+                            summary="a canonical proposal event is invalid or kind-incompatible",
+                            implicated_objects=(str(invalid_proposal_event[0]),),
+                        )
+                    )
+                if not findings:
+                    for (
+                        entity_kind,
+                        natural_key,
+                        operation,
+                        value_set_id,
+                    ) in self._connection.execute(
+                        "SELECT entity_kind, natural_key, operation, value_set_id"
+                        " FROM canonical_definition_proposal_event"
+                    ):
+                        definition_error = False
+                        if entity_kind not in {"type", "relationship"} or operation not in {
+                            "upsert",
+                            "delete",
+                            "unstage",
+                        }:
+                            definition_error = True
+                        elif operation != "upsert":
+                            definition_error = value_set_id is not None
+                        elif value_set_id is None:
+                            definition_error = True
+                        else:
+                            value = self._load_definition_set(str(value_set_id))
+                            if definition_content_stats(value)[1] != 1:
+                                definition_error = True
+                            elif entity_kind == "type":
+                                types = (
+                                    *value.anchor_types,
+                                    *value.associated_data_types,
+                                    *value.link_types,
+                                )
+                                definition_error = len(types) != 1 or types[0].type_key != str(
+                                    natural_key
+                                )
+                            else:
+                                relationships = value.relationship_constraints
+                                definition_error = len(relationships) != 1 or semantic_identity(
+                                    relationship_identity(relationships[0])
+                                ) != str(natural_key)
+                        if definition_error:
+                            findings.append(
+                                ValidationFinding(
+                                    summary=(
+                                        "a canonical definition-proposal event is invalid or"
+                                        " key-incompatible"
+                                    )
+                                )
+                            )
+                            break
                 base = self._connection.execute(
                     "SELECT established_revision FROM canonical_record WHERE ordinal = 0"
                 ).fetchone()
@@ -5069,10 +5476,11 @@ class CanonicalStore:
                     (int(base[0]),),
                 )
                 differences = self._connection.execute(
-                    "SELECT uuid, object_value_id FROM replay_expected"
-                    " EXCEPT SELECT uuid, object_value_id FROM current_graph_object"
-                    " UNION ALL SELECT uuid, object_value_id FROM current_graph_object"
-                    " EXCEPT SELECT uuid, object_value_id FROM replay_expected LIMIT 1"
+                    "SELECT uuid, object_value_id FROM (SELECT uuid, object_value_id"
+                    " FROM replay_expected EXCEPT SELECT uuid, object_value_id"
+                    " FROM current_graph_object) UNION ALL SELECT uuid, object_value_id"
+                    " FROM (SELECT uuid, object_value_id FROM current_graph_object"
+                    " EXCEPT SELECT uuid, object_value_id FROM replay_expected) LIMIT 1"
                 ).fetchone()
                 definition = self._connection.execute(
                     "SELECT active_definition_set_id, proposed_definition_set_id"
@@ -5088,7 +5496,6 @@ class CanonicalStore:
                     " FROM canonical_definition_event WHERE delta_disposition != 'unchanged'"
                     " ORDER BY established_revision DESC LIMIT 1"
                 ).fetchone()
-                findings: list[ValidationFinding] = []
                 if differences is not None:
                     findings.append(
                         ValidationFinding(

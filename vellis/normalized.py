@@ -9,6 +9,7 @@ the public language has no path-level meaning to normalize further.
 from __future__ import annotations
 
 import hashlib
+from collections.abc import Iterable
 from decimal import Decimal
 from enum import Enum
 from sqlite3 import Connection
@@ -44,7 +45,10 @@ __all__ = [
     "load_definition_set",
     "load_object_value",
     "object_identity",
+    "normalized_state_identity",
     "semantic_identity",
+    "semantic_row_summary",
+    "verify_normalized_identities",
 ]
 
 
@@ -111,6 +115,76 @@ def semantic_identity(value: object) -> str:
 
     add(value)
     return digest.hexdigest()
+
+
+def semantic_row_summary(rows: Iterable[object]) -> tuple[int, str]:
+    """Summarize a keyed or occurrence-bearing row stream with constant memory.
+
+    Every caller includes the row's semantic key (or event occurrence) in each value.
+    Count plus a 256-bit modular accumulator therefore preserves multiplicity while
+    avoiding a resident tuple proportional to the stored population.
+    """
+    count = 0
+    accumulator = 0
+    for row in rows:
+        accumulator = (accumulator + int(semantic_identity(row), 16)) % (1 << 256)
+        count += 1
+    return count, f"{accumulator:064x}"
+
+
+def normalized_state_identity(connection: Connection) -> str:
+    """Commit to the complete normalized current/prospective meaning in bounded memory."""
+    head = connection.execute(
+        "SELECT revision, active_definition_set_id, proposed_definition_set_id"
+        " FROM state_head WHERE id = 0"
+    ).fetchone()
+    if head is None:
+        raise ValueError("normalized state has no head")
+    graph = semantic_row_summary(
+        (str(uuid), str(identity))
+        for uuid, identity in connection.execute(
+            "SELECT c.uuid, v.content_identity FROM current_graph_object AS c"
+            " JOIN object_value AS v ON v.id = c.object_value_id ORDER BY c.uuid"
+        )
+    )
+    overlay = semantic_row_summary(
+        (
+            str(uuid),
+            str(kind),
+            str(operation),
+            None if identity is None else str(identity),
+        )
+        for uuid, kind, operation, identity in connection.execute(
+            "SELECT p.uuid, p.object_kind, p.operation, v.content_identity"
+            " FROM proposal_entry AS p LEFT JOIN object_value AS v ON v.id = p.object_value_id"
+            " ORDER BY p.uuid"
+        )
+    )
+    definition_overlay = semantic_row_summary(
+        (
+            str(entity_kind),
+            str(natural_key),
+            str(operation),
+            None if value_set_id is None else str(value_set_id),
+        )
+        for entity_kind, natural_key, operation, value_set_id in connection.execute(
+            "SELECT 'type', type_key, operation, value_set_id"
+            " FROM proposal_definition_type"
+            " UNION ALL SELECT 'relationship', natural_key, operation, value_set_id"
+            " FROM proposal_definition_relationship ORDER BY 1, 2"
+        )
+    )
+    return semantic_identity(
+        (
+            "normalizedState",
+            int(head[0]),
+            str(head[1]),
+            None if head[2] is None else str(head[2]),
+            graph,
+            overlay,
+            definition_overlay,
+        )
+    )
 
 
 def json_storage_fields(value: JsonValue) -> tuple[str, int | None, str | None, str | None]:
@@ -375,6 +449,64 @@ def definition_identity(definitions: GraphDefinitionSet) -> str:
     """Return a path-independent identity aligned with definition-set equality."""
 
     return definition_identity_from_stats(*definition_content_stats(definitions))
+
+
+def verify_normalized_identities(connection: Connection) -> str | None:
+    """Return the first stale normalized content identity using bounded entry loads."""
+    for value_id, stored_identity in connection.execute(
+        "SELECT id, content_identity FROM object_value ORDER BY id"
+    ):
+        try:
+            actual_identity = object_identity(load_object_value(connection, int(value_id)))
+        except (TypeError, ValueError, ArithmeticError) as error:
+            return f"object value {value_id} cannot be decoded: {error}"
+        if actual_identity != str(stored_identity):
+            return f"object value {value_id} does not match its semantic identity"
+
+    for (set_identity,) in connection.execute(
+        "SELECT identity FROM definition_set ORDER BY identity"
+    ):
+        accumulator = 0
+        count = 0
+        for (type_key,) in connection.execute(
+            "SELECT DISTINCT type_key FROM definition_type WHERE definition_set_id = ?"
+            " ORDER BY type_key",
+            (set_identity,),
+        ):
+            definitions = load_definition_set(
+                connection,
+                str(set_identity),
+                type_keys={str(type_key)},
+                relationship_keys=set(),
+            )
+            members = _definition_members(definitions)
+            accumulator += sum(int(semantic_identity(member), 16) for member in members)
+            count += len(members)
+        for (natural_key,) in connection.execute(
+            "SELECT DISTINCT natural_key FROM definition_multiplicity_rule"
+            " WHERE definition_set_id = ? ORDER BY natural_key",
+            (set_identity,),
+        ):
+            definitions = load_definition_set(
+                connection,
+                str(set_identity),
+                type_keys=set(),
+                relationship_keys={str(natural_key)},
+            )
+            members = _definition_members(definitions)
+            accumulator += sum(int(semantic_identity(member), 16) for member in members)
+            count += len(members)
+        computed_accumulator = f"{accumulator % _IDENTITY_MODULUS:064x}"
+        stored = connection.execute(
+            "SELECT content_accumulator, entry_count FROM definition_set WHERE identity = ?",
+            (set_identity,),
+        ).fetchone()
+        assert stored is not None
+        if (str(stored[0]), int(stored[1])) != (computed_accumulator, count):
+            return f"definition set {set_identity} does not match its content summary"
+        if definition_identity_from_stats(computed_accumulator, count) != str(set_identity):
+            return f"definition set {set_identity} does not match its semantic identity"
+    return None
 
 
 def insert_definition_set(connection: Connection, definitions: GraphDefinitionSet) -> str:

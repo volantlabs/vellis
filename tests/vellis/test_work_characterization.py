@@ -595,30 +595,25 @@ def test_replay_visits_exactly_its_required_tail_and_reaches_the_same_state(
         source.close()
 
 
-@pytest.mark.parametrize("depth", [4, 16, 32])
-def test_restoring_a_past_state_costs_the_tail_it_has_to_replay(tmp_path: Path, depth: int) -> None:
-    """The fourth operation the requirement exempts, and so the fourth to characterize.
-
-    Restoration is not bounded by the selection rule — reaching a past graph means
-    replaying the transitions that produced it — but the requirement still says it must
-    be characterized rather than left unmeasured. The cost is the tail up to the selected
-    revision plus resolving the selector and reading the base; what it is *not* is the
-    records after the selected revision, which is why restoring something old from a much
-    longer ledger costs what restoring it from a shorter one costs.
-    """
-    system = establish(tmp_path / f"vellis-{depth}.sqlite3")
+@pytest.mark.parametrize("selected_revision", [4, 16, 32])
+def test_restoring_a_past_state_uses_set_difference_not_ledger_replay(
+    tmp_path: Path, selected_revision: int
+) -> None:
+    """Restore reads one selected record while SQLite computes the state difference."""
+    system = establish(tmp_path / f"vellis-{selected_revision}.sqlite3")
     try:
         commit_graph_transitions(system, 40)
 
         measured = measure(
             system,
             lambda: system.restore_historical_state(
-                RevisionSelection(revision=depth), provenance=OWNER
+                RevisionSelection(revision=selected_revision), provenance=OWNER
             ),
         )
 
         assert measured.value.accepted, measured.value.findings
-        assert measured.cost.canonical_record_visits == depth + 2
+        assert measured.cost.canonical_record_visits == 1
+        assert any("EXCEPT" in statement for statement in measured.cost.statements)
         assert measured.cost.duration_seconds >= 0.0
     finally:
         system.close()
