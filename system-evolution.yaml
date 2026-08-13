@@ -9,7 +9,7 @@ evolution:
     reason: The owner accepted normalized SQLite state, prospective graph overlay, complete stored assessments with bounded retrieval, and streamed snapshots while preserving portable system meaning.
     checkpoint: git:8109ab24c4dc58d81fbfe2fee0181b395089a61d
   blocker: null
-  checkpoint: null
+  checkpoint: git:2d969dfc919acd7f0b1d2bd2e37e63e8b3a563a6
 baselines:
   status: current
   source:
@@ -19,17 +19,17 @@ baselines:
     execution_environment: sha256:c24a0bae1e63d1f4923d6c7925925ea4e02743568a84b403677b5f6a718879fa
     checkpoint: git:79840c2168e5d136571a89f7eb6ccd6ff7e56659
   target:
-    model: sha256:ad02d24b6c6eeb38f904d551e0ae7dfd48101ff41e44db79effb3014e137e4c6
-    implementation: git:cc667f4dde9dcf1e27418085360f9a7f8453bd6a
+    model: sha256:23a0fa4c525a6e89ec0740c4d4f0af283cccae44abc23b73b99f7427d7c93c7e
+    implementation: git:2d969dfc919acd7f0b1d2bd2e37e63e8b3a563a6
     language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
     execution_environment: sha256:c24a0bae1e63d1f4923d6c7925925ea4e02743568a84b403677b5f6a718879fa
-    checkpoint: git:cc667f4dde9dcf1e27418085360f9a7f8453bd6a
+    checkpoint: git:2d969dfc919acd7f0b1d2bd2e37e63e8b3a563a6
   observed:
-    model: sha256:ad02d24b6c6eeb38f904d551e0ae7dfd48101ff41e44db79effb3014e137e4c6
-    implementation: git:cc667f4dde9dcf1e27418085360f9a7f8453bd6a
+    model: sha256:23a0fa4c525a6e89ec0740c4d4f0af283cccae44abc23b73b99f7427d7c93c7e
+    implementation: git:2d969dfc919acd7f0b1d2bd2e37e63e8b3a563a6
     language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
     execution_environment: sha256:c24a0bae1e63d1f4923d6c7925925ea4e02743568a84b403677b5f6a718879fa
-    checkpoint: git:cc667f4dde9dcf1e27418085360f9a7f8453bd6a
+    checkpoint: git:2d969dfc919acd7f0b1d2bd2e37e63e8b3a563a6
 scope:
   authority_scope:
     - model/10-rtg-domain.sysml
@@ -99,7 +99,8 @@ findings:
       - VellisRequirements::historyIndependentCurrentWork
     evidence_refs:
       - command:uv run pytest tests/vellis/test_graph_changes.py tests/vellis/test_current_work.py
-    disposition: model-change
+      - command:just model-check
+    disposition: accepted
     owner_work_item_id: W002
     implementation_status: conflicting
     nearest_wrong_system: SQLite owns durable state but ordinary mutation validation reconstructs the complete graph before applying a bounded change.
@@ -129,7 +130,8 @@ findings:
       - VellisRequirements::replayEquivalence
     evidence_refs:
       - command:uv run pytest tests/vellis/test_snapshot_replay.py tests/vellis/test_snapshot_document.py tests/vellis/test_historical_restore.py tests/vellis/test_current_work.py
-    disposition: model-change
+      - command:just model-check
+    disposition: accepted
     owner_work_item_id: W002
     implementation_status: conflicting
     nearest_wrong_system: A semantically correct complete lifecycle operation assembles every object into one process-resident value before producing its effect or artifact.
@@ -159,7 +161,8 @@ findings:
       - VellisRequirements::historyIndependentCurrentWork
     evidence_refs:
       - command:uv run pytest tests/vellis/test_graph_queries.py tests/vellis/test_work_characterization.py
-    disposition: model-change
+      - command:just model-check
+    disposition: accepted
     owner_work_item_id: W002
     implementation_status: conflicting
     nearest_wrong_system: Candidate narrowing uses SQLite indexes but transfers an unbounded same-type candidate set into Python before projection and result-bound refusal.
@@ -174,7 +177,8 @@ findings:
       - VellisRequirements::mcpAgentToolContract
     evidence_refs:
       - command:uv run pytest tests/vellis/test_graph_changes.py tests/vellis/test_mcp_boundary.py
-    disposition: model-change
+      - command:just model-check
+    disposition: accepted
     owner_work_item_id: W002
     implementation_status: conflicting
     nearest_wrong_system: A complete assessment is either returned as one unbounded value or repeatedly recomputed to reveal further findings.
@@ -189,7 +193,8 @@ findings:
       - VellisRequirements::nonDisruptiveDefinitionWork
     evidence_refs:
       - command:uv run pytest tests/vellis/test_definition_governance.py tests/vellis/test_graph_changes.py
-    disposition: model-change
+      - command:just model-check
+    disposition: accepted
     owner_work_item_id: W002
     implementation_status: absent
     nearest_wrong_system: Prospective definitions are singular and durable, but required graph upserts and explicit removals must be applied separately against the wrong active vocabulary.
@@ -204,7 +209,8 @@ findings:
       - VellisRequirements::canonicalSnapshotCompleteness
     evidence_refs:
       - command:uv run pytest tests/vellis/test_snapshot_initialization.py tests/vellis/test_v1_recovery.py
-    disposition: model-change
+      - command:just model-check
+    disposition: accepted
     owner_work_item_id: W002
     implementation_status: conflicting
     nearest_wrong_system: A compatible complete input is semantically valid but cannot be established without first becoming one resident candidate graph and definition set.
@@ -395,11 +401,12 @@ work_items:
       - No database, index, serialization, or programming technology becomes portable model authority.
       - Completeness, exact equality, history, lineage, and atomic failure non-effects remain authoritative.
       - Numerical latency targets remain deferred pending representative hardware and owner data.
-    lifecycle: active
-    implementation_status: not evaluated
-    evidence_refs: []
+    lifecycle: complete
+    implementation_status: not applicable
+    evidence_refs:
+      - command:just model-check
     blocker: null
-    checkpoint: null
+    checkpoint: git:2d969dfc919acd7f0b1d2bd2e37e63e8b3a563a6
   - id: W003
     order: 3
     label: Realize normalized current, historical, and canonical-ledger state with bounded query and mutation
@@ -409,7 +416,7 @@ work_items:
       - W002
     planned_baseline:
       dimension: implementation
-      identity: git:096d548af4a744aa60a6bacafa74d3d0b58b7fe1
+      identity: git:2d969dfc919acd7f0b1d2bd2e37e63e8b3a563a6
     finding_ids:
       - F006
     decision_ids:
@@ -437,7 +444,7 @@ work_items:
     non_effects:
       - Graph, definition, query, equality, revision, and ledger semantics remain model-controlled.
       - User-owned .data content remains untouched.
-    lifecycle: pending
+    lifecycle: active
     implementation_status: not evaluated
     evidence_refs: []
     blocker: null
@@ -451,7 +458,7 @@ work_items:
       - W003
     planned_baseline:
       dimension: model
-      identity: sha256:ad02d24b6c6eeb38f904d551e0ae7dfd48101ff41e44db79effb3014e137e4c6
+      identity: sha256:23a0fa4c525a6e89ec0740c4d4f0af283cccae44abc23b73b99f7427d7c93c7e
     finding_ids: []
     decision_ids:
       - D003
@@ -488,7 +495,7 @@ work_items:
       - W004
     planned_baseline:
       dimension: model
-      identity: sha256:ad02d24b6c6eeb38f904d551e0ae7dfd48101ff41e44db79effb3014e137e4c6
+      identity: sha256:23a0fa4c525a6e89ec0740c4d4f0af283cccae44abc23b73b99f7427d7c93c7e
     finding_ids: []
     decision_ids:
       - D004
@@ -525,7 +532,7 @@ work_items:
       - W005
     planned_baseline:
       dimension: model
-      identity: sha256:ad02d24b6c6eeb38f904d551e0ae7dfd48101ff41e44db79effb3014e137e4c6
+      identity: sha256:23a0fa4c525a6e89ec0740c4d4f0af283cccae44abc23b73b99f7427d7c93c7e
     finding_ids: []
     decision_ids:
       - D006
