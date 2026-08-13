@@ -34,7 +34,7 @@ from enum import Enum
 from typing import Protocol
 
 from vellis.definitions import AssociatedDataTypeDefinition, GraphDefinitionSet
-from vellis.graph import Anchor, AssociatedDataObject, Graph, Link, LinkEndpoint
+from vellis.graph import Anchor, AssociatedDataObject, Link, LinkEndpoint
 from vellis.history import HistoricalSelection
 from vellis.json_value import JsonKind, JsonValue, json_equal, json_kind, unencodable_reason
 from vellis.outcomes import OperationStatus, ValidationFinding
@@ -62,10 +62,8 @@ __all__ = [
     "ReturnShape",
     "ReturnProjection",
     "ReturnedProperty",
-    "evaluate_query",
     "evaluate_indexed_query",
     "indexed_query_findings",
-    "query_findings",
 ]
 
 
@@ -277,12 +275,16 @@ class GraphQueryResult:
         return self.status is OperationStatus.ACCEPTED
 
 
-class QueryCandidateIndex(Protocol):
-    """The identity joins the query language needs from a current-state realization."""
+class QueryValidationIndex(Protocol):
+    """Bounded identity checks needed before SQL evaluation."""
 
     def known_anchor_uuids(self, anchor_type: str, uuids: tuple[str, ...]) -> set[str]: ...
 
     def known_link_uuids(self, link_type: str, uuids: tuple[str, ...]) -> set[str]: ...
+
+
+class QueryCandidateIndex(QueryValidationIndex, Protocol):
+    """Candidate joins used only by an explicitly selected evaluation realization."""
 
     def anchor_candidates(
         self, group: AnchorGroup, allowed_uuids: frozenset[str] | None = None
@@ -302,114 +304,18 @@ class QueryCandidateIndex(Protocol):
     def link_endpoint_pairs(self, required: RequiredLink) -> frozenset[tuple[str, str]]: ...
 
 
-class _InMemoryQueryIndex:
-    """Hash-indexed access over an explicitly materialized graph."""
-
-    def __init__(self, graph: Graph) -> None:
-        self._anchors_by_uuid = {anchor.uuid: anchor for anchor in graph.anchors}
-        self._links_by_uuid = {link.uuid: link for link in graph.links}
-        self._anchors_by_type: dict[str, list[Anchor]] = {}
-        self._data_by_type_and_anchor: dict[tuple[str, str], list[AssociatedDataObject]] = {}
-        self._links_by_join: dict[tuple[str, str, str], list[Link]] = {}
-        self._link_pairs_by_type: dict[str, set[tuple[str, str]]] = {}
-        for anchor in graph.anchors:
-            self._anchors_by_type.setdefault(anchor.type_key, []).append(anchor)
-        for data in graph.associated_data:
-            for anchor_uuid in data.anchor_uuids:
-                self._data_by_type_and_anchor.setdefault((data.type_key, anchor_uuid), []).append(
-                    data
-                )
-        for link in graph.links:
-            self._links_by_join.setdefault(
-                (link.type_key, link.source_uuid, link.target_uuid), []
-            ).append(link)
-            self._link_pairs_by_type.setdefault(link.type_key, set()).add(
-                (link.source_uuid, link.target_uuid)
-            )
-
-    def known_anchor_uuids(self, anchor_type: str, uuids: tuple[str, ...]) -> set[str]:
-        return {
-            uuid
-            for uuid in uuids
-            if (anchor := self._anchors_by_uuid.get(uuid)) is not None
-            and anchor.type_key == anchor_type
-        }
-
-    def known_link_uuids(self, link_type: str, uuids: tuple[str, ...]) -> set[str]:
-        return {
-            uuid
-            for uuid in uuids
-            if (link := self._links_by_uuid.get(uuid)) is not None and link.type_key == link_type
-        }
-
-    def anchor_candidates(
-        self, group: AnchorGroup, allowed_uuids: frozenset[str] | None = None
-    ) -> tuple[Anchor, ...]:
-        candidates = self._anchors_by_type.get(group.anchor_type, ())
-        permitted = None if group.uuid_filter is None else frozenset(group.uuid_filter.uuids)
-        if allowed_uuids is not None:
-            permitted = allowed_uuids if permitted is None else permitted & allowed_uuids
-        if permitted is None:
-            return tuple(candidates)
-        return tuple(anchor for anchor in candidates if anchor.uuid in permitted)
-
-    def associated_data_candidates(
-        self,
-        associated_data_type: str,
-        anchor_uuid: str,
-        allowed_uuids: frozenset[str] | None = None,
-    ) -> tuple[AssociatedDataObject, ...]:
-        candidates = self._data_by_type_and_anchor.get((associated_data_type, anchor_uuid), ())
-        if allowed_uuids is None:
-            return tuple(candidates)
-        return tuple(data for data in candidates if data.uuid in allowed_uuids)
-
-    def link_candidates(
-        self, required: RequiredLink, source_uuid: str, target_uuid: str
-    ) -> tuple[Link, ...]:
-        candidates = self._links_by_join.get((required.link_type, source_uuid, target_uuid), ())
-        if required.uuid_filter is None:
-            return tuple(candidates)
-        permitted = frozenset(required.uuid_filter.uuids)
-        return tuple(link for link in candidates if link.uuid in permitted)
-
-    def link_endpoint_pairs(self, required: RequiredLink) -> frozenset[tuple[str, str]]:
-        pairs = self._link_pairs_by_type.get(required.link_type, set())
-        if required.uuid_filter is None:
-            return frozenset(pairs)
-        permitted = frozenset(required.uuid_filter.uuids)
-        return frozenset(
-            (link.source_uuid, link.target_uuid)
-            for uuid in permitted
-            if (link := self._links_by_uuid.get(uuid)) is not None
-            and link.type_key == required.link_type
-        )
-
-
 # --- Whether a query means anything --------------------------------------------------
 
 
-def query_findings(
-    query: GraphQuery, definitions: GraphDefinitionSet, graph: Graph
-) -> tuple[ValidationFinding, ...]:
-    """Return every reason ``query`` cannot be evaluated.
-
-    A restriction to an identity that does not exist is a finding rather than an empty
-    answer: the caller named something it believed it knew, and reporting nothing found
-    would answer a question it did not ask.
-    """
-    return _query_findings(query, definitions, _InMemoryQueryIndex(graph))
-
-
 def indexed_query_findings(
-    query: GraphQuery, definitions: GraphDefinitionSet, index: QueryCandidateIndex
+    query: GraphQuery, definitions: GraphDefinitionSet, index: QueryValidationIndex
 ) -> tuple[ValidationFinding, ...]:
     """Validate query meaning with a realization-provided identity index."""
     return _query_findings(query, definitions, index)
 
 
 def _query_findings(
-    query: GraphQuery, definitions: GraphDefinitionSet, index: QueryCandidateIndex
+    query: GraphQuery, definitions: GraphDefinitionSet, index: QueryValidationIndex
 ) -> tuple[ValidationFinding, ...]:
     findings: list[ValidationFinding] = []
     names = _name_findings(query, findings)
@@ -460,7 +366,7 @@ def _name_findings(query: GraphQuery, findings: list[ValidationFinding]) -> dict
 def _group_findings(
     query: GraphQuery,
     definitions: GraphDefinitionSet,
-    index: QueryCandidateIndex,
+    index: QueryValidationIndex,
     findings: list[ValidationFinding],
 ) -> None:
     for group in query.anchor_groups:
@@ -636,7 +542,7 @@ def _comparison_findings(
 def _link_findings(
     query: GraphQuery,
     definitions: GraphDefinitionSet,
-    index: QueryCandidateIndex,
+    index: QueryValidationIndex,
     names: dict[str, str],
     findings: list[ValidationFinding],
 ) -> None:
@@ -780,13 +686,6 @@ class _Assignment:
 
     endpoints: dict[str, LinkEndpoint] = field(default_factory=dict)
     links: dict[str, Link] = field(default_factory=dict)
-
-
-def evaluate_query(
-    query: GraphQuery, definitions: GraphDefinitionSet, graph: Graph, revision: int
-) -> GraphQueryResult:
-    """Evaluate ``query`` against current state, or refuse it whole."""
-    return evaluate_indexed_query(query, definitions, _InMemoryQueryIndex(graph), revision)
 
 
 def evaluate_indexed_query(

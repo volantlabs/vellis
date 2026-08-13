@@ -64,6 +64,7 @@ __all__ = [
     "DefinitionInspectionRequest",
     "DefinitionInspectionResult",
     "DefinitionSummaryResult",
+    "DefinitionSummaryRequest",
     "anchor_neighborhood",
     "inspection_findings",
     "summarize_anchor_types",
@@ -79,6 +80,14 @@ class AnchorTypeSummary:
 
     type_key: str
     description: str | None
+
+
+@dataclass(frozen=True, slots=True)
+class DefinitionSummaryRequest:
+    """Select current, prospective, or historical shallow definition meaning."""
+
+    historical_selection: HistoricalSelection | None = None
+    state_scope: EvaluatedStateScope = EvaluatedStateScope.CURRENT
 
 
 @dataclass(frozen=True, slots=True)

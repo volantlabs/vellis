@@ -15,17 +15,18 @@ from pathlib import Path
 import pytest
 
 from tests.vellis.evolution_support import activate_clean_delta, stage_complete_fixture
+from tests.vellis.oracle import materialize_everyday_life, materialize_state
 from vellis.canonical import Provenance
 from vellis.changes import GraphChange
 from vellis.definitions import definition_set_equal, validate_definition_set
-from vellis.everyday_life import DATE_PATTERN, everyday_life_starter
+from vellis.everyday_life import DATE_PATTERN
 from vellis.graph import Anchor, AssociatedDataObject
 from vellis.json_value import JsonKind, normalize
 from vellis.outcomes import OperationStatus
 from vellis.patterns import compile_pattern
 from vellis.system import RTGSystem
 
-STARTER = everyday_life_starter()
+STARTER = materialize_everyday_life()
 
 
 def test_the_starter_matches_the_modeled_counts() -> None:
@@ -62,7 +63,7 @@ def test_the_starter_carries_no_graph_data(tmp_path: Path) -> None:
         assert system.initialize_fresh(
             STARTER, provenance=Provenance(initiator="owner"), initialization_summary="starter"
         ).accepted
-        assert system.current_state().graph.is_empty
+        assert materialize_state(system).graph.is_empty
     finally:
         system.close()
 
@@ -210,7 +211,7 @@ def test_the_starter_is_governed_like_any_other_vocabulary(tmp_path: Path) -> No
         ).accepted
         assert activate_clean_delta(system, provenance=Provenance(initiator="owner")).accepted
 
-        active = system.current_state().active_definitions
+        active = materialize_state(system).active_definitions
         assert active.anchor_type("life.pet") is not None
         assert not definition_set_equal(active, STARTER)
     finally:

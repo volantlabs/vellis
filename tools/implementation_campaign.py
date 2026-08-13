@@ -8,6 +8,7 @@ import json
 import re
 import subprocess
 from collections import Counter
+from functools import cache
 from pathlib import Path, PurePosixPath
 from typing import Any, cast
 
@@ -210,7 +211,23 @@ def _evidence_fragment_exists(path: str, source: str, fragment: str) -> bool:
     return False
 
 
-def _evidence_reference_findings(reference: str, *, label: str, root: Path) -> list[str]:
+@cache
+def _committed_evidence_source(
+    root_text: str, revision: str, path_text: str
+) -> tuple[str, str] | None:
+    root = Path(root_text)
+    try:
+        listing = _git(root, "ls-tree", revision, "--", path_text)
+        source = _git(root, "show", f"{revision}:{path_text}")
+    except RuntimeError:
+        return None
+    mode = listing.split(maxsplit=1)[0] if listing else ""
+    return mode, source
+
+
+def _evidence_reference_findings(
+    reference: str, *, label: str, root: Path, revision: str | None = None
+) -> list[str]:
     if reference.startswith("command:"):
         command = reference.removeprefix("command:")
         if (
@@ -234,6 +251,19 @@ def _evidence_reference_findings(reference: str, *, label: str, root: Path) -> l
             or any(ord(character) < 32 or ord(character) == 127 for character in value)
         ):
             return [f"{label} path evidence must be path:<repo-relative-path>#<test-or-section>"]
+        if revision is not None:
+            committed = _committed_evidence_source(str(root.resolve()), revision, path_text)
+            if committed is None:
+                return [f"{label} path evidence does not exist at checkpoint: {path_text}"]
+            mode, source = committed
+            if mode not in {"100644", "100755"}:
+                return [f"{label} path evidence is not a regular file at checkpoint: {path_text}"]
+            if not _evidence_fragment_exists(path_text, source, fragment):
+                return [
+                    f"{label} evidence fragment does not resolve at checkpoint: "
+                    f"{path_text}#{fragment}"
+                ]
+            return []
         candidate = root / Path(*path.parts)
         try:
             resolved_root = root.resolve(strict=True)
@@ -252,6 +282,40 @@ def _evidence_reference_findings(reference: str, *, label: str, root: Path) -> l
             return [f"{label} evidence fragment does not resolve: {path_text}#{fragment}"]
         return []
     return [f"{label} evidence must use path: or command:"]
+
+
+def _completed_campaign_evidence_revision(campaign: dict[str, Any], *, root: Path) -> str | None:
+    """Locate the commit that closed this campaign for durable evidence lookup.
+
+    A completed campaign is historical authority. Later model evolution may retire or
+    consolidate its evidence files without erasing the exact committed evidence that
+    justified closure.
+    """
+    checkpoint = campaign["closure"]["checkpoint"]
+    if checkpoint is None:
+        return None
+    try:
+        commits = _git(
+            root, "log", "--format=%H", "--", IMPLEMENTATION_CAMPAIGN_PATH.name
+        ).splitlines()
+    except RuntimeError:
+        return None
+    for commit in commits:
+        try:
+            recorded = load_campaign_text(
+                _git(root, "show", f"{commit}:{IMPLEMENTATION_CAMPAIGN_PATH.name}"),
+                label=f"{commit}:{IMPLEMENTATION_CAMPAIGN_PATH.name}",
+            )
+        except RuntimeError, ValueError, yaml.YAMLError:
+            continue
+        if recorded == campaign:
+            return commit
+        if (
+            recorded.get("campaign", {}).get("lifecycle") == "complete"
+            and recorded.get("closure", {}).get("checkpoint") == checkpoint
+        ):
+            return commit
+    return None
 
 
 def _all_evidence_references(campaign: dict[str, Any]) -> list[tuple[str, str]]:
@@ -484,8 +548,16 @@ def validate_campaign(
     if findings:
         return findings
 
+    evidence_revision = _completed_campaign_evidence_revision(campaign, root=root)
     for label, reference in _all_evidence_references(campaign):
-        findings.extend(_evidence_reference_findings(reference, label=label, root=root))
+        findings.extend(
+            _evidence_reference_findings(
+                reference,
+                label=label,
+                root=root,
+                revision=evidence_revision,
+            )
+        )
     findings.extend(_checkpoint_format_findings(campaign))
 
     baseline = campaign["model_baseline"]

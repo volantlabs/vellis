@@ -18,6 +18,8 @@ from pathlib import Path
 import pytest
 from conftest import build_rich_definitions
 
+from tests.vellis.oracle import materialize_state
+from tests.vellis.semantic_state import semantic_state_equal
 from vellis.canonical import Provenance
 from vellis.changes import GraphChange
 from vellis.graph import Anchor, AssociatedDataObject, Link
@@ -167,7 +169,7 @@ def test_one_anchor_type_is_queried_broadly(system: RTGSystem) -> None:
     result = system.query_graph(_just_people())
 
     assert result.status is OperationStatus.ACCEPTED
-    assert result.evaluated_revision == system.current_state().revision
+    assert result.evaluated_revision == materialize_state(system).revision
     assert _bound_anchors(result) == {"a-1", "a-2"}
 
 
@@ -777,15 +779,14 @@ def test_unsatisfied_unprojected_component_still_removes_every_row(tmp_path: Pat
 
 
 def test_a_query_changes_no_canonical_state_or_revision(system: RTGSystem) -> None:
-    from vellis.canonical import canonical_state_equal
 
-    before = system.current_state()
+    before = materialize_state(system)
     records = system.store.canonical_record_count()
 
     assert system.query_graph(_just_people()).accepted
     assert not system.query_graph(_just_people(maximum_rows=1)).accepted
 
-    assert canonical_state_equal(system.current_state(), before)
+    assert semantic_state_equal(materialize_state(system), before)
     assert system.store.canonical_record_count() == records
 
 
@@ -1223,7 +1224,7 @@ def test_a_query_that_matches_nothing_is_accepted_with_no_rows(system: RTGSystem
 
     assert result.status is OperationStatus.ACCEPTED
     assert result.rows == ()
-    assert result.evaluated_revision == system.current_state().revision
+    assert result.evaluated_revision == materialize_state(system).revision
     assert result.findings == ()
 
 

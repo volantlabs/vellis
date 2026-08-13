@@ -1,14 +1,13 @@
-"""Reading one Vellis v1 system snapshot into a v2 first-use candidate.
+"""Semantic translation helpers for incremental Vellis v1 snapshot import.
 
 Realizes ``RTG::'Recovery Candidate'``, ``RTG::'Recovery Finding'``,
 ``RTG::'Recovery Report'``, ``Vellis::'V1 JSON System Snapshot'``,
 ``Vellis::'V1 Import Preview'``, and the analysis half of
 ``VellisRequirements::v1SnapshotCompatibility``.
 
-Everything here is transient. Analysis produces a candidate and a report bound to the
-exact snapshot that produced them; nothing is established until an owner has seen that
-pair and said yes, and the pair is not an operation on an existing system — there is no
-merge and no replacement anywhere in this module.
+The streaming importer owns document traversal, temporary normalized state, and atomic
+publication.  This module translates one already-bounded record or rule at a time.  It
+never owns a complete source document or recovered graph.
 
 Two rules shape the whole translation. Graph content is carried across unchanged: every
 identifier, kind, type key, name, nested value, and piece of metadata arrives as it was
@@ -21,13 +20,21 @@ this cannot express is removed and said out loud, not approximated.
 
 from __future__ import annotations
 
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import (
+    Container,
+    Iterable,
+    Iterator,
+    Mapping,
+    MutableMapping,
+    MutableSequence,
+    MutableSet,
+    Sequence,
+)
 from dataclasses import dataclass, field, replace
 from decimal import Decimal
 from enum import Enum
-from hashlib import sha256
+from typing import Protocol
 
-from vellis.canonical import CanonicalState
 from vellis.definitions import (
     AnchorTypeDefinition,
     AssociatedDataTypeDefinition,
@@ -48,7 +55,6 @@ from vellis.definitions import (
 from vellis.graph import (
     Anchor,
     AssociatedDataObject,
-    Graph,
     Link,
     MetadataError,
     SystemMetadata,
@@ -57,25 +63,17 @@ from vellis.json_value import (
     JsonKind,
     JsonValue,
     JsonValueError,
-    dumps,
     json_equal,
     json_kind,
     normalize,
 )
+from vellis.normalized import semantic_identity
 from vellis.patterns import PatternError, compile_pattern
-from vellis.replay import state_findings
 
 __all__ = [
-    "ImportPreview",
-    "RecoveryCandidate",
     "RecoveryDisposition",
     "RecoveryFinding",
-    "RecoveryReport",
     "SnapshotError",
-    "analyze_v1_snapshot",
-    "looks_like_v1_snapshot",
-    "recovery_summary",
-    "snapshot_identity",
 ]
 
 # The four sections a v1 system snapshot carries. A v1 snapshot names no format and no
@@ -129,6 +127,16 @@ class SnapshotError(ValueError):
     """
 
 
+class RecoveryFacts(Protocol):
+    """Bounded graph facts needed while translating v1 definitions."""
+
+    def data_type_used(self, type_key: str) -> bool: ...
+
+    def grounding_types(self, type_key: str) -> set[str]: ...
+
+    def stored_kinds(self, type_key: str, name: str) -> set[JsonKind]: ...
+
+
 @dataclass(frozen=True, slots=True)
 class RecoveryFinding:
     """One thing the owner is told about their import before they confirm it."""
@@ -137,126 +145,9 @@ class RecoveryFinding:
     summary: str
 
 
-@dataclass(frozen=True, slots=True)
-class RecoveryCandidate:
-    """The transient graph and vocabulary an accepted import would establish."""
-
-    graph: Graph
-    active_definitions: GraphDefinitionSet
-
-
-@dataclass(frozen=True, slots=True)
-class RecoveryReport:
-    """The complete account of one candidate: what it holds and what it cost."""
-
-    candidate: RecoveryCandidate
-    findings: tuple[RecoveryFinding, ...] = ()
-
-    @property
-    def blocking_findings(self) -> tuple[RecoveryFinding, ...]:
-        return tuple(
-            each for each in self.findings if each.disposition is RecoveryDisposition.BLOCKING
-        )
-
-
-@dataclass(frozen=True, slots=True)
-class ImportPreview:
-    """One report, bound to the exact snapshot that produced it.
-
-    The binding is the whole point of the identity: an owner confirms this preview, not
-    "an import", and a snapshot that changed underneath is a different preview that has
-    not been confirmed. The candidate is read through the report rather than held beside
-    it, so there is no arrangement in which the two could describe different things.
-    """
-
-    source_identity: str
-    report: RecoveryReport
-
-    @property
-    def candidate(self) -> RecoveryCandidate:
-        return self.report.candidate
-
-    @property
-    def is_acceptable(self) -> bool:
-        return not self.report.blocking_findings
-
-
-def looks_like_v1_snapshot(content: JsonValue) -> bool:
-    """Say whether a document presents itself as a v1 system snapshot."""
-    return isinstance(content, dict) and all(section in content for section in V1_SECTIONS)
-
-
-def snapshot_identity(content: JsonValue) -> str:
-    """Return a stable identity for the exact snapshot content.
-
-    Taken over the canonical serialization rather than the file's bytes, so that
-    reformatting is not treated as a changed snapshot and a changed value always is.
-    """
-    return sha256(dumps(normalize(content)).encode("utf-8")).hexdigest()
-
-
-def recovery_summary(preview: ImportPreview) -> str:
-    """Return the bounded sentence an accepted import records permanently."""
-    graph = preview.candidate.graph
-    definitions = preview.candidate.active_definitions
-    return (
-        f"first-use recovery from a Vellis v1 snapshot ({preview.source_identity[:12]}) "
-        f"with {_counted(len(graph.anchors), 'anchor')}, "
-        f"{_counted(len(graph.associated_data), 'associated-data object')}, "
-        f"{_counted(len(graph.links), 'link')}, "
-        f"{_counted(len(definitions.anchor_types), 'anchor type')}, "
-        f"{_counted(len(definitions.associated_data_types), 'associated-data type')}, and "
-        f"{_counted(len(definitions.link_types), 'link type')}"
-    )
-
-
 def _counted(total: int, noun: str) -> str:
     """Say how many of something there are, in the words that fit that many."""
     return f"{total} {noun}" if total == 1 else f"{total} {noun}s"
-
-
-def analyze_v1_snapshot(content: JsonValue) -> ImportPreview:
-    """Read one complete v1 snapshot into a candidate and a report bound to it.
-
-    Analysis always produces a preview. A snapshot this cannot import produces one whose
-    report carries blocking findings, because an owner is owed the reason as much as the
-    refusal; only a document that is not a snapshot at all raises.
-    """
-    if not looks_like_v1_snapshot(content):
-        raise SnapshotError(
-            "this is not a Vellis v1 system snapshot: a snapshot carries " + ", ".join(V1_SECTIONS)
-        )
-    assert isinstance(content, dict)
-    findings: list[RecoveryFinding] = []
-    graph = Graph()
-    definitions = GraphDefinitionSet()
-    complete = True
-    try:
-        graph = _recovered_graph(_section(content, "graph"), findings)
-        translation = _Translation()
-        _read_definitions(_section(content, "schema"), graph, translation, findings)
-        _report_untranslatable_sections(content, translation, findings)
-        definitions = _translated_vocabulary(translation, graph, findings)
-    except SnapshotError as unreadable:
-        # A section this cannot read stops the reading but not the report: what was
-        # already understood stays in it, and the reason it stopped joins it.
-        complete = False
-        findings.append(
-            RecoveryFinding(
-                disposition=RecoveryDisposition.BLOCKING,
-                summary=f"this snapshot cannot be read past that point: {unreadable}",
-            )
-        )
-    candidate = RecoveryCandidate(graph=graph, active_definitions=definitions)
-    if complete:
-        # Only what was read whole can be held to what it says. Asking a half-read
-        # vocabulary whether it describes the graph would say the owner's own content is
-        # wrong, when what is wrong is that the reading stopped.
-        findings.extend(_conformance_findings(candidate))
-    if not any(each.disposition is RecoveryDisposition.BLOCKING for each in findings):
-        findings.insert(0, _preserved_finding(candidate))
-    report = RecoveryReport(candidate=candidate, findings=tuple(findings))
-    return ImportPreview(source_identity=snapshot_identity(content), report=report)
 
 
 # --- Reading the document -----------------------------------------------------------
@@ -311,102 +202,6 @@ def _metadata(entry: Mapping[str, JsonValue]) -> SystemMetadata:
 # --- Graph --------------------------------------------------------------------------
 
 
-def _recovered_graph(section: Mapping[str, JsonValue], findings: list[RecoveryFinding]) -> Graph:
-    """Carry every live object across unchanged, and say what was left behind."""
-    anchors = _entries(section, "anchors")
-    data_objects = _entries(section, "data_objects")
-    links = _entries(section, "links")
-    index = section.get("anchor_data_index", {})
-    if not isinstance(index, dict):
-        raise SnapshotError("the snapshot's anchor_data_index is not an object")
-    for anchor_uuid, data_uuids in index.items():
-        if not isinstance(data_uuids, list):
-            raise SnapshotError(
-                f"the associations recorded for anchor {anchor_uuid} are not a list"
-            )
-
-    live_anchors = _live(anchors, "anchor", findings)
-    live_data = _live(data_objects, "associated-data object", findings)
-    live_links = _live(links, "link", findings)
-
-    recovered_anchors = tuple(
-        each
-        for each in (_read(_recovered_anchor, entry, findings) for entry in live_anchors)
-        if each is not None
-    )
-    # An association to an anchor v1 retired is not a live relationship, and only those
-    # become memory. Leaving it out is what live filtering means here, not repair: an
-    # association to an anchor the snapshot never had is dangling, and still refuses.
-    retired = {each for each in _uuids(anchors) if each not in _uuids(live_anchors)}
-    recovered_data = tuple(
-        each
-        for each in (
-            _read(_recovered_data_object, entry, findings, index, retired) for entry in live_data
-        )
-        if each is not None
-    )
-    recovered_links = tuple(
-        each
-        for each in (_read(_recovered_link, entry, findings) for entry in live_links)
-        if each is not None
-    )
-    return Graph(anchors=recovered_anchors, associated_data=recovered_data, links=recovered_links)
-
-
-def _read[T](
-    reader: Callable[..., T],
-    entry: Mapping[str, JsonValue],
-    findings: list[RecoveryFinding],
-    *rest: object,
-) -> T | None:
-    """Read one graph record, or say why it could not be read and carry on.
-
-    A record this cannot read makes the import impossible, but not the account of it: the
-    owner is owed every reason at once, not the first one in file order.
-    """
-    try:
-        return reader(entry, findings, *rest)
-    except SnapshotError as unreadable:
-        findings.append(
-            RecoveryFinding(
-                disposition=RecoveryDisposition.BLOCKING,
-                summary=f"a v1 record cannot be read: {unreadable}",
-            )
-        )
-        return None
-
-
-def _live(
-    entries: Sequence[Mapping[str, JsonValue]], kind: str, findings: list[RecoveryFinding]
-) -> tuple[Mapping[str, JsonValue], ...]:
-    live: list[Mapping[str, JsonValue]] = []
-    for entry in entries:
-        try:
-            is_live = _is_live(entry)
-        except SnapshotError as unreadable:
-            findings.append(
-                RecoveryFinding(
-                    disposition=RecoveryDisposition.BLOCKING,
-                    summary=f"a v1 {kind} cannot be read: {unreadable}",
-                )
-            )
-            continue
-        if is_live:
-            live.append(entry)
-            continue
-        identity = entry.get("type_key") or entry.get("uuid")
-        findings.append(
-            RecoveryFinding(
-                disposition=RecoveryDisposition.OMITTED,
-                summary=(
-                    f"the non-live {kind} {identity} is not imported; only live v1 content "
-                    "becomes memory"
-                ),
-            )
-        )
-    return tuple(live)
-
-
 def _recovered_anchor(entry: Mapping[str, JsonValue], findings: list[RecoveryFinding]) -> Anchor:
     uuid = _text(entry, "uuid", where="an anchor")
     type_key = _text(entry, "type", where=f"anchor {uuid}")
@@ -429,12 +224,6 @@ def _recovered_anchor(entry: Mapping[str, JsonValue], findings: list[RecoveryFin
         display_name=display_name,
         system_metadata=_metadata(entry),
     )
-
-
-def _uuids(entries: Sequence[Mapping[str, JsonValue]]) -> set[str]:
-    """The uuids of the records that have one, for asking which of them are still here."""
-    found = (each.get("uuid") for each in entries)
-    return {each for each in found if isinstance(each, str)}
 
 
 def _recovered_data_object(
@@ -502,54 +291,37 @@ def _recovered_link(
 class _Translation:
     """The vocabulary being built, and the anchors each data type may be grounded by."""
 
-    anchors: list[AnchorTypeDefinition] = field(default_factory=list)
-    data_types: dict[str, AssociatedDataTypeDefinition] = field(default_factory=dict)
-    links: list[LinkTypeDefinition] = field(default_factory=list)
-    constraints: list[RelationshipConstraint] = field(default_factory=list)
+    anchors: MutableSequence[AnchorTypeDefinition] = field(default_factory=list)
+    data_types: MutableMapping[str, AssociatedDataTypeDefinition] = field(default_factory=dict)
+    links: MutableSequence[LinkTypeDefinition] = field(default_factory=list)
+    constraints: MutableSequence[RelationshipConstraint] = field(default_factory=list)
     # The most any rule about one thing asked for, split by whether v1's own join could
     # reach a count of none. A floor v1 reached only where a group formed is not settled
     # until every rule about that thing is in: another may require a group to always form,
     # and then the floor was in force after all.
-    limited_floors: dict[tuple[object, ...], int] = field(default_factory=dict)
+    limited_floors: MutableMapping[str, int] = field(default_factory=dict)
     # The rules v1 always reached that require at least one of what they count. One of
     # these is what can make a join-limited floor have been in force after all.
-    guarantees: list[RelationshipConstraint] = field(default_factory=list)
+    guarantees: MutableSequence[RelationshipConstraint] = field(default_factory=list)
     # What each rule would be reported as having carried whole, held until the vocabulary
     # settles. A rule that counts a type this vocabulary leaves out goes with it, and a
     # claim that it arrived would be untrue of the candidate the owner confirms.
-    carried_whole: dict[tuple[object, ...], list[str]] = field(default_factory=dict)
-    permitted_anchors: dict[str, list[str]] = field(default_factory=dict)
+    carried_whole: MutableMapping[str, MutableSequence[str]] = field(default_factory=dict)
+    permitted_anchors: MutableMapping[str, MutableSequence[str]] = field(default_factory=dict)
+    anchor_keys: MutableSet[str] = field(default_factory=set)
+    data_keys: MutableSet[str] = field(default_factory=set)
+    link_keys: MutableSet[str] = field(default_factory=set)
 
 
-def _read_definitions(
-    section: Mapping[str, JsonValue],
-    graph: Graph,
+def _translated_vocabulary_entries(
     translation: _Translation,
+    graph: RecoveryFacts,
     findings: list[RecoveryFinding],
-) -> None:
-    """Read the live v1 vocabulary into a translation, saying what each reading cost."""
-    definitions = _entries(section, "definitions")
-    live = _live(definitions, "definition", findings)
-    for entry in live:
-        try:
-            _translate_definition(entry, graph, translation, findings)
-        except SnapshotError as unreadable:
-            # One definition this cannot read does not stop the analysis. An owner is owed
-            # the whole account of their snapshot, and a refusal they can act on needs the
-            # rest of it as much as this.
-            findings.append(
-                RecoveryFinding(
-                    disposition=RecoveryDisposition.BLOCKING,
-                    summary=f"a v1 definition cannot be read: {unreadable}",
-                )
-            )
-
-
-def _translated_vocabulary(
-    translation: _Translation, graph: Graph, findings: list[RecoveryFinding]
-) -> GraphDefinitionSet:
-    """Settle the vocabulary, leaving out what nothing in it can reach."""
-    data_types: list[AssociatedDataTypeDefinition] = []
+) -> Iterator[GraphDefinitionSet]:
+    """Yield one settled normalized definition entry at a time."""
+    for each in translation.anchors:
+        translation.anchor_keys.add(each.type_key)
+        yield GraphDefinitionSet(anchor_types=(each,))
     for each in translation.data_types.values():
         declared = set(translation.permitted_anchors.get(each.type_key, []))
         grounding = _grounding_types(graph, each.type_key)
@@ -567,7 +339,7 @@ def _translated_vocabulary(
             )
         permitted = tuple(sorted(declared | grounding))
         if not permitted:
-            used = any(stored.type_key == each.type_key for stored in graph.associated_data)
+            used = _data_type_used(graph, each.type_key)
             findings.append(
                 RecoveryFinding(
                     disposition=(
@@ -585,24 +357,24 @@ def _translated_vocabulary(
                 )
             )
             continue
-        data_types.append(
-            AssociatedDataTypeDefinition(
-                type_key=each.type_key,
-                permitted_anchor_type_keys=permitted,
-                property_constraints=each.property_constraints,
-                description=each.description,
-            )
+        settled_data = AssociatedDataTypeDefinition(
+            type_key=each.type_key,
+            permitted_anchor_type_keys=permitted,
+            property_constraints=each.property_constraints,
+            description=each.description,
         )
+        translation.data_keys.add(each.type_key)
+        yield GraphDefinitionSet(associated_data_types=(settled_data,))
 
     # What this vocabulary describes, kind by kind. A v1 system may retire a type and leave
     # the definitions that mention it, so what is left of them has to be settled against
     # what is actually here rather than against what v1 once had — and against the kind of
     # thing each name is used as, since v1 accepted names nothing of that kind ever had.
-    anchor_keys = {each.type_key for each in translation.anchors}
-    data_keys = {each.type_key for each in data_types}
     # Only these can be at the end of a link: v1 refused a link as an endpoint too.
-    endpoints = anchor_keys | data_keys
-    for type_key in sorted(set(translation.permitted_anchors) - set(translation.data_types)):
+    endpoints = _CombinedKeys(translation.anchor_keys, translation.data_keys)
+    for type_key in (
+        key for key in translation.permitted_anchors if key not in translation.data_types
+    ):
         findings.append(
             RecoveryFinding(
                 disposition=RecoveryDisposition.OMITTED,
@@ -612,14 +384,12 @@ def _translated_vocabulary(
                 ),
             )
         )
-    links: list[LinkTypeDefinition] = []
-    left_out: set[str] = set()
     for each in translation.links:
         narrowed = _joins_described(each, endpoints, findings)
         if narrowed is not None:
-            links.append(narrowed)
+            translation.link_keys.add(narrowed.type_key)
+            yield GraphDefinitionSet(link_types=(narrowed,))
             continue
-        left_out.add(each.type_key)
         findings.append(
             RecoveryFinding(
                 disposition=RecoveryDisposition.OMITTED,
@@ -629,51 +399,59 @@ def _translated_vocabulary(
                 ),
             )
         )
-    link_keys = {each.type_key for each in links}
-    kept_counts = [
-        each
-        for each in translation.constraints
-        if _counts_only(each, anchor_keys, data_keys, endpoints, link_keys)
-    ]
-    for dropped_count in translation.constraints:
-        if dropped_count in kept_counts:
-            continue
-        findings.append(
-            RecoveryFinding(
-                disposition=RecoveryDisposition.OMITTED,
-                summary=(
-                    f"the v1 rule counting {_counted_phrase(dropped_count)} counts a type "
-                    "this vocabulary left out, so it is left out with it"
-                ),
+
+    def kept_counts() -> Iterator[RelationshipConstraint]:
+        for each in translation.constraints:
+            if _counts_only(
+                each,
+                translation.anchor_keys,
+                translation.data_keys,
+                endpoints,
+                translation.link_keys,
+            ):
+                yield each
+                continue
+            findings.append(
+                RecoveryFinding(
+                    disposition=RecoveryDisposition.OMITTED,
+                    summary=(
+                        f"the v1 rule counting {_counted_phrase(each)} counts a type "
+                        "this vocabulary left out, so it is left out with it"
+                    ),
+                )
             )
-        )
-    return GraphDefinitionSet(
-        anchor_types=tuple(translation.anchors),
-        associated_data_types=tuple(data_types),
-        link_types=tuple(links),
-        relationship_constraints=_settled_counts(kept_counts, translation, findings),
-    )
+
+    for each in _settled_counts(kept_counts(), translation, findings):
+        yield GraphDefinitionSet(relationship_constraints=(each,))
 
 
-def _grounding_types(graph: Graph, type_key: str) -> set[str]:
+def _data_type_used(graph: RecoveryFacts, type_key: str) -> bool:
+    return graph.data_type_used(type_key)
+
+
+def _grounding_types(graph: RecoveryFacts, type_key: str) -> set[str]:
     """Return the anchor types that ground imported objects of one associated-data type.
 
     v1's required and optional lists say which facts an anchor must or may have; nothing
     there decided which anchors could ground a fact group, and v1 enforced no such rule.
     v2 does, so the rule has to come from somewhere: what the owner's own graph does.
     """
-    anchors = {each.uuid: each.type_key for each in graph.anchors}
-    return {
-        anchors[uuid]
-        for stored in graph.associated_data
-        if stored.type_key == type_key
-        for uuid in stored.anchor_uuids
-        if uuid in anchors
-    }
+    return graph.grounding_types(type_key)
+
+
+class _CombinedKeys(Container[str]):
+    def __init__(self, first: Container[str], second: Container[str]) -> None:
+        self.first = first
+        self.second = second
+
+    def __contains__(self, value: object) -> bool:
+        if not isinstance(value, str):
+            return False
+        return value in self.first or value in self.second
 
 
 def _joins_described(
-    link: LinkTypeDefinition, endpoints: set[str], findings: list[RecoveryFinding]
+    link: LinkTypeDefinition, endpoints: Container[str], findings: list[RecoveryFinding]
 ) -> LinkTypeDefinition | None:
     """Return the link type with only the ends this vocabulary describes, or nothing.
 
@@ -710,10 +488,10 @@ def _joins_described(
 
 def _counts_only(
     constraint: RelationshipConstraint,
-    anchor_keys: set[str],
-    data_keys: set[str],
-    endpoints: set[str],
-    link_keys: set[str],
+    anchor_keys: Container[str],
+    data_keys: Container[str],
+    endpoints: Container[str],
+    link_keys: Container[str],
 ) -> bool:
     """Say whether a rule counts things this vocabulary describes, each as what it is.
 
@@ -721,14 +499,13 @@ def _counts_only(
     counted nothing there. Kept here it would be a rule about something that cannot exist.
     """
     if isinstance(constraint, DirectAssociationMultiplicityConstraint):
-        return (
-            set(constraint.anchor_type_keys) <= anchor_keys
-            and set(constraint.associated_data_type_keys) <= data_keys
+        return all(key in anchor_keys for key in constraint.anchor_type_keys) and all(
+            key in data_keys for key in constraint.associated_data_type_keys
         )
     return (
         constraint.link_type_key in link_keys
-        and set(constraint.constrained_endpoint_type_keys) <= endpoints
-        and set(constraint.opposite_endpoint_type_keys) <= endpoints
+        and all(key in endpoints for key in constraint.constrained_endpoint_type_keys)
+        and all(key in endpoints for key in constraint.opposite_endpoint_type_keys)
     )
 
 
@@ -790,85 +567,83 @@ def _always_forms(
 
 
 def _settled_counts(
-    constraints: Sequence[RelationshipConstraint],
+    constraints: Iterable[RelationshipConstraint],
     translation: _Translation,
     findings: list[RecoveryFinding],
-) -> tuple[RelationshipConstraint, ...]:
+) -> Iterator[RelationshipConstraint]:
     """Leave one rule per thing counted, saying everything the rules about it said.
 
     v1 says requiredness on the anchor and may also carry a cardinality rule about the
     same association. Both are in force there, and v2 states one rule per association, so
     the one that means the same is the narrowest range they jointly allow.
     """
-    settled: dict[tuple[object, ...], RelationshipConstraint] = {}
+    current_identity: str | None = None
+    current: RelationshipConstraint | None = None
+
+    def settled_value(identity: str, held: RelationshipConstraint) -> RelationshipConstraint | None:
+        lowered = False
+        floor = translation.limited_floors.get(identity, 0)
+        if floor and not _always_forms(held, translation.guarantees):
+            lowered = True
+            held = replace(held, lower_bound=0)
+            findings.append(
+                RecoveryFinding(
+                    disposition=RecoveryDisposition.SIMPLIFIED,
+                    summary=(
+                        f"the v1 rule counting {_counted_phrase(held)} asked for at least "
+                        f"{floor} only of those that had any, which v2 cannot say of some and "
+                        "not others; the ceiling is kept and the floor is not"
+                    ),
+                )
+            )
+        if held.upper_bound is not None and held.lower_bound > held.upper_bound:
+            findings.append(
+                RecoveryFinding(
+                    disposition=RecoveryDisposition.BLOCKING,
+                    summary=(
+                        f"v1 rules counting {_counted_phrase(held)} cannot all be met: one asks "
+                        f"for at least {held.lower_bound} and another for at most "
+                        f"{held.upper_bound}, so there is no one rule here that says what they "
+                        "said"
+                    ),
+                )
+            )
+            return None
+        if not lowered:
+            findings.extend(
+                RecoveryFinding(disposition=RecoveryDisposition.PRESERVED, summary=summary)
+                for summary in translation.carried_whole.get(identity, ())
+            )
+        return _counted_description(held, findings)
+
     for constraint in constraints:
-        identity = relationship_identity(constraint)
-        held = settled.get(identity)
-        if held is None:
-            settled[identity] = constraint
+        identity = semantic_identity(relationship_identity(constraint))
+        if current_identity is None:
+            current_identity, current = identity, constraint
             continue
-        merged = _both(held, constraint)
-        settled[identity] = merged
+        assert current is not None
+        if identity != current_identity:
+            value = settled_value(current_identity, current)
+            if value is not None:
+                yield value
+            current_identity, current = identity, constraint
+            continue
+        merged = _both(current, constraint)
         findings.append(
             RecoveryFinding(
                 disposition=RecoveryDisposition.SIMPLIFIED,
                 summary=(
                     f"two v1 rules count the same thing ({relationship_label(constraint)}); "
                     f"they are one rule here, bounded {_bounds(merged)}, which is what both "
-                    f"of them said ({_bounds(held)} and {_bounds(constraint)})"
+                    f"of them said ({_bounds(current)} and {_bounds(constraint)})"
                 ),
             )
         )
-    lowered: set[tuple[object, ...]] = set()
-    for identity, floor in translation.limited_floors.items():
-        held = settled.get(identity)
-        if held is None or floor == 0:
-            continue
-        if _always_forms(held, translation.guarantees):
-            # Other rules require at least one of these of every one of those, so the count
-            # v1 took never had an empty group to miss and its floor was in force after all.
-            continue
-        lowered.add(identity)
-        settled[identity] = replace(held, lower_bound=0)
-        findings.append(
-            RecoveryFinding(
-                disposition=RecoveryDisposition.SIMPLIFIED,
-                summary=(
-                    f"the v1 rule counting {_counted_phrase(held)} asked for at least "
-                    f"{floor} only of those that had any, which v2 cannot say of some and "
-                    "not others; the ceiling is kept and the floor is not"
-                ),
-            )
-        )
-    for identity, held in list(settled.items()):
-        if held.upper_bound is None or held.lower_bound <= held.upper_bound:
-            continue
-        # Two v1 rules that nothing can satisfy at once. v1 held both and only refused a
-        # system that had one of these to refuse; v2 says one rule per thing counted, and
-        # there is no one rule here. Saying either of them would be choosing for the owner.
-        del settled[identity]
-        lowered.add(identity)
-        findings.append(
-            RecoveryFinding(
-                disposition=RecoveryDisposition.BLOCKING,
-                summary=(
-                    f"v1 rules counting {_counted_phrase(held)} cannot all be met: one asks "
-                    f"for at least {held.lower_bound} and another for at most "
-                    f"{held.upper_bound}, so there is no one rule here that says what they "
-                    "said"
-                ),
-            )
-        )
-    for identity in settled:
-        if identity in lowered:
-            # Its floor was left behind, and the finding above says so. Saying here that it
-            # arrived as it stands would say the opposite in the same report.
-            continue
-        findings.extend(
-            RecoveryFinding(disposition=RecoveryDisposition.PRESERVED, summary=summary)
-            for summary in translation.carried_whole.get(identity, ())
-        )
-    return tuple(_counted_description(each, findings) for each in settled.values())
+        current = merged
+    if current_identity is not None and current is not None:
+        value = settled_value(current_identity, current)
+        if value is not None:
+            yield value
 
 
 def _counted_description(
@@ -901,7 +676,7 @@ def _counted_phrase(constraint: RelationshipConstraint) -> str:
 
 def _translate_definition(
     entry: Mapping[str, JsonValue],
-    graph: Graph,
+    graph: RecoveryFacts,
     translation: _Translation,
     findings: list[RecoveryFinding],
 ) -> None:
@@ -1102,7 +877,7 @@ def _translate_anchor_payload(
 def _translated_properties(
     type_key: str,
     payload: Mapping[str, JsonValue],
-    graph: Graph,
+    graph: RecoveryFacts,
     findings: list[RecoveryFinding],
 ) -> tuple[PropertyConstraint, ...]:
     fields = payload.get("properties", {})
@@ -1135,7 +910,7 @@ def _translated_property(
     type_key: str,
     name: str,
     rule: Mapping[str, JsonValue],
-    graph: Graph,
+    graph: RecoveryFacts,
     findings: list[RecoveryFinding],
 ) -> PropertyConstraint | None:
     where = f"{type_key}.{name}"
@@ -1195,7 +970,7 @@ def _translated_property(
 def _single_kind(
     where: str,
     rule: Mapping[str, JsonValue],
-    graph: Graph,
+    graph: RecoveryFacts,
     type_key: str,
     name: str,
     findings: list[RecoveryFinding],
@@ -1310,12 +1085,8 @@ def _report_lost_refinements(
         )
 
 
-def _stored_kinds(graph: Graph, type_key: str, name: str) -> set[JsonKind]:
-    return {
-        json_kind(each.properties[name])
-        for each in graph.associated_data
-        if each.type_key == type_key and name in each.properties
-    }
+def _stored_kinds(graph: RecoveryFacts, type_key: str, name: str) -> set[JsonKind]:
+    return graph.stored_kinds(type_key, name)
 
 
 def _translated_range(
@@ -1460,44 +1231,6 @@ def _translated_pattern(
 # --- What is left out, and what is left ---------------------------------------------
 
 
-def _report_untranslatable_sections(
-    content: Mapping[str, JsonValue],
-    translation: _Translation,
-    findings: list[RecoveryFinding],
-) -> None:
-    """Carry what the constraints section says that v2 can say, and name the rest."""
-    for entry in _live(
-        _entries(_section(content, "constraints"), "constraints"), "constraint", findings
-    ):
-        _translate_constraint(entry, translation, findings)
-    migrations = _entries(_section(content, "migration"), "migrations")
-    if migrations:
-        findings.append(
-            RecoveryFinding(
-                disposition=RecoveryDisposition.OMITTED,
-                summary=(
-                    f"{_counted(len(migrations), 'v1 migration record')} describe how that "
-                    "system changed and are not memory; they are left out"
-                ),
-            )
-        )
-    carried_over = [
-        name
-        for name in ("last_ledger_position", "last_transaction_id", "last_transaction_timestamp")
-        if content.get(name) is not None
-    ]
-    if carried_over:
-        findings.append(
-            RecoveryFinding(
-                disposition=RecoveryDisposition.OMITTED,
-                summary=(
-                    "the v1 ledger position and transaction metadata are left out; this is a "
-                    "new lineage and claims none of that history"
-                ),
-            )
-        )
-
-
 def _translate_constraint(
     entry: Mapping[str, JsonValue],
     translation: _Translation,
@@ -1600,7 +1333,9 @@ def _carried_whole(
     constraint: RelationshipConstraint, summary: str, translation: _Translation
 ) -> None:
     """Hold what would be said of a rule that arrived whole until the vocabulary settles."""
-    translation.carried_whole.setdefault(relationship_identity(constraint), []).append(summary)
+    translation.carried_whole.setdefault(
+        semantic_identity(relationship_identity(constraint)), []
+    ).append(summary)
 
 
 def _counting(
@@ -1613,7 +1348,7 @@ def _counting(
     can be said here is settled once every rule about the thing has arrived.
     """
     if limited:
-        identity = relationship_identity(constraint)
+        identity = semantic_identity(relationship_identity(constraint))
         floors = translation.limited_floors
         floors[identity] = max(floors.get(identity, 0), constraint.lower_bound)
     elif constraint.lower_bound >= 1:
@@ -1777,36 +1512,3 @@ def _translated_cardinality(
             translation,
         )
     return None
-
-
-def _preserved_finding(candidate: RecoveryCandidate) -> RecoveryFinding:
-    graph = candidate.graph
-    return RecoveryFinding(
-        disposition=RecoveryDisposition.PRESERVED,
-        summary=(
-            f"{_counted(len(graph.anchors), 'anchor')}, "
-            f"{_counted(len(graph.associated_data), 'associated-data object')}, and "
-            f"{_counted(len(graph.links), 'link')} arrive exactly as v1 stored them"
-        ),
-    )
-
-
-def _conformance_findings(candidate: RecoveryCandidate) -> tuple[RecoveryFinding, ...]:
-    """Ask the questions first use itself would ask, before an owner is asked anything.
-
-    The import is refused as a whole or not at all, so every reason it would be refused
-    belongs in the report the owner reads rather than in the failure after they agreed.
-    """
-    state = CanonicalState(
-        graph=candidate.graph,
-        active_definitions=candidate.active_definitions,
-        revision=0,
-        definition_delta=None,
-    )
-    return tuple(
-        RecoveryFinding(
-            disposition=RecoveryDisposition.BLOCKING,
-            summary=f"the v1 content does not form a system this can hold: {each.summary}",
-        )
-        for each in state_findings(state)
-    )

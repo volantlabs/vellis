@@ -1431,6 +1431,12 @@ def test_closure_checkpoint_binds_complete_current_state(tmp_path: Path) -> None
     assert implementation_campaign.validate_campaign(campaign, root=tmp_path) == []
     assert implementation_campaign.checkpoint_binding_findings(campaign, root=tmp_path) == []
 
+    evidence.unlink()
+    _git(tmp_path, "add", "evidence.md")
+    _git(tmp_path, "commit", "-m", "retire superseded evidence")
+
+    assert implementation_campaign.validate_campaign(campaign, root=tmp_path) == []
+
 
 def test_dispatch_launches_only_the_ready_slice_and_binds_a_state_token(tmp_path: Path) -> None:
     campaign, _ = _approval_repository(tmp_path)

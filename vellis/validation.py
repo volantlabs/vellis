@@ -17,6 +17,8 @@ rather than a cascade of consequences the owner cannot act on separately.
 
 from __future__ import annotations
 
+from collections.abc import Iterable
+from dataclasses import dataclass
 from decimal import Decimal
 
 from vellis.definitions import (
@@ -29,18 +31,60 @@ from vellis.definitions import (
     RelationshipConstraint,
     relationship_label,
 )
-from vellis.graph import Anchor, AssociatedDataObject, Graph, Link, ObjectKind
+from vellis.graph import Anchor, AssociatedDataObject, GraphObject, Link, ObjectKind
 from vellis.json_value import JsonValue, json_equal, json_kind, value_size
 from vellis.outcomes import ValidationFinding
 from vellis.patterns import PatternError, compile_pattern
 
-__all__ = ["assess_graph_conformance", "validate_property_value"]
+__all__ = ["assess_object_neighborhood", "validate_property_value"]
 
 
-def assess_graph_conformance(
-    graph: Graph, definitions: GraphDefinitionSet
+@dataclass(frozen=True, slots=True)
+class _ObjectNeighborhood:
+    anchors: tuple[Anchor, ...]
+    associated_data: tuple[AssociatedDataObject, ...]
+    links: tuple[Link, ...]
+    by_uuid: dict[str, GraphObject]
+
+    @classmethod
+    def from_values(cls, values: Iterable[GraphObject]) -> _ObjectNeighborhood:
+        anchors: list[Anchor] = []
+        data: list[AssociatedDataObject] = []
+        links: list[Link] = []
+        by_uuid: dict[str, GraphObject] = {}
+        for value in values:
+            by_uuid.setdefault(value.uuid, value)
+            if isinstance(value, Anchor):
+                anchors.append(value)
+            elif isinstance(value, AssociatedDataObject):
+                data.append(value)
+            else:
+                links.append(value)
+        return cls(tuple(anchors), tuple(data), tuple(links), by_uuid)
+
+    def objects(self) -> Iterable[GraphObject]:
+        yield from self.anchors
+        yield from self.associated_data
+        yield from self.links
+
+    def anchor(self, uuid: str) -> Anchor | None:
+        value = self.by_uuid.get(uuid)
+        return value if isinstance(value, Anchor) else None
+
+    def link(self, uuid: str) -> Link | None:
+        value = self.by_uuid.get(uuid)
+        return value if isinstance(value, Link) else None
+
+    def endpoint(self, uuid: str) -> Anchor | AssociatedDataObject | None:
+        value = self.by_uuid.get(uuid)
+        return value if isinstance(value, (Anchor, AssociatedDataObject)) else None
+
+
+def assess_object_neighborhood(
+    values: Iterable[GraphObject], definitions: GraphDefinitionSet
 ) -> tuple[ValidationFinding, ...]:
-    """Return every finding that keeps ``graph`` from conforming to ``definitions``."""
+    """Assess one already-bounded object neighborhood against relevant definitions."""
+    graph = _ObjectNeighborhood.from_values(values)
     findings: list[ValidationFinding] = []
     _check_unique_identity(graph, findings)
     for anchor in graph.anchors:
@@ -54,7 +98,7 @@ def assess_graph_conformance(
     return tuple(findings)
 
 
-def _check_unique_identity(graph: Graph, findings: list[ValidationFinding]) -> None:
+def _check_unique_identity(graph: _ObjectNeighborhood, findings: list[ValidationFinding]) -> None:
     seen: set[str] = set()
     for graph_object in graph.objects():
         uuid = graph_object.uuid
@@ -126,7 +170,7 @@ def _check_type_key_resolves(
 
 def _check_associated_data(
     data: AssociatedDataObject,
-    graph: Graph,
+    graph: _ObjectNeighborhood,
     definitions: GraphDefinitionSet,
     findings: list[ValidationFinding],
 ) -> None:
@@ -288,7 +332,10 @@ def _pattern_reasons(constraint: PropertyConstraint, value: JsonValue) -> list[s
 
 
 def _check_link(
-    link: Link, graph: Graph, definitions: GraphDefinitionSet, findings: list[ValidationFinding]
+    link: Link,
+    graph: _ObjectNeighborhood,
+    definitions: GraphDefinitionSet,
+    findings: list[ValidationFinding],
 ) -> None:
     if not _check_type_key_resolves(
         link.uuid, link.type_key, ObjectKind.LINK, definitions, findings
@@ -341,7 +388,9 @@ def _bounds_text(constraint: RelationshipConstraint) -> str:
 
 
 def _check_multiplicity(
-    constraint: RelationshipConstraint, graph: Graph, findings: list[ValidationFinding]
+    constraint: RelationshipConstraint,
+    graph: _ObjectNeighborhood,
+    findings: list[ValidationFinding],
 ) -> None:
     if isinstance(constraint, LinkMultiplicityConstraint):
         _check_link_multiplicity(constraint, graph, findings)
@@ -350,7 +399,9 @@ def _check_multiplicity(
 
 
 def _check_link_multiplicity(
-    constraint: LinkMultiplicityConstraint, graph: Graph, findings: list[ValidationFinding]
+    constraint: LinkMultiplicityConstraint,
+    graph: _ObjectNeighborhood,
+    findings: list[ValidationFinding],
 ) -> None:
     label = relationship_label(constraint)
     constrained = frozenset(constraint.constrained_endpoint_type_keys)
@@ -390,7 +441,7 @@ def _check_link_multiplicity(
 
 def _check_direct_association_multiplicity(
     constraint: DirectAssociationMultiplicityConstraint,
-    graph: Graph,
+    graph: _ObjectNeighborhood,
     findings: list[ValidationFinding],
 ) -> None:
     label = relationship_label(constraint)

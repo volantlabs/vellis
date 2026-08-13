@@ -19,14 +19,14 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from enum import Enum
 
-from vellis.graph import Anchor, AssociatedDataObject, Graph, GraphObject, Link, ObjectKind
+from vellis.graph import Anchor, AssociatedDataObject, GraphObject, Link, ObjectKind
 from vellis.outcomes import ValidationFinding
 
 __all__ = [
     "GraphChange",
     "GraphChangeRequest",
     "GraphChangeTarget",
-    "apply_change",
+    "apply_change_to_objects",
     "change_findings",
 ]
 
@@ -82,18 +82,30 @@ class GraphChangeRequest:
         )
 
 
-def apply_change(graph: Graph, change: GraphChange) -> Graph:
-    """Return the graph this change produces.
+def apply_change_to_objects(
+    existing: Iterable[GraphObject], change: GraphChange
+) -> tuple[GraphObject, ...]:
+    """Return the bounded object neighborhood this change produces.
 
     This assumes the change is structurally sound; :func:`change_findings` decides that.
     Kept pure so that committing a change and replaying its record run the same code.
     """
-    anchors = _replace(graph.anchors, change.anchor_upserts, change.anchor_removals)
+    anchors: list[Anchor] = []
+    associated_data: list[AssociatedDataObject] = []
+    links: list[Link] = []
+    for value in existing:
+        if isinstance(value, Anchor):
+            anchors.append(value)
+        elif isinstance(value, AssociatedDataObject):
+            associated_data.append(value)
+        else:
+            links.append(value)
+    next_anchors = _replace(tuple(anchors), change.anchor_upserts, change.anchor_removals)
     associated = _replace(
-        graph.associated_data, change.associated_data_upserts, change.associated_data_removals
+        tuple(associated_data), change.associated_data_upserts, change.associated_data_removals
     )
-    links = _replace(graph.links, change.link_upserts, change.link_removals)
-    return Graph(anchors=anchors, associated_data=associated, links=links)
+    next_links = _replace(tuple(links), change.link_upserts, change.link_removals)
+    return (*next_anchors, *associated, *next_links)
 
 
 def _replace[T: GraphObject](
@@ -113,7 +125,9 @@ def _replace[T: GraphObject](
 # --- Structural validity ------------------------------------------------------------
 
 
-def change_findings(change: GraphChange, graph: Graph) -> tuple[ValidationFinding, ...]:
+def change_findings(
+    change: GraphChange, existing: Iterable[GraphObject]
+) -> tuple[ValidationFinding, ...]:
     """Return why this change cannot be applied to ``graph``, if it cannot.
 
     These are the faults that make the command itself incoherent, checked before any
@@ -122,9 +136,10 @@ def change_findings(change: GraphChange, graph: Graph) -> tuple[ValidationFindin
     findings: list[ValidationFinding] = []
     _check_duplicate_commands(change, findings)
     _check_upsert_removal_conflicts(change, findings)
-    _check_removals_are_known(change, graph, findings)
-    _check_object_kinds(change, graph, findings)
-    _check_no_implicit_cascade(change, graph, findings)
+    by_uuid = {value.uuid: value for value in existing}
+    _check_removals_are_known(change, by_uuid, findings)
+    _check_object_kinds(change, by_uuid, findings)
+    _check_no_implicit_cascade(change, by_uuid, findings)
     return tuple(findings)
 
 
@@ -161,10 +176,10 @@ def _check_upsert_removal_conflicts(change: GraphChange, findings: list[Validati
 
 
 def _check_removals_are_known(
-    change: GraphChange, graph: Graph, findings: list[ValidationFinding]
+    change: GraphChange, by_uuid: dict[str, GraphObject], findings: list[ValidationFinding]
 ) -> None:
     for kind, uuid in change.removals():
-        present = _existing_kind(graph, uuid)
+        present = _existing_kind(by_uuid, uuid)
         if present is None:
             findings.append(
                 ValidationFinding(
@@ -182,10 +197,10 @@ def _check_removals_are_known(
 
 
 def _check_object_kinds(
-    change: GraphChange, graph: Graph, findings: list[ValidationFinding]
+    change: GraphChange, by_uuid: dict[str, GraphObject], findings: list[ValidationFinding]
 ) -> None:
     for kind, graph_object in change.upserts():
-        present = _existing_kind(graph, graph_object.uuid)
+        present = _existing_kind(by_uuid, graph_object.uuid)
         if present is not None and present is not kind:
             findings.append(
                 ValidationFinding(
@@ -198,18 +213,19 @@ def _check_object_kinds(
             )
 
 
-def _existing_kind(graph: Graph, uuid: str) -> ObjectKind | None:
-    if graph.anchor(uuid) is not None:
+def _existing_kind(by_uuid: dict[str, GraphObject], uuid: str) -> ObjectKind | None:
+    value = by_uuid.get(uuid)
+    if isinstance(value, Anchor):
         return ObjectKind.ANCHOR
-    if graph.associated_data_object(uuid) is not None:
+    if isinstance(value, AssociatedDataObject):
         return ObjectKind.ASSOCIATED_DATA
-    if graph.link(uuid) is not None:
+    if isinstance(value, Link):
         return ObjectKind.LINK
     return None
 
 
 def _check_no_implicit_cascade(
-    change: GraphChange, graph: Graph, findings: list[ValidationFinding]
+    change: GraphChange, by_uuid: dict[str, GraphObject], findings: list[ValidationFinding]
 ) -> None:
     """Refuse a removal that something surviving the change still points at.
 
@@ -220,8 +236,8 @@ def _check_no_implicit_cascade(
     if not removed:
         return
     upserted = {graph_object.uuid for _, graph_object in change.upserts()}
-    resulting = apply_change(graph, change)
-    for data in resulting.associated_data:
+    resulting = apply_change_to_objects(by_uuid.values(), change)
+    for data in (value for value in resulting if isinstance(value, AssociatedDataObject)):
         for anchor_uuid in data.anchor_uuids:
             if anchor_uuid in removed and data.uuid not in upserted:
                 findings.append(
@@ -234,7 +250,7 @@ def _check_no_implicit_cascade(
                         implicated_objects=(anchor_uuid, data.uuid),
                     )
                 )
-    for link in resulting.links:
+    for link in (value for value in resulting if isinstance(value, Link)):
         for role, endpoint in (("source", link.source_uuid), ("target", link.target_uuid)):
             if endpoint in removed and link.uuid not in upserted:
                 findings.append(

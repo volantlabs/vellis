@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import pytest
 
-from vellis.canonical import CanonicalState, DefinitionDelta
+from tests.vellis.semantic_state import DefinitionDelta, SemanticState
 from vellis.definitions import (
     AnchorTypeDefinition,
     AssociatedDataTypeDefinition,
@@ -154,7 +154,7 @@ def build_rich_graph() -> Graph:
     )
 
 
-def build_rich_state(revision: int = 7) -> CanonicalState:
+def build_rich_state(revision: int = 7) -> SemanticState:
     """Return a canonical state carrying a graph, definitions, and an in-flight delta."""
     definitions = build_rich_definitions()
     proposed = GraphDefinitionSet(
@@ -166,7 +166,7 @@ def build_rich_state(revision: int = 7) -> CanonicalState:
         link_types=definitions.link_types,
         relationship_constraints=definitions.relationship_constraints,
     )
-    return CanonicalState(
+    return SemanticState(
         graph=build_rich_graph(),
         active_definitions=definitions,
         revision=revision,
@@ -185,5 +185,5 @@ def rich_graph() -> Graph:
 
 
 @pytest.fixture
-def rich_state() -> CanonicalState:
+def rich_state() -> SemanticState:
     return build_rich_state()

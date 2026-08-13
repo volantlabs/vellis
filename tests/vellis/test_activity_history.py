@@ -17,8 +17,10 @@ from pathlib import Path
 import pytest
 from conftest import build_rich_definitions
 
+from tests.vellis.oracle import materialize_replay, materialize_state
+from tests.vellis.semantic_state import semantic_state_equal
 from vellis.activity import HistoryKind, HistoryQuery, RetentionDecision
-from vellis.canonical import Provenance, TransitionKind, canonical_state_equal, now
+from vellis.canonical import Provenance, TransitionKind, now
 from vellis.changes import GraphChange
 from vellis.graph import Anchor
 from vellis.outcomes import OperationStatus
@@ -150,7 +152,7 @@ def test_forgetting_activity_leaves_replayed_state_identical(system: RTGSystem) 
         GraphChange(anchor_upserts=(ADA, ORBIT)), provenance=_owner()
     ).accepted
     system.check(provenance=_owner())
-    before = system.replay()
+    before = materialize_replay(system)
     assert system.store.activity_record_count() > 0
 
     outcome = system.manage_activity_retention(
@@ -158,8 +160,8 @@ def test_forgetting_activity_leaves_replayed_state_identical(system: RTGSystem) 
     )
 
     assert outcome.accepted, outcome.findings
-    assert canonical_state_equal(system.replay(), before)
-    assert canonical_state_equal(system.current_state(), before)
+    assert semantic_state_equal(materialize_replay(system), before)
+    assert semantic_state_equal(materialize_state(system), before)
 
 
 def test_retention_changes_no_canonical_state_or_history(system: RTGSystem) -> None:
@@ -167,14 +169,14 @@ def test_retention_changes_no_canonical_state_or_history(system: RTGSystem) -> N
         GraphChange(anchor_upserts=(ADA,)), provenance=_owner()
     ).accepted
     records = system.store.canonical_record_count()
-    before = system.current_state()
+    before = materialize_state(system)
 
     assert system.manage_activity_retention(
         RetentionDecision(remove_before=now() + timedelta(seconds=1)), provenance=_owner()
     ).accepted
 
     assert system.store.canonical_record_count() == records
-    assert canonical_state_equal(system.current_state(), before)
+    assert semantic_state_equal(materialize_state(system), before)
 
 
 def test_a_refused_retention_preserves_every_preexisting_record(system: RTGSystem) -> None:
@@ -535,7 +537,7 @@ def test_history_entries_and_evaluated_revision_share_one_read_snapshot(
 
         assert result.evaluated_revision == 0
         assert [entry.revision for entry in result.canonical_entries] == [0]
-        assert writer.current_state().revision == 1
+        assert materialize_state(writer).revision == 1
     finally:
         writer.close()
         reader.close()
@@ -624,7 +626,7 @@ def test_a_broken_activity_ledger_cannot_break_the_operation_it_observes(
     outcome = system.apply_graph_change(GraphChange(anchor_upserts=(ADA,)), provenance=_owner())
 
     assert outcome.accepted, outcome.findings
-    assert system.current_state().graph.anchor("a-1") is not None
+    assert materialize_state(system).graph.anchor("a-1") is not None
 
 
 def test_a_canonical_summary_carries_no_replay_payload(system: RTGSystem) -> None:

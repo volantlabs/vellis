@@ -128,6 +128,7 @@ class SnapshotMetadata:
     row_count: int
     digest: str
     row_buffer_bound: int
+    tail_digest: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -679,7 +680,7 @@ def _tail_event_error(connection: sqlite3.Connection, revision: int) -> str | No
             *definition_content_stats(active)
         ) == str(value_set_id):
             return "tail definition upsert should unstage active-equivalent meaning"
-        value = load_definition_set(connection, str(value_set_id))
+        value = load_definition_set(connection, str(value_set_id), one_entry=True)
         if definition_content_stats(value)[1] != 1:
             return "tail definition upsert is not one normalized definition entry"
         if entity_kind == "type":
@@ -858,7 +859,7 @@ def _apply_tail_stream(
     connection: sqlite3.Connection,
     tail: TextIO,
     snapshot_header: dict[str, object],
-) -> dict[str, object]:
+) -> tuple[dict[str, object], str]:
     records = _records(tail)
     header, header_bytes = next(records)
     if (
@@ -1137,11 +1138,16 @@ def _apply_tail_stream(
         or _captured_state_identity(connection) != str(header["throughStateIdentity"])
     ):
         raise StoreError("tail does not reconstruct its claimed final canonical state")
-    return header
+    return header, digest.hexdigest()
 
 
 def import_ndjson(
-    source: TextIO, destination: Path, *, tail: TextIO | None = None
+    source: TextIO,
+    destination: Path,
+    *,
+    tail: TextIO | None = None,
+    expected_digest: str | None = None,
+    expected_tail_digest: str | None = None,
 ) -> SnapshotMetadata:
     """Verify into temporary SQLite and atomically establish an empty destination."""
     if destination.exists():
@@ -1283,7 +1289,16 @@ def import_ndjson(
                 ),
             }:
                 raise StoreError("snapshot semantic counts do not match its rows")
-            result_header = header if tail is None else _apply_tail_stream(connection, tail, header)
+            snapshot_digest = digest.hexdigest()
+            if expected_digest is not None and snapshot_digest != expected_digest:
+                raise StoreError("snapshot bytes do not match the confirmed input")
+            tail_digest: str | None = None
+            if tail is None:
+                result_header = header
+            else:
+                result_header, tail_digest = _apply_tail_stream(connection, tail, header)
+                if expected_tail_digest is not None and tail_digest != expected_tail_digest:
+                    raise StoreError("tail bytes do not match the confirmed input")
             identity_error = verify_normalized_identities(connection)
             if identity_error is not None:
                 raise StoreError(identity_error)
@@ -1323,8 +1338,9 @@ def import_ndjson(
             int(str(result_header.get("throughRevision", result_header.get("revision")))),
             str(result_header.get("throughRecordIdentity", result_header.get("recordIdentity"))),
             row_count,
-            digest.hexdigest(),
+            snapshot_digest,
             int(str(header["rowBufferBound"])),
+            tail_digest,
         )
     except (StopIteration, KeyError, TypeError, ValueError, sqlite3.Error) as error:
         raise StoreError(f"snapshot import failed: {error}") from error

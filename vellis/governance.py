@@ -27,21 +27,16 @@ from vellis.definitions import (
     AnchorTypeDefinition,
     AssociatedDataTypeDefinition,
     DirectAssociationEnd,
-    GraphDefinitionSet,
     LinkEnd,
     LinkTypeDefinition,
     RelationshipConstraint,
     relationship_identity,
-    validate_definition_set,
 )
-from vellis.graph import Graph
 from vellis.outcomes import (
     OperationStatus,
     ValidationFinding,
     ValidationReport,
-    ValidationScope,
 )
-from vellis.validation import assess_graph_conformance
 
 __all__ = [
     "ActivateDefinitionDeltaRequest",
@@ -50,8 +45,6 @@ __all__ = [
     "DirectAssociationMultiplicitySelection",
     "LinkMultiplicitySelection",
     "SetDefinitionDeltaRequest",
-    "apply_definition_change",
-    "assess_proposal",
     "definition_change_findings",
 ]
 
@@ -137,42 +130,6 @@ def definition_change_findings(change: DefinitionChange) -> tuple[ValidationFind
     return tuple(findings)
 
 
-def apply_definition_change(
-    base: GraphDefinitionSet, change: DefinitionChange
-) -> GraphDefinitionSet:
-    """Apply one keyed edit; callers validate duplicate/conflicting commands first."""
-
-    replaced_types = {
-        *(each.type_key for each in change.anchor_type_upserts),
-        *(each.type_key for each in change.associated_data_type_upserts),
-        *(each.type_key for each in change.link_type_upserts),
-    }
-    removed_types = {*change.type_removals, *replaced_types}
-
-    def replaced(values, upserts):
-        kept = [each for each in values if each.type_key not in removed_types]
-        return (*kept, *upserts)
-
-    removal_identities = {
-        *(selection.identity() for selection in change.link_multiplicity_removals),
-        *(selection.identity() for selection in change.direct_association_multiplicity_removals),
-    }
-    upserts = {relationship_identity(each): each for each in change.relationship_constraint_upserts}
-    relationships = [
-        upserts.pop(relationship_identity(each), each)
-        for each in base.relationship_constraints
-        if relationship_identity(each) not in removal_identities
-    ]
-    return GraphDefinitionSet(
-        anchor_types=replaced(base.anchor_types, change.anchor_type_upserts),
-        associated_data_types=replaced(
-            base.associated_data_types, change.associated_data_type_upserts
-        ),
-        link_types=replaced(base.link_types, change.link_type_upserts),
-        relationship_constraints=(*relationships, *upserts.values()),
-    )
-
-
 @dataclass(frozen=True, slots=True)
 class SetDefinitionDeltaRequest:
     """One bounded keyed edit of the sole proposed vocabulary."""
@@ -211,24 +168,3 @@ class DefinitionDeltaResult:
     @property
     def accepted(self) -> bool:
         return self.status is OperationStatus.ACCEPTED
-
-
-def assess_proposal(
-    proposed: GraphDefinitionSet, graph: Graph, evaluated_revision: int
-) -> ValidationReport:
-    """Assess a proposal's descriptions, internal consistency, and graph impact.
-
-    The graph is assessed against the proposal rather than against the active set, which
-    is what turns "this vocabulary is coherent" into "this vocabulary still fits the
-    memory the owner has".
-    """
-    findings = (
-        *validate_definition_set(proposed, require_descriptions=True),
-        *assess_graph_conformance(graph, proposed),
-    )
-    return ValidationReport(
-        scope=ValidationScope.DEFINITION_DELTA,
-        conforms=not findings,
-        evaluated_revision=evaluated_revision,
-        findings=findings,
-    )

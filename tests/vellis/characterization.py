@@ -29,6 +29,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from tests.vellis.evolution_support import activate_clean_delta, stage_complete_fixture
+from tests.vellis.oracle import materialize_state
 from vellis.canonical import Provenance
 from vellis.changes import GraphChange
 from vellis.definitions import AnchorTypeDefinition, GraphDefinitionSet
@@ -82,7 +83,7 @@ def commit_definition_changes(system: RTGSystem, count: int, *, prefix: str = "k
     — which is what lets a test hold definition history fixed while graph history grows.
     """
     for index in range(count):
-        state = system.current_state()
+        state = materialize_state(system)
         proposed = GraphDefinitionSet(
             anchor_types=(
                 *state.active_definitions.anchor_types,

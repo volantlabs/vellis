@@ -10,7 +10,7 @@ from decimal import Decimal
 
 import pytest
 
-from vellis.canonical import CanonicalState, DefinitionDelta, canonical_state_equal
+from tests.vellis.semantic_state import DefinitionDelta, SemanticState, semantic_state_equal
 from vellis.definitions import (
     AnchorTypeDefinition,
     AssociatedDataTypeDefinition,
@@ -245,19 +245,17 @@ def _direct_association(anchor_types: tuple[str, ...]) -> GraphDefinitionSet:
 
 
 @pytest.mark.parametrize("revision", [0, 1])
-def test_canonical_state_equality_includes_revision(revision: int) -> None:
-    base = CanonicalState(graph=Graph(), active_definitions=GraphDefinitionSet(), revision=0)
-    other = CanonicalState(
-        graph=Graph(), active_definitions=GraphDefinitionSet(), revision=revision
-    )
-    assert canonical_state_equal(base, other) is (revision == 0)
+def test_semantic_state_equality_includes_revision(revision: int) -> None:
+    base = SemanticState(graph=Graph(), active_definitions=GraphDefinitionSet(), revision=0)
+    other = SemanticState(graph=Graph(), active_definitions=GraphDefinitionSet(), revision=revision)
+    assert semantic_state_equal(base, other) is (revision == 0)
 
 
-def test_canonical_state_equality_includes_delta_presence_and_content() -> None:
+def test_semantic_state_equality_includes_delta_presence_and_content() -> None:
     """Excludes comparing only graph and active definitions."""
     empty = GraphDefinitionSet()
-    without = CanonicalState(graph=Graph(), active_definitions=empty, revision=0)
-    with_delta = CanonicalState(
+    without = SemanticState(graph=Graph(), active_definitions=empty, revision=0)
+    with_delta = SemanticState(
         graph=Graph(),
         active_definitions=empty,
         revision=0,
@@ -265,7 +263,7 @@ def test_canonical_state_equality_includes_delta_presence_and_content() -> None:
             proposed_definitions=GraphDefinitionSet(anchor_types=(_described(),))
         ),
     )
-    other_delta = CanonicalState(
+    other_delta = SemanticState(
         graph=Graph(),
         active_definitions=empty,
         revision=0,
@@ -273,9 +271,9 @@ def test_canonical_state_equality_includes_delta_presence_and_content() -> None:
             proposed_definitions=GraphDefinitionSet(anchor_types=(_described("project"),))
         ),
     )
-    assert not canonical_state_equal(without, with_delta)
-    assert not canonical_state_equal(with_delta, other_delta)
-    assert canonical_state_equal(with_delta, with_delta)
+    assert not semantic_state_equal(without, with_delta)
+    assert not semantic_state_equal(with_delta, other_delta)
+    assert semantic_state_equal(with_delta, with_delta)
 
 
 def test_system_metadata_participates_in_graph_equality() -> None:
@@ -869,21 +867,21 @@ def test_objects_of_equal_size_with_different_member_names_are_unequal() -> None
     )
 
 
-def test_canonical_state_equality_includes_its_graph_and_its_definitions() -> None:
+def test_semantic_state_equality_includes_its_graph_and_its_definitions() -> None:
     """Excludes comparing only revision and delta at the canonical-state level."""
     definitions = GraphDefinitionSet(anchor_types=(_described(),))
     other_definitions = GraphDefinitionSet(anchor_types=(_described("project"),))
     graph = Graph(anchors=(_anchor("a-1"),))
 
-    base = CanonicalState(graph=graph, active_definitions=definitions, revision=0)
-    other_graph = CanonicalState(
+    base = SemanticState(graph=graph, active_definitions=definitions, revision=0)
+    other_graph = SemanticState(
         graph=Graph(anchors=(_anchor("a-2"),)), active_definitions=definitions, revision=0
     )
-    other_vocabulary = CanonicalState(graph=graph, active_definitions=other_definitions, revision=0)
+    other_vocabulary = SemanticState(graph=graph, active_definitions=other_definitions, revision=0)
 
-    assert canonical_state_equal(base, base)
-    assert not canonical_state_equal(base, other_graph)
-    assert not canonical_state_equal(base, other_vocabulary)
+    assert semantic_state_equal(base, base)
+    assert not semantic_state_equal(base, other_graph)
+    assert not semantic_state_equal(base, other_vocabulary)
 
 
 def test_narrowing_a_permitted_value_set_is_not_an_effective_no_op() -> None:

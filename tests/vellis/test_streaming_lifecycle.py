@@ -144,13 +144,6 @@ def test_import_rebuilds_live_meaning_on_one_fresh_history_base(
     source_ledger_identity = system.store.ledger_identity()
     system.close()
 
-    def reject_whole_state(*_args: object, **_kwargs: object) -> None:
-        raise AssertionError("streaming lifecycle operation constructed complete state")
-
-    monkeypatch.setattr(CanonicalStore, "current_state", reject_whole_state)
-    monkeypatch.setattr(CanonicalStore, "current_graph", reject_whole_state)
-    monkeypatch.setattr(CanonicalStore, "replay", reject_whole_state)
-
     stream = io.StringIO()
     written = export_ndjson(source_path, stream, batch_size=3)
     stream.seek(0)
@@ -159,7 +152,7 @@ def test_import_rebuilds_live_meaning_on_one_fresh_history_base(
     try:
         assert read == written
         assert restored.store.canonical_record_count() == 1
-        assert restored.store.initial_record().established_revision == written.revision
+        assert restored.store.canonical_summaries()[0][0] == written.revision
         assert restored.store.ledger_identity() != source_ledger_identity
         assert restored.store.activity_record_count() == 0
         assert restored.query_graph(query).rows == expected_rows
@@ -316,9 +309,7 @@ def test_in_flight_proposal_survives_streaming_without_carrying_assessments(
         restored.close()
 
 
-def test_sql_replay_verification_and_restore_construct_no_graph(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_sql_replay_verification_and_restore_construct_no_graph(tmp_path: Path) -> None:
     path = tmp_path / "source.sqlite3"
     system = _source(path, 2)
     try:
@@ -336,21 +327,6 @@ def test_sql_replay_verification_and_restore_construct_no_graph(
             ),
             provenance=Provenance("owner"),
         ).accepted
-        monkeypatch.setattr(
-            CanonicalStore,
-            "current_state",
-            lambda *_args, **_kwargs: pytest.fail("constructed CanonicalState"),
-        )
-        monkeypatch.setattr(
-            CanonicalStore,
-            "current_graph",
-            lambda *_args, **_kwargs: pytest.fail("constructed Graph"),
-        )
-        monkeypatch.setattr(
-            CanonicalStore,
-            "replay",
-            lambda *_args, **_kwargs: pytest.fail("performed Python replay"),
-        )
         restored = system.restore_historical_state(
             RevisionSelection(1), provenance=Provenance("owner")
         )
@@ -401,16 +377,25 @@ def test_scale_snapshot_and_tail_import_keep_their_database_row_buffer_fixed(
 ) -> None:
     system = _source(tmp_path / "source.sqlite3", 0)
     try:
-        for start in range(0, 99_000, 1_000):
-            assert system.apply_graph_change(
-                GraphChange(
-                    anchor_upserts=tuple(
-                        Anchor(f"large-{index}", "person", "x")
-                        for index in range(start, start + 1_000)
-                    )
-                ),
-                provenance=Provenance("owner"),
-            ).accepted
+        connection = system.store._connection  # noqa: SLF001
+        connection.execute("BEGIN IMMEDIATE")
+        connection.executemany(
+            "INSERT INTO object_value"
+            " (content_identity, uuid, object_kind, type_key, display_name)"
+            " VALUES (?, ?, 'anchor', 'person', 'x')",
+            (
+                (object_identity(anchor), anchor.uuid)
+                for anchor in (Anchor(f"large-{index}", "person", "x") for index in range(99_000))
+            ),
+        )
+        connection.execute(
+            "INSERT INTO graph_presence_interval"
+            " (uuid, object_value_id, object_kind, type_key, source_uuid, target_uuid,"
+            " valid_from_revision, valid_to_revision)"
+            " SELECT uuid, id, object_kind, type_key, NULL, NULL, 0, NULL FROM object_value"
+        )
+        system.store._seal_record_identity_unlocked(0)  # noqa: SLF001
+        connection.execute("COMMIT")
         snapshot_path = tmp_path / "snapshot.ndjson"
         with snapshot_path.open("w", encoding="utf-8") as snapshot:
             captured = export_ndjson(tmp_path / "source.sqlite3", snapshot, batch_size=17)

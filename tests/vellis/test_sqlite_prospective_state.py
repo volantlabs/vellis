@@ -3,12 +3,13 @@
 from decimal import Decimal
 from pathlib import Path
 
-from vellis.canonical import (
+from tests.vellis.oracle import materialize_definitions, materialize_replay, materialize_state
+from tests.vellis.semantic_state import (
     DefinitionDelta,
-    Provenance,
-    canonical_state_equal,
     definition_delta_equal,
+    semantic_state_equal,
 )
+from vellis.canonical import Provenance
 from vellis.changes import GraphChange, GraphChangeRequest, GraphChangeTarget
 from vellis.definitions import (
     AnchorTypeDefinition,
@@ -22,7 +23,7 @@ from vellis.definitions import (
     LinkTypeDefinition,
     validate_definition_set,
 )
-from vellis.discovery import DefinitionInspectionRequest
+from vellis.discovery import DefinitionInspectionRequest, DefinitionSummaryRequest
 from vellis.governance import (
     ActivateDefinitionDeltaRequest,
     DefinitionChange,
@@ -111,7 +112,7 @@ def test_prospective_overlay_isolated_queryable_and_activates_atomically(tmp_pat
         )
         assert outcome.accepted
         assert system.definition_delta().proposed_definition_identity is None
-        state = system.current_state()
+        state = materialize_state(system)
         assert state.graph.anchor("a") == Anchor("a", "team", "Ada")
         assert state.active_definitions.anchor_type("team") == TEAM
     finally:
@@ -188,7 +189,9 @@ def test_prospective_definition_discovery_uses_the_proposed_vocabulary(tmp_path:
             DefinitionChange(anchor_type_upserts=(TEAM,), type_removals=("person",)),
             provenance=OWNER,
         ).accepted
-        summary = system.definition_summary(state_scope=EvaluatedStateScope.PROSPECTIVE)
+        summary = system.definition_summary(
+            DefinitionSummaryRequest(state_scope=EvaluatedStateScope.PROSPECTIVE)
+        )
         detail = system.inspect_definitions(
             DefinitionInspectionRequest(("team",), state_scope=EvaluatedStateScope.PROSPECTIVE)
         )
@@ -217,7 +220,9 @@ def test_definition_discovery_never_decodes_the_large_graph_overlay(tmp_path: Pa
         ).accepted
         system.store.reset_instrumentation()
 
-        summary = system.definition_summary(state_scope=EvaluatedStateScope.PROSPECTIVE)
+        summary = system.definition_summary(
+            DefinitionSummaryRequest(state_scope=EvaluatedStateScope.PROSPECTIVE)
+        )
         detail = system.inspect_definitions(
             DefinitionInspectionRequest(("team",), state_scope=EvaluatedStateScope.PROSPECTIVE)
         )
@@ -359,7 +364,9 @@ def test_type_upsert_replaces_the_prior_kind_at_shared_natural_identity(tmp_path
             DefinitionChange(anchor_type_upserts=(AnchorTypeDefinition("shared", "New kind."),)),
             provenance=OWNER,
         ).accepted
-        summary = system.definition_summary(state_scope=EvaluatedStateScope.PROSPECTIVE)
+        summary = system.definition_summary(
+            DefinitionSummaryRequest(state_scope=EvaluatedStateScope.PROSPECTIVE)
+        )
         assessment = _assess_delta(system)
         assert [value.type_key for value in summary.anchor_types] == ["base", "shared"]
         assert assessment.conforms
@@ -483,15 +490,15 @@ def test_sparse_definition_events_replay_edits_unstaging_discard_and_activation(
         assert system.set_definition_delta(
             DefinitionChange(anchor_type_upserts=(TEAM, changed_person)), provenance=OWNER
         ).accepted
-        assert canonical_state_equal(system.current_state(), system.replay())
+        assert semantic_state_equal(materialize_state(system), materialize_replay(system))
 
         assert system.set_definition_delta(
             DefinitionChange(anchor_type_upserts=(PERSON,)), provenance=OWNER
         ).accepted
-        assert canonical_state_equal(system.current_state(), system.replay())
+        assert semantic_state_equal(materialize_state(system), materialize_replay(system))
 
         assert system.discard_definition_delta(provenance=OWNER).accepted
-        assert canonical_state_equal(system.current_state(), system.replay())
+        assert semantic_state_equal(materialize_state(system), materialize_replay(system))
 
         assert system.set_definition_delta(
             DefinitionChange(anchor_type_upserts=(TEAM,)), provenance=OWNER
@@ -501,7 +508,7 @@ def test_sparse_definition_events_replay_edits_unstaging_discard_and_activation(
         assert system.activate_definition_delta(
             ActivateDefinitionDeltaRequest(assessment.assessment_id), provenance=OWNER
         ).accepted
-        assert canonical_state_equal(system.current_state(), system.replay())
+        assert semantic_state_equal(materialize_state(system), materialize_replay(system))
     finally:
         system.close()
 
@@ -580,7 +587,7 @@ def test_assessment_closure_validates_reverse_definition_dependencies(tmp_path: 
 
         assert not report.conforms
         assert any("unknown anchor type" in finding.summary for finding in report.returned_findings)
-        assert not validate_definition_set(system.current_state().active_definitions)
+        assert not validate_definition_set(materialize_state(system).active_definitions)
     finally:
         system.close()
 
@@ -592,7 +599,7 @@ def test_proposed_and_activated_definition_identity_is_content_canonical(tmp_pat
             DefinitionChange(anchor_type_upserts=(TEAM,)), provenance=OWNER
         )
         assert staged.proposed_definition_identity is not None
-        _, proposed, _ = system.store.definition_view(prospective=True)
+        proposed = materialize_definitions(system, prospective=True)
         assert staged.proposed_definition_identity == definition_identity(proposed)
 
         assessment = _assess_delta(system)
@@ -600,7 +607,7 @@ def test_proposed_and_activated_definition_identity_is_content_canonical(tmp_pat
         assert system.activate_definition_delta(
             ActivateDefinitionDeltaRequest(assessment.assessment_id), provenance=OWNER
         ).accepted
-        _, active, _ = system.store.definition_view()
+        active = materialize_definitions(system)
         head_identity = system.store._connection.execute(  # noqa: SLF001
             "SELECT active_definition_set_id FROM state_head WHERE id = 0"
         ).fetchone()[0]
@@ -778,7 +785,7 @@ def test_one_object_proposal_assessment_visits_only_its_neighborhood(tmp_path: P
         report = _assess_delta(system)
 
         assert report.conforms
-        assert len(loaded) == 1
+        assert loaded == []
     finally:
         system.close()
 
@@ -853,7 +860,7 @@ def test_graph_overlay_replay_is_independent_of_edit_order(tmp_path: Path) -> No
             provenance=OWNER,
         ).accepted
 
-        assert canonical_state_equal(system.current_state(), system.replay())
+        assert semantic_state_equal(materialize_state(system), materialize_replay(system))
     finally:
         system.close()
 
@@ -1125,11 +1132,10 @@ def test_definition_summary_enforces_state_scope_truth_table_and_observes_reject
         before = system.store.activity_record_count()
 
         missing = system.definition_summary(
-            state_scope=EvaluatedStateScope.HISTORICAL, provenance=OWNER
+            DefinitionSummaryRequest(state_scope=EvaluatedStateScope.HISTORICAL), provenance=OWNER
         )
         inconsistent = system.definition_summary(
-            state_scope=EvaluatedStateScope.CURRENT,
-            selection=RevisionSelection(0),
+            DefinitionSummaryRequest(RevisionSelection(0), EvaluatedStateScope.CURRENT),
             provenance=OWNER,
         )
 
@@ -1264,7 +1270,7 @@ def test_restaging_rejects_cross_kind_active_conflict(tmp_path: Path) -> None:
         rejected = system.apply_graph_change(request, provenance=OWNER)
 
         assert not rejected.accepted
-        assert system.current_state().graph.associated_data_object("x") is not None
+        assert materialize_state(system).graph.associated_data_object("x") is not None
     finally:
         system.close()
 

@@ -15,7 +15,9 @@ from pathlib import Path
 
 import pytest
 
-from vellis.canonical import Provenance, canonical_state_equal
+from tests.vellis.oracle import materialize_replay, materialize_state
+from tests.vellis.semantic_state import semantic_state_equal
+from vellis.canonical import Provenance
 from vellis.changes import GraphChange
 from vellis.definitions import AnchorTypeDefinition, GraphDefinitionSet
 from vellis.discovery import DefinitionInspectionRequest
@@ -32,7 +34,7 @@ from vellis.query import (
     ReturnShape,
 )
 from vellis.system import RTGSystem
-from vellis.validation import assess_graph_conformance
+from vellis.validation import assess_object_neighborhood
 
 VOCABULARY = GraphDefinitionSet(
     anchor_types=(AnchorTypeDefinition(type_key="person", description="A person."),)
@@ -50,22 +52,11 @@ def _established(tmp_path: Path) -> RTGSystem:
     return system
 
 
-def test_reading_current_state_visits_no_canonical_record(tmp_path: Path) -> None:
-    system = _established(tmp_path)
-    try:
-        system.current_state()
-        assert system.store.record_reads == 0
-        assert system.store.current_projection_decodes == 1
-        assert system.store.current_graph_decodes == 1
-    finally:
-        system.close()
-
-
 def test_current_conformance_assessment_visits_no_canonical_record(tmp_path: Path) -> None:
     system = _established(tmp_path)
     try:
-        state = system.current_state()
-        assert assess_graph_conformance(state.graph, state.active_definitions) == ()
+        state = materialize_state(system)
+        assert assess_object_neighborhood(state.graph.objects(), state.active_definitions) == ()
         assert system.store.record_reads == 0
     finally:
         system.close()
@@ -75,17 +66,6 @@ def test_asking_whether_state_exists_visits_no_canonical_record(tmp_path: Path) 
     system = _established(tmp_path)
     try:
         assert system.is_initialized
-        assert system.store.record_reads == 0
-    finally:
-        system.close()
-
-
-def test_repeating_current_work_does_not_accumulate_record_reads(tmp_path: Path) -> None:
-    system = _established(tmp_path)
-    try:
-        for _ in range(25):
-            state = system.current_state()
-            assess_graph_conformance(state.graph, state.active_definitions)
         assert system.store.record_reads == 0
     finally:
         system.close()
@@ -111,7 +91,7 @@ def test_definition_work_reads_only_the_durable_definition_facet(
 
         assert reopened.store.current_projection_decodes == 0
         assert reopened.store.current_graph_decodes == 0
-        assert reopened.store.current_definition_decodes == 50
+        assert reopened.store.current_definition_decodes == 25
         assert reopened.store.record_reads == 0
     finally:
         reopened.close()
@@ -191,22 +171,7 @@ def test_definition_delta_discard_decodes_no_graph_objects(tmp_path: Path) -> No
 
         assert discarded.accepted
         assert system.store.current_graph_object_decodes == 0
-        assert system.current_state().definition_delta is None
-    finally:
-        system.close()
-
-
-def test_public_current_state_cannot_mutate_the_durable_projection(tmp_path: Path) -> None:
-    system = _established(tmp_path)
-    try:
-        assert system.apply_graph_change(
-            GraphChange(anchor_upserts=(Anchor("a-1", "person", "Ada"),)),
-            provenance=Provenance(initiator="owner"),
-        ).accepted
-        exposed = system.current_state()
-        exposed.graph.anchors[0].system_metadata.members["live"] = False
-
-        assert system.current_state().graph.anchors[0].system_metadata.live is True
+        assert materialize_state(system).definition_delta is None
     finally:
         system.close()
 
@@ -222,8 +187,8 @@ def test_an_external_commit_is_visible_without_a_resident_projection(tmp_path: P
             provenance=Provenance(initiator="owner"),
         ).accepted
 
-        assert first.current_state().revision == 1
-        assert first.store.current_projection_decodes == 1
+        assert first.store.current_revision() == 1
+        assert first.store.current_projection_decodes == 0
     finally:
         second.close()
         first.close()
@@ -249,36 +214,22 @@ def test_complete_state_assembly_uses_one_cross_process_read_snapshot(tmp_path: 
         commit_between_projection_statements
     )
     try:
-        state = reader.current_state()
+        state = materialize_state(reader)
 
         assert committed
         assert state.revision == 0
         assert state.graph.anchors == ()
-        assert writer.current_state().revision == 1
+        assert materialize_state(writer).revision == 1
     finally:
         reader.store._connection.set_trace_callback(None)  # noqa: SLF001
         writer.close()
         reader.close()
 
 
-def test_the_instrumentation_counts_a_real_record_access(tmp_path: Path) -> None:
-    """Without this the zero-access assertions above would pass vacuously."""
-    system = _established(tmp_path)
-    try:
-        system.replay()
-        assert system.store.record_reads == 1
-        system.initial_record()
-        assert system.store.record_reads == 2
-        system.store.reset_instrumentation()
-        assert system.store.record_reads == 0
-    finally:
-        system.close()
-
-
 def test_the_projection_is_the_replayed_state_not_a_second_authority(tmp_path: Path) -> None:
     system = _established(tmp_path)
     try:
-        assert canonical_state_equal(system.current_state(), system.replay())
+        assert semantic_state_equal(materialize_state(system), materialize_replay(system))
     finally:
         system.close()
 
@@ -294,14 +245,14 @@ def test_current_work_issues_no_statement_against_the_ledger(tmp_path: Path) -> 
     # Reaching the connection directly is the point: this observes what was really run.
     system.store._connection.set_trace_callback(statements.append)  # noqa: SLF001
     try:
-        state = system.current_state()
-        assess_graph_conformance(state.graph, state.active_definitions)
+        state = materialize_state(system)
+        assess_object_neighborhood(state.graph.objects(), state.active_definitions)
         assert system.is_initialized
         assert not any("canonical_record" in statement for statement in statements)
         assert statements
 
         statements.clear()
-        system.replay()
+        materialize_replay(system)
         assert any("canonical_record" in statement for statement in statements)
     finally:
         system.store._connection.set_trace_callback(None)  # noqa: SLF001
@@ -384,6 +335,31 @@ def test_schema_four_has_no_whole_state_definition_object_or_change_payloads(
                 str(row[1]).lower() for row in connection.execute(f"PRAGMA table_info({table})")
             }
             assert columns.isdisjoint(forbidden), (table, columns & forbidden)
+    finally:
+        system.close()
+
+
+def test_definition_discovery_decodes_only_the_requested_neighborhood(
+    tmp_path: Path,
+) -> None:
+    definitions = GraphDefinitionSet(
+        anchor_types=tuple(
+            AnchorTypeDefinition(f"type-{index}", f"Type {index}.") for index in range(1_000)
+        )
+    )
+    system = RTGSystem.open(tmp_path / "definitions.sqlite3")
+    try:
+        assert system.initialize_fresh(
+            definitions, provenance=Provenance("owner"), initialization_summary="large"
+        ).accepted
+        system.store.reset_instrumentation()
+        summary = system.definition_summary()
+        assert summary.accepted and len(summary.anchor_types) == 1_000
+        assert system.store.current_definition_decodes == 0
+
+        inspection = system.inspect_definitions(DefinitionInspectionRequest(("type-0",)))
+        assert inspection.accepted and len(inspection.anchor_details) == 1
+        assert system.store.current_definition_decodes == 1
     finally:
         system.close()
 

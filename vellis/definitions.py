@@ -16,7 +16,7 @@ unresolved reference a validation finding rather than an unrepresentable state.
 from __future__ import annotations
 
 from collections import Counter
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Iterator, Sequence
 from dataclasses import dataclass
 from decimal import Decimal
 from enum import Enum
@@ -197,6 +197,12 @@ class DirectAssociationMultiplicityConstraint:
 
 
 RelationshipConstraint = LinkMultiplicityConstraint | DirectAssociationMultiplicityConstraint
+DefinitionEntry = (
+    AnchorTypeDefinition
+    | AssociatedDataTypeDefinition
+    | LinkTypeDefinition
+    | RelationshipConstraint
+)
 
 _SIZED_KINDS = frozenset({JsonKind.STRING, JsonKind.ARRAY, JsonKind.OBJECT})
 
@@ -209,6 +215,17 @@ class GraphDefinitionSet:
     associated_data_types: tuple[AssociatedDataTypeDefinition, ...] = ()
     link_types: tuple[LinkTypeDefinition, ...] = ()
     relationship_constraints: tuple[RelationshipConstraint, ...] = ()
+
+    def entries(self) -> Iterator[DefinitionEntry]:
+        """Yield definition occurrences without constructing another aggregate."""
+        yield from self.anchor_types
+        yield from self.associated_data_types
+        yield from self.link_types
+        yield from self.relationship_constraints
+
+    def __iter__(self) -> Iterator[DefinitionEntry]:
+        """Stream entries when this semantic value is supplied at a trust boundary."""
+        return self.entries()
 
     def anchor_type(self, type_key: str) -> AnchorTypeDefinition | None:
         return next((each for each in self.anchor_types if each.type_key == type_key), None)

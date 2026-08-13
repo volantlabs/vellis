@@ -31,7 +31,8 @@ from __future__ import annotations
 
 import argparse
 import os
-from collections.abc import Sequence
+import tempfile
+from collections.abc import Iterator, Sequence
 from dataclasses import dataclass, replace
 from enum import Enum
 from pathlib import Path
@@ -48,16 +49,10 @@ from vellis.client_setup import (
     plan_clients,
     render_command,
 )
-from vellis.definitions import GraphDefinitionSet
-from vellis.everyday_life import everyday_life_starter
-from vellis.json_value import JsonValueError, loads
+from vellis.definitions import DefinitionEntry
+from vellis.everyday_life import everyday_life_entries
 from vellis.outcomes import OperationStatus
 from vellis.paths import DestinationError, resolve_data_directory, store_path
-from vellis.snapshot_document import (
-    SnapshotStart,
-    analyze_snapshot_document,
-    start_summary,
-)
 from vellis.store import (
     CanonicalStore,
     ForeignDatabaseError,
@@ -66,13 +61,10 @@ from vellis.store import (
     UnreadableStoreError,
     holds_established_memory,
 )
+from vellis.streaming import SnapshotMetadata, import_ndjson
 from vellis.system import RTGSystem
-from vellis.v1 import (
-    ImportPreview,
-    SnapshotError,
-    analyze_v1_snapshot,
-    recovery_summary,
-)
+from vellis.v1 import SnapshotError
+from vellis.v1_streaming import V1StreamPreview, import_v1_stream, preview_v1_stream
 
 __all__ = [
     "RECOMMENDED_VOCABULARY",
@@ -122,17 +114,17 @@ class FreshVocabularyChoice(Enum):
     EVERYDAY_LIFE_STARTER = "everydayLifeStarter"
 
     @property
-    def definitions(self) -> GraphDefinitionSet:
-        """The definition set this choice establishes.
+    def definition_entries(self) -> Iterator[DefinitionEntry]:
+        """The bounded definition entries this choice establishes.
 
         Written as exhaustive dispatch rather than a two-way test so that a third choice
         would be a type error here instead of silently becoming one of these two.
         """
         match self:
             case FreshVocabularyChoice.BLANK:
-                return GraphDefinitionSet()
+                return iter(())
             case FreshVocabularyChoice.EVERYDAY_LIFE_STARTER:
-                return everyday_life_starter()
+                return everyday_life_entries()
 
     @property
     def description(self) -> str:
@@ -156,6 +148,15 @@ class FreshVocabularyChoice(Enum):
                 return "blank first-use start with an empty definition set"
             case FreshVocabularyChoice.EVERYDAY_LIFE_STARTER:
                 return "first-use start with the Everyday Life starter vocabulary"
+
+    @property
+    def content_summary(self) -> str:
+        """The modeled fixed population established by this bounded choice."""
+        match self:
+            case FreshVocabularyChoice.BLANK:
+                return "0 anchor types"
+            case FreshVocabularyChoice.EVERYDAY_LIFE_STARTER:
+                return "12 anchor types"
 
 
 RECOMMENDED_VOCABULARY = FreshVocabularyChoice.EVERYDAY_LIFE_STARTER
@@ -198,14 +199,27 @@ class SetupReport:
         )
 
 
+@dataclass(frozen=True, slots=True)
+class SnapshotInput:
+    """One verified normalized snapshot file selected for initialization."""
+
+    path: Path
+    metadata: SnapshotMetadata
+    tail_path: Path | None = None
+
+    @property
+    def source_identity(self) -> str:
+        return self.metadata.digest
+
+
 def prepare_local_system(
     *,
     data_directory: str | Path | None = None,
     dry_run: bool = False,
     initiator: str = "owner",
     choice: FreshVocabularyChoice = RECOMMENDED_VOCABULARY,
-    recovery: ImportPreview | None = None,
-    snapshot: SnapshotStart | None = None,
+    recovery: V1StreamPreview | None = None,
+    snapshot: SnapshotInput | None = None,
     environ: dict[str, str] | None = None,
 ) -> SetupReport:
     """Prepare one local Vellis system with the start it is given.
@@ -250,20 +264,6 @@ def prepare_local_system(
             store=store_file,
             choice=choice,
         )
-    if snapshot is not None and not snapshot.is_acceptable:
-        # Refused before the destination is even created. Reconstruction already decided
-        # this document cannot become a state, and the reasons are the ones an owner was
-        # shown; going on would leave a directory behind for a system that never began.
-        return SetupReport(
-            stage=SetupStage.PREVIEW,
-            succeeded=False,
-            memory_changed=False,
-            summary=snapshot.reconstruction.summary,
-            choice=choice,
-            corrective_action=SNAPSHOT_NOT_USABLE,
-            destination=destination,
-            store=store_file,
-        )
     try:
         destination.mkdir(parents=True, exist_ok=True)
     except OSError as error:
@@ -279,6 +279,73 @@ def prepare_local_system(
             destination=destination,
             store=store_file,
         )
+    if snapshot is not None:
+        try:
+            with snapshot.path.open("r", encoding="utf-8") as source:
+                if snapshot.tail_path is None:
+                    metadata = import_ndjson(
+                        source,
+                        store_file,
+                        expected_digest=snapshot.metadata.digest,
+                    )
+                else:
+                    with snapshot.tail_path.open("r", encoding="utf-8") as tail:
+                        metadata = import_ndjson(
+                            source,
+                            store_file,
+                            tail=tail,
+                            expected_digest=snapshot.metadata.digest,
+                            expected_tail_digest=snapshot.metadata.tail_digest,
+                        )
+        except (OSError, UnicodeError, StoreError) as error:
+            return SetupReport(
+                stage=SetupStage.INITIALIZE,
+                succeeded=False,
+                memory_changed=False,
+                summary=f"the normalized snapshot could not be imported: {error}",
+                choice=choice,
+                corrective_action=SNAPSHOT_NOT_USABLE,
+                destination=destination,
+                store=store_file,
+            )
+        return SetupReport(
+            stage=SetupStage.INITIALIZE,
+            succeeded=True,
+            memory_changed=True,
+            summary=f"started from normalized snapshot revision {metadata.revision}",
+            choice=choice,
+            destination=destination,
+            store=store_file,
+            revision=metadata.revision,
+        )
+    if recovery is not None:
+        try:
+            imported = import_v1_stream(
+                recovery.path,
+                store_file,
+                expected_source_identity=recovery.source_identity,
+            )
+        except (OSError, UnicodeError, StoreError, SnapshotError) as error:
+            return SetupReport(
+                SetupStage.INITIALIZE,
+                False,
+                False,
+                f"the v1 snapshot could not be imported: {error}",
+                choice,
+                NOTHING_STARTED,
+                destination,
+                store_file,
+            )
+        return SetupReport(
+            SetupStage.INITIALIZE,
+            True,
+            True,
+            imported.summary,
+            choice,
+            destination=destination,
+            store=store_file,
+            revision=0,
+        )
     return _initialize(destination, store_file, initiator, choice, recovery, snapshot)
 
 
@@ -290,7 +357,7 @@ def _revision_if_readable(system: RTGSystem) -> int | None:
     would tell an owner with a system that they have none.
     """
     try:
-        return system.current_state().revision
+        return system.store.current_revision()
     except StoreError:
         return None
 
@@ -300,8 +367,8 @@ def _initialize(
     store_file: Path,
     initiator: str,
     choice: FreshVocabularyChoice,
-    recovery: ImportPreview | None = None,
-    snapshot: SnapshotStart | None = None,
+    recovery: V1StreamPreview | None = None,
+    snapshot: SnapshotInput | None = None,
 ) -> SetupReport:
     try:
         store = CanonicalStore(store_file)
@@ -320,25 +387,14 @@ def _initialize(
         )
     system = RTGSystem(store)
     try:
-        if snapshot is not None:
-            outcome = system.initialize_from_snapshot(
-                snapshot.request,
-                provenance=Provenance(initiator=initiator, source="vellis setup: snapshot"),
-                initialization_summary=start_summary(snapshot),
-            )
-        elif recovery is None:
+        if recovery is None:
             outcome = system.initialize_fresh(
-                choice.definitions,
+                choice.definition_entries,
                 provenance=Provenance(initiator=initiator, source="vellis setup"),
                 initialization_summary=choice.established_summary,
             )
         else:
-            outcome = system.initialize_from_recovery(
-                recovery.candidate.graph,
-                recovery.candidate.active_definitions,
-                provenance=Provenance(initiator=initiator, source="vellis setup: v1 recovery"),
-                initialization_summary=recovery_summary(recovery),
-            )
+            raise AssertionError("v1 recovery is published before opening the destination store")
         if outcome.status is not OperationStatus.ACCEPTED:
             # Refused because this is already a system, or refused for some other reason
             # with nothing established. Telling the second owner to use the system they
@@ -359,7 +415,7 @@ def _initialize(
             stage=SetupStage.INITIALIZE,
             succeeded=True,
             memory_changed=True,
-            summary=outcome.summary,
+            summary=f"{outcome.summary}; {choice.content_summary}",
             destination=destination,
             store=store_file,
             choice=choice,
@@ -428,8 +484,8 @@ def _write_preview(
     stream: TextIO,
     *,
     existing: _Existing | None,
-    recovered: ImportPreview | None = None,
-    started_from: SnapshotStart | None = None,
+    recovered: V1StreamPreview | None = None,
+    started_from: SnapshotInput | None = None,
     unreadable: str | None = None,
     connect_existing: bool = False,
     configure_clients: bool = False,
@@ -438,7 +494,6 @@ def _write_preview(
         (existing is not None and not connect_existing)
         or unreadable is not None
         or _refused(recovered)
-        or (started_from is not None and not started_from.is_acceptable)
     )
     if connect_existing:
         print(
@@ -510,12 +565,12 @@ def _existing_memory(store_file: Path) -> _Existing | None:
     )
 
 
-def _refused(recovered: ImportPreview | None) -> bool:
+def _refused(recovered: V1StreamPreview | None) -> bool:
     """Say whether a recovery has already been decided against."""
     return recovered is not None and not recovered.is_acceptable
 
 
-def _write_recovery(preview: ImportPreview, stream: TextIO) -> None:
+def _write_recovery(preview: V1StreamPreview, stream: TextIO) -> None:
     """Show the exact candidate and report an owner is being asked to confirm.
 
     Every finding is printed, not a count and not a sample. An owner confirming an import
@@ -523,29 +578,16 @@ def _write_recovery(preview: ImportPreview, stream: TextIO) -> None:
     shown is one they did not agree to.
     """
     print("  starting from a Vellis v1 snapshot:", file=stream)
-    for finding in preview.report.findings:
+    for finding in preview.findings:
         print(f"    {finding.disposition.value}: {finding.summary}", file=stream)
 
 
-def _write_snapshot_start(start: SnapshotStart, stream: TextIO) -> None:
-    """Show what beginning from this canonical snapshot would establish, or why it cannot.
-
-    The revision is stated because it is the surprising part: the new lineage starts where
-    that state got to, not at zero, and an owner should learn that here rather than from a
-    history that appears to be missing its beginning.
-    """
-    print("  starting from a Vellis canonical snapshot:", file=stream)
-    state = start.canonical_state
-    if state is None:
-        for finding in start.reconstruction.findings:
-            print(f"    blocking: {finding.summary}", file=stream)
-        return
-    print(f"    the new lineage begins at revision {state.revision}", file=stream)
-    print(f"    later transitions replayed: {start.tail_length}", file=stream)
-    # Everything the permanent record will say this start established, said before it is
-    # agreed to. An owner should not learn from their own history that they accepted more
-    # than the preview named.
-    print(f"    what it establishes: {start_summary(start)}", file=stream)
+def _write_snapshot_start(start: SnapshotInput, stream: TextIO) -> None:
+    """Show the bounded metadata of one verified normalized snapshot."""
+    print("  starting from a normalized Vellis snapshot:", file=stream)
+    print(f"    the new lineage begins at revision {start.metadata.revision}", file=stream)
+    print(f"    normalized rows: {start.metadata.row_count}", file=stream)
+    print(f"    snapshot digest: {start.metadata.digest}", file=stream)
 
 
 def _write_offer(selected: FreshVocabularyChoice, stream: TextIO) -> None:
@@ -683,6 +725,11 @@ def main(
         ),
     )
     parser.add_argument(
+        "--tail",
+        default=None,
+        help="apply one contiguous normalized ledger tail after --from-snapshot",
+    )
+    parser.add_argument(
         "--vocabulary",
         choices=[each.value for each in FreshVocabularyChoice],
         default=None,
@@ -716,6 +763,8 @@ def main(
         parser.error(
             "a system begins from one starting input; pass --from-v1 or --from-snapshot, not both"
         )
+    if arguments.tail is not None and arguments.from_snapshot is None:
+        parser.error("--tail is meaningful only with --from-snapshot")
     if arguments.vocabulary is not None:
         if arguments.from_v1 is not None:
             parser.error("a v1 snapshot carries its own vocabulary, so --vocabulary says nothing")
@@ -734,8 +783,8 @@ def main(
     # A preview that succeeded resolved a destination, so it knows where the store goes.
     assert preview.store is not None
     existing = _existing_memory(preview.store)
-    recovered: ImportPreview | None = None
-    started_from: SnapshotStart | None = None
+    recovered: V1StreamPreview | None = None
+    started_from: SnapshotInput | None = None
     unreadable_snapshot: str | None = None
     unreadable_option = "--from-v1"
     # Only when the destination is free. A destination that already holds memory has
@@ -750,7 +799,10 @@ def main(
         elif arguments.from_snapshot is not None:
             unreadable_option = "--from-snapshot"
             try:
-                started_from = _read_snapshot_document(str(arguments.from_snapshot))
+                started_from = _read_snapshot_stream(
+                    str(arguments.from_snapshot),
+                    None if arguments.tail is None else str(arguments.tail),
+                )
             except SnapshotError as unreadable:
                 unreadable_snapshot = str(unreadable)
     explicit_start = any(
@@ -784,7 +836,7 @@ def main(
                     + (
                         "Vellis v1 system snapshot"
                         if unreadable_option == "--from-v1"
-                        else "Vellis canonical snapshot document"
+                        else "Vellis normalized NDJSON snapshot"
                     )
                     + "; the destination is untouched either way"
                 ),
@@ -818,19 +870,6 @@ def main(
                     "the conditions above have to be resolved in the v1 system and a new "
                     "snapshot taken; nothing here was changed"
                 ),
-            ),
-            error,
-        )
-        return EXIT_FAILED
-    if started_from is not None and not started_from.is_acceptable:
-        # Reconstruction refused it, and every reason is already above. There is nothing
-        # here an answer could change.
-        _write_report(
-            replace(
-                preview,
-                succeeded=False,
-                summary=started_from.reconstruction.summary,
-                corrective_action=SNAPSHOT_NOT_USABLE,
             ),
             error,
         )
@@ -895,13 +934,13 @@ def main(
         # The same re-read, for the same reason: the owner agreed to begin at one exact
         # reconstructed state, and a document that changed since describes another one.
         try:
-            confirmed_start = _read_snapshot_document(str(arguments.from_snapshot))
+            confirmed_start = _read_snapshot_stream(
+                str(arguments.from_snapshot),
+                None if arguments.tail is None else str(arguments.tail),
+            )
         except SnapshotError:
             confirmed_start = None
-        if (
-            confirmed_start is None
-            or confirmed_start.source_identity != started_from.source_identity
-        ):
+        if confirmed_start is None or confirmed_start.metadata != started_from.metadata:
             # A document that is gone and one that is different are both "not the one that
             # was confirmed", but saying the second about the first would describe
             # something that did not happen.
@@ -941,45 +980,30 @@ def main(
     return EXIT_SUCCESS if all(outcome.succeeded for outcome in client_outcomes) else EXIT_FAILED
 
 
-def _read_v1_snapshot(path: str) -> ImportPreview:
-    """Read and analyze one v1 snapshot document, or say why it cannot be read."""
-    try:
-        text = Path(path).read_text(encoding="utf-8")
-    except (OSError, UnicodeError) as error:
-        raise SnapshotError(f"could not read {path}: {error}") from error
-    try:
-        return analyze_v1_snapshot(loads(text))
-    except JsonValueError as error:
-        raise SnapshotError(f"{path} does not hold JSON this can read: {error}") from error
+def _read_v1_snapshot(path: str) -> V1StreamPreview:
+    """Incrementally analyze one v1 snapshot without materializing its graph."""
+    return preview_v1_stream(Path(path))
 
 
-def _read_snapshot_document(path: str) -> SnapshotStart:
-    """Read and reconstruct one canonical snapshot document, or say why it cannot be read.
-
-    A document that is not one at all raises; a document that is one and reconstructs to
-    nothing usable comes back as a start carrying its findings. The difference matters to
-    an owner: the first is the wrong file, the second is the right file with something
-    wrong in it that the system it came from can be asked about.
-    """
+def _read_snapshot_stream(path: str, tail_path: str | None = None) -> SnapshotInput:
+    """Verify one normalized snapshot in temporary SQLite for preview."""
+    source_path = Path(path)
     try:
-        text = Path(path).read_text(encoding="utf-8")
-    except (OSError, UnicodeError) as error:
-        raise SnapshotError(f"could not read {path}: {error}") from error
-    try:
-        return analyze_snapshot_document(loads(text))
-    except JsonValueError as error:
-        raise SnapshotError(f"{path} does not hold JSON this can read: {error}") from error
-    except (ValueError, ArithmeticError, RecursionError) as error:
-        # Wider than ``DecodeError`` on purpose. The state decoders build domain values as
-        # they go, and those raise their own errors — metadata that is not Boolean, a
-        # number no stored value could be — none of which are decode errors and all of
-        # which mean the same thing here: this file is not a document this can read. The
-        # store's own decode path catches exactly this family for exactly this reason,
-        # and a narrower catch here would let one of them out as a traceback where the
-        # model requires a named stage and a corrective action.
-        raise SnapshotError(f"{path} is not a Vellis canonical snapshot document: {error}") from (
-            error
-        )
+        with tempfile.TemporaryDirectory(prefix="vellis-snapshot-preview-") as directory:
+            target = Path(directory) / "preview.sqlite3"
+            with source_path.open("r", encoding="utf-8") as source:
+                if tail_path is None:
+                    metadata = import_ndjson(source, target)
+                else:
+                    with Path(tail_path).open("r", encoding="utf-8") as tail:
+                        metadata = import_ndjson(source, target, tail=tail)
+    except (OSError, UnicodeError, StoreError) as error:
+        raise SnapshotError(f"could not verify {path}: {error}") from error
+    return SnapshotInput(
+        source_path,
+        metadata,
+        None if tail_path is None else Path(tail_path),
+    )
 
 
 if __name__ == "__main__":

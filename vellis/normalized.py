@@ -9,7 +9,7 @@ the public language has no path-level meaning to normalize further.
 from __future__ import annotations
 
 import hashlib
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from decimal import Decimal
 from enum import Enum
 from sqlite3 import Connection
@@ -17,6 +17,7 @@ from sqlite3 import Connection
 from vellis.definitions import (
     AnchorTypeDefinition,
     AssociatedDataTypeDefinition,
+    DefinitionEntry,
     DirectAssociationEnd,
     DirectAssociationMultiplicityConstraint,
     EndpointConstraint,
@@ -38,7 +39,9 @@ __all__ = [
     "definition_entry_digest",
     "definition_identity",
     "definition_identity_from_stats",
-    "insert_definition_set",
+    "insert_definition_entry",
+    "insert_definition_entries",
+    "insert_associated_data_value",
     "insert_object_value",
     "json_storage_fields",
     "json_storage_value",
@@ -228,12 +231,68 @@ def object_identity(value: GraphObject) -> str:
         meaning = (
             ObjectKind.ASSOCIATED_DATA.value,
             common,
-            tuple(sorted(value.anchor_uuids)),
+            semantic_row_summary(sorted(value.anchor_uuids)),
             tuple(sorted(value.properties.items())),
         )
     else:
         meaning = (ObjectKind.LINK.value, common, value.source_uuid, value.target_uuid)
     return semantic_identity(meaning)
+
+
+def insert_associated_data_value(
+    connection: Connection,
+    value_without_anchors: AssociatedDataObject,
+    anchor_rows: Callable[[], Iterable[str]],
+) -> int:
+    """Insert one data value while streaming its potentially high-fanout associations."""
+    anchor_summary = semantic_row_summary(anchor_rows())
+    common = (
+        value_without_anchors.uuid,
+        value_without_anchors.type_key,
+        tuple(sorted(value_without_anchors.system_metadata.members.items())),
+    )
+    identity = semantic_identity(
+        (
+            ObjectKind.ASSOCIATED_DATA.value,
+            common,
+            anchor_summary,
+            tuple(sorted(value_without_anchors.properties.items())),
+        )
+    )
+    existing = connection.execute(
+        "SELECT id FROM object_value WHERE content_identity = ?", (identity,)
+    ).fetchone()
+    if existing is not None:
+        return int(existing[0])
+    cursor = connection.execute(
+        "INSERT INTO object_value"
+        " (content_identity, uuid, object_kind, type_key, display_name, source_uuid, target_uuid)"
+        " VALUES (?, ?, 'associatedData', ?, NULL, NULL, NULL)",
+        (identity, value_without_anchors.uuid, value_without_anchors.type_key),
+    )
+    assert cursor.lastrowid is not None
+    value_id = int(cursor.lastrowid)
+    for ordinal, (name, member) in enumerate(
+        sorted(value_without_anchors.system_metadata.members.items())
+    ):
+        connection.execute(
+            "INSERT INTO object_metadata"
+            " (object_value_id, ordinal, name, json_kind, boolean_value, number_value, text_value)"
+            " VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (value_id, ordinal, name, *json_storage_fields(member)),
+        )
+    connection.executemany(
+        "INSERT INTO object_anchor (object_value_id, ordinal, anchor_uuid) VALUES (?, ?, ?)",
+        ((value_id, ordinal, anchor) for ordinal, anchor in enumerate(anchor_rows())),
+    )
+    for ordinal, (name, member) in enumerate(sorted(value_without_anchors.properties.items())):
+        connection.execute(
+            "INSERT INTO object_property"
+            " (object_value_id, ordinal, name, json_kind, boolean_value, number_value, text_value)"
+            " VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (value_id, ordinal, name, *json_storage_fields(member)),
+        )
+    return value_id
 
 
 def insert_object_value(connection: Connection, value: GraphObject) -> int:
@@ -509,8 +568,11 @@ def verify_normalized_identities(connection: Connection) -> str | None:
     return None
 
 
-def insert_definition_set(connection: Connection, definitions: GraphDefinitionSet) -> str:
+def insert_definition_entry(connection: Connection, definitions: GraphDefinitionSet) -> str:
+    """Normalize exactly one immutable definition entry."""
     accumulator, entry_count = definition_content_stats(definitions)
+    if entry_count != 1:
+        raise ValueError("normalized definition insertion requires exactly one entry")
     identity = definition_identity_from_stats(accumulator, entry_count)
     if connection.execute(
         "SELECT 1 FROM definition_set WHERE identity = ?", (identity,)
@@ -640,6 +702,141 @@ def insert_definition_set(connection: Connection, definitions: GraphDefinitionSe
     return identity
 
 
+def insert_definition_entries(connection: Connection, entries: Iterable[DefinitionEntry]) -> str:
+    """Normalize a streamed definition population into one content-addressed set."""
+    connection.execute(
+        "CREATE TEMP TABLE IF NOT EXISTS normalized_definition_entry"
+        " (ordinal INTEGER PRIMARY KEY, value_set_id TEXT NOT NULL,"
+        " created INTEGER NOT NULL)"
+    )
+    connection.execute("DELETE FROM normalized_definition_entry")
+    accumulator = 0
+    entry_count = 0
+    for ordinal, entry in enumerate(entries):
+        if isinstance(entry, AnchorTypeDefinition):
+            one = GraphDefinitionSet(anchor_types=(entry,))
+        elif isinstance(entry, AssociatedDataTypeDefinition):
+            one = GraphDefinitionSet(associated_data_types=(entry,))
+        elif isinstance(entry, LinkTypeDefinition):
+            one = GraphDefinitionSet(link_types=(entry,))
+        else:
+            one = GraphDefinitionSet(relationship_constraints=(entry,))
+        one_identity = definition_identity(one)
+        existed = connection.execute(
+            "SELECT 1 FROM definition_set WHERE identity = ?", (one_identity,)
+        ).fetchone()
+        value_set_id = insert_definition_entry(connection, one)
+        row = connection.execute(
+            "SELECT content_accumulator, entry_count FROM definition_set WHERE identity = ?",
+            (value_set_id,),
+        ).fetchone()
+        assert row is not None
+        accumulator = (accumulator + int(str(row[0]), 16)) % _IDENTITY_MODULUS
+        entry_count += int(row[1])
+        connection.execute(
+            "INSERT INTO normalized_definition_entry VALUES (?, ?, ?)",
+            (ordinal, value_set_id, int(existed is None)),
+        )
+    summary = f"{accumulator:064x}"
+    identity = definition_identity_from_stats(summary, entry_count)
+    if connection.execute(
+        "SELECT 1 FROM definition_set WHERE identity = ?", (identity,)
+    ).fetchone():
+        _delete_staged_definition_entries(connection, identity)
+        return identity
+    connection.execute(
+        "INSERT INTO definition_set VALUES (?, ?, ?)", (identity, summary, entry_count)
+    )
+    type_occurrence = 0
+    relationship_occurrence = 0
+    for (source_identity,) in connection.execute(
+        "SELECT value_set_id FROM normalized_definition_entry ORDER BY ordinal"
+    ):
+        source_type = connection.execute(
+            "SELECT occurrence, object_kind, type_key, description FROM definition_type"
+            " WHERE definition_set_id = ?",
+            (source_identity,),
+        ).fetchone()
+        if source_type is not None:
+            source_occurrence = int(source_type[0])
+            connection.execute(
+                "INSERT INTO definition_type VALUES (?, ?, ?, ?, ?)",
+                (identity, type_occurrence, *source_type[1:]),
+            )
+            for table, columns in (
+                ("definition_anchor_permission", "occurrence, anchor_type_key"),
+                (
+                    "definition_property_rule",
+                    "occurrence, property_name, required, json_kind, description,"
+                    " minimum_size, maximum_size, lower_kind, lower_value, upper_kind,"
+                    " upper_value, pattern",
+                ),
+                ("definition_endpoint_rule", "description"),
+                ("definition_endpoint_permission", "role, occurrence, type_key"),
+            ):
+                connection.execute(
+                    f"INSERT INTO {table} SELECT ?, ?, {columns} FROM {table}"  # noqa: S608
+                    " WHERE definition_set_id = ? AND type_occurrence = ?",
+                    (identity, type_occurrence, source_identity, source_occurrence),
+                )
+            connection.execute(
+                "INSERT INTO definition_permitted_value"
+                " SELECT ?, ?, property_occurrence, occurrence, json_kind, json_value"
+                " FROM definition_permitted_value WHERE definition_set_id = ?"
+                " AND type_occurrence = ?",
+                (identity, type_occurrence, source_identity, source_occurrence),
+            )
+            type_occurrence += 1
+            continue
+        source_rule = connection.execute(
+            "SELECT occurrence, natural_key, rule_kind, link_type_key, constrained_end,"
+            " lower_bound, upper_bound, description FROM definition_multiplicity_rule"
+            " WHERE definition_set_id = ?",
+            (source_identity,),
+        ).fetchone()
+        assert source_rule is not None
+        source_occurrence = int(source_rule[0])
+        connection.execute(
+            "INSERT INTO definition_multiplicity_rule VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (identity, relationship_occurrence, *source_rule[1:]),
+        )
+        connection.execute(
+            "INSERT INTO definition_multiplicity_participant"
+            " SELECT ?, ?, role, occurrence, type_key"
+            " FROM definition_multiplicity_participant"
+            " WHERE definition_set_id = ? AND rule_occurrence = ?",
+            (identity, relationship_occurrence, source_identity, source_occurrence),
+        )
+        relationship_occurrence += 1
+    _delete_staged_definition_entries(connection, identity)
+    return identity
+
+
+def _delete_staged_definition_entries(connection: Connection, retained_identity: str) -> None:
+    """Remove one-entry construction sets after their rows have been combined."""
+    for (source_value,) in connection.execute(
+        "SELECT DISTINCT value_set_id FROM normalized_definition_entry"
+        " WHERE created = 1 AND value_set_id != ?",
+        (retained_identity,),
+    ):
+        source_identity = str(source_value)
+        for table in (
+            "definition_permitted_value",
+            "definition_property_rule",
+            "definition_anchor_permission",
+            "definition_endpoint_permission",
+            "definition_endpoint_rule",
+            "definition_multiplicity_participant",
+            "definition_multiplicity_rule",
+            "definition_type",
+        ):
+            connection.execute(
+                f"DELETE FROM {table} WHERE definition_set_id = ?",  # noqa: S608
+                (source_identity,),
+            )
+        connection.execute("DELETE FROM definition_set WHERE identity = ?", (source_identity,))
+
+
 def load_definition_set(
     connection: Connection,
     identity: str,
@@ -647,14 +844,30 @@ def load_definition_set(
     type_keys: set[str] | None = None,
     constrained_type_keys: set[str] | None = None,
     relationship_keys: set[str] | None = None,
+    one_entry: bool = False,
 ) -> GraphDefinitionSet:
-    """Load complete or request-local definition meaning from normalized rows.
+    """Load request-local or explicitly one-entry definition meaning.
 
     ``None`` means the complete collection. An explicit set selects only matching
     natural identities. Relationship rules are selected independently by the type keys
     at their constrained participant end, which is the subset an affected-neighborhood
     mutation can make newly false.
     """
+    if (
+        type_keys is None
+        and constrained_type_keys is None
+        and relationship_keys is None
+        and not one_entry
+    ):
+        raise ValueError("complete definition-set materialization is not a production operation")
+    if one_entry:
+        entry = connection.execute(
+            "SELECT entry_count FROM definition_set WHERE identity = ?", (identity,)
+        ).fetchone()
+        if entry is None:
+            raise ValueError(f"unknown definition-set identity {identity!r}")
+        if int(entry[0]) != 1:
+            raise ValueError("definition entry reference names more than one entry")
     if (
         connection.execute(
             "SELECT 1 FROM definition_set WHERE identity = ?", (identity,)

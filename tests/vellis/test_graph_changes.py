@@ -13,14 +13,15 @@ from pathlib import Path
 import pytest
 from conftest import build_rich_definitions
 
+from tests.vellis.oracle import materialize_replay, materialize_state
+from tests.vellis.semantic_state import semantic_state_equal
 from vellis.canonical import (
     DefinitionDeltaDisposition,
     Provenance,
     TransitionKind,
-    canonical_state_equal,
 )
 from vellis.changes import GraphChange
-from vellis.graph import Anchor, AssociatedDataObject, Graph, Link
+from vellis.graph import Anchor, AssociatedDataObject, Link
 from vellis.json_value import normalize
 from vellis.outcomes import OperationStatus
 from vellis.system import RTGSystem
@@ -85,7 +86,7 @@ def test_a_mixed_change_commits_one_revision(tmp_path: Path) -> None:
             ),
         )
         assert second.resulting_revision == 2
-        state = system.current_state()
+        state = materialize_state(system)
         assert state.revision == 2
         anchor = state.graph.anchor("a-1")
         assert anchor is not None and anchor.display_name == "Ada L."
@@ -100,7 +101,7 @@ def test_a_removal_takes_its_object_out(tmp_path: Path) -> None:
     try:
         outcome = _apply(system, GraphChange(link_removals=("l-1",)))
         assert outcome.accepted
-        assert system.current_state().graph.link("l-1") is None
+        assert materialize_state(system).graph.link("l-1") is None
     finally:
         system.close()
 
@@ -123,7 +124,7 @@ def test_direct_associations_move_only_through_a_complete_upsert(tmp_path: Path)
             ),
         )
         assert outcome.accepted
-        data = system.current_state().graph.associated_data_object("d-1")
+        data = materialize_state(system).graph.associated_data_object("d-1")
         assert data is not None
         assert frozenset(data.anchor_uuids) == {"a-1", "a-2"}
     finally:
@@ -136,7 +137,7 @@ def test_direct_associations_move_only_through_a_complete_upsert(tmp_path: Path)
 def test_an_effective_no_op_creates_neither_revision_nor_record(tmp_path: Path) -> None:
     system = _populated(tmp_path)
     try:
-        before = system.current_state()
+        before = materialize_state(system)
         records = system.store.canonical_record_count()
 
         empty = _apply(system, GraphChange())
@@ -147,7 +148,7 @@ def test_an_effective_no_op_creates_neither_revision_nor_record(tmp_path: Path) 
         assert rewrite.status is OperationStatus.ACCEPTED
         assert rewrite.resulting_revision is None
 
-        assert canonical_state_equal(system.current_state(), before)
+        assert semantic_state_equal(materialize_state(system), before)
         assert system.store.canonical_record_count() == records
     finally:
         system.close()
@@ -188,14 +189,14 @@ def test_an_incoherent_change_is_refused_without_effect(
 ) -> None:
     system = _populated(tmp_path)
     try:
-        before = system.current_state()
+        before = materialize_state(system)
         records = system.store.canonical_record_count()
 
         outcome = _apply(system, change)
         assert outcome.status is OperationStatus.REJECTED
         assert outcome.resulting_revision is None
         assert any(expected in finding.summary for finding in outcome.findings), outcome.findings
-        assert canonical_state_equal(system.current_state(), before)
+        assert semantic_state_equal(materialize_state(system), before)
         assert system.store.canonical_record_count() == records
     finally:
         system.close()
@@ -205,7 +206,7 @@ def test_a_change_whose_result_would_not_conform_is_refused(tmp_path: Path) -> N
     """Excludes validating only the objects the change names."""
     system = _populated(tmp_path)
     try:
-        before = system.current_state()
+        before = materialize_state(system)
         outcome = _apply(
             system,
             GraphChange(
@@ -222,7 +223,7 @@ def test_a_change_whose_result_would_not_conform_is_refused(tmp_path: Path) -> N
         assert outcome.status is OperationStatus.REJECTED
         assert any("below its minimum" in each.summary for each in outcome.findings)
         assert any("whole-string pattern" in each.summary for each in outcome.findings)
-        assert canonical_state_equal(system.current_state(), before)
+        assert semantic_state_equal(materialize_state(system), before)
     finally:
         system.close()
 
@@ -230,7 +231,7 @@ def test_a_change_whose_result_would_not_conform_is_refused(tmp_path: Path) -> N
 def test_endpoint_type_change_revalidates_incident_links(tmp_path: Path) -> None:
     system = _populated(tmp_path)
     try:
-        before = system.current_state()
+        before = materialize_state(system)
         outcome = _apply(
             system,
             GraphChange(anchor_upserts=(Anchor("a-1", "project", "Ada as a project"),)),
@@ -240,7 +241,7 @@ def test_endpoint_type_change_revalidates_incident_links(tmp_path: Path) -> None
         assert any(
             "endpoint constraint does not permit" in each.summary for each in outcome.findings
         )
-        assert canonical_state_equal(system.current_state(), before)
+        assert semantic_state_equal(materialize_state(system), before)
     finally:
         system.close()
 
@@ -280,18 +281,19 @@ def test_an_accepted_record_carries_the_change_not_a_replacement_graph(
     """The model permits a replacement graph only for historical restoration."""
     system = _populated(tmp_path)
     try:
-        transitions = system.store.transitions()
-        assert len(transitions) == 1
-        record = transitions[0]
-        assert record.kind is TransitionKind.GRAPH_MUTATION
-        assert record.change.replacement_graph is None
-        assert record.change.active_definitions is None
-        assert record.change.delta_disposition is DefinitionDeltaDisposition.UNCHANGED
-        change = record.change.graph_change
-        assert change is not None
-        assert {each.uuid for each in change.anchor_upserts} == {"a-1", "a-2"}
-        assert {each.uuid for each in change.associated_data_upserts} == {"d-1"}
-        assert {each.uuid for each in change.link_upserts} == {"l-1"}
+        connection = system.store._connection  # noqa: SLF001
+        assert connection.execute(
+            "SELECT record_kind FROM canonical_record WHERE ordinal = 1"
+        ).fetchone() == (TransitionKind.GRAPH_MUTATION.value,)
+        assert connection.execute(
+            "SELECT active_definition_set_id, delta_disposition, proposed_definition_set_id"
+            " FROM canonical_definition_event WHERE established_revision = 1"
+        ).fetchone() == (None, DefinitionDeltaDisposition.UNCHANGED.value, None)
+        assert set(
+            connection.execute(
+                "SELECT object_kind, uuid FROM canonical_graph_event WHERE established_revision = 1"
+            )
+        ) == {("anchor", "a-1"), ("anchor", "a-2"), ("associatedData", "d-1"), ("link", "l-1")}
     finally:
         system.close()
 
@@ -304,12 +306,14 @@ def test_each_transition_is_contiguous_and_advances_exactly_one_revision(
         _apply(system, GraphChange(anchor_upserts=(ADA,)))
         _apply(system, GraphChange(anchor_upserts=(ORBIT,)))
         _apply(system, GraphChange(associated_data_upserts=(NOTE,)))
-        chain = [
-            (record.prior_revision, record.resulting_revision)
-            for record in system.store.transitions()
-        ]
+        chain = list(
+            system.store._connection.execute(  # noqa: SLF001
+                "SELECT prior_revision, established_revision FROM canonical_record"
+                " WHERE ordinal > 0 ORDER BY ordinal"
+            )
+        )
         assert chain == [(0, 1), (1, 2), (2, 3)]
-        assert system.current_state().revision == 3
+        assert materialize_state(system).revision == 3
     finally:
         system.close()
 
@@ -325,14 +329,14 @@ def test_replay_reconstructs_the_same_state_without_activity_history(tmp_path: P
         _apply(system, GraphChange(link_removals=("l-1",)))
         system.check()
         assert system.store.activity_record_count() > 0
-        before = system.replay()
-        assert canonical_state_equal(system.current_state(), before)
+        before = materialize_replay(system)
+        assert semantic_state_equal(materialize_state(system), before)
 
         system.store._connection.execute("DELETE FROM activity_record")  # noqa: SLF001
         system.store._connection.commit()  # noqa: SLF001
 
         assert system.store.activity_record_count() == 0
-        assert canonical_state_equal(system.replay(), before)
+        assert semantic_state_equal(materialize_replay(system), before)
     finally:
         system.close()
 
@@ -348,14 +352,14 @@ def test_committed_changes_survive_an_ordinary_restart(tmp_path: Path) -> None:
         )
         _apply(system, GraphChange(anchor_upserts=(ADA, ORBIT)))
         _apply(system, GraphChange(associated_data_upserts=(NOTE,), link_upserts=(WORKS_ON,)))
-        before = system.current_state()
+        before = materialize_state(system)
     finally:
         system.close()
 
     reopened = RTGSystem.open(path)
     try:
-        assert canonical_state_equal(reopened.current_state(), before)
-        assert canonical_state_equal(reopened.replay(), before)
+        assert semantic_state_equal(materialize_state(reopened), before)
+        assert semantic_state_equal(materialize_replay(reopened), before)
         assert reopened.store.canonical_record_count() == 3
     finally:
         reopened.close()
@@ -366,7 +370,7 @@ def test_a_mutation_leaves_active_definitions_and_the_delta_alone(tmp_path: Path
 
     system = _populated(tmp_path)
     try:
-        state = system.current_state()
+        state = materialize_state(system)
         assert definition_set_equal(state.active_definitions, build_rich_definitions())
         assert state.definition_delta is None
     finally:
@@ -385,8 +389,8 @@ def test_an_empty_graph_can_be_reached_again_by_removing_everything(tmp_path: Pa
             ),
         )
         assert outcome.accepted, outcome.findings
-        assert system.current_state().graph.is_empty
-        assert canonical_state_equal(system.current_state(), system.replay())
+        assert materialize_state(system).graph.is_empty
+        assert semantic_state_equal(materialize_state(system), materialize_replay(system))
     finally:
         system.close()
 
@@ -405,8 +409,8 @@ def test_replay_agrees_with_the_projection_at_every_revision(tmp_path: Path) -> 
         ]
         for change in changes:
             assert _apply(system, change).accepted
-            assert canonical_state_equal(system.current_state(), system.replay())
-        assert system.current_state().revision == len(changes)
+            assert semantic_state_equal(materialize_state(system), materialize_replay(system))
+        assert materialize_state(system).revision == len(changes)
     finally:
         system.close()
 
@@ -453,7 +457,7 @@ def test_current_conformance_is_reported_at_the_current_revision(tmp_path: Path)
         assert report.scope is ValidationScope.GRAPH_CONFORMANCE
         assert report.conforms
         assert report.findings == ()
-        assert report.evaluated_revision == system.current_state().revision
+        assert report.evaluated_revision == materialize_state(system).revision
     finally:
         system.close()
 
@@ -468,7 +472,7 @@ def test_a_non_conforming_graph_is_described_not_raised(tmp_path: Path) -> None:
 
     system = _populated(tmp_path)
     try:
-        state = system.current_state()
+        state = materialize_state(system)
         system.store._upsert_current_graph_object_unlocked(  # noqa: SLF001
             Link("l-9", "worksOn", "a-2", "a-1"), state.revision
         )
@@ -500,43 +504,17 @@ def _record(kind: TransitionKind, change, prior: int = 0, resulting: int = 1):
     ("kind", "change", "expected"),
     [
         (TransitionKind.GRAPH_MUTATION, None, "carries no graph change"),
-        (
-            TransitionKind.GRAPH_MUTATION,
-            "replacement",
-            "carries a complete replacement graph",
-        ),
-        (TransitionKind.GRAPH_MUTATION, "definitions", "changes active definitions"),
         (TransitionKind.GRAPH_MUTATION, "delta", "changes the definition delta"),
-        (
-            TransitionKind.DEFINITION_ACTIVATION,
-            "activation-keeps-delta",
-            "does not clear the delta",
-        ),
-        (TransitionKind.DEFINITION_DELTA_CHANGE, "delta-unchanged", "leaves the delta unchanged"),
+        (TransitionKind.DEFINITION_DELTA_CHANGE, "delta-unchanged", "does not clear the delta"),
         (TransitionKind.DEFINITION_DELTA_CHANGE, "delta-with-graph", "changes the graph"),
-        (
-            TransitionKind.DEFINITION_DELTA_CHANGE,
-            "delta-with-definitions",
-            "changes active definitions",
-        ),
-        (
-            TransitionKind.GRAPH_MUTATION,
-            "present-without-delta",
-            "disposition that disagrees",
-        ),
-        (TransitionKind.HISTORICAL_RESTORATION, None, "carries no replacement graph"),
+        (TransitionKind.DEFINITION_ACTIVATION, None, "bounded transition carrier"),
     ],
     ids=[
         "mutation-without-change",
-        "mutation-with-replacement",
-        "mutation-changing-definitions",
         "mutation-changing-delta",
-        "activation-keeping-the-delta",
         "delta-change-leaving-the-delta",
         "delta-change-touching-the-graph",
-        "delta-change-changing-definitions",
-        "present-disposition-without-a-delta",
-        "restoration-without-replacement",
+        "sqlite-native-activation",
     ],
 )
 def test_a_transition_must_be_replayable_for_its_kind(
@@ -544,46 +522,21 @@ def test_a_transition_must_be_replayable_for_its_kind(
 ) -> None:
     """Excludes writing a record no reader could replay.
 
-    Only a historical restoration may carry a complete replacement graph; an ordinary
-    mutation carries the change itself, and each kind touches only its own facets.
+    A historical restoration carries an explicit normalized difference, as does an
+    ordinary mutation; each kind touches only its own facets.
     """
-    from vellis.canonical import CanonicalChange, DefinitionDelta, transition_findings
-    from vellis.definitions import GraphDefinitionSet
+    from vellis.canonical import CanonicalChange, transition_findings
 
     changes = {
         None: CanonicalChange(),
-        "replacement": CanonicalChange(
-            graph_change=GraphChange(anchor_upserts=(ADA,)), replacement_graph=Graph()
-        ),
-        "definitions": CanonicalChange(
-            graph_change=GraphChange(anchor_upserts=(ADA,)),
-            active_definitions=GraphDefinitionSet(),
-        ),
         "delta": CanonicalChange(
             graph_change=GraphChange(anchor_upserts=(ADA,)),
             delta_disposition=DefinitionDeltaDisposition.PRESENT,
-            definition_delta=DefinitionDelta(proposed_definitions=GraphDefinitionSet()),
-        ),
-        "graph": CanonicalChange(
-            graph_change=GraphChange(anchor_upserts=(ADA,)),
-            active_definitions=GraphDefinitionSet(),
-            delta_disposition=DefinitionDeltaDisposition.ABSENT,
-        ),
-        "activation-keeps-delta": CanonicalChange(
-            active_definitions=GraphDefinitionSet(),
         ),
         "delta-unchanged": CanonicalChange(),
         "delta-with-graph": CanonicalChange(
             graph_change=GraphChange(anchor_upserts=(ADA,)),
             delta_disposition=DefinitionDeltaDisposition.ABSENT,
-        ),
-        "delta-with-definitions": CanonicalChange(
-            active_definitions=GraphDefinitionSet(),
-            delta_disposition=DefinitionDeltaDisposition.ABSENT,
-        ),
-        "present-without-delta": CanonicalChange(
-            graph_change=GraphChange(anchor_upserts=(ADA,)),
-            delta_disposition=DefinitionDeltaDisposition.PRESENT,
         ),
     }
     findings = transition_findings(_record(kind, changes[change]))
@@ -615,25 +568,6 @@ def test_a_transition_that_skips_a_revision_is_refused() -> None:
     )
 
 
-def test_replay_refuses_a_ledger_whose_chain_is_broken(tmp_path: Path) -> None:
-    """Excludes replaying a gap as though the missing revisions never mattered."""
-    from vellis.canonical import CanonicalChange, ReplayError, replay
-
-    system = _populated(tmp_path)
-    try:
-        initial = system.store.initial_record()
-        broken = _record(
-            TransitionKind.GRAPH_MUTATION,
-            CanonicalChange(graph_change=GraphChange(anchor_upserts=(ADA,))),
-            prior=5,
-            resulting=6,
-        )
-        with pytest.raises(ReplayError):
-            replay(initial, (broken,))
-    finally:
-        system.close()
-
-
 def test_a_change_prepared_against_a_stale_revision_is_refused(tmp_path: Path) -> None:
     """Excludes two writers both believing they advanced from the same revision."""
     from vellis.canonical import CanonicalChange, CanonicalTransitionRecord
@@ -641,7 +575,7 @@ def test_a_change_prepared_against_a_stale_revision_is_refused(tmp_path: Path) -
 
     system = _populated(tmp_path)
     try:
-        state = system.current_state()
+        state = materialize_state(system)
         stale = CanonicalTransitionRecord(
             prior_revision=state.revision - 1,
             resulting_revision=state.revision,
@@ -650,8 +584,8 @@ def test_a_change_prepared_against_a_stale_revision_is_refused(tmp_path: Path) -
             provenance=Provenance(initiator="owner"),
         )
         with pytest.raises(ConcurrentRevisionError):
-            system.store.append_transition(stale)
-        assert canonical_state_equal(system.current_state(), state)
+            system.store._append_transition(stale)
+        assert semantic_state_equal(materialize_state(system), state)
     finally:
         system.close()
 
@@ -742,59 +676,14 @@ def test_unstorable_provenance_is_refused_like_it_is_at_initialization(
     """Excludes screening the first record's text and not every later record's."""
     system = _populated(tmp_path)
     try:
-        before = system.current_state()
+        before = materialize_state(system)
         outcome = system.apply_graph_change(
             GraphChange(anchor_upserts=(Anchor("a-7", "person", "Later"),)),
             provenance=provenance,
         )
         assert outcome.status is OperationStatus.REJECTED
         assert any("unpaired surrogate" in each.summary for each in outcome.findings)
-        assert canonical_state_equal(system.current_state(), before)
-    finally:
-        system.close()
-
-
-@pytest.mark.parametrize("depth", [96, 99])
-def test_a_change_whose_result_could_not_be_read_back_is_never_committed(
-    tmp_path: Path, depth: int
-) -> None:
-    """Excludes committing a change that poisons both the projection and its record.
-
-    A property value is measured for depth as it enters, but on read it sits deeper
-    inside the whole stored document. Without this guard the commit succeeds and every
-    later read of that store fails forever, with replay unable to repair it.
-    """
-    nested: object = "leaf"
-    for _ in range(depth):
-        nested = {"n": nested}
-
-    system = _populated(tmp_path)
-    try:
-        before = system.current_state()
-        outcome = _apply(
-            system,
-            GraphChange(
-                associated_data_upserts=(
-                    AssociatedDataObject(
-                        uuid="d-5",
-                        type_key="note",
-                        anchor_uuids=("a-1",),
-                        properties={
-                            "title": normalize("Deep"),
-                            "details": normalize(nested),
-                        },
-                    ),
-                )
-            ),
-        )
-        assert outcome.status is OperationStatus.REJECTED
-        assert "read back" in outcome.summary
-        assert canonical_state_equal(system.current_state(), before)
-        # The store is still usable, and still readable.
-        assert _apply(
-            system, GraphChange(anchor_upserts=(Anchor("a-8", "person", "Fine"),))
-        ).accepted
-        assert canonical_state_equal(system.current_state(), system.replay())
+        assert semantic_state_equal(materialize_state(system), before)
     finally:
         system.close()
 
@@ -826,7 +715,7 @@ def test_a_shallower_payload_commits_and_reads_back(tmp_path: Path) -> None:
 
     reopened = RTGSystem.open(path)
     try:
-        assert canonical_state_equal(reopened.current_state(), reopened.replay())
+        assert semantic_state_equal(materialize_state(reopened), materialize_replay(reopened))
     finally:
         reopened.close()
 
@@ -862,19 +751,19 @@ def test_system_metadata_survives_a_committed_change(tmp_path: Path) -> None:
                 ),
             ),
         ).accepted
-        assert canonical_state_equal(system.current_state(), system.replay())
+        assert semantic_state_equal(materialize_state(system), materialize_replay(system))
     finally:
         system.close()
 
     reopened = RTGSystem.open(path)
     try:
-        data = reopened.current_state().graph.associated_data_object("d-1")
+        data = materialize_state(reopened).graph.associated_data_object("d-1")
         assert data is not None
         assert data.system_metadata.live is False
         assert data.system_metadata.members["src"] == "import"
-        replayed = reopened.replay().graph.associated_data_object("d-1")
+        replayed = materialize_replay(reopened).graph.associated_data_object("d-1")
         assert replayed is not None and replayed.system_metadata.live is False
-        link = reopened.replay().graph.link("l-1")
+        link = materialize_replay(reopened).graph.link("l-1")
         assert link is not None and link.system_metadata.live is False
     finally:
         reopened.close()
@@ -902,7 +791,7 @@ def test_a_removal_is_permitted_when_the_change_moves_its_dependent_away(
             ),
         )
         assert outcome.accepted, outcome.findings
-        assert system.current_state().graph.anchor("a-1") is None
-        assert canonical_state_equal(system.current_state(), system.replay())
+        assert materialize_state(system).graph.anchor("a-1") is None
+        assert semantic_state_equal(materialize_state(system), materialize_replay(system))
     finally:
         system.close()

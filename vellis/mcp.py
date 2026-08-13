@@ -52,6 +52,7 @@ from vellis.changes import GraphChangeRequest
 from vellis.discovery import (
     DefinitionInspectionRequest,
     DefinitionInspectionResult,
+    DefinitionSummaryRequest,
     DefinitionSummaryResult,
 )
 from vellis.governance import (
@@ -59,7 +60,6 @@ from vellis.governance import (
     DefinitionDeltaResult,
     SetDefinitionDeltaRequest,
 )
-from vellis.history import HistoricalSelection
 from vellis.json_value import MAXIMUM_STORED_INTEGER_EXPONENT, JsonValueError
 from vellis.outcomes import (
     OperationStatus,
@@ -68,7 +68,7 @@ from vellis.outcomes import (
     ValidationReport,
     ValidationRequest,
 )
-from vellis.query import EvaluatedStateScope, GraphQuery, GraphQueryResult
+from vellis.query import GraphQuery, GraphQueryResult
 from vellis.store import StoreError
 from vellis.system import RTGSystem
 
@@ -118,16 +118,11 @@ def build_server(system: RTGSystem, *, name: str = "vellis") -> FastMCP:
 
     @server.tool
     def rtg_definition_summary(
-        historical_selection: HistoricalSelection | None = None,
-        state_scope: EvaluatedStateScope = EvaluatedStateScope.CURRENT,
+        request: DefinitionSummaryRequest,
     ) -> DefinitionSummaryResult:
-        """Discover every anchor type active at current or selected historical state."""
+        """Discover shallow definitions in the selected evaluated state."""
         return _result(
-            system.definition_summary(
-                selection=historical_selection,
-                state_scope=state_scope,
-                provenance=_agent(),
-            ),
+            system.definition_summary(request, provenance=_agent()),
             lambda reason: DefinitionSummaryResult(
                 status=OperationStatus.FAILED,
                 summary=f"the summary could not be returned completely: {reason}",
@@ -152,7 +147,7 @@ def build_server(system: RTGSystem, *, name: str = "vellis") -> FastMCP:
 
     @server.tool
     def rtg_definition_delta() -> DefinitionDeltaResult:
-        """Retrieve the complete sole proposal and current assessment, or normal absence."""
+        """Retrieve proposal identities, staged counts, and assessment status, or absence."""
         return _result(
             system.definition_delta(provenance=_agent()),
             lambda reason: DefinitionDeltaResult(
@@ -164,7 +159,7 @@ def build_server(system: RTGSystem, *, name: str = "vellis") -> FastMCP:
 
     @server.tool
     def rtg_query(query: GraphQuery) -> GraphQueryResult:
-        """Query current or selected historical graph meaning with one complete bound."""
+        """Query selected current, prospective, or historical graph meaning with one bound."""
         return _result(
             system.query_graph(query, provenance=_agent()),
             lambda reason: GraphQueryResult(
@@ -185,7 +180,7 @@ def build_server(system: RTGSystem, *, name: str = "vellis") -> FastMCP:
 
     @server.tool
     def rtg_set_definition_delta(request: SetDefinitionDeltaRequest) -> DefinitionDeltaResult:
-        """Create or replace the sole complete proposal and return its current assessment."""
+        """Apply bounded keyed definition edits to the sole proposal."""
         return _result(
             system.set_definition_delta(request.change, provenance=_agent()),
             lambda reason: DefinitionDeltaResult(

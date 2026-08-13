@@ -19,7 +19,9 @@ from pathlib import Path
 import pytest
 from conftest import build_rich_definitions
 
-from vellis.canonical import Provenance
+from tests.vellis.oracle import materialize_replay, materialize_state
+from tests.vellis.semantic_state import semantic_state_equal
+from vellis.canonical import Provenance, now
 from vellis.changes import GraphChange
 from vellis.definitions import (
     AnchorTypeDefinition,
@@ -36,8 +38,8 @@ from vellis.graph import Anchor, AssociatedDataObject
 from vellis.json_value import JsonKind, normalize
 from vellis.normalized import (
     definition_identity,
-    insert_definition_set,
     insert_object_value,
+    load_definition_set,
     load_object_value,
     object_identity,
 )
@@ -102,10 +104,7 @@ def test_normalized_definition_identity_distinguishes_absence_from_empty_text(
     absent = GraphDefinitionSet(anchor_types=(AnchorTypeDefinition("person", None),))
     empty = GraphDefinitionSet(anchor_types=(AnchorTypeDefinition("person", ""),))
     try:
-        assert insert_definition_set(store._connection, absent) != insert_definition_set(  # noqa: SLF001
-            store._connection,
-            empty,  # noqa: SLF001
-        )
+        assert definition_identity(absent) != definition_identity(empty)
     finally:
         store.close()
 
@@ -124,11 +123,30 @@ def test_normalized_definition_identity_frames_endpoint_collections(tmp_path: Pa
         )
 
     try:
-        left = insert_definition_set(store._connection, definitions(("a",), ("b", "c")))  # noqa: SLF001
-        right = insert_definition_set(store._connection, definitions(("a", "b"), ("c",)))  # noqa: SLF001
+        left = definition_identity(definitions(("a",), ("b", "c")))
+        right = definition_identity(definitions(("a", "b"), ("c",)))
         assert left != right
     finally:
         store.close()
+
+
+def test_one_entry_definition_reads_reject_a_multi_entry_identity_before_decode(
+    tmp_path: Path,
+) -> None:
+    system = RTGSystem.open(tmp_path / "vellis.sqlite3")
+    definitions = build_rich_definitions()
+    try:
+        assert system.initialize_fresh(
+            definitions, provenance=Provenance("owner"), initialization_summary="fresh"
+        ).accepted
+        identity = system.store._connection.execute(  # noqa: SLF001
+            "SELECT active_definition_set_id FROM state_head WHERE id = 0"
+        ).fetchone()[0]
+
+        with pytest.raises(ValueError, match="more than one entry"):
+            load_definition_set(system.store._connection, str(identity), one_entry=True)  # noqa: SLF001
+    finally:
+        system.close()
 
 
 def test_normalized_identities_follow_canonical_numeric_equality() -> None:
@@ -222,7 +240,7 @@ def test_a_projection_whose_revision_markers_disagree_is_refused(tmp_path: Path)
     store = CanonicalStore(path)
     try:
         with pytest.raises(StoreError, match="claims revision"):
-            store.current_state()
+            materialize_state(store)
     finally:
         store.close()
 
@@ -267,7 +285,6 @@ def test_a_store_missing_its_tables_reports_a_store_error(tmp_path: Path) -> Non
 
 def test_a_rich_vocabulary_survives_an_ordinary_restart(tmp_path: Path) -> None:
     """Excludes a durability claim proven only with a vocabulary that has no rules."""
-    from vellis.canonical import canonical_state_equal
     from vellis.definitions import definition_set_equal
 
     path = tmp_path / "vellis.sqlite3"
@@ -276,9 +293,9 @@ def test_a_rich_vocabulary_survives_an_ordinary_restart(tmp_path: Path) -> None:
 
     system = RTGSystem.open(path)
     try:
-        state = system.current_state()
+        state = materialize_state(system)
         assert definition_set_equal(state.active_definitions, definitions)
-        assert canonical_state_equal(state, system.replay())
+        assert semantic_state_equal(state, materialize_replay(system))
         restored = state.active_definitions.associated_data_type("note")
         assert restored is not None
         year = next(each for each in restored.property_constraints if each.property_name == "year")
@@ -381,18 +398,12 @@ def test_a_failure_between_the_record_and_the_projection_establishes_nothing(
     two were separate commits, the record would survive; and if the failure left the
     transaction open, the store would be unusable afterwards.
     """
-    from vellis.canonical import CanonicalState, InitialStateRecord, Provenance
-    from vellis.graph import Graph
+    from vellis.canonical import Provenance
 
     path = tmp_path / "vellis.sqlite3"
     store = CanonicalStore(path)
-    record = InitialStateRecord(
-        canonical_state=CanonicalState(
-            graph=Graph(), active_definitions=build_rich_definitions(), revision=0
-        ),
-        initialization_summary="a fresh start",
-        provenance=Provenance(initiator="owner"),
-    )
+    definitions = build_rich_definitions()
+    provenance = Provenance(initiator="owner")
     try:
         blocker = sqlite3.connect(path)
         try:
@@ -405,7 +416,12 @@ def test_a_failure_between_the_record_and_the_projection_establishes_nothing(
             blocker.close()
 
         with pytest.raises(StoreError, match="could not establish canonical state"):
-            store.initialize(record)
+            store.initialize_empty(
+                definitions,
+                provenance=provenance,
+                initialization_summary="a fresh start",
+                recorded_at=now(),
+            )
         assert not store.is_initialized()
         assert store.canonical_record_count() == 0
 
@@ -417,7 +433,12 @@ def test_a_failure_between_the_record_and_the_projection_establishes_nothing(
             remover.close()
 
         # An open transaction left behind by the failure would refuse this.
-        store.initialize(record)
+        store.initialize_empty(
+            definitions,
+            provenance=provenance,
+            initialization_summary="a fresh start",
+            recorded_at=now(),
+        )
         assert store.is_initialized()
         assert store.canonical_record_count() == 1
     finally:
@@ -448,8 +469,8 @@ def test_a_transition_projection_failure_rolls_back_every_table(tmp_path: Path) 
             provenance=Provenance(initiator="owner"),
         )
         assert outcome.status is OperationStatus.FAILED
-        assert system.current_state().revision == 0
-        assert system.current_state().graph.is_empty
+        assert materialize_state(system).revision == 0
+        assert materialize_state(system).graph.is_empty
         assert system.store.canonical_record_count() == 1
 
         remover = sqlite3.connect(path)
@@ -480,7 +501,7 @@ def test_an_unreadable_record_time_is_reported_as_a_store_error(tmp_path: Path) 
     store = CanonicalStore(path)
     try:
         with pytest.raises(StoreError, match="unreadable time"):
-            store.initial_record()
+            store.canonical_summaries()
     finally:
         store.close()
 
@@ -564,7 +585,7 @@ def test_concurrent_initialization_establishes_exactly_one_base(tmp_path: Path) 
     store = CanonicalStore(path)
     try:
         assert store.canonical_record_count() == 1
-        assert store.current_state().revision == 0
+        assert materialize_state(store).revision == 0
     finally:
         store.close()
 
@@ -579,14 +600,12 @@ def test_a_failed_read_is_reported_as_a_store_error_not_a_driver_exception(
     try:
         store._connection.execute("DROP TABLE state_head")  # noqa: SLF001
         with pytest.raises(StoreError, match="could not read"):
-            store.current_state()
+            materialize_state(store)
         with pytest.raises(StoreError, match="could not read"):
             store.is_initialized()
         store._connection.execute("PRAGMA foreign_keys = OFF")  # noqa: SLF001
         store._connection.execute("DROP TABLE canonical_record")  # noqa: SLF001
         with pytest.raises(StoreError, match="could not read"):
-            store.initial_record()
-        with pytest.raises(StoreError, match="could not read"):
-            store.transitions()
+            store.canonical_summaries()
     finally:
         store.close()

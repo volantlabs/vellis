@@ -17,7 +17,9 @@ from pathlib import Path
 import pytest
 from conftest import build_rich_definitions
 
-from vellis.canonical import Provenance, canonical_state_equal
+from tests.vellis.oracle import materialize_state
+from tests.vellis.semantic_state import semantic_state_equal
+from vellis.canonical import Provenance
 from vellis.changes import GraphChange
 from vellis.graph import Anchor, AssociatedDataObject, Graph, Link, SystemMetadata
 from vellis.json_value import normalize
@@ -337,7 +339,7 @@ INVALID: tuple[tuple[str, GraphQuery, str], ...] = (
 def test_an_invalid_query_reports_findings_and_returns_no_rows(
     system: RTGSystem, query: GraphQuery, expected: str
 ) -> None:
-    before = system.current_state()
+    before = materialize_state(system)
     records = system.store.canonical_record_count()
 
     result = system.query_graph(query)
@@ -346,7 +348,7 @@ def test_an_invalid_query_reports_findings_and_returns_no_rows(
     assert result.rows == ()
     assert result.evaluated_revision is None
     assert any(expected in finding.summary for finding in result.findings), result.findings
-    assert canonical_state_equal(system.current_state(), before)
+    assert semantic_state_equal(materialize_state(system), before)
     assert system.store.canonical_record_count() == records
 
 
@@ -385,8 +387,8 @@ def test_a_result_that_cannot_be_returned_completely_is_refused_whole() -> None:
     graph that reached memory another way, and the model is explicit that such a result is
     refused whole rather than quietly shortened.
     """
+    from tests.vellis.oracle import evaluate_query
     from vellis.graph import Graph
-    from vellis.query import evaluate_query
 
     definitions = build_rich_definitions()
     graph = Graph(anchors=(ADA, Anchor(uuid="a-2", type_key="person", display_name="Gr\ud800ce")))
@@ -472,7 +474,7 @@ def test_no_field_of_a_returned_anchor_escapes_the_completeness_screen(
     Each of these reaches a row without passing through ``normalize``, so each is a way an
     imported or repaired graph could hand back a result nothing can encode.
     """
-    from vellis.query import evaluate_query
+    from tests.vellis.oracle import evaluate_query
 
     result = evaluate_query(_query(), build_rich_definitions(), graph_of("Gr\ud800ce"), revision=1)
 
@@ -522,7 +524,7 @@ def test_no_field_of_returned_associated_data_escapes_the_completeness_screen(
     field: str, graph: Graph
 ) -> None:
     """``AssociatedDataObject`` normalizes property values, not their names or its own ids."""
-    from vellis.query import evaluate_query
+    from tests.vellis.oracle import evaluate_query
 
     query = _query(
         data_conditions=(_notes(),),
@@ -561,7 +563,7 @@ def test_no_field_of_a_returned_link_escapes_the_completeness_screen(
     field: str, link: Link
 ) -> None:
     """A projected link carries its endpoints' identities even when neither is projected."""
-    from vellis.query import evaluate_query
+    from tests.vellis.oracle import evaluate_query
 
     graph = Graph(
         anchors=(

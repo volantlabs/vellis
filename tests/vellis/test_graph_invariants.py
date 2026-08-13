@@ -25,7 +25,7 @@ from vellis.definitions import (
 )
 from vellis.graph import Anchor, AssociatedDataObject, Graph, Link, MetadataError, SystemMetadata
 from vellis.json_value import JsonKind, JsonValue, normalize
-from vellis.validation import assess_graph_conformance
+from vellis.validation import assess_object_neighborhood
 
 PERSON = AnchorTypeDefinition(type_key="person", description="A person the owner knows.")
 PROJECT = AnchorTypeDefinition(type_key="project", description="A piece of work.")
@@ -90,7 +90,7 @@ def _note(
 
 
 def _summaries(graph: Graph, definitions: GraphDefinitionSet = DEFINITIONS) -> list[str]:
-    return [finding.summary for finding in assess_graph_conformance(graph, definitions)]
+    return [finding.summary for finding in assess_object_neighborhood(graph.objects(), definitions)]
 
 
 def test_a_conforming_graph_produces_no_findings() -> None:
@@ -318,7 +318,7 @@ def test_system_metadata_live_must_be_boolean() -> None:
 def test_assessment_leaves_the_graph_unchanged() -> None:
     graph = Graph(anchors=(ADA,), associated_data=(_note(),))
     before = (graph.anchors, graph.associated_data, graph.links)
-    assess_graph_conformance(graph, DEFINITIONS)
+    assess_object_neighborhood(graph.objects(), DEFINITIONS)
     assert (graph.anchors, graph.associated_data, graph.links) == before
 
 
@@ -528,21 +528,6 @@ def test_link_multiplicity_counts_associated_data_endpoints() -> None:
         ),
     )
     assert any("outside 0..1" in each for each in _summaries(graph, definitions))
-
-
-def test_a_data_to_data_link_survives_the_round_trip() -> None:
-    """Endpoint kind must not be lost by the stored form either."""
-    from vellis.graph import graph_equal
-    from vellis.serialization import decode_graph, decode_text, encode_graph, encode_text
-
-    graph = Graph(
-        anchors=(ADA,),
-        associated_data=(_note("d-1"), _note("d-2")),
-        links=(Link(uuid="l-1", type_key="cites", source_uuid="d-1", target_uuid="d-2"),),
-    )
-    restored = decode_graph(decode_text(encode_text(encode_graph(graph))))
-    assert graph_equal(restored, graph)
-    assert _summaries(restored, WITH_DATA_LINKS) == []
 
 
 def test_a_multiplicity_rule_says_nothing_about_objects_outside_its_scope() -> None:

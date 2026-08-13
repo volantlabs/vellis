@@ -26,9 +26,10 @@ from pathlib import Path
 
 import pytest
 
-from vellis.canonical import CanonicalState, Provenance
+from tests.vellis.oracle import materialize_everyday_life, materialize_state
+from tests.vellis.semantic_state import SemanticState
+from vellis.canonical import Provenance
 from vellis.definitions import GraphDefinitionSet, definition_set_equal
-from vellis.everyday_life import everyday_life_starter
 from vellis.paths import store_path
 from vellis.setup import (
     EXIT_DECLINED,
@@ -75,16 +76,16 @@ def _selected(output: str) -> str:
     return marked[0]
 
 
-def _state_of(store: Path | None) -> CanonicalState:
+def _state_of(store: Path | None) -> SemanticState:
     assert store is not None
     system = RTGSystem.open(store)
     try:
-        return system.current_state()
+        return materialize_state(system)
     finally:
         system.close()
 
 
-def _state(destination: Path) -> CanonicalState:
+def _state(destination: Path) -> SemanticState:
     return _state_of(store_path(destination.resolve()))
 
 
@@ -217,7 +218,7 @@ def test_the_confirmed_recommendation_establishes_the_starter(tmp_path: Path) ->
     code, out, err = _confirmed_run(["--data-dir", str(destination)])
 
     assert code == EXIT_SUCCESS, err
-    assert definition_set_equal(_state(destination).active_definitions, everyday_life_starter())
+    assert definition_set_equal(_state(destination).active_definitions, materialize_everyday_life())
     assert "current revision: 0" in out
     # An owner is told what they now have, not only that something happened.
     assert "12 anchor types" in out
@@ -235,7 +236,7 @@ def test_the_confirmed_alternative_establishes_nothing_but_an_empty_vocabulary(
     assert "0 anchor types" in out
     active = _state(destination).active_definitions
     assert definition_set_equal(active, GraphDefinitionSet())
-    assert not definition_set_equal(active, everyday_life_starter())
+    assert not definition_set_equal(active, materialize_everyday_life())
 
 
 def test_the_programmatic_default_is_the_recommendation(tmp_path: Path) -> None:
@@ -244,7 +245,9 @@ def test_the_programmatic_default_is_the_recommendation(tmp_path: Path) -> None:
 
     assert report.succeeded, report.summary
     assert report.choice is STARTER
-    assert definition_set_equal(_state_of(report.store).active_definitions, everyday_life_starter())
+    assert definition_set_equal(
+        _state_of(report.store).active_definitions, materialize_everyday_life()
+    )
 
 
 def test_a_successful_report_names_the_choice_it_established(tmp_path: Path) -> None:
@@ -270,7 +273,7 @@ def test_the_record_says_which_vocabulary_was_started(
     assert report.store is not None
     system = RTGSystem.open(report.store)
     try:
-        summary: str = system.initial_record().initialization_summary
+        summary = system.store.canonical_summaries()[0][5]
     finally:
         system.close()
     assert summary == expected
@@ -295,7 +298,7 @@ def test_either_choice_leaves_one_fresh_canonical_base(
     assert report.store is not None
     system = RTGSystem.open(report.store)
     try:
-        state = system.current_state()
+        state = materialize_state(system)
         assert state.graph.is_empty
         assert state.revision == 0
         assert state.definition_delta is None
@@ -725,7 +728,7 @@ def test_a_store_another_process_is_writing_does_not_block_a_beginning(tmp_path:
 
     assert code == EXIT_SUCCESS, err
     assert len(_offer(out)) == 2
-    assert definition_set_equal(_state(destination).active_definitions, everyday_life_starter())
+    assert definition_set_equal(_state(destination).active_definitions, materialize_everyday_life())
 
 
 def test_a_file_carrying_our_own_marker_and_nothing_else_is_a_beginning(tmp_path: Path) -> None:
@@ -872,7 +875,7 @@ def test_a_refusal_survives_a_reading_that_does_not(tmp_path: Path) -> None:
 
     assert not report.succeeded
     assert report.stage == SetupStage.INITIALIZE
-    assert report.revision is None
+    assert report.revision == 0
     assert "use this system as it is" in (report.corrective_action or "")
 
 
@@ -887,7 +890,7 @@ def test_a_start_that_did_not_happen_is_not_reported_as_one_that_did(
         def fails(*arguments: object, **keywords: object) -> None:
             raise StoreError("the disk filled up")
 
-        monkeypatch.setattr(CanonicalStore, "initialize", fails)
+        monkeypatch.setattr(CanonicalStore, "initialize_empty", fails)
     else:
         # A lone surrogate cannot be encoded, so the record's own text cannot be stored.
         initiator = "owner\ud800"
@@ -922,11 +925,11 @@ def test_the_initial_record_says_where_it_came_from(tmp_path: Path) -> None:
     assert report.store is not None
     system = RTGSystem.open(report.store)
     try:
-        provenance = system.initial_record().provenance
+        record = system.store.canonical_summaries()[0]
     finally:
         system.close()
-    assert provenance.initiator == "owner"
-    assert provenance.source == "vellis setup"
+    assert record[3] == "owner"
+    assert record[4] == "vellis setup"
 
 
 @pytest.mark.parametrize("stage", [SetupStage.RESOLVE_DESTINATION, SetupStage.PREPARE_DESTINATION])

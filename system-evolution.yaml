@@ -22,13 +22,13 @@ baselines:
     model: sha256:23a0fa4c525a6e89ec0740c4d4f0af283cccae44abc23b73b99f7427d7c93c7e
     implementation: git:9a68e816e6d0e00bb23719f42b139c8166d24bec
     language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
-    execution_environment: sha256:c24a0bae1e63d1f4923d6c7925925ea4e02743568a84b403677b5f6a718879fa
+    execution_environment: sha256:3315a10b5fcc8d62aa435d2f4e12165a147f334b01fad06ce367d11b6eb8191c
     checkpoint: git:9a68e816e6d0e00bb23719f42b139c8166d24bec
   observed:
     model: sha256:23a0fa4c525a6e89ec0740c4d4f0af283cccae44abc23b73b99f7427d7c93c7e
     implementation: git:9a68e816e6d0e00bb23719f42b139c8166d24bec
     language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
-    execution_environment: sha256:c24a0bae1e63d1f4923d6c7925925ea4e02743568a84b403677b5f6a718879fa
+    execution_environment: sha256:3315a10b5fcc8d62aa435d2f4e12165a147f334b01fad06ce367d11b6eb8191c
     checkpoint: git:9a68e816e6d0e00bb23719f42b139c8166d24bec
 scope:
   authority_scope:
@@ -42,8 +42,9 @@ scope:
     - vellis/definitions.py
     - vellis/graph.py
     - vellis/query.py
-    - vellis/replay.py
-    - vellis/snapshot_document.py
+    - vellis/normalized.py
+    - vellis/streaming.py
+    - vellis/v1_streaming.py
     - vellis/system.py
     - vellis/store.py
     - vellis/serialization.py
@@ -83,7 +84,7 @@ findings:
       - VellisRequirements::durableCanonicalHistory
       - VellisRequirements::historyIndependentCurrentWork
     evidence_refs:
-      - command:uv run pytest tests/vellis/test_serialization.py tests/vellis/test_current_work.py
+      - command:uv run pytest tests/vellis/test_current_work.py tests/vellis/test_graph_changes.py
     disposition: resolved
     owner_work_item_id: W001
     implementation_status: conforming
@@ -129,7 +130,7 @@ findings:
       - VellisRequirements::historyIndependentCurrentWork
       - VellisRequirements::replayEquivalence
     evidence_refs:
-      - command:uv run pytest tests/vellis/test_snapshot_replay.py tests/vellis/test_snapshot_document.py tests/vellis/test_historical_restore.py tests/vellis/test_current_work.py
+      - command:uv run pytest tests/vellis/test_streaming_lifecycle.py tests/vellis/test_historical_restore.py tests/vellis/test_current_work.py
       - command:just model-check
     disposition: accepted
     owner_work_item_id: W002
@@ -145,7 +146,7 @@ findings:
       - VellisRequirements::agentDefinitionDiscoverability
       - VellisRequirements::canonicalSemanticEquality
     evidence_refs:
-      - command:uv run pytest tests/vellis/test_store_integrity.py tests/vellis/test_serialization.py
+      - command:uv run pytest tests/vellis/test_store_integrity.py tests/vellis/test_canonical_equality.py tests/vellis/test_current_work.py
     disposition: resolved
     owner_work_item_id: W003
     implementation_status: conforming
@@ -208,7 +209,7 @@ findings:
       - VellisRequirements::v1SnapshotCompatibility
       - VellisRequirements::canonicalSnapshotCompleteness
     evidence_refs:
-      - command:uv run pytest tests/vellis/test_snapshot_initialization.py tests/vellis/test_v1_recovery.py
+      - command:uv run pytest tests/vellis/test_v1_streaming.py tests/vellis/test_setup_path.py tests/vellis/test_fresh_initialization.py
       - command:just model-check
     disposition: accepted
     owner_work_item_id: W002
@@ -234,7 +235,7 @@ decisions:
       - Ledger append and changed projection facets remain one atomic SQLite transaction.
     implementation_status: conforming
     evidence_refs:
-      - command:uv run pytest tests/vellis/test_current_work.py tests/vellis/test_serialization.py tests/vellis/test_graph_changes.py tests/vellis/test_definition_discovery.py
+      - command:uv run pytest tests/vellis/test_current_work.py tests/vellis/test_graph_changes.py tests/vellis/test_definition_discovery.py
   - id: D002
     summary: SQLite stores normalized active, prospective, historical, assessment, and canonical-ledger meaning as the live Vellis realization.
     authority_refs:
@@ -360,7 +361,7 @@ work_items:
     lifecycle: complete
     implementation_status: conforming
     evidence_refs:
-      - command:uv run pytest tests/vellis/test_current_work.py tests/vellis/test_serialization.py tests/vellis/test_graph_changes.py tests/vellis/test_definition_discovery.py
+      - command:uv run pytest tests/vellis/test_current_work.py tests/vellis/test_graph_changes.py tests/vellis/test_definition_discovery.py
     blocker: null
     checkpoint: git:096d548af4a744aa60a6bacafa74d3d0b58b7fe1
   - id: W002

@@ -12,7 +12,9 @@ from pathlib import Path
 
 import pytest
 
-from vellis.canonical import Provenance, canonical_state_equal
+from tests.vellis.oracle import materialize_replay, materialize_state
+from tests.vellis.semantic_state import semantic_state_equal
+from vellis.canonical import Provenance
 from vellis.changes import GraphChange
 from vellis.definitions import (
     AnchorTypeDefinition,
@@ -332,12 +334,12 @@ def test_a_revision_that_moved_between_the_two_reads_is_visible_to_the_caller(
 def test_discovery_changes_no_canonical_state(tmp_path: Path) -> None:
     system = _system(tmp_path)
     try:
-        before = system.current_state()
+        before = materialize_state(system)
         records = system.store.canonical_record_count()
         system.definition_summary()
         system.inspect_definitions(DefinitionInspectionRequest(("person",)))
         system.inspect_definitions(DefinitionInspectionRequest(("ghost",)))
-        assert canonical_state_equal(system.current_state(), before)
+        assert semantic_state_equal(materialize_state(system), before)
         assert system.store.canonical_record_count() == records
     finally:
         system.close()
@@ -944,42 +946,18 @@ def test_a_link_rule_brings_the_data_types_at_its_constrained_end_too(
 def test_the_summary_reports_a_delta_that_is_present(tmp_path: Path) -> None:
     """Excludes a delta-presence flag that is always false.
 
-    The delta is staged here by writing the transition directly, because the operation
-    that stages one belongs to a later slice. The shallow read still has to report it:
-    an agent continuing definition work decides whether to retrieve the proposal from
-    exactly this flag.
+    The shallow read reports proposal presence without returning a whole proposal.
     """
-    from vellis.canonical import (
-        CanonicalChange,
-        CanonicalTransitionRecord,
-        DefinitionDelta,
-        DefinitionDeltaDisposition,
-        TransitionKind,
-    )
+    from vellis.governance import DefinitionChange
 
     system = _system(tmp_path)
     try:
         assert system.definition_summary().delta_present is False
 
-        state = system.current_state()
-        proposed = GraphDefinitionSet(
-            anchor_types=(*VOCABULARY.anchor_types, AnchorTypeDefinition("team", "A group.")),
-            associated_data_types=VOCABULARY.associated_data_types,
-            link_types=VOCABULARY.link_types,
-            relationship_constraints=VOCABULARY.relationship_constraints,
-        )
-        delta = DefinitionDelta(proposed_definitions=proposed)
-        system.store.append_transition(
-            CanonicalTransitionRecord(
-                prior_revision=state.revision,
-                resulting_revision=state.revision + 1,
-                kind=TransitionKind.DEFINITION_DELTA_CHANGE,
-                change=CanonicalChange(
-                    delta_disposition=DefinitionDeltaDisposition.PRESENT,
-                    definition_delta=delta,
-                ),
-                provenance=Provenance(initiator="owner"),
-            )
+        state = materialize_state(system)
+        assert system.set_definition_delta(
+            DefinitionChange(anchor_type_upserts=(AnchorTypeDefinition("team", "A group."),)),
+            provenance=Provenance(initiator="owner"),
         )
 
         result = system.definition_summary()
@@ -991,7 +969,7 @@ def test_the_summary_reports_a_delta_that_is_present(tmp_path: Path) -> None:
             each.type_key for each in VOCABULARY.anchor_types
         }
         # And replay agrees, so the staged delta is really in the ledger.
-        assert canonical_state_equal(system.current_state(), system.replay())
+        assert semantic_state_equal(materialize_state(system), materialize_replay(system))
     finally:
         system.close()
 

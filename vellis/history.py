@@ -22,26 +22,16 @@ use it.
 
 from __future__ import annotations
 
-from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import datetime
 
-from vellis.canonical import (
-    CanonicalState,
-    CanonicalTransitionRecord,
-    DefinitionDelta,
-    DefinitionDeltaDisposition,
-)
-from vellis.definitions import GraphDefinitionSet
 from vellis.outcomes import ValidationFinding
 
 __all__ = [
-    "EvaluatedDefinitions",
     "MAXIMUM_REVISION",
     "HistoricalSelection",
     "RevisionSelection",
     "TimeSelection",
-    "definitions_through",
     "selection_findings",
 ]
 
@@ -66,14 +56,6 @@ HistoricalSelection = RevisionSelection | TimeSelection
 MAXIMUM_REVISION = 2**63 - 1
 
 
-@dataclass(frozen=True, slots=True)
-class EvaluatedDefinitions:
-    """The vocabulary in force at one revision, and whether a proposal stood then."""
-
-    active_definitions: GraphDefinitionSet
-    delta_present: bool
-
-
 def selection_findings(selection: HistoricalSelection) -> tuple[ValidationFinding, ...]:
     """Return every reason a selector cannot be resolved before the ledger is consulted."""
     if isinstance(selection, RevisionSelection) and not (
@@ -90,26 +72,3 @@ def selection_findings(selection: HistoricalSelection) -> tuple[ValidationFindin
     if isinstance(selection, TimeSelection) and selection.time.tzinfo is None:
         return (ValidationFinding(summary="a time selector must say which zone it is in"),)
     return ()
-
-
-def definitions_through(
-    base: CanonicalState, transitions: Sequence[CanonicalTransitionRecord]
-) -> EvaluatedDefinitions:
-    """Rebuild the vocabulary from definition-changing records alone.
-
-    ``transitions`` carries only the records that touched definitions, so this walks what
-    changed the answer rather than everything that happened. Delta presence is part of the
-    answer: an agent reading a historical summary needs to know a proposal stood then,
-    even though it can only retrieve the current one.
-    """
-    active = base.active_definitions
-    delta: DefinitionDelta | None = base.definition_delta
-    for record in transitions:
-        change = record.change
-        if change.active_definitions is not None:
-            active = change.active_definitions
-        if change.delta_disposition is DefinitionDeltaDisposition.PRESENT:
-            delta = change.definition_delta
-        elif change.delta_disposition is DefinitionDeltaDisposition.ABSENT:
-            delta = None
-    return EvaluatedDefinitions(active_definitions=active, delta_present=delta is not None)

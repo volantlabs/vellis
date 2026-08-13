@@ -5,7 +5,9 @@ from pathlib import Path
 import pytest
 
 from tests.vellis.evolution_support import activate_clean_delta, stage_complete_fixture
-from vellis.canonical import Provenance, canonical_state_equal
+from tests.vellis.oracle import materialize_definitions, materialize_replay, materialize_state
+from tests.vellis.semantic_state import semantic_state_equal
+from vellis.canonical import Provenance
 from vellis.changes import GraphChange
 from vellis.definitions import (
     AnchorTypeDefinition,
@@ -64,7 +66,7 @@ def test_staging_creates_the_sole_proposal_and_advances_one_revision(tmp_path: P
         result = stage_complete_fixture(system, WIDER, provenance=OWNER)
         assert result.accepted and result.resulting_revision == 1
         assert result.proposed_definition_identity is not None
-        assert definition_set_equal(system.store.definition_view(prospective=True)[1], WIDER)
+        assert definition_set_equal(materialize_definitions(system, prospective=True), WIDER)
     finally:
         system.close()
 
@@ -101,7 +103,7 @@ def test_a_valid_activation_replaces_the_active_set_and_clears_the_proposal(
         assert stage_complete_fixture(system, WIDER, provenance=OWNER).accepted
         activated = activate_clean_delta(system, provenance=OWNER)
         assert activated.accepted
-        assert definition_set_equal(system.store.definition_view()[1], WIDER)
+        assert definition_set_equal(materialize_definitions(system), WIDER)
         assert system.definition_delta().proposed_definition_identity is None
     finally:
         system.close()
@@ -144,11 +146,11 @@ def test_proposal_work_changes_neither_graph_nor_active_definitions(tmp_path: Pa
         assert system.apply_graph_change(
             GraphChange(anchor_upserts=(Anchor("a", "person", "Ada"),)), provenance=OWNER
         ).accepted
-        before_graph = system.current_state().graph
-        before_definitions = system.store.definition_view()[1]
+        before_graph = materialize_state(system).graph
+        before_definitions = materialize_definitions(system)
         assert stage_complete_fixture(system, WIDER, provenance=OWNER).accepted
-        assert system.current_state().graph == before_graph
-        assert definition_set_equal(system.store.definition_view()[1], before_definitions)
+        assert materialize_state(system).graph == before_graph
+        assert definition_set_equal(materialize_definitions(system), before_definitions)
     finally:
         system.close()
 
@@ -178,7 +180,7 @@ def test_replay_carries_a_standing_proposal_across_a_graph_mutation(tmp_path: Pa
         assert system.apply_graph_change(
             GraphChange(anchor_upserts=(Anchor("a", "person", "Ada"),)), provenance=OWNER
         ).accepted
-        assert canonical_state_equal(system.store.replay(), system.current_state())
+        assert semantic_state_equal(materialize_replay(system.store), materialize_state(system))
     finally:
         system.close()
 
@@ -188,7 +190,7 @@ def test_the_whole_arc_replays_from_the_ledger_alone(tmp_path: Path) -> None:
     try:
         assert stage_complete_fixture(system, WIDER, provenance=OWNER).accepted
         assert activate_clean_delta(system, provenance=OWNER).accepted
-        assert canonical_state_equal(system.store.replay(), system.current_state())
+        assert semantic_state_equal(materialize_replay(system.store), materialize_state(system))
     finally:
         system.close()
 
@@ -262,7 +264,7 @@ def test_a_commit_that_cannot_be_appended_reports_failure_without_effect(
 ) -> None:
     system = _system(tmp_path)
     try:
-        before = system.current_state()
+        before = materialize_state(system)
         monkeypatch.setattr(
             system.store,
             "_append_proposal_transition_unlocked",
@@ -272,7 +274,7 @@ def test_a_commit_that_cannot_be_appended_reports_failure_without_effect(
             DefinitionChange(anchor_type_upserts=(PROJECT,)), provenance=OWNER
         )
         assert result.status is OperationStatus.FAILED
-        assert canonical_state_equal(system.current_state(), before)
+        assert semantic_state_equal(materialize_state(system), before)
     finally:
         system.close()
 
@@ -295,7 +297,7 @@ def test_the_whole_proposal_can_be_compared_with_focused_active_views(tmp_path: 
     system = _system(tmp_path)
     try:
         assert stage_complete_fixture(system, WIDER, provenance=OWNER).accepted
-        proposal = system.store.definition_view(prospective=True)[1]
+        proposal = materialize_definitions(system, prospective=True)
         assert {value.type_key for value in proposal.anchor_types} == {"person", "project"}
         assert system.definition_summary().delta_present is True
     finally:

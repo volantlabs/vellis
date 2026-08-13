@@ -28,6 +28,7 @@ collaborators.
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import replace
 from datetime import datetime
 from pathlib import Path
@@ -46,39 +47,32 @@ from vellis.activity import (
 )
 from vellis.canonical import (
     CanonicalChange,
-    CanonicalState,
     CanonicalTransitionRecord,
     DefinitionDeltaDisposition,
-    InitialStateRecord,
     Provenance,
-    ReplayError,
     TransitionKind,
     now,
-    replay,
     transition_findings,
 )
 from vellis.changes import GraphChange, GraphChangeRequest, GraphChangeTarget
-from vellis.definitions import (
-    GraphDefinitionSet,
-)
+from vellis.definitions import DefinitionEntry
 from vellis.discovery import (
     AnchorDefinitionDetail,
+    AnchorTypeSummary,
     DefinitionInspectionRequest,
     DefinitionInspectionResult,
+    DefinitionSummaryRequest,
     DefinitionSummaryResult,
     anchor_neighborhood,
     inspection_findings,
-    summarize_anchor_types,
 )
 from vellis.governance import (
     ActivateDefinitionDeltaRequest,
     DefinitionChange,
     DefinitionDeltaResult,
 )
-from vellis.graph import Graph
 from vellis.history import (
     MAXIMUM_REVISION,
-    EvaluatedDefinitions,
     HistoricalSelection,
     RevisionSelection,
     selection_findings,
@@ -94,21 +88,11 @@ from vellis.outcomes import (
     ValidationScope,
 )
 from vellis.query import EvaluatedStateScope, GraphQuery, GraphQueryResult
-from vellis.replay import (
-    CanonicalSnapshot,
-    LedgerTail,
-    ReconstructionResult,
-    ReplayRequest,
-    SnapshotResult,
-    reconstruct,
-    record_identity,
-    state_findings,
-)
-from vellis.serialization import unreadable_change_reason, unreadable_reason
 from vellis.store import (
     AlreadyInitializedError,
     CanonicalStore,
     ConcurrentRevisionError,
+    InvalidInitialDefinitionsError,
     NotInitializedError,
     ProposalState,
     StoreError,
@@ -147,30 +131,11 @@ class RTGSystem:
     def is_initialized(self) -> bool:
         return self._store.is_initialized()
 
-    def current_state(self) -> CanonicalState:
-        """Return the current canonical-state projection.
-
-        This is one projection of replay through the final canonical record, never
-        parallel authority, and it is read without traversing history.
-        """
-        return self._store.current_state()
-
-    def _working_state(self) -> CanonicalState:
-        """Materialize the durable SQLite projection for graph-bearing domain work."""
-        return self._store.current_state()
-
-    def replay(self) -> CanonicalState:
-        """Reconstruct canonical state from the ledger itself."""
-        return self._store.replay()
-
-    def initial_record(self) -> InitialStateRecord:
-        return self._store.initial_record()
-
     # --- Initialization -------------------------------------------------------------
 
     def initialize_fresh(
         self,
-        initial_definitions: GraphDefinitionSet,
+        initial_definitions: Iterable[DefinitionEntry],
         *,
         provenance: Provenance,
         initialization_summary: str,
@@ -182,171 +147,50 @@ class RTGSystem:
         transitions, and an empty activity ledger. Refusal establishes no partial
         canonical or activity state.
         """
-        return self._establish(
-            CanonicalState(
-                graph=Graph(),
-                active_definitions=initial_definitions,
-                revision=0,
-                definition_delta=None,
-            ),
-            provenance=provenance,
-            initialization_summary=initialization_summary,
-        )
-
-    def _establish(
-        self,
-        state: CanonicalState,
-        *,
-        provenance: Provenance,
-        initialization_summary: str,
-    ) -> RevisionedOutcome:
-        """Write one initial record and its projection, or establish nothing.
-
-        Shared by both ways of starting, because what it means to have a history base is
-        the same either way: one record containing the whole of it, and no claim about
-        anything before.
-        """
         record_findings = _unstorable_record_text(provenance, initialization_summary)
         if record_findings:
             return RevisionedOutcome(
                 status=OperationStatus.REJECTED,
                 summary=(
-                    "the record's own text cannot be stored; no canonical state was established"
+                    "the initial definitions were not established "
+                    f"({len(record_findings)} findings)"
                 ),
                 findings=record_findings,
             )
-        if not 0 <= state.revision <= MAXIMUM_REVISION:
-            # A base outside what a revision can be would be a history nothing could
-            # name: below zero no selector reaches it, and above the ledger's range the
-            # next transition could never be written.
-            return RevisionedOutcome(
-                status=OperationStatus.REJECTED,
-                summary=(
-                    f"revision {state.revision} is not one a ledger can hold; no canonical "
-                    "state was established"
-                ),
-                findings=(
-                    ValidationFinding(
-                        summary=f"a history base names a committed revision, not {state.revision}"
-                    ),
-                ),
-            )
-        unsound = state_findings(state)
-        if unsound:
-            return RevisionedOutcome(
-                status=OperationStatus.REJECTED,
-                summary=(
-                    f"the state is not one this system could have committed "
-                    f"({len(unsound)} findings); no canonical state was established"
-                ),
-                findings=unsound,
-            )
-        unreadable = unreadable_reason(state)
-        if unreadable is not None:
-            return RevisionedOutcome(
-                status=OperationStatus.REJECTED,
-                summary=(
-                    "this state could not be read back after storage, so it was not established"
-                ),
-                findings=(ValidationFinding(summary=unreadable),),
-            )
-        record = InitialStateRecord(
-            canonical_state=state,
-            initialization_summary=initialization_summary,
-            provenance=provenance,
-            recorded_at=now(),
-        )
         try:
-            self._store.initialize(record)
-        except (StoreError, OSError) as error:
-            if not isinstance(error, AlreadyInitializedError):
-                return RevisionedOutcome(
-                    status=OperationStatus.FAILED,
-                    summary=f"no canonical state was established: {error}",
-                    findings=(ValidationFinding(summary=str(error)),),
-                )
-            # The store decides "already established" inside its own transaction, so this
-            # is the only check on the path; a pre-check here would be a second, racier one.
+            self._store.initialize_empty(
+                iter(initial_definitions),
+                provenance=provenance,
+                initialization_summary=initialization_summary,
+                recorded_at=now(),
+            )
+        except AlreadyInitializedError:
             return RevisionedOutcome(
-                status=OperationStatus.REJECTED,
-                summary=(
-                    "canonical state is already established; initialization applies only to "
-                    "an RTG with no established state"
-                ),
+                OperationStatus.REJECTED,
+                "canonical state is already established; initialization applies only to an RTG"
+                " with no established state",
                 findings=(
                     ValidationFinding(
                         summary="this RTG already has an established canonical state"
                     ),
                 ),
             )
-        return RevisionedOutcome(
-            status=OperationStatus.ACCEPTED,
-            summary=(
-                f"established revision {state.revision} with "
-                f"{_vocabulary_summary(state.active_definitions)}"
-            ),
-            resulting_revision=state.revision,
-        )
-
-    def initialize_from_snapshot(
-        self,
-        request: ReplayRequest,
-        *,
-        provenance: Provenance,
-        initialization_summary: str,
-    ) -> RevisionedOutcome:
-        """Begin a new lineage from a state that already existed somewhere else.
-
-        The reconstructed state becomes this system's history base at the revision it
-        reached, not at zero. Renumbering it would claim the transitions that produced it,
-        and this ledger does not have them; keeping the revision says plainly that the
-        history starts partway through.
-
-        No starting vocabulary is offered or overlaid. A snapshot already carries one, and
-        a fresh-start choice on top of it would be answering a question the owner already
-        answered.
-        """
-        result = reconstruct(request)
-        if result.canonical_state is None:
+        except InvalidInitialDefinitionsError as error:
             return RevisionedOutcome(
-                status=result.status,
-                summary=result.summary,
-                findings=result.findings,
+                OperationStatus.REJECTED,
+                f"the initial definitions were not established ({len(error.findings)} findings)",
+                findings=error.findings,
             )
-        return self._establish(
-            result.canonical_state,
-            provenance=provenance,
-            initialization_summary=initialization_summary,
-        )
-
-    def initialize_from_recovery(
-        self,
-        graph: Graph,
-        active_definitions: GraphDefinitionSet,
-        *,
-        provenance: Provenance,
-        initialization_summary: str,
-    ) -> RevisionedOutcome:
-        """Begin at revision 0 from content recovered somewhere Vellis cannot replay.
-
-        Unlike a snapshot of this system's own kind, a recovery candidate carries no
-        history to inherit: what came before it happened in a system whose ledger this one
-        never had and could not read. So the lineage starts at zero — not because the
-        content is new, but because this is the first thing that ever happened here.
-
-        The graph arrives unchanged. Whether it can be held at all was settled while the
-        candidate was formed, and is asked again here for the same reason every other
-        write asks: what establishes state decides whether it may.
-        """
-        return self._establish(
-            CanonicalState(
-                graph=graph,
-                active_definitions=active_definitions,
-                revision=0,
-                definition_delta=None,
-            ),
-            provenance=provenance,
-            initialization_summary=initialization_summary,
+        except (StoreError, OSError) as error:
+            return RevisionedOutcome(
+                OperationStatus.FAILED,
+                f"no canonical state was established: {error}",
+                findings=(ValidationFinding(summary=str(error)),),
+            )
+        return RevisionedOutcome(
+            OperationStatus.ACCEPTED,
+            "established revision 0 with the streamed initial definitions",
+            resulting_revision=0,
         )
 
     # --- Change -----------------------------------------------------------------------
@@ -468,9 +312,8 @@ class RTGSystem:
 
     def definition_summary(
         self,
+        request: DefinitionSummaryRequest | None = None,
         *,
-        selection: HistoricalSelection | None = None,
-        state_scope: EvaluatedStateScope = EvaluatedStateScope.CURRENT,
         provenance: Provenance = UNATTRIBUTED,
     ) -> DefinitionSummaryResult:
         """Return every anchor type active at the current or a selected state.
@@ -479,6 +322,9 @@ class RTGSystem:
         were evaluated at, which is how a caller notices that the definitions moved
         between the two reads.
         """
+        selected_request = DefinitionSummaryRequest() if request is None else request
+        selection = selected_request.historical_selection
+        state_scope = selected_request.state_scope
         if state_scope is EvaluatedStateScope.PROSPECTIVE:
             if selection is not None:
                 result = DefinitionSummaryResult(
@@ -495,7 +341,7 @@ class RTGSystem:
                 )
                 return result
             try:
-                revision, definitions, _ = self._store.definition_view(prospective=True)
+                revision, rows, _ = self._store.definition_summary_rows(prospective=True)
             except StoreError as error:
                 result = DefinitionSummaryResult(
                     OperationStatus.REJECTED,
@@ -512,8 +358,8 @@ class RTGSystem:
                 return result
             result = DefinitionSummaryResult(
                 OperationStatus.ACCEPTED,
-                f"{len(definitions.anchor_types)} prospective anchor types",
-                anchor_types=summarize_anchor_types(definitions),
+                f"{len(rows)} prospective anchor types",
+                anchor_types=tuple(AnchorTypeSummary(*row) for row in rows),
                 evaluated_revision=revision,
                 delta_present=True,
             )
@@ -566,7 +412,7 @@ class RTGSystem:
             )
             return result
         try:
-            revision, definitions, delta_present = self._store.definition_view()
+            revision, rows, delta_present = self._store.definition_summary_rows()
         except StoreError as error:
             failed = DefinitionSummaryResult(
                 status=OperationStatus.FAILED,
@@ -583,8 +429,8 @@ class RTGSystem:
             return failed
         result = DefinitionSummaryResult(
             status=OperationStatus.ACCEPTED,
-            summary=f"{len(definitions.anchor_types)} active anchor types",
-            anchor_types=summarize_anchor_types(definitions),
+            summary=f"{len(rows)} active anchor types",
+            anchor_types=tuple(AnchorTypeSummary(*row) for row in rows),
             evaluated_revision=revision,
             delta_present=delta_present,
         )
@@ -647,7 +493,9 @@ class RTGSystem:
                     findings=(ValidationFinding(summary="state selection is inconsistent"),),
                 )
             try:
-                revision, definitions, _ = self._store.definition_view(prospective=True)
+                revision, definitions, _ = self._store.definition_neighborhood(
+                    request.anchor_type_keys, prospective=True
+                )
             except StoreError as error:
                 return DefinitionInspectionResult(
                     OperationStatus.REJECTED,
@@ -673,7 +521,9 @@ class RTGSystem:
                     findings=(ValidationFinding(summary="no historical selection was provided"),),
                 )
             try:
-                revision, definitions, _ = self._store.definition_view()
+                revision, definitions, _ = self._store.definition_neighborhood(
+                    request.anchor_type_keys
+                )
             except StoreError as error:
                 return DefinitionInspectionResult(
                     status=OperationStatus.FAILED,
@@ -876,18 +726,8 @@ class RTGSystem:
                 summary="the resulting transition could not be replayed; nothing was committed",
                 findings=invalid,
             )
-        unreadable = unreadable_change_reason(change)
-        if unreadable is not None:
-            return RevisionedOutcome(
-                status=OperationStatus.REJECTED,
-                summary=(
-                    "the resulting state could not be read back after storage, so it was not "
-                    "committed"
-                ),
-                findings=(ValidationFinding(summary=unreadable),),
-            )
         try:
-            self._store.append_transition(record)
+            self._store._append_transition(record)  # noqa: SLF001 - system owns store commits
         except ConcurrentRevisionError as error:
             # Another writer got there first. The request was well formed and nothing was
             # committed, so this is a refusal the caller can act on by reading and
@@ -1133,16 +973,6 @@ class RTGSystem:
             )
         return resolved, ()
 
-    def _definitions_at(self, revision: int) -> EvaluatedDefinitions:
-        """Read the normalized vocabulary in force without replaying graph work."""
-        active, delta_present = self._store.definitions_at_revision(revision)
-        return EvaluatedDefinitions(active, delta_present)
-
-    def _state_at(self, revision: int) -> CanonicalState:
-        """Rebuild complete state at one revision. A graph needs its transitions."""
-        base = self._store.initial_record()
-        return replay(base, self._store.transitions_through(revision))
-
     def _historical_summary(self, selection: HistoricalSelection) -> DefinitionSummaryResult:
         try:
             return self._summary_at(selection)
@@ -1164,16 +994,13 @@ class RTGSystem:
                 summary=f"the selected state could not be resolved ({len(findings)} findings)",
                 findings=findings,
             )
-        evaluated = self._definitions_at(revision)
+        _, rows, delta_present = self._store.definition_summary_rows(revision=revision)
         return DefinitionSummaryResult(
             status=OperationStatus.ACCEPTED,
-            summary=(
-                f"{len(evaluated.active_definitions.anchor_types)} anchor types at "
-                f"revision {revision}"
-            ),
-            anchor_types=summarize_anchor_types(evaluated.active_definitions),
+            summary=(f"{len(rows)} anchor types at revision {revision}"),
+            anchor_types=tuple(AnchorTypeSummary(*row) for row in rows),
             evaluated_revision=revision,
-            delta_present=evaluated.delta_present,
+            delta_present=delta_present,
         )
 
     def _historical_inspection(
@@ -1200,7 +1027,9 @@ class RTGSystem:
                 request=request,
                 findings=findings,
             )
-        definitions = self._definitions_at(revision).active_definitions
+        _, definitions, _ = self._store.definition_neighborhood(
+            request.anchor_type_keys, revision=revision
+        )
         findings = inspection_findings(request, definitions)
         if findings:
             return DefinitionInspectionResult(
@@ -1227,7 +1056,7 @@ class RTGSystem:
     ) -> GraphQueryResult:
         try:
             return self._query_at(query, selection)
-        except (StoreError, ReplayError) as error:
+        except StoreError as error:
             # A ledger that cannot be replayed is a failure to answer, not an answer.
             return GraphQueryResult(
                 status=OperationStatus.FAILED,
@@ -1273,110 +1102,6 @@ class RTGSystem:
             evaluated_revision=metadata.revision,
         )
         return metadata
-
-    def create_snapshot(self, *, provenance: Provenance = UNATTRIBUTED) -> SnapshotResult:
-        """Capture complete canonical state, bound to the record that established it.
-
-        Reads nothing it does not return and changes nothing at all: a capture that moved
-        the revision would be capturing a state that no longer existed by the time it
-        finished.
-        """
-        try:
-            state, initial, transitions, ledger_identity = self._store.snapshot_basis()
-            captured = record_identity(initial, follows=ledger_identity)
-            for transition in transitions:
-                captured = record_identity(transition, follows=captured)
-        except NotInitializedError as error:
-            result = SnapshotResult(
-                status=OperationStatus.REJECTED,
-                summary="no canonical state is established; initialize this RTG first",
-                findings=(ValidationFinding(summary=str(error)),),
-            )
-        except StoreError as error:
-            result = SnapshotResult(
-                status=OperationStatus.FAILED,
-                summary=f"the snapshot could not be captured: {error}",
-                findings=(ValidationFinding(summary=str(error)),),
-            )
-        else:
-            result = SnapshotResult(
-                status=OperationStatus.ACCEPTED,
-                summary=f"captured revision {state.revision}",
-                snapshot=CanonicalSnapshot(canonical_state=state, captured_through=captured),
-            )
-        self._observe(
-            "snapshot",
-            result.status,
-            scope="complete canonical state",
-            summary=result.summary,
-            provenance=provenance,
-            evaluated_revision=None if result.snapshot is None else result.snapshot.revision,
-        )
-        return result
-
-    def base_identity(self) -> str:
-        """Return the identity of this ledger's own history base."""
-        return record_identity(self._store.initial_record(), follows=self._store.ledger_identity())
-
-    def _identity_through(self, record: CanonicalTransitionRecord | None) -> str:
-        """Walk the chain to the identity of ``record``, or of the base when it is None."""
-        identity = self.base_identity()
-        if record is None:
-            return identity
-        for each in self._store.transitions():
-            identity = record_identity(each, follows=identity)
-            if each.resulting_revision == record.resulting_revision:
-                return identity
-        raise StoreError("the record establishing the current revision is not in the ledger")
-
-    def ledger_tail(self, *, after: int) -> LedgerTail:
-        """Return the contiguous run of transitions following revision ``after``.
-
-        The preceding record is named by its chained identity, so a tail taken from here
-        cannot be joined onto another history that happens to sit at the same revision.
-        An ``after`` no record established is refused rather than answered with a tail
-        that says it follows something it does not.
-        """
-        base = self._store.initial_record()
-        identity = self.base_identity()
-        transitions = self._store.transitions()
-        start: int | None = None
-        preceding = identity
-        if after == base.canonical_state.revision:
-            start = 0
-        for index, each in enumerate(transitions):
-            identity = record_identity(each, follows=identity)
-            if start is None and each.resulting_revision == after:
-                start, preceding = index + 1, identity
-        if start is None:
-            raise ValueError(f"no record in this ledger established revision {after}")
-        return LedgerTail(
-            preceding_record=preceding,
-            transitions=transitions[start:],
-            final_record=identity,
-        )
-
-    def reconstruct_state(
-        self, request: ReplayRequest, *, provenance: Provenance = UNATTRIBUTED
-    ) -> ReconstructionResult:
-        """Rebuild canonical state from a base and an optional tail.
-
-        Live state is neither read nor moved: the answer comes entirely from what the
-        caller supplied, which is what makes it a check of the ledger rather than of
-        this system's memory.
-        """
-        result = reconstruct(request)
-        self._observe(
-            "reconstruction",
-            result.status,
-            scope="a supplied base and tail",
-            summary=result.summary,
-            provenance=provenance,
-            evaluated_revision=(
-                None if result.canonical_state is None else result.canonical_state.revision
-            ),
-        )
-        return result
 
     # --- History ------------------------------------------------------------------------
 
@@ -1727,15 +1452,6 @@ def _unstorable_record_text(
         if reason is not None:
             findings.append(ValidationFinding(summary=f"the {label} {reason}"))
     return tuple(findings)
-
-
-def _vocabulary_summary(definitions: GraphDefinitionSet) -> str:
-    return (
-        f"{len(definitions.anchor_types)} anchor types, "
-        f"{len(definitions.associated_data_types)} associated-data types, "
-        f"{len(definitions.link_types)} link types, and "
-        f"{len(definitions.relationship_constraints)} relationship constraints"
-    )
 
 
 def _proposal_result(

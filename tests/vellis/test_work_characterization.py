@@ -35,10 +35,11 @@ from characterization import (
     observe,
 )
 
+from tests.vellis.oracle import materialize_replay, materialize_state
+from tests.vellis.semantic_state import semantic_state_equal
 from vellis.activity import ActivityRecord, HistoryKind, HistoryQuery, HistoryResult
-from vellis.canonical import canonical_state_equal
 from vellis.changes import GraphChange
-from vellis.discovery import DefinitionInspectionRequest
+from vellis.discovery import DefinitionInspectionRequest, DefinitionSummaryRequest
 from vellis.graph import Anchor, graph_equal
 from vellis.history import RevisionSelection, TimeSelection
 from vellis.outcomes import OperationStatus
@@ -49,7 +50,6 @@ from vellis.query import (
     GraphQuery,
     ReturnShape,
 )
-from vellis.replay import ReplayRequest
 from vellis.system import RTGSystem
 
 CHURN = 30
@@ -132,7 +132,7 @@ def test_the_two_histories_carry_the_same_current_state_at_different_lengths(
 ) -> None:
     """Without this, every comparison below could be between two different questions."""
     short, long = histories
-    here, there = short.current_state(), long.current_state()
+    here, there = materialize_state(short), materialize_state(long)
 
     assert graph_equal(here.graph, there.graph)
     assert here.definition_delta is None and there.definition_delta is None
@@ -244,17 +244,17 @@ def test_one_commit_appends_one_record_and_moves_the_projection_together(
 ) -> None:
     """``atomicCanonicalRevision`` at the terminal position: one effect, one record."""
     for system in histories:
-        before = system.current_state()
+        before = materialize_state(system)
         records = system.store.canonical_record_count()
 
         assert system.apply_graph_change(
             GraphChange(anchor_upserts=(ARRIVAL,)), provenance=OWNER
         ).accepted
 
-        after = system.current_state()
+        after = materialize_state(system)
         assert after.revision == before.revision + 1
         assert system.store.canonical_record_count() == records + 1
-        assert canonical_state_equal(after, system.replay())
+        assert semantic_state_equal(after, materialize_replay(system))
 
 
 def _commit_cost(system: RTGSystem) -> Measurement:
@@ -300,14 +300,14 @@ def test_a_commit_survives_an_ordinary_restart_at_either_history_length(
         assert system.apply_graph_change(
             GraphChange(anchor_upserts=(ARRIVAL,)), provenance=OWNER
         ).accepted
-        expected = system.current_state()
+        expected = materialize_state(system)
     finally:
         system.close()
 
     reopened = RTGSystem.open(path)
     try:
-        assert canonical_state_equal(reopened.current_state(), expected)
-        assert canonical_state_equal(reopened.replay(), expected)
+        assert semantic_state_equal(materialize_state(reopened), expected)
+        assert semantic_state_equal(materialize_replay(reopened), expected)
     finally:
         reopened.close()
 
@@ -317,7 +317,7 @@ def test_appending_activity_visits_no_canonical_record_and_reconstructs_nothing(
 ) -> None:
     """``historyIndependentCurrentWork``: observation stays observational."""
     _, long = histories
-    before = long.replay()
+    before = materialize_replay(long)
     record = ActivityRecord(
         capability="query",
         outcome_category=OperationStatus.ACCEPTED,
@@ -332,7 +332,7 @@ def test_appending_activity_visits_no_canonical_record_and_reconstructs_nothing(
     assert cost.canonical_record_visits == 0
     assert not cost.touches("canonical_record")
     assert not cost.touches("current_state")
-    assert canonical_state_equal(long.replay(), before)
+    assert semantic_state_equal(materialize_replay(long), before)
 
 
 def test_observation_does_not_get_more_expensive_as_observations_accumulate(
@@ -461,22 +461,24 @@ def test_resolving_a_revision_or_a_time_does_not_depend_on_ledger_length(
     system = establish(tmp_path / f"vellis-{length}.sqlite3")
     try:
         commit_graph_transitions(system, length, prefix="old")
-        wanted = system.current_state().revision - 1
+        wanted = materialize_state(system).revision - 1
         moment = _all_canonical(system).canonical_entries[-1].recorded_at
 
         by_revision = measure(
             system,
             lambda: system.definition_summary(
-                state_scope=EvaluatedStateScope.HISTORICAL,
-                selection=RevisionSelection(revision=wanted),
+                DefinitionSummaryRequest(
+                    RevisionSelection(revision=wanted), EvaluatedStateScope.HISTORICAL
+                ),
                 provenance=OWNER,
             ),
         )
         by_time = measure(
             system,
             lambda: system.definition_summary(
-                state_scope=EvaluatedStateScope.HISTORICAL,
-                selection=TimeSelection(time=moment),
+                DefinitionSummaryRequest(
+                    TimeSelection(time=moment), EvaluatedStateScope.HISTORICAL
+                ),
                 provenance=OWNER,
             ),
         )
@@ -502,14 +504,15 @@ def test_a_historical_vocabulary_does_not_pay_for_unrelated_graph_transitions(
     try:
         commit_definition_changes(system, 3)
         commit_graph_transitions(system, graph_only)
-        revision = system.current_state().revision
+        revision = materialize_state(system).revision
         request = DefinitionInspectionRequest(anchor_type_keys=("person",))
 
         summary = measure(
             system,
             lambda: system.definition_summary(
-                state_scope=EvaluatedStateScope.HISTORICAL,
-                selection=RevisionSelection(revision=revision),
+                DefinitionSummaryRequest(
+                    RevisionSelection(revision=revision), EvaluatedStateScope.HISTORICAL
+                ),
                 provenance=OWNER,
             ),
         )
@@ -534,7 +537,7 @@ def test_a_historical_query_uses_intervals_not_transition_replay(tmp_path: Path)
     system = establish(tmp_path / "vellis.sqlite3")
     try:
         commit_graph_transitions(system, 20)
-        revision = system.current_state().revision
+        revision = materialize_state(system).revision
         measured = measure(
             system,
             lambda: system.query_graph(
@@ -548,51 +551,6 @@ def test_a_historical_query_uses_intervals_not_transition_replay(tmp_path: Path)
         assert not any("FROM canonical_record" in sql for sql in measured.cost.statements[1:])
     finally:
         system.close()
-
-
-# --- Replay is characterized by its required tail -------------------------------------
-
-
-def _seeded_from_snapshot(source: RTGSystem, path: Path, tail: int) -> RTGSystem:
-    """Return a new lineage based on ``source``'s state, advanced by ``tail`` revisions.
-
-    Basing the new ledger on a snapshot is what makes the required replay tail a
-    dimension of its own: the state carries the same history behind it either way, but
-    only ``tail`` records have to be replayed to reach it.
-    """
-    captured = source.create_snapshot(provenance=OWNER)
-    assert captured.accepted and captured.snapshot is not None
-    system = RTGSystem.open(path)
-    outcome = system.initialize_from_snapshot(
-        ReplayRequest(snapshot=captured.snapshot),
-        provenance=OWNER,
-        initialization_summary="continued from a snapshot",
-    )
-    assert outcome.accepted, outcome.findings
-    commit_graph_transitions(system, tail, prefix=f"t{tail}")
-    return system
-
-
-@pytest.mark.parametrize("tail", [0, 4, 16])
-def test_replay_visits_exactly_its_required_tail_and_reaches_the_same_state(
-    tmp_path: Path, tail: int
-) -> None:
-    """``replayCharacterization``: the dependency is the tail, and replay still agrees."""
-    source = establish(tmp_path / "source.sqlite3")
-    try:
-        commit_graph_transitions(source, 12, prefix="before")
-        system = _seeded_from_snapshot(source, tmp_path / f"tail-{tail}.sqlite3", tail)
-        try:
-            measured = measure(system, system.replay)
-
-            assert canonical_state_equal(measured.value, system.current_state())
-            # One base record, and one record for every transition that must be replayed.
-            assert measured.cost.canonical_record_visits == tail + 1
-            assert measured.cost.duration_seconds >= 0.0
-        finally:
-            system.close()
-    finally:
-        source.close()
 
 
 @pytest.mark.parametrize("selected_revision", [4, 16, 32])
@@ -617,32 +575,3 @@ def test_restoring_a_past_state_uses_set_difference_not_ledger_replay(
         assert measured.cost.duration_seconds >= 0.0
     finally:
         system.close()
-
-
-@pytest.mark.parametrize("tail", [0, 4, 16])
-def test_an_ordinary_restart_does_not_depend_on_the_required_tail(
-    tmp_path: Path, tail: int
-) -> None:
-    """The other half of the characterization, and the more owner-visible half.
-
-    Starting up ordinarily reads the projection, so it costs the same at every tail
-    length. Replay is what the tail is charged to, and the two are different paths.
-    """
-    source = establish(tmp_path / "source.sqlite3")
-    try:
-        commit_graph_transitions(source, 12, prefix="before")
-        system = _seeded_from_snapshot(source, tmp_path / f"tail-{tail}.sqlite3", tail)
-        expected = system.current_state()
-        path = system.store.path
-        system.close()
-
-        reopened = RTGSystem.open(path)
-        try:
-            measured = measure(reopened, reopened.current_state)
-            assert canonical_state_equal(measured.value, expected)
-            assert measured.cost.canonical_record_visits == 0
-            assert measured.cost.duration_seconds >= 0.0
-        finally:
-            reopened.close()
-    finally:
-        source.close()

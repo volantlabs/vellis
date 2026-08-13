@@ -11,12 +11,12 @@ Every case uses a temporary destination; none touches the platform default.
 from __future__ import annotations
 
 import io
-from decimal import Decimal
 from pathlib import Path
 
 import pytest
 
-from vellis.canonical import canonical_state_equal
+from tests.vellis.oracle import materialize_replay, materialize_state
+from tests.vellis.semantic_state import semantic_state_equal
 from vellis.paths import (
     DATA_DIRECTORY_VARIABLE,
     DestinationError,
@@ -147,8 +147,8 @@ def test_setup_establishes_one_local_system(tmp_path: Path) -> None:
     system = RTGSystem.open(report.store)
     try:
         assert system.is_initialized
-        assert system.current_state().revision == 0
-        assert system.current_state().graph.is_empty
+        assert materialize_state(system).revision == 0
+        assert materialize_state(system).graph.is_empty
     finally:
         system.close()
 
@@ -161,7 +161,7 @@ def test_a_second_attempt_fails_actionably_and_leaves_memory_unchanged(tmp_path:
 
     system = RTGSystem.open(first.store)
     try:
-        before = system.current_state()
+        before = materialize_state(system)
     finally:
         system.close()
 
@@ -173,8 +173,8 @@ def test_a_second_attempt_fails_actionably_and_leaves_memory_unchanged(tmp_path:
 
     system = RTGSystem.open(first.store)
     try:
-        assert canonical_state_equal(system.current_state(), before)
-        assert canonical_state_equal(system.replay(), before)
+        assert semantic_state_equal(materialize_state(system), before)
+        assert semantic_state_equal(materialize_replay(system), before)
         assert system.store.canonical_record_count() == 1
     finally:
         system.close()
@@ -303,31 +303,27 @@ def test_only_an_explicit_yes_proceeds(tmp_path: Path, answer: str) -> None:
 # --- Beginning from a canonical snapshot ----------------------------------------------
 
 
-def _snapshot_document(tmp_path: Path, name: str = "snapshot.json") -> Path:
-    """One document holding a real capture, written where an owner would bring it.
-
-    It carries one anchor, so the document has stored graph content for the cases below
-    to reach; an empty graph would leave whole decode branches unexercised.
-    """
+def _snapshot_document(tmp_path: Path, name: str = "snapshot.ndjson") -> Path:
+    """Write one normalized streaming capture where an owner would bring it."""
+    from tests.vellis.oracle import materialize_everyday_life
     from vellis.canonical import Provenance
     from vellis.changes import GraphChange
-    from vellis.everyday_life import everyday_life_starter
     from vellis.graph import Anchor
-    from vellis.snapshot_document import write_snapshot_document
+    from vellis.streaming import export_ndjson
 
-    source = RTGSystem.open(tmp_path / f"source-{name}.sqlite3")
+    source_path = tmp_path / f"source-{name}.sqlite3"
+    source = RTGSystem.open(source_path)
     try:
         owner = Provenance(initiator="owner")
         assert source.initialize_fresh(
-            everyday_life_starter(), provenance=owner, initialization_summary="a fresh start"
+            materialize_everyday_life(), provenance=owner, initialization_summary="a fresh start"
         ).accepted
         assert source.apply_graph_change(
             GraphChange(anchor_upserts=(Anchor("a-1", "life.person", "Ada"),)), provenance=owner
         ).accepted
-        captured = source.create_snapshot(provenance=owner)
-        assert captured.snapshot is not None
         document = tmp_path / name
-        write_snapshot_document(document, captured.snapshot)
+        with document.open("w", encoding="utf-8") as output:
+            export_ndjson(source_path, output)
         return document
     finally:
         source.close()
@@ -363,10 +359,8 @@ def test_two_starting_inputs_are_refused(tmp_path: Path) -> None:
         )
 
 
-def test_a_file_that_is_not_a_snapshot_document_is_an_actionable_failure(
-    tmp_path: Path,
-) -> None:
-    not_one = tmp_path / "notes.json"
+def test_a_file_that_is_not_a_snapshot_stream_is_an_actionable_failure(tmp_path: Path) -> None:
+    not_one = tmp_path / "notes.ndjson"
     not_one.write_text('{"hello": "world"}', encoding="utf-8")
 
     code, _, err = _run(
@@ -379,16 +373,14 @@ def test_a_file_that_is_not_a_snapshot_document_is_an_actionable_failure(
     assert not (tmp_path / "new").exists()
 
 
-def test_a_snapshot_that_changed_after_it_was_previewed_is_not_the_one_confirmed(
-    tmp_path: Path,
-) -> None:
+def test_a_snapshot_that_changed_after_preview_is_not_the_one_confirmed(tmp_path: Path) -> None:
     """The owner agreed to one exact reconstructed state, not to whatever the file holds.
 
     Confirming re-reads the document, so a file rewritten between the preview and the
     answer is a different start that nobody has seen.
     """
     document = _snapshot_document(tmp_path)
-    replacement = _snapshot_document(tmp_path, name="other.json")
+    replacement = _snapshot_document(tmp_path, name="other.ndjson")
     destination = tmp_path / "new"
 
     stdout, stderr = io.StringIO(), io.StringIO()
@@ -412,62 +404,102 @@ def test_a_snapshot_that_changed_after_it_was_previewed_is_not_the_one_confirmed
     assert not store_path(destination.resolve()).exists()
 
 
-def test_a_snapshot_document_holding_a_value_that_is_not_one_is_an_actionable_failure(
-    tmp_path: Path,
+def test_the_published_import_is_bound_to_the_confirmed_snapshot_bytes(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Excludes a traceback where the model requires a stage and a corrective action.
-
-    The state decoders build domain values as they read, and those refuse in their own
-    words rather than as decode errors. A file whose stored metadata is a number is a
-    file this cannot read, and has to arrive as that answer.
-    """
-    from vellis.json_value import dumps, loads
+    import vellis.setup as setup
 
     document = _snapshot_document(tmp_path)
-    content = loads(document.read_text(encoding="utf-8"))
-    assert isinstance(content, dict)
-    snapshot = content["snapshot"]
-    assert isinstance(snapshot, dict)
-    state = snapshot["canonicalState"]
-    assert isinstance(state, dict)
-    graph = state["graph"]
-    assert isinstance(graph, dict)
-    anchors = graph["anchors"]
-    assert isinstance(anchors, list) and anchors
-    anchor = anchors[0]
-    assert isinstance(anchor, dict)
-    anchor["systemMetadata"] = {"live": Decimal(5)}
-    document.write_text(dumps(content), encoding="utf-8")
+    replacement = _snapshot_document(tmp_path, name="replacement.ndjson")
     destination = tmp_path / "new"
+    original = setup.import_ndjson
+    calls = 0
 
-    code, _, err = _run(["--data-dir", str(destination), "--from-snapshot", str(document), "--yes"])
+    def replace_before_publication(*args: object, **kwargs: object) -> object:
+        nonlocal calls
+        calls += 1
+        if calls == 3:
+            document.write_text(replacement.read_text(encoding="utf-8"), encoding="utf-8")
+        return original(*args, **kwargs)  # type: ignore[arg-type]
 
+    monkeypatch.setattr(setup, "import_ndjson", replace_before_publication)
+    code, _out, error = _run(
+        ["--data-dir", str(destination), "--from-snapshot", str(document), "--yes"]
+    )
     assert code == EXIT_FAILED
-    assert "what to do next:" in err
-    assert not destination.exists()
+    assert "confirmed input" in error
+    assert not store_path(destination.resolve()).exists()
 
 
-def test_a_snapshot_revision_no_ledger_could_hold_creates_no_destination(tmp_path: Path) -> None:
-    """Refused before the question is put, so nothing is created to be cleaned up."""
-    from vellis.json_value import dumps, loads
-
+def test_a_normalized_snapshot_initializes_the_selected_destination(tmp_path: Path) -> None:
     document = _snapshot_document(tmp_path)
-    content = loads(document.read_text(encoding="utf-8"))
-    assert isinstance(content, dict)
-    snapshot = content["snapshot"]
-    assert isinstance(snapshot, dict)
-    state = snapshot["canonicalState"]
-    assert isinstance(state, dict)
-    state["revision"] = Decimal(-3)
-    document.write_text(dumps(content), encoding="utf-8")
     destination = tmp_path / "new"
 
     code, out, err = _run(
         ["--data-dir", str(destination), "--from-snapshot", str(document), "--yes"]
     )
 
-    assert code == EXIT_FAILED
-    assert "Vellis setup cannot prepare a system here." in out
-    assert "not one a ledger can hold" in out
-    assert "what to do next:" in err
-    assert not destination.exists()
+    assert code == EXIT_SUCCESS, err
+    assert "normalized Vellis snapshot" in out
+    system = RTGSystem.open(store_path(destination.resolve()))
+    try:
+        assert system.store.current_revision() == 1
+    finally:
+        system.close()
+
+
+def test_a_normalized_snapshot_plus_contiguous_tail_initializes_the_later_state(
+    tmp_path: Path,
+) -> None:
+    from vellis.canonical import Provenance
+    from vellis.changes import GraphChange
+    from vellis.definitions import AnchorTypeDefinition, GraphDefinitionSet
+    from vellis.graph import Anchor
+    from vellis.streaming import export_ndjson, export_tail_ndjson
+
+    source_path = tmp_path / "source.sqlite3"
+    snapshot = tmp_path / "snapshot.ndjson"
+    tail = tmp_path / "tail.ndjson"
+    source = RTGSystem.open(source_path)
+    try:
+        owner = Provenance("owner")
+        assert source.initialize_fresh(
+            GraphDefinitionSet(anchor_types=(AnchorTypeDefinition("person", "A person."),)),
+            provenance=owner,
+            initialization_summary="fresh",
+        ).accepted
+        with snapshot.open("w", encoding="utf-8") as output:
+            captured = export_ndjson(source_path, output)
+        assert source.apply_graph_change(
+            GraphChange(anchor_upserts=(Anchor("a-1", "person", "Ada"),)),
+            provenance=owner,
+        ).accepted
+        with tail.open("w", encoding="utf-8") as output:
+            export_tail_ndjson(
+                source_path,
+                output,
+                after_revision=captured.revision,
+                after_record_identity=captured.record_identity,
+            )
+    finally:
+        source.close()
+
+    destination = tmp_path / "new"
+    code, _out, error = _run(
+        [
+            "--data-dir",
+            str(destination),
+            "--from-snapshot",
+            str(snapshot),
+            "--tail",
+            str(tail),
+            "--yes",
+        ]
+    )
+    assert code == EXIT_SUCCESS, error
+    imported = RTGSystem.open(store_path(destination.resolve()))
+    try:
+        assert imported.store.current_revision() == 1
+        assert materialize_state(imported).graph.anchor("a-1") is not None
+    finally:
+        imported.close()

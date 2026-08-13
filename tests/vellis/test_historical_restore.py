@@ -16,9 +16,12 @@ import pytest
 from conftest import build_rich_definitions
 
 from tests.vellis.evolution_support import activate_clean_delta, stage_complete_fixture
-from vellis.canonical import Provenance, TransitionKind, canonical_state_equal, now
+from tests.vellis.oracle import materialize_replay, materialize_state
+from tests.vellis.semantic_state import semantic_state_equal
+from vellis.canonical import Provenance, TransitionKind, now
 from vellis.changes import GraphChange
 from vellis.definitions import AnchorTypeDefinition, GraphDefinitionSet
+from vellis.discovery import DefinitionSummaryRequest
 from vellis.graph import Anchor, graph_equal
 from vellis.history import RevisionSelection, TimeSelection
 from vellis.outcomes import OperationStatus
@@ -54,7 +57,7 @@ def system(tmp_path: Path):
     assert system.apply_graph_change(
         GraphChange(anchor_removals=("a-1",)), provenance=_owner()
     ).accepted
-    assert system.current_state().revision == 3
+    assert materialize_state(system).revision == 3
     try:
         yield system
     finally:
@@ -63,8 +66,11 @@ def system(tmp_path: Path):
 
 def _records(system: RTGSystem):
     return tuple(
-        (record.prior_revision, record.resulting_revision, record.kind)
-        for record in system.store.transitions()
+        (int(prior), int(revision), TransitionKind(str(kind)))
+        for prior, revision, kind in system.store._connection.execute(  # noqa: SLF001
+            "SELECT prior_revision, established_revision, record_kind FROM canonical_record"
+            " WHERE ordinal > 0 ORDER BY ordinal"
+        )
     )
 
 
@@ -77,7 +83,7 @@ def test_restoring_commits_the_selected_state_as_a_new_revision(system: RTGSyste
 
     assert outcome.accepted, outcome.findings
     assert outcome.resulting_revision == 4
-    current = system.current_state()
+    current = materialize_state(system)
     assert current.revision == 4
     assert {anchor.uuid for anchor in current.graph.anchors} == {"a-1", "a-2"}
     assert current.definition_delta is None
@@ -97,14 +103,14 @@ def test_every_earlier_record_is_left_exactly_as_it_was(system: RTGSystem) -> No
 
 def test_the_restored_state_can_itself_be_left_behind(system: RTGSystem) -> None:
     """An owner who went back by mistake is not stuck there."""
-    before = system.current_state()
+    before = materialize_state(system)
 
     assert system.restore_historical_state(RevisionSelection(1), provenance=_owner()).accepted
-    assert system.current_state().graph.anchor("a-2") is None
+    assert materialize_state(system).graph.anchor("a-2") is None
 
     assert system.restore_historical_state(RevisionSelection(3), provenance=_owner()).accepted
 
-    restored = system.current_state()
+    restored = materialize_state(system)
     assert restored.revision == 5
     assert graph_equal(restored.graph, before.graph)
 
@@ -121,14 +127,14 @@ def test_restoring_by_time_selects_the_same_state(system: RTGSystem) -> None:
     )
     assert system.restore_historical_state(TimeSelection(at_two), provenance=_owner()).accepted
 
-    assert {anchor.uuid for anchor in system.current_state().graph.anchors} == {"a-1", "a-2"}
+    assert {anchor.uuid for anchor in materialize_state(system).graph.anchors} == {"a-1", "a-2"}
 
 
 def test_a_restored_state_replays_from_the_ledger(system: RTGSystem) -> None:
     """A restoration is an ordinary record: replay reaches the same place."""
     assert system.restore_historical_state(RevisionSelection(1), provenance=_owner()).accepted
 
-    assert canonical_state_equal(system.current_state(), system.replay())
+    assert semantic_state_equal(materialize_state(system), materialize_replay(system))
 
 
 def test_a_restoration_survives_an_ordinary_restart(tmp_path: Path) -> None:
@@ -142,14 +148,14 @@ def test_a_restoration_survives_an_ordinary_restart(tmp_path: Path) -> None:
             GraphChange(anchor_upserts=(Anchor("a-1", "person", "Ada"),)), provenance=_owner()
         ).accepted
         assert system.restore_historical_state(RevisionSelection(0), provenance=_owner()).accepted
-        expected = system.current_state()
+        expected = materialize_state(system)
     finally:
         system.close()
 
     reopened = RTGSystem.open(path)
     try:
-        assert canonical_state_equal(reopened.current_state(), expected)
-        assert canonical_state_equal(reopened.replay(), expected)
+        assert semantic_state_equal(materialize_state(reopened), expected)
+        assert semantic_state_equal(materialize_replay(reopened), expected)
     finally:
         reopened.close()
 
@@ -160,7 +166,7 @@ def test_a_restoration_survives_an_ordinary_restart(tmp_path: Path) -> None:
 def test_a_proposal_in_flight_blocks_restoration(system: RTGSystem) -> None:
     """Excludes discarding an owner's draft to make room for the past."""
     assert stage_complete_fixture(system, WIDER, provenance=_owner()).accepted
-    before = system.current_state()
+    before = materialize_state(system)
     records = _records(system)
 
     outcome = system.restore_historical_state(RevisionSelection(1), provenance=_owner())
@@ -168,7 +174,7 @@ def test_a_proposal_in_flight_blocks_restoration(system: RTGSystem) -> None:
     assert outcome.status is OperationStatus.REJECTED
     assert outcome.resulting_revision is None
     assert any("in-flight definition delta" in f.summary for f in outcome.findings)
-    assert canonical_state_equal(system.current_state(), before)
+    assert semantic_state_equal(materialize_state(system), before)
     assert _records(system) == records
 
 
@@ -192,7 +198,7 @@ def test_restoring_after_the_proposal_is_resolved_succeeds(system: RTGSystem) ->
 def test_an_unresolvable_selection_changes_nothing(
     system: RTGSystem, selection, expected: str
 ) -> None:
-    before = system.current_state()
+    before = materialize_state(system)
     records = _records(system)
 
     outcome = system.restore_historical_state(selection, provenance=_owner())
@@ -200,7 +206,7 @@ def test_an_unresolvable_selection_changes_nothing(
     assert outcome.status is OperationStatus.REJECTED
     assert outcome.resulting_revision is None
     assert any(expected in finding.summary for finding in outcome.findings)
-    assert canonical_state_equal(system.current_state(), before)
+    assert semantic_state_equal(materialize_state(system), before)
     assert _records(system) == records
 
 
@@ -243,7 +249,9 @@ def widened(tmp_path: Path):
     ).accepted
     assert stage_complete_fixture(system, WIDER, provenance=_owner()).accepted
     assert activate_clean_delta(system, provenance=_owner()).accepted
-    assert {each.type_key for each in system.current_state().active_definitions.anchor_types} == {
+    assert {
+        each.type_key for each in materialize_state(system).active_definitions.anchor_types
+    } == {
         "person",
         "project",
         "team",
@@ -263,7 +271,7 @@ def test_restoring_takes_the_vocabulary_back_as_well_as_the_graph(widened: RTGSy
     """
     assert widened.restore_historical_state(RevisionSelection(1), provenance=_owner()).accepted
 
-    current = widened.current_state()
+    current = materialize_state(widened)
     assert {each.type_key for each in current.active_definitions.anchor_types} == {
         "person",
         "project",
@@ -275,14 +283,18 @@ def test_the_committed_record_carries_the_historical_vocabulary(widened: RTGSyst
     """Excludes a record that says one thing while the projection says another."""
     assert widened.restore_historical_state(RevisionSelection(1), provenance=_owner()).accepted
 
-    record = widened.store.transitions()[-1]
-    assert record.kind is TransitionKind.HISTORICAL_RESTORATION
-    assert record.change.active_definitions is not None
-    assert {each.type_key for each in record.change.active_definitions.anchor_types} == {
+    record = widened.store._connection.execute(  # noqa: SLF001
+        "SELECT record_kind FROM canonical_record ORDER BY ordinal DESC LIMIT 1"
+    ).fetchone()
+    assert record == (TransitionKind.HISTORICAL_RESTORATION.value,)
+    active_keys = {
+        each.type_key for each in materialize_state(widened).active_definitions.anchor_types
+    }
+    assert active_keys == {
         "person",
         "project",
     }
-    assert canonical_state_equal(widened.replay(), widened.current_state())
+    assert semantic_state_equal(materialize_replay(widened), materialize_state(widened))
 
 
 def test_a_historical_summary_after_a_restoration_reports_the_restored_vocabulary(
@@ -291,8 +303,9 @@ def test_a_historical_summary_after_a_restoration_reports_the_restored_vocabular
     assert widened.restore_historical_state(RevisionSelection(1), provenance=_owner()).accepted
 
     summary = widened.definition_summary(
-        state_scope=EvaluatedStateScope.HISTORICAL,
-        selection=RevisionSelection(widened.current_state().revision),
+        DefinitionSummaryRequest(
+            RevisionSelection(materialize_state(widened).revision), EvaluatedStateScope.HISTORICAL
+        ),
         provenance=_owner(),
     )
 
@@ -307,14 +320,14 @@ def test_restoring_the_state_already_current_creates_neither_revision_nor_record
     system: RTGSystem,
 ) -> None:
     """``atomicTransitions``: an effective no-op creates neither revision nor record."""
-    before = system.current_state()
+    before = materialize_state(system)
     records = _records(system)
 
     outcome = system.restore_historical_state(RevisionSelection(3), provenance=_owner())
 
     assert outcome.status is OperationStatus.ACCEPTED
     assert outcome.resulting_revision is None
-    assert canonical_state_equal(system.current_state(), before)
+    assert semantic_state_equal(materialize_state(system), before)
     assert _records(system) == records
 
 

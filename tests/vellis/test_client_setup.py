@@ -11,6 +11,7 @@ from pathlib import Path
 
 import pytest
 
+from tests.vellis.oracle import materialize_state
 from vellis.client_setup import (
     ClientAction,
     ClientKind,
@@ -376,7 +377,7 @@ def test_missing_client_reports_a_copyable_command_without_undoing_memory(
     system = RTGSystem.open(store_path(destination.resolve()))
     try:
         assert system.is_initialized
-        assert system.current_state().revision == 0
+        assert materialize_state(system).revision == 0
     finally:
         system.close()
 
@@ -401,7 +402,7 @@ def test_unparseable_inspection_is_separate_from_successful_initialization(
     assert "--vocabulary" not in error.getvalue()
     system = RTGSystem.open(store_path(destination.resolve()))
     try:
-        before = system.current_state()
+        before = materialize_state(system)
     finally:
         system.close()
 
@@ -417,7 +418,7 @@ def test_unparseable_inspection_is_separate_from_successful_initialization(
     assert retry_error.getvalue() == ""
     system = RTGSystem.open(store_path(destination.resolve()))
     try:
-        assert system.current_state() == before
+        assert materialize_state(system) == before
     finally:
         system.close()
 

@@ -9,6 +9,7 @@ dependencies = [
     "fastmcp==4.0.0b1",
     "fastmcp-slim==4.0.0b1",
     "google-re2>=1.1,<2",
+    "ijson>=3.5.1",
 ]
 
 [tool.uv]

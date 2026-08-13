@@ -32,7 +32,7 @@ from __future__ import annotations
 
 import secrets
 import sqlite3
-from collections.abc import Iterator
+from collections.abc import Iterable, Iterator
 from contextlib import closing, contextmanager
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -45,11 +45,8 @@ from urllib.parse import quote
 from vellis.activity import ActivityRecord
 from vellis.canonical import (
     CanonicalChange,
-    CanonicalState,
     CanonicalTransitionRecord,
-    DefinitionDelta,
     DefinitionDeltaDisposition,
-    InitialStateRecord,
     Provenance,
     TransitionKind,
     now,
@@ -58,12 +55,13 @@ from vellis.changes import (
     GraphChange,
     GraphChangeRequest,
     GraphChangeTarget,
-    apply_change,
+    apply_change_to_objects,
     change_findings,
 )
 from vellis.definitions import (
     AnchorTypeDefinition,
     AssociatedDataTypeDefinition,
+    DefinitionEntry,
     DirectAssociationEnd,
     DirectAssociationMultiplicityConstraint,
     EndpointConstraint,
@@ -79,11 +77,9 @@ from vellis.governance import DefinitionChange, definition_change_findings
 from vellis.graph import (
     Anchor,
     AssociatedDataObject,
-    Graph,
     GraphObject,
     Link,
     ObjectKind,
-    graph_equal,
 )
 from vellis.json_value import JsonKind, json_equal
 from vellis.normalized import (
@@ -91,7 +87,8 @@ from vellis.normalized import (
     definition_entry_digest,
     definition_identity,
     definition_identity_from_stats,
-    insert_definition_set,
+    insert_definition_entries,
+    insert_definition_entry,
     insert_object_value,
     json_storage_fields,
     json_storage_value,
@@ -109,16 +106,17 @@ from vellis.outcomes import (
     ValidationReport,
     ValidationScope,
 )
-from vellis.validation import assess_graph_conformance
+from vellis.validation import assess_object_neighborhood, validate_property_value
 
 if TYPE_CHECKING:
-    from vellis.query import AnchorGroup, GraphQuery, GraphQueryResult, RequiredLink
+    from vellis.query import GraphQuery, GraphQueryResult
 
 __all__ = [
     "AlreadyInitializedError",
     "CanonicalStore",
     "ConcurrentRevisionError",
     "ForeignDatabaseError",
+    "InvalidInitialDefinitionsError",
     "NotADatabaseError",
     "NotInitializedError",
     "ProposalState",
@@ -644,6 +642,14 @@ class AlreadyInitializedError(StoreError):
     """Raised when initialization is attempted against established canonical state."""
 
 
+class InvalidInitialDefinitionsError(StoreError):
+    """Raised when streamed initial definitions fail semantic validation."""
+
+    def __init__(self, findings: tuple[ValidationFinding, ...]) -> None:
+        super().__init__("the normalized initial definitions are not conforming")
+        self.findings = findings
+
+
 class NotInitializedError(StoreError):
     """Raised when an operation needs canonical state that was never established.
 
@@ -666,17 +672,6 @@ class ProposalState:
     staged_link_count: int = 0
     staged_removal_count: int = 0
     assessment: ValidationReport | None = None
-
-
-@dataclass(slots=True)
-class _RecordRow:
-    established_revision: int
-    record_kind: str
-    recorded_at: str
-    initiator: str
-    source: str | None
-    summary: str
-    prior_revision: int | None
 
 
 def _schema_present(connection: sqlite3.Connection) -> bool:
@@ -940,29 +935,25 @@ def _component_query(query: GraphQuery, names: set[str], *, projections: bool) -
     )
 
 
-def _graph_from_objects(values: Iterator[GraphObject] | list[GraphObject]) -> Graph:
-    anchors: list[Anchor] = []
-    data: list[AssociatedDataObject] = []
-    links: list[Link] = []
-    for value in values:
-        if isinstance(value, Anchor):
-            anchors.append(value)
-        elif isinstance(value, AssociatedDataObject):
-            data.append(value)
-        else:
-            links.append(value)
-    return Graph(tuple(anchors), tuple(data), tuple(links))
+def _merge_objects(
+    first: Iterable[GraphObject], second: Iterable[GraphObject]
+) -> tuple[GraphObject, ...]:
+    """Combine disjoint bounded identity selections from one SQLite snapshot."""
+    by_uuid = {value.uuid: value for value in first}
+    by_uuid.update((value.uuid, value) for value in second)
+    return tuple(by_uuid.values())
 
 
-def _merge_graphs(first: Graph, second: Graph) -> Graph:
-    """Combine disjoint identity selections from one SQLite snapshot."""
-    by_uuid = {value.uuid: value for value in first.objects()}
-    by_uuid.update((value.uuid, value) for value in second.objects())
-    return _graph_from_objects(list(by_uuid.values()))
-
-
-def _graph_identity(graph: Graph) -> str:
-    return semantic_identity(tuple(sorted(object_identity(value) for value in graph.objects())))
+def _merge_definition_sets(
+    first: GraphDefinitionSet, second: GraphDefinitionSet
+) -> GraphDefinitionSet:
+    """Combine disjoint normalized definition selections without broadening either."""
+    return GraphDefinitionSet(
+        (*first.anchor_types, *second.anchor_types),
+        (*first.associated_data_types, *second.associated_data_types),
+        (*first.link_types, *second.link_types),
+        (*first.relationship_constraints, *second.relationship_constraints),
+    )
 
 
 def _change_identity(change: CanonicalChange) -> str:
@@ -981,29 +972,6 @@ def _change_identity(change: CanonicalChange) -> str:
         (
             change.delta_disposition.value,
             graph_change,
-            None if change.replacement_graph is None else _graph_identity(change.replacement_graph),
-            None
-            if change.active_definitions is None
-            else definition_identity(change.active_definitions),
-            None
-            if change.definition_delta is None
-            else (
-                definition_identity(change.definition_delta.proposed_definitions),
-                (
-                    tuple(
-                        sorted(
-                            (kind.value, object_identity(value))
-                            for kind, value in change.definition_delta.graph_overlay.upserts()
-                        )
-                    ),
-                    tuple(
-                        sorted(
-                            (kind.value, uuid)
-                            for kind, uuid in change.definition_delta.graph_overlay.removals()
-                        )
-                    ),
-                ),
-            ),
         )
     )
 
@@ -1185,73 +1153,6 @@ class CanonicalStore:
                 try:
                     yield
                     self._connection.execute("COMMIT")
-                except BaseException:
-                    self._rollback_quietly()
-                    raise
-        except sqlite3.Error as error:
-            raise StoreError(f"could not read from the store at {self._path}: {error}") from error
-
-    def current_state(self) -> CanonicalState:
-        """Return the current canonical-state projection.
-
-        SQLite owns the live projection. Every call materializes a new domain value, so
-        mutable nested JSON handed to a library caller has no shared resident object to
-        corrupt and needs no defensive whole-state copy. This explicit complete-state
-        operation is one of the few paths that assembles every graph row.
-        """
-        try:
-            with self._lock:
-                self._connection.execute("BEGIN")
-                try:
-                    state = self._current_state_unlocked()
-                    self._connection.execute("COMMIT")
-                    return state
-                except BaseException:
-                    self._rollback_quietly()
-                    raise
-        except sqlite3.Error as error:
-            raise StoreError(f"could not read from the store at {self._path}: {error}") from error
-
-    def _current_state_unlocked(self) -> CanonicalState:
-        row = self._connection.execute(
-            "SELECT revision, established_by, active_definition_set_id,"
-            " proposed_definition_set_id FROM state_head WHERE id = 0"
-        ).fetchone()
-        if not isinstance(row, tuple):
-            raise NotInitializedError("no canonical state is established")
-        revision = _projection_revision(row)
-        state = CanonicalState(
-            graph=self._current_graph_unlocked(),
-            active_definitions=self._load_definition_set(str(row[2])),
-            definition_delta=(
-                None
-                if row[3] is None
-                else DefinitionDelta(
-                    proposed_definitions=self._effective_proposed_definitions_unlocked(str(row[2])),
-                    graph_overlay=self._proposal_graph_change_unlocked(),
-                )
-            ),
-            revision=revision,
-        )
-        self._current_projection_decodes += 1
-        return state
-
-    def current_graph(self) -> Graph:
-        """Assemble the complete current graph without reading canonical history."""
-        try:
-            with self._lock:
-                self._connection.execute("BEGIN")
-                try:
-                    if self._connection.execute(INITIALIZED_SQL).fetchone() is None:
-                        raise NotInitializedError("no canonical state is established")
-                    row = self._connection.execute(
-                        "SELECT revision, established_by FROM state_head WHERE id = 0"
-                    ).fetchone()
-                    assert isinstance(row, tuple)
-                    _projection_revision(row)
-                    graph = self._current_graph_unlocked()
-                    self._connection.execute("COMMIT")
-                    return graph
                 except BaseException:
                     self._rollback_quietly()
                     raise
@@ -1640,43 +1541,259 @@ class CanonicalStore:
             rows=tuple(rows),
         )
 
-    def current_definitions(self) -> tuple[int, GraphDefinitionSet, DefinitionDelta | None]:
-        """Read current definition facets without materializing the graph facet."""
-        with self._lock:
-            row = self._connection.execute(
-                "SELECT revision, established_by, active_definition_set_id,"
-                " proposed_definition_set_id FROM state_head WHERE id = 0"
-            ).fetchone()
-            if not isinstance(row, tuple):
-                raise NotInitializedError("no canonical state is established")
-            return (
-                _projection_revision(row),
-                self._load_definition_set(str(row[2])),
-                None
-                if row[3] is None
-                else DefinitionDelta(
-                    proposed_definitions=self._effective_proposed_definitions_unlocked(str(row[2])),
-                    graph_overlay=self._proposal_graph_change_unlocked(),
-                ),
-            )
+    def definition_summary_rows(
+        self, *, prospective: bool = False, revision: int | None = None
+    ) -> tuple[int, tuple[tuple[str, str | None], ...], bool]:
+        """Return the shallow anchor vocabulary without constructing a definition set."""
+        try:
+            with self._lock:
+                evaluated, active_identity, delta_present = (
+                    self._definition_selection_context_unlocked(
+                        prospective=prospective, revision=revision
+                    )
+                )
+                if not prospective:
+                    rows = self._connection.execute(
+                        "SELECT type_key, description FROM definition_type"
+                        " WHERE definition_set_id = ? AND object_kind = 'anchor'"
+                        " ORDER BY type_key",
+                        (active_identity,),
+                    )
+                else:
+                    rows = self._connection.execute(
+                        "SELECT t.type_key, t.description FROM definition_type AS t"
+                        " WHERE t.definition_set_id = ? AND t.object_kind = 'anchor'"
+                        " AND NOT EXISTS (SELECT 1 FROM proposal_definition_type AS p"
+                        " WHERE p.type_key = t.type_key)"
+                        " UNION ALL SELECT t.type_key, t.description"
+                        " FROM proposal_definition_type AS p JOIN definition_type AS t"
+                        " ON t.definition_set_id = p.value_set_id"
+                        " WHERE p.operation = 'upsert' AND t.object_kind = 'anchor'"
+                        " ORDER BY type_key",
+                        (active_identity,),
+                    )
+                return (
+                    evaluated,
+                    tuple(
+                        (str(key), None if description is None else str(description))
+                        for key, description in rows
+                    ),
+                    delta_present,
+                )
+        except sqlite3.Error as error:
+            raise StoreError(f"could not read from the store at {self._path}: {error}") from error
 
-    def definition_view(self, *, prospective: bool = False) -> tuple[int, GraphDefinitionSet, bool]:
-        """Read evaluated definition meaning without reading staged graph objects."""
-        with self._lock:
+    def definition_neighborhood(
+        self,
+        type_keys: tuple[str, ...],
+        *,
+        prospective: bool = False,
+        revision: int | None = None,
+    ) -> tuple[int, GraphDefinitionSet, bool]:
+        """Load only definitions transitively relevant to selected anchor types."""
+        try:
+            with self._lock:
+                evaluated, active_identity, delta_present = (
+                    self._definition_selection_context_unlocked(
+                        prospective=prospective, revision=revision
+                    )
+                )
+                self._connection.executescript(
+                    "DROP TABLE IF EXISTS temp.definition_type_source;"
+                    "DROP TABLE IF EXISTS temp.definition_relationship_source;"
+                    "DROP TABLE IF EXISTS temp.definition_wanted_type;"
+                    "DROP TABLE IF EXISTS temp.definition_wanted_relationship;"
+                    "CREATE TEMP TABLE definition_type_source ("
+                    " type_key TEXT PRIMARY KEY, value_set_id TEXT NOT NULL);"
+                    "CREATE TEMP TABLE definition_relationship_source ("
+                    " natural_key TEXT PRIMARY KEY, value_set_id TEXT NOT NULL);"
+                    "CREATE TEMP TABLE definition_wanted_type (type_key TEXT PRIMARY KEY);"
+                    "CREATE TEMP TABLE definition_wanted_relationship ("
+                    " natural_key TEXT PRIMARY KEY);"
+                )
+                if prospective:
+                    self._connection.execute(
+                        "INSERT INTO definition_type_source"
+                        " SELECT type_key, definition_set_id FROM definition_type AS t"
+                        " WHERE definition_set_id = ? AND NOT EXISTS"
+                        " (SELECT 1 FROM proposal_definition_type AS p"
+                        " WHERE p.type_key = t.type_key) GROUP BY type_key",
+                        (active_identity,),
+                    )
+                    self._connection.execute(
+                        "INSERT INTO definition_type_source"
+                        " SELECT t.type_key, p.value_set_id FROM proposal_definition_type AS p"
+                        " JOIN definition_type AS t ON t.definition_set_id = p.value_set_id"
+                        " WHERE p.operation = 'upsert'"
+                    )
+                    self._connection.execute(
+                        "INSERT INTO definition_relationship_source"
+                        " SELECT natural_key, definition_set_id"
+                        " FROM definition_multiplicity_rule AS r WHERE definition_set_id = ?"
+                        " AND NOT EXISTS (SELECT 1 FROM proposal_definition_relationship AS p"
+                        " WHERE p.natural_key = r.natural_key) GROUP BY natural_key",
+                        (active_identity,),
+                    )
+                    self._connection.execute(
+                        "INSERT INTO definition_relationship_source"
+                        " SELECT r.natural_key, p.value_set_id"
+                        " FROM proposal_definition_relationship AS p"
+                        " JOIN definition_multiplicity_rule AS r"
+                        " ON r.definition_set_id = p.value_set_id"
+                        " WHERE p.operation = 'upsert'"
+                    )
+                else:
+                    self._connection.execute(
+                        "INSERT INTO definition_type_source"
+                        " SELECT type_key, definition_set_id FROM definition_type"
+                        " WHERE definition_set_id = ? GROUP BY type_key",
+                        (active_identity,),
+                    )
+                    self._connection.execute(
+                        "INSERT INTO definition_relationship_source"
+                        " SELECT natural_key, definition_set_id FROM definition_multiplicity_rule"
+                        " WHERE definition_set_id = ? GROUP BY natural_key",
+                        (active_identity,),
+                    )
+                self._connection.executemany(
+                    "INSERT OR IGNORE INTO definition_wanted_type VALUES (?)",
+                    ((key,) for key in type_keys),
+                )
+                # Grounding data, rules, links, then every type those included definitions name.
+                self._connection.execute(
+                    "INSERT OR IGNORE INTO definition_wanted_type"
+                    " SELECT DISTINCT t.type_key FROM definition_type_source AS s"
+                    " JOIN definition_type AS t ON t.definition_set_id = s.value_set_id"
+                    " AND t.type_key = s.type_key JOIN definition_anchor_permission AS p"
+                    " ON p.definition_set_id = t.definition_set_id"
+                    " AND p.type_occurrence = t.occurrence"
+                    " WHERE p.anchor_type_key IN (SELECT type_key FROM definition_wanted_type)"
+                )
+                self._connection.execute(
+                    "INSERT OR IGNORE INTO definition_wanted_relationship"
+                    " SELECT DISTINCT s.natural_key FROM definition_relationship_source AS s"
+                    " JOIN definition_multiplicity_rule AS r"
+                    " ON r.definition_set_id = s.value_set_id AND r.natural_key = s.natural_key"
+                    " JOIN definition_multiplicity_participant AS p"
+                    " ON p.definition_set_id = r.definition_set_id"
+                    " AND p.rule_occurrence = r.occurrence"
+                    " WHERE p.type_key IN (SELECT type_key FROM definition_wanted_type)"
+                )
+                self._connection.execute(
+                    "INSERT OR IGNORE INTO definition_wanted_type"
+                    " SELECT DISTINCT t.type_key FROM definition_type_source AS s"
+                    " JOIN definition_type AS t ON t.definition_set_id = s.value_set_id"
+                    " AND t.type_key = s.type_key JOIN definition_endpoint_permission AS p"
+                    " ON p.definition_set_id = t.definition_set_id"
+                    " AND p.type_occurrence = t.occurrence"
+                    " WHERE t.object_kind = 'link' AND p.type_key IN"
+                    " (SELECT type_key FROM definition_wanted_type)"
+                )
+                self._connection.execute(
+                    "INSERT OR IGNORE INTO definition_wanted_type"
+                    " SELECT DISTINCT r.link_type_key FROM definition_relationship_source AS s"
+                    " JOIN definition_multiplicity_rule AS r"
+                    " ON r.definition_set_id = s.value_set_id AND r.natural_key = s.natural_key"
+                    " WHERE s.natural_key IN"
+                    " (SELECT natural_key FROM definition_wanted_relationship)"
+                    " AND r.link_type_key IS NOT NULL"
+                )
+                self._connection.execute(
+                    "INSERT OR IGNORE INTO definition_wanted_type"
+                    " SELECT DISTINCT p.type_key FROM definition_type_source AS s"
+                    " JOIN definition_type AS t ON t.definition_set_id = s.value_set_id"
+                    " AND t.type_key = s.type_key JOIN definition_endpoint_permission AS p"
+                    " ON p.definition_set_id = t.definition_set_id"
+                    " AND p.type_occurrence = t.occurrence"
+                    " WHERE t.type_key IN (SELECT type_key FROM definition_wanted_type)"
+                )
+                self._connection.execute(
+                    "INSERT OR IGNORE INTO definition_wanted_type"
+                    " SELECT DISTINCT p.type_key FROM definition_relationship_source AS s"
+                    " JOIN definition_multiplicity_rule AS r"
+                    " ON r.definition_set_id = s.value_set_id AND r.natural_key = s.natural_key"
+                    " JOIN definition_multiplicity_participant AS p"
+                    " ON p.definition_set_id = r.definition_set_id"
+                    " AND p.rule_occurrence = r.occurrence"
+                    " WHERE s.natural_key IN"
+                    " (SELECT natural_key FROM definition_wanted_relationship)"
+                )
+                definitions = GraphDefinitionSet()
+                for (set_id,) in self._connection.execute(
+                    "SELECT DISTINCT s.value_set_id FROM definition_type_source AS s"
+                    " WHERE s.type_key IN (SELECT type_key FROM definition_wanted_type)"
+                ):
+                    keys = {
+                        str(row[0])
+                        for row in self._connection.execute(
+                            "SELECT s.type_key FROM definition_type_source AS s"
+                            " WHERE s.value_set_id = ? AND s.type_key IN"
+                            " (SELECT type_key FROM definition_wanted_type)",
+                            (set_id,),
+                        )
+                    }
+                    definitions = _merge_definition_sets(
+                        definitions,
+                        self._load_definition_set(
+                            str(set_id), type_keys=keys, relationship_keys=set()
+                        ),
+                    )
+                for (set_id,) in self._connection.execute(
+                    "SELECT DISTINCT s.value_set_id FROM definition_relationship_source AS s"
+                    " WHERE s.natural_key IN"
+                    " (SELECT natural_key FROM definition_wanted_relationship)"
+                ):
+                    keys = {
+                        str(row[0])
+                        for row in self._connection.execute(
+                            "SELECT s.natural_key FROM definition_relationship_source AS s"
+                            " WHERE s.value_set_id = ? AND s.natural_key IN"
+                            " (SELECT natural_key FROM definition_wanted_relationship)",
+                            (set_id,),
+                        )
+                    }
+                    definitions = _merge_definition_sets(
+                        definitions,
+                        self._load_definition_set(
+                            str(set_id), type_keys=set(), relationship_keys=keys
+                        ),
+                    )
+                return evaluated, definitions, delta_present
+        except sqlite3.Error as error:
+            raise StoreError(f"could not read from the store at {self._path}: {error}") from error
+
+    def _definition_selection_context_unlocked(
+        self, *, prospective: bool, revision: int | None
+    ) -> tuple[int, str, bool]:
+        if prospective and revision is not None:
+            raise StoreError("prospective definition selection cannot be historical")
+        if revision is None:
             row = self._connection.execute(
                 "SELECT revision, established_by, active_definition_set_id,"
                 " proposed_definition_set_id FROM state_head WHERE id = 0"
             ).fetchone()
             if not isinstance(row, tuple):
                 raise NotInitializedError("no canonical state is established")
-            revision = _projection_revision(row)
-            if prospective:
-                if row[3] is None:
-                    raise StoreError("no definition delta is present")
-                definitions = self._effective_proposed_definitions_unlocked(str(row[2]))
-            else:
-                definitions = self._load_definition_set(str(row[2]))
-            return revision, definitions, row[3] is not None
+            evaluated = _projection_revision(row)
+            delta_present = row[3] is not None
+            if prospective and not delta_present:
+                raise StoreError("no definition delta is present")
+            return evaluated, str(row[2]), delta_present
+        active = self._connection.execute(
+            "SELECT active_definition_set_id FROM canonical_definition_event"
+            " WHERE established_revision <= ? AND active_definition_set_id IS NOT NULL"
+            " ORDER BY established_revision DESC LIMIT 1",
+            (revision,),
+        ).fetchone()
+        delta = self._connection.execute(
+            "SELECT delta_disposition FROM canonical_definition_event"
+            " WHERE established_revision <= ? AND delta_disposition != 'unchanged'"
+            " ORDER BY established_revision DESC LIMIT 1",
+            (revision,),
+        ).fetchone()
+        if active is None:
+            raise StoreError(f"revision {revision} has no active definition meaning")
+        return revision, str(active[0]), delta is not None and delta[0] == "present"
 
     def _effective_proposed_definitions_unlocked(
         self,
@@ -1926,7 +2043,7 @@ class CanonicalStore:
                         else:
                             assert isinstance(value, LinkTypeDefinition)
                             single = GraphDefinitionSet(link_types=(value,))
-                        value_set_id = insert_definition_set(self._connection, single)
+                        value_set_id = insert_definition_entry(self._connection, single)
                         active_single = (
                             GraphDefinitionSet(anchor_types=active.anchor_types)
                             if active.anchor_types
@@ -2025,7 +2142,7 @@ class CanonicalStore:
                         operation = "delete" if active.relationship_constraints else None
                     else:
                         single = GraphDefinitionSet(relationship_constraints=(value,))
-                        value_set_id = insert_definition_set(self._connection, single)
+                        value_set_id = insert_definition_entry(self._connection, single)
                         operation = (
                             None
                             if definition_identity(
@@ -2847,22 +2964,180 @@ class CanonicalStore:
         object_relation = (
             "assessment_effective_object" if relation == "prospective_graph_object" else relation
         )
-        object_sql = f"SELECT uuid, object_value_id FROM {object_relation}"
-        for uuid, value_id in self._connection.execute(object_sql + " ORDER BY uuid"):
-            root = self._load_object_value(int(value_id))
-            neighborhood = self._effective_neighborhood_unlocked(object_relation, root)
-            type_keys = {value.type_key for value in neighborhood.objects()}
-            object_definitions = self._definitions_for_relation_unlocked(
+        yield from self._iter_local_object_findings_unlocked(
+            relation, object_relation, active_identity
+        )
+        yield from self._iter_multiplicity_findings_unlocked(relation, active_identity)
+
+    def _iter_local_object_findings_unlocked(
+        self, relation: str, object_relation: str, active_identity: str
+    ) -> Iterator[ValidationFinding]:
+        """Validate each object from normalized rows without assembling its neighborhood."""
+        rows = self._connection.execute(
+            f"SELECT uuid, object_value_id, object_kind, type_key, source_uuid, target_uuid"
+            f" FROM {object_relation} ORDER BY uuid"  # noqa: S608
+        )
+        for uuid_value, value_id, kind_value, type_key_value, source, target in rows:
+            uuid = str(uuid_value)
+            kind = ObjectKind(str(kind_value))
+            type_key = str(type_key_value)
+            definitions = self._definitions_for_relation_unlocked(
                 relation,
                 active_identity,
-                type_keys=type_keys,
+                type_keys={type_key},
                 constrained_type_keys=set(),
                 relationship_keys=set(),
             )
-            for finding in assess_graph_conformance(neighborhood, object_definitions):
-                if finding.implicated_objects and finding.implicated_objects[0] == str(uuid):
-                    yield finding
-        yield from self._iter_multiplicity_findings_unlocked(relation, active_identity)
+            resolved = {
+                ObjectKind.ANCHOR: definitions.anchor_type(type_key) is not None,
+                ObjectKind.ASSOCIATED_DATA: definitions.associated_data_type(type_key) is not None,
+                ObjectKind.LINK: definitions.link_type(type_key) is not None,
+            }
+            if not resolved[kind]:
+                other = next((each for each, present in resolved.items() if present), None)
+                detail = (
+                    f", which is active as a {other.value} type; a type key never changes an "
+                    "object's kind"
+                    if other is not None
+                    else f", which resolves to no active {kind.value} type definition"
+                )
+                yield ValidationFinding(
+                    summary=f"{kind.value} {uuid!r} uses type key {type_key!r}{detail}",
+                    implicated_objects=(uuid,),
+                )
+                continue
+            if kind is ObjectKind.ANCHOR:
+                display_name = self._connection.execute(
+                    "SELECT display_name FROM object_value WHERE id = ?", (value_id,)
+                ).fetchone()[0]
+                if not display_name:
+                    yield ValidationFinding(
+                        summary=f"anchor {uuid!r} has an empty display name",
+                        implicated_objects=(uuid,),
+                    )
+                continue
+            if kind is ObjectKind.LINK:
+                definition = definitions.link_type(type_key)
+                assert definition is not None
+                endpoints = definition.endpoint_constraint
+                for role, endpoint_uuid, permitted in (
+                    ("source", str(source), endpoints.permitted_source_type_keys),
+                    ("target", str(target), endpoints.permitted_target_type_keys),
+                ):
+                    endpoint = self._connection.execute(
+                        f"SELECT object_kind, type_key FROM {object_relation} WHERE uuid = ?",  # noqa: S608
+                        (endpoint_uuid,),
+                    ).fetchone()
+                    if endpoint is None or str(endpoint[0]) not in {
+                        ObjectKind.ANCHOR.value,
+                        ObjectKind.ASSOCIATED_DATA.value,
+                    }:
+                        detail = (
+                            "a link, which is never an endpoint"
+                            if endpoint is not None
+                            else "no anchor or associated data owned by this graph"
+                        )
+                        yield ValidationFinding(
+                            summary=(
+                                f"link {uuid!r} {role} {endpoint_uuid!r} resolves to {detail}"
+                            ),
+                            implicated_objects=(uuid, endpoint_uuid),
+                        )
+                    elif str(endpoint[1]) not in permitted:
+                        yield ValidationFinding(
+                            summary=(
+                                f"link {uuid!r} of type {type_key!r} has {role} type "
+                                f"{endpoint[1]!r}, which its endpoint constraint does not permit"
+                            ),
+                            implicated_definitions=(f"endpointConstraint:{type_key}",),
+                            implicated_objects=(uuid, endpoint_uuid),
+                        )
+                continue
+
+            definition = definitions.associated_data_type(type_key)
+            assert definition is not None
+            association_count = int(
+                self._connection.execute(
+                    "SELECT count(*) FROM object_anchor WHERE object_value_id = ?", (value_id,)
+                ).fetchone()[0]
+            )
+            if association_count == 0:
+                yield ValidationFinding(
+                    summary=(
+                        f"associated data {uuid!r} is grounded by no anchor; "
+                        "at least one is required"
+                    ),
+                    implicated_objects=(uuid,),
+                )
+            for anchor_uuid, occurrence_count in self._connection.execute(
+                "SELECT anchor_uuid, count(*) FROM object_anchor WHERE object_value_id = ?"
+                " GROUP BY anchor_uuid ORDER BY anchor_uuid",
+                (value_id,),
+            ):
+                anchor_id = str(anchor_uuid)
+                if int(occurrence_count) > 1:
+                    yield ValidationFinding(
+                        summary=(
+                            f"associated data {uuid!r} references anchor {anchor_id!r} "
+                            "more than once"
+                        ),
+                        implicated_objects=(uuid, anchor_id),
+                    )
+                anchor = self._connection.execute(
+                    f"SELECT object_kind, type_key FROM {object_relation} WHERE uuid = ?",  # noqa: S608
+                    (anchor_id,),
+                ).fetchone()
+                if anchor is None or str(anchor[0]) != ObjectKind.ANCHOR.value:
+                    yield ValidationFinding(
+                        summary=(
+                            f"associated data {uuid!r} references {anchor_id!r}, which is no "
+                            "anchor owned by this graph"
+                        ),
+                        implicated_objects=(uuid, anchor_id),
+                    )
+                elif str(anchor[1]) not in definition.permitted_anchor_type_keys:
+                    yield ValidationFinding(
+                        summary=(
+                            f"associated data {uuid!r} of type {type_key!r} is grounded by "
+                            f"anchor type {anchor[1]!r}, which that type does not permit"
+                        ),
+                        implicated_definitions=(f"associatedDataType:{type_key}",),
+                        implicated_objects=(uuid, anchor_id),
+                    )
+            declared = {rule.property_name: rule for rule in definition.property_constraints}
+            present: set[str] = set()
+            for name, json_kind_value, boolean, number, text_value in self._connection.execute(
+                "SELECT name, json_kind, boolean_value, number_value, text_value"
+                " FROM object_property WHERE object_value_id = ? ORDER BY ordinal",
+                (value_id,),
+            ):
+                property_name = str(name)
+                present.add(property_name)
+                rule = declared.get(property_name)
+                if rule is None:
+                    yield ValidationFinding(
+                        summary=(
+                            f"associated data {uuid!r} carries property {property_name!r}, which "
+                            f"its type {type_key!r} does not declare"
+                        ),
+                        implicated_definitions=(f"associatedDataType:{type_key}",),
+                        implicated_objects=(uuid,),
+                    )
+                    continue
+                value = json_storage_value(json_kind_value, boolean, number, text_value)
+                for reason in validate_property_value(rule, value):
+                    yield ValidationFinding(
+                        summary=f"associated data {uuid!r} property {property_name!r} {reason}",
+                        implicated_definitions=(f"property:{type_key}.{property_name}",),
+                        implicated_objects=(uuid,),
+                    )
+            for name, rule in declared.items():
+                if rule.required and name not in present:
+                    yield ValidationFinding(
+                        summary=f"associated data {uuid!r} omits required property {name!r}",
+                        implicated_definitions=(f"property:{type_key}.{name}",),
+                        implicated_objects=(uuid,),
+                    )
 
     def _prepare_prospective_assessment_scope_unlocked(self, active_identity: str) -> None:
         """Derive the changed-definition and staged-graph invariant closure in SQL."""
@@ -3442,44 +3717,6 @@ class CanonicalStore:
             )
             yield from self._multiplicity_findings_unlocked(relation, definitions)
 
-    def _effective_neighborhood_unlocked(self, relation: str, root: GraphObject) -> Graph:
-        wanted = {root.uuid}
-        if isinstance(root, AssociatedDataObject):
-            wanted.update(root.anchor_uuids)
-        elif isinstance(root, Link):
-            wanted.update((root.source_uuid, root.target_uuid))
-        values: list[GraphObject] = [root]
-        pending = wanted - {root.uuid}
-        if pending:
-            placeholders = ", ".join("?" for _ in pending)
-            for (value_id,) in self._connection.execute(
-                f"SELECT object_value_id FROM {relation} WHERE uuid IN ({placeholders})",
-                tuple(pending),
-            ):
-                values.append(self._load_object_value(int(value_id)))
-        anchors = [each for each in values if isinstance(each, Anchor)]
-        data = [each for each in values if isinstance(each, AssociatedDataObject)]
-        links = [each for each in values if isinstance(each, Link)]
-        # Data used as a link endpoint brings its grounding anchors into the local
-        # neighborhood so its own reference checks do not create false findings.
-        extra_anchor_ids = {
-            anchor_uuid
-            for each in data
-            for anchor_uuid in each.anchor_uuids
-            if all(anchor.uuid != anchor_uuid for anchor in anchors)
-        }
-        if extra_anchor_ids:
-            placeholders = ", ".join("?" for _ in extra_anchor_ids)
-            for (value_id,) in self._connection.execute(
-                f"SELECT object_value_id FROM {relation}"
-                f" WHERE object_kind = 'anchor' AND uuid IN ({placeholders})",
-                tuple(extra_anchor_ids),
-            ):
-                value = self._load_object_value(int(value_id))
-                assert isinstance(value, Anchor)
-                anchors.append(value)
-        return Graph(tuple(anchors), tuple(data), tuple(links))
-
     def _multiplicity_findings_unlocked(
         self, relation: str, definitions: GraphDefinitionSet
     ) -> Iterator[ValidationFinding]:
@@ -4029,27 +4266,6 @@ class CanonicalStore:
                     f"could not restore revision {selected_revision}: {error}"
                 ) from error
 
-    def definitions_at_revision(self, revision: int) -> tuple[GraphDefinitionSet, bool]:
-        """Read definition meaning in force at a revision without graph or record replay."""
-        active_row = self._fetchone(
-            "SELECT active_definition_set_id FROM canonical_definition_event"
-            " WHERE established_revision <= ? AND active_definition_set_id IS NOT NULL"
-            " ORDER BY established_revision DESC LIMIT 1",
-            (revision,),
-        )
-        delta_row = self._fetchone(
-            "SELECT delta_disposition FROM canonical_definition_event"
-            " WHERE established_revision <= ? AND delta_disposition != 'unchanged'"
-            " ORDER BY established_revision DESC LIMIT 1",
-            (revision,),
-        )
-        if not isinstance(active_row, tuple) or active_row[0] is None:
-            raise StoreError(f"revision {revision} has no active definition meaning")
-        return (
-            self._load_definition_set(str(active_row[0])),
-            isinstance(delta_row, tuple) and delta_row[0] == "present",
-        )
-
     def current_revision(self) -> int:
         """Read the established current revision without materializing any state facet."""
         row = self._fetchone("SELECT revision, established_by FROM state_head WHERE id = 0")
@@ -4091,47 +4307,45 @@ class CanonicalStore:
                     removed = {uuid for _, uuid in change.removals()}
                     structural_ids = set(touched)
                     structural_ids.update(self._referencing_uuids_unlocked(removed))
-                    structural_graph = self._graph_for_uuids_unlocked(structural_ids)
-                    structural = change_findings(change, structural_graph)
+                    structural_objects = self._objects_for_uuids_unlocked(structural_ids)
+                    structural = change_findings(change, structural_objects)
                     if structural:
                         self._connection.execute("COMMIT")
                         return revision, structural, (), False
 
                     existing_touched = {
-                        value.uuid: value
-                        for value in structural_graph.objects()
-                        if value.uuid in touched
+                        value.uuid: value for value in structural_objects if value.uuid in touched
                     }
                     affected = self._affected_participants_unlocked(change, existing_touched)
                     closure_ids = set(touched) | affected
                     closure_ids.update(self._incident_relationship_uuids_unlocked(affected))
-                    already_loaded = {value.uuid for value in structural_graph.objects()}
-                    current_neighborhood = _merge_graphs(
-                        structural_graph,
-                        self._graph_for_uuids_unlocked(closure_ids - already_loaded),
+                    already_loaded = {value.uuid for value in structural_objects}
+                    current_neighborhood = _merge_objects(
+                        structural_objects,
+                        self._objects_for_uuids_unlocked(closure_ids - already_loaded),
                     )
 
                     referenced: set[str] = set()
-                    values = (*current_neighborhood.objects(), *(v for _, v in change.upserts()))
+                    values = (*current_neighborhood, *(v for _, v in change.upserts()))
                     for value in values:
                         if isinstance(value, AssociatedDataObject):
                             referenced.update(value.anchor_uuids)
                         elif isinstance(value, Link):
                             referenced.update((value.source_uuid, value.target_uuid))
-                    known = {value.uuid for value in current_neighborhood.objects()}
+                    known = {value.uuid for value in current_neighborhood}
                     missing_references = referenced - known
                     if missing_references:
-                        current_neighborhood = _merge_graphs(
+                        current_neighborhood = _merge_objects(
                             current_neighborhood,
-                            self._graph_for_uuids_unlocked(missing_references),
+                            self._objects_for_uuids_unlocked(missing_references),
                         )
 
-                    resulting = apply_change(current_neighborhood, change)
+                    resulting = apply_change_to_objects(current_neighborhood, change)
                     relevant = closure_ids
-                    type_keys = {value.type_key for value in resulting.objects()}
+                    type_keys = {value.type_key for value in resulting}
                     constrained_type_keys = {
                         value.type_key
-                        for value in resulting.objects()
+                        for value in resulting
                         if value.uuid in relevant and not isinstance(value, Link)
                     }
                     definitions = self._load_definition_set(
@@ -4141,10 +4355,12 @@ class CanonicalStore:
                     )
                     conformance = tuple(
                         finding
-                        for finding in assess_graph_conformance(resulting, definitions)
+                        for finding in assess_object_neighborhood(resulting, definitions)
                         if set(finding.implicated_objects) & relevant
                     )
-                    no_op = graph_equal(resulting, current_neighborhood)
+                    no_op = {value.uuid: object_identity(value) for value in resulting} == {
+                        value.uuid: object_identity(value) for value in current_neighborhood
+                    }
                     self._connection.execute("COMMIT")
                     return revision, (), conformance, no_op
                 except BaseException:
@@ -4155,7 +4371,7 @@ class CanonicalStore:
                 f"could not validate a graph change at {self._path}: {error}"
             ) from error
 
-    def _graph_for_uuids_unlocked(self, uuids: set[str]) -> Graph:
+    def _objects_for_uuids_unlocked(self, uuids: set[str]) -> tuple[GraphObject, ...]:
         objects: list[GraphObject] = []
         for chunk in _chunks(uuids):
             placeholders = ", ".join("?" for _ in chunk)
@@ -4166,7 +4382,7 @@ class CanonicalStore:
                 tuple(chunk),
             )
             objects.extend(self._decode_current_graph_object(*row) for row in rows)
-        return _graph_from_objects(objects)
+        return tuple(objects)
 
     def _referencing_uuids_unlocked(self, uuids: set[str]) -> set[str]:
         references: set[str] = set()
@@ -4238,8 +4454,8 @@ class CanonicalStore:
                 changed_endpoint_types.add(old.uuid)
 
         incident = self._incident_relationship_uuids_unlocked(changed_endpoint_types)
-        incident_graph = self._graph_for_uuids_unlocked(incident)
-        for relationship in incident_graph.objects():
+        incident_objects = self._objects_for_uuids_unlocked(incident)
+        for relationship in incident_objects:
             if isinstance(relationship, Link):
                 affected.update((relationship.source_uuid, relationship.target_uuid))
             elif isinstance(relationship, AssociatedDataObject):
@@ -4248,13 +4464,58 @@ class CanonicalStore:
 
     # --- Owned history base ---------------------------------------------------------
 
-    def initialize(self, record: InitialStateRecord) -> None:
-        """Establish the owned history base and its projection as one atomic effect.
+    def initialize_empty(
+        self,
+        definition_entries: Iterable[DefinitionEntry],
+        *,
+        provenance: Provenance,
+        initialization_summary: str,
+        recorded_at: datetime,
+    ) -> None:
+        """Establish an empty revision-zero history base as one atomic effect.
 
         Nothing is established when the store already holds canonical state, and a
         failure part-way through leaves no partial canonical or activity state.
         """
-        state = record.canonical_state
+        self._initialize_base(
+            False,
+            definition_entries,
+            revision=0,
+            provenance=provenance,
+            initialization_summary=initialization_summary,
+            recorded_at=recorded_at,
+        )
+
+    def initialize_staged_recovery_identity(
+        self,
+        active_definition_identity: str,
+        *,
+        provenance: Provenance,
+        initialization_summary: str,
+        recorded_at: datetime,
+    ) -> None:
+        """Establish staged graph rows with an already-normalized definition set."""
+        self._initialize_base(
+            True,
+            None,
+            active_definition_identity=active_definition_identity,
+            revision=0,
+            provenance=provenance,
+            initialization_summary=initialization_summary,
+            recorded_at=recorded_at,
+        )
+
+    def _initialize_base(
+        self,
+        use_staged_graph: bool,
+        definition_entries: Iterable[DefinitionEntry] | None,
+        *,
+        active_definition_identity: str | None = None,
+        revision: int,
+        provenance: Provenance,
+        initialization_summary: str,
+        recorded_at: datetime,
+    ) -> None:
         with self._lock:
             try:
                 self._connection.execute("BEGIN IMMEDIATE")
@@ -4285,26 +4546,40 @@ class CanonicalStore:
                     " VALUES (0, NULL, ?, 0, NULL, NULL, NULL)",
                     ("0" * 64,),
                 )
-                active_identity = insert_definition_set(self._connection, state.active_definitions)
-                proposed_identity = (
-                    None
-                    if state.definition_delta is None
-                    else insert_definition_set(
-                        self._connection, state.definition_delta.proposed_definitions
-                    )
-                )
-                content_identity = semantic_identity(
-                    (_graph_identity(state.graph), active_identity, proposed_identity)
-                )
+                if definition_entries is not None:
+                    try:
+                        active_identity = insert_definition_entries(
+                            self._connection, definition_entries
+                        )
+                    except (OverflowError, UnicodeError, ValueError) as error:
+                        reason = (
+                            "contains a numeric bound too large to be stored"
+                            if isinstance(error, OverflowError)
+                            else f"cannot be stored: {error}"
+                        )
+                        raise InvalidInitialDefinitionsError(
+                            (ValidationFinding(summary=f"an initial definition {reason}"),)
+                        ) from error
+                elif (
+                    active_definition_identity is not None
+                    and self._connection.execute(
+                        "SELECT 1 FROM definition_set WHERE identity = ?",
+                        (active_definition_identity,),
+                    ).fetchone()
+                ):
+                    active_identity = active_definition_identity
+                else:
+                    raise StoreError("the normalized initial definition set is absent")
+                content_identity = semantic_identity(("pendingInitialState", secrets.token_hex(16)))
                 record_identity = self._record_identity(
                     ledger_identity,
                     None,
-                    record.established_revision,
+                    revision,
                     "initial",
-                    record.recorded_at,
-                    record.provenance.initiator,
-                    record.provenance.source,
-                    record.initialization_summary,
+                    recorded_at,
+                    provenance.initiator,
+                    provenance.source,
+                    initialization_summary,
                     content_identity,
                 )
                 self._connection.execute(
@@ -4313,11 +4588,11 @@ class CanonicalStore:
                     " prior_record_identity, content_identity)"
                     " VALUES (?, 0, 'initial', ?, ?, ?, ?, NULL, ?, NULL, ?)",
                     (
-                        record.established_revision,
-                        _stored_time(record.recorded_at),
-                        record.provenance.initiator,
-                        record.provenance.source,
-                        record.initialization_summary,
+                        revision,
+                        _stored_time(recorded_at),
+                        provenance.initiator,
+                        provenance.source,
+                        initialization_summary,
                         record_identity,
                         content_identity,
                     ),
@@ -4328,31 +4603,48 @@ class CanonicalStore:
                     " proposed_definition_set_id)"
                     " VALUES (0, ?, ?, ?, ?)",
                     (
-                        state.revision,
-                        record.established_revision,
+                        revision,
+                        revision,
                         active_identity,
-                        proposed_identity,
+                        None,
                     ),
                 )
-                self._replace_current_graph_unlocked(state.graph, state.revision)
+                if use_staged_graph:
+                    self._connection.execute(
+                        "INSERT INTO graph_presence_interval"
+                        " (uuid, object_value_id, object_kind, type_key, source_uuid, target_uuid,"
+                        " valid_from_revision, valid_to_revision)"
+                        " SELECT r.uuid, r.object_value_id, v.object_kind, v.type_key,"
+                        " v.source_uuid, v.target_uuid, ?, NULL FROM recovery_object AS r"
+                        " JOIN object_value AS v ON v.id = r.object_value_id",
+                        (revision,),
+                    )
                 self._connection.execute(
                     "INSERT INTO canonical_definition_event"
                     " (established_revision, active_definition_set_id, delta_disposition,"
                     " proposed_definition_set_id)"
                     " VALUES (?, ?, ?, ?)",
                     (
-                        state.revision,
+                        revision,
                         active_identity,
-                        "absent" if proposed_identity is None else "present",
-                        proposed_identity,
+                        "absent",
+                        None,
                     ),
                 )
-                self._seal_record_identity_unlocked(state.revision)
+                definition_findings = tuple(
+                    self._iter_definition_findings_unlocked("current_graph_object", active_identity)
+                )
+                if definition_findings:
+                    raise InvalidInitialDefinitionsError(definition_findings)
+                self._seal_record_identity_unlocked(revision)
                 # A read attempted before the system existed may already have observed itself
                 # here, and success promises an empty ledger.
                 self._connection.execute("DELETE FROM activity_record")
                 self._connection.execute("COMMIT")
             except AlreadyInitializedError:
+                raise
+            except InvalidInitialDefinitionsError:
+                self._rollback_quietly()
                 raise
             except Exception as error:
                 # Any failure between BEGIN and COMMIT must roll back. Letting one escape
@@ -4514,15 +4806,6 @@ class CanonicalStore:
             ),
         )
 
-    def _replace_current_graph_unlocked(self, graph: Graph, revision: int) -> None:
-        self._connection.execute(
-            "UPDATE graph_presence_interval SET valid_to_revision = ?"
-            " WHERE valid_to_revision IS NULL",
-            (revision,),
-        )
-        for graph_object in graph.objects():
-            self._upsert_current_graph_object_unlocked(graph_object, revision)
-
     def _apply_current_graph_change_unlocked(self, change: GraphChange, revision: int) -> None:
         removals = tuple(uuid for _, uuid in change.removals())
         replaced = (*removals, *(value.uuid for _, value in change.upserts()))
@@ -4563,7 +4846,7 @@ class CanonicalStore:
         )
         return value_id
 
-    def append_transition(self, record: CanonicalTransitionRecord) -> None:
+    def _append_transition(self, record: CanonicalTransitionRecord) -> None:
         """Append one transition and update the projection as one recoverable effect.
 
         The appended record and the updated projection commit together, so no reader can
@@ -4573,14 +4856,7 @@ class CanonicalStore:
         """
         projection_assignments = ["revision = ?", "established_by = ?"]
         projection_values: list[object] = [record.resulting_revision, record.resulting_revision]
-        active_identity: str | None = None
-        proposed_identity: str | None = None
-        if record.change.active_definitions is not None:
-            projection_assignments.append("active_definition_set_id = ?")
-        if record.change.delta_disposition is DefinitionDeltaDisposition.PRESENT:
-            assert record.change.definition_delta is not None
-            projection_assignments.append("proposed_definition_set_id = ?")
-        elif record.change.delta_disposition is DefinitionDeltaDisposition.ABSENT:
+        if record.change.delta_disposition is DefinitionDeltaDisposition.ABSENT:
             projection_assignments.append("proposed_definition_set_id = ?")
         with self._lock:
             try:
@@ -4596,18 +4872,7 @@ class CanonicalStore:
                     raise ConcurrentRevisionError(
                         f"the current revision is {row[0]}, not {record.prior_revision}"
                     )
-                if record.change.active_definitions is not None:
-                    active_identity = insert_definition_set(
-                        self._connection, record.change.active_definitions
-                    )
-                    projection_values.append(active_identity)
-                if record.change.delta_disposition is DefinitionDeltaDisposition.PRESENT:
-                    assert record.change.definition_delta is not None
-                    proposed_identity = insert_definition_set(
-                        self._connection, record.change.definition_delta.proposed_definitions
-                    )
-                    projection_values.append(proposed_identity)
-                elif record.change.delta_disposition is DefinitionDeltaDisposition.ABSENT:
+                if record.change.delta_disposition is DefinitionDeltaDisposition.ABSENT:
                     projection_values.append(None)
                 previous = self._connection.execute(
                     "SELECT r.record_identity FROM canonical_record AS r"
@@ -4674,13 +4939,6 @@ class CanonicalStore:
                         record.change.graph_change, record.resulting_revision
                     )
                     self._insert_graph_events(record.resulting_revision, record.change.graph_change)
-                elif record.change.replacement_graph is not None:
-                    self._insert_replacement_events(
-                        record.resulting_revision, record.change.replacement_graph
-                    )
-                    self._replace_current_graph_unlocked(
-                        record.change.replacement_graph, record.resulting_revision
-                    )
                 self._connection.execute(
                     "INSERT INTO canonical_definition_event"
                     " (established_revision, active_definition_set_id, delta_disposition,"
@@ -4688,9 +4946,9 @@ class CanonicalStore:
                     " VALUES (?, ?, ?, ?)",
                     (
                         record.resulting_revision,
-                        active_identity,
+                        None,
                         record.change.delta_disposition.value,
-                        proposed_identity,
+                        None,
                     ),
                 )
                 self._seal_record_identity_unlocked(record.resulting_revision)
@@ -4718,251 +4976,6 @@ class CanonicalStore:
             )
             occurrence += 1
 
-    def _insert_replacement_events(self, revision: int, graph: Graph) -> None:
-        # Historical replacement is retained only until W005 converts restore to an
-        # SQL-computed explicit difference.  Even here the ledger stores normalized
-        # per-object events rather than one replacement document.
-        current = {
-            str(row[0]): str(row[1])
-            for row in self._connection.execute(
-                "SELECT uuid, object_kind FROM current_graph_object"
-            )
-        }
-        wanted = {value.uuid: value for value in graph.objects()}
-        change = GraphChange(
-            anchor_upserts=tuple(value for value in wanted.values() if isinstance(value, Anchor)),
-            associated_data_upserts=tuple(
-                value for value in wanted.values() if isinstance(value, AssociatedDataObject)
-            ),
-            link_upserts=tuple(value for value in wanted.values() if isinstance(value, Link)),
-            anchor_removals=tuple(
-                uuid
-                for uuid, kind in current.items()
-                if uuid not in wanted and kind == ObjectKind.ANCHOR.value
-            ),
-            associated_data_removals=tuple(
-                uuid
-                for uuid, kind in current.items()
-                if uuid not in wanted and kind == ObjectKind.ASSOCIATED_DATA.value
-            ),
-            link_removals=tuple(
-                uuid
-                for uuid, kind in current.items()
-                if uuid not in wanted and kind == ObjectKind.LINK.value
-            ),
-        )
-        self._insert_graph_events(revision, change)
-
-    def transitions(self) -> tuple[CanonicalTransitionRecord, ...]:
-        """Read every transition in ledger order. Each is a semantic record access."""
-        rows = self._fetchall(
-            "SELECT established_revision, record_kind, recorded_at, initiator, source, summary,"
-            " prior_revision FROM canonical_record WHERE ordinal > 0 ORDER BY ordinal"
-        )
-        self._record_reads += len(rows)
-        records: list[CanonicalTransitionRecord] = []
-        for row in rows:
-            assert isinstance(row, tuple)
-            records.append(self._transition_from(_RecordRow(*row)))
-        return tuple(records)
-
-    def _transition_from(self, record: _RecordRow) -> CanonicalTransitionRecord:
-        try:
-            kind = TransitionKind(record.record_kind)
-            if record.prior_revision is None:
-                raise ValueError("a transition has no prior revision")
-            prior = int(record.prior_revision)
-        except ValueError as error:
-            raise StoreError(
-                f"a canonical record at {self._path} is not a readable transition: {error}"
-            ) from error
-        return CanonicalTransitionRecord(
-            prior_revision=prior,
-            resulting_revision=record.established_revision,
-            kind=kind,
-            change=self._change_at(record.established_revision, kind),
-            provenance=Provenance(initiator=record.initiator, source=record.source),
-            recorded_at=self._recorded_at(record.recorded_at),
-        )
-
-    def _change_at(self, revision: int, kind: TransitionKind) -> CanonicalChange:
-        upserts: dict[ObjectKind, list[GraphObject]] = {each: [] for each in ObjectKind}
-        removals: dict[ObjectKind, list[str]] = {each: [] for each in ObjectKind}
-        for operation, kind_text, uuid, value_id in self._connection.execute(
-            "SELECT operation, object_kind, uuid, object_value_id FROM canonical_graph_event"
-            " WHERE established_revision = ? ORDER BY occurrence",
-            (revision,),
-        ):
-            object_kind = ObjectKind(str(kind_text))
-            if operation == "delete":
-                removals[object_kind].append(str(uuid))
-            else:
-                if value_id is None:
-                    raise StoreError(f"upsert event {revision}:{uuid} has no object value")
-                upserts[object_kind].append(self._load_object_value(int(value_id)))
-        graph_change = GraphChange(
-            anchor_upserts=tuple(
-                each for each in upserts[ObjectKind.ANCHOR] if isinstance(each, Anchor)
-            ),
-            associated_data_upserts=tuple(
-                each
-                for each in upserts[ObjectKind.ASSOCIATED_DATA]
-                if isinstance(each, AssociatedDataObject)
-            ),
-            link_upserts=tuple(each for each in upserts[ObjectKind.LINK] if isinstance(each, Link)),
-            anchor_removals=tuple(removals[ObjectKind.ANCHOR]),
-            associated_data_removals=tuple(removals[ObjectKind.ASSOCIATED_DATA]),
-            link_removals=tuple(removals[ObjectKind.LINK]),
-        )
-        definition_row = self._connection.execute(
-            "SELECT active_definition_set_id, delta_disposition, proposed_definition_set_id"
-            " FROM canonical_definition_event WHERE established_revision = ?",
-            (revision,),
-        ).fetchone()
-        if definition_row is None:
-            raise StoreError(f"canonical record {revision} has no normalized definition event")
-        active_id, disposition_text, proposed_id = definition_row
-        disposition = DefinitionDeltaDisposition(str(disposition_text))
-        definition_delta = (
-            None
-            if proposed_id is None
-            else DefinitionDelta(
-                proposed_definitions=self._proposal_definitions_at_unlocked(revision),
-                graph_overlay=self._proposal_graph_change_at_unlocked(revision),
-            )
-        )
-        replacement = (
-            self._graph_at_unlocked(revision)
-            if kind is TransitionKind.HISTORICAL_RESTORATION
-            else None
-        )
-        return CanonicalChange(
-            graph_change=(
-                graph_change
-                if kind in {TransitionKind.GRAPH_MUTATION, TransitionKind.DEFINITION_ACTIVATION}
-                and (graph_change.upserts() or graph_change.removals())
-                else None
-            ),
-            replacement_graph=replacement,
-            active_definitions=(
-                None if active_id is None else self._load_definition_set(str(active_id))
-            ),
-            delta_disposition=disposition,
-            definition_delta=definition_delta,
-        )
-
-    def _proposal_definitions_at_unlocked(self, revision: int) -> GraphDefinitionSet:
-        """Rebuild sparse proposed-definition meaning from append-only keyed events."""
-        active_row = self._connection.execute(
-            "SELECT active_definition_set_id FROM canonical_definition_event"
-            " WHERE established_revision <= ? AND active_definition_set_id IS NOT NULL"
-            " ORDER BY established_revision DESC LIMIT 1",
-            (revision,),
-        ).fetchone()
-        if active_row is None:
-            raise StoreError(f"revision {revision} has no active definition base")
-        active = self._load_definition_set(str(active_row[0]))
-        last_absent = self._connection.execute(
-            "SELECT coalesce(max(established_revision), -1) FROM canonical_definition_event"
-            " WHERE established_revision <= ? AND delta_disposition = 'absent'",
-            (revision,),
-        ).fetchone()
-        start = -1 if last_absent is None else int(last_absent[0])
-        active_types: dict[str, object] = {
-            **{value.type_key: value for value in active.anchor_types},
-            **{value.type_key: value for value in active.associated_data_types},
-            **{value.type_key: value for value in active.link_types},
-        }
-        active_relationships = {
-            semantic_identity(relationship_identity(value)): value
-            for value in active.relationship_constraints
-        }
-        types = dict(active_types)
-        relationships = dict(active_relationships)
-        for entity_kind, natural_key, operation, value_set_id in self._connection.execute(
-            "SELECT entity_kind, natural_key, operation, value_set_id"
-            " FROM canonical_definition_proposal_event WHERE established_revision > ?"
-            " AND established_revision <= ? ORDER BY established_revision, occurrence",
-            (start, revision),
-        ):
-            key = str(natural_key)
-            if str(entity_kind) == "type":
-                if operation == "unstage":
-                    if key in active_types:
-                        types[key] = active_types[key]
-                    else:
-                        types.pop(key, None)
-                    continue
-                if operation == "delete":
-                    types.pop(key, None)
-                    continue
-                value = self._load_definition_set(str(value_set_id))
-                members = (*value.anchor_types, *value.associated_data_types, *value.link_types)
-                if len(members) != 1:
-                    raise StoreError("a definition proposal type event is not one value")
-                types[key] = members[0]
-            else:
-                if operation == "unstage":
-                    if key in active_relationships:
-                        relationships[key] = active_relationships[key]
-                    else:
-                        relationships.pop(key, None)
-                    continue
-                if operation == "delete":
-                    relationships.pop(key, None)
-                    continue
-                value = self._load_definition_set(str(value_set_id))
-                if len(value.relationship_constraints) != 1:
-                    raise StoreError("a definition proposal rule event is not one value")
-                relationships[key] = value.relationship_constraints[0]
-        return GraphDefinitionSet(
-            tuple(value for value in types.values() if isinstance(value, AnchorTypeDefinition)),
-            tuple(
-                value for value in types.values() if isinstance(value, AssociatedDataTypeDefinition)
-            ),
-            tuple(value for value in types.values() if isinstance(value, LinkTypeDefinition)),
-            tuple(relationships.values()),
-        )
-
-    def _proposal_graph_change_at_unlocked(self, revision: int) -> GraphChange:
-        last_absent = self._connection.execute(
-            "SELECT coalesce(max(established_revision), -1) FROM canonical_definition_event"
-            " WHERE established_revision <= ? AND delta_disposition = 'absent'",
-            (revision,),
-        ).fetchone()
-        start = -1 if last_absent is None else int(last_absent[0])
-        entries: dict[str, tuple[ObjectKind, str, int | None]] = {}
-        for operation, kind_name, uuid, value_id in self._connection.execute(
-            "SELECT operation, object_kind, uuid, object_value_id"
-            " FROM canonical_proposal_event WHERE established_revision > ?"
-            " AND established_revision <= ? ORDER BY established_revision, occurrence",
-            (start, revision),
-        ):
-            if operation == "unstage":
-                entries.pop(str(uuid), None)
-            else:
-                entries[str(uuid)] = (ObjectKind(str(kind_name)), str(operation), value_id)
-        upserts: dict[ObjectKind, list[GraphObject]] = {kind: [] for kind in ObjectKind}
-        removals: dict[ObjectKind, list[str]] = {kind: [] for kind in ObjectKind}
-        for uuid, (kind, operation, value_id) in sorted(entries.items()):
-            if operation == "delete":
-                removals[kind].append(uuid)
-            else:
-                assert value_id is not None
-                upserts[kind].append(self._load_object_value(int(value_id)))
-        return GraphChange(
-            tuple(each for each in upserts[ObjectKind.ANCHOR] if isinstance(each, Anchor)),
-            tuple(
-                each
-                for each in upserts[ObjectKind.ASSOCIATED_DATA]
-                if isinstance(each, AssociatedDataObject)
-            ),
-            tuple(each for each in upserts[ObjectKind.LINK] if isinstance(each, Link)),
-            tuple(removals[ObjectKind.ANCHOR]),
-            tuple(removals[ObjectKind.ASSOCIATED_DATA]),
-            tuple(removals[ObjectKind.LINK]),
-        )
-
     def _recorded_at(self, text: str) -> datetime:
         try:
             return datetime.fromisoformat(text)
@@ -4978,62 +4991,6 @@ class CanonicalStore:
             raise NotInitializedError("no canonical state is established")
         assert isinstance(row, tuple)
         return str(row[0])
-
-    def establishing_record(self) -> tuple[int, CanonicalTransitionRecord | None]:
-        """Return the current revision and the transition that established it.
-
-        Read from the projection row in one statement, so the pair cannot disagree the
-        way two separate reads can when another writer commits between them.
-        """
-        row = self._read_record(
-            "SELECT s.revision, r.ordinal, r.established_revision, r.record_kind, r.recorded_at,"
-            " r.initiator, r.source, r.summary, r.prior_revision"
-            " FROM state_head s JOIN canonical_record r"
-            " ON r.established_revision = s.established_by WHERE s.id = 0"
-        )
-        if row is None:
-            raise NotInitializedError("no canonical state is established")
-        assert isinstance(row, tuple)
-        revision, ordinal = int(row[0]), int(row[1])
-        if not ordinal:
-            return revision, None
-        record = _RecordRow(*row[2:])
-        return revision, self._transition_from(record)
-
-    def snapshot_basis(
-        self,
-    ) -> tuple[
-        CanonicalState,
-        InitialStateRecord,
-        tuple[CanonicalTransitionRecord, ...],
-        str,
-    ]:
-        """Capture state and every value needed for its lineage in one read snapshot."""
-        try:
-            with self._lock:
-                self._connection.execute("BEGIN")
-                try:
-                    state = self._current_state_unlocked()
-                    initial = self.initial_record()
-                    transitions = self.transitions()
-                    identity = self.ledger_identity()
-                    if transitions and transitions[-1].resulting_revision != state.revision:
-                        raise StoreError(
-                            "the current projection and canonical ledger end at different revisions"
-                        )
-                    if not transitions and state.revision != initial.established_revision:
-                        raise StoreError(
-                            "the current projection and canonical history base disagree"
-                        )
-                    self._connection.execute("COMMIT")
-                    return state, initial, transitions, identity
-                except BaseException:
-                    self._rollback_quietly()
-                    raise
-        except sqlite3.Error as error:
-            raise StoreError(
-                f"could not capture a snapshot basis at {self._path}: {error}"
-            ) from error
 
     def revision_at(self, moment: datetime) -> int | None:
         """Return the greatest committed revision recorded at or before ``moment``.
@@ -5059,45 +5016,6 @@ class CanonicalStore:
             "SELECT 1 FROM canonical_record WHERE established_revision = ?", (revision,)
         )
         return row is not None
-
-    def transitions_through(self, revision: int) -> tuple[CanonicalTransitionRecord, ...]:
-        """Read the transitions establishing revisions up to and including ``revision``."""
-        rows = self._fetchall(
-            "SELECT established_revision, record_kind, recorded_at, initiator, source, summary,"
-            " prior_revision FROM canonical_record WHERE ordinal > 0 AND established_revision <= ?"
-            " ORDER BY ordinal",
-            (revision,),
-        )
-        self._record_reads += len(rows)
-        records: list[CanonicalTransitionRecord] = []
-        for row in rows:
-            assert isinstance(row, tuple)
-            records.append(self._transition_from(_RecordRow(*row)))
-        return tuple(records)
-
-    def definition_transitions_through(
-        self, revision: int
-    ) -> tuple[CanonicalTransitionRecord, ...]:
-        """Read only the transitions up to ``revision`` that changed definitions.
-
-        Graph mutations are excluded in the query rather than skipped afterwards, so
-        answering "what was the vocabulary then" does not cost the graph work that
-        happened in between — which is the difference the requirement asks for.
-
-        Stated as what to leave out rather than what to include: a kind added later is
-        then read by default and answers for itself, instead of being silently dropped
-        from every historical vocabulary until someone remembers this list.
-        """
-        rows = self._fetchall(
-            DEFINITION_TRANSITIONS_SQL,
-            (revision,),
-        )
-        self._record_reads += len(rows)
-        records: list[CanonicalTransitionRecord] = []
-        for row in rows:
-            assert isinstance(row, tuple)
-            records.append(self._transition_from(_RecordRow(*row)))
-        return tuple(records)
 
     def canonical_summaries(
         self,
@@ -5152,57 +5070,6 @@ class CanonicalStore:
                 )
             )
         return tuple(summaries)
-
-    def initial_record(self) -> InitialStateRecord:
-        """Read the owned initial record. This is a semantic canonical-record access."""
-        row = self._read_record(
-            "SELECT established_revision, record_kind, recorded_at, initiator, source, summary,"
-            " prior_revision FROM canonical_record WHERE ordinal = 0"
-        )
-        if row is None:
-            raise StoreError("no initial canonical record is established")
-        assert isinstance(row, tuple)
-        record = _RecordRow(*row)
-        if record.record_kind != "initial":
-            raise StoreError(f"ledger base is a {record.record_kind} record, not an initial record")
-        definition_row = self._fetchone(
-            "SELECT active_definition_set_id, proposed_definition_set_id"
-            " FROM canonical_definition_event"
-            " WHERE established_revision = ?",
-            (record.established_revision,),
-        )
-        if not isinstance(definition_row, tuple):
-            raise StoreError("the initial record has no normalized definition event")
-        state = CanonicalState(
-            graph=self._graph_at_unlocked(record.established_revision),
-            active_definitions=self._load_definition_set(str(definition_row[0])),
-            definition_delta=(
-                None
-                if definition_row[1] is None
-                else DefinitionDelta(
-                    proposed_definitions=self._load_definition_set(str(definition_row[1]))
-                )
-            ),
-            revision=record.established_revision,
-        )
-        if state.revision != record.established_revision:
-            raise StoreError(
-                f"the initial record at {self._path} establishes revision "
-                f"{record.established_revision} but carries revision {state.revision}"
-            )
-        recorded_at = self._recorded_at(record.recorded_at)
-        return InitialStateRecord(
-            canonical_state=state,
-            initialization_summary=record.summary,
-            provenance=Provenance(initiator=record.initiator, source=record.source),
-            recorded_at=recorded_at,
-        )
-
-    def replay(self) -> CanonicalState:
-        """Reconstruct canonical state by replaying through the final canonical record."""
-        from vellis.canonical import replay as replay_records
-
-        return replay_records(self.initial_record(), self.transitions())
 
     def verify_projection_from_ledger(self) -> tuple[ValidationFinding, ...]:
         """Rebuild expected projection in temporary SQL and compare in both directions."""
@@ -5429,7 +5296,7 @@ class CanonicalStore:
                         elif value_set_id is None:
                             definition_error = True
                         else:
-                            value = self._load_definition_set(str(value_set_id))
+                            value = self._load_definition_set(str(value_set_id), one_entry=True)
                             if definition_content_stats(value)[1] != 1:
                                 definition_error = True
                             elif entity_kind == "type":
@@ -5636,25 +5503,6 @@ class CanonicalStore:
         assert isinstance(row, tuple)
         return int(row[0])
 
-    def _current_graph_unlocked(self) -> Graph:
-        rows = self._connection.execute(
-            "SELECT uuid, object_kind, type_key, source_uuid, target_uuid, object_value_id"
-            " FROM current_graph_object ORDER BY uuid"
-        ).fetchall()
-        anchors: list[Anchor] = []
-        associated: list[AssociatedDataObject] = []
-        links: list[Link] = []
-        for row in rows:
-            graph_object = self._decode_current_graph_object(*row)
-            if isinstance(graph_object, Anchor):
-                anchors.append(graph_object)
-            elif isinstance(graph_object, AssociatedDataObject):
-                associated.append(graph_object)
-            else:
-                links.append(graph_object)
-        self._current_graph_decodes += 1
-        return Graph(anchors=tuple(anchors), associated_data=tuple(associated), links=tuple(links))
-
     def _decode_current_graph_object(
         self,
         uuid: object,
@@ -5725,6 +5573,7 @@ class CanonicalStore:
         type_keys: set[str] | None = None,
         constrained_type_keys: set[str] | None = None,
         relationship_keys: set[str] | None = None,
+        one_entry: bool = False,
     ) -> GraphDefinitionSet:
         self._current_definition_decodes += 1
         try:
@@ -5734,29 +5583,10 @@ class CanonicalStore:
                 type_keys=type_keys,
                 constrained_type_keys=constrained_type_keys,
                 relationship_keys=relationship_keys,
+                one_entry=one_entry,
             )
         except (ValueError, ArithmeticError) as error:
             raise StoreError(f"stored definitions do not decode: {error}") from error
-
-    def _graph_at_unlocked(self, revision: int) -> Graph:
-        rows = self._connection.execute(
-            "SELECT v.id FROM graph_presence_interval p JOIN object_value v"
-            " ON v.id = p.object_value_id WHERE p.valid_from_revision <= ?"
-            " AND (p.valid_to_revision IS NULL OR p.valid_to_revision > ?) ORDER BY p.uuid",
-            (revision, revision),
-        )
-        anchors: list[Anchor] = []
-        associated: list[AssociatedDataObject] = []
-        links: list[Link] = []
-        for (value_id,) in rows:
-            value = self._load_object_value(int(value_id))
-            if isinstance(value, Anchor):
-                anchors.append(value)
-            elif isinstance(value, AssociatedDataObject):
-                associated.append(value)
-            else:
-                links.append(value)
-        return Graph(tuple(anchors), tuple(associated), tuple(links))
 
 
 class _SQLiteQueryIndex:
@@ -5768,12 +5598,6 @@ class _SQLiteQueryIndex:
         self._store = store
         self._revision = revision
         self._prospective = prospective
-        self._anchors: dict[object, tuple[Anchor, ...]] = {}
-        self._data: dict[
-            tuple[str, str, frozenset[str] | None], tuple[AssociatedDataObject, ...]
-        ] = {}
-        self._links: dict[tuple[object, str, str], tuple[Link, ...]] = {}
-        self._link_pairs: dict[object, frozenset[tuple[str, str]]] = {}
 
     def known_anchor_uuids(self, anchor_type: str, uuids: tuple[str, ...]) -> set[str]:
         return self._known_uuids(ObjectKind.ANCHOR, anchor_type, uuids)
@@ -5807,142 +5631,3 @@ class _SQLiteQueryIndex:
                 (kind.value, type_key, *uuids),
             ).fetchall()
         }
-
-    def anchor_candidates(
-        self, group: AnchorGroup, allowed_uuids: frozenset[str] | None = None
-    ) -> tuple[Anchor, ...]:
-        key = (group.anchor_type, group.uuid_filter, allowed_uuids)
-        cached = self._anchors.get(key)
-        if cached is not None:
-            return cached
-        clauses = ["object_kind = ?", "type_key = ?"]
-        parameters: list[object] = [ObjectKind.ANCHOR.value, group.anchor_type]
-        permitted = None if group.uuid_filter is None else frozenset(group.uuid_filter.uuids)
-        if allowed_uuids is not None:
-            permitted = allowed_uuids if permitted is None else permitted & allowed_uuids
-        if permitted is not None:
-            if not permitted:
-                return ()
-            placeholders = ", ".join("?" for _ in permitted)
-            clauses.append(f"uuid IN ({placeholders})")
-            parameters.extend(permitted)
-        rows = self._store._connection.execute(  # noqa: SLF001
-            "SELECT uuid, object_kind, type_key, source_uuid, target_uuid, object_value_id"
-            " FROM current_graph_object WHERE " + " AND ".join(clauses),
-            tuple(parameters),
-        ).fetchall()
-        result = tuple(self._anchors_from(rows))
-        self._anchors[key] = result
-        return result
-
-    def associated_data_candidates(
-        self,
-        associated_data_type: str,
-        anchor_uuid: str,
-        allowed_uuids: frozenset[str] | None = None,
-    ) -> tuple[AssociatedDataObject, ...]:
-        key = (associated_data_type, anchor_uuid, allowed_uuids)
-        cached = self._data.get(key)
-        if cached is not None:
-            return cached
-        clauses = ["da.anchor_uuid = ?", "o.object_kind = ?", "o.type_key = ?"]
-        parameters: list[object] = [
-            anchor_uuid,
-            ObjectKind.ASSOCIATED_DATA.value,
-            associated_data_type,
-        ]
-        if allowed_uuids is not None:
-            if not allowed_uuids:
-                return ()
-            placeholders = ", ".join("?" for _ in allowed_uuids)
-            clauses.append(f"o.uuid IN ({placeholders})")
-            parameters.extend(allowed_uuids)
-        rows = self._store._connection.execute(  # noqa: SLF001
-            "SELECT o.uuid, o.object_kind, o.type_key, o.source_uuid, o.target_uuid,"
-            " o.object_value_id"
-            " FROM current_data_anchor AS da"
-            " JOIN current_graph_object AS o ON o.uuid = da.data_uuid"
-            " WHERE " + " AND ".join(clauses),
-            tuple(parameters),
-        ).fetchall()
-        result = tuple(self._data_from(rows))
-        self._data[key] = result
-        return result
-
-    def link_candidates(
-        self, required: RequiredLink, source_uuid: str, target_uuid: str
-    ) -> tuple[Link, ...]:
-        key = (required, source_uuid, target_uuid)
-        cached = self._links.get(key)
-        if cached is not None:
-            return cached
-        clauses = [
-            "object_kind = ?",
-            "type_key = ?",
-            "source_uuid = ?",
-            "target_uuid = ?",
-        ]
-        parameters: list[object] = [
-            ObjectKind.LINK.value,
-            required.link_type,
-            source_uuid,
-            target_uuid,
-        ]
-        if required.uuid_filter is not None:
-            if not required.uuid_filter.uuids:
-                return ()
-            placeholders = ", ".join("?" for _ in required.uuid_filter.uuids)
-            clauses.append(f"uuid IN ({placeholders})")
-            parameters.extend(required.uuid_filter.uuids)
-        rows = self._store._connection.execute(  # noqa: SLF001
-            "SELECT uuid, object_kind, type_key, source_uuid, target_uuid, object_value_id"
-            " FROM current_graph_object WHERE " + " AND ".join(clauses),
-            tuple(parameters),
-        ).fetchall()
-        result = tuple(self._links_from(rows))
-        self._links[key] = result
-        return result
-
-    def link_endpoint_pairs(self, required: RequiredLink) -> frozenset[tuple[str, str]]:
-        cached = self._link_pairs.get(required)
-        if cached is not None:
-            return cached
-        clauses = ["object_kind = ?", "type_key = ?"]
-        parameters: list[object] = [ObjectKind.LINK.value, required.link_type]
-        if required.uuid_filter is not None:
-            if not required.uuid_filter.uuids:
-                return frozenset()
-            placeholders = ", ".join("?" for _ in required.uuid_filter.uuids)
-            clauses.append(f"uuid IN ({placeholders})")
-            parameters.extend(required.uuid_filter.uuids)
-        rows = self._store._connection.execute(  # noqa: SLF001
-            "SELECT source_uuid, target_uuid FROM current_graph_object WHERE "
-            + " AND ".join(clauses),
-            tuple(parameters),
-        ).fetchall()
-        result = frozenset(
-            (str(source_uuid), str(target_uuid)) for source_uuid, target_uuid in rows
-        )
-        self._link_pairs[required] = result
-        return result
-
-    def _anchors_from(self, rows: list[tuple[object, ...]]):
-        for row in rows:
-            graph_object = self._store._decode_current_graph_object(*row)  # noqa: SLF001
-            if not isinstance(graph_object, Anchor):
-                raise StoreError("an indexed anchor candidate carries another object kind")
-            yield graph_object
-
-    def _data_from(self, rows: list[tuple[object, ...]]):
-        for row in rows:
-            graph_object = self._store._decode_current_graph_object(*row)  # noqa: SLF001
-            if not isinstance(graph_object, AssociatedDataObject):
-                raise StoreError("an indexed data candidate carries another object kind")
-            yield graph_object
-
-    def _links_from(self, rows: list[tuple[object, ...]]):
-        for row in rows:
-            graph_object = self._store._decode_current_graph_object(*row)  # noqa: SLF001
-            if not isinstance(graph_object, Link):
-                raise StoreError("an indexed link candidate carries another object kind")
-            yield graph_object

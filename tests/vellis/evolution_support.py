@@ -5,6 +5,7 @@ fixtures are intentionally convenient complete sets; this module keeps their ora
 value without restoring a whole-definition-set production API.
 """
 
+from tests.vellis.oracle import materialize_definitions
 from vellis.canonical import Provenance
 from vellis.definitions import (
     DirectAssociationMultiplicityConstraint,
@@ -19,16 +20,15 @@ from vellis.governance import (
     LinkMultiplicitySelection,
 )
 from vellis.outcomes import ValidationRequest, ValidationRequestKind, ValidationScope
-from vellis.store import StoreError
 from vellis.system import RTGSystem
 
 
 def change_to(system: RTGSystem, target: GraphDefinitionSet) -> DefinitionChange:
     """Derive one test edit from the current active/proposed semantic fixture."""
-    try:
-        active = system.store.definition_view(prospective=True)[1]
-    except StoreError:
-        active = system.store.definition_view()[1]
+    proposal_present = system.store._connection.execute(  # noqa: SLF001
+        "SELECT proposed_definition_set_id IS NOT NULL FROM state_head WHERE id = 0"
+    ).fetchone()[0]
+    active = materialize_definitions(system, prospective=bool(proposal_present))
     target_types = {
         *(value.type_key for value in target.anchor_types),
         *(value.type_key for value in target.associated_data_types),

@@ -14,21 +14,22 @@ pattern says what a date looks like, not which dates exist.
 
 from __future__ import annotations
 
+from collections.abc import Iterator
+
 from vellis.definitions import (
     AnchorTypeDefinition,
     AssociatedDataTypeDefinition,
+    DefinitionEntry,
     DirectAssociationEnd,
     DirectAssociationMultiplicityConstraint,
     EndpointConstraint,
-    GraphDefinitionSet,
     LinkTypeDefinition,
     PropertyConstraint,
-    RelationshipConstraint,
     StringPattern,
 )
 from vellis.json_value import JsonKind
 
-__all__ = ["DATE_PATTERN", "everyday_life_starter"]
+__all__ = ["DATE_PATTERN", "everyday_life_entries"]
 
 DATE_PATTERN = "[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])"
 
@@ -330,22 +331,19 @@ def _details_key(anchor_key: str) -> str:
     return f"{anchor_key}.details"
 
 
-def _build() -> GraphDefinitionSet:
-    anchor_types = tuple(
-        AnchorTypeDefinition(type_key=key, description=description)
-        for key, description in _ANCHOR_TYPES
-    )
-    data_types = tuple(
-        AssociatedDataTypeDefinition(
+def everyday_life_entries() -> Iterator[DefinitionEntry]:
+    """Stream the fixed, bounded entries for the optional starter."""
+    for key, description in _ANCHOR_TYPES:
+        yield AnchorTypeDefinition(type_key=key, description=description)
+    for anchor_key, _, description, properties in _DETAILS:
+        yield AssociatedDataTypeDefinition(
             type_key=_details_key(anchor_key),
             permitted_anchor_type_keys=(anchor_key,),
             property_constraints=tuple(_property(*each) for each in properties),
             description=description,
         )
-        for anchor_key, _, description, properties in _DETAILS
-    )
-    link_types = tuple(
-        LinkTypeDefinition(
+    for key, description, endpoint_description, sources, targets in _LINK_TYPES:
+        yield LinkTypeDefinition(
             type_key=key,
             endpoint_constraint=EndpointConstraint(
                 permitted_source_type_keys=sources,
@@ -354,41 +352,21 @@ def _build() -> GraphDefinitionSet:
             ),
             description=description,
         )
-        for key, description, endpoint_description, sources, targets in _LINK_TYPES
-    )
-
-    constraints: list[RelationshipConstraint] = []
     for anchor_key, label, _, _ in _DETAILS:
         details_key = _details_key(anchor_key)
-        constraints.append(
-            DirectAssociationMultiplicityConstraint(
-                constrained_end=DirectAssociationEnd.ASSOCIATED_DATA,
-                anchor_type_keys=(anchor_key,),
-                associated_data_type_keys=(details_key,),
-                lower_bound=1,
-                upper_bound=1,
-                description=f"Each {label} details object describes exactly one {label}.",
-            )
+        yield DirectAssociationMultiplicityConstraint(
+            constrained_end=DirectAssociationEnd.ASSOCIATED_DATA,
+            anchor_type_keys=(anchor_key,),
+            associated_data_type_keys=(details_key,),
+            lower_bound=1,
+            upper_bound=1,
+            description=f"Each {label} details object describes exactly one {label}.",
         )
-        constraints.append(
-            DirectAssociationMultiplicityConstraint(
-                constrained_end=DirectAssociationEnd.ANCHOR,
-                anchor_type_keys=(anchor_key,),
-                associated_data_type_keys=(details_key,),
-                lower_bound=0,
-                upper_bound=1,
-                description=f"Each {label} has at most one {label} details object.",
-            )
+        yield DirectAssociationMultiplicityConstraint(
+            constrained_end=DirectAssociationEnd.ANCHOR,
+            anchor_type_keys=(anchor_key,),
+            associated_data_type_keys=(details_key,),
+            lower_bound=0,
+            upper_bound=1,
+            description=f"Each {label} has at most one {label} details object.",
         )
-
-    return GraphDefinitionSet(
-        anchor_types=anchor_types,
-        associated_data_types=data_types,
-        link_types=link_types,
-        relationship_constraints=tuple(constraints),
-    )
-
-
-def everyday_life_starter() -> GraphDefinitionSet:
-    """Return the complete Everyday Life starter definition set."""
-    return _build()
