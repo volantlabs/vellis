@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import shlex
 import subprocess
 from collections import Counter
 from pathlib import Path
@@ -112,13 +113,13 @@ def _reference_findings(record: dict[str, Any], *, root: Path) -> list[str]:
     for label, reference in refs:
         findings.extend(_evidence_reference_findings(reference, label=label, root=root))
         if reference.startswith("command:") and not _is_vellis_check_command(
-            reference.removeprefix("command:")
+            reference.removeprefix("command:"), root=root
         ):
             findings.append(f"{label} command evidence is not a Vellis check: {reference}")
     return findings
 
 
-def _is_vellis_check_command(command: str) -> bool:
+def _is_vellis_check_command(command: str, *, root: Path) -> bool:
     if command in {
         "just check",
         "just implementation-campaign-check",
@@ -127,9 +128,25 @@ def _is_vellis_check_command(command: str) -> bool:
         "just skills-check",
     }:
         return True
-    return command.startswith("uv run pytest tests/") and not any(
-        token in command for token in ("\n", "\r", ";", "&&", "||", "`", "$(")
-    )
+    if any(token in command for token in ("\n", "\r", ";", "&&", "||", "`", "$(")):
+        return False
+    try:
+        parts = shlex.split(command)
+    except ValueError:
+        return False
+    if parts[:3] != ["uv", "run", "pytest"]:
+        return False
+    targets = [part for part in parts[3:] if not part.startswith("-")]
+    if not targets:
+        return False
+    for target in targets:
+        path_text = target.split("::", 1)[0]
+        if not path_text.startswith("tests/"):
+            return False
+        candidate = (root / path_text).resolve()
+        if not candidate.is_file() or not candidate.is_relative_to((root / "tests").resolve()):
+            return False
+    return True
 
 
 def _git_checkpoint_findings(record: dict[str, Any], *, root: Path) -> list[str]:
@@ -232,6 +249,8 @@ def _repository_baseline_findings(record: dict[str, Any], *, root: Path) -> list
     if not target["implementation"].startswith("git:"):
         findings.append("complete target implementation is not a Vellis Git checkpoint")
         return findings
+    if target["checkpoint"] != target["implementation"]:
+        findings.append("complete target checkpoint must equal its implementation checkpoint")
     target_revision = target["implementation"].removeprefix("git:")
     if target_revision != head_revision:
         try:
@@ -244,11 +263,7 @@ def _repository_baseline_findings(record: dict[str, Any], *, root: Path) -> list
             findings.append(
                 "complete target implementation is not the reviewed repository checkpoint"
             )
-    dirty = [
-        line
-        for line in _git_text(root, "status", "--porcelain", "--untracked-files=no").splitlines()
-        if not line.endswith(" system-evolution.yaml")
-    ]
+    dirty = _git_text(root, "status", "--porcelain", "--untracked-files=no").splitlines()
     if dirty:
         findings.append("complete evolution has dirty tracked state outside its record")
     return findings
@@ -278,6 +293,18 @@ def _approval_checkpoint_findings(record: dict[str, Any], *, root: Path) -> list
             continue
         if label == "evolution":
             historical_approval = historical.get("evolution", {}).get("approval", {})
+            current_projection = {
+                "objective": record["evolution"]["objective"],
+                "observable_distinction": record["evolution"]["observable_distinction"],
+                "reason": approval["reason"],
+            }
+            historical_projection = {
+                "objective": historical.get("evolution", {}).get("objective"),
+                "observable_distinction": historical.get("evolution", {}).get(
+                    "observable_distinction"
+                ),
+                "reason": historical_approval.get("reason"),
+            }
         else:
             item_id = label.removeprefix("work item ")
             historical_item = next(
@@ -285,8 +312,26 @@ def _approval_checkpoint_findings(record: dict[str, Any], *, root: Path) -> list
                 {},
             )
             historical_approval = historical_item.get("approval", {})
+            current_item = next(item for item in record["work_items"] if item["id"] == item_id)
+            fields = (
+                "label",
+                "kind",
+                "nearest_wrong_system",
+                "compatibility_effect",
+                "non_effects",
+            )
+            current_projection = {
+                **{field: current_item[field] for field in fields},
+                "reason": approval["reason"],
+            }
+            historical_projection = {
+                **{field: historical_item.get(field) for field in fields},
+                "reason": historical_approval.get("reason"),
+            }
         if historical_approval.get("status") != "accepted":
             findings.append(f"accepted {label} approval is absent from its checkpoint")
+        elif current_projection != historical_projection:
+            findings.append(f"accepted {label} consequence differs from its approval checkpoint")
     return findings
 
 
@@ -371,6 +416,8 @@ def validate_record(record: dict[str, Any], *, root: Path = ROOT) -> list[str]:
                 findings.append(f"resolved finding {finding['id']} has no evidence")
         if finding["disposition"] == "accepted" and not finding["evidence_refs"]:
             findings.append(f"accepted finding {finding['id']} has no acceptance evidence")
+        if finding["disposition"] == "out-of-scope" and not finding["evidence_refs"]:
+            findings.append(f"out-of-scope finding {finding['id']} has no disposition evidence")
 
     for decision in decision_by_id.values():
         owner = decision["owner_work_item_id"]
@@ -422,7 +469,10 @@ def validate_record(record: dict[str, Any], *, root: Path = ROOT) -> list[str]:
                 for baseline in (baselines["source"], baselines["target"], baselines["observed"])
                 if baseline is not None
             }
-            and not binding["identity"].startswith("git:")
+            and not (
+                binding["dimension"] in {"implementation", "checkpoint"}
+                and binding["identity"].startswith("git:")
+            )
         ):
             findings.append(
                 f"complete work item {item['id']} has an unrecognized historical planned baseline"
@@ -605,12 +655,19 @@ def validate_record(record: dict[str, Any], *, root: Path = ROOT) -> list[str]:
             findings.append(
                 f"complete evolution lacks clean required review lenses {sorted(missing_lenses)}"
             )
+        target_implementation = (
+            None if baselines["target"] is None else baselines["target"]["implementation"]
+        )
         for lens in required_lenses & clean_reviews.keys():
             review = clean_reviews[lens]
             if not review["evidence_refs"]:
                 findings.append(f"clean required review {lens!r} has no attributable evidence")
             if review["reviewer"] is None or review["checkpoint"] is None:
                 findings.append(f"clean required review {lens!r} lacks reviewer attribution")
+            if review["checkpoint"] != target_implementation:
+                findings.append(
+                    f"clean required review {lens!r} is not bound to the target implementation"
+                )
 
     for review in record["closure"]["reviews"]:
         attributed = review["reviewer"] is not None and review["checkpoint"] is not None

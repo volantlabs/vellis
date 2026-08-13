@@ -20,6 +20,43 @@ def _active_work(record: dict[str, object]) -> dict[str, object]:
     return next(item for item in items if item["lifecycle"] == "active")
 
 
+def _complete_record() -> dict[str, Any]:
+    record = copy.deepcopy(system_evolution.load_record())
+    checkpoint = record["baselines"]["target"]["implementation"]
+    for finding in record["findings"]:
+        finding["disposition"] = "resolved"
+        finding["implementation_status"] = "conforming"
+    for decision in record["decisions"]:
+        decision["implementation_status"] = "conforming"
+    for item in record["work_items"]:
+        item["lifecycle"] = "complete"
+        item["implementation_status"] = "conforming"
+        item["checkpoint"] = checkpoint
+        item["evidence_refs"] = item["evidence_refs"] or ["command:just check"]
+    record["evolution"]["lifecycle"] = "complete"
+    record["evolution"]["checkpoint"] = checkpoint
+    record["closure"].update(
+        finding_disposition="complete",
+        model_status="accepted",
+        implementation_status="conforming",
+        integration_status="conforming",
+        external_status="not applicable",
+        checkpoint=checkpoint,
+        evidence_refs=["command:just check"],
+        reviews=[
+            {
+                "lens": lens,
+                "status": "clean",
+                "reviewer": f"agent:{index}",
+                "checkpoint": checkpoint,
+                "evidence_refs": ["command:just check"],
+            }
+            for index, lens in enumerate(record["scope"]["review_lenses"])
+        ],
+    )
+    return record
+
+
 def test_committed_evolution_record_is_valid() -> None:
     assert system_evolution.validate_record(_record()) == []
 
@@ -376,3 +413,70 @@ def test_completed_reviews_require_attribution_and_every_declared_lens() -> None
     findings = system_evolution.validate_record(record)  # type: ignore[arg-type]
 
     assert "review 'authority and conformance' lacks reviewer attribution" in findings
+
+
+def test_clean_final_reviews_must_bind_the_exact_target_implementation() -> None:
+    record = _complete_record()
+    for review in record["closure"]["reviews"]:
+        review["checkpoint"] = "git:da790ff"
+
+    findings = system_evolution.validate_record(record)
+
+    assert any("is not bound to the target implementation" in each for each in findings)
+
+
+def test_accepted_approval_seals_its_owner_facing_consequence() -> None:
+    record = copy.deepcopy(system_evolution.load_record())
+    _work(record, "W003")["nearest_wrong_system"] = "A changed gated consequence."
+
+    findings = system_evolution.validate_record(record)
+
+    assert "accepted work item W003 consequence differs from its approval checkpoint" in findings
+
+
+def test_complete_record_must_be_committed(monkeypatch: Any) -> None:
+    record = _complete_record()
+    original = system_evolution._git_text  # noqa: SLF001
+
+    def dirty_record(root, *arguments):
+        if arguments == ("status", "--porcelain", "--untracked-files=no"):
+            return " M system-evolution.yaml"
+        return original(root, *arguments)
+
+    monkeypatch.setattr(system_evolution, "_git_text", dirty_record)
+
+    findings = system_evolution.validate_record(record)
+
+    assert "complete evolution has dirty tracked state outside its record" in findings
+
+
+def test_historical_baseline_keeps_its_declared_dimension() -> None:
+    record = copy.deepcopy(system_evolution.load_record())
+    _work(record, "W001")["planned_baseline"] = {
+        "dimension": "model",
+        "identity": record["baselines"]["observed"]["implementation"],
+    }
+
+    findings = system_evolution.validate_record(record)
+
+    assert "complete work item W001 has an unrecognized historical planned baseline" in findings
+
+
+def test_pytest_evidence_targets_must_exist() -> None:
+    record = copy.deepcopy(system_evolution.load_record())
+    record["findings"][0]["evidence_refs"] = ["command:uv run pytest tests/does_not_exist.py"]
+
+    findings = system_evolution.validate_record(record)
+
+    assert any("not a Vellis check" in each for each in findings)
+
+
+def test_out_of_scope_disposition_requires_evidence() -> None:
+    record = copy.deepcopy(system_evolution.load_record())
+    record["findings"][0]["disposition"] = "out-of-scope"
+    record["findings"][0]["implementation_status"] = "conflicting"
+    record["findings"][0]["evidence_refs"] = []
+
+    findings = system_evolution.validate_record(record)
+
+    assert "out-of-scope finding F001 has no disposition evidence" in findings

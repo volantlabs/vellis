@@ -20,16 +20,16 @@ baselines:
     checkpoint: git:e82e0e6161040baa4a4a728d05cabbd418c57d83
   target:
     model: sha256:ad02d24b6c6eeb38f904d551e0ae7dfd48101ff41e44db79effb3014e137e4c6
-    implementation: git:c88d3d188160137bc47616ad645edde96148eb59
+    implementation: git:32813348fd7c0c289febeaed325eaa1aee5ded95
     language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
     execution_environment: sha256:c24a0bae1e63d1f4923d6c7925925ea4e02743568a84b403677b5f6a718879fa
-    checkpoint: git:c88d3d188160137bc47616ad645edde96148eb59
+    checkpoint: git:32813348fd7c0c289febeaed325eaa1aee5ded95
   observed:
     model: sha256:ad02d24b6c6eeb38f904d551e0ae7dfd48101ff41e44db79effb3014e137e4c6
-    implementation: git:c88d3d188160137bc47616ad645edde96148eb59
+    implementation: git:32813348fd7c0c289febeaed325eaa1aee5ded95
     language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
     execution_environment: sha256:c24a0bae1e63d1f4923d6c7925925ea4e02743568a84b403677b5f6a718879fa
-    checkpoint: git:c88d3d188160137bc47616ad645edde96148eb59
+    checkpoint: git:32813348fd7c0c289febeaed325eaa1aee5ded95
 scope:
   authority_scope:
     - model/10-rtg-domain.sysml
@@ -299,9 +299,9 @@ findings:
       - VellisRequirements::historyIndependentCurrentWork
     evidence_refs:
       - command:uv run pytest tests/vellis/test_current_work.py
-    disposition: implementation-work
+    disposition: resolved
     owner_work_item_id: W007
-    implementation_status: partial
+    implementation_status: conforming
     nearest_wrong_system: Definition summaries are facet-specific but definitionDelta still routes through complete-state assembly even when the delta is absent.
     compatibility_effect: Proposal result meaning is unchanged; absence reads only revision, definitions, and delta facets.
   - id: F019
@@ -313,9 +313,9 @@ findings:
       - VellisRequirements::atomicCanonicalRevision
     evidence_refs:
       - command:uv run pytest tests/vellis/test_activity_history.py
-    disposition: implementation-work
+    disposition: resolved
     owner_work_item_id: W007
-    implementation_status: partial
+    implementation_status: conforming
     nearest_wrong_system: Per-call reads are individually committed but entries and evaluated revision do not share a SQLite read snapshot.
     compatibility_effect: History selection and result shape remain unchanged while their revision binding becomes atomic.
   - id: F020
@@ -327,9 +327,9 @@ findings:
       - VellisRequirements::semanticQueryMeaning
     evidence_refs:
       - command:uv run pytest tests/vellis/test_graph_queries.py
-    disposition: implementation-work
+    disposition: resolved
     owner_work_item_id: W007
-    implementation_status: partial
+    implementation_status: conforming
     nearest_wrong_system: Every link is ultimately checked, but early candidate narrowing preserves only the final applicable relationship.
     compatibility_effect: Query rows remain identical; all applicable identity restrictions are intersected before data filtering.
   - id: F021
@@ -340,9 +340,9 @@ findings:
       - RTGSystem::rtg_query
     evidence_refs:
       - command:just model-check
-    disposition: implementation-work
+    disposition: resolved
     owner_work_item_id: W007
-    implementation_status: partial
+    implementation_status: conforming
     nearest_wrong_system: The behavior and test conform while the durable evidence index points at an invented queryCurrentGraph name.
     compatibility_effect: Correcting a navigation reference changes no model or product behavior.
   - id: F022
@@ -599,7 +599,7 @@ work_items:
       - W008
     planned_baseline:
       dimension: implementation
-      identity: git:c88d3d188160137bc47616ad645edde96148eb59
+      identity: git:32813348fd7c0c289febeaed325eaa1aee5ded95
     finding_ids:
       - F006
       - F007
@@ -739,11 +739,13 @@ work_items:
       - The SQLite-owned live-state decision remains accepted.
       - The completed implementation campaign remains unchanged.
       - User-owned .data remains untouched.
-    lifecycle: active
-    implementation_status: partial
-    evidence_refs: []
+    lifecycle: complete
+    implementation_status: conforming
+    evidence_refs:
+      - command:uv run pytest tests/vellis/test_current_work.py tests/vellis/test_graph_queries.py tests/vellis/test_activity_history.py
+      - command:just model-check
     blocker: null
-    checkpoint: null
+    checkpoint: git:32813348fd7c0c289febeaed325eaa1aee5ded95
   - id: W008
     order: 8
     label: Close final-review evolution-validator gaps
@@ -752,7 +754,7 @@ work_items:
       - W007
     planned_baseline:
       dimension: implementation
-      identity: git:c88d3d188160137bc47616ad645edde96148eb59
+      identity: git:32813348fd7c0c289febeaed325eaa1aee5ded95
     finding_ids:
       - F022
       - F023
@@ -777,8 +779,8 @@ work_items:
     non_effects:
       - Portable schema semantics remain implementation and repository neutral.
       - Completed campaign history remains immutable.
-    lifecycle: pending
-    implementation_status: not evaluated
+    lifecycle: active
+    implementation_status: partial
     evidence_refs: []
     blocker: null
     checkpoint: null
