@@ -47,6 +47,7 @@ from vellis.canonical import (
     CanonicalState,
     CanonicalTransitionRecord,
     DefinitionDelta,
+    DefinitionDeltaDisposition,
     InitialStateRecord,
     Provenance,
     TransitionKind,
@@ -870,9 +871,7 @@ class CanonicalStore:
                 ((graph_object.uuid, uuid) for uuid in graph_object.anchor_uuids),
             )
 
-    def append_transition(
-        self, record: CanonicalTransitionRecord, resulting_state: CanonicalState
-    ) -> None:
+    def append_transition(self, record: CanonicalTransitionRecord) -> None:
         """Append one transition and update the projection as one recoverable effect.
 
         The appended record and the updated projection commit together, so no reader can
@@ -880,8 +879,23 @@ class CanonicalStore:
         The prior revision is re-checked inside the transaction, so two writers cannot
         both believe they are advancing from it.
         """
-        definitions, delta = _encode_current_facets(resulting_state)
         change = encode_text(encode_canonical_change(record.change))
+        projection_assignments = ["revision = ?", "established_by = ?"]
+        projection_values: list[object] = [record.resulting_revision, record.resulting_revision]
+        if record.change.active_definitions is not None:
+            projection_assignments.append("active_definitions = ?")
+            projection_values.append(
+                encode_text(encode_definition_set(record.change.active_definitions))
+            )
+        if record.change.delta_disposition is DefinitionDeltaDisposition.PRESENT:
+            assert record.change.definition_delta is not None
+            projection_assignments.append("definition_delta = ?")
+            projection_values.append(
+                encode_text(encode_definition_delta(record.change.definition_delta))
+            )
+        elif record.change.delta_disposition is DefinitionDeltaDisposition.ABSENT:
+            projection_assignments.append("definition_delta = ?")
+            projection_values.append(None)
         with self._lock:
             try:
                 self._connection.execute("BEGIN IMMEDIATE")
@@ -911,14 +925,10 @@ class CanonicalStore:
                     ),
                 )
                 self._connection.execute(
-                    "UPDATE current_state SET revision = ?, established_by = ?,"
-                    " active_definitions = ?, definition_delta = ? WHERE id = 0",
-                    (
-                        resulting_state.revision,
-                        record.resulting_revision,
-                        definitions,
-                        delta,
-                    ),
+                    "UPDATE current_state SET "
+                    + ", ".join(projection_assignments)
+                    + " WHERE id = 0",
+                    tuple(projection_values),
                 )
                 if record.change.graph_change is not None:
                     self._apply_current_graph_change_unlocked(record.change.graph_change)

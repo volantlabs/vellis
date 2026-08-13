@@ -99,7 +99,7 @@ from vellis.replay import (
     record_identity,
     state_findings,
 )
-from vellis.serialization import unreadable_reason
+from vellis.serialization import unreadable_change_reason, unreadable_reason
 from vellis.store import (
     AlreadyInitializedError,
     CanonicalStore,
@@ -412,12 +412,9 @@ class RTGSystem:
                 summary="the change is an effective no-op; no revision was created",
             )
         return self._commit(
-            state,
+            state.revision,
             TransitionKind.GRAPH_MUTATION,
             CanonicalChange(graph_change=change),
-            active_definitions=state.active_definitions,
-            graph=resulting_graph,
-            delta=state.definition_delta,
             provenance=provenance,
         )
 
@@ -598,6 +595,38 @@ class RTGSystem:
         throw away work the owner did not ask to lose.
         """
         try:
+            revision, active_definitions, current = self._store.current_definitions()
+        except StoreError as error:
+            return DefinitionDeltaResult(
+                status=OperationStatus.FAILED,
+                summary=f"the proposal could not be staged: {error}",
+                findings=(ValidationFinding(summary=str(error)),),
+            )
+
+        # These outcomes depend only on the separately stored definition facets. A
+        # proposal that needs an impact assessment falls through to a complete graph
+        # read, but normal absence and deliberate refusal do not borrow that cost.
+        if current is None and definition_set_equal(proposed, active_definitions):
+            return DefinitionDeltaResult(
+                status=OperationStatus.ACCEPTED,
+                summary="the proposal matches the active definitions; nothing was staged",
+                evaluated_revision=revision,
+            )
+        if current is not None and definition_set_equal(proposed, active_definitions):
+            return DefinitionDeltaResult(
+                status=OperationStatus.REJECTED,
+                summary=(
+                    "staging the active definitions would discard the current proposal; use "
+                    "the discard operation to do that deliberately"
+                ),
+                findings=(
+                    ValidationFinding(
+                        summary="a proposal equal to the active set cannot implicitly discard"
+                    ),
+                ),
+            )
+
+        try:
             state = self._working_state()
         except StoreError as error:
             return DefinitionDeltaResult(
@@ -631,14 +660,11 @@ class RTGSystem:
 
         delta = DefinitionDelta(proposed_definitions=proposed)
         outcome = self._commit(
-            state,
+            state.revision,
             TransitionKind.DEFINITION_DELTA_CHANGE,
             CanonicalChange(
                 delta_disposition=DefinitionDeltaDisposition.PRESENT, definition_delta=delta
             ),
-            active_definitions=state.active_definitions,
-            graph=state.graph,
-            delta=delta,
             provenance=provenance,
         )
         if not outcome.accepted:
@@ -701,15 +727,12 @@ class RTGSystem:
                 findings=assessment.findings,
             )
         return self._commit(
-            state,
+            state.revision,
             TransitionKind.DEFINITION_ACTIVATION,
             CanonicalChange(
                 delta_disposition=DefinitionDeltaDisposition.ABSENT,
                 active_definitions=proposed,
             ),
-            active_definitions=proposed,
-            graph=state.graph,
-            delta=None,
             provenance=provenance,
         )
 
@@ -728,37 +751,31 @@ class RTGSystem:
     def _discard_definition_delta(self, *, provenance: Provenance) -> RevisionedOutcome:
         """Clear the sole proposal, or report that there is none."""
         try:
-            state = self._working_state()
+            revision, _, delta = self._store.current_definitions()
         except StoreError as error:
             return RevisionedOutcome(
                 status=OperationStatus.FAILED,
                 summary=f"the proposal could not be discarded: {error}",
                 findings=(ValidationFinding(summary=str(error)),),
             )
-        if state.definition_delta is None:
+        if delta is None:
             return RevisionedOutcome(
                 status=OperationStatus.REJECTED,
                 summary="there is no proposal to discard",
             )
         return self._commit(
-            state,
+            revision,
             TransitionKind.DEFINITION_DELTA_CHANGE,
             CanonicalChange(delta_disposition=DefinitionDeltaDisposition.ABSENT),
-            active_definitions=state.active_definitions,
-            graph=state.graph,
-            delta=None,
             provenance=provenance,
         )
 
     def _commit(
         self,
-        state: CanonicalState,
+        prior_revision: int,
         kind: TransitionKind,
         change: CanonicalChange,
         *,
-        active_definitions: GraphDefinitionSet,
-        graph: Graph,
-        delta: DefinitionDelta | None,
         provenance: Provenance,
     ) -> RevisionedOutcome:
         """Commit one canonical transition, or refuse without effect."""
@@ -769,15 +786,9 @@ class RTGSystem:
                 summary="the record's own text cannot be stored; nothing was committed",
                 findings=record_findings,
             )
-        resulting = CanonicalState(
-            graph=graph,
-            active_definitions=active_definitions,
-            revision=state.revision + 1,
-            definition_delta=delta,
-        )
         record = CanonicalTransitionRecord(
-            prior_revision=state.revision,
-            resulting_revision=resulting.revision,
+            prior_revision=prior_revision,
+            resulting_revision=prior_revision + 1,
             kind=kind,
             change=change,
             provenance=provenance,
@@ -790,7 +801,7 @@ class RTGSystem:
                 summary="the resulting transition could not be replayed; nothing was committed",
                 findings=invalid,
             )
-        unreadable = unreadable_reason(resulting)
+        unreadable = unreadable_change_reason(change)
         if unreadable is not None:
             return RevisionedOutcome(
                 status=OperationStatus.REJECTED,
@@ -801,7 +812,7 @@ class RTGSystem:
                 findings=(ValidationFinding(summary=unreadable),),
             )
         try:
-            self._store.append_transition(record, resulting)
+            self._store.append_transition(record)
         except ConcurrentRevisionError as error:
             # Another writer got there first. The request was well formed and nothing was
             # committed, so this is a refusal the caller can act on by reading and
@@ -821,8 +832,8 @@ class RTGSystem:
             )
         return RevisionedOutcome(
             status=OperationStatus.ACCEPTED,
-            summary=f"committed revision {resulting.revision}",
-            resulting_revision=resulting.revision,
+            summary=f"committed revision {record.resulting_revision}",
+            resulting_revision=record.resulting_revision,
         )
 
     # --- Query ------------------------------------------------------------------------
@@ -1412,16 +1423,13 @@ class RTGSystem:
                 summary=f"revision {revision} is already the current state; nothing was restored",
             )
         return self._commit(
-            state,
+            state.revision,
             TransitionKind.HISTORICAL_RESTORATION,
             CanonicalChange(
                 replacement_graph=historical.graph,
                 active_definitions=historical.active_definitions,
                 delta_disposition=DefinitionDeltaDisposition.ABSENT,
             ),
-            active_definitions=historical.active_definitions,
-            graph=historical.graph,
-            delta=None,
             provenance=provenance,
         )
 

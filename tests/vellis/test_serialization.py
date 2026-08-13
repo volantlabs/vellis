@@ -24,6 +24,7 @@ from vellis.serialization import (
     encode_definition_set,
     encode_graph,
     encode_text,
+    unreadable_change_reason,
     unreadable_reason,
 )
 
@@ -289,3 +290,28 @@ def test_a_lossy_but_decodable_encoding_is_refused_before_it_is_committed(
 
     assert reason is not None
     assert "same canonical state" in reason
+
+
+def test_a_lossy_transition_encoding_is_refused_before_it_is_committed(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A transition screens the replay-sufficient change it actually stores."""
+    from vellis.canonical import CanonicalChange
+
+    change = CanonicalChange(graph_change=_sample_change())
+    assert unreadable_change_reason(change) is None
+
+    import vellis.serialization as serialization
+
+    original = serialization.encode_canonical_change
+
+    def lose_the_graph_change(value: CanonicalChange) -> JsonValue:
+        encoded = original(value)
+        assert isinstance(encoded, dict)
+        return {**encoded, "graphChange": None}
+
+    monkeypatch.setattr(serialization, "encode_canonical_change", lose_the_graph_change)
+    reason = unreadable_change_reason(change)
+
+    assert reason is not None
+    assert "same canonical change" in reason

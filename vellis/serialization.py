@@ -49,6 +49,7 @@ from vellis.outcomes import OperationStatus
 
 __all__ = [
     "DecodeError",
+    "unreadable_change_reason",
     "unreadable_reason",
     "decode_text",
     "decode_canonical_state",
@@ -746,4 +747,23 @@ def unreadable_reason(state: CanonicalState) -> str | None:
         # Decodability is not fidelity. A lossy encoding reads back cleanly and means
         # something else, which is the one failure a revision check cannot see.
         return "the stored form does not read back as the same canonical state"
+    return None
+
+
+def unreadable_change_reason(change: CanonicalChange) -> str | None:
+    """Return why a transition change could not be read back from its stored form.
+
+    Initial records store a complete canonical state and therefore use
+    :func:`unreadable_reason`. Later canonical records store only their replay-sufficient
+    change. Screening that actual representation avoids serializing unchanged graph
+    state merely to validate a form the transition never writes.
+    """
+    try:
+        restored = decode_canonical_change(
+            decode_text(encode_text(encode_canonical_change(change)))
+        )
+    except (DecodeError, ValueError, ArithmeticError, RecursionError) as error:
+        return str(error)
+    if restored != change:
+        return "the stored transition form does not read back as the same canonical change"
     return None

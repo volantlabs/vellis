@@ -641,7 +641,7 @@ def test_a_change_prepared_against_a_stale_revision_is_refused(tmp_path: Path) -
             provenance=Provenance(initiator="owner"),
         )
         with pytest.raises(ConcurrentRevisionError):
-            system.store.append_transition(stale, state)
+            system.store.append_transition(stale)
         assert canonical_state_equal(system.current_state(), state)
     finally:
         system.close()

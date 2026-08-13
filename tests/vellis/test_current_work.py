@@ -18,6 +18,7 @@ from vellis.changes import GraphChange
 from vellis.definitions import AnchorTypeDefinition, GraphDefinitionSet
 from vellis.discovery import DefinitionInspectionRequest
 from vellis.graph import Anchor
+from vellis.outcomes import OperationStatus
 from vellis.system import RTGSystem
 from vellis.validation import assess_graph_conformance
 
@@ -120,6 +121,58 @@ def test_absent_proposal_retrieval_decodes_no_graph_objects(tmp_path: Path) -> N
         assert system.store.current_graph_decodes == 0
         assert system.store.current_graph_object_decodes == 0
         assert system.store.current_definition_decodes == 1
+    finally:
+        system.close()
+
+
+def test_definition_only_no_op_and_refusal_decode_no_graph_objects(tmp_path: Path) -> None:
+    system = _established(tmp_path)
+    wider = GraphDefinitionSet(
+        anchor_types=(AnchorTypeDefinition(type_key="person", description="A described person."),)
+    )
+    try:
+        anchors = tuple(Anchor(f"a-{index}", "person", f"Person {index}") for index in range(500))
+        assert system.apply_graph_change(
+            GraphChange(anchor_upserts=anchors), provenance=Provenance(initiator="owner")
+        ).accepted
+        system.store.reset_instrumentation()
+
+        unchanged = system.set_definition_delta(
+            VOCABULARY, provenance=Provenance(initiator="owner")
+        )
+
+        assert unchanged.accepted and unchanged.resulting_revision is None
+        assert system.store.current_graph_object_decodes == 0
+
+        assert system.set_definition_delta(wider, provenance=Provenance(initiator="owner")).accepted
+        system.store.reset_instrumentation()
+
+        refused = system.set_definition_delta(VOCABULARY, provenance=Provenance(initiator="owner"))
+
+        assert refused.status is OperationStatus.REJECTED
+        assert system.store.current_graph_object_decodes == 0
+    finally:
+        system.close()
+
+
+def test_definition_delta_discard_decodes_no_graph_objects(tmp_path: Path) -> None:
+    system = _established(tmp_path)
+    wider = GraphDefinitionSet(
+        anchor_types=(AnchorTypeDefinition(type_key="person", description="A described person."),)
+    )
+    try:
+        anchors = tuple(Anchor(f"a-{index}", "person", f"Person {index}") for index in range(500))
+        assert system.apply_graph_change(
+            GraphChange(anchor_upserts=anchors), provenance=Provenance(initiator="owner")
+        ).accepted
+        assert system.set_definition_delta(wider, provenance=Provenance(initiator="owner")).accepted
+        system.store.reset_instrumentation()
+
+        discarded = system.discard_definition_delta(provenance=Provenance(initiator="owner"))
+
+        assert discarded.accepted
+        assert system.store.current_graph_object_decodes == 0
+        assert system.current_state().definition_delta is None
     finally:
         system.close()
 
