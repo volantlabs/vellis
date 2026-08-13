@@ -20,16 +20,16 @@ baselines:
     checkpoint: git:e82e0e6161040baa4a4a728d05cabbd418c57d83
   target:
     model: sha256:ad02d24b6c6eeb38f904d551e0ae7dfd48101ff41e44db79effb3014e137e4c6
-    implementation: git:32813348fd7c0c289febeaed325eaa1aee5ded95
+    implementation: git:8f1a93e4c53b5e53fa377683de5b5e1eb5885abf
     language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
     execution_environment: sha256:c24a0bae1e63d1f4923d6c7925925ea4e02743568a84b403677b5f6a718879fa
-    checkpoint: git:32813348fd7c0c289febeaed325eaa1aee5ded95
+    checkpoint: git:8f1a93e4c53b5e53fa377683de5b5e1eb5885abf
   observed:
     model: sha256:ad02d24b6c6eeb38f904d551e0ae7dfd48101ff41e44db79effb3014e137e4c6
-    implementation: git:32813348fd7c0c289febeaed325eaa1aee5ded95
+    implementation: git:8f1a93e4c53b5e53fa377683de5b5e1eb5885abf
     language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
     execution_environment: sha256:c24a0bae1e63d1f4923d6c7925925ea4e02743568a84b403677b5f6a718879fa
-    checkpoint: git:32813348fd7c0c289febeaed325eaa1aee5ded95
+    checkpoint: git:8f1a93e4c53b5e53fa377683de5b5e1eb5885abf
 scope:
   authority_scope:
     - model/10-rtg-domain.sysml
@@ -353,9 +353,9 @@ findings:
       - .agents/skills/sysml-evolution/references/evolution-record.md#baselines-and-lifecycle
     evidence_refs:
       - command:uv run pytest tests/test_system_evolution.py
-    disposition: implementation-work
+    disposition: resolved
     owner_work_item_id: W008
-    implementation_status: partial
+    implementation_status: conforming
     nearest_wrong_system: Tests address work by list position and assume one live record frontier forever.
     compatibility_effect: Tests resolve stable IDs and continue to exercise the current active frontier.
   - id: F023
@@ -366,9 +366,9 @@ findings:
       - .agents/skills/sysml-evolution/references/evolution-execution.md#review-and-remediation
     evidence_refs:
       - command:uv run pytest tests/test_system_evolution.py
-    disposition: implementation-work
+    disposition: resolved
     owner_work_item_id: W008
-    implementation_status: partial
+    implementation_status: conforming
     nearest_wrong_system: Review checkpoints need only resolve to some commit, not the exact target they claim to assess.
     compatibility_effect: Final closure requires every declared lens at the reviewed target implementation checkpoint.
   - id: F024
@@ -379,9 +379,9 @@ findings:
       - .agents/skills/sysml-evolution/references/evolution-execution.md#approval-gates
     evidence_refs:
       - command:uv run pytest tests/test_system_evolution.py
-    disposition: implementation-work
+    disposition: resolved
     owner_work_item_id: W008
-    implementation_status: partial
+    implementation_status: conforming
     nearest_wrong_system: Historical validation sees accepted but does not compare the live approval reason, nearest wrong system, compatibility effect, or non-effects.
     compatibility_effect: Vellis seals the consequence-bearing approval projection without adding Git to the portable contract.
   - id: F025
@@ -392,9 +392,9 @@ findings:
       - .agents/skills/sysml-evolution/references/evolution-execution.md#closure-and-rebaseline
     evidence_refs:
       - command:uv run pytest tests/test_system_evolution.py
-    disposition: implementation-work
+    disposition: resolved
     owner_work_item_id: W008
-    implementation_status: partial
+    implementation_status: conforming
     nearest_wrong_system: Administrative record-only commits may follow implementation, so the validator also exempts an uncommitted record at complete lifecycle.
     compatibility_effect: Active record transitions remain possible; complete validation requires a clean committed record.
   - id: F026
@@ -405,9 +405,9 @@ findings:
       - .agents/skills/sysml-evolution/references/evolution-record.md#baselines-and-lifecycle
     evidence_refs:
       - command:uv run pytest tests/test_system_evolution.py
-    disposition: implementation-work
+    disposition: resolved
     owner_work_item_id: W008
-    implementation_status: partial
+    implementation_status: conforming
     nearest_wrong_system: Any resolvable Git token bypasses historical identity recognition regardless of the dimension it occupies.
     compatibility_effect: Vellis preserves dimension-specific identities and binds checkpoint to implementation Git state.
   - id: F027
@@ -418,9 +418,9 @@ findings:
       - .agents/skills/sysml-evolution/references/evolution-record.md#work-items-and-evidence
     evidence_refs:
       - command:uv run pytest tests/test_system_evolution.py
-    disposition: implementation-work
+    disposition: resolved
     owner_work_item_id: W008
-    implementation_status: partial
+    implementation_status: conforming
     nearest_wrong_system: Prefix validation accepts uv run pytest tests/does_not_exist.py as a Vellis check.
     compatibility_effect: Focused pytest evidence must resolve every named path or node.
   - id: F028
@@ -431,9 +431,9 @@ findings:
       - .agents/skills/sysml-evolution/references/evolution-execution.md#closure-and-rebaseline
     evidence_refs:
       - command:uv run pytest tests/test_system_evolution.py
-    disposition: implementation-work
+    disposition: resolved
     owner_work_item_id: W008
-    implementation_status: partial
+    implementation_status: conforming
     nearest_wrong_system: Resolved and accepted findings require evidence, while out-of-scope is treated as self-proving.
     compatibility_effect: Every closed disposition remains evidence-bearing.
 decisions:
@@ -599,7 +599,7 @@ work_items:
       - W008
     planned_baseline:
       dimension: implementation
-      identity: git:32813348fd7c0c289febeaed325eaa1aee5ded95
+      identity: git:8f1a93e4c53b5e53fa377683de5b5e1eb5885abf
     finding_ids:
       - F006
       - F007
@@ -618,8 +618,8 @@ work_items:
     non_effects:
       - The completed implementation campaign history is not rewritten.
       - User-owned .data content is not inspected or migrated.
-    lifecycle: pending
-    implementation_status: not evaluated
+    lifecycle: active
+    implementation_status: partial
     evidence_refs: []
     blocker: null
     checkpoint: null
@@ -779,11 +779,13 @@ work_items:
     non_effects:
       - Portable schema semantics remain implementation and repository neutral.
       - Completed campaign history remains immutable.
-    lifecycle: active
-    implementation_status: partial
-    evidence_refs: []
+    lifecycle: complete
+    implementation_status: conforming
+    evidence_refs:
+      - command:uv run pytest tests/test_system_evolution.py
+      - command:just system-evolution-check
     blocker: null
-    checkpoint: null
+    checkpoint: git:8f1a93e4c53b5e53fa377683de5b5e1eb5885abf
 closure:
   finding_disposition: open
   model_status: not evaluated
