@@ -19,13 +19,18 @@ just check
 `$sysml-implementation`, `$sysml-implementation-campaign`, and `$sysml-evolution` are maintained as
 a portable SysML v2 MBSwE core. Keep Vellis paths, commands, RTG and MCP semantics, implementation language, and
 repository-specific review rules in local guidance or optional extensions. When changing the core,
-apply the cross-domain portability review in `AGENTS.md`; do not use Vellis as the only test case or
-claim that a standalone plugin already exists.
+apply the risk tier in `AGENTS.md`: repository checks for editorial changes, two contrasting fresh-
+agent archetypes for bounded orchestration or review-method changes, and all five archetypes for
+cross-domain semantic or readiness changes. Do not use Vellis as the only semantic test case or claim
+that a standalone plugin already exists.
 
 ## Change workflow
 
-1. Create a branch and read `AGENTS.md`, `model/README.md`, the complete model, relevant skills, and
-   current diff.
+1. Create a branch and read `AGENTS.md`, `model/README.md`, relevant skills, and the current diff.
+   Read the complete model for model edits, complete-system planning, and whole-system closure. For
+   bounded implementation, evolution, or slice review, read the qualified authority, enclosing
+   declarations, transitive semantic dependencies, and verification intent; record unread scope and
+   expand only when a consequential reference cannot be resolved.
 2. State one primary owner or engineering question, the observable change, and the explicit owner
    decisions, selected model meaning, or deliberate deferrals the change must preserve.
 3. Trace the smallest affected semantic slice through the existing behavior, domain meaning, native
@@ -68,9 +73,11 @@ sit between that checkpoint and closure.
    `implementation-campaign.yaml`, and obtain explicit human approval. Use
    `$sysml-implementation-campaign` only after approval. For one already selected slice, start with
    `$sysml-implementation`.
-2. Read the current model and diff before taking architecture from existing source. Use a current
-   model-work semantic handoff when available and verify it against the branch; otherwise reconstruct
-   the affected authority directly.
+2. Read the scope required by `AGENTS.md` and the current diff before taking architecture from
+   existing source. Use a current model-work semantic handoff when available and verify it against
+   the branch; otherwise reconstruct the affected authority directly. Ordinary post-build evolution
+   starts from `system-evolution.yaml`; read the stale completed campaign only for campaign-history
+   reconstruction, a preserved campaign decision, or complete-system replanning.
 3. Separate required model meaning, already selected realization constraints, realization decisions
    still open to implementation, genuine model gaps, and deliberate non-goals. Return to model work
    before coding across a gap in stakeholder-visible behavior, state, responsibility, failure,
@@ -81,6 +88,10 @@ sit between that checkpoint and closure.
    `conflicting`—separate from authority coverage. When software needs finer structure than the
    systems model, record a many-to-many realization against semantic neighborhoods and preserve the
    modeled lifecycle, state, transaction, failure, and external boundaries.
+   For consequential stateful operations, also record permitted scale drivers, forbidden unrelated-
+   population dependencies, retained and transient materialization shape, and any operation whose
+   meaning legitimately requires state-wide work. This qualitative resource-shape check does not
+   invent numerical budgets.
 5. Implement the simplest sufficient realization and derive conformance evidence from verification
    intent rather than mirroring model declarations. Use tests, analysis, simulation, inspection,
    demonstration, numerical references, timing measurements, or hardware evidence as appropriate.
@@ -96,14 +107,15 @@ sit between that checkpoint and closure.
    before representative budgets exist.
    Treat Vellis v1 compatibility as confirmed first-use initialization from one complete JSON snapshot,
    never as an existing-system merge or adoption of v1 ledger history.
-6. After focused evidence passes, use fresh read-only agents for separate authority/conformance and
-   engineering/evidence reviews. One writer collects both sets of findings and batches all in-scope
-   corrections, then sweeps the same root cause and obtains one final independent review pair.
-   Repeat only if that pair finds a plausible failure under the declared project assumptions. After
-   three consecutive non-clean final pairs, perform one bounded root-cause audit before another pair;
-   do not ask reviewers to invent mutants or speculative inputs merely to continue discovery. Commit
-   the slice's implementation, tests, evidence, documentation truth, and campaign update together;
-   return the compact worker result and stop without selecting the next slice.
+6. After focused evidence passes, freeze one state token and use fresh read-only agents for separate
+   authority/conformance and engineering/evidence reviews. Checkpoint after one pair in which both
+   lenses are clean and no tracked or evidence state changes afterward. If either lens finds a
+   material issue, one writer batches corrections, sweeps the root cause, reruns affected evidence,
+   and obtains a new clean pair. Any mutation invalidates a prior clean pair. After three consecutive
+   non-clean pairs, perform one bounded root-cause audit before another pair; do not ask reviewers to
+   invent mutants or speculative inputs merely to continue discovery. Commit the slice's
+   implementation, tests, evidence, documentation truth, and campaign update together; return the
+   compact worker result and stop without selecting the next slice.
 7. In the PR, distinguish modeled, selected, implemented, verified, and runnable. Do not claim an
    entire requirement satisfied or verification case passed from a partially covered slice. Return
    reproducible implementation evidence to model work only for a model gap or demonstrated
