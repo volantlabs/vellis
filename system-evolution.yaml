@@ -3,7 +3,7 @@ evolution:
   id: sqlite-write-path-resource-review
   objective: Correct facet-only SQLite write work and decide whether ordinary graph mutation must avoid complete-graph materialization.
   observable_distinction: A definition-only no-op or delta discard reads and writes no graph objects, transition commits validate their actual stored representation, and any stronger mutation bound is accepted before implementation relies on it.
-  lifecycle: active
+  lifecycle: awaiting-approval
   approval:
     status: pending
     reason: Strengthening ordinary graph-mutation resource behavior beyond the current complete-graph validation exception requires owner acceptance; independent implementation defects do not.
@@ -18,13 +18,18 @@ baselines:
     language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
     execution_environment: sha256:c24a0bae1e63d1f4923d6c7925925ea4e02743568a84b403677b5f6a718879fa
     checkpoint: git:79840c2168e5d136571a89f7eb6ccd6ff7e56659
-  target: null
-  observed:
+  target:
     model: sha256:ad02d24b6c6eeb38f904d551e0ae7dfd48101ff41e44db79effb3014e137e4c6
-    implementation: git:79840c2168e5d136571a89f7eb6ccd6ff7e56659
+    implementation: git:096d548af4a744aa60a6bacafa74d3d0b58b7fe1
     language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
     execution_environment: sha256:c24a0bae1e63d1f4923d6c7925925ea4e02743568a84b403677b5f6a718879fa
-    checkpoint: git:79840c2168e5d136571a89f7eb6ccd6ff7e56659
+    checkpoint: git:096d548af4a744aa60a6bacafa74d3d0b58b7fe1
+  observed:
+    model: sha256:ad02d24b6c6eeb38f904d551e0ae7dfd48101ff41e44db79effb3014e137e4c6
+    implementation: git:096d548af4a744aa60a6bacafa74d3d0b58b7fe1
+    language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
+    execution_environment: sha256:c24a0bae1e63d1f4923d6c7925925ea4e02743568a84b403677b5f6a718879fa
+    checkpoint: git:096d548af4a744aa60a6bacafa74d3d0b58b7fe1
 scope:
   authority_scope:
     - model/40-requirements.sysml
@@ -53,9 +58,9 @@ findings:
       - VellisRequirements::nonDisruptiveDefinitionWork
     evidence_refs:
       - command:uv run pytest tests/vellis/test_current_work.py
-    disposition: implementation-work
+    disposition: resolved
     owner_work_item_id: W001
-    implementation_status: conflicting
+    implementation_status: conforming
     nearest_wrong_system: Definition-only no-op and discard results are correct while their transient decoding and allocation scale linearly with unrelated graph population.
     compatibility_effect: Public results and durable meaning remain unchanged; no released database layout requires migration.
   - id: F002
@@ -68,9 +73,9 @@ findings:
       - VellisRequirements::historyIndependentCurrentWork
     evidence_refs:
       - command:uv run pytest tests/vellis/test_serialization.py tests/vellis/test_current_work.py
-    disposition: implementation-work
+    disposition: resolved
     owner_work_item_id: W001
-    implementation_status: conflicting
+    implementation_status: conforming
     nearest_wrong_system: A transition remains replayable in ordinary cases but screens a representation it does not write and re-encodes unchanged graph state on every commit.
     compatibility_effect: Stored transition meaning remains unchanged; the unreleased implementation may correct its internal validation without migration.
   - id: F003
@@ -119,8 +124,9 @@ decisions:
       - Transition fidelity validation rejects a lossy replay-change encoding.
       - Initial establishment continues to validate and store its complete canonical-state base.
       - Ledger append and changed projection facets remain one atomic SQLite transaction.
-    implementation_status: partial
-    evidence_refs: []
+    implementation_status: conforming
+    evidence_refs:
+      - command:uv run pytest tests/vellis/test_current_work.py tests/vellis/test_serialization.py tests/vellis/test_graph_changes.py tests/vellis/test_definition_discovery.py
 work_items:
   - id: W001
     order: 1
@@ -154,11 +160,12 @@ work_items:
       - Initialization continues to validate and store a complete canonical-state history base.
       - Graph changes still receive the complete validation required by current accepted authority.
       - User-owned .data content remains untouched.
-    lifecycle: active
-    implementation_status: partial
-    evidence_refs: []
+    lifecycle: complete
+    implementation_status: conforming
+    evidence_refs:
+      - command:uv run pytest tests/vellis/test_current_work.py tests/vellis/test_serialization.py tests/vellis/test_graph_changes.py tests/vellis/test_definition_discovery.py
     blocker: null
-    checkpoint: null
+    checkpoint: git:096d548af4a744aa60a6bacafa74d3d0b58b7fe1
   - id: W002
     order: 2
     label: Decide the SQLite-native mutation resource boundary
