@@ -12,6 +12,8 @@ Supports ``VellisVerification::durableHistory`` and the atomicity obligation in
 from __future__ import annotations
 
 import sqlite3
+from datetime import UTC, datetime
+from decimal import Decimal
 from pathlib import Path
 
 import pytest
@@ -19,8 +21,26 @@ from conftest import build_rich_definitions
 
 from vellis.canonical import Provenance
 from vellis.changes import GraphChange
-from vellis.definitions import GraphDefinitionSet
-from vellis.graph import Anchor
+from vellis.definitions import (
+    AnchorTypeDefinition,
+    AssociatedDataTypeDefinition,
+    EndpointConstraint,
+    GraphDefinitionSet,
+    LinkEnd,
+    LinkMultiplicityConstraint,
+    LinkTypeDefinition,
+    PropertyConstraint,
+    ValueRange,
+)
+from vellis.graph import Anchor, AssociatedDataObject
+from vellis.json_value import JsonKind, normalize
+from vellis.normalized import (
+    definition_identity,
+    insert_definition_set,
+    insert_object_value,
+    load_object_value,
+    object_identity,
+)
 from vellis.outcomes import OperationStatus
 from vellis.store import APPLICATION_ID, CanonicalStore, NotADatabaseError, StoreError
 from vellis.system import RTGSystem
@@ -60,7 +80,129 @@ def test_the_journal_mode_and_application_marker_are_set(tmp_path: Path) -> None
         inspect.close()
 
 
-def test_a_projection_whose_row_contradicts_its_payload_is_refused(tmp_path: Path) -> None:
+def test_normalized_object_identity_frames_collections_and_fields(tmp_path: Path) -> None:
+    store = CanonicalStore(tmp_path / "vellis.sqlite3")
+    first = AssociatedDataObject("d", "note", ("0",), {"1": Decimal(2)})
+    second = AssociatedDataObject("d", "note", ("0", "1", "2"), {})
+    try:
+        first_id = insert_object_value(store._connection, first)  # noqa: SLF001
+        second_id = insert_object_value(store._connection, second)  # noqa: SLF001
+
+        assert first_id != second_id
+        assert load_object_value(store._connection, first_id) == first  # noqa: SLF001
+        assert load_object_value(store._connection, second_id) == second  # noqa: SLF001
+    finally:
+        store.close()
+
+
+def test_normalized_definition_identity_distinguishes_absence_from_empty_text(
+    tmp_path: Path,
+) -> None:
+    store = CanonicalStore(tmp_path / "vellis.sqlite3")
+    absent = GraphDefinitionSet(anchor_types=(AnchorTypeDefinition("person", None),))
+    empty = GraphDefinitionSet(anchor_types=(AnchorTypeDefinition("person", ""),))
+    try:
+        assert insert_definition_set(store._connection, absent) != insert_definition_set(  # noqa: SLF001
+            store._connection,
+            empty,  # noqa: SLF001
+        )
+    finally:
+        store.close()
+
+
+def test_normalized_definition_identity_frames_endpoint_collections(tmp_path: Path) -> None:
+    store = CanonicalStore(tmp_path / "vellis.sqlite3")
+
+    def definitions(source: tuple[str, ...], target: tuple[str, ...]) -> GraphDefinitionSet:
+        return GraphDefinitionSet(
+            link_types=(
+                LinkTypeDefinition(
+                    "edge",
+                    EndpointConstraint(source, target),
+                ),
+            )
+        )
+
+    try:
+        left = insert_definition_set(store._connection, definitions(("a",), ("b", "c")))  # noqa: SLF001
+        right = insert_definition_set(store._connection, definitions(("a", "b"), ("c",)))  # noqa: SLF001
+        assert left != right
+    finally:
+        store.close()
+
+
+def test_normalized_identities_follow_canonical_numeric_equality() -> None:
+    negative_zero = AssociatedDataObject("d", "note", ("a",), {"number": normalize(Decimal("-0"))})
+    positive_zero = AssociatedDataObject("d", "note", ("a",), {"number": normalize(Decimal("0"))})
+
+    def definitions(number: str) -> GraphDefinitionSet:
+        return GraphDefinitionSet(
+            associated_data_types=(
+                AssociatedDataTypeDefinition(
+                    "note",
+                    property_constraints=(
+                        PropertyConstraint(
+                            "number",
+                            False,
+                            JsonKind.NUMBER,
+                            value_range=ValueRange(lower_bound=normalize(Decimal(number))),
+                        ),
+                    ),
+                ),
+            )
+        )
+
+    assert object_identity(negative_zero) == object_identity(positive_zero)
+    assert definition_identity(definitions("1")) == definition_identity(definitions("1.0"))
+
+
+def test_normalized_numbers_preserve_precision_beyond_decimal_context(tmp_path: Path) -> None:
+    store = CanonicalStore(tmp_path / "vellis.sqlite3")
+    first = AssociatedDataObject(
+        "d", "note", ("a",), {"number": normalize(Decimal("12345678901234567890123456789"))}
+    )
+    second = AssociatedDataObject(
+        "d", "note", ("a",), {"number": normalize(Decimal("12345678901234567890123456788"))}
+    )
+    try:
+        first_id = insert_object_value(store._connection, first)  # noqa: SLF001
+        second_id = insert_object_value(store._connection, second)  # noqa: SLF001
+        assert first_id != second_id
+        assert load_object_value(store._connection, first_id) == first  # noqa: SLF001
+        assert load_object_value(store._connection, second_id) == second  # noqa: SLF001
+    finally:
+        store.close()
+
+
+def test_normalized_relationship_identity_ignores_unordered_participant_order() -> None:
+    def definitions(participants: tuple[str, ...]) -> GraphDefinitionSet:
+        return GraphDefinitionSet(
+            relationship_constraints=(
+                LinkMultiplicityConstraint(
+                    "edge",
+                    LinkEnd.SOURCE,
+                    participants,
+                    ("target", "other"),
+                    0,
+                ),
+            )
+        )
+
+    assert definition_identity(definitions(("a", "b"))) == definition_identity(
+        definitions(("b", "a"))
+    )
+
+
+def test_canonical_record_identity_is_bound_to_record_content() -> None:
+    moment = datetime.now(UTC)
+    common = ("ledger", "prior", 2, "graphMutation", moment, "owner", None, "1")
+
+    assert CanonicalStore._record_identity(*common, "change-a") != (  # noqa: SLF001
+        CanonicalStore._record_identity(*common, "change-b")  # noqa: SLF001
+    )
+
+
+def test_a_projection_whose_revision_markers_disagree_is_refused(tmp_path: Path) -> None:
     """Excludes serving a mixed tuple whose revision and content came from different writes.
 
     Content divergence introduced by editing the file directly is out of scope: detecting
@@ -72,7 +214,7 @@ def test_a_projection_whose_row_contradicts_its_payload_is_refused(tmp_path: Pat
 
     connection = sqlite3.connect(path)
     try:
-        connection.execute("UPDATE current_state SET revision = 99 WHERE id = 0")
+        connection.execute("UPDATE state_head SET revision = 99 WHERE id = 0")
         connection.commit()
     finally:
         connection.close()
@@ -81,157 +223,6 @@ def test_a_projection_whose_row_contradicts_its_payload_is_refused(tmp_path: Pat
     try:
         with pytest.raises(StoreError, match="claims revision"):
             store.current_state()
-    finally:
-        store.close()
-
-
-def test_a_record_whose_payload_contradicts_its_revision_is_refused(tmp_path: Path) -> None:
-    path = tmp_path / "vellis.sqlite3"
-    _established(path)
-
-    connection = sqlite3.connect(path)
-    try:
-        connection.execute(
-            "UPDATE canonical_record SET payload = replace(payload, '\"revision\":0',"
-            " '\"revision\":42') WHERE ordinal = 0"
-        )
-        connection.commit()
-    finally:
-        connection.close()
-
-    store = CanonicalStore(path)
-    try:
-        with pytest.raises(StoreError, match="but carries revision"):
-            store.initial_record()
-    finally:
-        store.close()
-
-
-def test_unreadable_stored_text_is_refused_rather_than_reinterpreted(tmp_path: Path) -> None:
-    path = tmp_path / "vellis.sqlite3"
-    _established(path)
-
-    connection = sqlite3.connect(path)
-    try:
-        connection.execute("UPDATE current_state SET active_definitions = 'not json' WHERE id = 0")
-        connection.commit()
-    finally:
-        connection.close()
-
-    store = CanonicalStore(path)
-    try:
-        with pytest.raises(StoreError, match="do not decode"):
-            store.current_state()
-    finally:
-        store.close()
-
-
-def test_indexed_selectors_that_disagree_with_payload_are_refused(tmp_path: Path) -> None:
-    path = tmp_path / "vellis.sqlite3"
-    system = RTGSystem.open(path)
-    try:
-        assert system.initialize_fresh(
-            build_rich_definitions(),
-            provenance=Provenance(initiator="owner"),
-            initialization_summary="a fresh start",
-        ).accepted
-        assert system.apply_graph_change(
-            GraphChange(anchor_upserts=(Anchor("a-1", "person", "Ada"),)),
-            provenance=Provenance(initiator="owner"),
-        ).accepted
-    finally:
-        system.close()
-
-    connection = sqlite3.connect(path)
-    try:
-        connection.execute(
-            "UPDATE current_graph_object SET type_key = 'project' WHERE uuid = 'a-1'"
-        )
-        connection.execute(
-            "UPDATE current_state SET sealed_projection_writes = projection_writes WHERE id = 0"
-        )
-        connection.commit()
-    finally:
-        connection.close()
-
-    store = CanonicalStore(path)
-    try:
-        with pytest.raises(StoreError, match="selectors that disagree"):
-            store.current_state()
-    finally:
-        store.close()
-
-
-@pytest.mark.parametrize("corruption", ["extra", "missing"])
-def test_association_selectors_that_disagree_with_payload_are_refused(
-    tmp_path: Path, corruption: str
-) -> None:
-    from vellis.graph import AssociatedDataObject
-
-    path = tmp_path / "vellis.sqlite3"
-    system = RTGSystem.open(path)
-    try:
-        assert system.initialize_fresh(
-            build_rich_definitions(),
-            provenance=Provenance(initiator="owner"),
-            initialization_summary="a fresh start",
-        ).accepted
-        assert system.apply_graph_change(
-            GraphChange(
-                anchor_upserts=(
-                    Anchor("a-1", "person", "Ada"),
-                    Anchor("a-2", "person", "Grace"),
-                ),
-                associated_data_upserts=(
-                    AssociatedDataObject(
-                        "d-1",
-                        "note",
-                        ("a-1",),
-                        {"title": "Note"},
-                    ),
-                ),
-            ),
-            provenance=Provenance(initiator="owner"),
-        ).accepted
-        if corruption == "extra":
-            system.store._connection.execute(  # noqa: SLF001
-                "INSERT INTO current_data_anchor VALUES ('d-1', 'a-2')"
-            )
-        else:
-            system.store._connection.execute(  # noqa: SLF001
-                "DELETE FROM current_data_anchor WHERE data_uuid = 'd-1'"
-            )
-        system.store._connection.execute(  # noqa: SLF001
-            "UPDATE current_state SET sealed_projection_writes = projection_writes WHERE id = 0"
-        )
-
-        with pytest.raises(StoreError, match="association selectors that disagree"):
-            system.current_state()
-    finally:
-        system.close()
-
-
-def test_an_unsealed_projection_change_is_refused_before_it_can_underselect(
-    tmp_path: Path,
-) -> None:
-    path = tmp_path / "vellis.sqlite3"
-    _established(path)
-
-    connection = sqlite3.connect(path)
-    try:
-        connection.execute(
-            "INSERT INTO current_graph_object"
-            " (uuid, object_kind, type_key, source_uuid, target_uuid, payload)"
-            " VALUES ('a-1', 'anchor', 'person', NULL, NULL, '{}')"
-        )
-        connection.commit()
-    finally:
-        connection.close()
-
-    store = CanonicalStore(path)
-    try:
-        with pytest.raises(StoreError, match="projection changed"):
-            store.current_revision()
     finally:
         store.close()
 
@@ -265,12 +256,12 @@ def test_a_store_missing_its_tables_reports_a_store_error(tmp_path: Path) -> Non
 
     connection = sqlite3.connect(path)
     try:
-        connection.execute("DROP TABLE current_state")
+        connection.execute("DROP TABLE state_head")
         connection.commit()
     finally:
         connection.close()
 
-    with pytest.raises(StoreError, match="missing its current_state table"):
+    with pytest.raises(StoreError, match="missing its state_head table"):
         CanonicalStore(path)
 
 
@@ -406,7 +397,7 @@ def test_a_failure_between_the_record_and_the_projection_establishes_nothing(
         blocker = sqlite3.connect(path)
         try:
             blocker.execute(
-                "CREATE TRIGGER refuse_projection BEFORE INSERT ON current_state "
+                "CREATE TRIGGER refuse_projection BEFORE INSERT ON state_head "
                 "BEGIN SELECT RAISE(ABORT, 'disk went away'); END"
             )
             blocker.commit()
@@ -445,7 +436,7 @@ def test_a_transition_projection_failure_rolls_back_every_table(tmp_path: Path) 
         blocker = sqlite3.connect(path)
         try:
             blocker.execute(
-                "CREATE TRIGGER refuse_graph_projection BEFORE INSERT ON current_graph_object "
+                "CREATE TRIGGER refuse_graph_projection BEFORE INSERT ON graph_presence_interval "
                 "BEGIN SELECT RAISE(ABORT, 'projection failed'); END"
             )
             blocker.commit()
@@ -578,29 +569,6 @@ def test_concurrent_initialization_establishes_exactly_one_base(tmp_path: Path) 
         store.close()
 
 
-def test_a_stored_number_outside_the_decimal_range_is_a_store_error(tmp_path: Path) -> None:
-    """Every unreadable stored payload must reach the caller as StoreError."""
-    path = tmp_path / "vellis.sqlite3"
-    _established(path)
-
-    connection = sqlite3.connect(path)
-    try:
-        connection.execute(
-            "UPDATE canonical_record SET payload = replace(payload, '\"revision\":0',"
-            " '\"revision\":1e1000000000000000000') WHERE ordinal = 0"
-        )
-        connection.commit()
-    finally:
-        connection.close()
-
-    store = CanonicalStore(path)
-    try:
-        with pytest.raises(StoreError, match="does not decode"):
-            store.initial_record()
-    finally:
-        store.close()
-
-
 def test_a_failed_read_is_reported_as_a_store_error_not_a_driver_exception(
     tmp_path: Path,
 ) -> None:
@@ -609,11 +577,12 @@ def test_a_failed_read_is_reported_as_a_store_error_not_a_driver_exception(
     _established(path)
     store = CanonicalStore(path)
     try:
-        store._connection.execute("DROP TABLE current_state")  # noqa: SLF001
+        store._connection.execute("DROP TABLE state_head")  # noqa: SLF001
         with pytest.raises(StoreError, match="could not read"):
             store.current_state()
         with pytest.raises(StoreError, match="could not read"):
             store.is_initialized()
+        store._connection.execute("PRAGMA foreign_keys = OFF")  # noqa: SLF001
         store._connection.execute("DROP TABLE canonical_record")  # noqa: SLF001
         with pytest.raises(StoreError, match="could not read"):
             store.initial_record()

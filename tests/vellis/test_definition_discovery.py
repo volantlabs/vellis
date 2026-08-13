@@ -171,7 +171,7 @@ def test_a_summary_that_cannot_be_returned_completely_returns_nothing(tmp_path: 
     """Excludes reporting a partial vocabulary, or metadata without one."""
     system = _system(tmp_path)
     try:
-        system.store._connection.execute("DROP TABLE current_state")  # noqa: SLF001
+        system.store._connection.execute("DROP TABLE state_head")  # noqa: SLF001
         result = system.definition_summary()
         assert result.status is OperationStatus.FAILED
         assert result.anchor_types == ()
@@ -773,7 +773,7 @@ def test_an_inspection_against_an_unreadable_store_reports_rather_than_raises(
 ) -> None:
     system = _system(tmp_path)
     try:
-        system.store._connection.execute("DROP TABLE current_state")  # noqa: SLF001
+        system.store._connection.execute("DROP TABLE state_head")  # noqa: SLF001
         result = system.inspect_definitions(DefinitionInspectionRequest(("person",)))
         assert result.status is OperationStatus.FAILED
         assert result.anchor_details == ()

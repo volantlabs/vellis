@@ -28,7 +28,7 @@ model_baseline:
     validator_sha256: 1f6f2eb0eb43cf4a2154ef4989a0ed22c871051711c50b2f88399c299cad5bbf
     checkpoint: null
   observed:
-    authority_sha256: ad02d24b6c6eeb38f904d551e0ae7dfd48101ff41e44db79effb3014e137e4c6
+    authority_sha256: 23a0fa4c525a6e89ec0740c4d4f0af283cccae44abc23b73b99f7427d7c93c7e
     language_sha256: 054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
     validator_sha256: 1f6f2eb0eb43cf4a2154ef4989a0ed22c871051711c50b2f88399c299cad5bbf
     checkpoint: null
@@ -91,7 +91,7 @@ authority:
       - path:tests/vellis/test_fresh_initialization.py#test_canonical_memory_survives_an_ordinary_restart
       - path:tests/vellis/test_fresh_initialization.py#test_refusal_after_establishment_leaves_the_record_untouched
       - path:tests/vellis/test_serialization.py#test_a_complete_canonical_state_round_trips_through_text
-      - path:tests/vellis/test_store_integrity.py#test_a_projection_whose_row_contradicts_its_payload_is_refused
+      - path:tests/vellis/test_store_integrity.py#test_a_projection_whose_revision_markers_disagree_is_refused
       - path:tests/vellis/test_store_integrity.py#test_a_rich_vocabulary_survives_an_ordinary_restart
       - path:tests/vellis/test_graph_changes.py#test_each_transition_is_contiguous_and_advances_exactly_one_revision
       - path:tests/vellis/test_graph_changes.py#test_an_accepted_record_carries_the_change_not_a_replacement_graph
@@ -545,7 +545,7 @@ slices:
       - path:docs/mcp-realization.md#local-setup-path
       - command:uv run pytest tests/vellis
       - path:tests/vellis/test_serialization.py#test_a_complete_canonical_state_round_trips_through_text
-      - path:tests/vellis/test_store_integrity.py#test_a_projection_whose_row_contradicts_its_payload_is_refused
+      - path:tests/vellis/test_store_integrity.py#test_a_projection_whose_revision_markers_disagree_is_refused
     realization_decisions:
       - id: D002
         summary: Use one documented Python setup path with interactive preview and confirmation, complete noninteractive arguments plus --yes, and a no-effect --dry-run mode.
@@ -1129,7 +1129,7 @@ slices:
       - path:tests/vellis/test_work_characterization.py#test_a_narrow_activity_interval_costs_the_interval_whatever_precedes_it
       - path:tests/vellis/test_work_characterization.py#test_resolving_a_revision_or_a_time_does_not_depend_on_ledger_length
       - path:tests/vellis/test_work_characterization.py#test_a_historical_vocabulary_does_not_pay_for_unrelated_graph_transitions
-      - path:tests/vellis/test_work_characterization.py#test_a_historical_graph_does_pay_for_its_transitions
+      - path:tests/vellis/test_work_characterization.py#test_a_historical_query_uses_intervals_not_transition_replay
       - path:tests/vellis/test_work_characterization.py#test_replay_visits_exactly_its_required_tail_and_reaches_the_same_state
       - path:tests/vellis/test_work_characterization.py#test_restoring_a_past_state_costs_the_tail_it_has_to_replay
       - path:tests/vellis/test_work_characterization.py#test_an_ordinary_restart_does_not_depend_on_the_required_tail

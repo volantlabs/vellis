@@ -227,6 +227,24 @@ def test_a_change_whose_result_would_not_conform_is_refused(tmp_path: Path) -> N
         system.close()
 
 
+def test_endpoint_type_change_revalidates_incident_links(tmp_path: Path) -> None:
+    system = _populated(tmp_path)
+    try:
+        before = system.current_state()
+        outcome = _apply(
+            system,
+            GraphChange(anchor_upserts=(Anchor("a-1", "project", "Ada as a project"),)),
+        )
+
+        assert outcome.status is OperationStatus.REJECTED
+        assert any(
+            "endpoint constraint does not permit" in each.summary for each in outcome.findings
+        )
+        assert canonical_state_equal(system.current_state(), before)
+    finally:
+        system.close()
+
+
 def test_a_change_that_breaks_an_untouched_objects_rule_is_refused(tmp_path: Path) -> None:
     """The complete resulting graph is validated, not the delta of it."""
     system = _populated(tmp_path)
@@ -452,14 +470,7 @@ def test_a_non_conforming_graph_is_described_not_raised(tmp_path: Path) -> None:
     try:
         state = system.current_state()
         system.store._upsert_current_graph_object_unlocked(  # noqa: SLF001
-            Link("l-9", "worksOn", "a-2", "a-1")
-        )
-        # This fixture intentionally creates a canonically established but
-        # non-conforming graph. A raw projection edit is a different failure
-        # mode, covered by test_store_integrity, so acknowledge this test-only
-        # write before asking the conformance checker to describe the graph.
-        system.store._connection.execute(  # noqa: SLF001
-            "UPDATE current_state SET sealed_projection_writes = projection_writes WHERE id = 0"
+            Link("l-9", "worksOn", "a-2", "a-1"), state.revision
         )
         report = system.check()
         assert report.scope is ValidationScope.GRAPH_CONFORMANCE

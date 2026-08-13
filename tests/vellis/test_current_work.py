@@ -13,12 +13,16 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 from vellis.canonical import Provenance, canonical_state_equal
 from vellis.changes import GraphChange
 from vellis.definitions import AnchorTypeDefinition, GraphDefinitionSet
 from vellis.discovery import DefinitionInspectionRequest
 from vellis.graph import Anchor
+from vellis.history import RevisionSelection
 from vellis.outcomes import OperationStatus
+from vellis.query import AnchorGroup, AnchorProjection, AnchorUuidFilter, GraphQuery, ReturnShape
 from vellis.system import RTGSystem
 from vellis.validation import assess_graph_conformance
 
@@ -286,4 +290,122 @@ def test_current_work_issues_no_statement_against_the_ledger(tmp_path: Path) -> 
         assert any("canonical_record" in statement for statement in statements)
     finally:
         system.store._connection.set_trace_callback(None)  # noqa: SLF001
+        system.close()
+
+
+@pytest.mark.parametrize("unrelated_population", (250, 1_000, 4_000))
+def test_one_object_mutation_decodes_only_its_affected_neighborhood(
+    tmp_path: Path, unrelated_population: int
+) -> None:
+    """A fixed mutation is independent of unrelated current graph population."""
+    system = _established(tmp_path)
+    try:
+        anchors = tuple(
+            Anchor(f"a-{index}", "person", f"Person {index}")
+            for index in range(unrelated_population)
+        )
+        assert system.apply_graph_change(
+            GraphChange(anchor_upserts=anchors), provenance=Provenance(initiator="owner")
+        ).accepted
+        system.store.reset_instrumentation()
+
+        outcome = system.apply_graph_change(
+            GraphChange(anchor_upserts=(Anchor("a-0", "person", "Renamed"),)),
+            provenance=Provenance(initiator="owner"),
+        )
+
+        assert outcome.accepted
+        assert system.store.current_graph_decodes == 0
+        assert system.store.current_graph_object_decodes == 1
+        assert system.store.record_reads == 0
+    finally:
+        system.close()
+
+
+def test_broad_query_hydrates_only_the_bounded_answer(tmp_path: Path) -> None:
+    system = _established(tmp_path)
+    try:
+        anchors = tuple(Anchor(f"a-{index}", "person", f"Person {index}") for index in range(500))
+        assert system.apply_graph_change(
+            GraphChange(anchor_upserts=anchors), provenance=Provenance(initiator="owner")
+        ).accepted
+        system.store.reset_instrumentation()
+
+        result = system.query_graph(
+            GraphQuery(
+                anchor_groups=(AnchorGroup("person", "person"),),
+                return_shape=ReturnShape((AnchorProjection("person", "person"),)),
+                maximum_rows=10,
+            )
+        )
+
+        assert result.status is OperationStatus.REJECTED
+        assert result.rows == ()
+        assert system.store.current_graph_decodes == 0
+        assert system.store.current_graph_object_decodes == 0
+    finally:
+        system.close()
+
+
+def test_schema_four_has_no_whole_state_definition_object_or_change_payloads(
+    tmp_path: Path,
+) -> None:
+    system = _established(tmp_path)
+    try:
+        connection = system.store._connection  # noqa: SLF001
+        assert connection.execute(
+            "SELECT value FROM schema_meta WHERE key = 'schema_version'"
+        ).fetchone() == ("4",)
+        forbidden = {"payload", "state", "graph", "definitions", "canonical_change"}
+        for table in (
+            "canonical_record",
+            "canonical_graph_event",
+            "canonical_definition_event",
+            "state_head",
+            "object_value",
+            "definition_set",
+        ):
+            columns = {
+                str(row[1]).lower() for row in connection.execute(f"PRAGMA table_info({table})")
+            }
+            assert columns.isdisjoint(forbidden), (table, columns & forbidden)
+    finally:
+        system.close()
+
+
+@pytest.mark.parametrize("population", (10, 1_000, 4_000))
+def test_narrow_historical_query_does_not_materialize_the_revision_population(
+    tmp_path: Path, population: int
+) -> None:
+    system = _established(tmp_path)
+    try:
+        assert system.apply_graph_change(
+            GraphChange(
+                anchor_upserts=tuple(
+                    Anchor(f"a-{index}", "person", f"Person {index}") for index in range(population)
+                )
+            ),
+            provenance=Provenance(initiator="owner"),
+        ).accepted
+        query = GraphQuery(
+            anchor_groups=(AnchorGroup("person", "person", AnchorUuidFilter(("a-0",))),),
+            return_shape=ReturnShape((AnchorProjection("returned-person", "person"),)),
+            maximum_rows=1,
+        )
+        steps = 0
+
+        def progress() -> int:
+            nonlocal steps
+            steps += 1
+            return 0
+
+        system.store._connection.set_progress_handler(progress, 1)  # noqa: SLF001
+        try:
+            result = system.query_graph(query, selection=RevisionSelection(1))
+        finally:
+            system.store._connection.set_progress_handler(None, 0)  # noqa: SLF001
+
+        assert result.accepted and len(result.rows) == 1
+        assert steps < 2_000
+    finally:
         system.close()

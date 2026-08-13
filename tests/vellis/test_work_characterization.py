@@ -449,8 +449,8 @@ def test_resolving_a_revision_or_a_time_does_not_depend_on_ledger_length(
 
     A time selector is the one that could quietly walk: the greatest revision at or
     before an instant is also what an aggregate over the whole ledger computes. Two
-    records either way — one to resolve the selector, one for the history base — with no
-    definition-changing transition in a graph-only history to add to them.
+    One record seek resolves either selector; normalized definition intervals answer the
+    vocabulary without reading a history base or transition prefix.
     """
     system = establish(tmp_path / f"vellis-{length}.sqlite3")
     try:
@@ -473,7 +473,7 @@ def test_resolving_a_revision_or_a_time_does_not_depend_on_ledger_length(
 
         for measured in (by_revision, by_time):
             assert measured.value.accepted, measured.value.findings
-            assert measured.cost.canonical_record_visits == 2
+            assert measured.cost.canonical_record_visits == 1
             assert not ledger_scans(system, measured.cost)
     finally:
         system.close()
@@ -510,20 +510,15 @@ def test_a_historical_vocabulary_does_not_pay_for_unrelated_graph_transitions(
 
         for measured in (summary, inspection):
             assert measured.value.accepted, measured.value.findings
-            # Resolve the selector, read the base, and read the six definition-changing
-            # records — never the graph-only ones, however many of them there are.
-            assert measured.cost.canonical_record_visits == 8
+            # Resolve the selector once; normalized definition rows answer directly,
+            # regardless of either graph-only or definition-changing ledger length.
+            assert measured.cost.canonical_record_visits == 1
     finally:
         system.close()
 
 
-def test_a_historical_graph_does_pay_for_its_transitions(tmp_path: Path) -> None:
-    """The separately characterized case, kept honest by measuring it too.
-
-    The requirement exempts historical graph reconstruction from the bound rather than
-    claiming it is free. Showing the exemption is real is what stops the vocabulary
-    result above from being read as a claim about graphs as well.
-    """
+def test_a_historical_query_uses_intervals_not_transition_replay(tmp_path: Path) -> None:
+    """Historical selection resolves once, then reads normalized presence intervals."""
     system = establish(tmp_path / "vellis.sqlite3")
     try:
         commit_graph_transitions(system, 20)
@@ -536,7 +531,9 @@ def test_a_historical_graph_does_pay_for_its_transitions(tmp_path: Path) -> None
         )
 
         assert measured.value.accepted, measured.value.findings
-        assert measured.cost.canonical_record_visits > 20
+        assert measured.cost.canonical_record_visits == 1
+        assert not any("canonical_graph_event" in sql for sql in measured.cost.statements)
+        assert not any("FROM canonical_record" in sql for sql in measured.cost.statements[1:])
     finally:
         system.close()
 

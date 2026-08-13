@@ -648,7 +648,7 @@ def test_a_delta_read_that_cannot_be_answered_reports_failure(tmp_path: Path) ->
     system = _system(tmp_path)
     try:
         assert _stage(system, WIDER).accepted
-        system.store._connection.execute("DROP TABLE current_state")  # noqa: SLF001
+        system.store._connection.execute("DROP TABLE state_head")  # noqa: SLF001
         result = system.definition_delta()
         assert result.status is OperationStatus.FAILED
         assert result.findings
@@ -677,7 +677,7 @@ def test_a_delta_write_that_cannot_be_answered_reports_failure(
     """
     system = _system(tmp_path)
     try:
-        system.store._connection.execute("DROP TABLE current_state")  # noqa: SLF001
+        system.store._connection.execute("DROP TABLE state_head")  # noqa: SLF001
         outcome = operate(system)
         assert outcome.status is OperationStatus.FAILED, name
         assert outcome.findings
@@ -728,11 +728,10 @@ def test_a_commit_that_cannot_be_appended_reports_failure_without_effect(
     try:
         assert _stage(system, WIDER).accepted
         before = system.current_state()
-        # Occupy the revision the next commit will claim.
+        # Fail the next append after validation but before any projection can commit.
         system.store._connection.execute(  # noqa: SLF001
-            "INSERT INTO canonical_record (established_revision, ordinal, record_kind, "
-            "recorded_at, initiator, summary, payload) "
-            "VALUES (2, 99, 'transition', '2026-01-01T00:00:00Z', 'someone', 'x', '{}')"
+            "CREATE TRIGGER refuse_next_record BEFORE INSERT ON canonical_record "
+            "BEGIN SELECT RAISE(ABORT, 'record append failed'); END"
         )
 
         outcome = system.discard_definition_delta(provenance=_owner())

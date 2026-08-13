@@ -56,7 +56,7 @@ from vellis.canonical import (
     replay,
     transition_findings,
 )
-from vellis.changes import GraphChange, apply_change, change_findings
+from vellis.changes import GraphChange
 from vellis.definitions import (
     GraphDefinitionSet,
     definition_set_equal,
@@ -77,7 +77,6 @@ from vellis.history import (
     EvaluatedDefinitions,
     HistoricalSelection,
     RevisionSelection,
-    definitions_through,
     selection_findings,
 )
 from vellis.json_value import unencodable_reason
@@ -88,7 +87,7 @@ from vellis.outcomes import (
     ValidationReport,
     ValidationScope,
 )
-from vellis.query import GraphQuery, GraphQueryResult, evaluate_query
+from vellis.query import GraphQuery, GraphQueryResult
 from vellis.replay import (
     CanonicalSnapshot,
     LedgerTail,
@@ -370,7 +369,9 @@ class RTGSystem:
         either way.
         """
         try:
-            state = self._working_state()
+            revision, structural, conformance, no_op = self._store.prepare_active_graph_change(
+                change
+            )
         except NotInitializedError as error:
             # A determinate precondition, like initializing an established RTG: the caller
             # can act on it. A damaged store cannot be acted on, only reported.
@@ -385,7 +386,6 @@ class RTGSystem:
                 summary=f"the change could not be applied: {error}",
                 findings=(ValidationFinding(summary=str(error)),),
             )
-        structural = change_findings(change, state.graph)
         if structural:
             return RevisionedOutcome(
                 status=OperationStatus.REJECTED,
@@ -395,8 +395,6 @@ class RTGSystem:
                 ),
                 findings=structural,
             )
-        resulting_graph = apply_change(state.graph, change)
-        conformance = assess_graph_conformance(resulting_graph, state.active_definitions)
         if conformance:
             return RevisionedOutcome(
                 status=OperationStatus.REJECTED,
@@ -406,13 +404,13 @@ class RTGSystem:
                 ),
                 findings=conformance,
             )
-        if graph_equal(resulting_graph, state.graph):
+        if no_op:
             return RevisionedOutcome(
                 status=OperationStatus.ACCEPTED,
                 summary="the change is an effective no-op; no revision was created",
             )
         return self._commit(
-            state.revision,
+            revision,
             TransitionKind.GRAPH_MUTATION,
             CanonicalChange(graph_change=change),
             provenance=provenance,
@@ -985,11 +983,9 @@ class RTGSystem:
         return resolved, ()
 
     def _definitions_at(self, revision: int) -> EvaluatedDefinitions:
-        """Rebuild the vocabulary at one revision without replaying graph work."""
-        return definitions_through(
-            self._store.initial_record().canonical_state,
-            self._store.definition_transitions_through(revision),
-        )
+        """Read the normalized vocabulary in force without replaying graph work."""
+        active, delta_present = self._store.definitions_at_revision(revision)
+        return EvaluatedDefinitions(active, delta_present)
 
     def _state_at(self, revision: int) -> CanonicalState:
         """Rebuild complete state at one revision. A graph needs its transitions."""
@@ -1098,10 +1094,7 @@ class RTGSystem:
                 query=query,
                 findings=findings,
             )
-        state = self._state_at(revision)
-        # The same evaluation as current state, against the definitions in force then.
-        # A query means what it means; only the state it is asked of changes.
-        return evaluate_query(query, state.active_definitions, state.graph, revision)
+        return self._store.evaluate_query_at_revision(query, revision)
 
     # --- Capture and rebuild ------------------------------------------------------------
 

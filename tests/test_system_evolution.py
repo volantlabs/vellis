@@ -31,7 +31,7 @@ def _active_record() -> dict[str, Any]:
     record["closure"]["checkpoint"] = implementation
     record["evolution"]["lifecycle"] = "active"
     record["evolution"]["checkpoint"] = None
-    active = _work(record, "W004")
+    active = _active_work(record)
     active["planned_baseline"] = {
         "dimension": "implementation",
         "identity": implementation,
@@ -132,16 +132,17 @@ def test_resolved_findings_and_conforming_decisions_require_evidence() -> None:
 
 def test_complete_work_item_cannot_retain_open_owned_work() -> None:
     record = copy.deepcopy(_record())
-    item = record["work_items"][1]  # type: ignore[index]
+    item = _work(record, "W002")
     item["lifecycle"] = "complete"
     item["implementation_status"] = "conforming"
     item["checkpoint"] = "git:checkpoint"
-    record["findings"][1]["disposition"] = "implementation-work"  # type: ignore[index]
-    record["findings"][1]["implementation_status"] = "partial"  # type: ignore[index]
+    finding = next(each for each in record["findings"] if each["id"] == "F003")  # type: ignore[union-attr]
+    finding["disposition"] = "implementation-work"
+    finding["implementation_status"] = "partial"
 
     findings = system_evolution.validate_record(record)  # type: ignore[arg-type]
 
-    assert "complete work item W002 has open findings ['F002']" in findings
+    assert "complete work item W002 has open findings ['F003']" in findings
 
 
 def test_status_reports_the_active_item_before_another_ready_item() -> None:
@@ -153,8 +154,8 @@ def test_status_reports_the_active_item_before_another_ready_item() -> None:
 
 def test_ready_work_requires_complete_dependencies() -> None:
     record = copy.deepcopy(_record())
-    record["work_items"][2]["lifecycle"] = "pending"  # type: ignore[index]
-    record["work_items"][3]["lifecycle"] = "ready"  # type: ignore[index]
+    _work(record, "W003")["lifecycle"] = "pending"
+    _work(record, "W004")["lifecycle"] = "ready"
 
     findings = system_evolution.validate_record(record)  # type: ignore[arg-type]
 
@@ -163,11 +164,11 @@ def test_ready_work_requires_complete_dependencies() -> None:
 
 def test_accepted_approval_requires_an_attributable_checkpoint() -> None:
     record = copy.deepcopy(_record())
-    record["work_items"][2]["approval"]["checkpoint"] = None  # type: ignore[index]
+    _work(record, "W002")["approval"]["checkpoint"] = None  # type: ignore[index]
 
     findings = system_evolution.validate_record(record)  # type: ignore[arg-type]
 
-    assert "accepted approval for W003 has no attributable checkpoint" in findings
+    assert "accepted approval for W002 has no attributable checkpoint" in findings
 
 
 def test_active_work_cannot_remain_bound_only_to_a_source_baseline() -> None:
@@ -187,8 +188,8 @@ def test_active_work_cannot_remain_bound_only_to_a_source_baseline() -> None:
 
 def test_complete_work_requires_complete_dependencies() -> None:
     record = copy.deepcopy(_record())
-    record["work_items"][1]["lifecycle"] = "pending"  # type: ignore[index]
-    record["work_items"][3]["lifecycle"] = "complete"  # type: ignore[index]
+    _work(record, "W002")["lifecycle"] = "pending"
+    _work(record, "W004")["lifecycle"] = "complete"
 
     findings = system_evolution.validate_record(record)  # type: ignore[arg-type]
 
@@ -305,19 +306,19 @@ def test_unknown_blocker_finding_and_duplicate_ownership_are_rejected() -> None:
         "finding_ids": ["F999"],
         "evidence_refs": [],
     }
-    record["work_items"][1]["lifecycle"] = "blocked"  # type: ignore[index]
-    record["work_items"][1]["blocker"] = {  # type: ignore[index]
+    _work(record, "W002")["lifecycle"] = "blocked"
+    _work(record, "W002")["blocker"] = {
         "classification": "external dependency",
         "summary": "The same bounded dependency blocks this work item.",
-        "finding_ids": ["F002"],
+        "finding_ids": ["F003"],
         "evidence_refs": [],
     }
-    record["work_items"][0]["finding_ids"].append("F002")  # type: ignore[index,union-attr]
+    _work(record, "W001")["finding_ids"].append("F003")  # type: ignore[union-attr]
 
     findings = system_evolution.validate_record(record)  # type: ignore[arg-type]
 
     assert "evolution blocker names unknown finding F999" in findings
-    assert any("finding F002 is listed by" in finding for finding in findings)
+    assert any("finding F003 is listed by" in finding for finding in findings)
 
 
 def test_duplicate_ids_are_rejected_before_indexing() -> None:
@@ -394,7 +395,7 @@ def test_vellis_evidence_rejects_false_commands_and_unresolved_fragments() -> No
 
 def test_accepted_approval_checkpoint_must_exist_and_contain_the_gate() -> None:
     record = copy.deepcopy(_record())
-    record["work_items"][2]["approval"]["checkpoint"] = "git:does-not-exist"  # type: ignore[index]
+    _work(record, "W002")["approval"]["checkpoint"] = "git:does-not-exist"  # type: ignore[index]
 
     findings = system_evolution.validate_record(record)  # type: ignore[arg-type]
 
@@ -437,7 +438,7 @@ def test_lifecycle_rollup_requires_matching_executable_or_approval_frontier() ->
 
 
 def test_completed_reviews_require_attribution_and_every_declared_lens() -> None:
-    record = copy.deepcopy(_record())
+    record = _complete_record()
     record["closure"]["reviews"][0]["reviewer"] = None  # type: ignore[index]
     record["closure"]["reviews"].pop()  # type: ignore[union-attr]
 
@@ -458,11 +459,11 @@ def test_clean_final_reviews_must_bind_the_exact_target_implementation() -> None
 
 def test_accepted_approval_seals_its_owner_facing_consequence() -> None:
     record = copy.deepcopy(system_evolution.load_record())
-    _work(record, "W003")["nearest_wrong_system"] = "A changed gated consequence."
+    _work(record, "W002")["nearest_wrong_system"] = "A changed gated consequence."
 
     findings = system_evolution.validate_record(record)
 
-    assert "accepted work item W003 consequence differs from its approval checkpoint" in findings
+    assert "accepted work item W002 consequence differs from its approval checkpoint" in findings
 
 
 def test_complete_record_must_be_committed(monkeypatch: Any) -> None:

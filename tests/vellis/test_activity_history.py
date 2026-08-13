@@ -399,7 +399,7 @@ def test_a_refused_read_is_recorded_with_its_refusal(system: RTGSystem) -> None:
 
 def test_a_failed_read_is_recorded_as_a_failure(system: RTGSystem) -> None:
     """Excludes a ledger that only remembers what worked."""
-    system.store._connection.execute("DROP TABLE current_state")  # noqa: SLF001
+    system.store._connection.execute("DROP TABLE state_head")  # noqa: SLF001
 
     result = system.definition_summary(provenance=_owner())
     assert result.status is OperationStatus.FAILED

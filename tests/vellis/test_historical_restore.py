@@ -344,7 +344,7 @@ def test_a_ledger_that_cannot_be_replayed_reports_a_failure(system: RTGSystem) -
     """Excludes an exception crossing the boundary where every sibling returns an outcome."""
     before = system.current_state()
     system.store._connection.execute(  # noqa: SLF001
-        "UPDATE canonical_record SET payload = 'not json' WHERE ordinal = 1"
+        "UPDATE canonical_record SET record_kind = 'not-a-transition' WHERE ordinal = 1"
     )
     system.store._connection.commit()  # noqa: SLF001
 

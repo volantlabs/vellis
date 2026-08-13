@@ -32,6 +32,7 @@ from vellis.query import (
     DataPropertyCondition,
     DataPropertyProjection,
     GraphQuery,
+    GraphQueryResult,
     LinkProjection,
     LinkUuidFilter,
     PropertyComparison,
@@ -189,25 +190,25 @@ def test_sqlite_candidate_joins_have_matching_indexes(system: RTGSystem) -> None
     connection = system.store._connection  # noqa: SLF001
 
     anchor_plan = connection.execute(
-        "EXPLAIN QUERY PLAN SELECT payload FROM current_graph_object"
+        "EXPLAIN QUERY PLAN SELECT object_value_id FROM current_graph_object"
         " WHERE object_kind = ? AND type_key = ?",
         ("anchor", "person"),
     ).fetchall()
     data_plan = connection.execute(
-        "EXPLAIN QUERY PLAN SELECT o.payload FROM current_data_anchor AS da"
+        "EXPLAIN QUERY PLAN SELECT o.object_value_id FROM current_data_anchor AS da"
         " JOIN current_graph_object AS o ON o.uuid = da.data_uuid"
         " WHERE da.anchor_uuid = ? AND o.object_kind = ? AND o.type_key = ?",
         ("a-1", "associatedData", "note"),
     ).fetchall()
     link_plan = connection.execute(
-        "EXPLAIN QUERY PLAN SELECT payload FROM current_graph_object"
+        "EXPLAIN QUERY PLAN SELECT object_value_id FROM current_graph_object"
         " WHERE object_kind = ? AND type_key = ? AND source_uuid = ? AND target_uuid = ?",
         ("link", "worksOn", "a-1", "p-1"),
     ).fetchall()
 
-    assert any("current_graph_object_kind_type" in str(row) for row in anchor_plan)
-    assert any("current_data_anchor_anchor" in str(row) for row in data_plan)
-    assert any("current_graph_link_endpoints" in str(row) for row in link_plan)
+    assert any("object_value_selector" in str(row) for row in anchor_plan)
+    assert any("object_anchor_reverse" in str(row) for row in data_plan)
+    assert any("object_value_selector" in str(row) for row in link_plan)
 
 
 def test_known_uuids_narrow_an_anchor_group(system: RTGSystem) -> None:
@@ -306,9 +307,9 @@ def test_sparse_directed_links_constrain_endpoint_decoding_before_join(
 
     assert result.accepted, result.findings
     assert len(result.rows) == 3
-    # Four linked endpoints and three returned links; 400 unrelated same-type
-    # endpoints never become domain objects in the query evaluator.
-    assert system.store.current_graph_object_decodes == 7
+    # SQL performs the endpoint/link joins; only the six projected object occurrences
+    # are hydrated. The 400 unrelated same-type endpoints never become domain objects.
+    assert system.store.current_graph_object_decodes == 6
     assert system.store.current_graph_decodes == 0
 
 
@@ -355,9 +356,9 @@ def test_multiple_assigned_link_restrictions_are_intersected_before_data_filteri
 
     assert result.accepted, result.findings
     assert _bound_anchors(result) == {"p-1"}
-    # Four globally link-relevant anchors, both Orbit notes, and two returned links.
-    # Compiler's matching note is excluded before property comparison.
-    assert system.store.current_graph_object_decodes == 8
+    # Every unprojected selector remains inside SQLite; only the projected project is
+    # hydrated after the complete join and property predicate have succeeded.
+    assert system.store.current_graph_object_decodes == 1
 
 
 def _worked_on(uuid_filter: LinkUuidFilter | None = None) -> GraphQuery:
@@ -486,9 +487,9 @@ def test_sparse_links_prune_associated_data_before_property_comparison(tmp_path:
 
         assert result.accepted, result.findings
         assert [row.associated_data[0].associated_data.uuid for row in result.rows] == ["n-1"]
-        # Two anchors, the sole linked note, and the returned link are decoded. The
-        # other 99 directly associated, property-matching notes never reach comparison.
-        assert system.store.current_graph_object_decodes == 4
+        # The anchors, link, and other 99 notes stay inside SQLite. Only the one projected
+        # note is hydrated after the join and property comparison.
+        assert system.store.current_graph_object_decodes == 1
     finally:
         system.close()
 
@@ -694,16 +695,8 @@ def test_alternative_evaluation_orders_produce_equivalent_rows(system: RTGSystem
 
 
 def test_unprojected_disconnected_population_does_not_multiply_projection_work(
-    system: RTGSystem, monkeypatch: pytest.MonkeyPatch
+    system: RTGSystem,
 ) -> None:
-    import vellis.query as query_module
-
-    additions = tuple(
-        Anchor(f"person-{index}", "person", f"Person {index}") for index in range(30)
-    ) + tuple(Anchor(f"project-{index}", "project", f"Project {index}") for index in range(30))
-    assert system.apply_graph_change(
-        GraphChange(anchor_upserts=additions), provenance=_owner()
-    ).accepted
     question = GraphQuery(
         anchor_groups=(
             AnchorGroup(name="people", anchor_type="person"),
@@ -715,20 +708,34 @@ def test_unprojected_disconnected_population_does_not_multiply_projection_work(
         maximum_rows=100,
     )
 
-    calls = 0
-    original = query_module._project  # noqa: SLF001
+    def measured_steps() -> tuple[GraphQueryResult, int]:
+        steps = 0
 
-    def counted(query, assignment):
-        nonlocal calls
-        calls += 1
-        return original(query, assignment)
+        def progress() -> int:
+            nonlocal steps
+            steps += 1
+            return 0
 
-    monkeypatch.setattr(query_module, "_project", counted)
-    result = system.query_graph(question)
+        system.store._connection.set_progress_handler(progress, 1)  # noqa: SLF001
+        try:
+            return system.query_graph(question), steps
+        finally:
+            system.store._connection.set_progress_handler(None, 0)  # noqa: SLF001
 
-    assert result.accepted, result.findings
-    assert len(result.rows) == 32
-    assert calls <= 66
+    before, baseline_steps = measured_steps()
+    assert system.apply_graph_change(
+        GraphChange(
+            anchor_upserts=tuple(
+                Anchor(f"project-{index}", "project", f"Project {index}") for index in range(1_000)
+            )
+        ),
+        provenance=_owner(),
+    ).accepted
+    after, expanded_steps = measured_steps()
+
+    assert before.accepted and after.accepted
+    assert _bound_anchors(before) == _bound_anchors(after) == {"a-1", "a-2"}
+    assert expanded_steps < baseline_steps * 4
 
 
 def test_unsatisfied_unprojected_component_still_removes_every_row(tmp_path: Path) -> None:
@@ -1078,6 +1085,28 @@ def test_equality_compares_lossless_json_values(rated: RTGSystem) -> None:
     }
 
 
+def test_number_equality_does_not_distinguish_signed_zero(rated: RTGSystem) -> None:
+    assert rated.apply_graph_change(
+        GraphChange(
+            anchor_upserts=(Anchor("zero-anchor", "person", "Zero"),),
+            associated_data_upserts=(
+                AssociatedDataObject(
+                    "n-zero",
+                    "note",
+                    ("zero-anchor",),
+                    {"rating": normalize(Decimal("-0"))},
+                ),
+            ),
+        ),
+        provenance=_owner(),
+    ).accepted
+
+    assert "n-zero" in _matched(rated, _compared(PropertyComparison.EQUAL, normalize(Decimal("0"))))
+    assert "n-zero" not in _matched(
+        rated, _compared(PropertyComparison.NOT_EQUAL, normalize(Decimal("0")))
+    )
+
+
 # --- Projections ----------------------------------------------------------------------
 
 
@@ -1121,7 +1150,7 @@ def test_a_query_against_an_unestablished_rtg_is_refused(tmp_path: Path) -> None
 
 def test_a_query_a_damaged_store_cannot_answer_reports_failure(system: RTGSystem) -> None:
     """Excludes an untyped store error crossing the boundary as an exception."""
-    system.store._connection.execute("DROP TABLE current_state")  # noqa: SLF001
+    system.store._connection.execute("DROP TABLE state_head")  # noqa: SLF001
 
     result = system.query_graph(_just_people())
 

@@ -648,9 +648,7 @@ def test_a_store_this_cannot_reach_answers_nothing_rather_than_no(tmp_path: Path
     assert not holds_established_memory(tmp_path / "absent.sqlite3")
 
 
-@pytest.mark.parametrize(
-    "table", ["canonical_record", "activity_record", "current_state", "ledger"]
-)
+@pytest.mark.parametrize("table", ["canonical_record", "activity_record", "state_head", "ledger"])
 def test_a_store_missing_one_of_its_tables_still_belongs_to_its_owner(
     tmp_path: Path, table: str
 ) -> None:
@@ -714,7 +712,11 @@ def test_a_store_another_process_is_writing_does_not_block_a_beginning(tmp_path:
     writer = sqlite3.connect(store)
     try:
         writer.execute("PRAGMA journal_mode = WAL")
-        writer.execute("INSERT INTO activity_record (recorded_at, payload) VALUES ('x', 'y')")
+        writer.execute(
+            "INSERT INTO activity_record"
+            " (recorded_at, capability, outcome_category, semantic_scope, summary, initiator)"
+            " VALUES ('x', 'setup', 'accepted', 'test', 'y', 'owner')"
+        )
         writer.commit()
 
         code, out, err = _confirmed_run(["--data-dir", str(destination)])
@@ -859,7 +861,9 @@ def test_a_refusal_survives_a_reading_that_does_not(tmp_path: Path) -> None:
     assert first.succeeded and first.store is not None
     connection = sqlite3.connect(first.store)
     try:
-        connection.execute("UPDATE current_state SET active_definitions = '{not json' WHERE id = 0")
+        connection.execute(
+            "UPDATE state_head SET active_definition_set_id = 'missing' WHERE id = 0"
+        )
         connection.commit()
     finally:
         connection.close()

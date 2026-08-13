@@ -63,6 +63,7 @@ __all__ = [
     "ReturnedProperty",
     "evaluate_query",
     "evaluate_indexed_query",
+    "indexed_query_findings",
     "query_findings",
 ]
 
@@ -390,6 +391,13 @@ def query_findings(
     would answer a question it did not ask.
     """
     return _query_findings(query, definitions, _InMemoryQueryIndex(graph))
+
+
+def indexed_query_findings(
+    query: GraphQuery, definitions: GraphDefinitionSet, index: QueryCandidateIndex
+) -> tuple[ValidationFinding, ...]:
+    """Validate query meaning with a realization-provided identity index."""
+    return _query_findings(query, definitions, index)
 
 
 def _query_findings(

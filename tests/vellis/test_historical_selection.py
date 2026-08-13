@@ -524,19 +524,17 @@ def test_a_store_that_cannot_answer_a_historical_read_reports_a_failure(
     system: RTGSystem,
 ) -> None:
     """Excludes an exception crossing the boundary where a current read returns an outcome."""
-    system.store._connection.execute(  # noqa: SLF001
-        "UPDATE canonical_record SET payload = 'not json' WHERE ordinal > 0"
-    )
+    system.store._connection.execute("DROP TABLE graph_presence_interval")  # noqa: SLF001
     system.store._connection.commit()  # noqa: SLF001
 
-    # Revision 5 is where the definition changes are; revision 2 needs the graph.
+    # Revision 5 can answer from normalized definition rows; revision 2 needs graph rows.
     summary = system.definition_summary(selection=RevisionSelection(5), provenance=_owner())
     query = system.query_graph(_rituals(), selection=RevisionSelection(2), provenance=_owner())
 
-    for result in (summary, query):
-        assert result.status is OperationStatus.FAILED
-        assert result.evaluated_revision is None
-        assert result.findings
+    assert summary.accepted
+    assert query.status is OperationStatus.FAILED
+    assert query.evaluated_revision is None
+    assert query.findings
 
 
 def test_delta_retrieval_answers_about_now_however_far_back_was_just_read(
