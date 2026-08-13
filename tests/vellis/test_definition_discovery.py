@@ -951,7 +951,6 @@ def test_the_summary_reports_a_delta_that_is_present(tmp_path: Path) -> None:
     """
     from vellis.canonical import (
         CanonicalChange,
-        CanonicalState,
         CanonicalTransitionRecord,
         DefinitionDelta,
         DefinitionDeltaDisposition,
@@ -980,13 +979,7 @@ def test_the_summary_reports_a_delta_that_is_present(tmp_path: Path) -> None:
                     definition_delta=delta,
                 ),
                 provenance=Provenance(initiator="owner"),
-            ),
-            CanonicalState(
-                graph=state.graph,
-                active_definitions=state.active_definitions,
-                revision=state.revision + 1,
-                definition_delta=delta,
-            ),
+            )
         )
 
         result = system.definition_summary()
