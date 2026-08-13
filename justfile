@@ -34,6 +34,14 @@ skills-check:
 implementation-campaign-check:
     @uv run python tools/implementation_campaign.py check
 
+# Validate the active model-and-implementation evolution record.
+system-evolution-check:
+    @uv run python tools/system_evolution.py check
+
+# Show the active evolution lifecycle, approval, and next work.
+system-evolution-status:
+    @uv run python tools/system_evolution.py status
+
 # Show the current implementation campaign lifecycle and next work.
 implementation-campaign-status:
     @uv run python tools/implementation_campaign.py status
@@ -84,7 +92,7 @@ model-reference-find query specification="" limit="8":
     @specification={{quote(specification)}}; if test -n "$specification"; then uv run python tools/sysml_reference.py find {{quote(query)}} --specification "$specification" --limit {{quote(limit)}}; else uv run python tools/sysml_reference.py find {{quote(query)}} --limit {{quote(limit)}}; fi
 
 # Run the complete repository gate.
-check: lint typecheck skills-check implementation-campaign-check model-check model-reference-check test
+check: lint typecheck skills-check implementation-campaign-check system-evolution-check model-check model-reference-check test
 
 # List every SysML v2 construct name, for turning a question into a searchable term.
 model-reference-concepts:

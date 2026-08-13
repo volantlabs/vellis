@@ -389,6 +389,18 @@ def test_a_historical_summary_skips_the_graph_work_between_definition_changes(
     assert same == lean
 
 
+def test_definition_history_uses_the_definition_only_partial_index(system: RTGSystem) -> None:
+    """A returned-row counter cannot expose graph rows filtered beneath the query."""
+    from vellis.store import DEFINITION_TRANSITIONS_SQL
+
+    plan = system.store._connection.execute(  # noqa: SLF001
+        f"EXPLAIN QUERY PLAN {DEFINITION_TRANSITIONS_SQL}", (system.current_state().revision,)
+    ).fetchall()
+    detail = " ".join(str(row[-1]) for row in plan)
+
+    assert "canonical_definition_transition" in detail
+
+
 def test_resolving_a_time_selector_does_not_walk_the_ledger(tmp_path: Path) -> None:
     """``boundedHistoricalSelectionWork``: resolution is a seek, not a scan.
 

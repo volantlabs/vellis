@@ -170,6 +170,46 @@ def test_one_anchor_type_is_queried_broadly(system: RTGSystem) -> None:
     assert _bound_anchors(result) == {"a-1", "a-2"}
 
 
+def test_current_query_decodes_only_query_relevant_sqlite_rows(system: RTGSystem) -> None:
+    """Projects people without assembling projects, data, links, or a complete graph."""
+    system.store.reset_instrumentation()
+
+    result = system.query_graph(_just_people())
+
+    assert result.accepted, result.findings
+    assert _bound_anchors(result) == {"a-1", "a-2"}
+    assert system.store.current_projection_decodes == 0
+    assert system.store.current_graph_decodes == 0
+    assert system.store.current_graph_object_decodes == 2
+    assert system.store.current_definition_decodes == 1
+    assert system.store.record_reads == 0
+
+
+def test_sqlite_candidate_joins_have_matching_indexes(system: RTGSystem) -> None:
+    connection = system.store._connection  # noqa: SLF001
+
+    anchor_plan = connection.execute(
+        "EXPLAIN QUERY PLAN SELECT payload FROM current_graph_object"
+        " WHERE object_kind = ? AND type_key = ?",
+        ("anchor", "person"),
+    ).fetchall()
+    data_plan = connection.execute(
+        "EXPLAIN QUERY PLAN SELECT o.payload FROM current_data_anchor AS da"
+        " JOIN current_graph_object AS o ON o.uuid = da.data_uuid"
+        " WHERE da.anchor_uuid = ? AND o.object_kind = ? AND o.type_key = ?",
+        ("a-1", "associatedData", "note"),
+    ).fetchall()
+    link_plan = connection.execute(
+        "EXPLAIN QUERY PLAN SELECT payload FROM current_graph_object"
+        " WHERE object_kind = ? AND type_key = ? AND source_uuid = ? AND target_uuid = ?",
+        ("link", "worksOn", "a-1", "p-1"),
+    ).fetchall()
+
+    assert any("current_graph_object_kind_type" in str(row) for row in anchor_plan)
+    assert any("current_data_anchor_anchor" in str(row) for row in data_plan)
+    assert any("current_graph_link_endpoints" in str(row) for row in link_plan)
+
+
 def test_known_uuids_narrow_an_anchor_group(system: RTGSystem) -> None:
     result = system.query_graph(_just_people(uuid_filter=AnchorUuidFilter(uuids=("a-2",))))
 
@@ -247,6 +287,29 @@ def test_a_directed_link_constrains_two_anchor_groups(system: RTGSystem) -> None
         ("a-1", "p-2"),
         ("a-2", "p-1"),
     }
+
+
+def test_sparse_directed_links_constrain_endpoint_decoding_before_join(
+    system: RTGSystem,
+) -> None:
+    unrelated = tuple(
+        Anchor(f"extra-person-{index}", "person", f"Person {index}") for index in range(200)
+    ) + tuple(
+        Anchor(f"extra-project-{index}", "project", f"Project {index}") for index in range(200)
+    )
+    assert system.apply_graph_change(
+        GraphChange(anchor_upserts=unrelated), provenance=_owner()
+    ).accepted
+    system.store.reset_instrumentation()
+
+    result = system.query_graph(_worked_on())
+
+    assert result.accepted, result.findings
+    assert len(result.rows) == 3
+    # Four linked endpoints and three returned links; 400 unrelated same-type
+    # endpoints never become domain objects in the query evaluator.
+    assert system.store.current_graph_object_decodes == 7
+    assert system.store.current_graph_decodes == 0
 
 
 def _worked_on(uuid_filter: LinkUuidFilter | None = None) -> GraphQuery:
@@ -531,6 +594,70 @@ def test_alternative_evaluation_orders_produce_equivalent_rows(system: RTGSystem
         }
 
     assert pairs(first) == pairs(second)
+
+
+def test_unprojected_disconnected_population_does_not_multiply_projection_work(
+    system: RTGSystem, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import vellis.query as query_module
+
+    additions = tuple(
+        Anchor(f"person-{index}", "person", f"Person {index}") for index in range(30)
+    ) + tuple(Anchor(f"project-{index}", "project", f"Project {index}") for index in range(30))
+    assert system.apply_graph_change(
+        GraphChange(anchor_upserts=additions), provenance=_owner()
+    ).accepted
+    question = GraphQuery(
+        anchor_groups=(
+            AnchorGroup(name="people", anchor_type="person"),
+            AnchorGroup(name="projects", anchor_type="project"),
+        ),
+        return_shape=ReturnShape(
+            projections=(AnchorProjection(name="who", anchor_group="people"),)
+        ),
+        maximum_rows=100,
+    )
+
+    calls = 0
+    original = query_module._project  # noqa: SLF001
+
+    def counted(query, assignment):
+        nonlocal calls
+        calls += 1
+        return original(query, assignment)
+
+    monkeypatch.setattr(query_module, "_project", counted)
+    result = system.query_graph(question)
+
+    assert result.accepted, result.findings
+    assert len(result.rows) == 32
+    assert calls <= 66
+
+
+def test_unsatisfied_unprojected_component_still_removes_every_row(tmp_path: Path) -> None:
+    system = _system_with(tmp_path, build_rich_definitions())
+    try:
+        assert system.apply_graph_change(
+            GraphChange(anchor_upserts=(Anchor("person-only", "person", "Person"),)),
+            provenance=_owner(),
+        ).accepted
+        result = system.query_graph(
+            GraphQuery(
+                anchor_groups=(
+                    AnchorGroup(name="people", anchor_type="person"),
+                    AnchorGroup(name="projects", anchor_type="project"),
+                ),
+                return_shape=ReturnShape(
+                    projections=(AnchorProjection(name="who", anchor_group="people"),)
+                ),
+                maximum_rows=10,
+            )
+        )
+
+        assert result.accepted, result.findings
+        assert result.rows == ()
+    finally:
+        system.close()
 
 
 def test_a_query_changes_no_canonical_state_or_revision(system: RTGSystem) -> None:

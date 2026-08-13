@@ -1,0 +1,338 @@
+schema_version: "1.0"
+evolution:
+  id: post-build-resource-and-evolution-review
+  objective: Reconcile post-build resource-behavior findings and establish a portable model-and-implementation evolution workflow.
+  observable_distinction: Live state is durably addressable without a resident whole graph, bounded reads stop at the caller bound, indexed identity joins constrain current queries before value filtering, and every change remains traceable to accepted authority.
+  lifecycle: active
+  approval:
+    status: accepted
+    reason: The owner accepted the strengthened resource behavior and selected SQLite-owned live state with no unreleased-format compatibility obligation.
+    checkpoint: owner-acceptance:2026-08-12
+  blocker: null
+  checkpoint: null
+baselines:
+  status: current
+  source:
+    model: sha256:0dbc79b3e2036ddda8fdd35e8ad4efe4616cdc5c5b89bd08a66c92972c004437
+    implementation: git:e82e0e6817c67a76c21d4d4a29c8d7cf70203a86
+    language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
+    execution_environment: python-and-sqlite-pins:uv.lock
+    checkpoint: git:e82e0e6817c67a76c21d4d4a29c8d7cf70203a86
+  target:
+    model: sha256:ad02d24b6c6eeb38f904d551e0ae7dfd48101ff41e44db79effb3014e137e4c6
+    implementation: working-tree:codex/model-implementation-evolution
+    language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
+    execution_environment: python-and-sqlite-pins:uv.lock
+    checkpoint: git:218bc71
+  observed:
+    model: sha256:ad02d24b6c6eeb38f904d551e0ae7dfd48101ff41e44db79effb3014e137e4c6
+    implementation: working-tree:codex/model-implementation-evolution
+    language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
+    execution_environment: python-and-sqlite-pins:uv.lock
+    checkpoint: git:218bc71
+scope:
+  authority_scope:
+    - model/10-rtg-domain.sysml
+    - model/20-rtg-system.sysml
+    - model/30-vellis.sysml
+    - model/40-requirements.sysml
+    - model/50-verification.sysml
+  implementation_scope:
+    - vellis
+    - tests/vellis
+    - tools
+  review_lenses:
+    - authority and conformance
+    - engineering and evidence
+    - resource behavior and durability
+    - portable evolution method
+  non_goals:
+    - Numerical latency or storage budgets without representative owner data and hardware.
+    - Mutation of user-owned .data content or live external client configuration.
+    - Rewriting the v2 implementation-campaign history rather than preserving it as the source baseline.
+findings:
+  - id: F001
+    summary: Every current operation decodes the complete serialized canonical-state tuple.
+    classification: realization decision
+    consequence: Definition-only and metadata reads repeatedly parse and allocate the unchanged graph, so steady-state work and memory churn scale with unrelated graph population.
+    authority_refs:
+      - VellisRequirements::historyIndependentCurrentWork
+      - RTGSystem::'RTG System'::currentState
+    evidence_refs:
+      - path:vellis/store.py
+      - path:tests/vellis/test_current_work.py
+    disposition: implementation-work
+    owner_work_item_id: W003
+    implementation_status: partial
+    nearest_wrong_system: Repeated current operations deserialize the unchanged complete graph and definition tuple from one durable blob.
+    compatibility_effect: No released store format exists; replace the experimental layout without migration while preserving public state semantics.
+  - id: F002
+    summary: Historical definition lookup can walk graph-only transition prefixes.
+    classification: implementation defect
+    consequence: SQLite may seek the ordinal index and filter every unrelated graph mutation even though accepted authority forbids replaying unrelated graph-only transitions.
+    authority_refs:
+      - VellisRequirements::boundedHistoricalSelectionWork
+    evidence_refs:
+      - path:vellis/store.py
+      - path:tests/vellis/test_historical_selection.py
+    disposition: implementation-work
+    owner_work_item_id: W002
+    implementation_status: conflicting
+    nearest_wrong_system: A historical definition lookup returns few definition transitions while SQLite filters a linearly growing graph-only prefix underneath the result.
+    compatibility_effect: Query results are unchanged; no migration of the unreleased experimental store layout is required.
+  - id: F003
+    summary: Bounded history reads fetch and decode the complete interval before enforcing maximumRecords.
+    classification: implementation defect
+    consequence: A request bounded to one record can process an arbitrarily large selected interval before returning the required whole-result rejection.
+    authority_refs:
+      - VellisRequirements::boundedHistoryRead
+      - VellisRequirements::boundedHistoricalSelectionWork
+    evidence_refs:
+      - path:vellis/store.py
+      - path:vellis/system.py
+      - path:tests/vellis/test_activity_history.py
+    disposition: implementation-work
+    owner_work_item_id: W002
+    implementation_status: conflicting
+    nearest_wrong_system: A maximumRecords value of one still retrieves and decodes the complete matching history interval before whole-result rejection.
+    compatibility_effect: Limiting retrieval to maximumRecords plus one preserves accepted and rejected result meaning.
+  - id: F004
+    summary: Query evaluation enumerates assignments that no projection or remaining constraint can distinguish.
+    classification: model gap
+    consequence: A small distinct result can require a Cartesian walk over unrelated unprojected selector populations, while current authority constrains result meaning but not this resource consequence.
+    authority_refs:
+      - VellisRequirements::semanticQueryMeaning
+      - VellisRequirements::querySafety
+    evidence_refs:
+      - path:vellis/query.py
+      - path:tests/vellis/test_graph_queries.py
+    disposition: resolved
+    owner_work_item_id: W001
+    implementation_status: conforming
+    nearest_wrong_system: A query with one projected selector and a large disconnected unprojected selector enumerates their Cartesian assignments before deduplication.
+    compatibility_effect: Distinct row meaning and maximumRows remain unchanged; only semantically redundant work is removed.
+  - id: F005
+    summary: Existing scaling evidence counts returned records but misses decoding, allocation, query-plan filtering, and assignment work.
+    classification: plan gap
+    consequence: The complete test gate can pass while operations perform linear or combinatorial internal work that the evidence counters do not observe.
+    authority_refs:
+      - VellisVerification::'Current Operations Ignore History Length'
+      - VellisVerification::'Historical Selection Avoids Irrelevant Records'
+      - VellisVerification::'History Growth Performance Characterization'
+    evidence_refs:
+      - path:tests/vellis/characterization.py
+      - path:tests/vellis/test_current_work.py
+      - path:tests/vellis/test_historical_selection.py
+    disposition: resolved
+    owner_work_item_id: W001
+    implementation_status: conforming
+    nearest_wrong_system: Returned-record counters and small fixtures pass while hidden filtering, state decoding, allocation, or joint-assignment work grows materially.
+    compatibility_effect: Stronger evidence adds instrumentation and representative populations without changing public behavior.
+  - id: F006
+    summary: The original implementation campaign did not select or evidence a consequential current-state realization.
+    classification: plan gap
+    consequence: Storage remained nominally open, but no slice owned the choice between resident, decomposed durable, or repeatedly serialized working state and its nearest resource failure.
+    authority_refs:
+      - VellisRequirements::historyIndependentCurrentWork
+      - model/README.md
+    evidence_refs:
+      - path:implementation-campaign.yaml
+    disposition: plan-change
+    owner_work_item_id: W004
+    implementation_status: conflicting
+    nearest_wrong_system: A complete build closes without one owner for a consequential working-state realization and its discriminating resource evidence.
+    compatibility_effect: The evolution record supplements the build record without treating an unreleased experimental layout as a compatibility boundary.
+  - id: F007
+    summary: Evolution status can report an earlier ready item instead of the item that currently owns mutation.
+    classification: implementation defect
+    consequence: A resumed agent can be directed away from the sole active work item even though the record itself validates.
+    authority_refs:
+      - .agents/skills/sysml-evolution/references/evolution-record.md#baselines-and-lifecycle
+    evidence_refs:
+      - path:tools/system_evolution.py
+      - path:tests/test_system_evolution.py
+    disposition: implementation-work
+    owner_work_item_id: W004
+    implementation_status: partial
+    nearest_wrong_system: The record has exactly one active writer but status labels an earlier ready item as next work.
+    compatibility_effect: Status output becomes consistent with existing lifecycle meaning; record shape and product behavior do not change.
+decisions:
+  - id: D001
+    summary: Keep live graph objects, definitions, and proposal state in addressable SQLite projections with no resident complete-state cache.
+    authority_refs:
+      - VellisRequirements::atomicCanonicalRevision
+      - VellisRequirements::durableCanonicalHistory
+      - VellisRequirements::historyIndependentCurrentWork
+    alternatives:
+      - Keep a revision-aware complete resident projection per process.
+      - Normalize every property into fully relational storage and compile the complete query language to SQL.
+      - Decode the complete current-state serialization on every operation.
+    reversible: true
+    owner_work_item_id: W003
+    evidence_intent:
+      - Definition-only reads decode no graph objects.
+      - Current query candidates are joined through identity, type, association, and directed-link indexes before property filtering.
+      - Public complete-state inspection cannot mutate durable canonical state and no complete state is retained between calls.
+      - A canonical transition and every affected projection row commit atomically.
+    implementation_status: partial
+    evidence_refs:
+      - path:tests/vellis/test_current_work.py
+      - path:tests/vellis/test_graph_queries.py
+  - id: D002
+    summary: Evaluate independent selector components separately and treat unprojected components as existence constraints.
+    authority_refs:
+      - VellisRequirements::semanticQueryMeaning
+      - VellisRequirements::querySafety
+    alternatives:
+      - Retain full assignment enumeration and deduplicate only after projection.
+      - Introduce a general-purpose external query engine.
+    reversible: true
+    owner_work_item_id: W003
+    evidence_intent:
+      - Evaluation order preserves identical rows and whole-result bounds.
+      - Unprojected disconnected populations do not multiply projected assignment work.
+      - Unsatisfied unprojected components still eliminate every result row.
+    implementation_status: partial
+    evidence_refs:
+      - path:tests/vellis/test_graph_queries.py
+work_items:
+  - id: W001
+    order: 1
+    label: Close resource-behavior authority and evidence gaps
+    kind: modeling
+    dependencies: []
+    planned_baseline: sha256:0dbc79b3e2036ddda8fdd35e8ad4efe4616cdc5c5b89bd08a66c92972c004437
+    finding_ids:
+      - F004
+      - F005
+    decision_ids: []
+    authority:
+      - refs:
+          - VellisRequirements::semanticQueryMeaning
+          - VellisRequirements::historyIndependentCurrentWork
+          - VellisVerification::'History Growth Performance Characterization'
+        coverage: full
+        remaining_work_item_ids: []
+    approval:
+      status: accepted
+      reason: The owner accepted the strengthened generic resource-behavior authority.
+      checkpoint: owner-acceptance:2026-08-12
+    nearest_wrong_system: Query and current-state semantics remain correct while unbounded redundant work is still permitted and unobserved.
+    compatibility_effect: The proposal strengthens resource guarantees without selecting storage or query technology.
+    non_effects:
+      - Existing query row meaning and whole-result bounds remain unchanged.
+      - Existing durability, recovery, and public snapshot meaning remain unchanged.
+    lifecycle: complete
+    implementation_status: conforming
+    evidence_refs:
+      - command:just model-check
+      - path:model/50-verification.sysml
+    blocker: null
+    checkpoint: git:218bc71
+  - id: W002
+    order: 2
+    label: Make historical selection physically honor existing bounds
+    kind: implementation
+    dependencies: []
+    planned_baseline: git:e82e0e6817c67a76c21d4d4a29c8d7cf70203a86
+    finding_ids:
+      - F002
+      - F003
+    decision_ids: []
+    authority:
+      - refs:
+          - VellisRequirements::boundedHistoryRead
+          - VellisRequirements::boundedHistoricalSelectionWork
+        coverage: full
+        remaining_work_item_ids: []
+    approval:
+      status: not-required
+      reason: Existing accepted authority already decides these implementation defects.
+      checkpoint: null
+    nearest_wrong_system: Narrow historical results still cause linear filtered-prefix work or complete-interval decoding.
+    compatibility_effect: Owner-facing history results remain semantically unchanged; no released store format requires migration.
+    non_effects:
+      - Canonical and activity ledger ordering and contents do not change.
+      - Whole-result rejection and inclusive interval semantics do not change.
+    lifecycle: ready
+    implementation_status: partial
+    evidence_refs:
+      - path:tests/vellis/test_historical_selection.py
+      - path:tests/vellis/test_activity_history.py
+    blocker: null
+    checkpoint: null
+  - id: W003
+    order: 3
+    label: Establish efficient working state and projection-aware query evaluation
+    kind: implementation
+    dependencies:
+      - W001
+    planned_baseline: sha256:ad02d24b6c6eeb38f904d551e0ae7dfd48101ff41e44db79effb3014e137e4c6
+    finding_ids:
+      - F001
+    decision_ids:
+      - D001
+      - D002
+    authority:
+      - refs:
+          - VellisRequirements::atomicCanonicalRevision
+          - VellisRequirements::durableCanonicalHistory
+          - VellisRequirements::semanticQueryMeaning
+        coverage: full
+        remaining_work_item_ids: []
+    approval:
+      status: accepted
+      reason: The owner selected SQLite-owned live state and explicitly declined compatibility work for the unreleased experimental format.
+      checkpoint: owner-acceptance:2026-08-12
+    nearest_wrong_system: Correct results are produced from SQLite but every query first materializes a broad or complete graph instead of joining indexed identities.
+    compatibility_effect: Durable ledger authority, public query results, and restart recovery remain; the unreleased SQLite layout is replaced without migration.
+    non_effects:
+      - SQLite owns live state and remains recoverably atomic with the canonical ledger.
+      - Public current-state reads cannot mutate canonical state.
+      - Query projections, distinctness, and bounds retain their modeled meaning.
+    lifecycle: active
+    implementation_status: partial
+    evidence_refs: []
+    blocker: null
+    checkpoint: null
+  - id: W004
+    order: 4
+    label: Review, reconcile, document, and rebaseline the evolution set
+    kind: closure
+    dependencies:
+      - W001
+      - W002
+      - W003
+    planned_baseline: working-tree:codex/model-implementation-evolution
+    finding_ids:
+      - F006
+      - F007
+    decision_ids: []
+    authority:
+      - refs:
+          - model/README.md
+        coverage: full
+        remaining_work_item_ids: []
+    approval:
+      status: pending
+      reason: Closure depends on acceptance of W001 and W003 and the final background-campaign checkpoint.
+      checkpoint: null
+    nearest_wrong_system: Code, model, documentation, and records each pass locally but describe different baselines or leave findings without closure evidence.
+    compatibility_effect: Rebaseline preserves campaign history but owes no migration for an unreleased implementation store.
+    non_effects:
+      - The completed implementation campaign history is not rewritten.
+      - User-owned .data content is not inspected or migrated.
+    lifecycle: pending
+    implementation_status: not evaluated
+    evidence_refs: []
+    blocker: null
+    checkpoint: null
+closure:
+  finding_disposition: open
+  model_status: not evaluated
+  implementation_status: partial
+  integration_status: not evaluated
+  external_status: not evaluated
+  compatibility: No released store format exists. The experimental layout is replaced without migration, and user-owned .data remains untouched.
+  evidence_refs: []
+  checkpoint: null

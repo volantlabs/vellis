@@ -639,3 +639,25 @@ def test_a_bounded_canonical_read_does_not_walk_the_records_before_it(
 
     assert len(narrow.canonical_entries) == 1
     assert system.store.record_reads == 1
+
+
+def test_overbroad_history_decodes_only_enough_records_to_reject(system: RTGSystem) -> None:
+    for _ in range(20):
+        system.check(provenance=_owner())
+
+    system.store.reset_instrumentation()
+    activity = system.history(HistoryQuery(kind=HistoryKind.ACTIVITY, maximum_records=1))
+
+    assert activity.status is OperationStatus.REJECTED
+    assert system.store.activity_reads == 2
+
+    for index in range(5):
+        assert system.apply_graph_change(
+            GraphChange(anchor_upserts=(Anchor(f"bound-{index}", "person", f"P{index}"),)),
+            provenance=_owner(),
+        ).accepted
+    system.store.reset_instrumentation()
+    canonical = system.history(HistoryQuery(kind=HistoryKind.CANONICAL, maximum_records=1))
+
+    assert canonical.status is OperationStatus.REJECTED
+    assert system.store.record_reads == 2

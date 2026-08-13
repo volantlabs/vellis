@@ -12,8 +12,11 @@ Algorithms, storage layouts, transports, protocols, frameworks, deployment choic
 Vellis treats one durable canonical ledger as the authority for personal memory while keeping current
 work independent of accumulated history and bounded historical selection efficient. Materialized
 projections, indexes, caches, checkpoints, snapshot cadence, and persistence technology remain
-implementation choices rather than modeled subsystems. The current realization is characterized
-along each of those dimensions — what its work responds to and what it ignores — and that
+implementation choices rather than modeled subsystems. Vellis currently selects one SQLite-owned
+live projection: graph objects and relationships are addressable through identity and semantic
+indexes, definitions and the proposal are separate durable facets, and no complete graph is retained
+between calls. The realization is characterized along each of those dimensions — what its work
+responds to and what it ignores — and that
 characterization deliberately sets no numerical latency, startup, or storage budget, because there
 is not yet a chosen runtime, a hardware profile, or a representative owner's data to set one
 against.
@@ -30,8 +33,8 @@ agents may realize those concerns through finer-grained classes and modules, the
 or feasibility evidence translated back into stakeholder-visible systems meaning. Code structure informs
 engineering judgment but does not become the model by transcription.
 
-The reference, modeling, whole-model planning, bounded implementation, and campaign-management skills
-form a portable SysML v2 MBSwE core. A project
+The reference, modeling, whole-model planning, bounded implementation, campaign-management, and
+implemented-system evolution skills form a portable SysML v2 MBSwE core. A project
 binds that core to its model layout, language baseline, validator, engineering checks, source rules,
 and change workflow; optional domain skills add specialized meaning. Vellis contributes RTG as one
 such extension, not as the assumed shape of the method. The repository does not yet ship a standalone

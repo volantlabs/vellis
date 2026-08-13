@@ -58,7 +58,9 @@ __all__ = [
     "encode_definition_set",
     "decode_canonical_change",
     "encode_canonical_change",
+    "decode_definition_delta",
     "encode_graph",
+    "encode_definition_delta",
     "encode_text",
 ]
 
@@ -517,6 +519,25 @@ def decode_definition_set(value: JsonValue) -> GraphDefinitionSet:
     )
 
 
+def encode_definition_delta(delta: DefinitionDelta | None) -> JsonValue:
+    """Encode the optional sole definition proposal as one durable facet."""
+    if delta is None:
+        return None
+    return {"proposedDefinitions": encode_definition_set(delta.proposed_definitions)}
+
+
+def decode_definition_delta(value: JsonValue) -> DefinitionDelta | None:
+    """Decode the optional sole definition proposal from one durable facet."""
+    if value is None:
+        return None
+    members = _object(value, "definition delta")
+    return DefinitionDelta(
+        proposed_definitions=decode_definition_set(
+            _member(members, "proposedDefinitions", "definition delta")
+        )
+    )
+
+
 # --- Graph changes ------------------------------------------------------------------
 
 
@@ -588,13 +609,6 @@ def decode_graph_change(value: JsonValue) -> GraphChange:
 
 def encode_canonical_change(change: CanonicalChange) -> JsonValue:
     """Encode one transition's replay-sufficient change."""
-    delta: JsonValue = None
-    if change.definition_delta is not None:
-        delta = {
-            "proposedDefinitions": encode_definition_set(
-                change.definition_delta.proposed_definitions
-            )
-        }
     return {
         "deltaDisposition": change.delta_disposition.value,
         "graphChange": (
@@ -608,7 +622,7 @@ def encode_canonical_change(change: CanonicalChange) -> JsonValue:
             if change.active_definitions is None
             else encode_definition_set(change.active_definitions)
         ),
-        "definitionDelta": delta,
+        "definitionDelta": encode_definition_delta(change.definition_delta),
     }
 
 
@@ -616,14 +630,7 @@ def decode_canonical_change(value: JsonValue) -> CanonicalChange:
     """Decode one transition's replay-sufficient change."""
     members = _object(value, "canonical change")
     where = "canonical change"
-    raw_delta = _member(members, "definitionDelta", where)
-    delta: DefinitionDelta | None = None
-    if raw_delta is not None:
-        delta = DefinitionDelta(
-            proposed_definitions=decode_definition_set(
-                _member(_object(raw_delta, "definition delta"), "proposedDefinitions", where)
-            )
-        )
+    delta = decode_definition_delta(_member(members, "definitionDelta", where))
     raw_graph_change = _member(members, "graphChange", where)
     raw_replacement = _member(members, "replacementGraph", where)
     raw_definitions = _member(members, "activeDefinitions", where)
@@ -647,18 +654,11 @@ def decode_canonical_change(value: JsonValue) -> CanonicalChange:
 
 def encode_canonical_state(state: CanonicalState) -> JsonValue:
     """Encode one complete canonical-state tuple."""
-    delta: JsonValue = None
-    if state.definition_delta is not None:
-        delta = {
-            "proposedDefinitions": encode_definition_set(
-                state.definition_delta.proposed_definitions
-            )
-        }
     return {
         "revision": Decimal(state.revision),
         "graph": encode_graph(state.graph),
         "activeDefinitions": encode_definition_set(state.active_definitions),
-        "definitionDelta": delta,
+        "definitionDelta": encode_definition_delta(state.definition_delta),
     }
 
 
@@ -666,20 +666,11 @@ def decode_canonical_state(value: JsonValue) -> CanonicalState:
     """Decode one complete canonical-state tuple."""
     members = _object(value, "canonical state")
     where = "canonical state"
-    raw_delta = _member(members, "definitionDelta", where)
-    delta: DefinitionDelta | None = None
-    if raw_delta is not None:
-        delta_members = _object(raw_delta, "definition delta")
-        delta = DefinitionDelta(
-            proposed_definitions=decode_definition_set(
-                _member(delta_members, "proposedDefinitions", "definition delta")
-            )
-        )
     return CanonicalState(
         graph=decode_graph(_member(members, "graph", where)),
         active_definitions=decode_definition_set(_member(members, "activeDefinitions", where)),
         revision=_int(_member(members, "revision", where), f"{where} revision"),
-        definition_delta=delta,
+        definition_delta=decode_definition_delta(_member(members, "definitionDelta", where)),
     )
 
 

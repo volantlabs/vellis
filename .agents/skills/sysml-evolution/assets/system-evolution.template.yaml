@@ -1,0 +1,87 @@
+schema_version: "1.0"
+evolution:
+  id: system-evolution
+  objective: Reconcile one evidence-backed change set across accepted model authority and implementation.
+  observable_distinction: The accepted target behavior and its implementation can be distinguished from the source baseline and nearest plausible wrong system.
+  lifecycle: discovery
+  approval:
+    status: pending
+    reason: Changed system meaning or a consequential selected boundary requires human acceptance.
+    checkpoint: null
+  blocker: null
+  checkpoint: null
+baselines:
+  status: current
+  source:
+    model: source-model-baseline
+    implementation: source-implementation-baseline
+    language: language-baseline
+    execution_environment: null
+    checkpoint: null
+  target: null
+  observed:
+    model: source-model-baseline
+    implementation: source-implementation-baseline
+    language: language-baseline
+    execution_environment: null
+    checkpoint: null
+scope:
+  authority_scope:
+    - accepted-system-authority
+  implementation_scope:
+    - affected-system-realization
+  review_lenses:
+    - authority and conformance
+    - engineering and evidence
+  non_goals: []
+findings:
+  - id: F001
+    summary: One reproducible observation requires disposition.
+    classification: model gap
+    consequence: Current accepted authority cannot distinguish the observed system from the intended one.
+    authority_refs:
+      - Model::AffectedAuthority
+    evidence_refs:
+      - path:test-or-analysis#case
+    disposition: model-change
+    owner_work_item_id: W001
+    implementation_status: conflicting
+    nearest_wrong_system: The source implementation remains permitted because current authority cannot distinguish the intended consequence.
+    compatibility_effect: Compatibility remains to be evaluated against the accepted target meaning.
+decisions: []
+work_items:
+  - id: W001
+    order: 1
+    label: Close the affected accepted model meaning
+    kind: modeling
+    dependencies: []
+    planned_baseline: source-model-baseline
+    finding_ids:
+      - F001
+    decision_ids: []
+    authority:
+      - refs:
+          - Model::AffectedAuthority
+        coverage: full
+        remaining_work_item_ids: []
+    approval:
+      status: pending
+      reason: This work item changes accepted system meaning.
+      checkpoint: null
+    nearest_wrong_system: The source behavior remains possible until accepted authority distinguishes it.
+    compatibility_effect: Compatibility remains to be evaluated.
+    non_effects: []
+    lifecycle: pending
+    implementation_status: not evaluated
+    evidence_refs: []
+    blocker: null
+    checkpoint: null
+closure:
+  finding_disposition: open
+  model_status: not evaluated
+  implementation_status: not evaluated
+  integration_status: not applicable
+  external_status: not applicable
+  compatibility: Not yet evaluated.
+  evidence_refs: []
+  checkpoint: null

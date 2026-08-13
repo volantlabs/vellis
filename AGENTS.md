@@ -24,7 +24,8 @@ historical comparison or recovery task.
 ## Skill routing
 
 `$sysml-reference`, `$sysml-modeling`, `$sysml-implementation-planning`,
-`$sysml-implementation`, and `$sysml-implementation-campaign` are the portable MBSwE core.
+`$sysml-implementation`, `$sysml-implementation-campaign`, and `$sysml-evolution` are the portable
+MBSwE core.
 The paths, commands, reading scope, checks, and review rules in this file bind that core to Vellis.
 `$rtg-schema-design` and `$documentation-sync` are optional Vellis domain and repository extensions,
 not dependencies that another project must carry.
@@ -41,11 +42,13 @@ not dependencies that another project must carry.
   decisions, implement it, and review conformance evidence.
 - `$sysml-implementation-campaign`: execute or resume the human-approved multi-slice campaign,
   coordinate independent review and remediation, checkpoint each slice, and prove system closure.
+- `$sysml-evolution`: classify and coordinate evidence-backed changes to an already implemented
+  system across accepted authority, realization, evidence, compatibility, and rebaselining.
 - `$documentation-sync`: repository authority, commands, skills, templates, and public guidance.
 
 ## Portable-method boundary
 
-Keep the five core skills reusable as written outside Vellis. They may require abstract capabilities
+Keep the six core skills reusable as written outside Vellis. They may require abstract capabilities
 such as model entry-point discovery, pinned reference search, official validation, project checks,
 and change review, but must not hard-code Vellis paths, `just` commands, RTG or MCP vocabulary,
 Python, Git, persistence, networking, code generation, or a particular application architecture.
@@ -242,6 +245,12 @@ current model-work handoff when available and verify it against the branch; othe
 task-local implementation frame directly from the model. Return to model work before coding across
 an unresolved semantic gap.
 
+For post-build audits or changes spanning model authority, implementation, evidence, and selected
+realization, use `$sysml-evolution` and validate `system-evolution.yaml` with
+`just system-evolution-check`. The record is an execution and evidence index, never product
+authority. Changed system meaning still requires acceptance before implementation relies on it;
+defects already decided by accepted authority remain ordinary implementation work.
+
 ## Resources and checks
 
 `just model-setup` downloads and checksum-verifies every reference artifact into the ignored
@@ -273,6 +282,10 @@ model and language baselines. `just implementation-campaign-status` reports its 
 next slice, blocker, and closure state. `just implementation-campaign-dispatch` emits the manager's
 machine-readable next action and durable state token without changing files. These tools do not
 resolve SysML semantics and the ledger does not replace rereading qualified model authority.
+
+`just system-evolution-check` validates the active evolution record's schema, ownership, dependency,
+approval, lifecycle, and evidence-reference invariants. `just system-evolution-status` reports its
+approval, next work, and open-finding count.
 
 The repository exposes the selected MCP tool contract over local standard input and output. Matching
 user-scoped Codex and Claude Code entries are configured to launch it, while live closure remains

@@ -9,15 +9,15 @@ This realization selects one embedded SQL database file. That choice supplies th
 recoverable atomicity ``VellisRequirements::atomicCanonicalRevision`` requires — the
 appended canonical record and the updated current projection commit as one effect —
 and gives later slices ordered, indexed selection without a linear ledger scan. The
-materialized current projection is the realization the model names as permitted: it is
-a projection of replay through the final canonical record, never parallel authority,
-and one row so no tuple can mix values established by different records.
+current projection stores graph objects as addressable rows and definitions as a
+separate facet. It remains a projection of replay through the final canonical record,
+never parallel authority, but routine reads need not deserialize unrelated graph data.
 
 The projection and the record it derives from are written as one effect and each read
-checks the revision it carries against the row it came from, so an interrupted or
-partial write cannot present a mixed tuple. Content divergence introduced by editing the
-database file directly is not detected: comparing decoded content on every current read
-would traverse a canonical record, which is exactly the work
+checks its revision markers, so an interrupted or partial write cannot present a mixed
+tuple. Content divergence introduced by editing the database file directly is not
+detected: comparing decoded content on every current read would traverse a canonical
+record, which is exactly the work
 ``VellisRequirements::historyIndependentCurrentWork`` forbids. A store file edited from
 outside is therefore screened, not trusted: what this module can tell about such a file —
 that it is not a database, that it belongs to something else, that it is a store this
@@ -37,6 +37,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from threading import RLock
+from typing import TYPE_CHECKING
 from urllib.parse import quote
 
 from vellis.activity import ActivityRecord
@@ -44,21 +45,34 @@ from vellis.canonical import (
     CanonicalChange,
     CanonicalState,
     CanonicalTransitionRecord,
+    DefinitionDelta,
     InitialStateRecord,
     Provenance,
     TransitionKind,
 )
+from vellis.changes import GraphChange
+from vellis.definitions import GraphDefinitionSet
+from vellis.graph import Anchor, AssociatedDataObject, Graph, GraphObject, Link, ObjectKind
 from vellis.serialization import (
     DecodeError,
     decode_activity_record,
     decode_canonical_change,
     decode_canonical_state,
+    decode_definition_delta,
+    decode_definition_set,
+    decode_graph,
     decode_text,
     encode_activity_record,
     encode_canonical_change,
     encode_canonical_state,
+    encode_definition_delta,
+    encode_definition_set,
+    encode_graph,
     encode_text,
 )
+
+if TYPE_CHECKING:
+    from vellis.query import AnchorGroup, GraphQuery, GraphQueryResult, RequiredLink
 
 __all__ = [
     "AlreadyInitializedError",
@@ -72,12 +86,27 @@ __all__ = [
     "holds_established_memory",
 ]
 
-SCHEMA_VERSION = "2"
+SCHEMA_VERSION = "3"
 
 # The next ledger position. Counting rows would traverse the whole prefix on every
 # commit, which is exactly the work history-independent current operations may not do;
 # ordinal is UNIQUE, so taking its maximum is an index seek instead.
 NEXT_ORDINAL_SQL = "SELECT ifnull(max(ordinal), -1) + 1 FROM canonical_record"
+
+# A partial index over only definition-affecting transitions. The predicate is repeated
+# literally in the historical-definition query so SQLite can prove the index applies;
+# a returned-row counter cannot detect an ordinal-index walk that filters graph records.
+DEFINITION_TRANSITION_INDEX_SQL = """
+CREATE INDEX IF NOT EXISTS canonical_definition_transition
+ON canonical_record (established_revision)
+WHERE ordinal > 0 AND record_kind != 'graphMutation'
+"""
+
+DEFINITION_TRANSITIONS_SQL = (
+    "SELECT established_revision, record_kind, recorded_at, initiator, source, summary,"
+    " payload FROM canonical_record WHERE ordinal > 0 AND established_revision <= ?"
+    " AND record_kind != 'graphMutation' ORDER BY established_revision"
+)
 
 # Whether canonical state exists. One statement, so a caller asking before it may create
 # anything and the store asking during a commit are asking exactly the same question.
@@ -121,8 +150,28 @@ CREATE TABLE current_state (
     id             INTEGER PRIMARY KEY CHECK (id = 0),
     revision       INTEGER NOT NULL,
     established_by INTEGER NOT NULL REFERENCES canonical_record (established_revision),
-    state          TEXT    NOT NULL
+    active_definitions TEXT NOT NULL,
+    definition_delta TEXT
 );
+CREATE TABLE current_graph_object (
+    uuid        TEXT PRIMARY KEY,
+    object_kind TEXT NOT NULL,
+    type_key    TEXT NOT NULL,
+    source_uuid TEXT,
+    target_uuid TEXT,
+    payload     TEXT NOT NULL
+);
+CREATE TABLE current_data_anchor (
+    data_uuid   TEXT NOT NULL REFERENCES current_graph_object (uuid),
+    anchor_uuid TEXT NOT NULL REFERENCES current_graph_object (uuid),
+    PRIMARY KEY (data_uuid, anchor_uuid)
+);
+CREATE INDEX current_graph_object_kind_type
+    ON current_graph_object (object_kind, type_key);
+CREATE INDEX current_graph_link_endpoints
+    ON current_graph_object (object_kind, type_key, source_uuid, target_uuid);
+CREATE INDEX current_data_anchor_anchor
+    ON current_data_anchor (anchor_uuid, data_uuid);
 """
 
 
@@ -137,6 +186,56 @@ def _stored_time(moment: datetime) -> str:
     if moment.tzinfo is None:
         raise StoreError(f"a time bound must say which zone it is in: {moment.isoformat()}")
     return moment.astimezone(UTC).isoformat()
+
+
+def _encode_current_facets(state: CanonicalState) -> tuple[str, str | None]:
+    return (
+        encode_text(encode_definition_set(state.active_definitions)),
+        (
+            None
+            if state.definition_delta is None
+            else encode_text(encode_definition_delta(state.definition_delta))
+        ),
+    )
+
+
+def _encoded_graph_object(
+    graph_object: GraphObject,
+) -> tuple[str, str, str, str | None, str | None, str]:
+    """Encode one addressable projection row without inventing another wire format."""
+    if isinstance(graph_object, Anchor):
+        graph = Graph(anchors=(graph_object,))
+        kind = ObjectKind.ANCHOR.value
+        source = target = None
+    elif isinstance(graph_object, AssociatedDataObject):
+        graph = Graph(associated_data=(graph_object,))
+        kind = ObjectKind.ASSOCIATED_DATA.value
+        source = target = None
+    else:
+        graph = Graph(links=(graph_object,))
+        kind = ObjectKind.LINK.value
+        source, target = graph_object.source_uuid, graph_object.target_uuid
+    return (
+        graph_object.uuid,
+        kind,
+        graph_object.type_key,
+        source,
+        target,
+        encode_text(encode_graph(graph)),
+    )
+
+
+def _projection_revision(row: tuple[object, ...]) -> int:
+    if not isinstance(row[0], int) or not isinstance(row[1], int):
+        raise StoreError("the current projection revision markers are not integers")
+    revision = row[0]
+    established_by = row[1]
+    if revision != established_by:
+        raise StoreError(
+            f"the current projection claims revision {revision} established by record "
+            f"{established_by}"
+        )
+    return revision
 
 
 class StoreError(RuntimeError):
@@ -270,12 +369,35 @@ def _screen_marker(connection: sqlite3.Connection, path: Path) -> None:
             f"canonical store at {path} has schema version {found}, "
             f"but this build reads version {SCHEMA_VERSION}"
         )
-    for table in ("canonical_record", "activity_record", "current_state", "ledger"):
+    for table in (
+        "canonical_record",
+        "activity_record",
+        "current_state",
+        "current_graph_object",
+        "current_data_anchor",
+        "ledger",
+    ):
         present = connection.execute(
             "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?", (table,)
         ).fetchone()
         if present is None:
             raise UnreadableStoreError(f"canonical store at {path} is missing its {table} table")
+    columns = {
+        str(info[1]) for info in connection.execute("PRAGMA table_info(current_state)").fetchall()
+    }
+    required = {
+        "id",
+        "revision",
+        "established_by",
+        "active_definitions",
+        "definition_delta",
+    }
+    if not required.issubset(columns):
+        missing = ", ".join(sorted(required - columns))
+        raise UnreadableStoreError(
+            f"canonical store at {path} schema version {SCHEMA_VERSION} is missing current-state "
+            f"columns {missing}"
+        )
 
 
 def holds_established_memory(path: Path) -> bool:
@@ -337,6 +459,10 @@ class CanonicalStore:
             raise NotADatabaseError(f"the file at {path} is not a database")
         self._record_reads = 0
         self._activity_reads = 0
+        self._current_projection_decodes = 0
+        self._current_graph_decodes = 0
+        self._current_graph_object_decodes = 0
+        self._current_definition_decodes = 0
         try:
             # One owner, one process, one connection — but not necessarily one thread:
             # a tool boundary answers on whichever worker it is called from. The
@@ -371,22 +497,23 @@ class CanonicalStore:
         self._connection.close()
 
     def _ensure_schema(self) -> None:
-        if _schema_present(self._connection):
-            return
-        version_row = (
-            f"INSERT INTO schema_meta (key, value) VALUES ('schema_version', '{SCHEMA_VERSION}');"
-        )
-        try:
-            self._connection.executescript(
-                f"BEGIN IMMEDIATE;PRAGMA application_id = {APPLICATION_ID};"
-                f"{_SCHEMA}{version_row}COMMIT;"
+        if not _schema_present(self._connection):
+            version_row = (
+                "INSERT INTO schema_meta (key, value) VALUES "
+                f"('schema_version', '{SCHEMA_VERSION}');"
             )
-        except sqlite3.OperationalError:
-            # Another process created the schema between the check and this statement.
-            self._rollback_quietly()
-            if not _schema_present(self._connection):
-                raise
+            try:
+                self._connection.executescript(
+                    f"BEGIN IMMEDIATE;PRAGMA application_id = {APPLICATION_ID};"
+                    f"{_SCHEMA}{version_row}COMMIT;"
+                )
+            except sqlite3.OperationalError:
+                # Another process created the schema between the check and this statement.
+                self._rollback_quietly()
+                if not _schema_present(self._connection):
+                    raise
         _screen_marker(self._connection, self._path)
+        self._connection.execute(DEFINITION_TRANSITION_INDEX_SQL)
 
     # --- Instrumentation ------------------------------------------------------------
 
@@ -406,9 +533,33 @@ class CanonicalStore:
         """
         return self._activity_reads
 
+    @property
+    def current_projection_decodes(self) -> int:
+        """Complete current-state materializations since the last instrumentation reset."""
+        return self._current_projection_decodes
+
+    @property
+    def current_graph_decodes(self) -> int:
+        """Current graph-facet decodes since the last instrumentation reset."""
+        return self._current_graph_decodes
+
+    @property
+    def current_definition_decodes(self) -> int:
+        """Current definition-facet decodes since the last instrumentation reset."""
+        return self._current_definition_decodes
+
+    @property
+    def current_graph_object_decodes(self) -> int:
+        """Addressable graph-object decodes since the last instrumentation reset."""
+        return self._current_graph_object_decodes
+
     def reset_instrumentation(self) -> None:
         self._record_reads = 0
         self._activity_reads = 0
+        self._current_projection_decodes = 0
+        self._current_graph_decodes = 0
+        self._current_graph_object_decodes = 0
+        self._current_definition_decodes = 0
 
     # --- Current projection ---------------------------------------------------------
 
@@ -447,21 +598,88 @@ class CanonicalStore:
     def current_state(self) -> CanonicalState:
         """Return the current canonical-state projection.
 
-        This reads the one projection row and no canonical record, so its work does not
-        grow with history length.
+        SQLite owns the live projection. Every call materializes a new domain value, so
+        mutable nested JSON handed to a library caller has no shared resident object to
+        corrupt and needs no defensive whole-state copy. This explicit complete-state
+        operation is one of the few paths that assembles every graph row.
         """
+        try:
+            with self._lock:
+                row = self._connection.execute(
+                    "SELECT revision, established_by, active_definitions, definition_delta"
+                    " FROM current_state WHERE id = 0"
+                ).fetchone()
+                if not isinstance(row, tuple):
+                    raise NotInitializedError("no canonical state is established")
+                revision = _projection_revision(row)
+                state = CanonicalState(
+                    graph=self._current_graph_unlocked(),
+                    active_definitions=self._decode_current_definitions(row[2]),
+                    definition_delta=self._decode_current_delta(row[3]),
+                    revision=revision,
+                )
+                self._current_projection_decodes += 1
+                return state
+        except sqlite3.Error as error:
+            raise StoreError(f"could not read from the store at {self._path}: {error}") from error
+
+    def current_graph(self) -> Graph:
+        """Assemble the complete current graph without reading canonical history."""
+        try:
+            with self._lock:
+                if self._connection.execute(INITIALIZED_SQL).fetchone() is None:
+                    raise NotInitializedError("no canonical state is established")
+                return self._current_graph_unlocked()
+        except sqlite3.Error as error:
+            raise StoreError(f"could not read from the store at {self._path}: {error}") from error
+
+    def evaluate_current_query(self, query: GraphQuery) -> GraphQueryResult:
+        """Evaluate against indexed SQLite candidates in one revision snapshot."""
+        from vellis.query import evaluate_indexed_query
+
+        try:
+            with self._lock:
+                self._connection.execute("BEGIN")
+                try:
+                    row = self._connection.execute(
+                        "SELECT revision, established_by, active_definitions"
+                        " FROM current_state WHERE id = 0"
+                    ).fetchone()
+                    if not isinstance(row, tuple):
+                        raise NotInitializedError("no canonical state is established")
+                    revision = _projection_revision(row)
+                    definitions = self._decode_current_definitions(row[2])
+                    result = evaluate_indexed_query(
+                        query, definitions, _SQLiteQueryIndex(self), revision
+                    )
+                    self._connection.execute("COMMIT")
+                    return result
+                except BaseException:
+                    self._rollback_quietly()
+                    raise
+        except sqlite3.Error as error:
+            raise StoreError(f"could not read from the store at {self._path}: {error}") from error
+
+    def current_definitions(self) -> tuple[int, GraphDefinitionSet, DefinitionDelta | None]:
+        """Read current definition facets without materializing the graph facet."""
         row = self._fetchone(
-            "SELECT revision, established_by, state FROM current_state WHERE id = 0"
+            "SELECT revision, established_by, active_definitions, definition_delta"
+            " FROM current_state WHERE id = 0"
         )
         if not isinstance(row, tuple):
             raise NotInitializedError("no canonical state is established")
-        state = self._decode_state(row[2], "current state")
-        if state.revision != row[0] or state.revision != row[1]:
-            raise StoreError(
-                f"the current projection at {self._path} claims revision {row[0]} established by "
-                f"record {row[1]}, but carries revision {state.revision}"
-            )
-        return state
+        return (
+            _projection_revision(row),
+            self._decode_current_definitions(row[2]),
+            self._decode_current_delta(row[3]),
+        )
+
+    def current_revision(self) -> int:
+        """Read the established current revision without materializing any state facet."""
+        row = self._fetchone("SELECT revision, established_by FROM current_state WHERE id = 0")
+        if not isinstance(row, tuple):
+            raise NotInitializedError("no canonical state is established")
+        return _projection_revision(row)
 
     # --- Owned history base ---------------------------------------------------------
 
@@ -473,6 +691,7 @@ class CanonicalStore:
         """
         state = record.canonical_state
         payload = encode_text(encode_canonical_state(state))
+        definitions, delta = _encode_current_facets(state)
         with self._lock:
             try:
                 self._connection.execute("BEGIN IMMEDIATE")
@@ -495,10 +714,17 @@ class CanonicalStore:
                     ),
                 )
                 self._connection.execute(
-                    "INSERT INTO current_state (id, revision, established_by, state)"
-                    " VALUES (0, ?, ?, ?)",
-                    (state.revision, record.established_revision, payload),
+                    "INSERT INTO current_state"
+                    " (id, revision, established_by, active_definitions, definition_delta)"
+                    " VALUES (0, ?, ?, ?, ?)",
+                    (
+                        state.revision,
+                        record.established_revision,
+                        definitions,
+                        delta,
+                    ),
                 )
+                self._replace_current_graph_unlocked(state.graph)
                 # A read attempted before the system existed may already have observed itself
                 # here, and success promises an empty ledger.
                 self._connection.execute("DELETE FROM activity_record")
@@ -523,6 +749,49 @@ class CanonicalStore:
         except sqlite3.Error:
             pass
 
+    def _replace_current_graph_unlocked(self, graph: Graph) -> None:
+        self._connection.execute("DELETE FROM current_data_anchor")
+        self._connection.execute("DELETE FROM current_graph_object")
+        for graph_object in graph.objects():
+            self._upsert_current_graph_object_unlocked(graph_object)
+
+    def _apply_current_graph_change_unlocked(self, change: GraphChange) -> None:
+        data_to_replace = {
+            *(data.uuid for data in change.associated_data_upserts),
+            *change.associated_data_removals,
+        }
+        if data_to_replace:
+            placeholders = ", ".join("?" for _ in data_to_replace)
+            self._connection.execute(
+                f"DELETE FROM current_data_anchor WHERE data_uuid IN ({placeholders})",
+                tuple(data_to_replace),
+            )
+        removals = tuple(uuid for _, uuid in change.removals())
+        if removals:
+            placeholders = ", ".join("?" for _ in removals)
+            self._connection.execute(
+                f"DELETE FROM current_graph_object WHERE uuid IN ({placeholders})", removals
+            )
+        for _, graph_object in change.upserts():
+            self._upsert_current_graph_object_unlocked(graph_object)
+
+    def _upsert_current_graph_object_unlocked(self, graph_object: GraphObject) -> None:
+        self._connection.execute(
+            "INSERT INTO current_graph_object"
+            " (uuid, object_kind, type_key, source_uuid, target_uuid, payload)"
+            " VALUES (?, ?, ?, ?, ?, ?)"
+            " ON CONFLICT(uuid) DO UPDATE SET"
+            " object_kind=excluded.object_kind, type_key=excluded.type_key,"
+            " source_uuid=excluded.source_uuid, target_uuid=excluded.target_uuid,"
+            " payload=excluded.payload",
+            _encoded_graph_object(graph_object),
+        )
+        if isinstance(graph_object, AssociatedDataObject):
+            self._connection.executemany(
+                "INSERT INTO current_data_anchor (data_uuid, anchor_uuid) VALUES (?, ?)",
+                ((graph_object.uuid, uuid) for uuid in graph_object.anchor_uuids),
+            )
+
     def append_transition(
         self, record: CanonicalTransitionRecord, resulting_state: CanonicalState
     ) -> None:
@@ -533,7 +802,7 @@ class CanonicalStore:
         The prior revision is re-checked inside the transaction, so two writers cannot
         both believe they are advancing from it.
         """
-        payload = encode_text(encode_canonical_state(resulting_state))
+        definitions, delta = _encode_current_facets(resulting_state)
         change = encode_text(encode_canonical_change(record.change))
         with self._lock:
             try:
@@ -565,9 +834,18 @@ class CanonicalStore:
                 )
                 self._connection.execute(
                     "UPDATE current_state SET revision = ?, established_by = ?,"
-                    " state = ? WHERE id = 0",
-                    (resulting_state.revision, record.resulting_revision, payload),
+                    " active_definitions = ?, definition_delta = ? WHERE id = 0",
+                    (
+                        resulting_state.revision,
+                        record.resulting_revision,
+                        definitions,
+                        delta,
+                    ),
                 )
+                if record.change.graph_change is not None:
+                    self._apply_current_graph_change_unlocked(record.change.graph_change)
+                elif record.change.replacement_graph is not None:
+                    self._replace_current_graph_unlocked(record.change.replacement_graph)
                 self._connection.execute("COMMIT")
             except StoreError:
                 self._rollback_quietly()
@@ -707,10 +985,8 @@ class CanonicalStore:
         from every historical vocabulary until someone remembers this list.
         """
         rows = self._fetchall(
-            "SELECT established_revision, record_kind, recorded_at, initiator, source, summary,"
-            " payload FROM canonical_record WHERE ordinal > 0 AND established_revision <= ?"
-            " AND record_kind != ? ORDER BY ordinal",
-            (revision, TransitionKind.GRAPH_MUTATION.value),
+            DEFINITION_TRANSITIONS_SQL,
+            (revision,),
         )
         self._record_reads += len(rows)
         records: list[CanonicalTransitionRecord] = []
@@ -720,7 +996,11 @@ class CanonicalStore:
         return tuple(records)
 
     def canonical_summaries(
-        self, *, start: datetime | None = None, end: datetime | None = None
+        self,
+        *,
+        start: datetime | None = None,
+        end: datetime | None = None,
+        limit: int | None = None,
     ) -> tuple[tuple[int, int | None, str | None, str, str | None, str, datetime], ...]:
         """Read canonical records for review over an inclusive interval.
 
@@ -738,11 +1018,18 @@ class CanonicalStore:
             clauses.append("recorded_at <= ?")
             parameters.append(_stored_time(end))
         where = f" WHERE {' AND '.join(clauses)}" if clauses else ""
-        rows = self._fetchall(
-            "SELECT established_revision, ordinal, record_kind, summary, initiator, source,"
-            f" recorded_at FROM canonical_record{where} ORDER BY ordinal",
-            tuple(parameters),
+        columns = (
+            "established_revision, ordinal, record_kind, summary, initiator, source, recorded_at"
         )
+        if limit is None:
+            sql = f"SELECT {columns} FROM canonical_record{where} ORDER BY ordinal"
+        else:
+            parameters.append(limit)
+            sql = (
+                f"WITH bounded AS MATERIALIZED (SELECT {columns} FROM canonical_record{where}"
+                f" LIMIT ?) SELECT {columns} FROM bounded ORDER BY ordinal"
+            )
+        rows = self._fetchall(sql, tuple(parameters))
         self._record_reads += len(rows)
         summaries: list[tuple[int, int | None, str | None, str, str | None, str, datetime]] = []
         for row in rows:
@@ -821,7 +1108,11 @@ class CanonicalStore:
             raise StoreError(f"could not append the activity record: {error}") from error
 
     def activity_records(
-        self, *, start: datetime | None = None, end: datetime | None = None
+        self,
+        *,
+        start: datetime | None = None,
+        end: datetime | None = None,
+        limit: int | None = None,
     ) -> tuple[ActivityRecord, ...]:
         """Read observations in ledger order over an inclusive interval."""
         clauses: list[str] = []
@@ -833,9 +1124,15 @@ class CanonicalStore:
             clauses.append("recorded_at <= ?")
             parameters.append(_stored_time(end))
         where = f" WHERE {' AND '.join(clauses)}" if clauses else ""
-        rows = self._fetchall(
-            f"SELECT payload FROM activity_record{where} ORDER BY ordinal", tuple(parameters)
-        )
+        if limit is None:
+            sql = f"SELECT payload FROM activity_record{where} ORDER BY ordinal"
+        else:
+            parameters.append(limit)
+            sql = (
+                "WITH bounded AS MATERIALIZED (SELECT ordinal, payload FROM activity_record"
+                f"{where} LIMIT ?) SELECT payload FROM bounded ORDER BY ordinal"
+            )
+        rows = self._fetchall(sql, tuple(parameters))
         self._activity_reads += len(rows)
         records: list[ActivityRecord] = []
         for row in rows:
@@ -877,3 +1174,247 @@ class CanonicalStore:
             raise StoreError(f"stored {where} does not decode to canonical meaning: {error}") from (
                 error
             )
+
+    def _current_graph_unlocked(self) -> Graph:
+        rows = self._connection.execute(
+            "SELECT uuid, object_kind, type_key, source_uuid, target_uuid, payload"
+            " FROM current_graph_object ORDER BY rowid"
+        ).fetchall()
+        anchors: list[Anchor] = []
+        associated: list[AssociatedDataObject] = []
+        links: list[Link] = []
+        for row in rows:
+            graph_object = self._decode_current_graph_object(*row)
+            if isinstance(graph_object, Anchor):
+                anchors.append(graph_object)
+            elif isinstance(graph_object, AssociatedDataObject):
+                associated.append(graph_object)
+            else:
+                links.append(graph_object)
+        self._current_graph_decodes += 1
+        return Graph(anchors=tuple(anchors), associated_data=tuple(associated), links=tuple(links))
+
+    def _decode_current_graph_object(
+        self,
+        uuid: object,
+        kind: object,
+        type_key: object,
+        source_uuid: object,
+        target_uuid: object,
+        payload: object,
+    ) -> GraphObject:
+        if (
+            not isinstance(uuid, str)
+            or not isinstance(kind, str)
+            or not isinstance(type_key, str)
+            or not isinstance(payload, str)
+        ):
+            raise StoreError("a stored current graph-object row has non-text identity or content")
+        try:
+            graph = decode_graph(decode_text(payload))
+        except (DecodeError, ValueError, ArithmeticError, RecursionError) as error:
+            raise StoreError(
+                f"stored current graph object {uuid!r} does not decode: {error}"
+            ) from error
+        objects = graph.objects()
+        if len(objects) != 1 or objects[0].uuid != uuid:
+            raise StoreError(f"stored current graph-object row {uuid!r} carries different content")
+        graph_object = objects[0]
+        if kind != (
+            ObjectKind.ANCHOR.value
+            if isinstance(graph_object, Anchor)
+            else ObjectKind.ASSOCIATED_DATA.value
+            if isinstance(graph_object, AssociatedDataObject)
+            else ObjectKind.LINK.value
+        ):
+            raise StoreError(f"stored current graph-object row {uuid!r} carries a different kind")
+        expected_source = graph_object.source_uuid if isinstance(graph_object, Link) else None
+        expected_target = graph_object.target_uuid if isinstance(graph_object, Link) else None
+        if (
+            type_key != graph_object.type_key
+            or source_uuid != expected_source
+            or target_uuid != expected_target
+        ):
+            raise StoreError(
+                f"stored current graph-object row {uuid!r} has selectors that disagree with"
+                " its payload"
+            )
+        self._current_graph_object_decodes += 1
+        return graph_object
+
+    def _decode_current_definitions(self, payload: object) -> GraphDefinitionSet:
+        if not isinstance(payload, str):
+            raise StoreError("stored current definitions are not text")
+        try:
+            definitions = decode_definition_set(decode_text(payload))
+        except (DecodeError, ValueError, ArithmeticError, RecursionError) as error:
+            raise StoreError(
+                f"stored current definitions do not decode to definition meaning: {error}"
+            ) from error
+        self._current_definition_decodes += 1
+        return definitions
+
+    def _decode_current_delta(self, payload: object) -> DefinitionDelta | None:
+        if payload is None:
+            return None
+        if not isinstance(payload, str):
+            raise StoreError("stored current definition delta is not text")
+        try:
+            return decode_definition_delta(decode_text(payload))
+        except (DecodeError, ValueError, ArithmeticError, RecursionError) as error:
+            raise StoreError(
+                f"stored current definition delta does not decode to proposal meaning: {error}"
+            ) from error
+
+
+class _SQLiteQueryIndex:
+    """Query-local access through the durable projection's identity indexes."""
+
+    def __init__(self, store: CanonicalStore) -> None:
+        self._store = store
+        self._anchors: dict[object, tuple[Anchor, ...]] = {}
+        self._data: dict[tuple[str, str], tuple[AssociatedDataObject, ...]] = {}
+        self._links: dict[tuple[object, str, str], tuple[Link, ...]] = {}
+        self._link_pairs: dict[object, frozenset[tuple[str, str]]] = {}
+
+    def known_anchor_uuids(self, uuids: tuple[str, ...]) -> set[str]:
+        return self._known_uuids(ObjectKind.ANCHOR, uuids)
+
+    def known_link_uuids(self, uuids: tuple[str, ...]) -> set[str]:
+        return self._known_uuids(ObjectKind.LINK, uuids)
+
+    def _known_uuids(self, kind: ObjectKind, uuids: tuple[str, ...]) -> set[str]:
+        if not uuids:
+            return set()
+        placeholders = ", ".join("?" for _ in uuids)
+        return {
+            str(row[0])
+            for row in self._store._connection.execute(  # noqa: SLF001
+                "SELECT uuid FROM current_graph_object"
+                f" WHERE object_kind = ? AND uuid IN ({placeholders})",
+                (kind.value, *uuids),
+            ).fetchall()
+        }
+
+    def anchor_candidates(
+        self, group: AnchorGroup, allowed_uuids: frozenset[str] | None = None
+    ) -> tuple[Anchor, ...]:
+        key = (group.anchor_type, group.uuid_filter, allowed_uuids)
+        cached = self._anchors.get(key)
+        if cached is not None:
+            return cached
+        clauses = ["object_kind = ?", "type_key = ?"]
+        parameters: list[object] = [ObjectKind.ANCHOR.value, group.anchor_type]
+        permitted = None if group.uuid_filter is None else frozenset(group.uuid_filter.uuids)
+        if allowed_uuids is not None:
+            permitted = allowed_uuids if permitted is None else permitted & allowed_uuids
+        if permitted is not None:
+            if not permitted:
+                return ()
+            placeholders = ", ".join("?" for _ in permitted)
+            clauses.append(f"uuid IN ({placeholders})")
+            parameters.extend(permitted)
+        rows = self._store._connection.execute(  # noqa: SLF001
+            "SELECT uuid, object_kind, type_key, source_uuid, target_uuid, payload"
+            " FROM current_graph_object WHERE " + " AND ".join(clauses),
+            tuple(parameters),
+        ).fetchall()
+        result = tuple(self._anchors_from(rows))
+        self._anchors[key] = result
+        return result
+
+    def associated_data_candidates(
+        self, associated_data_type: str, anchor_uuid: str
+    ) -> tuple[AssociatedDataObject, ...]:
+        key = (associated_data_type, anchor_uuid)
+        cached = self._data.get(key)
+        if cached is not None:
+            return cached
+        rows = self._store._connection.execute(  # noqa: SLF001
+            "SELECT o.uuid, o.object_kind, o.type_key, o.source_uuid, o.target_uuid, o.payload"
+            " FROM current_data_anchor AS da"
+            " JOIN current_graph_object AS o ON o.uuid = da.data_uuid"
+            " WHERE da.anchor_uuid = ? AND o.object_kind = ? AND o.type_key = ?",
+            (anchor_uuid, ObjectKind.ASSOCIATED_DATA.value, associated_data_type),
+        ).fetchall()
+        result = tuple(self._data_from(rows))
+        self._data[key] = result
+        return result
+
+    def link_candidates(
+        self, required: RequiredLink, source_uuid: str, target_uuid: str
+    ) -> tuple[Link, ...]:
+        key = (required, source_uuid, target_uuid)
+        cached = self._links.get(key)
+        if cached is not None:
+            return cached
+        clauses = [
+            "object_kind = ?",
+            "type_key = ?",
+            "source_uuid = ?",
+            "target_uuid = ?",
+        ]
+        parameters: list[object] = [
+            ObjectKind.LINK.value,
+            required.link_type,
+            source_uuid,
+            target_uuid,
+        ]
+        if required.uuid_filter is not None:
+            if not required.uuid_filter.uuids:
+                return ()
+            placeholders = ", ".join("?" for _ in required.uuid_filter.uuids)
+            clauses.append(f"uuid IN ({placeholders})")
+            parameters.extend(required.uuid_filter.uuids)
+        rows = self._store._connection.execute(  # noqa: SLF001
+            "SELECT uuid, object_kind, type_key, source_uuid, target_uuid, payload"
+            " FROM current_graph_object WHERE " + " AND ".join(clauses),
+            tuple(parameters),
+        ).fetchall()
+        result = tuple(self._links_from(rows))
+        self._links[key] = result
+        return result
+
+    def link_endpoint_pairs(self, required: RequiredLink) -> frozenset[tuple[str, str]]:
+        cached = self._link_pairs.get(required)
+        if cached is not None:
+            return cached
+        clauses = ["object_kind = ?", "type_key = ?"]
+        parameters: list[object] = [ObjectKind.LINK.value, required.link_type]
+        if required.uuid_filter is not None:
+            if not required.uuid_filter.uuids:
+                return frozenset()
+            placeholders = ", ".join("?" for _ in required.uuid_filter.uuids)
+            clauses.append(f"uuid IN ({placeholders})")
+            parameters.extend(required.uuid_filter.uuids)
+        rows = self._store._connection.execute(  # noqa: SLF001
+            "SELECT source_uuid, target_uuid FROM current_graph_object WHERE "
+            + " AND ".join(clauses),
+            tuple(parameters),
+        ).fetchall()
+        result = frozenset(
+            (str(source_uuid), str(target_uuid)) for source_uuid, target_uuid in rows
+        )
+        self._link_pairs[required] = result
+        return result
+
+    def _anchors_from(self, rows: list[tuple[object, ...]]):
+        for row in rows:
+            graph_object = self._store._decode_current_graph_object(*row)  # noqa: SLF001
+            if not isinstance(graph_object, Anchor):
+                raise StoreError("an indexed anchor candidate carries another object kind")
+            yield graph_object
+
+    def _data_from(self, rows: list[tuple[object, ...]]):
+        for row in rows:
+            graph_object = self._store._decode_current_graph_object(*row)  # noqa: SLF001
+            if not isinstance(graph_object, AssociatedDataObject):
+                raise StoreError("an indexed data candidate carries another object kind")
+            yield graph_object
+
+    def _links_from(self, rows: list[tuple[object, ...]]):
+        for row in rows:
+            graph_object = self._store._decode_current_graph_object(*row)  # noqa: SLF001
+            if not isinstance(graph_object, Link):
+                raise StoreError("an indexed link candidate carries another object kind")
+            yield graph_object

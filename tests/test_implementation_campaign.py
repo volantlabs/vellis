@@ -39,6 +39,16 @@ def _pending_campaign() -> dict[str, object]:
     campaign["campaign"]["plan_approval"] = {"status": "pending", "checkpoint": None}  # type: ignore[index]
     campaign["campaign"]["checkpoint"] = None  # type: ignore[index]
     campaign["campaign"]["blocker"] = None  # type: ignore[index]
+    observed = implementation_campaign.observed_baseline()
+    campaign["model_baseline"]["status"] = "current"  # type: ignore[index]
+    campaign["model_baseline"]["planned"] = {  # type: ignore[index]
+        **observed,
+        "checkpoint": None,
+    }
+    campaign["model_baseline"]["observed"] = {  # type: ignore[index]
+        **observed,
+        "checkpoint": None,
+    }
     for entry in campaign["authority"]:  # type: ignore[union-attr]
         entry["implementation_status"] = "absent"
         entry["evidence_refs"] = []
@@ -517,13 +527,19 @@ def test_an_approval_commit_may_not_decline_the_rules_by_claiming_another_lifecy
     assert any("beyond approval state" in finding for finding in findings)
 
 
-def test_committed_campaign_is_current_and_valid() -> None:
+def test_committed_campaign_is_stale_and_valid() -> None:
     campaign = _campaign()
 
     assert implementation_campaign.validate_campaign(campaign) == []
+    assert campaign["campaign"]["lifecycle"] == "stale"  # type: ignore[index]
+    assert campaign["model_baseline"]["status"] == "stale"  # type: ignore[index]
+    assert campaign["model_baseline"]["observed"] == {  # type: ignore[index]
+        **implementation_campaign.observed_baseline(),
+        "checkpoint": None,
+    }
     assert (
-        campaign["model_baseline"]["observed"]["authority_sha256"]  # type: ignore[index]
-        == implementation_campaign.authority_digest()
+        campaign["model_baseline"]["planned"]["authority_sha256"]  # type: ignore[index]
+        != campaign["model_baseline"]["observed"]["authority_sha256"]  # type: ignore[index]
     )
 
 

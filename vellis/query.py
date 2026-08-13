@@ -11,8 +11,11 @@ only to constrain the answer and never appear in it. What comes back is one row 
 jointly satisfying assignment, carrying exactly the requested names and nothing else.
 
 Meaning is stated over sets, not over an evaluation order, so nothing here may depend on
-the order groups were written in. The join below enumerates in declaration order because
-some order is needed to walk it; the result is the same set of rows under any other.
+the order groups were written in. Evaluation asks a realization-neutral candidate index
+for identity/type, direct-association, and directed-link joins, then applies property
+comparisons. An in-memory graph supplies hash indexes; the selected durable realization
+supplies database indexes. The join enumerates in declaration order because some order is
+needed to walk it; the result is the same set of rows under any other.
 
 The bound is on the whole answer rather than on a page of it. A result larger than the
 caller asked for is refused entire, because a truncated answer to a question about what
@@ -28,6 +31,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from decimal import Decimal
 from enum import Enum
+from typing import Protocol
 
 from vellis.definitions import AssociatedDataTypeDefinition, GraphDefinitionSet
 from vellis.graph import Anchor, AssociatedDataObject, Graph, Link, LinkEndpoint
@@ -52,11 +56,13 @@ __all__ = [
     "LinkProjection",
     "LinkUuidFilter",
     "PropertyComparison",
+    "QueryCandidateIndex",
     "RequiredLink",
     "ReturnShape",
     "ReturnProjection",
     "ReturnedProperty",
     "evaluate_query",
+    "evaluate_indexed_query",
     "query_findings",
 ]
 
@@ -262,6 +268,97 @@ class GraphQueryResult:
         return self.status is OperationStatus.ACCEPTED
 
 
+class QueryCandidateIndex(Protocol):
+    """The identity joins the query language needs from a current-state realization."""
+
+    def known_anchor_uuids(self, uuids: tuple[str, ...]) -> set[str]: ...
+
+    def known_link_uuids(self, uuids: tuple[str, ...]) -> set[str]: ...
+
+    def anchor_candidates(
+        self, group: AnchorGroup, allowed_uuids: frozenset[str] | None = None
+    ) -> tuple[Anchor, ...]: ...
+
+    def associated_data_candidates(
+        self, associated_data_type: str, anchor_uuid: str
+    ) -> tuple[AssociatedDataObject, ...]: ...
+
+    def link_candidates(
+        self, required: RequiredLink, source_uuid: str, target_uuid: str
+    ) -> tuple[Link, ...]: ...
+
+    def link_endpoint_pairs(self, required: RequiredLink) -> frozenset[tuple[str, str]]: ...
+
+
+class _InMemoryQueryIndex:
+    """Hash-indexed access over an explicitly materialized graph."""
+
+    def __init__(self, graph: Graph) -> None:
+        self._anchors_by_uuid = {anchor.uuid: anchor for anchor in graph.anchors}
+        self._links_by_uuid = {link.uuid: link for link in graph.links}
+        self._anchors_by_type: dict[str, list[Anchor]] = {}
+        self._data_by_type_and_anchor: dict[tuple[str, str], list[AssociatedDataObject]] = {}
+        self._links_by_join: dict[tuple[str, str, str], list[Link]] = {}
+        self._link_pairs_by_type: dict[str, set[tuple[str, str]]] = {}
+        for anchor in graph.anchors:
+            self._anchors_by_type.setdefault(anchor.type_key, []).append(anchor)
+        for data in graph.associated_data:
+            for anchor_uuid in data.anchor_uuids:
+                self._data_by_type_and_anchor.setdefault((data.type_key, anchor_uuid), []).append(
+                    data
+                )
+        for link in graph.links:
+            self._links_by_join.setdefault(
+                (link.type_key, link.source_uuid, link.target_uuid), []
+            ).append(link)
+            self._link_pairs_by_type.setdefault(link.type_key, set()).add(
+                (link.source_uuid, link.target_uuid)
+            )
+
+    def known_anchor_uuids(self, uuids: tuple[str, ...]) -> set[str]:
+        return set(uuids) & self._anchors_by_uuid.keys()
+
+    def known_link_uuids(self, uuids: tuple[str, ...]) -> set[str]:
+        return set(uuids) & self._links_by_uuid.keys()
+
+    def anchor_candidates(
+        self, group: AnchorGroup, allowed_uuids: frozenset[str] | None = None
+    ) -> tuple[Anchor, ...]:
+        candidates = self._anchors_by_type.get(group.anchor_type, ())
+        permitted = None if group.uuid_filter is None else frozenset(group.uuid_filter.uuids)
+        if allowed_uuids is not None:
+            permitted = allowed_uuids if permitted is None else permitted & allowed_uuids
+        if permitted is None:
+            return tuple(candidates)
+        return tuple(anchor for anchor in candidates if anchor.uuid in permitted)
+
+    def associated_data_candidates(
+        self, associated_data_type: str, anchor_uuid: str
+    ) -> tuple[AssociatedDataObject, ...]:
+        return tuple(self._data_by_type_and_anchor.get((associated_data_type, anchor_uuid), ()))
+
+    def link_candidates(
+        self, required: RequiredLink, source_uuid: str, target_uuid: str
+    ) -> tuple[Link, ...]:
+        candidates = self._links_by_join.get((required.link_type, source_uuid, target_uuid), ())
+        if required.uuid_filter is None:
+            return tuple(candidates)
+        permitted = frozenset(required.uuid_filter.uuids)
+        return tuple(link for link in candidates if link.uuid in permitted)
+
+    def link_endpoint_pairs(self, required: RequiredLink) -> frozenset[tuple[str, str]]:
+        pairs = self._link_pairs_by_type.get(required.link_type, set())
+        if required.uuid_filter is None:
+            return frozenset(pairs)
+        permitted = frozenset(required.uuid_filter.uuids)
+        return frozenset(
+            (link.source_uuid, link.target_uuid)
+            for uuid in permitted
+            if (link := self._links_by_uuid.get(uuid)) is not None
+            and link.type_key == required.link_type
+        )
+
+
 # --- Whether a query means anything --------------------------------------------------
 
 
@@ -274,11 +371,17 @@ def query_findings(
     answer: the caller named something it believed it knew, and reporting nothing found
     would answer a question it did not ask.
     """
+    return _query_findings(query, definitions, _InMemoryQueryIndex(graph))
+
+
+def _query_findings(
+    query: GraphQuery, definitions: GraphDefinitionSet, index: QueryCandidateIndex
+) -> tuple[ValidationFinding, ...]:
     findings: list[ValidationFinding] = []
     names = _name_findings(query, findings)
-    _group_findings(query, definitions, graph, findings)
+    _group_findings(query, definitions, index, findings)
     _condition_findings(query, definitions, names, findings)
-    _link_findings(query, definitions, graph, names, findings)
+    _link_findings(query, definitions, index, names, findings)
     _projection_findings(query, definitions, names, findings)
     if not query.anchor_groups:
         findings.append(ValidationFinding(summary="a query must select at least one anchor group"))
@@ -323,10 +426,9 @@ def _name_findings(query: GraphQuery, findings: list[ValidationFinding]) -> dict
 def _group_findings(
     query: GraphQuery,
     definitions: GraphDefinitionSet,
-    graph: Graph,
+    index: QueryCandidateIndex,
     findings: list[ValidationFinding],
 ) -> None:
-    known_anchors = {anchor.uuid for anchor in graph.anchors}
     for group in query.anchor_groups:
         if definitions.anchor_type(group.anchor_type) is None:
             findings.append(
@@ -340,7 +442,11 @@ def _group_findings(
         _uuid_filter_findings(
             group.uuid_filter.uuids if group.uuid_filter is not None else None,
             label=f"anchor group '{group.name}'",
-            known=known_anchors,
+            known=(
+                set()
+                if group.uuid_filter is None
+                else index.known_anchor_uuids(group.uuid_filter.uuids)
+            ),
             kind="anchor",
             findings=findings,
         )
@@ -496,11 +602,10 @@ def _comparison_findings(
 def _link_findings(
     query: GraphQuery,
     definitions: GraphDefinitionSet,
-    graph: Graph,
+    index: QueryCandidateIndex,
     names: dict[str, str],
     findings: list[ValidationFinding],
 ) -> None:
-    known_links = {link.uuid for link in graph.links}
     endpoint_types = _endpoint_type_keys(query)
     for link in query.required_links:
         link_type = definitions.link_type(link.link_type)
@@ -544,7 +649,11 @@ def _link_findings(
         _uuid_filter_findings(
             link.uuid_filter.uuids if link.uuid_filter is not None else None,
             label=f"required link '{link.name}'",
-            known=known_links,
+            known=(
+                set()
+                if link.uuid_filter is None
+                else index.known_link_uuids(link.uuid_filter.uuids)
+            ),
             kind="link",
             findings=findings,
         )
@@ -643,7 +752,17 @@ def evaluate_query(
     query: GraphQuery, definitions: GraphDefinitionSet, graph: Graph, revision: int
 ) -> GraphQueryResult:
     """Evaluate ``query`` against current state, or refuse it whole."""
-    findings = query_findings(query, definitions, graph)
+    return evaluate_indexed_query(query, definitions, _InMemoryQueryIndex(graph), revision)
+
+
+def evaluate_indexed_query(
+    query: GraphQuery,
+    definitions: GraphDefinitionSet,
+    index: QueryCandidateIndex,
+    revision: int,
+) -> GraphQueryResult:
+    """Evaluate with candidates supplied by identity/type/relationship indexes."""
+    findings = _query_findings(query, definitions, index)
     if findings:
         return GraphQueryResult(
             status=OperationStatus.REJECTED,
@@ -652,7 +771,7 @@ def evaluate_query(
             query=query,
         )
 
-    rows = _distinct_rows(query, graph)
+    rows = _distinct_rows(query, index)
     unreturnable = _unreturnable_reason(rows)
     if unreturnable is not None:
         return GraphQueryResult(
@@ -728,7 +847,7 @@ def _first_unencodable(*values: str) -> str | None:
     return next((r for r in (unencodable_reason(each) for each in values) if r is not None), None)
 
 
-def _distinct_rows(query: GraphQuery, graph: Graph) -> tuple[GraphQueryRow, ...]:
+def _distinct_rows(query: GraphQuery, index: QueryCandidateIndex) -> tuple[GraphQueryRow, ...]:
     """Project satisfying assignments, keeping identical projected tuples once.
 
     Stops one row past the caller's maximum. Knowing the answer is too large is all a
@@ -737,7 +856,7 @@ def _distinct_rows(query: GraphQuery, graph: Graph) -> tuple[GraphQueryRow, ...]
     """
     seen: set[tuple[object, ...]] = set()
     rows: list[GraphQueryRow] = []
-    for assignment in _assignments(query, graph):
+    for assignment in _assignments(query, index):
         row = _project(query, assignment)
         key = _row_identity(row)
         if key in seen:
@@ -749,61 +868,221 @@ def _distinct_rows(query: GraphQuery, graph: Graph) -> tuple[GraphQueryRow, ...]
     return tuple(rows)
 
 
-def _assignments(query: GraphQuery, graph: Graph):
-    """Enumerate every joint assignment satisfying every group, condition, and link.
+def _assignments(query: GraphQuery, index: QueryCandidateIndex):
+    """Enumerate projected assignments without multiplying irrelevant components.
 
-    Groups are walked in declaration order because a walk needs one; the satisfying set
-    does not depend on it, which is what ``semanticQueryMeaning`` means by evaluation
-    strategy not changing meaning.
+    A disconnected component with no projection is an existence condition: zero
+    satisfying assignments removes every row, while one or a million have the same
+    effect. Projected components are deduplicated by their own projected tuple before
+    they are combined, so unprojected variation inside a component cannot manufacture
+    repeated global assignments either.
     """
+    projected_components: list[tuple[_Assignment, ...]] = []
+    for names in _selector_components(query):
+        component = _component_query(query, names)
+        if not component.return_shape.projections:
+            if next(_component_assignments(component, index), None) is None:
+                return
+            continue
+        distinct = _distinct_component_assignments(component, index)
+        if not distinct:
+            return
+        projected_components.append(distinct)
+
+    def combine(index: int, assignment: _Assignment):
+        if index == len(projected_components):
+            yield assignment
+            return
+        for component_assignment in projected_components[index]:
+            yield from combine(
+                index + 1,
+                _Assignment(
+                    endpoints={**assignment.endpoints, **component_assignment.endpoints},
+                    links={**assignment.links, **component_assignment.links},
+                ),
+            )
+
+    yield from combine(0, _Assignment())
+
+
+def _selector_components(query: GraphQuery) -> tuple[frozenset[str], ...]:
+    """Return connected endpoint-selector components in declaration order."""
+    names = [
+        *(group.name for group in query.anchor_groups),
+        *(condition.name for condition in query.data_conditions),
+    ]
+    adjacent = {name: set[str]() for name in names}
+    for condition in query.data_conditions:
+        adjacent[condition.name].add(condition.anchor_group)
+        adjacent[condition.anchor_group].add(condition.name)
+    for required in query.required_links:
+        adjacent[required.source_group].add(required.target_group)
+        adjacent[required.target_group].add(required.source_group)
+
+    components: list[frozenset[str]] = []
+    visited: set[str] = set()
+    for name in names:
+        if name in visited:
+            continue
+        pending = [name]
+        members: set[str] = set()
+        while pending:
+            current = pending.pop()
+            if current in members:
+                continue
+            members.add(current)
+            pending.extend(adjacent[current] - members)
+        visited.update(members)
+        components.append(frozenset(members))
+    return tuple(components)
+
+
+def _component_query(query: GraphQuery, names: frozenset[str]) -> GraphQuery:
+    """Project one selector component into a self-contained internal query."""
+    links = tuple(
+        required
+        for required in query.required_links
+        if required.source_group in names and required.target_group in names
+    )
+    link_names = {required.name for required in links}
+    projections = tuple(
+        projection
+        for projection in query.return_shape.projections
+        if (
+            isinstance(projection, AnchorProjection)
+            and projection.anchor_group in names
+            or isinstance(projection, (AssociatedDataProjection, DataPropertyProjection))
+            and projection.data_condition in names
+            or isinstance(projection, LinkProjection)
+            and projection.required_link in link_names
+        )
+    )
+    return GraphQuery(
+        anchor_groups=tuple(group for group in query.anchor_groups if group.name in names),
+        data_conditions=tuple(
+            condition for condition in query.data_conditions if condition.name in names
+        ),
+        required_links=links,
+        return_shape=ReturnShape(projections=projections),
+        maximum_rows=query.maximum_rows,
+    )
+
+
+def _distinct_component_assignments(
+    query: GraphQuery, index: QueryCandidateIndex
+) -> tuple[_Assignment, ...]:
+    """Keep one assignment for each distinct projection inside one component."""
+    seen: set[tuple[object, ...]] = set()
+    assignments: list[_Assignment] = []
+    for assignment in _component_assignments(query, index):
+        key = _row_identity(_project(query, assignment))
+        if key in seen:
+            continue
+        seen.add(key)
+        assignments.append(assignment)
+        if len(assignments) > query.maximum_rows:
+            break
+    return tuple(assignments)
+
+
+def _component_assignments(query: GraphQuery, index: QueryCandidateIndex):
+    """Enumerate satisfying assignments within one connected selector component."""
+    anchor_group_names = frozenset(group.name for group in query.anchor_groups)
+    link_pair_maps: dict[str, tuple[dict[str, set[str]], dict[str, set[str]]]] = {}
+    allowed_by_group: dict[str, frozenset[str]] = {}
+    for required in query.required_links:
+        if (
+            required.source_group not in anchor_group_names
+            or required.target_group not in anchor_group_names
+        ):
+            continue
+        targets_by_source: dict[str, set[str]] = {}
+        sources_by_target: dict[str, set[str]] = {}
+        for source_uuid, target_uuid in index.link_endpoint_pairs(required):
+            targets_by_source.setdefault(source_uuid, set()).add(target_uuid)
+            sources_by_target.setdefault(target_uuid, set()).add(source_uuid)
+        link_pair_maps[required.name] = (targets_by_source, sources_by_target)
+        for group_name, permitted in (
+            (required.source_group, frozenset(targets_by_source)),
+            (required.target_group, frozenset(sources_by_target)),
+        ):
+            prior = allowed_by_group.get(group_name)
+            allowed_by_group[group_name] = permitted if prior is None else prior & permitted
     anchor_candidates = {
-        group.name: _anchor_candidates(group, graph) for group in query.anchor_groups
+        group.name: index.anchor_candidates(group, allowed_by_group.get(group.name))
+        for group in query.anchor_groups
+    }
+    anchor_by_uuid = {
+        name: {anchor.uuid: anchor for anchor in candidates}
+        for name, candidates in anchor_candidates.items()
     }
 
-    def walk_groups(index: int, assignment: _Assignment):
-        if index == len(query.anchor_groups):
+    def walk_groups(position: int, assignment: _Assignment):
+        if position == len(query.anchor_groups):
             yield from walk_conditions(0, assignment)
             return
-        group = query.anchor_groups[index]
-        for anchor in anchor_candidates[group.name]:
+        group = query.anchor_groups[position]
+        candidates = anchor_candidates[group.name]
+        for required in query.required_links:
+            pair_maps = link_pair_maps.get(required.name)
+            if pair_maps is None:
+                continue
+            targets_by_source, sources_by_target = pair_maps
+            if (
+                required.target_group == group.name
+                and required.source_group in assignment.endpoints
+            ):
+                source_uuid = assignment.endpoints[required.source_group].uuid
+                candidates = tuple(
+                    anchor_by_uuid[group.name][target_uuid]
+                    for target_uuid in targets_by_source.get(source_uuid, ())
+                    if target_uuid in anchor_by_uuid[group.name]
+                )
+            elif (
+                required.source_group == group.name
+                and required.target_group in assignment.endpoints
+            ):
+                target_uuid = assignment.endpoints[required.target_group].uuid
+                candidates = tuple(
+                    anchor_by_uuid[group.name][source_uuid]
+                    for source_uuid in sources_by_target.get(target_uuid, ())
+                    if source_uuid in anchor_by_uuid[group.name]
+                )
+        for anchor in candidates:
             yield from walk_groups(
-                index + 1,
+                position + 1,
                 _Assignment(
                     endpoints={**assignment.endpoints, group.name: anchor}, links=assignment.links
                 ),
             )
 
-    def walk_conditions(index: int, assignment: _Assignment):
-        if index == len(query.data_conditions):
+    def walk_conditions(position: int, assignment: _Assignment):
+        if position == len(query.data_conditions):
             yield from walk_links(0, assignment)
             return
-        condition = query.data_conditions[index]
+        condition = query.data_conditions[position]
         anchor = assignment.endpoints[condition.anchor_group]
-        for data in _data_candidates(condition, anchor, graph):
+        for data in index.associated_data_candidates(condition.associated_data_type, anchor.uuid):
+            if not all(_satisfies(each, data) for each in condition.property_conditions):
+                continue
             yield from walk_conditions(
-                index + 1,
+                position + 1,
                 _Assignment(
                     endpoints={**assignment.endpoints, condition.name: data},
                     links=assignment.links,
                 ),
             )
 
-    def walk_links(index: int, assignment: _Assignment):
-        if index == len(query.required_links):
+    def walk_links(position: int, assignment: _Assignment):
+        if position == len(query.required_links):
             yield assignment
             return
-        required = query.required_links[index]
+        required = query.required_links[position]
         source = assignment.endpoints[required.source_group]
         target = assignment.endpoints[required.target_group]
-        for link in graph.links:
-            if link.type_key != required.link_type:
-                continue
-            if link.source_uuid != source.uuid or link.target_uuid != target.uuid:
-                continue
-            if required.uuid_filter is not None and link.uuid not in required.uuid_filter.uuids:
-                continue
+        for link in index.link_candidates(required, source.uuid, target.uuid):
             yield from walk_links(
-                index + 1,
+                position + 1,
                 _Assignment(
                     endpoints=assignment.endpoints,
                     links={**assignment.links, required.name: link},
@@ -811,27 +1090,6 @@ def _assignments(query: GraphQuery, graph: Graph):
             )
 
     yield from walk_groups(0, _Assignment())
-
-
-def _anchor_candidates(group: AnchorGroup, graph: Graph) -> tuple[Anchor, ...]:
-    return tuple(
-        anchor
-        for anchor in graph.anchors
-        if anchor.type_key == group.anchor_type
-        and (group.uuid_filter is None or anchor.uuid in group.uuid_filter.uuids)
-    )
-
-
-def _data_candidates(
-    condition: AssociatedDataCondition, anchor: LinkEndpoint, graph: Graph
-) -> tuple[AssociatedDataObject, ...]:
-    return tuple(
-        data
-        for data in graph.associated_data
-        if data.type_key == condition.associated_data_type
-        and anchor.uuid in data.anchor_uuids
-        and all(_satisfies(each, data) for each in condition.property_conditions)
-    )
 
 
 def _satisfies(condition: DataPropertyCondition, data: AssociatedDataObject) -> bool:

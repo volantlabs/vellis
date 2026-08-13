@@ -2,14 +2,19 @@ schema_version: "1.1"
 campaign:
   id: vellis-model-implementation
   objective: Realize the complete accepted Vellis model with discriminating evidence and a runnable selected boundary.
-  lifecycle: ready
+  lifecycle: stale
   plan_approval:
-    status: accepted
-    checkpoint: approval:5afe36b2bc261e726a1679596e4ef30ef0bf95f2
-  blocker: null
+    status: changes-required
+    checkpoint: null
+  blocker:
+    classification: stale baseline
+    summary: Post-build evolution changes current-work and query resource authority and records escaped historical-selection defects, so this completed-plan record remains a source baseline and cannot authorize work against the proposed authority.
+    authority_ids: [A006, A007, A008, A016]
+    evidence_refs:
+      - command:just system-evolution-check
   checkpoint: approval:5afe36b2bc261e726a1679596e4ef30ef0bf95f2
 model_baseline:
-  status: current
+  status: stale
   authority_files:
     - model/10-rtg-domain.sysml
     - model/15-everyday-life-starter.sysml
@@ -23,7 +28,7 @@ model_baseline:
     validator_sha256: 1f6f2eb0eb43cf4a2154ef4989a0ed22c871051711c50b2f88399c299cad5bbf
     checkpoint: null
   observed:
-    authority_sha256: 0dbc79b3e2036ddda8fdd35e8ad4efe4616cdc5c5b89bd08a66c92972c004437
+    authority_sha256: ad02d24b6c6eeb38f904d551e0ae7dfd48101ff41e44db79effb3014e137e4c6
     language_sha256: 054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
     validator_sha256: 1f6f2eb0eb43cf4a2154ef4989a0ed22c871051711c50b2f88399c299cad5bbf
     checkpoint: null
@@ -139,7 +144,7 @@ authority:
       - {model_ref: "VellisRequirements::agentDefinitionDiscoverability", source: "model/40-requirements.sysml"}
     planned_coverage: full
     slice_ids: [S003, S006, S008]
-    implementation_status: conforming
+    implementation_status: partial
     evidence_refs:
       - path:tests/vellis/test_historical_selection.py#test_a_cold_agent_discovers_definitions_later_retired
       - path:tests/vellis/test_definition_discovery.py#test_a_cold_agent_reads_the_whole_anchor_vocabulary
@@ -158,7 +163,7 @@ authority:
       - {model_ref: "VellisRequirements::querySafety", source: "model/40-requirements.sysml"}
     planned_coverage: full
     slice_ids: [S005, S006, S008]
-    implementation_status: conforming
+    implementation_status: partial
     evidence_refs:
       - path:tests/vellis/test_historical_selection.py#test_a_query_at_a_selected_revision_sees_that_state
       - path:tests/vellis/test_graph_queries.py#test_one_anchor_type_is_queried_broadly
@@ -179,7 +184,7 @@ authority:
       - {model_ref: "VellisRequirements::boundedHistoryRead", source: "model/40-requirements.sysml"}
     planned_coverage: full
     slice_ids: [S006, S007]
-    implementation_status: conforming
+    implementation_status: partial
     evidence_refs:
       - path:tests/vellis/test_activity_history.py#test_each_read_capability_records_its_own_observation
       - path:tests/vellis/test_activity_history.py#test_an_activity_read_is_selected_before_its_own_record_is_appended
@@ -405,7 +410,7 @@ authority:
       - {model_ref: "VellisVerification::historyGrowth", source: "model/50-verification.sysml"}
     planned_coverage: full
     slice_ids: [S001, S002, S003, S004, S005, S006, S007, S008, S009, S010, S016]
-    implementation_status: conforming
+    implementation_status: partial
     evidence_refs:
       - path:tests/vellis/test_current_work.py#test_reading_current_state_visits_no_canonical_record
       - path:tests/vellis/test_current_work.py#test_current_conformance_assessment_visits_no_canonical_record

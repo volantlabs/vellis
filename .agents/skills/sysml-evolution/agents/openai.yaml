@@ -1,0 +1,4 @@
+interface:
+  display_name: "SysML Evolution"
+  short_description: "Evolve modeled and implemented systems"
+  default_prompt: "Use $sysml-evolution to assess and evolve this implemented SysML system from current evidence."

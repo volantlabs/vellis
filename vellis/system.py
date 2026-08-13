@@ -149,6 +149,10 @@ class RTGSystem:
         """
         return self._store.current_state()
 
+    def _working_state(self) -> CanonicalState:
+        """Materialize the durable SQLite projection for graph-bearing domain work."""
+        return self._store.current_state()
+
     def replay(self) -> CanonicalState:
         """Reconstruct canonical state from the ledger itself."""
         return self._store.replay()
@@ -366,7 +370,7 @@ class RTGSystem:
         either way.
         """
         try:
-            state = self.current_state()
+            state = self._working_state()
         except NotInitializedError as error:
             # A determinate precondition, like initializing an established RTG: the caller
             # can act on it. A damaged store cannot be acted on, only reported.
@@ -443,7 +447,7 @@ class RTGSystem:
             )
             return result
         try:
-            state = self.current_state()
+            revision, definitions, delta = self._store.current_definitions()
         except StoreError as error:
             failed = DefinitionSummaryResult(
                 status=OperationStatus.FAILED,
@@ -460,10 +464,10 @@ class RTGSystem:
             return failed
         result = DefinitionSummaryResult(
             status=OperationStatus.ACCEPTED,
-            summary=f"{len(state.active_definitions.anchor_types)} active anchor types",
-            anchor_types=summarize_anchor_types(state.active_definitions),
-            evaluated_revision=state.revision,
-            delta_present=state.definition_delta is not None,
+            summary=f"{len(definitions.anchor_types)} active anchor types",
+            anchor_types=summarize_anchor_types(definitions),
+            evaluated_revision=revision,
+            delta_present=delta is not None,
         )
         self._observe(
             "definitionSummary",
@@ -505,7 +509,7 @@ class RTGSystem:
         if selection is not None:
             return self._historical_inspection(request, selection)
         try:
-            state = self.current_state()
+            revision, definitions, _ = self._store.current_definitions()
         except StoreError as error:
             return DefinitionInspectionResult(
                 status=OperationStatus.FAILED,
@@ -513,7 +517,7 @@ class RTGSystem:
                 request=request,
                 findings=(ValidationFinding(summary=str(error)),),
             )
-        findings = inspection_findings(request, state.active_definitions)
+        findings = inspection_findings(request, definitions)
         if findings:
             return DefinitionInspectionResult(
                 status=OperationStatus.REJECTED,
@@ -525,15 +529,14 @@ class RTGSystem:
                 findings=findings,
             )
         details: tuple[AnchorDefinitionDetail, ...] = tuple(
-            anchor_neighborhood(type_key, state.active_definitions)
-            for type_key in request.anchor_type_keys
+            anchor_neighborhood(type_key, definitions) for type_key in request.anchor_type_keys
         )
         return DefinitionInspectionResult(
             status=OperationStatus.ACCEPTED,
             summary=f"{len(details)} anchor neighborhoods",
             request=request,
             anchor_details=details,
-            evaluated_revision=state.revision,
+            evaluated_revision=revision,
         )
 
     # --- The sole proposal ------------------------------------------------------------
@@ -541,7 +544,7 @@ class RTGSystem:
     def definition_delta(self, *, provenance: Provenance = UNATTRIBUTED) -> DefinitionDeltaResult:
         """Return the sole proposal with a current assessment, or normal absence."""
         try:
-            state = self.current_state()
+            state = self._working_state()
         except StoreError as error:
             result = DefinitionDeltaResult(
                 status=OperationStatus.FAILED,
@@ -587,7 +590,7 @@ class RTGSystem:
         throw away work the owner did not ask to lose.
         """
         try:
-            state = self.current_state()
+            state = self._working_state()
         except StoreError as error:
             return DefinitionDeltaResult(
                 status=OperationStatus.FAILED,
@@ -666,7 +669,7 @@ class RTGSystem:
         conforming under it.
         """
         try:
-            state = self.current_state()
+            state = self._working_state()
         except StoreError as error:
             return RevisionedOutcome(
                 status=OperationStatus.FAILED,
@@ -717,7 +720,7 @@ class RTGSystem:
     def _discard_definition_delta(self, *, provenance: Provenance) -> RevisionedOutcome:
         """Clear the sole proposal, or report that there is none."""
         try:
-            state = self.current_state()
+            state = self._working_state()
         except StoreError as error:
             return RevisionedOutcome(
                 status=OperationStatus.FAILED,
@@ -842,7 +845,7 @@ class RTGSystem:
             )
             return result
         try:
-            state = self.current_state()
+            result = self._store.evaluate_current_query(query)
         except NotInitializedError as error:
             result = GraphQueryResult(
                 status=OperationStatus.REJECTED,
@@ -857,8 +860,6 @@ class RTGSystem:
                 findings=(ValidationFinding(summary=str(error)),),
                 query=query,
             )
-        else:
-            result = evaluate_query(query, state.active_definitions, state.graph, state.revision)
         self._observe(
             "query",
             result.status,
@@ -1236,7 +1237,7 @@ class RTGSystem:
             # After the entries, not before: a commit landing between the two reads would
             # otherwise produce a result claiming one revision while carrying records from
             # another, which is a state the ledger never held.
-            revision = self.current_state().revision
+            revision = self._store.current_revision()
         except NotInitializedError as error:
             return HistoryResult(
                 status=OperationStatus.REJECTED,
@@ -1359,7 +1360,7 @@ class RTGSystem:
         refusing for a reason already known should not cost a replay of the whole tail.
         """
         try:
-            state = self.current_state()
+            state = self._working_state()
         except NotInitializedError as error:
             return RevisionedOutcome(
                 status=OperationStatus.REJECTED,
@@ -1434,7 +1435,7 @@ class RTGSystem:
         record; a false ``conforms`` describes the graph, it does not report a failure.
         """
         try:
-            state = self.current_state()
+            state = self._working_state()
         except StoreError as error:
             self._observe(
                 "check",
@@ -1579,7 +1580,13 @@ def _canonical_entries(
             transition_kind=None if kind is None else TransitionKind(kind),
         )
         for revision, prior, kind, initiator, source, summary, recorded_at in (
-            system.store.canonical_summaries(start=query.start_time, end=query.end_time)
+            system.store.canonical_summaries(
+                start=query.start_time,
+                end=query.end_time,
+                limit=(
+                    None if query.maximum_records >= MAXIMUM_REVISION else query.maximum_records + 1
+                ),
+            )
         )
     )
     return entries, ()
@@ -1588,7 +1595,11 @@ def _canonical_entries(
 def _activity_entries(
     system: RTGSystem, query: HistoryQuery
 ) -> tuple[tuple[CanonicalHistoryEntry, ...], tuple[ActivityHistoryEntry, ...]]:
-    records = system.store.activity_records(start=query.start_time, end=query.end_time)
+    records = system.store.activity_records(
+        start=query.start_time,
+        end=query.end_time,
+        limit=(None if query.maximum_records >= MAXIMUM_REVISION else query.maximum_records + 1),
+    )
     return (), tuple(
         ActivityHistoryEntry(
             recorded_at=record.recorded_at,

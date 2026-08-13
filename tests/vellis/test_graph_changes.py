@@ -446,29 +446,13 @@ def test_a_non_conforming_graph_is_described_not_raised(tmp_path: Path) -> None:
     The graph is made non-conforming through the store rather than through a change,
     because an accepted change can never produce one.
     """
-    from vellis.canonical import CanonicalState
     from vellis.outcomes import ValidationScope
-    from vellis.serialization import encode_canonical_state, encode_text
 
     system = _populated(tmp_path)
     try:
         state = system.current_state()
-        stray = Graph(
-            anchors=state.graph.anchors,
-            associated_data=state.graph.associated_data,
-            links=(*state.graph.links, Link("l-9", "worksOn", "a-2", "a-1")),
-        )
-        payload = encode_text(
-            encode_canonical_state(
-                CanonicalState(
-                    graph=stray,
-                    active_definitions=state.active_definitions,
-                    revision=state.revision,
-                )
-            )
-        )
-        system.store._connection.execute(  # noqa: SLF001
-            "UPDATE current_state SET state = ? WHERE id = 0", (payload,)
+        system.store._upsert_current_graph_object_unlocked(  # noqa: SLF001
+            Link("l-9", "worksOn", "a-2", "a-1")
         )
         report = system.check()
         assert report.scope is ValidationScope.GRAPH_CONFORMANCE
