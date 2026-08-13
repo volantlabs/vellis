@@ -3,9 +3,9 @@ evolution:
   id: sqlite-write-path-resource-review
   objective: Make every Vellis operation use bounded local, set-based, or streaming work without constructing complete resident graph or canonical-state aggregates.
   observable_distinction: Ordinary work touches only its affected semantic neighborhood, complete assessments remain exhaustive through bounded retrieval, and lifecycle operations stream complete meaning without resident whole-state values.
-  lifecycle: awaiting-approval
+  lifecycle: ready
   approval:
-    status: pending
+    status: accepted
     reason: The owner accepted normalized SQLite state, prospective graph overlay, complete stored assessments with bounded retrieval, and streamed snapshots while preserving portable system meaning.
     checkpoint: null
   blocker: null
@@ -386,7 +386,7 @@ work_items:
           - W005
           - W006
     approval:
-      status: pending
+      status: accepted
       reason: The owner explicitly accepted the complete SQLite-native bounded-memory plan and requested its implementation.
       checkpoint: null
     nearest_wrong_system: Complete semantic outcomes remain correct while their implementation is permitted to require one resident representation of all graph, definition, assessment, or replay state.
@@ -395,7 +395,7 @@ work_items:
       - No database, index, serialization, or programming technology becomes portable model authority.
       - Completeness, exact equality, history, lineage, and atomic failure non-effects remain authoritative.
       - Numerical latency targets remain deferred pending representative hardware and owner data.
-    lifecycle: pending
+    lifecycle: ready
     implementation_status: not evaluated
     evidence_refs: []
     blocker: null
