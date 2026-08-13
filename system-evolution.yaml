@@ -3,13 +3,13 @@ evolution:
   id: sqlite-population-local-work
   objective: Eliminate population-wide work from ordinary Vellis operations while preserving exhaustive bounded-memory full-scope operations.
   observable_distinction: Fixed local writes, definition reads, tail records, and adjacent restores remain independent of unrelated graph and definition populations.
-  lifecycle: active
+  lifecycle: complete
   approval:
     status: not-required
     reason: Accepted authority already requires affected-neighborhood ordinary work and bounded streaming or set-based lifecycle work.
     checkpoint: null
   blocker: null
-  checkpoint: git:798b97c0cdfc3246397dc7ed0f826807ed2115cd
+  checkpoint: git:b9b52f07155ef7dacbb5c792871a9b03367cd703
 baselines:
   status: current
   source:
@@ -18,13 +18,18 @@ baselines:
     language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
     execution_environment: sha256:3315a10b5fcc8d62aa435d2f4e12165a147f334b01fad06ce367d11b6eb8191c
     checkpoint: git:798b97c0cdfc3246397dc7ed0f826807ed2115cd
-  target: null
-  observed:
+  target:
     model: sha256:23a0fa4c525a6e89ec0740c4d4f0af283cccae44abc23b73b99f7427d7c93c7e
-    implementation: git:798b97c0cdfc3246397dc7ed0f826807ed2115cd
+    implementation: git:b9b52f07155ef7dacbb5c792871a9b03367cd703
     language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
     execution_environment: sha256:3315a10b5fcc8d62aa435d2f4e12165a147f334b01fad06ce367d11b6eb8191c
-    checkpoint: git:798b97c0cdfc3246397dc7ed0f826807ed2115cd
+    checkpoint: git:b9b52f07155ef7dacbb5c792871a9b03367cd703
+  observed:
+    model: sha256:23a0fa4c525a6e89ec0740c4d4f0af283cccae44abc23b73b99f7427d7c93c7e
+    implementation: git:b9b52f07155ef7dacbb5c792871a9b03367cd703
+    language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
+    execution_environment: sha256:3315a10b5fcc8d62aa435d2f4e12165a147f334b01fad06ce367d11b6eb8191c
+    checkpoint: git:b9b52f07155ef7dacbb5c792871a9b03367cd703
 scope:
   authority_scope:
     - VellisRequirements::historyIndependentCurrentWork
@@ -60,9 +65,9 @@ findings:
       - VellisVerification::currentWorkScaling
     evidence_refs:
       - command:uv run pytest tests/vellis/test_current_work.py tests/vellis/test_sqlite_prospective_state.py
-    disposition: implementation-work
+    disposition: resolved
     owner_work_item_id: W001
-    implementation_status: conflicting
+    implementation_status: conforming
     nearest_wrong_system: Graph objects are not decoded, but every effective canonical write still hashes every unrelated current row.
     compatibility_effect: Schema five replaces unreleased schema four without migration; public tool meaning is unchanged.
   - id: F002
@@ -75,9 +80,9 @@ findings:
       - VellisVerification::currentWorkScaling
     evidence_refs:
       - command:uv run pytest tests/vellis/test_current_work.py tests/vellis/test_definition_discovery.py
-    disposition: implementation-work
+    disposition: resolved
     owner_work_item_id: W001
-    implementation_status: conflicting
+    implementation_status: conforming
     nearest_wrong_system: Decode counters remain local while temporary source maps and unindexed participant searches scan all definitions.
     compatibility_effect: Only SQLite indexes and private query plans change; public definition results remain unchanged.
   - id: F003
@@ -90,9 +95,9 @@ findings:
       - VellisVerification::replayCharacterization
     evidence_refs:
       - command:uv run pytest tests/vellis/test_streaming_lifecycle.py
-    disposition: implementation-work
+    disposition: resolved
     owner_work_item_id: W001
-    implementation_status: conflicting
+    implementation_status: conforming
     nearest_wrong_system: Snapshot and tail buffers remain bounded while each tail record silently scans the complete reconstructed graph.
     compatibility_effect: Schema-five snapshot and tail headers replace unreleased schema-four streams without adapters.
   - id: F004
@@ -105,9 +110,9 @@ findings:
       - VellisVerification::restoreHistory
     evidence_refs:
       - command:uv run pytest tests/vellis/test_historical_restore.py
-    disposition: implementation-work
+    disposition: resolved
     owner_work_item_id: W001
-    implementation_status: conflicting
+    implementation_status: conforming
     nearest_wrong_system: Restore is set-based and bounded-memory but still visits every unrelated current object for a one-object tail.
     compatibility_effect: Restoration results and ledger meaning remain unchanged.
 decisions:
@@ -125,8 +130,9 @@ decisions:
     evidence_intent:
       - Fixed writes ignore unrelated population while independent full recomputation detects summary drift.
       - Fault injection leaves graph rows, summaries, head, events, and identities mutually unchanged.
-    implementation_status: not evaluated
-    evidence_refs: []
+    implementation_status: conforming
+    evidence_refs:
+      - path:tests/vellis/test_population_local_work.py#test_ordinary_writes_are_independent_of_unrelated_graph_population
   - id: D002
     summary: Resolve focused definition closure and applicable rules through reverse indexes and a keyed frontier.
     authority_refs:
@@ -140,8 +146,9 @@ decisions:
     evidence_intent:
       - Focused inspection and one affected mutation remain local as unrelated definitions and rules increase.
       - Full assessment remains exhaustive while decoding each encountered type definition once.
-    implementation_status: not evaluated
-    evidence_refs: []
+    implementation_status: conforming
+    evidence_refs:
+      - path:tests/vellis/test_population_local_work.py#test_connected_definition_frontier_processes_each_edge_once
   - id: D003
     summary: Replay and restore advance semantic summaries from explicit events and changed identities.
     authority_refs:
@@ -156,8 +163,9 @@ decisions:
     evidence_intent:
       - Tail work scales with tail records and adjacent restore with changed tail identities.
       - Explicit integrity verification still recomputes and compares complete required state.
-    implementation_status: not evaluated
-    evidence_refs: []
+    implementation_status: conforming
+    evidence_refs:
+      - path:tests/vellis/test_population_local_work.py#test_adjacent_restore_depends_on_changed_tail_uuids_not_population
 work_items:
   - id: W001
     order: 1
@@ -200,11 +208,13 @@ work_items:
       - Canonical equality, replay sufficiency, and atomic failure non-effects remain unchanged.
       - Explicit full integrity checks may recompute all summaries.
       - User-owned .data content remains untouched.
-    lifecycle: active
-    implementation_status: conflicting
-    evidence_refs: []
+    lifecycle: complete
+    implementation_status: conforming
+    evidence_refs:
+      - command:uv run pytest tests/vellis/test_population_local_work.py tests/vellis/test_streaming_lifecycle.py tests/vellis/test_historical_selection.py
+      - command:just check
     blocker: null
-    checkpoint: null
+    checkpoint: git:b9b52f07155ef7dacbb5c792871a9b03367cd703
   - id: W004
     order: 2
     label: Review, document, and rebaseline population-local SQLite work
@@ -232,28 +242,33 @@ work_items:
     non_effects:
       - Numerical performance budgets remain deferred.
       - Prior completed evolution remains recoverable in Git history.
-    lifecycle: pending
-    implementation_status: not evaluated
-    evidence_refs: []
+    lifecycle: complete
+    implementation_status: conforming
+    evidence_refs:
+      - command:just check
     blocker: null
-    checkpoint: null
+    checkpoint: git:b9b52f07155ef7dacbb5c792871a9b03367cd703
 closure:
-  finding_disposition: open
-  model_status: unchanged
-  implementation_status: conflicting
-  integration_status: not evaluated
+  finding_disposition: complete
+  model_status: accepted
+  implementation_status: conforming
+  integration_status: conforming
   external_status: not applicable
   compatibility: Schema five will refuse unreleased schema-four stores and snapshots without migration; user-owned .data remains untouched.
   reviews:
     - lens: authority and conformance
-      status: pending
-      reviewer: null
-      checkpoint: null
-      evidence_refs: []
+      status: clean
+      reviewer: agent:population_final_authority
+      checkpoint: git:b9b52f07155ef7dacbb5c792871a9b03367cd703
+      evidence_refs:
+        - command:just model-check
+        - command:just system-evolution-check
     - lens: engineering and evidence
-      status: pending
-      reviewer: null
-      checkpoint: null
-      evidence_refs: []
-  evidence_refs: []
-  checkpoint: null
+      status: clean
+      reviewer: agent:population_engineering_review
+      checkpoint: git:b9b52f07155ef7dacbb5c792871a9b03367cd703
+      evidence_refs:
+        - command:just check
+  evidence_refs:
+    - command:just check
+  checkpoint: git:b9b52f07155ef7dacbb5c792871a9b03367cd703
