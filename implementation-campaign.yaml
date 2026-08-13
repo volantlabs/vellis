@@ -12,7 +12,7 @@ campaign:
     authority_ids: [A006, A007, A008, A016]
     evidence_refs:
       - command:just system-evolution-check
-  checkpoint: closure:5afe36b2bc26:1
+  checkpoint: slice:S018:c7acd9d2ac9f:1
 model_baseline:
   status: stale
   authority_files:
