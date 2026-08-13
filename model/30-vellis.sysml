@@ -279,10 +279,11 @@ package Vellis {
              * owner-readable meaning. According to owner intent, leave the proposal
              * staged for later work, activate it, or discard it. Refusal or failure
              * preserves active definitions and graph; failed activation also
-             * preserves the delta. No automatic graph migration occurs. Evidence:
-             * whole-delta retrieval preserves staged work, while active discovery
-             * reflects exactly one accepted activation or the prior active set
-             * after discard or failure.
+             * preserves the delta. Graph changes are staged explicitly as
+             * complete-object upserts, tombstones, or unstaging, never inferred
+             * migration or cascade. Evidence: prospective discovery and query
+             * preserve staged work, while active discovery reflects exactly one
+             * assessed activation or the prior active set after discard or failure.
              */
         }
     }
@@ -305,8 +306,9 @@ package Vellis {
         actor agent : 'MCP Agent';
         objective {
             doc /*
-             * Input: none; assess the owner's current personal memory. Success:
-             * present a scoped conformance report at the current revision. Refusal or
+             * Input: request a complete current or prospective assessment or one
+             * bounded interval of its findings. Success: present the assessment
+             * identity, complete finding count, and selected interval. Refusal or
              * failure is observable. Canonical memory and revision never change;
              * the validation attempt is recorded observationally. Evidence:
              * findings identify implicated definitions and graph objects when available.
@@ -406,8 +408,8 @@ package Vellis {
         objective {
             doc /*
              * Input: one initial record or complete snapshot with an optional
-             * later ledger tail. Success: reconstruct equivalent personal memory
-             * for inspection. Refusal or failure reports findings. Live canonical
+             * later ledger tail. Success: completely verify equivalent personal
+             * memory and identify its final revision and record. Refusal or failure reports findings. Live canonical
              * memory and revision do not change; the validation attempt is recorded
              * observationally, and the reconstruction does not initialize or
              * restore the live system. Evidence: the result is equivalent to direct
@@ -448,8 +450,9 @@ package Vellis {
         objective {
             doc /*
              * Input: one complete Vellis v1 JSON snapshot at first use. Analyze
-             * live graph content and active definitions into a transient complete
-             * recovery candidate and report bound to that exact snapshot. Summarize
+             * live graph content and active definitions incrementally into a
+             * staged recovery candidate and report bound to that exact snapshot,
+             * without constructing a resident whole graph or definition set. Summarize
              * preserved graph content and present every simplified, omitted, and
              * blocking definition condition.
              * Success requires owner confirmation of that exact candidate and

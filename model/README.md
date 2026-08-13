@@ -41,32 +41,38 @@ meaning translated from a complete Vellis v1 JSON snapshot. That path establishe
 v2 lineage; it is never an existing-system merge or replacement and never overlays the v2 starter.
 Starter dates constrain lexical shape only, not calendar validity or ordering.
 
-A cold agent first requests the complete shallow anchor summary for current state or an optional
-revision/time selection, then inspects the relevant anchor neighborhoods at that evaluated revision.
+A cold agent first requests the complete shallow anchor summary for current, prospective, or an
+explicit revision/time-selected historical state, then inspects the relevant anchor neighborhoods at that evaluated revision.
 Each result identifies its evaluated revision; if those revisions differ, the agent repeats discovery
 rather than relying on stale vocabulary. A time-based summary's resolved revision can be reused for
-inspection and graph query. If a current definition delta exists, the agent retrieves that sole
-proposal whole and compares it with
-the focused current views; the system does not manufacture a second schema authority or a server-side
-diff. Delta retrieval remains current-only.
+inspection and graph query. If a current definition delta exists, the agent discovers its identity,
+proposed-definition neighborhoods, staged-overlay counts, and latest assessment through bounded views
+and compares those with the focused current views; the system does not manufacture a second schema
+authority or a server-side diff. Proposal discovery remains current-only.
 
 The initial MCP boundary assumes one trusted owner-configured client; its tools do not decide
 per-call authorization or owner approval. History tools return bounded owner-facing entries rather
 than replay-bearing canonical payloads. Owner-directed activity retention and recovery behavior remain
 modeled but are not additional initial MCP tools.
 
-The model constrains current work to avoid history traversal, retained complete-state dependence,
-and materialization of state facets an operation does not need. Current query work narrows candidates
+The model constrains every production operation to avoid a resident complete graph, canonical state,
+definition-set document, or canonical-change document. Ordinary mutations validate their complete
+affected invariant closure; explicit conformance and broad definition cutovers may scan all relevant
+semantic entries while retaining bounded working memory; lifecycle operations use incremental, streaming, or
+set-based work. Current query work narrows candidates
 through identity, type, direct association, and directed relationship meaning before value filtering,
 and projected-query work avoids multiplication by semantically irrelevant assignments. Bounded
-historical selection avoids scanning excluded ledger prefixes. The model does not select materialized
+historical selection avoids scanning excluded ledger prefixes. The portable model does not select materialized
 projections, revision/time or relationship indexes, definition checkpoints, caches, snapshot cadence,
 databases, or storage layouts. Those are possible non-normative realizations whose conformance is
 shown with semantic record, state-materialization, candidate-join, and query-work evidence.
 Numerical latency, startup, throughput, and storage budgets remain deferred until the modeled
 performance analysis has representative runtime, hardware, and owner-data measurements.
 
-Realization remains open. Select the simplest approach from actual scale, startup, durability, and portability needs in the first implementation-focused semantic slice. Do not add interchangeable persistence or runtime abstractions before demonstrated need.
+Realization remains open in the portable model. Vellis evolution records may select one concrete
+storage and execution realization from actual scale, startup, durability, and portability needs;
+that selection does not become language-neutral RTG authority. Do not add interchangeable
+persistence or runtime abstractions before demonstrated need.
 
 The SysML on a branch is that branch's current system definition. Review its diff like code and accept changes through the normal pull-request process. Official validation establishes language conformance; requirements closure, verification evidence, and engineering review establish design quality.
 

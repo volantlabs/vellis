@@ -25,6 +25,22 @@ package RTG {
         doc /* A language-neutral chronological instant; representation remains open. */
     }
 
+    attribute def 'Assessment ID' :> ScalarValues::String {
+        doc /* The stable identity of one completed validation assessment. */
+    }
+
+    attribute def 'Canonical Record Identity' :> ScalarValues::String {
+        doc /* A content- and lineage-bound identity for one canonical record. */
+    }
+
+    attribute def 'Definition Set Identity' :> ScalarValues::String {
+        doc /* A canonical semantic identity for one complete graph definition set. */
+    }
+
+    attribute def 'Graph Overlay Identity' :> ScalarValues::String {
+        doc /* A canonical semantic identity for one keyed prospective graph overlay. */
+    }
+
     attribute def 'JSON Value' {
         doc /*
          * Any JSON value preserved without loss of kind or nested content.
@@ -104,6 +120,23 @@ package RTG {
     enum def 'Validation Scope' {
         enum graphConformance;
         enum definitionDelta;
+    }
+
+    enum def 'Evaluated State Scope' {
+        enum current;
+        enum prospective;
+        enum historical;
+        doc /* Selects active, sole prospective, or committed historical state. */
+    }
+
+    enum def 'Graph Change Target' {
+        enum active;
+        enum definitionDelta;
+    }
+
+    enum def 'Validation Request Kind' {
+        enum assess;
+        enum readFindings;
     }
 
     enum def 'Property Comparison' {
@@ -323,8 +356,11 @@ package RTG {
 
     item def 'Graph Definition Set' {
         doc /*
-         * The complete active graph vocabulary and constraints. Type keys are
-         * unique in one namespace and every reference resolves within the set.
+         * Complete graph vocabulary and constraint content. An active set and a
+         * proposal accepted for activation require type keys unique in one
+         * namespace and every reference resolved within the set. An in-progress
+         * proposal may temporarily violate those conditions so its assessment can
+         * expose the complete repair need.
          * A type definition's natural identity is its type key; its definition
          * kind is semantic content. Endpoint constraints are identified by their
          * owning link type. Property and multiplicity constraints use their
@@ -341,12 +377,16 @@ package RTG {
 
     item def 'Definition Delta' {
         doc /*
-         * The sole prospective next definition set. The difference from the
-         * active set is the in-flight change; diff representation remains open.
-         * When present in canonical state, the proposed set is semantically
-         * different from the active set by canonical semantic equality.
+         * The sole prospective next definition set and keyed graph overlay.
+         * Complete-object upserts replace the effective value at their UUID and
+         * explicit removals are tombstones; identities absent from the overlay
+         * retain active meaning. The overlay is proposed state, not an ordered
+         * edit log or a second active graph. When present in canonical state, its
+         * effective proposed definitions and graph differ semantically from the
+         * active definitions and graph.
          */
         item proposedDefinitions : 'Graph Definition Set';
+        item graphOverlay : 'Graph Change';
     }
 
     /* Agent-oriented definition discovery. */
@@ -356,13 +396,22 @@ package RTG {
         doc /* Projects the authoritative type key and description without copying their authority. */
     }
 
-    item def 'Definition Inspection Request' {
-        attribute anchorTypeKeys [1..*] : 'Type Key';
+    item def 'Definition Summary Request' {
+        attribute stateScope : 'Evaluated State Scope' default = 'Evaluated State Scope'::current;
         item historicalSelection [0..1] : 'Historical State Selection';
         doc /*
+         * Current and prospective scopes forbid a historical selection;
+         * historical scope requires exactly one revision or time selection and
+         * evaluates active definitions at its resolved revision. Prospective
+         * scope requires a current definition delta.
+         */
+    }
+
+    item def 'Definition Inspection Request' :> 'Definition Summary Request' {
+        attribute anchorTypeKeys [1..*] : 'Type Key';
+        doc /*
          * Selects a non-empty unique set of anchor keys from the definitions
-         * active at the current state when selection is absent, or at exactly
-         * one selected revision or time when present.
+         * selected by stateScope or at exactly one selected revision or time.
          */
     }
 
@@ -372,7 +421,9 @@ package RTG {
         ref item linkTypes [*] : 'Link Type Definition';
         ref item relationshipConstraints [*] : 'Relationship Constraint';
         doc /*
-         * A complete active-definition neighborhood for one selected anchor.
+         * A complete evaluated-definition neighborhood for one selected anchor.
+         * Current and historical scopes evaluate active definitions; prospective
+         * scope evaluates the delta's proposed definitions.
          * Associated-data property and link endpoint constraints are carried by
          * their referenced type definitions. Link roles include those involving
          * the anchor or its permitted associated-data types. Unrelated
@@ -380,8 +431,52 @@ package RTG {
          */
     }
 
+    item def 'Link Multiplicity Selection' {
+        attribute linkTypeKey : 'Type Key';
+        attribute constrainedEnd : 'Link End';
+        attribute constrainedEndpointTypeKeys [1..*] : 'Type Key';
+        attribute oppositeEndpointTypeKeys [1..*] : 'Type Key';
+        doc /* Selects one link-multiplicity natural identity without carrying its rule value. */
+    }
+
+    item def 'Direct Association Multiplicity Selection' {
+        attribute constrainedEnd : 'Direct Association End';
+        attribute anchorTypeKeys [1..*] : 'Type Key';
+        attribute associatedDataTypeKeys [1..*] : 'Type Key';
+        doc /* Selects one direct-association-multiplicity natural identity without carrying its rule value. */
+    }
+
+    item def 'Definition Change' {
+        item anchorTypeUpserts [*] : 'Anchor Type Definition';
+        item associatedDataTypeUpserts [*] : 'Associated Data Type Definition';
+        item linkTypeUpserts [*] : 'Link Type Definition';
+        item relationshipConstraintUpserts [*] : 'Relationship Constraint';
+        attribute typeRemovals [*] : 'Type Key';
+        item linkMultiplicityRemovals [*] : 'Link Multiplicity Selection';
+        item directAssociationMultiplicityRemovals [*] : 'Direct Association Multiplicity Selection';
+        doc /*
+         * One bounded keyed edit of proposed definitions. Upserts carry complete
+         * values at their natural identities; removals carry only natural identity.
+         * Duplicate commands and upsert/removal conflicts are rejected. Several
+         * accepted edits may build one temporarily invalid proposal incrementally.
+         * With no delta, the first effective edit applies over complete active
+         * definition meaning without requiring its physical materialization; with
+         * a delta, it applies over current proposed-definition meaning. Definitions
+         * untouched by an edit retain their prior effective meaning.
+         * With a present delta, an edit that would make the effective proposal
+         * semantically equal to active state is rejected and preserves the prior
+         * delta; explicit discard is the only operation that removes it. With no
+         * delta, an active-equivalent edit is an accepted no-op and creates none.
+         */
+    }
+
     item def 'Set Definition Delta Request' {
-        item proposedDefinitions : 'Graph Definition Set';
+        item change : 'Definition Change';
+    }
+
+    item def 'Activate Definition Delta Request' {
+        attribute assessmentID : 'Assessment ID';
+        doc /* Selects the exact completed prospective assessment authorizing activation. */
     }
 
     /* Simple semantic query vocabulary. */
@@ -405,7 +500,8 @@ package RTG {
         attribute anchorType : 'Type Key';
         item uuidFilter [0..1] : 'Anchor UUID Filter';
         doc /*
-         * A named anchor candidate set of exactly one active anchor type. An
+         * A named anchor candidate set of exactly one type in the definitions
+         * governing the evaluated state. An
          * absent UUID filter considers all anchors of that type.
          */
     }
@@ -417,7 +513,8 @@ package RTG {
         attribute linkType : 'Type Key';
         item uuidFilter [0..1] : 'Link UUID Filter';
         doc /*
-         * Requires a directed link of one active link type from a source-group
+         * Requires a directed link of one type in the definitions governing the
+         * evaluated state from a source-group
          * candidate to a target-group candidate. Groups may select anchors or
          * directly associated data. An optional UUID filter restricts the
          * matching identity-bearing links.
@@ -427,8 +524,8 @@ package RTG {
     item def 'Data Property Condition' {
         doc /*
          * A structured comparison against one present property value. A missing
-         * property does not satisfy the condition. The active
-         * property definition remains authoritative for JSON kind, shape,
+         * property does not satisfy the condition. The property definition in
+         * the definitions governing the evaluated state remains authoritative for JSON kind, shape,
          * permitted range, and stored-value pattern validation. Equal and
          * notEqual compare lossless JSON values;
          * ordered comparisons are valid only for numberValue properties. Other
@@ -444,7 +541,7 @@ package RTG {
         attribute associatedDataType : 'Type Key';
         item propertyConditions [*] : 'Data Property Condition';
         doc /*
-         * Selects directly associated data of the active type that satisfies
+         * Selects directly associated data of the evaluated type that satisfies
          * every stated property condition. With no property conditions, the
          * condition expresses existence of directly associated data of that
          * type. Its selected objects may participate as required-link endpoints.
@@ -489,15 +586,19 @@ package RTG {
         item dataConditions [*] : 'Associated Data Condition';
         item returnShape : 'Return Shape';
         item historicalSelection [0..1] : 'Historical State Selection';
+        attribute stateScope : 'Evaluated State Scope' default = 'Evaluated State Scope'::current;
         attribute maximumRows : ScalarValues::Positive;
         doc /*
          * Named anchor selection, required-link restriction, associated-data
          * filtering, and projection define meaning, not evaluation order. All
          * group, link-condition, data-condition, and projection names are
          * unique within the query. Every reference resolves to an element owned
-         * by the same query. An absent historical selection evaluates current
-         * state; a present revision or time selection evaluates the resolved
-         * historical state with identical query meaning. The caller may discover
+         * by the same query. Current scope with no historical selection evaluates
+         * active state; prospective scope evaluates active state with the sole
+         * definition delta's graph overlay and proposed definitions. Prospective
+         * scope requires a delta and forbids historical selection. Historical
+         * scope requires exactly one revision or time selection and evaluates the resolved historical active
+         * state with identical query meaning. The caller may discover
          * the definitions active at that selected state and reuse its exact
          * evaluated revision for this query. The positive maximum bounds a
          * complete result rather than requesting a page.
@@ -570,14 +671,55 @@ package RTG {
         ref item implicatedObjects [*] : 'Graph Object';
     }
 
-    item def 'Validation Report' {
+    item def 'Validation Assessment' {
+        attribute identity : 'Assessment ID';
         attribute scope : 'Validation Scope';
         attribute conforms : ScalarValues::Boolean;
         attribute evaluatedRevision : 'Revision Number';
-        item findings [*] : 'Validation Finding';
+        attribute proposedDefinitionIdentity [0..1] : 'Definition Set Identity';
+        attribute graphOverlayIdentity [0..1] : 'Graph Overlay Identity';
+        item findings [*] ordered : 'Validation Finding';
         doc /*
-         * A report is the successful result of an assessment. A false conforms
-         * value describes the assessed subject and is not an execution failure.
+         * One immutable completed assessment contains every finding for its
+         * exact evaluated active or prospective state. Prospective assessment
+         * identity includes the evaluated active revision and exact definition
+         * and graph-overlay meaning, whose identities are present exactly for a
+         * prospective assessment. It is observational evidence, not canonical
+         * state. A false conforms value is not an execution failure.
+         */
+    }
+
+    item def 'Validation Request' {
+        attribute kind : 'Validation Request Kind';
+        attribute scope : 'Validation Scope';
+        attribute assessmentID [0..1] : 'Assessment ID';
+        attribute startOrdinal [0..1] : ScalarValues::Positive;
+        attribute maximumFindings : ScalarValues::Positive;
+        doc /*
+         * An assess request forbids assessmentID and startOrdinal, computes one
+         * complete assessment, and returns its first bounded finding interval.
+         * A readFindings request requires both and reads another interval without
+         * re-running assessment. Unknown, expired, scope-mismatched, or out-of-
+         * range selections are rejected without partial findings. Ordinals are
+         * one-based, matching the ordered assessment finding collection.
+         */
+    }
+
+    item def 'Validation Report' :> 'Operation Outcome' {
+        ref item assessment [0..1] : 'Validation Assessment';
+        attribute findingCount [0..1] : ScalarValues::Natural;
+        attribute returnedStartOrdinal [0..1] : ScalarValues::Positive;
+        attribute moreFindings [0..1] : ScalarValues::Boolean;
+        ref item returnedFindings [*] ordered : 'Validation Finding';
+        doc /*
+         * An accepted report identifies one complete assessment and returns one
+         * contiguous bounded ordered interval of references to its findings using
+         * one-based ordinals. findingCount is the complete assessment count;
+         * moreFindings says whether a later interval exists. For a zero-finding
+         * assessment, returnedStartOrdinal is absent, returnedFindings is empty,
+         * and moreFindings is false. For a non-empty interval, returnedStartOrdinal
+         * is present and every returned reference preserves assessment order.
+         * Rejected or failed operations carry no assessment metadata or findings.
          */
     }
 
@@ -601,10 +743,11 @@ package RTG {
         attribute deltaPresent [0..1] : ScalarValues::Boolean;
         item anchorTypes [*] : 'Anchor Type Summary';
         doc /*
-         * Contains every active anchor type exactly once. Each summary refers to
+         * Contains every anchor type in the evaluated definition set exactly once. Each summary refers to
          * its authoritative type key and description. The result is complete
-         * for the definitions active at the evaluated current or historical
-         * state and changes no canonical state. Evaluated revision and delta
+         * for the definitions evaluated at current, prospective, or historical
+         * state. Prospective evaluates proposed definitions; current and
+         * historical evaluate active definitions. It changes no canonical state. Evaluated revision and delta
          * presence are present exactly for an accepted result. A rejected or failed result
          * returns no summaries, evaluated revision, or delta-presence value. The
          * operation attempt may still produce observational activity.
@@ -617,8 +760,8 @@ package RTG {
         item anchorDetails [*] : 'Anchor Definition Detail';
         doc /*
          * An accepted result contains one complete detail for every requested
-         * anchor type active at the request's evaluated current or historical
-         * state and no unrelated definitions. An unknown or
+         * anchor type in the request's evaluated current, prospective, or historical
+         * definition set and no unrelated definitions. An unknown or
          * duplicate key or inability to answer completely produces findings,
          * no evaluated revision, and no details. The operation changes no
          * canonical state but may produce observational activity.
@@ -627,19 +770,24 @@ package RTG {
 
     item def 'Definition Delta Result' :> 'Revisioned Outcome' {
         attribute evaluatedRevision [0..1] : 'Revision Number';
-        ref item definitionDelta [0..1] : 'Definition Delta';
-        item assessment [0..1] : 'Validation Report';
+        attribute proposedDefinitionIdentity [0..1] : 'Definition Set Identity';
+        attribute graphOverlayIdentity [0..1] : 'Graph Overlay Identity';
+        ref item assessment [0..1] : 'Validation Assessment';
+        attribute stagedAnchorCount [0..1] : ScalarValues::Natural;
+        attribute stagedAssociatedDataCount [0..1] : ScalarValues::Natural;
+        attribute stagedLinkCount [0..1] : ScalarValues::Natural;
+        attribute stagedRemovalCount [0..1] : ScalarValues::Natural;
         doc /*
          * An accepted result always identifies its evaluated revision. Absence
          * of a delta is a normal accepted result. When a delta is present, the
-         * result exposes the complete authoritative proposal and one current
-         * definitionDelta-scoped assessment without computing a server-side diff.
-         * Assessment is present exactly when a delta is returned and has the same
-         * evaluated revision as this result. A resulting revision, when present,
-         * is also this evaluated revision. A rejected or failed staging operation
-         * returns no proposal, assessment, evaluated revision, or resulting
-         * revision; the caller may retrieve the unchanged current proposal
-         * separately.
+         * result identifies its proposed definitions and graph overlay by
+         * canonical identity, graph-overlay cardinality,
+         * and latest completed definitionDelta assessment when one is current.
+         * Proposed definitions are discovered through prospective summary and
+         * focused inspection; staged graph objects are queried prospectively and
+         * are not copied into this result. The two identities and all staged
+         * counts are present exactly with a delta. A stale or absent assessment is absent.
+         * A resulting revision, when present, is also this evaluated revision.
          */
     }
 
@@ -655,8 +803,27 @@ package RTG {
          * associations change only through complete associated-data anchor
          * references. Duplicate commands, upsert/removal conflicts, unknown
          * removals, object-kind changes, invalid final references, and any
-         * change that depends on an implicit cascade are rejected. The complete
-         * resulting graph is validated before one atomic commit.
+         * change that depends on an implicit cascade are rejected. Complete
+         * resulting-graph conformance is a semantic obligation and does not
+         * require constructing one complete graph value.
+         */
+    }
+
+    item def 'Graph Change Request' {
+        attribute target : 'Graph Change Target';
+        item change : 'Graph Change';
+        attribute anchorUnstaging [*] : 'Graph UUID';
+        attribute associatedDataUnstaging [*] : 'Graph UUID';
+        attribute linkUnstaging [*] : 'Graph UUID';
+        doc /*
+         * Active-target requests forbid unstaging and atomically apply one
+         * conforming graph change. Definition-delta-target requests replace
+         * staged entries by UUID; explicit unstaging removes those entries from
+         * the overlay without changing active state. Within one request, a UUID
+         * may appear in exactly one upsert, tombstone, or unstaging command.
+         * A request that would make the effective proposal semantically equal to
+         * active state is rejected and preserves the delta; explicit discard is
+         * the only operation that removes a present delta.
          */
     }
 
@@ -676,21 +843,22 @@ package RTG {
         doc /*
          * Two canonical states are semantically equal exactly when their
          * revisions, graphs, active definitions, and delta presence agree and,
-         * when present, their proposed definition sets are semantically equal.
+         * when present, their proposed definition sets and graph overlays are
+         * semantically equal.
          */
     }
 
     item def 'Canonical Change' {
         doc /*
          * Replay-sufficient meaning for one transition. A graph mutation carries
-         * the accepted graph change, while historical restoration may carry a
-         * complete replacement graph. The two graph forms are never
-         * both present. An absent graph form or active-definition value means
-         * unchanged. Delta disposition distinguishes unchanged, present, and
-         * absent. Present requires a delta value; unchanged and absent forbid one.
+         * the accepted graph change. Activation carries the assessed prospective
+         * graph change, and historical restoration carries the complete explicit
+         * difference that establishes the selected state. An absent graph change
+         * or active-definition value means unchanged. Delta disposition
+         * distinguishes unchanged, present, and absent. Present requires a delta
+         * value; unchanged and absent forbid one.
          */
         item graphChange [0..1] : 'Graph Change';
-        item replacementGraph [0..1] : Graph;
         item activeDefinitions [0..1] : 'Graph Definition Set';
         attribute deltaDisposition : 'Definition Delta Disposition';
         item definitionDelta [0..1] : 'Definition Delta';
@@ -733,11 +901,12 @@ package RTG {
          * enough semantic change to replay without activity history but does
          * not prescribe event, snapshot, checkpoint, or hybrid storage.
          *
-         * A graph mutation supplies only graphChange and leaves the delta unchanged.
+         * A graph mutation supplies graphChange and leaves the delta unchanged.
          * A definition-delta change supplies only a present or absent delta. An
-         * activation supplies active definitions and an absent delta. Historical
-         * restoration supplies replacementGraph, active definitions, and an
-         * absent delta. Other combinations are invalid and cannot be replayed.
+         * activation supplies its prospective graphChange, active definitions,
+         * and an absent delta. Historical restoration supplies the explicit
+         * graphChange establishing the selected graph, active definitions, and
+         * an absent delta. Other combinations are invalid and cannot be replayed.
          */
     }
 
@@ -781,7 +950,8 @@ package RTG {
         doc /*
          * A self-contained, lossless capture of complete canonical state at its
          * revision, bound to the exact authoritative record that establishes
-         * that revision. Physical artifact and serialization format remain open.
+         * that revision. Completeness is semantic and does not require one
+         * resident aggregate. Physical artifact and serialization remain open.
          */
     }
 
@@ -812,8 +982,12 @@ package RTG {
     }
 
     item def 'Replay Outcome' :> 'Operation Outcome' {
-        item reconstructedState [0..1] : 'Historical State';
-        doc /* Reconstructed state is present exactly when status is accepted. */
+        attribute reconstructedRevision [0..1] : 'Revision Number';
+        attribute reconstructedThrough [0..1] : 'Canonical Record Identity';
+        doc /*
+         * Accepted replay identifies the completely verified reconstructed
+         * revision and final record without returning a resident whole state.
+         */
     }
 
     item def 'Snapshot Outcome' :> 'Operation Outcome' {
@@ -896,7 +1070,9 @@ package RTG {
     item def 'Recovery Candidate' {
         doc /*
          * Transient normalized v1 graph meaning and complete target active
-         * definitions. While forming this candidate, a v1
+         * definitions. It may be incrementally formed and assessed in bounded
+         * work; semantic completeness does not require one resident value. While
+         * forming this candidate, a v1
          * anchor without a display name is assigned the clearly synthetic value
          * "[recovered] {typeKey} {uuid}" using that anchor's exact type-key and
          * UUID strings. The candidate is validated before first-use initialization

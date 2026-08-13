@@ -49,18 +49,25 @@ package VellisVerification {
              * only for a projected missing optional property, present-valued
              * bindings for both non-null and JSON-null properties, and that identical
              * projected tuples occur once. Every binding identifies its projection
-             * and the result identifies its query. Repeat against current state, a selected revision, and
-             * a selected time; all use the same meaning. Alternative evaluation
+             * and the result identifies its query. Repeat against current state,
+             * the sole prospective overlay, a selected revision, and a selected
+             * time; all use the same meaning. Alternative evaluation
              * orders produce equivalent rows. After a definition change, repeat
              * a query after cold discovery of the historical vocabulary at an
              * earlier revision and show that evaluation uses the definitions
              * active there.
+             * Add a proposal-only type and changed proposed property rule and show
+             * prospective selection accepts and applies them while current rejects
+             * the proposal-only type and retains the active rule.
              * Independently increase satisfying assignments in a selector
              * component disconnected from every requested projection and show
              * that it changes rows only when the component moves between absent
              * and present, without multiplying projected assignment work. Repeat
              * with an unprojected selector connected by a condition and show its
              * distinguishable constraint outcomes still govern the rows.
+             * Hold a broad query's maximum fixed while increasing unrelated
+             * matching rows and show identity selection stops at maximum plus one
+             * and hydrates no more than that bounded candidate result.
              */
             verify VellisRequirements::semanticQueryMeaning;
         }
@@ -79,6 +86,12 @@ package VellisVerification {
              * completely. Show findings, no partial result rows, and unchanged
              * graph, definitions, delta, revision, and canonical history, while
              * one rejection observation may be appended to activity history.
+             * For query and definition discovery alike, accept current and
+             * prospective scopes without historical selection and historical
+             * scope with exactly one revision or time. Reject current or
+             * prospective with either selector, historical without one, and
+             * prospective without a delta, preserving no partial payload and
+             * every canonical non-effect.
              */
             verify VellisRequirements::querySafety;
         }
@@ -97,9 +110,10 @@ package VellisVerification {
              * For graph mutation, use mixed complete-object upserts and UUID
              * removals, then reject duplicate commands, conflicts, unknown
              * removals, kind changes, invalid references, and an assumed cascade.
-             * Show the accepted graph-change record carries those semantic upserts
-             * and removals rather than a complete replacement graph; historical
-             * restoration alone carries a replacement graph. An effective no-op
+             * Show graph mutation, activation, and historical restoration records
+             * carry their semantic upserts and removals rather than a complete
+             * replacement graph. Activation applies the exact assessed proposal
+             * overlay and definitions together. An effective no-op
              * creates neither revision nor record.
              */
             verify VellisRequirements::atomicCanonicalRevision;
@@ -119,7 +133,12 @@ package VellisVerification {
              * property, endpoint, link-role, and multiplicity neighborhoods with
              * descriptions and no unrelated definitions. Unknown and duplicate
              * selections return findings and no partial details. Retrieve the
-             * sole proposal whole with its current assessment, or normal absence.
+             * sole proposal through its identity, bounded definition discovery,
+             * overlay counts, and current assessment, or normal absence, without
+             * returning a whole proposal aggregate.
+             * Add a proposal-only anchor and remove one active anchor; show the
+             * prospective summary and detail include only the former while current
+             * discovery retains only the latter.
              * With no intervening definition change, show summary and inspection
              * revisions agree. Change active definitions between the two calls,
              * show the differing revisions expose the stale summary, then repeat
@@ -129,7 +148,7 @@ package VellisVerification {
              * delta presence at one consistent evaluated revision; reuse a time
              * summary's resolved revision for inspection and graph query. Reject
              * unresolved selections with no partial summary, detail, or evaluated
-             * revision. Confirm whole-delta retrieval remains current-only. All
+             * revision. Confirm proposal discovery remains current-only. All
              * reads leave canonical state and revision unchanged while recording
              * their observational outcomes after result selection.
              */
@@ -141,10 +160,18 @@ package VellisVerification {
         subject system : 'RTG System';
         objective {
             doc /*
-             * Through create, repeated edit, assessment, invalid activation,
+             * Through create, repeated definition edit, graph upsert staging,
+             * tombstone staging, explicit unstaging, prospective query,
+             * assessment, invalid activation,
              * valid activation, discard, and replay, show exactly one active set,
-             * at most one delta, unchanged graph and active definitions during
+             * at most one delta, unchanged active graph and definitions during
              * delta work, canonical preservation on failure, and singular activation.
+             * Build a proposal larger than one request through several bounded
+             * natural-keyed definition upserts and removals, including an
+             * intermediate invalid reference, without any complete definition-set
+             * request or resident definition-set document. On the first edit,
+             * change one active definition and show an untouched active definition
+             * remains in the proposal; later edits use that proposed meaning.
              * Stage a proposal with an empty description and show its automatic
              * finding and inspectability. Separately record owner review of
              * readability in the owner-facing governance scenario, while
@@ -152,10 +179,18 @@ package VellisVerification {
              * remains blocked while any description is empty. With no delta,
              * staging the active set is an accepted no-op; with a delta,
              * re-staging the same proposal is an accepted no-op and staging the
-             * active set cannot implicitly discard the proposal. Activation that
+             * active set cannot implicitly discard the proposal. Create a graph-
+             * only delta, then reject unstaging its final entry with the delta and
+             * revision unchanged. With an empty overlay, reject a definition edit
+             * that would remove the final difference and show rejected status,
+             * unchanged proposal identity and content, and unchanged revision;
+             * accept the same definition edit while a non-empty graph overlay still
+             * distinguishes the proposal. Explicit discard removes it. Activation that
              * clears a delta remains a canonical transition. Show a valid proposal
              * can remain staged across later interactions without requiring
-             * activation or discard.
+             * activation or discard. Change an active UUID that is also staged,
+             * show the assessment becomes stale while both values remain, then
+             * reassess the exact effective proposal before activation.
              */
             verify VellisRequirements::definitionCardinality;
             verify VellisRequirements::nonDisruptiveDefinitionWork;
@@ -169,12 +204,18 @@ package VellisVerification {
              * Produce governing-outcome findings for a well-formed but invalid
              * graph query, graph change, replay, and v1 recovery candidate. Show
              * malformed typed input is rejected before a domain outcome exists.
-             * Show the parameterless public check produces a graphConformance
-             * report for current graph state, while whole-delta retrieval and
-             * staging produce definitionDelta reports. Reports
-             * identify implicated modeled definitions and graph objects when
-             * available and create no separate canonical validation state. Show
-             * an unexpected check failure produces no successful report.
+             * Request complete current and prospective assessments and show each
+             * is bound to its exact revision and, for prospective work, exact
+             * proposal identity. Deliberately produce more findings than one
+             * response bound; show every finding is stored once, multiple ordered
+             * pages retrieve the complete set without reassessment. Exercise zero
+             * findings, exact-bound, first, middle, last, and out-of-range one-
+             * based intervals. Replacing an assessment expires the prior retrieval
+             * identity; a failed replacement preserves it; active or proposal
+             * change leaves it readable but stale for activation. Reports identify
+             * implicated modeled definitions and graph objects when available and
+             * create no canonical validation state. Show an unexpected check
+             * failure publishes no partial or successful assessment.
              */
             verify VellisRequirements::validationCoverage;
         }
@@ -208,7 +249,9 @@ package VellisVerification {
              * contains equivalent graph, active definitions, optional delta,
              * and revision, identifies the exact canonical record establishing
              * that revision, and changes no canonical state, revision, or
-             * canonical history.
+             * canonical history. Export and verify it incrementally with fixed-
+             * size buffers while instrumentation shows no Graph, Canonical State,
+             * definition-set document, or snapshot document is constructed.
              */
             verify VellisRequirements::canonicalSnapshotCompleteness;
         }
@@ -218,13 +261,16 @@ package VellisVerification {
         subject system : 'RTG System';
         objective {
             doc /*
-             * Initialize a fresh RTG from a complete snapshot, then apply every
+             * Initialize a fresh RTG from a semantically complete streamed
+             * snapshot, then apply every
              * later contiguous same-ledger canonical transition from the exact
              * captured source record. Show equivalent graph,
              * active definitions, optional delta, and final revision without
              * inventing a revision or reading activity history. Show the fresh
              * RTG owns one initial record containing the reconstructed final
              * state and does not claim transitions before that history base.
+             * Compare rebuilt and active projections in both directions using
+             * set differences and show peak materialization remains bounded.
              */
             verify VellisRequirements::replayEquivalence;
         }
@@ -266,8 +312,10 @@ package VellisVerification {
         objective {
             doc /*
              * With no delta, restore prior graph and active definitions and show
-             * one new revision and record with no delta while all earlier records
-             * remain unchanged. With a delta, show refusal and no state change.
+             * one new revision and explicit-difference record with no delta while
+             * all earlier records remain unchanged. Instrument the selected/current
+             * comparison and show set-based bounded-memory work without either
+             * graph aggregate. With a delta, show refusal and no state change.
              */
             verify VellisRequirements::historicalRestoreSemantics;
         }
@@ -317,9 +365,10 @@ package VellisVerification {
              * rtg_activate_definition_delta, rtg_discard_definition_delta,
              * rtg_check, and rtg_history with typed object outputs and typed
              * object inputs only where the operation has semantic input. Show
-             * rtg_definition_summary carries its optional selector directly,
-             * without an empty request type, and remaining parameterless tools
-             * introduce no empty domain request type.
+             * definition summary, graph change, activation, and conformance carry
+             * typed state-selection, target, exact-assessment, or page-request
+             * inputs, and genuinely parameterless tools introduce no empty domain
+             * request type.
              * Invoke every tool through core MCP discovery and invocation alone,
              * without any additional MCP capability.
              */
@@ -460,8 +509,9 @@ package VellisVerification {
              * endpoint, or association and show a semantic difference. Show type,
              * property, endpoint-rule, and multiplicity natural identities decide
              * whether content is an edit, addition, removal, or invalid duplicate.
-             * Compare canonical states and show revision, delta presence, and
-             * proposed-definition content also participate.
+             * Compare canonical states and show revision, delta presence,
+             * proposed-definition content, and keyed graph-overlay content also
+             * participate without requiring either state as a resident aggregate.
              */
             verify VellisRequirements::canonicalSemanticEquality;
         }
@@ -499,8 +549,9 @@ package VellisVerification {
              * one equivalent initial-state record, no transitions, and an empty
              * activity ledger. Reject an invalid initial set and a request against
              * an already initialized RTG without establishing partial state.
-             * Initialize separately from a snapshot and show its definitions and
-             * revision are reconstructed without any fresh-start overlay. Initialize
+             * Initialize separately from a streamed snapshot and show its
+             * definitions and revision are reconstructed without any fresh-start
+             * overlay or resident whole state. Initialize
              * separately from a confirmed v1 candidate and show its graph and
              * translated definitions form revision 0 with no transitions or activity.
              */
@@ -544,22 +595,26 @@ package VellisVerification {
              * Construct equivalent current canonical-state tuples backed by short
              * and long logical histories. Instrument semantic record accesses
              * while performing current definition summary and inspection, current
-             * graph query, current conformance assessment, delta retrieval, and
+             * graph query, current conformance assessment, proposal discovery, and
              * ordinary change validation. Show each performs constant
              * historical-record work while scaling only with the state facets and
              * candidate relationships its meaning requires, proposal, and requested
              * return bounds. Repeat definition summary and focused inspection across
-             * process restart and show they materialize definitions but no graph
-             * objects. Hold one small query answer fixed while increasing unrelated
+             * process restart and show they decode only requested definitions and
+             * no graph objects. Hold one small query answer fixed while increasing unrelated
              * graph populations; instrument candidate retrieval and object decoding
              * and show identities, types, direct associations, and directed
              * relationships constrain candidates before property comparisons without
-             * complete-graph materialization. Explicitly request complete current
-             * state and show one complete value is materialized, mutation of that
-             * returned value cannot change later current state, and the system need
-             * not retain that complete value between calls. Preserve complete-graph
-             * work for conformance, snapshot, replay, restoration, and change
-             * invariants that require it. Commit one effective
+             * complete-graph materialization. Hold one-object mutation meaning fixed
+             * while increasing unrelated populations and show decoded values remain
+             * limited to the touched object, its incident relationships and direct
+             * associations, and applicable rules. Separately increase only that
+             * object's degree and show work scales with the affected neighborhood.
+             * For state-wide conformance and cutover, show semantic-entry visits and
+             * finding counts may grow while peak materialization remains bounded.
+             * Instrument every production operation and show none constructs a
+             * Graph, Canonical State, definition-set document, or canonical-change
+             * document. Commit one effective
              * canonical mutation and show the current projection update and one
              * appended transition are recoverably atomic without traversing or
              * rewriting the earlier logical prefix.
@@ -600,9 +655,11 @@ package VellisVerification {
             doc /*
              * Reconstruct and ordinarily restart equivalent states across
              * increasing required replay-tail lengths. Record semantic record
-             * visits and startup or replay duration with their measurement units,
-             * demonstrate replay equivalence, and characterize the dependency on
-             * required tail length without asserting a numerical performance target.
+             * visits, bounded buffer occupancy, peak materialization, and startup
+             * or replay duration with their measurement units, demonstrate replay
+             * equivalence, and characterize the dependency on required tail length
+             * without asserting a numerical performance target. Show no Graph or
+             * Canonical State aggregate is constructed.
              */
             verify VellisRequirements::replayEquivalence;
             verify VellisRequirements::durableCanonicalHistory;
@@ -637,11 +694,16 @@ package VellisVerification {
              * definition-change density, activity-history length, selected
              * interval size, projected and unprojected query candidate populations,
              * distinct result cardinality, and required replay-tail length. Measure
-             * semantic and physically filtered record visits, complete-state and
-             * per-object encoding and decoding, retained and transient memory,
+             * semantic and physically filtered record visits, per-object encoding
+             * and decoding, retained and transient memory, streaming buffer bounds,
              * allocation or copy work, identity/type/association/relationship
              * candidate joins, value comparisons, joint-assignment work, replay and
-             * startup duration with explicit units, and storage growth.
+             * startup duration with explicit units, and storage growth. Include a
+             * representative scale fixture with about one thousand definitions and
+             * at least one hundred thousand graph objects, plus fixed one-object,
+             * high-degree, narrow-cutover, state-wide-cutover, and broad-query
+             * cases. Treat any complete-state materialization as a failure, not a
+             * quantity to optimize.
              * Use the resulting evidence to select later numerical latency,
              * startup, and storage budgets only after a runtime, hardware profile,
              * and representative owner dataset exist. This analysis does not

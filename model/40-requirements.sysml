@@ -39,15 +39,16 @@ package VellisRequirements {
     requirement def 'Semantic Query Meaning' {
         subject system : 'RTG System';
         doc /*
-         * A graph query shall select named anchor groups of one active type,
+         * A graph query shall select named anchor groups of one type in the
+         * definitions governing the evaluated state,
          * optionally narrow anchors and links by known UUIDs, select directly
          * associated-data groups by type and optional structured value
          * comparisons, require typed directed links between anchor or
          * associated-data groups, and return only bindings that reference the
          * named projections in its return shape at an identified revision. An
          * associated-data group with no property comparisons shall select by
-         * direct association and type alone. Active definitions at the evaluated
-         * revision shall govern property kind, shape, range, pattern validation,
+         * direct association and type alone. Definitions governing the evaluated
+         * state shall govern property kind, shape, range, pattern validation,
          * and endpoint validity.
          * Equality shall compare lossless JSON values; ordered comparisons shall
          * be valid only for number-valued properties. A listed property
@@ -61,9 +62,10 @@ package VellisRequirements {
          * property is present, including when that value is JSON null.
          * Query-local names shall be unique and every selector and projection
          * reference shall resolve within that query. Evaluation strategy shall
-         * not change this meaning. An absent historical selector shall evaluate
-         * current state; exactly one revision or time selector shall evaluate
-         * the resolved historical graph and definitions with the same semantics.
+         * not change this meaning. Current selection shall evaluate active state;
+         * prospective selection shall evaluate the sole delta's effective graph
+         * and proposed definitions; exactly one revision or time selector shall
+         * evaluate the resolved historical graph and definitions with the same semantics.
          */
     }
 
@@ -87,6 +89,9 @@ package VellisRequirements {
          * a component that can change a projected tuple, with combinations of
          * projected components, and with distinct rows needed to decide the
          * caller's maximum.
+         * Evaluation shall stop after enough distinct projected rows to decide
+         * the caller's bound and shall not materialize an unbounded candidate
+         * population merely because its type participates in the query.
          */
     }
 
@@ -100,6 +105,8 @@ package VellisRequirements {
          * appended transition shall become recoverable as one effect. Rejected
          * or failed operations shall change no canonical state or revision. An accepted
          * effective no-op shall create neither a revision nor a transition.
+         * Definition activation shall apply its exact assessed graph overlay,
+         * active-definition change, delta removal, and transition as that one effect.
          */
     }
 
@@ -108,22 +115,39 @@ package VellisRequirements {
         doc /*
          * At every established revision, the current canonical-state projection
          * shall contain exactly one active definition set and zero or one
-         * definition delta.
+         * definition delta. A present delta owns exactly one proposed definition
+         * set and one keyed graph overlay; neither is active state.
          */
     }
 
     requirement def 'Non Disruptive Definition Work' {
         subject system : 'RTG System';
         doc /*
-         * Creating, editing, retrieving, or assessing a definition delta shall not change
-         * active definitions or graph. Activation shall succeed only when
-         * every description is non-empty, the proposed set is internally
-         * valid, and the graph already conforms;
+         * Creating, editing, retrieving, querying, or assessing a definition
+         * delta shall not change active definitions or graph. Its graph overlay
+         * shall use complete-object upserts, explicit tombstones, and explicit
+         * unstaging without implicit cascade. Proposed definitions shall be built
+         * through bounded natural-keyed upserts and removals rather than one
+         * complete definition-set request, and may remain temporarily invalid
+         * across edits. The first effective definition edit shall apply over
+         * complete active-definition meaning and retain untouched definitions;
+         * later edits apply over current proposed meaning. Activation shall succeed only from
+         * an exact current complete assessment showing that every description is
+         * non-empty, the proposed set is internally valid, and the effective
+         * post-cutover graph conforms;
          * failure shall preserve graph, active set, delta, revision, and canonical history.
-         * A present delta shall differ semantically from the active set. Staging
-         * content equal to the sole current proposal, or equal to the active set
-         * when no delta exists, shall be an accepted no-op. When a different
-         * delta exists, the active set shall not implicitly discard it.
+         * A present delta's effective definitions and graph shall differ
+         * semantically from active state. Staging definition content equal to the
+         * sole current proposal, or equal to the active set when no delta exists,
+         * shall be an accepted no-op. A prospective graph change when no delta
+         * exists shall create one whose proposed definitions equal the active set.
+         * When a delta exists, setting proposed definitions equal to active shall
+         * retain a non-empty overlay and shall not implicitly discard an empty proposal.
+         * When the overlay is empty, a definition edit that would remove the final
+         * semantic difference shall be rejected atomically with the prior proposal
+         * and revision unchanged; only explicit discard removes the delta.
+         * Active changes that alter a staged identity shall make the prior prospective
+         * assessment stale without silently discarding the overlay.
          */
     }
 
@@ -132,12 +156,21 @@ package VellisRequirements {
         doc /*
          * The system shall produce typed findings within the governing outcome
          * for semantically invalid graph queries, proposed graph changes,
-         * replayed state, and v1 recovery candidates. Validation reports shall
-         * identify only the assessment scopes that currently return reports: complete
-         * graph conformance and definition-delta consistency and graph impact.
-         * The parameterless public check operation shall produce the former;
-         * whole-delta retrieval and staging shall produce the latter. Validation
-         * shall own no separate canonical state.
+         * replayed state, and v1 recovery candidates. Validation assessments shall
+         * identify only complete current-graph conformance and complete prospective
+         * definition-and-graph conformance. One completed assessment shall contain
+         * every finding and be bound to its exact evaluated revision and, when
+         * prospective, exact delta meaning. One public check request shall either
+         * produce that assessment once or retrieve a positive bounded ordered
+         * one-based finding interval from it without reassessment. The result shall expose
+         * assessment identity, complete finding count, returned interval, and
+         * whether more findings remain. Only the latest completed assessment for
+         * each current or prospective scope remains retrievable; publishing its
+         * replacement expires the prior assessment identity, while a failed run
+         * preserves the prior one. Current or proposal changes may make the
+         * retained assessment stale for activation without changing its findings
+         * or immediate retrievability. Assessment state is observational evidence,
+         * never canonical or replay authority.
          */
     }
 
@@ -157,9 +190,9 @@ package VellisRequirements {
          * values established by different canonical records. An initial base
          * seeded from reconstructed snapshot state shall not claim
          * omitted earlier transitions. Each transition's semantic change shall be
-         * valid for its kind. An ordinary graph mutation record shall carry its
-         * accepted graph change rather than a complete replacement graph. Only
-         * historical restoration may carry a complete replacement graph.
+         * valid for its kind. Graph mutation, definition activation, and
+         * historical restoration records shall carry their replay-sufficient
+         * explicit graph changes rather than a complete replacement graph.
          */
     }
 
@@ -169,7 +202,9 @@ package VellisRequirements {
          * A canonical snapshot shall be a self-contained, lossless capture of
          * graph, active definitions, optional in-flight delta, and total
          * revision and shall identify the exact canonical record it captures.
-         * Creating it shall not change canonical state or revision.
+         * Creating it shall not change canonical state or revision. Semantic
+         * completeness shall not require constructing a resident canonical-state,
+         * graph, definition-set, or snapshot-document aggregate.
          */
     }
 
@@ -186,7 +221,8 @@ package VellisRequirements {
          * reconstructed state at the resulting revision, without claiming
          * earlier transitions. A gap, duplicate, reorder, invalid transition,
          * or incompatible base shall fail without partially accepted canonical
-         * state.
+         * state. Replay and reconstruction shall use bounded incremental or
+         * set-based work and shall not return or require a resident whole state.
          */
     }
 
@@ -211,7 +247,11 @@ package VellisRequirements {
         doc /*
          * Restore shall require no in-flight delta and shall commit historical
          * graph and active definitions with no delta as one new revision without
-         * rewriting earlier history.
+         * rewriting earlier history. Its transition shall carry the explicit
+         * replay-sufficient difference from the prior current state. Computing
+         * and applying that difference may scan the selected and current state
+         * but shall use bounded incremental or set-based work and shall not
+         * construct either graph as one resident aggregate.
          */
     }
 
@@ -238,8 +278,9 @@ package VellisRequirements {
          * Every active type and rule definition shall have a non-empty,
          * owner-readable description. Automatic assessment shall establish only
          * presence and non-emptiness; owner review shall establish readability.
-         * A complete shallow read shall return every anchor type active at the
-         * current or selected historical state, its description, the evaluated
+         * A complete shallow read shall return every anchor type in the evaluated
+         * definition set for current, prospective, or selected historical state,
+         * its description, the evaluated
          * revision, and delta presence at that state, or no summaries when it
          * cannot return the complete vocabulary. A focused read shall return the
          * complete relevant definition neighborhood at its own identified
@@ -248,27 +289,38 @@ package VellisRequirements {
          * be able to detect an intervening definition change by comparing the
          * summary and inspection revisions. Unknown, duplicate, or
          * incompletely answerable selections shall return findings and no partial
-         * details or evaluated revision. The sole current proposed set shall
-         * remain separately retrievable whole with its current assessment;
-         * historical discovery shall not change delta retrieval. All discovery
+         * details or evaluated revision. The sole current proposal shall remain
+         * separately discoverable through its identity, bounded definition
+         * summary and inspection, overlay cardinalities, and latest assessment
+         * without returning one aggregate definition-set or overlay document.
+         * Historical discovery shall not change proposal discovery. All discovery
          * shall change no canonical state or revision, while its operation attempt may be recorded
          * observationally.
-         * A returned assessment shall be present exactly with a returned delta;
-         * its evaluated revision, and any resulting revision from staging, shall
-         * equal the whole-delta result's evaluated revision.
+         * A returned assessment shall be present exactly when the proposal has a
+         * current completed assessment; its evaluated revision and proposal
+         * identity shall equal those reported by proposal discovery.
          */
     }
 
     requirement def 'Explicit Graph Change Set' {
         subject system : 'RTG System';
         doc /*
-         * A graph change shall use complete-object upserts and explicit UUID
-         * removals for each graph-object kind. Direct associations shall change
+         * A graph change shall identify either active state or the sole
+         * definition delta and shall use complete-object upserts and explicit UUID
+         * removals for each graph-object kind. A delta change may also explicitly
+         * unstage a UUID. Direct associations shall change
          * only through associated-data anchor references. Duplicate commands,
          * upsert/removal conflicts, unknown removals, kind changes, invalid final
          * references, and any assumed implicit cascade shall be rejected without
-         * canonical effect. The complete resulting graph shall conform before an
-         * atomic commit.
+         * canonical effect. An ordinary active change shall validate every
+         * invariant that can be affected by its touched values, final references,
+         * reverse references, incident relationships, associations, and
+         * multiplicity participants, relying on the previously valid unaffected
+         * state. It shall not perform a complete-graph conformance assessment.
+         * Delta staging may remain temporarily nonconforming until an explicit
+         * prospective assessment and shall change no active state. An edit that
+         * would remove the final semantic difference from active state is rejected
+         * atomically; only explicit discard removes the delta.
          */
     }
 
@@ -295,7 +347,7 @@ package VellisRequirements {
         subject system : 'RTG System';
         doc /*
          * Current definition summary and inspection, current graph query,
-         * current conformance assessment, delta retrieval, and ordinary change
+         * current conformance assessment, proposal discovery, and ordinary change
          * validation shall use the current canonical-state projection and shall
          * not traverse canonical or activity history to rediscover current state.
          * Their work may scale with the current state facets and candidate
@@ -307,9 +359,14 @@ package VellisRequirements {
          * narrow candidates by the requested identities, types, direct associations,
          * and directed relationships before applying property comparisons and shall
          * not materialize unrelated graph objects merely because they are current.
-         * Complete-state inspection, snapshot capture, replay, restoration, whole-
-         * graph conformance, and change validation whose invariants require the whole
-         * graph may materialize complete state explicitly. A value returned to a
+         * No production operation shall construct or retain a complete Graph,
+         * Canonical State, definition-set document, canonical-change document, or
+         * equivalent whole-state aggregate. Ordinary mutation shall inspect only
+         * its complete affected invariant closure. A definition cutover or
+         * explicit conformance assessment may scan every applicable semantic
+         * state entry when its meaning is state-wide, while keeping working memory bounded.
+         * Snapshot, replay, import, initialization, and restoration shall use
+         * bounded streaming, incremental, or set-based work. A value returned to a
          * caller shall not share mutable canonical state retained by the system.
          * No cache, database, serialization, indexing technology, or storage layout
          * is selected.
@@ -330,9 +387,10 @@ package VellisRequirements {
          * plus the returned interval. Historical definition summary and focused
          * inspection shall locate the revision and applicable definition-changing
          * records without replaying unrelated graph-only transitions. Historical
-         * graph reconstruction, explicit replay, restoration, and startup recovery
-         * may depend on their required replay tail and shall be characterized
-         * separately. These constraints govern semantic record processing, not
+         * graph selection, explicit replay, restoration, and startup recovery may
+         * depend on their required rows or replay tail but shall remain bounded-
+         * memory and shall not construct a complete graph or canonical state.
+         * These constraints govern semantic record processing, not
          * physical database pages or a selected indexing technology.
          */
     }
@@ -343,9 +401,10 @@ package VellisRequirements {
          * The system shall expose exactly the selected ten stable, discoverable
          * MCP tool names. Every completed invocation shall return typed object
          * meaning; tools with semantic input shall accept typed object meaning.
-         * Optional selection on definition summary shall be carried directly and
-         * shall not introduce an empty request type. Other parameterless tools
-         * shall introduce no empty domain request.
+         * Definition summary, graph change, activation, and conformance shall
+         * carry their state selection, target, exact assessment identity, or
+         * assessment-page request through typed input. A genuinely parameterless
+         * tool shall introduce no empty domain request.
          * Every tool shall preserve canonical RTG semantics and remain usable
          * through core tool discovery and invocation without requiring any
          * additional MCP capability.
@@ -395,9 +454,10 @@ package VellisRequirements {
     requirement def 'V1 Snapshot Compatibility' {
         subject system : 'Vellis System';
         doc /*
-         * Only before any v2 canonical state exists, Vellis shall analyze one
-         * complete v1.0.0 JSON system snapshot into a transient complete target
-         * graph, active definition set, and report bound to that exact source.
+         * Only before any v2 canonical state exists, Vellis shall incrementally
+         * analyze one complete v1.0.0 JSON system snapshot into a staged target
+         * graph, active definition set, and report bound to that exact source
+         * without constructing one resident complete graph or definition set.
          * Missing v1 system.live shall mean true. The candidate shall contain
          * every live graph object and its closed live relationships, report every
          * omitted non-live candidate, and preserve UUID, object kind, type key,
@@ -475,7 +535,9 @@ package VellisRequirements {
          * descriptions, and every structured rule. Reordering unordered content
          * shall be an effective no-op; changing canonical meaning shall not. Two
          * canonical states shall additionally require equal revision and equal
-         * definition-delta presence and content.
+         * definition-delta presence, proposed-definition meaning, and keyed graph
+         * overlay meaning. This semantic equality does not require either state
+         * to exist as one physical aggregate.
          */
     }
 
@@ -487,10 +549,12 @@ package VellisRequirements {
          * graph, exactly that active set, no definition delta, one matching
          * initial-state record, no transitions, and an empty activity ledger.
          * Refusal or failure shall establish no partial state. Snapshot-based
-         * initialization shall use only reconstructed snapshot state and shall
+         * initialization shall use only incrementally verified and reconstructed
+         * snapshot state and shall
          * not overlay fresh-start definitions. Confirmed v1 initialization shall
-         * establish its complete recovery candidate at revision 0 as a new owned
-         * history base with no transitions or activity records.
+         * establish its semantically complete recovery candidate at revision 0 as
+         * a new owned history base with no transitions or activity records, using
+         * bounded streaming or set-based work rather than a resident whole state.
          */
     }
 
