@@ -1,12 +1,12 @@
 schema_version: "1.0"
 evolution:
   id: sqlite-write-path-resource-review
-  objective: Correct facet-only SQLite write work and decide whether ordinary graph mutation must avoid complete-graph materialization.
-  observable_distinction: A definition-only no-op or delta discard reads and writes no graph objects, transition commits validate their actual stored representation, and any stronger mutation bound is accepted before implementation relies on it.
+  objective: Make every Vellis operation use bounded local, set-based, or streaming work without constructing complete resident graph or canonical-state aggregates.
+  observable_distinction: Ordinary work touches only its affected semantic neighborhood, complete assessments remain exhaustive through bounded retrieval, and lifecycle operations stream complete meaning without resident whole-state values.
   lifecycle: awaiting-approval
   approval:
     status: pending
-    reason: Strengthening ordinary graph-mutation resource behavior beyond the current complete-graph validation exception requires owner acceptance; independent implementation defects do not.
+    reason: The owner accepted normalized SQLite state, prospective graph overlay, complete stored assessments with bounded retrieval, and streamed snapshots while preserving portable system meaning.
     checkpoint: null
   blocker: null
   checkpoint: null
@@ -32,22 +32,33 @@ baselines:
     checkpoint: git:096d548af4a744aa60a6bacafa74d3d0b58b7fe1
 scope:
   authority_scope:
+    - model/10-rtg-domain.sysml
+    - model/20-rtg-system.sysml
+    - model/30-vellis.sysml
     - model/40-requirements.sysml
     - model/50-verification.sysml
   implementation_scope:
+    - vellis/canonical.py
+    - vellis/definitions.py
+    - vellis/graph.py
+    - vellis/query.py
+    - vellis/replay.py
+    - vellis/snapshot_document.py
     - vellis/system.py
     - vellis/store.py
     - vellis/serialization.py
-    - tests/vellis/test_current_work.py
-    - tests/vellis/test_serialization.py
+    - vellis/mcp.py
+    - vellis/setup.py
+    - vellis/preserve.py
+    - tests/vellis
   review_lenses:
     - authority and conformance
     - engineering and evidence
   non_goals:
     - Numerical latency targets without representative owner data and hardware.
     - Mutation, inspection, or migration of user-owned .data content.
-    - Changing explicit whole-state snapshot, replay, restoration, initialization, or conformance semantics.
     - Query-local link-cache optimization without a demonstrated product consequence.
+    - Backward compatibility or migration for unreleased prototype database and API forms.
 findings:
   - id: F001
     summary: Facet-only definition work materializes the complete current graph.
@@ -107,6 +118,97 @@ findings:
     implementation_status: not applicable
     nearest_wrong_system: A correct query performs a repeated query-local lookup whose consequence remains uncharacterized.
     compatibility_effect: No public or stored meaning changes; revisit only with evidence of a material consequence.
+  - id: F005
+    summary: Complete-state APIs and lifecycle operations construct resident graph and canonical-state aggregates.
+    classification: model gap
+    consequence: Snapshot, replay, restore, initialization, historical graph work, and direct state inspection may require memory proportional to all graph and definition content even when complete semantic processing can be streamed or set-based.
+    authority_refs:
+      - RTGSystem::'Reconstruct canonical state'
+      - RTGSystem::'Create canonical snapshot'
+      - VellisRequirements::historyIndependentCurrentWork
+      - VellisRequirements::replayEquivalence
+    evidence_refs:
+      - command:uv run pytest tests/vellis/test_snapshot_replay.py tests/vellis/test_snapshot_document.py tests/vellis/test_historical_restore.py tests/vellis/test_current_work.py
+    disposition: model-change
+    owner_work_item_id: W002
+    implementation_status: conflicting
+    nearest_wrong_system: A semantically correct complete lifecycle operation assembles every object into one process-resident value before producing its effect or artifact.
+    compatibility_effect: Complete semantic results remain, but unreleased library APIs returning resident whole state are removed.
+  - id: F006
+    summary: Current definitions, graph-object bodies, initial state, and canonical changes are stored as opaque JSON documents.
+    classification: realization decision
+    consequence: SQLite cannot directly enforce natural keys, select focused definition meaning, compare changed values, or replay normalized changes without decoding broad opaque values.
+    authority_refs:
+      - VellisRequirements::durableCanonicalHistory
+      - VellisRequirements::agentDefinitionDiscoverability
+      - VellisRequirements::canonicalSemanticEquality
+    evidence_refs:
+      - command:uv run pytest tests/vellis/test_store_integrity.py tests/vellis/test_serialization.py
+    disposition: implementation-work
+    owner_work_item_id: W003
+    implementation_status: conflicting
+    nearest_wrong_system: SQLite stores durable rows but meaningful definitions, object values, and ledger changes remain documents that must be decoded before relational selection or enforcement.
+    compatibility_effect: A fresh unreleased database layout replaces the prototype layout with no migration obligation.
+  - id: F007
+    summary: Current graph query can materialize every candidate of a broad selected type before enforcing its return bound.
+    classification: model gap
+    consequence: A query returning one row can allocate and decode a population proportional to every same-type object even though indexed selection and maximumRows plus one are sufficient.
+    authority_refs:
+      - VellisRequirements::semanticQueryMeaning
+      - VellisRequirements::querySafety
+      - VellisRequirements::historyIndependentCurrentWork
+    evidence_refs:
+      - command:uv run pytest tests/vellis/test_graph_queries.py tests/vellis/test_work_characterization.py
+    disposition: model-change
+    owner_work_item_id: W002
+    implementation_status: conflicting
+    nearest_wrong_system: Candidate narrowing uses SQLite indexes but transfers an unbounded same-type candidate set into Python before projection and result-bound refusal.
+    compatibility_effect: Query rows and refusal meaning remain while evaluation becomes bounded and database-native.
+  - id: F008
+    summary: Complete conformance findings have no durable bounded retrieval meaning.
+    classification: model gap
+    consequence: Returning every finding in one call makes response memory and transport proportional to all violations, while truncating findings would prevent an agent from preparing one complete repair batch.
+    authority_refs:
+      - RTG::'Validation Report'
+      - VellisRequirements::validationCoverage
+      - VellisRequirements::mcpAgentToolContract
+    evidence_refs:
+      - command:uv run pytest tests/vellis/test_graph_changes.py tests/vellis/test_mcp_boundary.py
+    disposition: model-change
+    owner_work_item_id: W002
+    implementation_status: conflicting
+    nearest_wrong_system: A complete assessment is either returned as one unbounded value or repeatedly recomputed to reveal further findings.
+    compatibility_effect: The unreleased check request and result gain assessment identity, total count, and bounded interval retrieval.
+  - id: F009
+    summary: The sole definition delta cannot stage the graph edits required for one conforming cutover.
+    classification: model gap
+    consequence: When old data violates new definitions and migrated data violates old definitions, neither ordering can reach the valid post-cutover state even though an atomic combined transition is meaningful.
+    authority_refs:
+      - RTG::'Definition Delta'
+      - RTGSystem::'Activate definition delta'
+      - VellisRequirements::nonDisruptiveDefinitionWork
+    evidence_refs:
+      - command:uv run pytest tests/vellis/test_definition_governance.py tests/vellis/test_graph_changes.py
+    disposition: model-change
+    owner_work_item_id: W002
+    implementation_status: absent
+    nearest_wrong_system: Prospective definitions are singular and durable, but required graph upserts and explicit removals must be applied separately against the wrong active vocabulary.
+    compatibility_effect: The unreleased delta becomes one prospective definition-and-graph overlay with explicit active versus prospective selection.
+  - id: F010
+    summary: Initial and v1 snapshot analysis requires complete transient target state.
+    classification: model gap
+    consequence: Importing a large snapshot can consume memory proportional to the whole source before validation or establishment even though complete meaning can be incrementally staged and assessed.
+    authority_refs:
+      - VellisRequirements::freshInitialization
+      - VellisRequirements::v1SnapshotCompatibility
+      - VellisRequirements::canonicalSnapshotCompleteness
+    evidence_refs:
+      - command:uv run pytest tests/vellis/test_snapshot_initialization.py tests/vellis/test_v1_recovery.py
+    disposition: model-change
+    owner_work_item_id: W002
+    implementation_status: conflicting
+    nearest_wrong_system: A compatible complete input is semantically valid but cannot be established without first becoming one resident candidate graph and definition set.
+    compatibility_effect: Snapshot and v1 source meaning remain lossless while import becomes incremental and temporary-state backed.
 decisions:
   - id: D001
     summary: Transition commits consume the replay-sufficient change and update only facets that the change establishes.
@@ -127,6 +229,91 @@ decisions:
     implementation_status: conforming
     evidence_refs:
       - command:uv run pytest tests/vellis/test_current_work.py tests/vellis/test_serialization.py tests/vellis/test_graph_changes.py tests/vellis/test_definition_discovery.py
+  - id: D002
+    summary: SQLite stores normalized active, prospective, historical, assessment, and canonical-ledger meaning as the live Vellis realization.
+    authority_refs:
+      - VellisRequirements::durableCanonicalHistory
+      - VellisRequirements::historyIndependentCurrentWork
+      - VellisRequirements::canonicalSemanticEquality
+    alternatives:
+      - Retain JSON documents for definitions, graph objects, and canonical changes.
+      - Keep normalized live state but replay document-valued canonical changes.
+    reversible: false
+    owner_work_item_id: W003
+    evidence_intent:
+      - Schema inspection finds no whole-state, whole-definition-set, whole-object, or canonical-change document columns.
+      - Natural identities, focused selection, and revision membership are directly addressable.
+      - Fresh schema creation has no prototype migration path and never touches user-owned data.
+    implementation_status: not evaluated
+    evidence_refs: []
+  - id: D003
+    summary: The sole prospective state uses normalized complete-object upserts, tombstones, and explicit unstaging over active state.
+    authority_refs:
+      - VellisRequirements::definitionCardinality
+      - VellisRequirements::nonDisruptiveDefinitionWork
+      - VellisRequirements::explicitGraphChangeSet
+    alternatives:
+      - Require all graph data to conform before definition activation.
+      - Supply one potentially unbounded graph-change request at activation time.
+    reversible: true
+    owner_work_item_id: W004
+    evidence_intent:
+      - Ordinary current queries ignore prospective entries while explicit prospective queries evaluate the overlay.
+      - Incompatible old and new states can cross in one assessed atomic activation.
+      - Stale active bases block activation without discarding staged owner work.
+    implementation_status: not evaluated
+    evidence_refs: []
+  - id: D004
+    summary: Canonical snapshot artifacts use incrementally hashed streamed NDJSON while SQLite remains the ordinary durable state store.
+    authority_refs:
+      - VellisRequirements::canonicalSnapshotCompleteness
+      - VellisRequirements::replayEquivalence
+      - VellisRequirements::freshInitialization
+    alternatives:
+      - Use a SQLite database copy as the only portable snapshot.
+      - Retain one nested JSON document parsed and emitted whole.
+    reversible: true
+    owner_work_item_id: W005
+    evidence_intent:
+      - Export and import preserve complete canonical equality and lineage.
+      - Peak materialization remains bounded while graph size increases.
+      - A changed, incomplete, reordered, or incompatible stream establishes no partial state.
+    implementation_status: not evaluated
+    evidence_refs: []
+  - id: D005
+    summary: Complete validation runs publish immutable revision-bound assessments whose findings are retrieved in bounded intervals.
+    authority_refs:
+      - VellisRequirements::validationCoverage
+      - VellisRequirements::mcpAgentToolContract
+      - VellisRequirements::mcpOutcomeIntegrity
+    alternatives:
+      - Return every finding in one unbounded tool response.
+      - Return a truncated result and require repeated full validation.
+    reversible: true
+    owner_work_item_id: W004
+    evidence_intent:
+      - One validation produces every finding once and records a complete count.
+      - Bounded intervals retrieve the complete ordered set without revalidation.
+      - Activation accepts only the exact current conforming prospective assessment.
+    implementation_status: not evaluated
+    evidence_refs: []
+  - id: D006
+    summary: Production operations never construct or retain a complete Graph, CanonicalState, or definition-set aggregate.
+    authority_refs:
+      - VellisRequirements::historyIndependentCurrentWork
+      - VellisRequirements::boundedHistoricalSelectionWork
+      - VellisRequirements::replayEquivalence
+    alternatives:
+      - Permit explicit whole-state materializers outside routine calls.
+      - Retain whole-state materializers only for snapshot, replay, and restore.
+    reversible: false
+    owner_work_item_id: W006
+    evidence_intent:
+      - Ordinary mutation work is bounded by the change and affected invariant neighborhood.
+      - Whole-state assessment uses set-based or bounded streaming work.
+      - Snapshot, replay, restore, and import use streams or temporary durable state.
+    implementation_status: not evaluated
+    evidence_refs: []
 work_items:
   - id: W001
     order: 1
@@ -168,7 +355,7 @@ work_items:
     checkpoint: git:096d548af4a744aa60a6bacafa74d3d0b58b7fe1
   - id: W002
     order: 2
-    label: Decide the SQLite-native mutation resource boundary
+    label: Accept bounded local, set-based, streaming, and prospective-state semantics
     kind: modeling
     dependencies:
       - W001
@@ -177,23 +364,37 @@ work_items:
       identity: sha256:ad02d24b6c6eeb38f904d551e0ae7dfd48101ff41e44db79effb3014e137e4c6
     finding_ids:
       - F003
+      - F005
+      - F007
+      - F008
+      - F009
+      - F010
     decision_ids: []
     authority:
       - refs:
           - VellisRequirements::explicitGraphChangeSet
           - VellisRequirements::graphInvariants
           - VellisRequirements::historyIndependentCurrentWork
-        coverage: full
-        remaining_work_item_ids: []
+          - VellisRequirements::validationCoverage
+          - VellisRequirements::canonicalSnapshotCompleteness
+          - VellisRequirements::replayEquivalence
+          - VellisRequirements::freshInitialization
+        coverage: partial
+        remaining_work_item_ids:
+          - W003
+          - W004
+          - W005
+          - W006
     approval:
       status: pending
-      reason: Removing the current complete-graph change-validation exception strengthens accepted resource behavior and requires owner acceptance.
+      reason: The owner explicitly accepted the complete SQLite-native bounded-memory plan and requested its implementation.
       checkpoint: null
-    nearest_wrong_system: A one-object mutation remains permitted to reconstruct every unrelated graph object for validation.
-    compatibility_effect: Public mutation results remain while implementations must validate affected invariants without complete-graph materialization.
+    nearest_wrong_system: Complete semantic outcomes remain correct while their implementation is permitted to require one resident representation of all graph, definition, assessment, or replay state.
+    compatibility_effect: System meaning is strengthened and the unreleased public contract gains prospective graph work and bounded assessment retrieval; no released compatibility is preserved.
     non_effects:
       - No database, index, serialization, or programming technology becomes portable model authority.
-      - Snapshot, replay, restoration, initialization, and explicit whole-graph conformance may still materialize complete state.
+      - Completeness, exact equality, history, lineage, and atomic failure non-effects remain authoritative.
+      - Numerical latency targets remain deferred pending representative hardware and owner data.
     lifecycle: pending
     implementation_status: not evaluated
     evidence_refs: []
@@ -201,14 +402,169 @@ work_items:
     checkpoint: null
   - id: W003
     order: 3
-    label: Review and rebaseline the write-path evolution
-    kind: closure
+    label: Realize normalized current, historical, and canonical-ledger state with bounded query and mutation
+    kind: implementation
     dependencies:
       - W001
       - W002
     planned_baseline:
       dimension: implementation
-      identity: git:79840c2168e5d136571a89f7eb6ccd6ff7e56659
+      identity: git:096d548af4a744aa60a6bacafa74d3d0b58b7fe1
+    finding_ids:
+      - F006
+    decision_ids:
+      - D002
+    authority:
+      - refs:
+          - VellisRequirements::graphInvariants
+          - VellisRequirements::semanticQueryMeaning
+          - VellisRequirements::atomicCanonicalRevision
+          - VellisRequirements::durableCanonicalHistory
+          - VellisRequirements::canonicalSemanticEquality
+          - VellisRequirements::historyIndependentCurrentWork
+          - VellisRequirements::boundedHistoricalSelectionWork
+        coverage: partial
+        remaining_work_item_ids:
+          - W004
+          - W005
+          - W006
+    approval:
+      status: not-required
+      reason: Normalized SQLite layout and SQL evaluation are selected Vellis realization decisions under the accepted resource and semantic authority.
+      checkpoint: null
+    nearest_wrong_system: Durable rows exist but one ordinary mutation, historical query, or broad bounded query decodes unrelated graph or definition populations.
+    compatibility_effect: The unreleased prototype schema and whole-state library forms are replaced without migration.
+    non_effects:
+      - Graph, definition, query, equality, revision, and ledger semantics remain model-controlled.
+      - User-owned .data content remains untouched.
+    lifecycle: pending
+    implementation_status: not evaluated
+    evidence_refs: []
+    blocker: null
+    checkpoint: null
+  - id: W004
+    order: 4
+    label: Realize prospective graph overlay, complete stored assessments, and atomic cutover
+    kind: implementation
+    dependencies:
+      - W002
+      - W003
+    planned_baseline:
+      dimension: model
+      identity: sha256:ad02d24b6c6eeb38f904d551e0ae7dfd48101ff41e44db79effb3014e137e4c6
+    finding_ids: []
+    decision_ids:
+      - D003
+      - D005
+    authority:
+      - refs:
+          - VellisRequirements::definitionCardinality
+          - VellisRequirements::nonDisruptiveDefinitionWork
+          - VellisRequirements::validationCoverage
+          - VellisRequirements::explicitGraphChangeSet
+        coverage: full
+        remaining_work_item_ids: []
+    approval:
+      status: not-required
+      reason: The prospective and assessment realization follows accepted authority and the owner-selected SQLite boundary.
+      checkpoint: null
+    nearest_wrong_system: Prospective definitions remain isolated but required graph edits cannot be queried, completely assessed once, and activated in the same revision.
+    compatibility_effect: Unreleased definition-delta and check requests and results change without migration or compatibility adapters.
+    non_effects:
+      - Ordinary current queries and mutations ignore prospective state unless explicitly selected.
+      - Rejected or stale activation preserves active and prospective state.
+    lifecycle: pending
+    implementation_status: not evaluated
+    evidence_refs: []
+    blocker: null
+    checkpoint: null
+  - id: W005
+    order: 5
+    label: Realize streaming snapshot, import, replay verification, and restoration
+    kind: implementation
+    dependencies:
+      - W002
+      - W003
+      - W004
+    planned_baseline:
+      dimension: model
+      identity: sha256:ad02d24b6c6eeb38f904d551e0ae7dfd48101ff41e44db79effb3014e137e4c6
+    finding_ids: []
+    decision_ids:
+      - D004
+    authority:
+      - refs:
+          - VellisRequirements::canonicalSnapshotCompleteness
+          - VellisRequirements::replayEquivalence
+          - VellisRequirements::historicalRestoreSemantics
+          - VellisRequirements::freshInitialization
+          - VellisRequirements::v1SnapshotCompatibility
+        coverage: full
+        remaining_work_item_ids: []
+    approval:
+      status: not-required
+      reason: Streamed NDJSON and temporary SQLite reconstruction are owner-selected realizations of accepted complete lifecycle meaning.
+      checkpoint: null
+    nearest_wrong_system: Complete lifecycle behavior remains lossless but constructs one resident graph, definition set, canonical state, or nested snapshot document.
+    compatibility_effect: The unreleased nested snapshot document and resident reconstruction result are replaced without adapters.
+    non_effects:
+      - Snapshot completeness, record identity, tail lineage, and failure non-effects remain unchanged.
+      - No user-owned store is inspected or migrated during implementation.
+    lifecycle: pending
+    implementation_status: not evaluated
+    evidence_refs: []
+    blocker: null
+    checkpoint: null
+  - id: W006
+    order: 6
+    label: Prove no production whole-state path and synchronize the ten-tool boundary
+    kind: integration
+    dependencies:
+      - W003
+      - W004
+      - W005
+    planned_baseline:
+      dimension: model
+      identity: sha256:ad02d24b6c6eeb38f904d551e0ae7dfd48101ff41e44db79effb3014e137e4c6
+    finding_ids: []
+    decision_ids:
+      - D006
+    authority:
+      - refs:
+          - VellisRequirements::historyIndependentCurrentWork
+          - VellisRequirements::mcpAgentToolContract
+          - VellisRequirements::mcpOutcomeIntegrity
+          - VellisRequirements::simpleIndividualOperation
+        coverage: full
+        remaining_work_item_ids: []
+    approval:
+      status: not-required
+      reason: Integration proves the accepted model and selected realization without another external boundary decision.
+      checkpoint: null
+    nearest_wrong_system: Each subsystem is locally bounded but one retained API, tool adapter, setup path, or test-only production helper still reconstructs complete state.
+    compatibility_effect: The selected ten tool names remain while unreleased request and result shapes change coherently.
+    non_effects:
+      - Trusted-client and owner-approval assumptions remain unchanged.
+      - No additional MCP tools, services, transports, or infrastructure are introduced.
+    lifecycle: pending
+    implementation_status: not evaluated
+    evidence_refs: []
+    blocker: null
+    checkpoint: null
+  - id: W007
+    order: 7
+    label: Review, document, and rebaseline the SQLite-native bounded-memory evolution
+    kind: closure
+    dependencies:
+      - W001
+      - W002
+      - W003
+      - W004
+      - W005
+      - W006
+    planned_baseline:
+      dimension: implementation
+      identity: git:096d548af4a744aa60a6bacafa74d3d0b58b7fe1
     finding_ids: []
     decision_ids: []
     authority:
@@ -218,13 +574,13 @@ work_items:
         remaining_work_item_ids: []
     approval:
       status: not-required
-      reason: Closure reconciles accepted authority and implementation without selecting another boundary.
+      reason: Closure reconciles accepted authority, implementation, evidence, public truth, and the new baseline.
       checkpoint: null
-    nearest_wrong_system: Model, implementation, and evidence pass independently but describe different write-path resource behavior.
-    compatibility_effect: No released store format exists; user-owned data is not migrated.
+    nearest_wrong_system: Model, implementation, tests, and public guidance each pass locally while describing different state, resource, assessment, snapshot, or tool behavior.
+    compatibility_effect: No released Vellis v2 state or public API is preserved; user-owned .data remains untouched.
     non_effects:
-      - The prior completed evolution remains recoverable in Git history.
-      - User-owned .data content remains untouched.
+      - Prior checkpoints remain recoverable in Git history.
+      - Numerical performance budgets remain deferred.
     lifecycle: pending
     implementation_status: not evaluated
     evidence_refs: []
