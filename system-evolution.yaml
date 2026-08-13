@@ -3,7 +3,7 @@ evolution:
   id: sqlite-write-path-resource-review
   objective: Make every Vellis operation use bounded local, set-based, or streaming work without constructing complete resident graph or canonical-state aggregates.
   observable_distinction: Ordinary work touches only its affected semantic neighborhood, complete assessments remain exhaustive through bounded retrieval, and lifecycle operations stream complete meaning without resident whole-state values.
-  lifecycle: ready
+  lifecycle: active
   approval:
     status: accepted
     reason: The owner accepted normalized SQLite state, prospective graph overlay, complete stored assessments with bounded retrieval, and streamed snapshots while preserving portable system meaning.
@@ -20,16 +20,16 @@ baselines:
     checkpoint: git:79840c2168e5d136571a89f7eb6ccd6ff7e56659
   target:
     model: sha256:ad02d24b6c6eeb38f904d551e0ae7dfd48101ff41e44db79effb3014e137e4c6
-    implementation: git:096d548af4a744aa60a6bacafa74d3d0b58b7fe1
+    implementation: git:cc667f4dde9dcf1e27418085360f9a7f8453bd6a
     language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
     execution_environment: sha256:c24a0bae1e63d1f4923d6c7925925ea4e02743568a84b403677b5f6a718879fa
-    checkpoint: git:096d548af4a744aa60a6bacafa74d3d0b58b7fe1
+    checkpoint: git:cc667f4dde9dcf1e27418085360f9a7f8453bd6a
   observed:
     model: sha256:ad02d24b6c6eeb38f904d551e0ae7dfd48101ff41e44db79effb3014e137e4c6
-    implementation: git:096d548af4a744aa60a6bacafa74d3d0b58b7fe1
+    implementation: git:cc667f4dde9dcf1e27418085360f9a7f8453bd6a
     language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
     execution_environment: sha256:c24a0bae1e63d1f4923d6c7925925ea4e02743568a84b403677b5f6a718879fa
-    checkpoint: git:096d548af4a744aa60a6bacafa74d3d0b58b7fe1
+    checkpoint: git:cc667f4dde9dcf1e27418085360f9a7f8453bd6a
 scope:
   authority_scope:
     - model/10-rtg-domain.sysml
@@ -395,7 +395,7 @@ work_items:
       - No database, index, serialization, or programming technology becomes portable model authority.
       - Completeness, exact equality, history, lineage, and atomic failure non-effects remain authoritative.
       - Numerical latency targets remain deferred pending representative hardware and owner data.
-    lifecycle: ready
+    lifecycle: active
     implementation_status: not evaluated
     evidence_refs: []
     blocker: null
