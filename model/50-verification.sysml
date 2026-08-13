@@ -55,6 +55,12 @@ package VellisVerification {
              * a query after cold discovery of the historical vocabulary at an
              * earlier revision and show that evaluation uses the definitions
              * active there.
+             * Independently increase satisfying assignments in a selector
+             * component disconnected from every requested projection and show
+             * that it changes rows only when the component moves between absent
+             * and present, without multiplying projected assignment work. Repeat
+             * with an unprojected selector connected by a condition and show its
+             * distinguishable constraint outcomes still govern the rows.
              */
             verify VellisRequirements::semanticQueryMeaning;
         }
@@ -291,6 +297,10 @@ package VellisVerification {
              * its end. Show canonical entries omit canonical state and replay-
              * sufficient changes while retaining revision, kind, time, provenance,
              * and semantic summary needed for owner review.
+             * For intervals larger than the positive maximum, instrument record
+             * retrieval and decoding and show the read stops after enough entries
+             * to decide whole-result rejection rather than processing the remaining
+             * selected interval.
              */
             verify VellisRequirements::dualLedgerSeparation;
             verify VellisRequirements::boundedHistoryRead;
@@ -536,8 +546,20 @@ package VellisVerification {
              * while performing current definition summary and inspection, current
              * graph query, current conformance assessment, delta retrieval, and
              * ordinary change validation. Show each performs constant
-             * historical-record work while scaling only with current state,
-             * proposal, and requested return bounds. Commit one effective
+             * historical-record work while scaling only with the state facets and
+             * candidate relationships its meaning requires, proposal, and requested
+             * return bounds. Repeat definition summary and focused inspection across
+             * process restart and show they materialize definitions but no graph
+             * objects. Hold one small query answer fixed while increasing unrelated
+             * graph populations; instrument candidate retrieval and object decoding
+             * and show identities, types, direct associations, and directed
+             * relationships constrain candidates before property comparisons without
+             * complete-graph materialization. Explicitly request complete current
+             * state and show one complete value is materialized, mutation of that
+             * returned value cannot change later current state, and the system need
+             * not retain that complete value between calls. Preserve complete-graph
+             * work for conformance, snapshot, replay, restoration, and change
+             * invariants that require it. Commit one effective
              * canonical mutation and show the current projection update and one
              * appended transition are recoverably atomic without traversing or
              * rewriting the earlier logical prefix.
@@ -562,7 +584,9 @@ package VellisVerification {
              * and focused inspection and show no linear growth from those graph
              * mutations. Resolve revision and time selections without a complete-
              * ledger scan. Use equivalent access traces when direct counters are
-             * unavailable; do not use unstable wall-clock assertions.
+             * unavailable. Include the selection or filtering plan when a returned-
+             * record counter would hide excluded records visited underneath it; do
+             * not use unstable wall-clock assertions.
              */
             verify VellisRequirements::boundedHistoricalSelectionWork;
             verify VellisRequirements::historicalStateCorrectness;
@@ -611,9 +635,13 @@ package VellisVerification {
             doc /*
              * Independently vary current graph size, canonical-ledger length,
              * definition-change density, activity-history length, selected
-             * interval size, and required replay-tail length. Measure semantic
-             * record visits, current-operation work, historical-selection work,
-             * replay and startup duration with explicit units, and storage growth.
+             * interval size, projected and unprojected query candidate populations,
+             * distinct result cardinality, and required replay-tail length. Measure
+             * semantic and physically filtered record visits, complete-state and
+             * per-object encoding and decoding, retained and transient memory,
+             * allocation or copy work, identity/type/association/relationship
+             * candidate joins, value comparisons, joint-assignment work, replay and
+             * startup duration with explicit units, and storage growth.
              * Use the resulting evidence to select later numerical latency,
              * startup, and storage budgets only after a runtime, hardware profile,
              * and representative owner dataset exist. This analysis does not

@@ -55,10 +55,14 @@ per-call authorization or owner approval. History tools return bounded owner-fac
 than replay-bearing canonical payloads. Owner-directed activity retention and recovery behavior remain
 modeled but are not additional initial MCP tools.
 
-The model constrains current work to avoid history traversal and bounded historical selection to
-avoid scanning excluded ledger prefixes. It does not select materialized projections, revision/time
-indexes, definition checkpoints, caches, snapshot cadence, databases, or storage layouts. Those are
-possible non-normative realizations whose conformance is shown with semantic record-access evidence.
+The model constrains current work to avoid history traversal, retained complete-state dependence,
+and materialization of state facets an operation does not need. Current query work narrows candidates
+through identity, type, direct association, and directed relationship meaning before value filtering,
+and projected-query work avoids multiplication by semantically irrelevant assignments. Bounded
+historical selection avoids scanning excluded ledger prefixes. The model does not select materialized
+projections, revision/time or relationship indexes, definition checkpoints, caches, snapshot cadence,
+databases, or storage layouts. Those are possible non-normative realizations whose conformance is
+shown with semantic record, state-materialization, candidate-join, and query-work evidence.
 Numerical latency, startup, throughput, and storage budgets remain deferred until the modeled
 performance analysis has representative runtime, hardware, and owner-data measurements.
 
@@ -70,5 +74,6 @@ Run `just model-check` for full-model validation. Use `$sysml-modeling` for the 
 `$sysml-reference` for language evidence, `$rtg-schema-design` for RTG meaning and governance,
 `$sysml-implementation-planning` to derive the complete implementation campaign,
 `$sysml-implementation` for one accepted semantic slice, `$sysml-implementation-campaign` to execute
-an approved campaign through system closure, and
+an approved campaign through system closure, `$sysml-evolution` for changes to an already
+implemented model-and-code baseline, and
 `$documentation-sync` after model or workflow changes.

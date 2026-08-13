@@ -80,6 +80,13 @@ package VellisRequirements {
          * rows. Every query shall provide a
          * positive row maximum; a result exceeding it, or one the system cannot
          * return completely, shall be rejected whole, never truncated or paged.
+         * Evaluation shall not multiply work across selector components
+         * disconnected from every projected selector. Such a component shall
+         * affect the result only through whether it has at least one satisfying
+         * assignment. Query work may scale with candidates and conditions inside
+         * a component that can change a projected tuple, with combinations of
+         * projected components, and with distinct rows needed to decide the
+         * caller's maximum.
          */
     }
 
@@ -291,8 +298,21 @@ package VellisRequirements {
          * current conformance assessment, delta retrieval, and ordinary change
          * validation shall use the current canonical-state projection and shall
          * not traverse canonical or activity history to rediscover current state.
-         * Their work may scale with current graph size, active or proposed
-         * definitions, requested return bounds, and proposed change size.
+         * Their work may scale with the current state facets and candidate
+         * relationships their meaning requires, active or proposed definitions,
+         * requested return bounds, and proposed change size. Routine current work
+         * shall not require retaining the complete canonical-state tuple or complete
+         * graph in process memory between invocations. Definition-only summary and
+         * inspection shall not materialize graph objects. Current graph query shall
+         * narrow candidates by the requested identities, types, direct associations,
+         * and directed relationships before applying property comparisons and shall
+         * not materialize unrelated graph objects merely because they are current.
+         * Complete-state inspection, snapshot capture, replay, restoration, whole-
+         * graph conformance, and change validation whose invariants require the whole
+         * graph may materialize complete state explicitly. A value returned to a
+         * caller shall not share mutable canonical state retained by the system.
+         * No cache, database, serialization, indexing technology, or storage layout
+         * is selected.
          * Canonical mutation and activity observation may perform constant
          * terminal-position and append work but shall neither traverse nor
          * rewrite the existing logical ledger prefix. Activity recording shall
