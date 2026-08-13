@@ -13,12 +13,15 @@ Vellis treats one durable canonical ledger as the authority for personal memory 
 work independent of accumulated history and bounded historical selection efficient. Materialized
 projections, indexes, caches, checkpoints, snapshot cadence, and persistence technology remain
 implementation choices rather than modeled subsystems. Vellis currently selects one SQLite-owned
-live projection: graph objects and relationships are addressable through identity and semantic
-indexes, definitions and the proposal are separate durable facets, and no complete graph is retained
-between calls. The realization is characterized along each of those dimensions — what its work
+live and historical state: immutable object and definition values, membership intervals, the sole
+prospective overlay, complete assessments, canonical events, and activity history are normalized and
+addressable through identity and semantic indexes. No production operation constructs or retains a
+complete graph, definition set, canonical state, or canonical change. Ordinary work uses affected
+neighborhoods, complete checks use bounded set-based scans, and lifecycle work streams. The
+realization is characterized along each of those dimensions — what its work
 responds to and what it ignores — and that
 characterization deliberately sets no numerical latency, startup, or storage budget, because there
-is not yet a chosen runtime, a hardware profile, or a representative owner's data to set one
+is not yet a representative benchmark environment, hardware profile, or owner's data to set one
 against.
 
 The central experiment is whether a sufficiently specified model in a standard language can replace

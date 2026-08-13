@@ -72,7 +72,12 @@ verifies or reconstructs that frame, selects the simplest evidence-backed realiz
 end-to-end slice, and returns conformance evidence or precisely classified feedback. The handoff is a
 navigation aid, not another contract; the branch's SysML remains authoritative.
 
-A useful handoff answers the question, states the changed or reviewed meaning, gives decisive evidence and checks, and names only the remaining decision or follow-up work. An agent unfamiliar with an RTG begins with the modeled definition summary for current or selected historical state, then inspects only the active anchor neighborhoods needed for its query or proposed change. It retrieves the sole proposed definition set separately when continuing current definition work.
+A useful handoff answers the question, states the changed or reviewed meaning, gives decisive evidence
+and checks, and names only the remaining decision or follow-up work. An agent unfamiliar with an RTG
+begins with the modeled definition summary for current, prospective, or selected historical state,
+then inspects only the evaluated anchor neighborhoods needed for its query or proposed change. When
+continuing definition work it retrieves the sole proposal's identities, overlay counts, and assessment
+status, then uses prospective summary and inspection for its focused definition meaning.
 
 ## Development setup
 
@@ -123,22 +128,26 @@ boundary and manual fallback.
 Use these words precisely:
 
 - **Implemented and verified.** Canonical graph, definition, and constraint meaning; canonical
-  semantic equality over JSON, graphs, definitions, and canonical states; whole-string RE2 property
-  patterns evaluated by RE2 itself; assessment of a graph against a definition set; fresh
-  initialization from a supplied initial definition set at revision 0 with one initial-state
+  semantic equality over JSON, graphs, definitions, and canonical state meaning; whole-string RE2
+  property patterns evaluated by RE2 itself; complete SQLite-backed assessment of graph conformance
+  with bounded finding retrieval; fresh initialization from a streamed initial definition set at
+  revision 0 with one initial-state
   record, no transitions, and an empty activity ledger; a
-  durable local SQLite store that recovers identical memory across an ordinary restart, commits the
-  canonical record and its addressable graph, definition, and proposal projections as one effect,
-  and refuses a database holding anything else; live state is owned by SQLite rather than a resident
-  complete-graph cache, and complete current state is assembled only for operations that request or
-  require it;
-  explicit graph changes committed atomically as contiguous canonical transitions, with the
-  complete resulting graph validated first and replay reconstructing the same state from the
-  ledger alone; the typed graph-conformance report; and current definition discovery — the complete
+  schema-version-4 local SQLite store that owns normalized current, prospective, historical, and
+  ledger state, recovers identical memory across an ordinary restart, commits the canonical record
+  and its addressable graph, definition, and proposal projections as one effect, and refuses a
+  foreign or unsupported-version database. Complete assessments are published and retained as
+  observational state, separate from canonical replay authority. No production operation constructs a complete
+  resident graph, definition-set document, canonical-state document, or canonical-change document.
+  Explicit graph changes are committed atomically as contiguous canonical transitions after
+  validating their complete affected invariant closure; unaffected valid state is not revalidated.
+  The typed graph-conformance report and current definition discovery provide the complete
   shallow anchor vocabulary and the complete focused neighborhood of each selected anchor, each
   carrying the revision it was evaluated at so a caller can tell that the ground moved;
-  governance of the one prospective definition set — stage, edit, review, activate, discard —
-  where a working proposal may carry findings and activation is what they gate; and the optional
+  governance of the one prospective definition set and graph overlay — stage bounded keyed
+  definition edits, stage complete-object upserts or tombstones, unstage, assess, activate, and
+  discard — where a working proposal may temporarily carry findings and an exact non-stale clean
+  assessment gates atomic activation; and the optional
   Everyday Life starter vocabulary as an ordinary, owner-governable definition set; and bounded
   semantic query over current state — named anchor and associated-data groups, required directed
   links, structured property comparisons, and a shaped result refused whole rather than truncated
@@ -185,8 +194,9 @@ Use these words precisely:
   processed. Vellis supplies no scheduler, job registry, worker, or inference of its own — nothing
   happens that the agent did not ask for, and where to continue from is the agent's own state
   rather than anything Vellis stores. Before proposing either a definition delta or a graph
-  change, the agent rediscovers current definitions — a delta replaces the whole vocabulary, and a
-  change is written in concepts that may have been retired since — and rechecks current facts,
+  change, the agent rediscovers current definitions — bounded keyed edits produce one complete
+  proposed vocabulary meaning, and a graph change is written in concepts that may have been retired
+  since — and rechecks current facts,
   because the owner may have fixed the thing already; and every finding is traceable to the
   bounded observations and exact evaluated revisions it came from. Finally, that these compose
   into one cohesive system an individual can run is itself verified end to end: each of the three
@@ -199,22 +209,19 @@ Use these words precisely:
   say that established memory is unchanged, and give an available next step, with graph,
   definitions, delta, revision, and canonical ledger identical either side of the failure.
 - **Characterized, not budgeted.** What this realization's work responds to is measured in semantic
-  record accesses and current-object materialization, along each dimension separately: current
-  summary and inspection decode definitions but no graph; current query decodes indexed candidates
-  rather than unrelated objects or a complete graph; conformance assessment, delta assessment, and
-  change validation may assemble the graph when their global meaning requires it; none reads a
-  record of either ledger however long the history behind them; a commit appends one record at the
-  end without reading or rewriting the
-  prefix, and observing is observational; a bounded interval of either ledger costs the interval
-  and seeks to it rather than walking what precedes it; a historical vocabulary costs its
-  definition-changing records rather than the graph transitions between them, while a historical
-  graph is charged the replay the model exempts; replay costs its required tail while an ordinary
-  restart does not; restoring a past state costs the tail it has to replay and not the records
-  after it; and storage grows with both ledgers, including the observational one that every read
-  adds to. Forgetting activity removes those records and bounds what comes next, but the file keeps
-  the size it reached rather than returning pages to the disk. No numerical latency, startup, or
-  storage budget is claimed or met: choosing one needs a runtime, a hardware profile, and a
-  representative owner's data that do not exist yet.
+  row visits, decoded values, affected neighborhoods, streamed buffer sizes, and query candidates.
+  Summary and focused inspection decode no graph and no unrelated definitions. A one-object mutation
+  scales with its change, incident relationships, affected associations, and applicable rules; a
+  high-degree mutation scales with that degree, not unrelated population or obsolete object
+  versions. Current, prospective, and historical queries constrain candidates in SQL and stop after
+  `maximumRows + 1`; only projected rows are hydrated. An ordinary mutation never invokes a full
+  conformance check. A broad definition cutover or explicit full check may scan all applicable rows,
+  but does so set-wise with bounded working memory and stores every finding once for paged retrieval.
+  Snapshot, tail replay, import, verification, v1 translation, and restore stream or use temporary
+  SQLite/set operations without constructing whole-state values. Storage grows with normalized
+  history and the observational ledger. Forgetting activity removes those records but does not
+  promise file-page reclamation. No numerical latency, startup, throughput, or storage budget is
+  claimed without representative hardware and owner data.
 - **Runnable.** `uv run python -m vellis.setup` prepares one local system. It previews the
   destination and, unless it can already see that the destination will not do, offers both starting
   vocabularies with the Everyday Life starter preselected. It asks for confirmation, and accepts
@@ -256,6 +263,9 @@ Use these words precisely:
   fallback commands for unavailable clients. FastMCP and FastMCP Slim are pinned at 4.0.0b1 and
   installed.
 
-Deployment and migration realization remain open. The initial contract assumes one trusted
+Deployment realization remains open. This unreleased build intentionally starts a fresh normalized
+schema-version-4 store and refuses unsupported prototype schema versions rather than migrating them;
+it never inspects or changes this repository's ignored `.data/` content during development. The
+initial contract assumes one trusted
 owner-configured client; its tools do not implement per-call authorization or decide owner approval.
 See [CONTRIBUTING.md](CONTRIBUTING.md) for the contribution workflow.

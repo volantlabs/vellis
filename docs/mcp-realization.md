@@ -6,14 +6,17 @@ exposes it over local standard input and output.
 ## Agent path
 
 An unfamiliar agent first calls `rtg_definition_summary`, omitting its optional revision-or-time
-selector for current state or supplying one for historical state, to learn every active anchor type
-and its owner-readable description at the evaluated revision. It then calls
+selection inside its typed request for current state, selecting prospective state explicitly, or
+supplying exactly one selector for historical state, to learn every evaluated anchor type and its
+owner-readable description. It then calls
 `rtg_definition_inspect` with the same selection for only the anchor types relevant to its question.
 Each result identifies its evaluated revision; if the revisions differ, the agent repeats discovery
 instead of relying on stale vocabulary. After a time-based summary, it reuses the returned exact
 revision for inspection and graph query. If
 the current summary reports an in-flight proposal, an agent continuing definition work uses
-`rtg_definition_delta` to retrieve that sole proposed set and its current assessment whole.
+`rtg_definition_delta` to retrieve that proposal's definition identity, overlay identity and counts,
+and latest assessment reference/status. Focused prospective definition meaning is retrieved through
+the same bounded summary and inspection operations; the tool never returns a whole proposal document.
 
 The remaining selected tools query and change the graph, stage or resolve the sole definition delta,
 check conformance, and inspect bounded history. Historical summary and inspection allow cold discovery
@@ -26,10 +29,14 @@ evaluated revision, and bounded semantic scope without copying result rows or ca
 Activity retention, snapshot, replay, initialization, restoration, and v1 first-use onboarding are
 not in the initial MCP surface.
 
-`rtg_check` is a parameterless current-graph conformance check. Delta retrieval and staging already
-return the sole proposal's current assessment, so the realization must not create a duplicate delta-
-check path. A completed check returns a validation report; nonconformance is a successful assessment,
-not a tool rejection. An unexpected check failure produces no successful report.
+`rtg_check` accepts a typed validation request. It can create a complete current or proposal
+assessment or retrieve one bounded, one-based finding interval from a stored assessment without
+rerunning validation. A completed check returns assessment identity, evaluated revision, and, for a
+prospective assessment, proposed-definition and graph-overlay identities, plus the complete finding
+count, requested interval, and whether more findings remain. Nonconformance is
+a successful assessment, not a tool rejection. An unexpected check failure produces no successful
+report, and activation accepts only the exact clean, non-stale proposal assessment named by its
+request.
 
 Completed invocations return their modeled typed result. Accepted results carry their complete
 purpose-specific payload. Semantic rejection and a safely reported failure carry no success payload;
@@ -39,17 +46,18 @@ explicitly with `rtg_definition_delta`.
 
 ## FastMCP discipline
 
-The current implementation campaign selects direct pins for `fastmcp==4.0.0b1` and its pre-release
-companion `fastmcp-slim==4.0.0b1`. Their pre-release status is an explicit owner decision for this
-proving campaign; S009 must not enable prereleases globally, select unrelated prereleases, or upgrade
-opportunistically, and it must update the lock and prove `uv sync --locked`. It will use typed input
-and return models and keep text and structured content semantically equivalent. FastMCP, Python
+The completed implementation campaign selected direct pins for `fastmcp==4.0.0b1` and its
+pre-release companion `fastmcp-slim==4.0.0b1`. Their pre-release status was an explicit owner
+decision for the proving campaign; S009 changed no global prerelease policy, selected no unrelated
+prereleases, updated the lock, and proved `uv sync --locked`. The current boundary uses typed input
+and return models and keeps text and structured content semantically equivalent. FastMCP, Python
 models, decorators, the selected local STDIO transport, and serialization remain realization rather
 than RTG domain meaning.
 
 FastMCP may represent a parameterless tool with an empty object schema, but that representation does
-not create an empty RTG request concept. The optional selector for `rtg_definition_summary` belongs
-directly to that tool input and likewise does not create an empty wrapper. Public input schemas must
+not create an empty RTG request concept. `rtg_definition_summary`, inspection, query, check, change,
+definition staging, activation, and history each expose their modeled typed request; only the
+semantically parameterless delta read and discard tools have empty input. Public input schemas must
 advertise only caller-valid choices; internal validation scopes do not become `rtg_check` targets by
 reuse.
 
@@ -62,17 +70,25 @@ or atomicity.
 The initial boundary assumes one trusted, owner-configured MCP client. Tool invocation neither
 establishes nor evaluates per-call authorization. An owner-declined context proposal is never
 submitted to `rtg_change`; exposing graph mutation does not by itself implement Vellis's higher-level
-owner approval of personal context. The first implementation must preserve that distinction without
-inventing roles, tenants, or an authentication subsystem inside RTG.
+owner approval of personal context. The implementation preserves that distinction without inventing
+roles, tenants, or an authentication subsystem inside RTG.
 
-Current operations must use the current canonical-state projection rather than replaying history.
+Current operations must use normalized current SQLite membership rather than replaying history.
 Bounded history and revision/time selection must avoid scanning excluded ledger prefixes, and
 historical definition discovery must avoid replaying unrelated graph-only transitions. Materialized
 projections, revision/time indexes, definition checkpoints, caches, and snapshot cadence are allowed
 realization choices, not selected architecture. Conformance should use semantic record-access counts
 or equivalent traces; wall-clock targets wait for representative runtime, hardware, and owner data.
 
-The implementation PR must verify two realization-only properties that do not belong in the RTG
+The selected Vellis realization stores normalized object values, definition entries, presence
+intervals, proposal entries, assessments, canonical events, and activity records in shared SQLite
+tables. Queries compile to parameterized joins and `EXISTS` expressions with `DISTINCT` and
+`maximumRows + 1`. Ordinary mutation validation derives the affected invariant closure; explicit
+full checks and broad cutovers use set-based scans and SQLite-backed findings. Snapshot, tail, restore,
+and compatibility import are streaming or SQL set operations. These are Vellis realization choices,
+not portable RTG architecture.
+
+Implementation evidence verifies two realization-only properties that do not belong in the RTG
 domain model: text and structured content communicate the same typed outcome, and removing or
 changing advisory annotations cannot change authorization, validation, atomicity, or any promised
 failure non-effect.

@@ -88,10 +88,12 @@ sit between that checkpoint and closure.
    For modeled history scaling, instrument semantic record accesses or equivalent traces before using
    wall-clock measurements. Current-state decomposition, revision/time and relationship indexes,
    definition checkpoints, caches that do not retain prohibited complete state, and snapshot cadence
-   are possible realization choices, not model-selected architecture. Evidence still has to show that
-   definition-only work materializes no graph and query candidates are narrowed by semantic identity
-   joins before value filtering. Do not claim numerical performance satisfaction before representative
-   budgets exist.
+   are possible realization choices, not model-selected architecture. For the selected Vellis SQLite
+   realization, evidence must show that definition-only work materializes no graph, ordinary mutation
+   work stays within the complete affected invariant closure, query candidates are narrowed by
+   semantic identity joins before value filtering and stop at the modeled bound, explicit broad checks
+   remain bounded-memory, and lifecycle work streams. Do not claim numerical performance satisfaction
+   before representative budgets exist.
    Treat Vellis v1 compatibility as confirmed first-use initialization from one complete JSON snapshot,
    never as an existing-system merge or adoption of v1 ledger history.
 6. After focused evidence passes, use fresh read-only agents for separate authority/conformance and
@@ -139,19 +141,19 @@ Validate the compact handoff with `just implementation-campaign-worker-result-ch
 optional JSONL timing, review-count, check-count, and harness-usage telemetry under the ignored
 `.cache/implementation-campaign/` directory. Wait ten minutes only after transient launcher or quota
 failure when no child is live, and stop after three identical failures against one state token.
-The campaign's plan directly pins FastMCP and FastMCP Slim 4.0.0b1, selects local STDIO, and
-reserves clean macOS onboarding through a documented Python setup path for runnable closure. The
+The completed campaign's plan directly pins FastMCP and FastMCP Slim 4.0.0b1, selects local STDIO,
+and selected clean macOS onboarding through a documented Python setup path. The
 pins, the STDIO boundary, and the setup path's three starting inputs — a confirmed fresh vocabulary,
 a canonical snapshot document, and a confirmed v1 snapshot — are implemented, and a client launching
 the server as a subprocess is exercised end to end, including the exact command an owner would
-register. Configuring a client on this machine to launch it remains runnable closure, and changes
-that client's own configuration rather than this repository.
+register. Closure configured and verified both supported clients on this machine; that effect changed
+client-owned configuration rather than this repository.
 
 That selected client-configuration behavior was not built by its original owners. Closure caught the
 escaped implementation defect after all original slices had checkpointed, so the renewed approved
-plan preserves the choice and allocates it to corrective slice S018, with the live dry run and
-registration retained at closure. `just implementation-campaign-status` reports the open decisions
-and their owners.
+plan preserved the choice and allocated it to corrective slice S018, with the live dry run and
+registration completed at closure. That campaign is now the completed-but-stale source baseline;
+`system-evolution.yaml` and `just system-evolution-status` report the current post-build work.
 
 Vellis checkpoint identifiers are navigation labels in the portable campaign record:
 
@@ -174,15 +176,12 @@ blocker changes approval to `changes-required`, clears its approval checkpoint, 
 in `blocked` or `stale`; execution does not continue through that state.
 Every later slice and closure checkpoint preserves that approved plan-bearing projection exactly.
 
-For the current corrective candidate, the approval transition readies only S018. S001 through S017
-retain their existing checkpoints. S018 owns the missing selected setup behavior; closure owns the
-authorized live client transition. The approval does not itself authorize external client mutation:
-that occurs only at the approved closure step after its dry run exactly matches the expected state.
-The candidate preserves the prior `integration_status: conforming` evidence across the seventeen
-completed slices because the escaped obligation changes A017 and the runnable client boundary, which
-both remain `partial`; S018's `integration` kind sequences its cross-boundary work but does not turn
-the unimplemented runnable effect into a claim that prior integration evidence failed. Fresh closure
-must nevertheless recheck integration after S018 before campaign completion.
+For the completed corrective plan, the approval transition readied only S018 while S001 through S017
+retained their existing checkpoints. S018 owned the missing selected setup behavior; closure owned the
+authorized live client transition. Approval did not itself authorize external client mutation: that
+occurred only at the approved closure step after its dry run exactly matched expected state. The plan
+preserved prior `integration_status: conforming` evidence across the seventeen completed slices while
+keeping A017 and the runnable client boundary partial until S018 and fresh closure rechecked them.
 
 Replanning after slices have completed ends at a renewed approval, which follows the same rule with
 one difference: completed slices keep the checkpoints they earned, including the superseded approved
