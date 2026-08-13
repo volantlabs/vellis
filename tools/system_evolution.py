@@ -207,9 +207,20 @@ def _repository_baseline_findings(record: dict[str, Any], *, root: Path) -> list
         identity = actual[dimension]
         if observed[dimension] != identity:
             findings.append(f"observed {dimension} baseline does not match the current repository")
+    observed_revision = observed["implementation"].removeprefix("git:")
+    head_revision = actual["implementation"].removeprefix("git:")
+    record_only_advance = False
+    if observed["implementation"].startswith("git:") and observed_revision != head_revision:
+        try:
+            changed = _git_text(
+                root, "diff", "--name-only", observed_revision, head_revision
+            ).splitlines()
+        except RuntimeError:
+            changed = []
+        record_only_advance = changed == ["system-evolution.yaml"]
     if record["evolution"]["lifecycle"] != "complete":
         for dimension in ("implementation", "checkpoint"):
-            if observed[dimension] != actual[dimension]:
+            if observed[dimension] != actual[dimension] and not record_only_advance:
                 findings.append(
                     f"observed {dimension} baseline does not match the current repository"
                 )
@@ -222,7 +233,6 @@ def _repository_baseline_findings(record: dict[str, Any], *, root: Path) -> list
         findings.append("complete target implementation is not a Vellis Git checkpoint")
         return findings
     target_revision = target["implementation"].removeprefix("git:")
-    head_revision = actual["implementation"].removeprefix("git:")
     if target_revision != head_revision:
         try:
             changed = _git_text(
