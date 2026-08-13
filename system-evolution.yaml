@@ -3,13 +3,13 @@ evolution:
   id: streamed-reconstruction-transition-validity
   objective: Reject any native snapshot tail whose individual canonical transitions do not reconstruct the exact valid state they claim while preserving bounded-memory replay and first-use v1 recovery behavior.
   observable_distinction: A self-consistent tail with an invalid intermediate active graph or mismatched prospective-definition identity is refused even when a later record restores a valid final state.
-  lifecycle: active
+  lifecycle: complete
   approval:
     status: not-required
     reason: Accepted replay and canonical-history authority already requires every transition to be semantically valid and replay-equivalent.
     checkpoint: null
   blocker: null
-  checkpoint: null
+  checkpoint: git:8ff7aef4e5ed953b16edde5fd1eab0ae87e11446
 baselines:
   status: current
   source:
@@ -20,16 +20,16 @@ baselines:
     checkpoint: git:fd49bcf2722013f67ccaf706d26ab6bb303383af
   target:
     model: sha256:23a0fa4c525a6e89ec0740c4d4f0af283cccae44abc23b73b99f7427d7c93c7e
-    implementation: git:fd49bcf2722013f67ccaf706d26ab6bb303383af
+    implementation: git:8ff7aef4e5ed953b16edde5fd1eab0ae87e11446
     language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
     execution_environment: sha256:3315a10b5fcc8d62aa435d2f4e12165a147f334b01fad06ce367d11b6eb8191c
-    checkpoint: git:fd49bcf2722013f67ccaf706d26ab6bb303383af
+    checkpoint: git:8ff7aef4e5ed953b16edde5fd1eab0ae87e11446
   observed:
     model: sha256:23a0fa4c525a6e89ec0740c4d4f0af283cccae44abc23b73b99f7427d7c93c7e
-    implementation: git:fd49bcf2722013f67ccaf706d26ab6bb303383af
+    implementation: git:8ff7aef4e5ed953b16edde5fd1eab0ae87e11446
     language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
     execution_environment: sha256:3315a10b5fcc8d62aa435d2f4e12165a147f334b01fad06ce367d11b6eb8191c
-    checkpoint: git:fd49bcf2722013f67ccaf706d26ab6bb303383af
+    checkpoint: git:8ff7aef4e5ed953b16edde5fd1eab0ae87e11446
 scope:
   authority_scope:
     - RTG::Canonical State
@@ -165,12 +165,12 @@ work_items:
       - V1 recovery translation and confirmation remain unchanged.
       - Replay retains bounded memory and local graph mutations avoid full-population validation.
       - User-owned .data content remains untouched.
-    lifecycle: active
+    lifecycle: complete
     implementation_status: conforming
     evidence_refs:
       - command:uv run pytest tests/vellis/test_streaming_lifecycle.py tests/vellis/test_population_local_work.py tests/vellis/test_v1_streaming.py -q
     blocker: null
-    checkpoint: null
+    checkpoint: git:8ff7aef4e5ed953b16edde5fd1eab0ae87e11446
   - id: W004
     order: 2
     label: Review and rebaseline streamed reconstruction validity
@@ -200,11 +200,13 @@ work_items:
     non_effects:
       - No streaming framework or modeled subsystem is introduced.
       - User-owned .data content remains untouched.
-    lifecycle: pending
-    implementation_status: not evaluated
-    evidence_refs: []
+    lifecycle: complete
+    implementation_status: conforming
+    evidence_refs:
+      - command:uv run pytest tests/vellis/test_streaming_lifecycle.py tests/vellis/test_population_local_work.py tests/vellis/test_v1_streaming.py -q
+      - command:just check
     blocker: null
-    checkpoint: null
+    checkpoint: git:8ff7aef4e5ed953b16edde5fd1eab0ae87e11446
 closure:
   finding_disposition: complete
   model_status: accepted
@@ -214,15 +216,17 @@ closure:
   compatibility: Correct native streams and v1 recovery inputs retain their existing meaning; malformed native tails are refused.
   reviews:
     - lens: authority and conformance
-      status: pending
-      reviewer: null
-      checkpoint: null
-      evidence_refs: []
+      status: clean
+      reviewer: agent:streaming-authority-review
+      checkpoint: git:8ff7aef4e5ed953b16edde5fd1eab0ae87e11446
+      evidence_refs:
+        - command:uv run pytest tests/vellis/test_streaming_lifecycle.py tests/vellis/test_population_local_work.py tests/vellis/test_v1_streaming.py -q
     - lens: engineering and evidence
-      status: pending
-      reviewer: null
-      checkpoint: null
-      evidence_refs: []
+      status: clean
+      reviewer: agent:streaming-engineering-review
+      checkpoint: git:8ff7aef4e5ed953b16edde5fd1eab0ae87e11446
+      evidence_refs:
+        - command:uv run pytest tests/vellis/test_streaming_lifecycle.py tests/vellis/test_population_local_work.py tests/vellis/test_v1_streaming.py -q
   evidence_refs:
     - command:just check
-  checkpoint: null
+  checkpoint: git:8ff7aef4e5ed953b16edde5fd1eab0ae87e11446
