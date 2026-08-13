@@ -2,17 +2,12 @@ schema_version: "1.1"
 campaign:
   id: vellis-model-implementation
   objective: Realize the complete accepted Vellis model with discriminating evidence and a runnable selected boundary.
-  lifecycle: blocked
+  lifecycle: awaiting-plan-approval
   plan_approval:
-    status: changes-required
+    status: pending
     checkpoint: null
-  blocker:
-    classification: external dependency
-    summary: The matching user-scoped Claude Code STDIO entry cannot complete its required bounded read-only Vellis invocation because Claude Code reports that its OAuth session expired and could not be refreshed; both real-client bounded invocations remain required as reproducible D006 evidence.
-    authority_ids: [A017]
-    evidence_refs:
-      - 'command:claude -p --allowedTools mcp__vellis__rtg_definition_summary -- "Call rtg_definition_summary once."'
-  checkpoint: approval:80e929f0da20f77ce97ab6ceb57c87eeb2b146cd
+  blocker: null
+  checkpoint: null
 model_baseline:
   status: current
   authority_files:
@@ -445,7 +440,7 @@ authority:
       - {model_ref: "VellisVerification::simpleOperation", source: "model/50-verification.sysml"}
     planned_coverage: full
     slice_ids: [S001, S009, S017, S018]
-    implementation_status: partial
+    implementation_status: conforming
     evidence_refs:
       - path:tests/vellis/test_setup_path.py#test_setup_establishes_one_local_system
       - path:tests/vellis/test_setup_path.py#test_a_second_attempt_fails_actionably_and_leaves_memory_unchanged
@@ -1307,6 +1302,7 @@ closure:
         - command:uv run python -m vellis.setup --client codex --client claude --dry-run
         - command:codex mcp get vellis
         - command:claude mcp get vellis
+        - 'command:claude -p --allowedTools mcp__vellis__rtg_definition_summary -- "Call rtg_definition_summary once."'
   evidence_refs:
     - path:tests/vellis/test_cohesive_use.py#test_a_blank_start_establishes_one_empty_system
     - path:tests/vellis/test_cohesive_use.py#test_the_recommended_everyday_life_start_is_offered_and_confirmed
@@ -1336,6 +1332,7 @@ closure:
     - command:uv run python -m vellis.setup --client codex --client claude --dry-run
     - command:codex mcp get vellis
     - command:claude mcp get vellis
+    - 'command:claude -p --allowedTools mcp__vellis__rtg_definition_summary -- "Call rtg_definition_summary once."'
     - command:uv run pytest tests/vellis
     - command:just check
   checkpoint: null
