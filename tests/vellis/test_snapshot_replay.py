@@ -120,9 +120,15 @@ def test_capturing_changes_no_canonical_state_revision_or_history(system: RTGSys
     assert system.store.canonical_record_count() == records
 
 
-def test_snapshot_state_and_lineage_share_one_cross_process_read_snapshot(
+def test_a_capture_racing_a_commit_is_refused_rather_than_bound_to_the_wrong_record(
     tmp_path: Path,
 ) -> None:
+    """Preserve the campaign evidence node while strengthening its concurrency effect.
+
+    The earlier realization detected the race and refused. One SQLite read transaction
+    now makes the older state and its lineage indivisible, which is stronger: the
+    capture may succeed, but can never bind state to a record from another revision.
+    """
     reader = _fresh(tmp_path)
     writer = RTGSystem.open(tmp_path / "vellis.sqlite3")
     committed = False

@@ -53,6 +53,17 @@
       "minLength": 1,
       "maxLength": 400
     },
+    "baseline_binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["dimension", "identity"],
+      "properties": {
+        "dimension": {
+          "enum": ["model", "implementation", "language", "execution_environment", "checkpoint"]
+        },
+        "identity": {"$ref": "#/$defs/nonempty_string"}
+      }
+    },
     "status": {
       "enum": [
         "not applicable",
@@ -218,12 +229,7 @@
             "resolved"
           ]
         },
-        "owner_work_item_id": {
-          "oneOf": [
-            {"type": "null"},
-            {"$ref": "#/$defs/id"}
-          ]
-        },
+        "owner_work_item_id": {"$ref": "#/$defs/id"},
         "implementation_status": {"$ref": "#/$defs/status"},
         "nearest_wrong_system": {"type": "string", "minLength": 1, "maxLength": 700},
         "compatibility_effect": {"type": "string", "minLength": 1, "maxLength": 700}
@@ -294,7 +300,7 @@
         "label": {"$ref": "#/$defs/short_string"},
         "kind": {"enum": ["modeling", "implementation", "integration", "closure"]},
         "dependencies": {"$ref": "#/$defs/id_list"},
-        "planned_baseline": {"$ref": "#/$defs/nonempty_string"},
+        "planned_baseline": {"$ref": "#/$defs/baseline_binding"},
         "finding_ids": {"$ref": "#/$defs/id_list"},
         "decision_ids": {"$ref": "#/$defs/id_list"},
         "authority": {
@@ -315,10 +321,12 @@
     "review": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["lens", "status", "evidence_refs"],
+      "required": ["lens", "status", "reviewer", "checkpoint", "evidence_refs"],
       "properties": {
         "lens": {"$ref": "#/$defs/short_string"},
         "status": {"enum": ["pending", "findings", "clean"]},
+        "reviewer": {"type": ["string", "null"], "minLength": 1, "maxLength": 240},
+        "checkpoint": {"$ref": "#/$defs/checkpoint"},
         "evidence_refs": {"$ref": "#/$defs/reference_list"}
       }
     },

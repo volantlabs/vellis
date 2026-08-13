@@ -42,7 +42,7 @@ findings:
     authority_refs:
       - Model::AffectedAuthority
     evidence_refs:
-      - path:test-or-analysis#case
+      - evidence-system-reference
     disposition: model-change
     owner_work_item_id: W001
     implementation_status: conflicting
@@ -55,7 +55,9 @@ work_items:
     label: Close the affected accepted model meaning
     kind: modeling
     dependencies: []
-    planned_baseline: source-model-baseline
+    planned_baseline:
+      dimension: model
+      identity: source-model-baseline
     finding_ids:
       - F001
     decision_ids: []
@@ -86,9 +88,13 @@ closure:
   reviews:
     - lens: authority and conformance
       status: pending
+      reviewer: null
+      checkpoint: null
       evidence_refs: []
     - lens: engineering and evidence
       status: pending
+      reviewer: null
+      checkpoint: null
       evidence_refs: []
   evidence_refs: []
   checkpoint: null

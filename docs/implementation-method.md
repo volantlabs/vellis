@@ -289,7 +289,10 @@ baseline is available with `just implementation-campaign-baseline`, and committe
 resolved with `just implementation-campaign-checkpoint-check`.
 Post-build evolution is inspectable with `just system-evolution-check` and
 `just system-evolution-status`; its record indexes findings, decisions, work, and rebaselining but
-does not become product authority or a second implementation campaign.
+does not become product authority or a second implementation campaign. Vellis derives observed
+model, language, lockfile, Git implementation, and checkpoint identities from the repository and
+binds completed independent reviews to their reviewer and reviewed checkpoint; those are project
+bindings, not assumptions embedded in the portable skill.
 `$rtg-schema-design` is an optional Vellis domain extension, not part of the portable core.
 
 Within that extension, graph, definitions, validation, query, revision, and history may become

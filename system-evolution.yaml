@@ -7,7 +7,7 @@ evolution:
   approval:
     status: accepted
     reason: The owner accepted the strengthened resource behavior and selected SQLite-owned live state with no unreleased-format compatibility obligation.
-    checkpoint: owner-acceptance:2026-08-12
+    checkpoint: git:284efc9
   blocker: null
   checkpoint: null
 baselines:
@@ -16,20 +16,20 @@ baselines:
     model: sha256:0dbc79b3e2036ddda8fdd35e8ad4efe4616cdc5c5b89bd08a66c92972c004437
     implementation: git:e82e0e6161040baa4a4a728d05cabbd418c57d83
     language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
-    execution_environment: python-and-sqlite-pins:uv.lock
+    execution_environment: sha256:c24a0bae1e63d1f4923d6c7925925ea4e02743568a84b403677b5f6a718879fa
     checkpoint: git:e82e0e6161040baa4a4a728d05cabbd418c57d83
   target:
     model: sha256:ad02d24b6c6eeb38f904d551e0ae7dfd48101ff41e44db79effb3014e137e4c6
-    implementation: git:da790ff
+    implementation: git:f6927a85c750d7451d6c028595807e0cf98ebe8e
     language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
-    execution_environment: python-and-sqlite-pins:uv.lock
-    checkpoint: git:da790ff
+    execution_environment: sha256:c24a0bae1e63d1f4923d6c7925925ea4e02743568a84b403677b5f6a718879fa
+    checkpoint: git:f6927a85c750d7451d6c028595807e0cf98ebe8e
   observed:
     model: sha256:ad02d24b6c6eeb38f904d551e0ae7dfd48101ff41e44db79effb3014e137e4c6
-    implementation: git:da790ff
+    implementation: git:f6927a85c750d7451d6c028595807e0cf98ebe8e
     language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
-    execution_environment: python-and-sqlite-pins:uv.lock
-    checkpoint: git:da790ff
+    execution_environment: sha256:c24a0bae1e63d1f4923d6c7925925ea4e02743568a84b403677b5f6a718879fa
+    checkpoint: git:f6927a85c750d7451d6c028595807e0cf98ebe8e
 scope:
   authority_scope:
     - model/10-rtg-domain.sysml
@@ -59,8 +59,8 @@ findings:
       - VellisRequirements::historyIndependentCurrentWork
       - RTGSystem::'RTG System'::currentState
     evidence_refs:
-      - path:vellis/store.py
-      - path:tests/vellis/test_current_work.py
+      - command:uv run pytest tests/vellis/test_store_integrity.py
+      - command:uv run pytest tests/vellis/test_current_work.py
     disposition: resolved
     owner_work_item_id: W003
     implementation_status: conforming
@@ -73,8 +73,8 @@ findings:
     authority_refs:
       - VellisRequirements::boundedHistoricalSelectionWork
     evidence_refs:
-      - path:vellis/store.py
-      - path:tests/vellis/test_historical_selection.py
+      - command:uv run pytest tests/vellis/test_history_growth.py
+      - command:uv run pytest tests/vellis/test_historical_selection.py
     disposition: resolved
     owner_work_item_id: W002
     implementation_status: conforming
@@ -88,9 +88,9 @@ findings:
       - VellisRequirements::boundedHistoryRead
       - VellisRequirements::boundedHistoricalSelectionWork
     evidence_refs:
-      - path:vellis/store.py
-      - path:vellis/system.py
-      - path:tests/vellis/test_activity_history.py
+      - command:uv run pytest tests/vellis/test_history_growth.py
+      - command:uv run pytest tests/vellis/test_snapshot_replay.py
+      - command:uv run pytest tests/vellis/test_activity_history.py
     disposition: resolved
     owner_work_item_id: W002
     implementation_status: conforming
@@ -104,8 +104,7 @@ findings:
       - VellisRequirements::semanticQueryMeaning
       - VellisRequirements::querySafety
     evidence_refs:
-      - path:vellis/query.py
-      - path:tests/vellis/test_graph_queries.py
+      - command:uv run pytest tests/vellis/test_graph_queries.py
     disposition: resolved
     owner_work_item_id: W001
     implementation_status: conforming
@@ -120,9 +119,9 @@ findings:
       - VellisVerification::'Historical Selection Avoids Irrelevant Records'
       - VellisVerification::'History Growth Performance Characterization'
     evidence_refs:
-      - path:tests/vellis/characterization.py
-      - path:tests/vellis/test_current_work.py
-      - path:tests/vellis/test_historical_selection.py
+      - command:uv run pytest tests/vellis/test_history_growth.py
+      - command:uv run pytest tests/vellis/test_current_work.py
+      - command:uv run pytest tests/vellis/test_historical_selection.py
     disposition: resolved
     owner_work_item_id: W001
     implementation_status: conforming
@@ -136,7 +135,7 @@ findings:
       - VellisRequirements::historyIndependentCurrentWork
       - model/README.md
     evidence_refs:
-      - path:implementation-campaign.yaml
+      - command:just implementation-campaign-check
     disposition: resolved
     owner_work_item_id: W004
     implementation_status: conforming
@@ -149,8 +148,8 @@ findings:
     authority_refs:
       - .agents/skills/sysml-evolution/references/evolution-record.md#baselines-and-lifecycle
     evidence_refs:
-      - path:tools/system_evolution.py
-      - path:tests/test_system_evolution.py
+      - command:just system-evolution-check
+      - command:uv run pytest tests/test_system_evolution.py
     disposition: resolved
     owner_work_item_id: W004
     implementation_status: conforming
@@ -164,11 +163,11 @@ findings:
       - VellisRequirements::atomicCanonicalRevision
       - VellisRequirements::canonicalSnapshotCompleteness
     evidence_refs:
-      - path:tests/vellis/test_current_work.py
-      - path:tests/vellis/test_snapshot_replay.py
-    disposition: implementation-work
+      - command:uv run pytest tests/vellis/test_current_work.py
+      - command:uv run pytest tests/vellis/test_snapshot_replay.py
+    disposition: resolved
     owner_work_item_id: W005
-    implementation_status: partial
+    implementation_status: conforming
     nearest_wrong_system: Per-process locking prevents local overlap but separate committed reads assemble revision metadata and graph content from different SQLite snapshots.
     compatibility_effect: One read transaction changes no public result shape or unreleased storage compatibility promise.
   - id: F009
@@ -179,10 +178,10 @@ findings:
       - VellisRequirements::historyIndependentCurrentWork
       - VellisRequirements::semanticQueryMeaning
     evidence_refs:
-      - path:tests/vellis/test_graph_queries.py
-    disposition: implementation-work
+      - command:uv run pytest tests/vellis/test_graph_queries.py
+    disposition: resolved
     owner_work_item_id: W005
-    implementation_status: partial
+    implementation_status: conforming
     nearest_wrong_system: Anchor endpoints use link-pair semijoins before decoding, but associated-data endpoints wait until after property comparison to test the same link.
     compatibility_effect: Joint query results remain unchanged while irrelevant associated data is not decoded or compared.
   - id: F010
@@ -193,10 +192,10 @@ findings:
       - RTGSystem::'RTG System'::queryCurrentGraph
       - VellisVerification::invalidQuery
     evidence_refs:
-      - path:tests/vellis/test_invalid_queries.py
-    disposition: implementation-work
+      - command:uv run pytest tests/vellis/test_invalid_queries.py
+    disposition: resolved
     owner_work_item_id: W005
-    implementation_status: partial
+    implementation_status: conforming
     nearest_wrong_system: A project UUID in a person selector passes known-anchor validation and later disappears in type candidate selection.
     compatibility_effect: Invalid identity restrictions gain findings; compatible restrictions and accepted-empty joint results do not change.
   - id: F011
@@ -206,10 +205,10 @@ findings:
     authority_refs:
       - VellisRequirements::atomicCanonicalRevision
     evidence_refs:
-      - path:tests/vellis/test_store_integrity.py
-    disposition: implementation-work
+      - command:uv run pytest tests/vellis/test_store_integrity.py
+    disposition: resolved
     owner_work_item_id: W005
-    implementation_status: partial
+    implementation_status: conforming
     nearest_wrong_system: The transaction seal is tested twice while the independent indexed-selector consistency checks have no discriminating case.
     compatibility_effect: Test-only resealing separates the two integrity failure modes without changing product behavior.
   - id: F012
@@ -219,7 +218,7 @@ findings:
     authority_refs:
       - .agents/skills/sysml-evolution/references/evolution-record.md#record-consistency
     evidence_refs:
-      - path:tests/test_system_evolution.py
+      - command:uv run pytest tests/test_system_evolution.py
     disposition: implementation-work
     owner_work_item_id: W006
     implementation_status: partial
@@ -232,7 +231,7 @@ findings:
     authority_refs:
       - .agents/skills/sysml-evolution/references/evolution-record.md#baselines-and-lifecycle
     evidence_refs:
-      - path:tests/test_system_evolution.py
+      - command:uv run pytest tests/test_system_evolution.py
     disposition: implementation-work
     owner_work_item_id: W006
     implementation_status: partial
@@ -245,7 +244,7 @@ findings:
     authority_refs:
       - .agents/skills/sysml-evolution/references/evolution-execution.md#review-and-remediation
     evidence_refs:
-      - path:tests/test_system_evolution.py
+      - command:uv run pytest tests/test_system_evolution.py
     disposition: implementation-work
     owner_work_item_id: W006
     implementation_status: partial
@@ -258,7 +257,7 @@ findings:
     authority_refs:
       - .agents/skills/sysml-evolution/references/evolution-execution.md#approval-gates
     evidence_refs:
-      - path:tests/test_system_evolution.py
+      - command:uv run pytest tests/test_system_evolution.py
     disposition: implementation-work
     owner_work_item_id: W006
     implementation_status: partial
@@ -272,7 +271,7 @@ findings:
       - .agents/skills/sysml-evolution/references/evolution-record.md#baselines-and-lifecycle
       - .agents/skills/sysml-evolution/references/evolution-record.md#record-consistency
     evidence_refs:
-      - path:tests/test_system_evolution.py
+      - command:uv run pytest tests/test_system_evolution.py
     disposition: implementation-work
     owner_work_item_id: W006
     implementation_status: partial
@@ -285,7 +284,7 @@ findings:
     authority_refs:
       - .agents/skills/sysml-evolution/SKILL.md
     evidence_refs:
-      - path:.agents/skills/sysml-evolution/assets/system-evolution.template.yaml
+      - command:just skills-check
     disposition: implementation-work
     owner_work_item_id: W006
     implementation_status: partial
@@ -309,10 +308,10 @@ decisions:
       - Current query candidates are joined through identity, type, association, and directed-link indexes before property filtering.
       - Public complete-state inspection cannot mutate durable canonical state and no complete state is retained between calls.
       - A canonical transition and every affected projection row commit atomically.
-    implementation_status: partial
+    implementation_status: conforming
     evidence_refs:
-      - path:tests/vellis/test_current_work.py
-      - path:tests/vellis/test_graph_queries.py
+      - command:uv run pytest tests/vellis/test_current_work.py
+      - command:uv run pytest tests/vellis/test_graph_queries.py
   - id: D002
     summary: Evaluate independent selector components separately and treat unprojected components as existence constraints.
     authority_refs:
@@ -329,14 +328,16 @@ decisions:
       - Unsatisfied unprojected components still eliminate every result row.
     implementation_status: conforming
     evidence_refs:
-      - path:tests/vellis/test_graph_queries.py
+      - command:uv run pytest tests/vellis/test_graph_queries.py
 work_items:
   - id: W001
     order: 1
     label: Close resource-behavior authority and evidence gaps
     kind: modeling
     dependencies: []
-    planned_baseline: sha256:0dbc79b3e2036ddda8fdd35e8ad4efe4616cdc5c5b89bd08a66c92972c004437
+    planned_baseline:
+      dimension: model
+      identity: sha256:0dbc79b3e2036ddda8fdd35e8ad4efe4616cdc5c5b89bd08a66c92972c004437
     finding_ids:
       - F004
       - F005
@@ -351,7 +352,7 @@ work_items:
     approval:
       status: accepted
       reason: The owner accepted the strengthened generic resource-behavior authority.
-      checkpoint: owner-acceptance:2026-08-12
+      checkpoint: git:284efc9
     nearest_wrong_system: Query and current-state semantics remain correct while unbounded redundant work is still permitted and unobserved.
     compatibility_effect: The proposal strengthens resource guarantees without selecting storage or query technology.
     non_effects:
@@ -361,7 +362,6 @@ work_items:
     implementation_status: conforming
     evidence_refs:
       - command:just model-check
-      - path:model/50-verification.sysml
     blocker: null
     checkpoint: git:218bc71
   - id: W002
@@ -369,7 +369,9 @@ work_items:
     label: Make historical selection physically honor existing bounds
     kind: implementation
     dependencies: []
-    planned_baseline: git:e82e0e6161040baa4a4a728d05cabbd418c57d83
+    planned_baseline:
+      dimension: implementation
+      identity: git:e82e0e6161040baa4a4a728d05cabbd418c57d83
     finding_ids:
       - F002
       - F003
@@ -392,8 +394,8 @@ work_items:
     lifecycle: complete
     implementation_status: conforming
     evidence_refs:
-      - path:tests/vellis/test_historical_selection.py
-      - path:tests/vellis/test_activity_history.py
+      - command:uv run pytest tests/vellis/test_historical_selection.py
+      - command:uv run pytest tests/vellis/test_activity_history.py
     blocker: null
     checkpoint: git:284efc9
   - id: W003
@@ -402,7 +404,9 @@ work_items:
     kind: implementation
     dependencies:
       - W001
-    planned_baseline: sha256:ad02d24b6c6eeb38f904d551e0ae7dfd48101ff41e44db79effb3014e137e4c6
+    planned_baseline:
+      dimension: model
+      identity: sha256:ad02d24b6c6eeb38f904d551e0ae7dfd48101ff41e44db79effb3014e137e4c6
     finding_ids:
       - F001
     decision_ids:
@@ -419,7 +423,7 @@ work_items:
     approval:
       status: accepted
       reason: The owner selected SQLite-owned live state and explicitly declined compatibility work for the unreleased experimental format.
-      checkpoint: owner-acceptance:2026-08-12
+      checkpoint: git:284efc9
     nearest_wrong_system: Correct results are produced from SQLite but every query first materializes a broad or complete graph instead of joining indexed identities.
     compatibility_effect: Durable ledger authority, public query results, and restart recovery remain; the unreleased SQLite layout is replaced without migration.
     non_effects:
@@ -429,9 +433,9 @@ work_items:
     lifecycle: complete
     implementation_status: conforming
     evidence_refs:
-      - path:tests/vellis/test_current_work.py
-      - path:tests/vellis/test_graph_queries.py
-      - path:tests/vellis/test_store_integrity.py
+      - command:uv run pytest tests/vellis/test_current_work.py
+      - command:uv run pytest tests/vellis/test_graph_queries.py
+      - command:uv run pytest tests/vellis/test_store_integrity.py
       - command:uv run pytest tests/vellis/test_current_work.py tests/vellis/test_graph_queries.py tests/vellis/test_store_integrity.py
     blocker: null
     checkpoint: git:284efc9
@@ -445,7 +449,9 @@ work_items:
       - W003
       - W005
       - W006
-    planned_baseline: git:da790ff
+    planned_baseline:
+      dimension: implementation
+      identity: git:f6927a85c750d7451d6c028595807e0cf98ebe8e
     finding_ids:
       - F006
       - F007
@@ -475,7 +481,9 @@ work_items:
     kind: implementation
     dependencies:
       - W003
-    planned_baseline: git:da790ff
+    planned_baseline:
+      dimension: implementation
+      identity: git:da790ff
     finding_ids:
       - F008
       - F009
@@ -502,18 +510,21 @@ work_items:
       - The accepted SQLite-owned live-state decision does not change.
       - The completed source implementation campaign is not reopened or rewritten.
       - User-owned .data content remains untouched.
-    lifecycle: active
-    implementation_status: partial
-    evidence_refs: []
+    lifecycle: complete
+    implementation_status: conforming
+    evidence_refs:
+      - command:uv run pytest tests/vellis/test_current_work.py tests/vellis/test_graph_queries.py tests/vellis/test_invalid_queries.py tests/vellis/test_snapshot_replay.py tests/vellis/test_store_integrity.py
     blocker: null
-    checkpoint: null
+    checkpoint: git:f6927a85c750d7451d6c028595807e0cf98ebe8e
   - id: W006
     order: 5
     label: Harden the portable evolution contract and Vellis bindings
     kind: implementation
     dependencies:
       - W005
-    planned_baseline: git:da790ff
+    planned_baseline:
+      dimension: implementation
+      identity: git:f6927a85c750d7451d6c028595807e0cf98ebe8e
     finding_ids:
       - F012
       - F013
@@ -538,8 +549,8 @@ work_items:
     non_effects:
       - The portable core does not select Git, repositories, SQLite, Python, or Vellis vocabulary.
       - The completed source implementation campaign is not rewritten.
-    lifecycle: pending
-    implementation_status: not evaluated
+    lifecycle: active
+    implementation_status: partial
     evidence_refs: []
     blocker: null
     checkpoint: null
@@ -553,12 +564,28 @@ closure:
   reviews:
     - lens: authority and conformance
       status: findings
-      evidence_refs: []
+      reviewer: fresh-agent:final_authority_2
+      checkpoint: git:da790ff
+      evidence_refs:
+        - command:just model-check
+        - command:uv run pytest tests/vellis/test_current_work.py tests/vellis/test_graph_queries.py tests/vellis/test_snapshot_replay.py
     - lens: engineering and evidence
       status: findings
-      evidence_refs: []
+      reviewer: fresh-agent:final_engineering_2
+      checkpoint: git:da790ff
+      evidence_refs:
+        - command:just check
+    - lens: resource behavior and durability
+      status: findings
+      reviewer: fresh-agent:final_engineering_2
+      checkpoint: git:da790ff
+      evidence_refs:
+        - command:uv run pytest tests/vellis/test_current_work.py tests/vellis/test_graph_queries.py tests/vellis/test_store_integrity.py
     - lens: portable evolution method
       status: findings
-      evidence_refs: []
+      reviewer: fresh-agent:final_portable_2
+      checkpoint: git:da790ff
+      evidence_refs:
+        - command:uv run pytest tests/test_system_evolution.py
   evidence_refs: []
   checkpoint: null

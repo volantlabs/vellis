@@ -11,10 +11,20 @@ import yaml
 from jsonschema import Draft202012Validator
 
 try:
-    from .implementation_campaign import UniqueKeyLoader
+    from .implementation_campaign import (
+        UniqueKeyLoader,
+        _evidence_reference_findings,
+        _sha256,
+        authority_digest,
+    )
     from .model_layout import ROOT, SYSTEM_EVOLUTION_PATH, SYSTEM_EVOLUTION_SCHEMA_PATH
 except ImportError:  # pragma: no cover - direct script execution
-    from implementation_campaign import UniqueKeyLoader  # type: ignore[no-redef]
+    from implementation_campaign import (  # type: ignore[no-redef]
+        UniqueKeyLoader,
+        _evidence_reference_findings,
+        _sha256,
+        authority_digest,
+    )
     from model_layout import (  # type: ignore[no-redef]
         ROOT,
         SYSTEM_EVOLUTION_PATH,
@@ -73,36 +83,53 @@ def _cycle_findings(work: dict[str, dict[str, Any]]) -> list[str]:
 
 def _reference_findings(record: dict[str, Any], *, root: Path) -> list[str]:
     findings: list[str] = []
-    refs: list[str] = []
+    refs: list[tuple[str, str]] = []
     if record["evolution"]["blocker"] is not None:
-        refs.extend(record["evolution"]["blocker"]["evidence_refs"])
+        refs.extend(
+            ("evolution blocker", reference)
+            for reference in record["evolution"]["blocker"]["evidence_refs"]
+        )
     for finding in record["findings"]:
-        refs.extend(finding["evidence_refs"])
+        refs.extend(
+            (f"finding {finding['id']}", reference) for reference in finding["evidence_refs"]
+        )
     for decision in record["decisions"]:
-        refs.extend(decision["evidence_refs"])
+        refs.extend(
+            (f"decision {decision['id']}", reference) for reference in decision["evidence_refs"]
+        )
     for item in record["work_items"]:
-        refs.extend(item["evidence_refs"])
+        refs.extend((f"work item {item['id']}", reference) for reference in item["evidence_refs"])
         if item["blocker"] is not None:
-            refs.extend(item["blocker"]["evidence_refs"])
-    refs.extend(record["closure"]["evidence_refs"])
+            refs.extend(
+                (f"work item {item['id']} blocker", reference)
+                for reference in item["blocker"]["evidence_refs"]
+            )
+    refs.extend(("closure", reference) for reference in record["closure"]["evidence_refs"])
     for review in record["closure"]["reviews"]:
-        refs.extend(review["evidence_refs"])
-    for reference in sorted(set(refs)):
-        if reference.startswith("command:"):
-            continue
-        if not reference.startswith("path:"):
-            findings.append(f"unsupported evidence reference {reference!r}")
-            continue
-        target = reference.removeprefix("path:").split("#", 1)[0]
-        candidate = (root / target).resolve()
-        try:
-            candidate.relative_to(root.resolve())
-        except ValueError:
-            findings.append(f"evidence reference escapes the repository: {reference}")
-            continue
-        if not candidate.exists():
-            findings.append(f"evidence reference does not exist: {reference}")
+        refs.extend(
+            (f"review {review['lens']}", reference) for reference in review["evidence_refs"]
+        )
+    for label, reference in refs:
+        findings.extend(_evidence_reference_findings(reference, label=label, root=root))
+        if reference.startswith("command:") and not _is_vellis_check_command(
+            reference.removeprefix("command:")
+        ):
+            findings.append(f"{label} command evidence is not a Vellis check: {reference}")
     return findings
+
+
+def _is_vellis_check_command(command: str) -> bool:
+    if command in {
+        "just check",
+        "just implementation-campaign-check",
+        "just model-check",
+        "just system-evolution-check",
+        "just skills-check",
+    }:
+        return True
+    return command.startswith("uv run pytest tests/") and not any(
+        token in command for token in ("\n", "\r", ";", "&&", "||", "`", "$(")
+    )
 
 
 def _git_checkpoint_findings(record: dict[str, Any], *, root: Path) -> list[str]:
@@ -116,10 +143,21 @@ def _git_checkpoint_findings(record: dict[str, Any], *, root: Path) -> list[str]
                 if isinstance(value, str) and value.startswith("git:")
             )
     for item in record["work_items"]:
-        for value in (item["planned_baseline"], item["checkpoint"]):
+        for value in (
+            item["planned_baseline"]["identity"],
+            item["checkpoint"],
+            item["approval"]["checkpoint"],
+        ):
             if isinstance(value, str) and value.startswith("git:"):
                 references.add(value)
-    for value in (record["evolution"]["checkpoint"], record["closure"]["checkpoint"]):
+    for review in record["closure"]["reviews"]:
+        if isinstance(review["checkpoint"], str) and review["checkpoint"].startswith("git:"):
+            references.add(review["checkpoint"])
+    for value in (
+        record["evolution"]["approval"]["checkpoint"],
+        record["evolution"]["checkpoint"],
+        record["closure"]["checkpoint"],
+    ):
         if isinstance(value, str) and value.startswith("git:"):
             references.add(value)
     findings: list[str] = []
@@ -137,6 +175,111 @@ def _git_checkpoint_findings(record: dict[str, Any], *, root: Path) -> list[str]
     return findings
 
 
+def _git_text(root: Path, *arguments: str) -> str:
+    result = subprocess.run(
+        ["git", *arguments],
+        cwd=root,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        raise RuntimeError(result.stderr.strip() or "Git command failed")
+    return result.stdout.strip()
+
+
+def _repository_baseline(root: Path) -> dict[str, str]:
+    head = _git_text(root, "rev-parse", "HEAD")
+    return {
+        "model": f"sha256:{authority_digest(root)}",
+        "implementation": f"git:{head}",
+        "language": f"sha256:{_sha256(root / 'model' / 'config' / 'language.lock.json')}",
+        "execution_environment": f"sha256:{_sha256(root / 'uv.lock')}",
+        "checkpoint": f"git:{head}",
+    }
+
+
+def _repository_baseline_findings(record: dict[str, Any], *, root: Path) -> list[str]:
+    findings: list[str] = []
+    actual = _repository_baseline(root)
+    observed = record["baselines"]["observed"]
+    for dimension in ("model", "language", "execution_environment"):
+        identity = actual[dimension]
+        if observed[dimension] != identity:
+            findings.append(f"observed {dimension} baseline does not match the current repository")
+    if record["evolution"]["lifecycle"] != "complete":
+        for dimension in ("implementation", "checkpoint"):
+            if observed[dimension] != actual[dimension]:
+                findings.append(
+                    f"observed {dimension} baseline does not match the current repository"
+                )
+        return findings
+
+    target = record["baselines"]["target"]
+    if target is None:
+        return findings
+    if not target["implementation"].startswith("git:"):
+        findings.append("complete target implementation is not a Vellis Git checkpoint")
+        return findings
+    target_revision = target["implementation"].removeprefix("git:")
+    head_revision = actual["implementation"].removeprefix("git:")
+    if target_revision != head_revision:
+        try:
+            changed = _git_text(
+                root, "diff", "--name-only", target_revision, head_revision
+            ).splitlines()
+        except RuntimeError:
+            changed = []
+        if changed != ["system-evolution.yaml"]:
+            findings.append(
+                "complete target implementation is not the reviewed repository checkpoint"
+            )
+    dirty = [
+        line
+        for line in _git_text(root, "status", "--porcelain", "--untracked-files=no").splitlines()
+        if not line.endswith(" system-evolution.yaml")
+    ]
+    if dirty:
+        findings.append("complete evolution has dirty tracked state outside its record")
+    return findings
+
+
+def _approval_checkpoint_findings(record: dict[str, Any], *, root: Path) -> list[str]:
+    findings: list[str] = []
+    approvals = [("evolution", record["evolution"]["approval"])] + [
+        (f"work item {item['id']}", item["approval"]) for item in record["work_items"]
+    ]
+    for label, approval in approvals:
+        if approval["status"] != "accepted":
+            continue
+        checkpoint = approval["checkpoint"]
+        if not isinstance(checkpoint, str) or not checkpoint.startswith("git:"):
+            findings.append(f"accepted {label} approval is not bound to a Vellis Git checkpoint")
+            continue
+        revision = checkpoint.removeprefix("git:")
+        try:
+            source = _git_text(root, "show", f"{revision}:system-evolution.yaml")
+            historical = yaml.load(source, Loader=UniqueKeyLoader)  # noqa: S506
+        except RuntimeError, yaml.YAMLError:
+            findings.append(f"accepted {label} approval checkpoint is not reconstructible")
+            continue
+        if not isinstance(historical, dict):
+            findings.append(f"accepted {label} approval checkpoint has no evolution record")
+            continue
+        if label == "evolution":
+            historical_approval = historical.get("evolution", {}).get("approval", {})
+        else:
+            item_id = label.removeprefix("work item ")
+            historical_item = next(
+                (item for item in historical.get("work_items", []) if item.get("id") == item_id),
+                {},
+            )
+            historical_approval = historical_item.get("approval", {})
+        if historical_approval.get("status") != "accepted":
+            findings.append(f"accepted {label} approval is absent from its checkpoint")
+    return findings
+
+
 def validate_record(record: dict[str, Any], *, root: Path = ROOT) -> list[str]:
     errors = sorted(
         Draft202012Validator(
@@ -148,6 +291,16 @@ def validate_record(record: dict[str, Any], *, root: Path = ROOT) -> list[str]:
     if errors:
         return findings
 
+    finding_ids = [entry["id"] for entry in record["findings"]]
+    decision_ids = [entry["id"] for entry in record["decisions"]]
+    work_ids = [entry["id"] for entry in record["work_items"]]
+    for label, identifiers in (
+        ("finding", finding_ids),
+        ("decision", decision_ids),
+        ("work item", work_ids),
+    ):
+        for duplicate in _duplicates(identifiers):
+            findings.append(f"duplicate {label} ID: {duplicate}")
     finding_by_id = {entry["id"]: entry for entry in record["findings"]}
     decision_by_id = {entry["id"]: entry for entry in record["decisions"]}
     work_by_id = {entry["id"]: entry for entry in record["work_items"]}
@@ -162,6 +315,8 @@ def validate_record(record: dict[str, Any], *, root: Path = ROOT) -> list[str]:
         for dependency in item["dependencies"]:
             if dependency not in work_by_id:
                 findings.append(f"{item['id']} depends on unknown work item {dependency}")
+            elif work_by_id[dependency]["order"] >= item["order"]:
+                findings.append(f"{item['id']} dependency {dependency} must have a lower order")
         for finding_id in item["finding_ids"]:
             if finding_id not in finding_by_id:
                 findings.append(f"{item['id']} owns unknown finding {finding_id}")
@@ -185,12 +340,6 @@ def validate_record(record: dict[str, Any], *, root: Path = ROOT) -> list[str]:
 
     for finding in finding_by_id.values():
         owner = finding["owner_work_item_id"]
-        if owner is None:
-            if finding["disposition"] == "resolved":
-                findings.append(f"resolved finding {finding['id']} has no completion owner")
-            if finding["disposition"] not in {"accepted", "out-of-scope", "resolved"}:
-                findings.append(f"open finding {finding['id']} has no completion owner")
-            continue
         if owner not in work_by_id:
             findings.append(f"finding {finding['id']} names unknown owner {owner}")
         elif finding["id"] not in work_by_id[owner]["finding_ids"]:
@@ -245,17 +394,28 @@ def validate_record(record: dict[str, Any], *, root: Path = ROOT) -> list[str]:
         findings.append("current baselines must match the observed target or source baseline")
     if baselines["status"] == "stale" and baseline_matches:
         findings.append("stale baselines must differ from the observed target or source baseline")
-    current_baseline_ids = {
-        value for value in baselines["observed"].values() if isinstance(value, str)
-    }
     for item in work_by_id.values():
+        binding = item["planned_baseline"]
         if (
             item["lifecycle"] in {"ready", "active"}
-            and item["planned_baseline"] not in current_baseline_ids
+            and binding["identity"] != baselines["observed"][binding["dimension"]]
         ):
             findings.append(
                 f"{item['lifecycle']} work item {item['id']} has stale planned baseline"
-                f" {item['planned_baseline']}"
+                f" {binding['dimension']}={binding['identity']}"
+            )
+        if (
+            item["lifecycle"] == "complete"
+            and binding["identity"]
+            not in {
+                baseline[binding["dimension"]]
+                for baseline in (baselines["source"], baselines["target"], baselines["observed"])
+                if baseline is not None
+            }
+            and not binding["identity"].startswith("git:")
+        ):
+            findings.append(
+                f"complete work item {item['id']} has an unrecognized historical planned baseline"
             )
 
     active = [item for item in work_by_id.values() if item["lifecycle"] == "active"]
@@ -280,6 +440,18 @@ def validate_record(record: dict[str, Any], *, root: Path = ROOT) -> list[str]:
         findings.append("an active work item requires an active evolution")
     if lifecycle == "active" and len(active) != 1:
         findings.append("an active evolution requires exactly one active work item")
+    ready = [item for item in work_by_id.values() if item["lifecycle"] == "ready"]
+    if lifecycle == "ready" and not ready:
+        findings.append("a ready evolution requires at least one ready work item")
+    if ready and lifecycle != "ready":
+        findings.append("a ready work item requires a ready evolution")
+    if lifecycle in {"discovery", "planning", "awaiting-approval"} and (active or ready):
+        findings.append(f"a {lifecycle} evolution cannot contain executable work")
+    pending_approvals = [
+        item for item in work_by_id.values() if item["approval"]["status"] == "pending"
+    ]
+    if lifecycle == "awaiting-approval" and not pending_approvals:
+        findings.append("an awaiting-approval evolution requires a pending work-item approval")
     for item in work_by_id.values():
         approval = item["approval"]["status"]
         if item["lifecycle"] in {"ready", "active", "complete"} and approval not in {
@@ -400,11 +572,16 @@ def validate_record(record: dict[str, Any], *, root: Path = ROOT) -> list[str]:
                 )
         if not closure["evidence_refs"]:
             findings.append("complete evolution has no closure evidence")
-        required_lenses = {"authority and conformance", "engineering and evidence"}
+        required_lenses = set(record["scope"]["review_lenses"])
         review_counts = Counter(review["lens"] for review in closure["reviews"])
         duplicate_reviews = sorted(lens for lens, count in review_counts.items() if count > 1)
         if duplicate_reviews:
             findings.append(f"complete evolution has duplicate review lenses {duplicate_reviews}")
+        undeclared_reviews = review_counts.keys() - required_lenses
+        if undeclared_reviews:
+            findings.append(
+                f"complete evolution has undeclared review lenses {sorted(undeclared_reviews)}"
+            )
         unresolved_reviews = sorted(
             review["lens"] for review in closure["reviews"] if review["status"] != "clean"
         )
@@ -419,11 +596,25 @@ def validate_record(record: dict[str, Any], *, root: Path = ROOT) -> list[str]:
                 f"complete evolution lacks clean required review lenses {sorted(missing_lenses)}"
             )
         for lens in required_lenses & clean_reviews.keys():
-            if not clean_reviews[lens]["evidence_refs"]:
+            review = clean_reviews[lens]
+            if not review["evidence_refs"]:
                 findings.append(f"clean required review {lens!r} has no attributable evidence")
+            if review["reviewer"] is None or review["checkpoint"] is None:
+                findings.append(f"clean required review {lens!r} lacks reviewer attribution")
+
+    for review in record["closure"]["reviews"]:
+        attributed = review["reviewer"] is not None and review["checkpoint"] is not None
+        if review["status"] in {"findings", "clean"} and not attributed:
+            findings.append(f"review {review['lens']!r} lacks reviewer attribution")
+        if review["status"] in {"findings", "clean"} and not review["evidence_refs"]:
+            findings.append(f"review {review['lens']!r} has no attributable evidence")
+        if review["status"] == "pending" and (attributed or review["evidence_refs"]):
+            findings.append(f"pending review {review['lens']!r} retains completed-review state")
 
     findings.extend(_reference_findings(record, root=root))
     findings.extend(_git_checkpoint_findings(record, root=root))
+    findings.extend(_repository_baseline_findings(record, root=root))
+    findings.extend(_approval_checkpoint_findings(record, root=root))
     return findings
 
 

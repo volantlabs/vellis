@@ -22,7 +22,8 @@ Keep only stable navigation and decision information in the record:
 - classification, disposition, and affected work owner;
 - consequential realization decisions and evidence intent;
 - dependency-ordered work state, evidence references, blockers, approvals, and checkpoints;
-- final synchronization and compatibility status.
+- final synchronization and compatibility status;
+- independently attributable review results bound to the exact state reviewed.
 
 Keep transcripts, detailed designs, estimates, assignees, copied model prose, code inventories,
 temporary measurements, and reviewer dialogue elsewhere. Evidence references point to reproducible
@@ -35,6 +36,10 @@ when language meaning is consequential, and selected execution environment when 
 toolchain, hardware, or physical setup can change the result. Record the proposed target model and
 implementation checkpoints only after they exist. A mismatch between an observed baseline and the
 one a ready or active work item was planned against makes the record stale.
+
+Bind each ready or active work item to one named baseline dimension and identity. Do not accept a
+matching token from another dimension as freshness, and do not treat a record's self-declared
+`observed` values as observation when the project can derive them from its current system of record.
 
 Use these lifecycle meanings:
 
@@ -119,6 +124,12 @@ A project validator should reject at least:
 - completed work with open owned findings or decisions, blockers, or no checkpoint;
 - complete evolution with open findings, nonconforming authority or integration, required external
   behavior unevaluated, stale target baselines, or no final checkpoint.
+
+For every completed review, retain its declared lens, independent reviewer identity, reviewed-state
+checkpoint, disposition, and reproducible evidence references. Closure covers every lens declared in
+scope exactly once in its final pass; a clean status label without those bindings is not review
+evidence. Every finding, including an accepted or out-of-scope disposition, retains exactly one work
+item that owns its disposition and closure.
 
 The bundled schema checks shape, not project history or semantic truth. Bind stronger baseline,
 checkpoint, authority-reference, evidence-reference, and approval validation in the project.

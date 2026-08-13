@@ -76,7 +76,7 @@ def test_complete_work_item_cannot_retain_open_owned_work() -> None:
 def test_status_reports_the_active_item_before_another_ready_item() -> None:
     report = system_evolution.status(_record())  # type: ignore[arg-type]
 
-    assert "next_work: W004" in report
+    assert "next_work: W006" in report
 
 
 def test_ready_work_requires_complete_dependencies() -> None:
@@ -100,11 +100,14 @@ def test_accepted_approval_requires_an_attributable_checkpoint() -> None:
 
 def test_active_work_cannot_remain_bound_only_to_a_source_baseline() -> None:
     record = copy.deepcopy(_record())
-    record["work_items"][3]["planned_baseline"] = record["baselines"]["source"]["implementation"]  # type: ignore[index]
+    record["work_items"][5]["planned_baseline"] = {  # type: ignore[index]
+        "dimension": "implementation",
+        "identity": record["baselines"]["source"]["implementation"],  # type: ignore[index]
+    }
 
     findings = system_evolution.validate_record(record)  # type: ignore[arg-type]
 
-    assert any("active work item W004 has stale planned baseline" in each for each in findings)
+    assert any("active work item W006 has stale planned baseline" in each for each in findings)
 
 
 def test_complete_work_requires_complete_dependencies() -> None:
@@ -134,11 +137,23 @@ def test_complete_closure_requires_named_evidenced_review_lenses() -> None:
         implementation_status="conforming",
         integration_status="conforming",
         external_status="not applicable",
-        checkpoint="git:complete",
+        checkpoint="git:da790ff",
         evidence_refs=["command:just check"],
         reviews=[
-            {"lens": "foo", "status": "clean", "evidence_refs": []},
-            {"lens": "bar", "status": "clean", "evidence_refs": []},
+            {
+                "lens": "foo",
+                "status": "clean",
+                "reviewer": "agent:foo",
+                "checkpoint": "git:da790ff",
+                "evidence_refs": ["command:just check"],
+            },
+            {
+                "lens": "bar",
+                "status": "clean",
+                "reviewer": "agent:bar",
+                "checkpoint": "git:da790ff",
+                "evidence_refs": ["command:just check"],
+            },
         ],
     )
 
@@ -179,16 +194,22 @@ def test_complete_closure_rejects_duplicate_or_unresolved_reviews() -> None:
             {
                 "lens": "authority and conformance",
                 "status": "clean",
+                "reviewer": "agent:authority",
+                "checkpoint": "git:da790ff",
                 "evidence_refs": ["command:just model-check"],
             },
             {
                 "lens": "engineering and evidence",
                 "status": "findings",
-                "evidence_refs": [],
+                "reviewer": "agent:engineering-old",
+                "checkpoint": "git:da790ff",
+                "evidence_refs": ["command:just check"],
             },
             {
                 "lens": "engineering and evidence",
                 "status": "clean",
+                "reviewer": "agent:engineering",
+                "checkpoint": "git:da790ff",
                 "evidence_refs": ["command:just check"],
             },
         ],
@@ -222,3 +243,118 @@ def test_unknown_blocker_finding_and_duplicate_ownership_are_rejected() -> None:
 
     assert "evolution blocker names unknown finding F999" in findings
     assert any("finding F002 is listed by" in finding for finding in findings)
+
+
+def test_duplicate_ids_are_rejected_before_indexing() -> None:
+    record = copy.deepcopy(_record())
+    duplicate = copy.deepcopy(record["findings"][0])  # type: ignore[index]
+    duplicate["summary"] = "A shadow row must not replace the first finding."
+    record["findings"].append(duplicate)  # type: ignore[union-attr]
+
+    findings = system_evolution.validate_record(record)  # type: ignore[arg-type]
+
+    assert "duplicate finding ID: F001" in findings
+
+
+def test_observed_baseline_is_derived_from_the_repository() -> None:
+    record = copy.deepcopy(_record())
+    record["baselines"]["target"]["implementation"] = "git:ee86d59"  # type: ignore[index]
+    record["baselines"]["target"]["checkpoint"] = "git:ee86d59"  # type: ignore[index]
+    record["baselines"]["observed"]["implementation"] = "git:ee86d59"  # type: ignore[index]
+    record["baselines"]["observed"]["checkpoint"] = "git:ee86d59"  # type: ignore[index]
+
+    findings = system_evolution.validate_record(record)  # type: ignore[arg-type]
+
+    assert "observed implementation baseline does not match the current repository" in findings
+    assert "observed checkpoint baseline does not match the current repository" in findings
+
+
+def test_planned_baseline_names_one_dimension_not_any_matching_token() -> None:
+    record = copy.deepcopy(_record())
+    record["work_items"][5]["planned_baseline"] = {  # type: ignore[index]
+        "dimension": "implementation",
+        "identity": record["baselines"]["observed"]["execution_environment"],  # type: ignore[index]
+    }
+
+    findings = system_evolution.validate_record(record)  # type: ignore[arg-type]
+
+    assert any("active work item W006 has stale planned baseline" in each for each in findings)
+
+
+def test_completed_work_rejects_an_unrecognized_historical_baseline() -> None:
+    record = copy.deepcopy(_record())
+    record["work_items"][0]["planned_baseline"] = {  # type: ignore[index]
+        "dimension": "model",
+        "identity": "superseded-model-baseline",
+    }
+
+    findings = system_evolution.validate_record(record)  # type: ignore[arg-type]
+
+    assert "complete work item W001 has an unrecognized historical planned baseline" in findings
+
+
+def test_vellis_evidence_rejects_false_commands_and_unresolved_fragments() -> None:
+    record = copy.deepcopy(_record())
+    record["findings"][0]["evidence_refs"] = [  # type: ignore[index]
+        "command:false",
+        "path:tests/test_system_evolution.py#not_a_test",
+    ]
+
+    findings = system_evolution.validate_record(record)  # type: ignore[arg-type]
+
+    assert any("not a Vellis check" in each for each in findings)
+    assert any("evidence fragment does not resolve" in each for each in findings)
+
+
+def test_accepted_approval_checkpoint_must_exist_and_contain_the_gate() -> None:
+    record = copy.deepcopy(_record())
+    record["work_items"][2]["approval"]["checkpoint"] = "git:does-not-exist"  # type: ignore[index]
+
+    findings = system_evolution.validate_record(record)  # type: ignore[arg-type]
+
+    assert "Git checkpoint does not resolve to a commit: git:does-not-exist" in findings
+    assert any("approval checkpoint is not reconstructible" in each for each in findings)
+
+
+def test_every_finding_requires_one_completion_owner() -> None:
+    record = copy.deepcopy(_record())
+    record["findings"][0]["owner_work_item_id"] = None  # type: ignore[index]
+
+    findings = system_evolution.validate_record(record)  # type: ignore[arg-type]
+
+    assert any("owner_work_item_id" in each and "not of type 'string'" in each for each in findings)
+
+
+def test_dependency_order_must_precede_the_dependent() -> None:
+    record = copy.deepcopy(_record())
+    record["work_items"][5]["order"] = 2  # type: ignore[index]
+
+    findings = system_evolution.validate_record(record)  # type: ignore[arg-type]
+
+    assert "W006 dependency W005 must have a lower order" in findings
+
+
+def test_lifecycle_rollup_requires_matching_executable_or_approval_frontier() -> None:
+    ready = copy.deepcopy(_record())
+    ready["evolution"]["lifecycle"] = "ready"  # type: ignore[index]
+    ready["work_items"][5]["lifecycle"] = "pending"  # type: ignore[index]
+    awaiting = copy.deepcopy(ready)
+    awaiting["evolution"]["lifecycle"] = "awaiting-approval"  # type: ignore[index]
+
+    ready_findings = system_evolution.validate_record(ready)  # type: ignore[arg-type]
+    awaiting_findings = system_evolution.validate_record(awaiting)  # type: ignore[arg-type]
+
+    assert "a ready evolution requires at least one ready work item" in ready_findings
+    assert (
+        "an awaiting-approval evolution requires a pending work-item approval" in awaiting_findings
+    )
+
+
+def test_completed_reviews_require_attribution_and_every_declared_lens() -> None:
+    record = copy.deepcopy(_record())
+    record["closure"]["reviews"][0]["reviewer"] = None  # type: ignore[index]
+    record["closure"]["reviews"].pop()  # type: ignore[union-attr]
+
+    findings = system_evolution.validate_record(record)  # type: ignore[arg-type]
+
+    assert "review 'authority and conformance' lacks reviewer attribution" in findings

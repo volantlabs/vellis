@@ -52,6 +52,15 @@ gaps through `$sysml-modeling`, route bounded realization work through `$sysml-i
 run `just system-evolution-check`. A code defect under sufficient accepted authority does not require
 a model edit; changed system meaning must be accepted before implementation relies on it.
 
+Vellis derives the evolution record's observed model, language, lockfile environment, Git
+implementation, and checkpoint identities from the checked repository. A ready or active work item
+binds one named dimension to that observed identity. Accepted approvals use the Git commit containing
+the accepted record transition. Evidence commands are limited to repository checks and focused test
+commands; path evidence resolves a Python test node or Markdown heading. Final reviews name the
+independent reviewer and reviewed Git checkpoint and cover every lens declared in scope. The final
+record-only commit may follow the reviewed implementation checkpoint, but no other tracked change may
+sit between that checkpoint and closure.
+
 ## Implementation workflow
 
 1. For a complete-system request, use `$sysml-implementation-planning` to read the complete model,

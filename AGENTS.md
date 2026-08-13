@@ -283,9 +283,10 @@ next slice, blocker, and closure state. `just implementation-campaign-dispatch` 
 machine-readable next action and durable state token without changing files. These tools do not
 resolve SysML semantics and the ledger does not replace rereading qualified model authority.
 
-`just system-evolution-check` validates the active evolution record's schema, ownership, dependency,
-approval, lifecycle, and evidence-reference invariants. `just system-evolution-status` reports its
-approval, next work, and open-finding count.
+`just system-evolution-check` validates the active evolution record's schema, exact ownership,
+dependency order, approval checkpoints, lifecycle, repository-derived observed baselines,
+project-bound evidence references, and attributable review invariants. `just
+system-evolution-status` reports its approval, next work, and open-finding count.
 
 The repository exposes the selected MCP tool contract over local standard input and output. Matching
 user-scoped Codex and Claude Code entries are configured to launch it, and accepted bounded

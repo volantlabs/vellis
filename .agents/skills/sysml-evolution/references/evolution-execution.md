@@ -63,6 +63,10 @@ the same root cause, rerun relevant evidence, then obtain one clean final pass. 
 by inventing inputs, threat models, performance targets, or architecture outside declared authority
 and ordinary project assumptions.
 
+Bind each review result to its independent reviewer, exact reviewed-state checkpoint, lens, final
+disposition, and reproducible evidence. Every lens declared in the evolution scope participates in
+the clean final pass; do not substitute an unevidenced label or an earlier superseded review.
+
 An audit finding is not closed by adding a test that observes the existing behavior. Evidence must
 fail for the wrong implementation and the implementation or authority must actually change when the
 finding requires it.
