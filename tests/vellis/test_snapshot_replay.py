@@ -120,6 +120,45 @@ def test_capturing_changes_no_canonical_state_revision_or_history(system: RTGSys
     assert system.store.canonical_record_count() == records
 
 
+def test_a_capture_racing_a_commit_is_refused_rather_than_bound_to_the_wrong_record(
+    tmp_path: Path,
+) -> None:
+    """Preserve the campaign evidence node while strengthening its concurrency effect.
+
+    The earlier realization detected the race and refused. One SQLite read transaction
+    now makes the older state and its lineage indivisible, which is stronger: the
+    capture may succeed, but can never bind state to a record from another revision.
+    """
+    reader = _fresh(tmp_path)
+    writer = RTGSystem.open(tmp_path / "vellis.sqlite3")
+    committed = False
+
+    def commit_while_reader_materializes_graph(statement: str) -> None:
+        nonlocal committed
+        if committed or "FROM current_graph_object" not in statement:
+            return
+        committed = True
+        assert writer.apply_graph_change(
+            GraphChange(anchor_upserts=(ADA,)), provenance=Provenance(initiator="other process")
+        ).accepted
+
+    reader.store._connection.set_trace_callback(  # noqa: SLF001
+        commit_while_reader_materializes_graph
+    )
+    try:
+        result = reader.create_snapshot(provenance=_owner())
+
+        assert result.accepted, result.findings
+        assert result.snapshot is not None
+        assert result.snapshot.revision == 0
+        assert result.snapshot.canonical_state.graph.anchors == ()
+        assert writer.current_state().revision == 1
+    finally:
+        reader.store._connection.set_trace_callback(None)  # noqa: SLF001
+        writer.close()
+        reader.close()
+
+
 def test_capturing_before_a_system_exists_is_refused(tmp_path: Path) -> None:
     system = RTGSystem.open(tmp_path / "vellis.sqlite3")
     try:
@@ -647,33 +686,6 @@ def test_a_captured_identity_folds_the_whole_chain_not_only_the_last_record(
     unchained = record_identity(system.store.transitions()[-1], follows=system.base_identity())
     assert snapshot.captured_through != unchained
     assert snapshot.captured_through == system.ledger_tail(after=0).final_record
-
-
-def test_a_capture_racing_a_commit_is_refused_rather_than_bound_to_the_wrong_record(
-    tmp_path: Path,
-) -> None:
-    """Excludes a snapshot whose state and captured record came from different revisions."""
-    system = _fresh(tmp_path)
-    other = RTGSystem.open(system.store.path)
-    try:
-        original = system.current_state
-
-        def commit_then_read():
-            assert other.apply_graph_change(
-                GraphChange(anchor_upserts=(ADA,)), provenance=_owner()
-            ).accepted
-            system.current_state = original  # type: ignore[method-assign]
-            return original()
-
-        system.current_state = commit_then_read  # type: ignore[method-assign]
-        result = system.create_snapshot(provenance=_owner())
-
-        assert not result.accepted
-        assert result.snapshot is None
-        assert any("while it was being captured" in f.summary for f in result.findings)
-    finally:
-        other.close()
-        system.close()
 
 
 def test_a_snapshot_whose_state_does_not_conform_is_refused_on_reconstruction(

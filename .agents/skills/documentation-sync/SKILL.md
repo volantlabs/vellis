@@ -17,7 +17,8 @@ Bias toward small, claim-driven documentation changes. Do not turn a model edit 
 - Reference corpora are generated from checksum-pinned upstream sources into the ignored `.cache/`; they are never committed and must not be hand-edited.
 - `.agents/skills/` is the repo-local skill source; `.claude/skills/` contains managed links.
 - `$sysml-reference`, `$sysml-modeling`, `$sysml-implementation-planning`,
-  `$sysml-implementation`, and `$sysml-implementation-campaign` are a portable core. Vellis paths,
+  `$sysml-implementation`, `$sysml-implementation-campaign`, and `$sysml-evolution` are a portable
+  core. Vellis paths,
   commands, RTG vocabulary, and repository workflow belong in project bindings or optional domain
   skills rather than those core instructions.
 - Vellis product runtime source under `vellis/` is authored rather than generated. There are no

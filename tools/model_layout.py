@@ -16,6 +16,10 @@ IMPLEMENTATION_CAMPAIGN_SCHEMA_PATH = (
     / "assets"
     / "implementation-campaign.schema.json"
 )
+SYSTEM_EVOLUTION_PATH = ROOT / "system-evolution.yaml"
+SYSTEM_EVOLUTION_SCHEMA_PATH = (
+    ROOT / ".agents" / "skills" / "sysml-evolution" / "assets" / "system-evolution.schema.json"
+)
 AUTHORED_MODEL_PACKAGES = {
     "RTG": "model/10-rtg-domain.sysml",
     "EverydayLifeStarter": "model/15-everyday-life-starter.sysml",

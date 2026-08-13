@@ -17,7 +17,10 @@ The repository contains the Vellis system model, its development tooling, and th
   and repository extensions.
 - [`implementation-campaign.yaml`](implementation-campaign.yaml): the baseline-bound current plan
   and execution/evidence index for the application build; it is not product authority.
-- [`tools/`](tools/): the pinned validator, reference search, skill checks, and campaign validation.
+- [`system-evolution.yaml`](system-evolution.yaml): the baseline-bound active post-build finding,
+  decision, work, and rebaseline index; it is not product authority.
+- [`tools/`](tools/): the pinned validator, reference search, skill checks, campaign validation, and
+  evolution-record validation.
 
 `just model-setup` builds a searchable SysML v2 reference layer into an ignored cache: the pinned
 specifications, the normative model libraries, and 309 validated example models, all searched
@@ -33,8 +36,9 @@ Begin with [`AGENTS.md`](AGENTS.md), then read the [model map](model/README.md),
 
 The reusable core is `$sysml-reference`, `$sysml-modeling`,
 `$sysml-implementation-planning`, `$sysml-implementation`, and
-`$sysml-implementation-campaign`. Together they define a domain-neutral evidence, modeling,
-whole-model decomposition, bounded realization, conformance, resumable execution, and closure loop.
+`$sysml-implementation-campaign`, plus `$sysml-evolution` for changes to an already implemented
+system. Together they define a domain-neutral evidence, modeling, whole-model decomposition,
+bounded realization, conformance, resumable execution, evolution, and closure loop.
 They deliberately do not assume Vellis, RTG, this repository's paths or commands, Git, Python, MCP,
 persistence, networking, code generation, or a test framework.
 
@@ -102,6 +106,9 @@ Useful commands:
   validator digests without changing files.
 - `just implementation-campaign-checkpoint-check`: after a checkpoint commit, verify clean tracked
   state, the committed campaign, approved plan projection, current checkpoint, and current evidence.
+- `just system-evolution-check`: validate the active post-build evolution record's schema,
+  ownership, dependencies, approval, lifecycle, and evidence references.
+- `just system-evolution-status`: show its lifecycle, approval, next work item, and open findings.
 - `just check`: run the complete repository gate.
 
 ## Implementation status
@@ -120,9 +127,11 @@ Use these words precisely:
   patterns evaluated by RE2 itself; assessment of a graph against a definition set; fresh
   initialization from a supplied initial definition set at revision 0 with one initial-state
   record, no transitions, and an empty activity ledger; a
-  durable local store that recovers identical memory across an ordinary restart, commits the
-  canonical record and the current projection as one effect, and refuses a database holding
-  anything else; a current-state projection reached without traversing canonical history;
+  durable local SQLite store that recovers identical memory across an ordinary restart, commits the
+  canonical record and its addressable graph, definition, and proposal projections as one effect,
+  and refuses a database holding anything else; live state is owned by SQLite rather than a resident
+  complete-graph cache, and complete current state is assembled only for operations that request or
+  require it;
   explicit graph changes committed atomically as contiguous canonical transitions, with the
   complete resulting graph validated first and replay reconstructing the same state from the
   ledger alone; the typed graph-conformance report; and current definition discovery — the complete
@@ -133,7 +142,9 @@ Use these words precisely:
   Everyday Life starter vocabulary as an ordinary, owner-governable definition set; and bounded
   semantic query over current state — named anchor and associated-data groups, required directed
   links, structured property comparisons, and a shaped result refused whole rather than truncated
-  when it would exceed the caller's row bound; and a separated observational ledger — reads,
+  when it would exceed the caller's row bound, with indexed identity, type, direct-association, and
+  directed-link joins constraining candidates before property filtering; and a separated
+  observational ledger — reads,
   validation, and refused operations leave a bounded record carrying capability, outcome,
   provenance, evaluated revision and scope but no result rows, over which the owner may read a
   bounded interval of either ledger and forget activity without moving anything replay
@@ -188,9 +199,12 @@ Use these words precisely:
   say that established memory is unchanged, and give an available next step, with graph,
   definitions, delta, revision, and canonical ledger identical either side of the failure.
 - **Characterized, not budgeted.** What this realization's work responds to is measured in semantic
-  record accesses, along each dimension separately: current summary, inspection, query, conformance
-  assessment, delta retrieval, and change validation read no record of either ledger however long
-  the history behind them; a commit appends one record at the end without reading or rewriting the
+  record accesses and current-object materialization, along each dimension separately: current
+  summary and inspection decode definitions but no graph; current query decodes indexed candidates
+  rather than unrelated objects or a complete graph; conformance assessment, delta assessment, and
+  change validation may assemble the graph when their global meaning requires it; none reads a
+  record of either ledger however long the history behind them; a commit appends one record at the
+  end without reading or rewriting the
   prefix, and observing is observational; a bounded interval of either ledger costs the interval
   and seeks to it rather than walking what precedes it; a historical vocabulary costs its
   definition-changing records rather than the graph transitions between them, while a historical

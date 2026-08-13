@@ -512,6 +512,35 @@ def test_an_accepted_history_result_carries_its_evaluated_revision(system: RTGSy
     assert _activity(system).evaluated_revision == 1
 
 
+def test_history_entries_and_evaluated_revision_share_one_read_snapshot(
+    tmp_path: Path,
+) -> None:
+    reader = RTGSystem.open(tmp_path / "vellis.sqlite3")
+    assert reader.initialize_fresh(
+        build_rich_definitions(), provenance=_owner(), initialization_summary="a fresh start"
+    ).accepted
+    writer = RTGSystem.open(tmp_path / "vellis.sqlite3")
+    original = reader.store.current_revision
+
+    def commit_then_read_revision() -> int:
+        assert writer.apply_graph_change(
+            GraphChange(anchor_upserts=(ADA,)), provenance=Provenance(initiator="other process")
+        ).accepted
+        reader.store.current_revision = original  # type: ignore[method-assign]
+        return original()
+
+    reader.store.current_revision = commit_then_read_revision  # type: ignore[method-assign]
+    try:
+        result = _canonical(reader)
+
+        assert result.evaluated_revision == 0
+        assert [entry.revision for entry in result.canonical_entries] == [0]
+        assert writer.current_state().revision == 1
+    finally:
+        writer.close()
+        reader.close()
+
+
 # --- One interval means one thing, wherever the caller's clock is ----------------------
 
 
@@ -639,3 +668,25 @@ def test_a_bounded_canonical_read_does_not_walk_the_records_before_it(
 
     assert len(narrow.canonical_entries) == 1
     assert system.store.record_reads == 1
+
+
+def test_overbroad_history_decodes_only_enough_records_to_reject(system: RTGSystem) -> None:
+    for _ in range(20):
+        system.check(provenance=_owner())
+
+    system.store.reset_instrumentation()
+    activity = system.history(HistoryQuery(kind=HistoryKind.ACTIVITY, maximum_records=1))
+
+    assert activity.status is OperationStatus.REJECTED
+    assert system.store.activity_reads == 2
+
+    for index in range(5):
+        assert system.apply_graph_change(
+            GraphChange(anchor_upserts=(Anchor(f"bound-{index}", "person", f"P{index}"),)),
+            provenance=_owner(),
+        ).accepted
+    system.store.reset_instrumentation()
+    canonical = system.history(HistoryQuery(kind=HistoryKind.CANONICAL, maximum_records=1))
+
+    assert canonical.status is OperationStatus.REJECTED
+    assert system.store.record_reads == 2

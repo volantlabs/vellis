@@ -16,8 +16,8 @@ just check
 ## Skill portability
 
 `$sysml-reference`, `$sysml-modeling`, `$sysml-implementation-planning`,
-`$sysml-implementation`, and `$sysml-implementation-campaign` are maintained as a portable SysML v2
-MBSwE core. Keep Vellis paths, commands, RTG and MCP semantics, implementation language, and
+`$sysml-implementation`, `$sysml-implementation-campaign`, and `$sysml-evolution` are maintained as
+a portable SysML v2 MBSwE core. Keep Vellis paths, commands, RTG and MCP semantics, implementation language, and
 repository-specific review rules in local guidance or optional extensions. When changing the core,
 apply the cross-domain portability review in `AGENTS.md`; do not use Vellis as the only test case or
 claim that a standalone plugin already exists.
@@ -46,6 +46,21 @@ claim that a standalone plugin already exists.
    removed or deferred, any decision reopened by the review scope or new contradictory evidence, and
    bounded follow-up work.
 
+For a post-build audit or cohesive change set that spans model and implementation, use
+`$sysml-evolution`. Bind raw evidence and classifications to `system-evolution.yaml`, route model
+gaps through `$sysml-modeling`, route bounded realization work through `$sysml-implementation`, and
+run `just system-evolution-check`. A code defect under sufficient accepted authority does not require
+a model edit; changed system meaning must be accepted before implementation relies on it.
+
+Vellis derives the evolution record's observed model, language, lockfile environment, Git
+implementation, and checkpoint identities from the checked repository. A ready or active work item
+binds one named dimension to that observed identity. Accepted approvals use the Git commit containing
+the accepted record transition. Evidence commands are limited to repository checks and focused test
+commands; path evidence resolves a Python test node or Markdown heading. Final reviews name the
+independent reviewer and reviewed Git checkpoint and cover every lens declared in scope. The final
+record-only commit may follow the reviewed implementation checkpoint, but no other tracked change may
+sit between that checkpoint and closure.
+
 ## Implementation workflow
 
 1. For a complete-system request, use `$sysml-implementation-planning` to read the complete model,
@@ -71,9 +86,12 @@ claim that a standalone plugin already exists.
    demonstration, numerical references, timing measurements, or hardware evidence as appropriate.
    Exercise accepted behavior, semantic rejection or failure, and the nearest invalid counterexample.
    For modeled history scaling, instrument semantic record accesses or equivalent traces before using
-   wall-clock measurements. Materialized current projections, revision/time indexes, definition
-   checkpoints, caches, and snapshot cadence are possible realization choices, not model-selected
-   architecture; do not claim numerical performance satisfaction before representative budgets exist.
+   wall-clock measurements. Current-state decomposition, revision/time and relationship indexes,
+   definition checkpoints, caches that do not retain prohibited complete state, and snapshot cadence
+   are possible realization choices, not model-selected architecture. Evidence still has to show that
+   definition-only work materializes no graph and query candidates are narrowed by semantic identity
+   joins before value filtering. Do not claim numerical performance satisfaction before representative
+   budgets exist.
    Treat Vellis v1 compatibility as confirmed first-use initialization from one complete JSON snapshot,
    never as an existing-system merge or adoption of v1 ledger history.
 6. After focused evidence passes, use fresh read-only agents for separate authority/conformance and

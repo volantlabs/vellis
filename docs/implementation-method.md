@@ -14,8 +14,9 @@ The workflow has three deliberately separate layers:
 
 1. **Portable core:** `$sysml-reference`, `$sysml-modeling`,
    `$sysml-implementation-planning`, `$sysml-implementation`, and
-   `$sysml-implementation-campaign` define the evidence, modeling, whole-model decomposition,
-   bounded realization, conformance, resumable execution, and feedback method.
+   `$sysml-implementation-campaign`, plus `$sysml-evolution`, define the evidence, modeling,
+   whole-model decomposition, bounded realization, conformance, resumable execution, post-build
+   evolution, and feedback method.
 2. **Project binding:** local instructions identify model entry points and reading order, the active
    language baseline, reference and validation tooling, source and generated-artifact ownership,
    implementation constraints, checks, and change-control workflow.
@@ -282,10 +283,16 @@ selected boundary, and no blocker.
 ## Vellis as a proving case
 
 Vellis binds the portable core through `AGENTS.md`, `model/README.md`, its pinned reference and
-validator tooling, `implementation-campaign.yaml`, and its `just` checks. The campaign is inspectable
+validator tooling, `implementation-campaign.yaml`, `system-evolution.yaml`, and its `just` checks. The campaign is inspectable
 with `just implementation-campaign-check` and `just implementation-campaign-status`; its observed
 baseline is available with `just implementation-campaign-baseline`, and committed checkpoints are
 resolved with `just implementation-campaign-checkpoint-check`.
+Post-build evolution is inspectable with `just system-evolution-check` and
+`just system-evolution-status`; its record indexes findings, decisions, work, and rebaselining but
+does not become product authority or a second implementation campaign. Vellis derives observed
+model, language, lockfile, Git implementation, and checkpoint identities from the repository and
+binds completed independent reviews to their reviewer and reviewed checkpoint; those are project
+bindings, not assumptions embedded in the portable skill.
 `$rtg-schema-design` is an optional Vellis domain extension, not part of the portable core.
 
 Within that extension, graph, definitions, validation, query, revision, and history may become

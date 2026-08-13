@@ -18,7 +18,10 @@ import pytest
 from conftest import build_rich_definitions
 
 from vellis.canonical import Provenance
+from vellis.changes import GraphChange
 from vellis.definitions import GraphDefinitionSet
+from vellis.graph import Anchor
+from vellis.outcomes import OperationStatus
 from vellis.store import APPLICATION_ID, CanonicalStore, NotADatabaseError, StoreError
 from vellis.system import RTGSystem
 
@@ -76,7 +79,7 @@ def test_a_projection_whose_row_contradicts_its_payload_is_refused(tmp_path: Pat
 
     store = CanonicalStore(path)
     try:
-        with pytest.raises(StoreError, match="carries revision"):
+        with pytest.raises(StoreError, match="claims revision"):
             store.current_state()
     finally:
         store.close()
@@ -110,15 +113,125 @@ def test_unreadable_stored_text_is_refused_rather_than_reinterpreted(tmp_path: P
 
     connection = sqlite3.connect(path)
     try:
-        connection.execute("UPDATE current_state SET state = 'not json' WHERE id = 0")
+        connection.execute("UPDATE current_state SET active_definitions = 'not json' WHERE id = 0")
         connection.commit()
     finally:
         connection.close()
 
     store = CanonicalStore(path)
     try:
-        with pytest.raises(StoreError, match="does not decode"):
+        with pytest.raises(StoreError, match="do not decode"):
             store.current_state()
+    finally:
+        store.close()
+
+
+def test_indexed_selectors_that_disagree_with_payload_are_refused(tmp_path: Path) -> None:
+    path = tmp_path / "vellis.sqlite3"
+    system = RTGSystem.open(path)
+    try:
+        assert system.initialize_fresh(
+            build_rich_definitions(),
+            provenance=Provenance(initiator="owner"),
+            initialization_summary="a fresh start",
+        ).accepted
+        assert system.apply_graph_change(
+            GraphChange(anchor_upserts=(Anchor("a-1", "person", "Ada"),)),
+            provenance=Provenance(initiator="owner"),
+        ).accepted
+    finally:
+        system.close()
+
+    connection = sqlite3.connect(path)
+    try:
+        connection.execute(
+            "UPDATE current_graph_object SET type_key = 'project' WHERE uuid = 'a-1'"
+        )
+        connection.execute(
+            "UPDATE current_state SET sealed_projection_writes = projection_writes WHERE id = 0"
+        )
+        connection.commit()
+    finally:
+        connection.close()
+
+    store = CanonicalStore(path)
+    try:
+        with pytest.raises(StoreError, match="selectors that disagree"):
+            store.current_state()
+    finally:
+        store.close()
+
+
+@pytest.mark.parametrize("corruption", ["extra", "missing"])
+def test_association_selectors_that_disagree_with_payload_are_refused(
+    tmp_path: Path, corruption: str
+) -> None:
+    from vellis.graph import AssociatedDataObject
+
+    path = tmp_path / "vellis.sqlite3"
+    system = RTGSystem.open(path)
+    try:
+        assert system.initialize_fresh(
+            build_rich_definitions(),
+            provenance=Provenance(initiator="owner"),
+            initialization_summary="a fresh start",
+        ).accepted
+        assert system.apply_graph_change(
+            GraphChange(
+                anchor_upserts=(
+                    Anchor("a-1", "person", "Ada"),
+                    Anchor("a-2", "person", "Grace"),
+                ),
+                associated_data_upserts=(
+                    AssociatedDataObject(
+                        "d-1",
+                        "note",
+                        ("a-1",),
+                        {"title": "Note"},
+                    ),
+                ),
+            ),
+            provenance=Provenance(initiator="owner"),
+        ).accepted
+        if corruption == "extra":
+            system.store._connection.execute(  # noqa: SLF001
+                "INSERT INTO current_data_anchor VALUES ('d-1', 'a-2')"
+            )
+        else:
+            system.store._connection.execute(  # noqa: SLF001
+                "DELETE FROM current_data_anchor WHERE data_uuid = 'd-1'"
+            )
+        system.store._connection.execute(  # noqa: SLF001
+            "UPDATE current_state SET sealed_projection_writes = projection_writes WHERE id = 0"
+        )
+
+        with pytest.raises(StoreError, match="association selectors that disagree"):
+            system.current_state()
+    finally:
+        system.close()
+
+
+def test_an_unsealed_projection_change_is_refused_before_it_can_underselect(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "vellis.sqlite3"
+    _established(path)
+
+    connection = sqlite3.connect(path)
+    try:
+        connection.execute(
+            "INSERT INTO current_graph_object"
+            " (uuid, object_kind, type_key, source_uuid, target_uuid, payload)"
+            " VALUES ('a-1', 'anchor', 'person', NULL, NULL, '{}')"
+        )
+        connection.commit()
+    finally:
+        connection.close()
+
+    store = CanonicalStore(path)
+    try:
+        with pytest.raises(StoreError, match="projection changed"):
+            store.current_revision()
     finally:
         store.close()
 
@@ -320,6 +433,48 @@ def test_a_failure_between_the_record_and_the_projection_establishes_nothing(
         store.close()
 
 
+def test_a_transition_projection_failure_rolls_back_every_table(tmp_path: Path) -> None:
+    path = tmp_path / "vellis.sqlite3"
+    system = RTGSystem.open(path)
+    try:
+        assert system.initialize_fresh(
+            build_rich_definitions(),
+            provenance=Provenance(initiator="owner"),
+            initialization_summary="a fresh start",
+        ).accepted
+        blocker = sqlite3.connect(path)
+        try:
+            blocker.execute(
+                "CREATE TRIGGER refuse_graph_projection BEFORE INSERT ON current_graph_object "
+                "BEGIN SELECT RAISE(ABORT, 'projection failed'); END"
+            )
+            blocker.commit()
+        finally:
+            blocker.close()
+
+        outcome = system.apply_graph_change(
+            GraphChange(anchor_upserts=(Anchor("a-1", "person", "Ada"),)),
+            provenance=Provenance(initiator="owner"),
+        )
+        assert outcome.status is OperationStatus.FAILED
+        assert system.current_state().revision == 0
+        assert system.current_state().graph.is_empty
+        assert system.store.canonical_record_count() == 1
+
+        remover = sqlite3.connect(path)
+        try:
+            remover.execute("DROP TRIGGER refuse_graph_projection")
+            remover.commit()
+        finally:
+            remover.close()
+        assert system.apply_graph_change(
+            GraphChange(anchor_upserts=(Anchor("a-1", "person", "Ada"),)),
+            provenance=Provenance(initiator="owner"),
+        ).accepted
+    finally:
+        system.close()
+
+
 def test_an_unreadable_record_time_is_reported_as_a_store_error(tmp_path: Path) -> None:
     path = tmp_path / "vellis.sqlite3"
     _established(path)
@@ -374,12 +529,12 @@ def test_a_store_written_by_a_later_build_is_refused(tmp_path: Path) -> None:
 
     connection = sqlite3.connect(path)
     try:
-        connection.execute("UPDATE schema_meta SET value = '3' WHERE key = 'schema_version'")
+        connection.execute("UPDATE schema_meta SET value = '999' WHERE key = 'schema_version'")
         connection.commit()
     finally:
         connection.close()
 
-    with pytest.raises(StoreError, match="schema version 3"):
+    with pytest.raises(StoreError, match="schema version 999"):
         CanonicalStore(path)
 
 
@@ -431,8 +586,8 @@ def test_a_stored_number_outside_the_decimal_range_is_a_store_error(tmp_path: Pa
     connection = sqlite3.connect(path)
     try:
         connection.execute(
-            "UPDATE current_state SET state = replace(state, '\"revision\":0',"
-            " '\"revision\":1e1000000000000000000') WHERE id = 0"
+            "UPDATE canonical_record SET payload = replace(payload, '\"revision\":0',"
+            " '\"revision\":1e1000000000000000000') WHERE ordinal = 0"
         )
         connection.commit()
     finally:
@@ -441,7 +596,7 @@ def test_a_stored_number_outside_the_decimal_range_is_a_store_error(tmp_path: Pa
     store = CanonicalStore(path)
     try:
         with pytest.raises(StoreError, match="does not decode"):
-            store.current_state()
+            store.initial_record()
     finally:
         store.close()
 

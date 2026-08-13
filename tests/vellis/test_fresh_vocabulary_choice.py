@@ -627,18 +627,18 @@ def test_a_store_written_by_a_later_build_is_still_this_owner_s(tmp_path: Path) 
     assert report.store is not None
     connection = sqlite3.connect(report.store)
     try:
-        connection.execute("UPDATE schema_meta SET value = '3' WHERE key = 'schema_version'")
+        connection.execute("UPDATE schema_meta SET value = '999' WHERE key = 'schema_version'")
         connection.commit()
     finally:
         connection.close()
 
-    with pytest.raises(UnreadableStoreError, match="schema version 3"):
+    with pytest.raises(UnreadableStoreError, match="schema version 999"):
         holds_established_memory(report.store)
 
     code, out, err = _confirmed_run(["--data-dir", str(report.store.parent), "--dry-run"])
 
     assert code == EXIT_FAILED
-    assert "schema version 3" in out
+    assert "schema version 999" in out
     assert "  starting vocabulary:" not in out
     assert "leave this system where it is" in err
 
@@ -859,7 +859,7 @@ def test_a_refusal_survives_a_reading_that_does_not(tmp_path: Path) -> None:
     assert first.succeeded and first.store is not None
     connection = sqlite3.connect(first.store)
     try:
-        connection.execute("UPDATE current_state SET state = '{not json' WHERE id = 0")
+        connection.execute("UPDATE current_state SET active_definitions = '{not json' WHERE id = 0")
         connection.commit()
     finally:
         connection.close()

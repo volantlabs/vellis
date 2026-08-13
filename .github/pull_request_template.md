@@ -43,6 +43,8 @@ non-goal and confirm the final full review cycle found no new material issue.
 - [ ] Slice reviews collected both lenses, batched in-scope remediation, and ran one final review
       pair without expanding the declared project assumptions or recursively reviewing the process.
 - [ ] Official model validation and `just check` pass.
+- [ ] When this is post-build evolution, `system-evolution.yaml` classifies each finding, preserves
+      approval boundaries, assigns one completion owner, and passes `just system-evolution-check`.
 - [ ] Adequacy and subtraction reviews found no responsibility stranded in prose and no unsupported
       service, runtime, storage, migration, transport, deployment, or inventory-driven architecture.
 - [ ] Natural identity, derived meaning, bounded responses, and existing authority were preferred
