@@ -7,7 +7,7 @@ evolution:
   approval:
     status: accepted
     reason: The owner accepted normalized SQLite state, prospective graph overlay, complete stored assessments with bounded retrieval, and streamed snapshots while preserving portable system meaning.
-    checkpoint: null
+    checkpoint: git:8109ab24c4dc58d81fbfe2fee0181b395089a61d
   blocker: null
   checkpoint: null
 baselines:
@@ -388,7 +388,7 @@ work_items:
     approval:
       status: accepted
       reason: The owner explicitly accepted the complete SQLite-native bounded-memory plan and requested its implementation.
-      checkpoint: null
+      checkpoint: git:8109ab24c4dc58d81fbfe2fee0181b395089a61d
     nearest_wrong_system: Complete semantic outcomes remain correct while their implementation is permitted to require one resident representation of all graph, definition, assessment, or replay state.
     compatibility_effect: System meaning is strengthened and the unreleased public contract gains prospective graph work and bounded assessment retrieval; no released compatibility is preserved.
     non_effects:
