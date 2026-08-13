@@ -32,7 +32,8 @@ from __future__ import annotations
 
 import secrets
 import sqlite3
-from contextlib import closing
+from collections.abc import Iterator
+from contextlib import closing, contextmanager
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -617,6 +618,21 @@ class CanonicalStore:
         """
         self._record_reads += 1
         return self._fetchone(sql, parameters)
+
+    @contextmanager
+    def read_snapshot(self) -> Iterator[None]:
+        """Keep several semantic reads on one committed SQLite snapshot."""
+        try:
+            with self._lock:
+                self._connection.execute("BEGIN")
+                try:
+                    yield
+                    self._connection.execute("COMMIT")
+                except BaseException:
+                    self._rollback_quietly()
+                    raise
+        except sqlite3.Error as error:
+            raise StoreError(f"could not read from the store at {self._path}: {error}") from error
 
     def current_state(self) -> CanonicalState:
         """Return the current canonical-state projection.

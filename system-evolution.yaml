@@ -20,16 +20,16 @@ baselines:
     checkpoint: git:e82e0e6161040baa4a4a728d05cabbd418c57d83
   target:
     model: sha256:ad02d24b6c6eeb38f904d551e0ae7dfd48101ff41e44db79effb3014e137e4c6
-    implementation: git:68d645bba9588135123e5d7177584382739bcbca
+    implementation: git:c88d3d188160137bc47616ad645edde96148eb59
     language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
     execution_environment: sha256:c24a0bae1e63d1f4923d6c7925925ea4e02743568a84b403677b5f6a718879fa
-    checkpoint: git:68d645bba9588135123e5d7177584382739bcbca
+    checkpoint: git:c88d3d188160137bc47616ad645edde96148eb59
   observed:
     model: sha256:ad02d24b6c6eeb38f904d551e0ae7dfd48101ff41e44db79effb3014e137e4c6
-    implementation: git:68d645bba9588135123e5d7177584382739bcbca
+    implementation: git:c88d3d188160137bc47616ad645edde96148eb59
     language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
     execution_environment: sha256:c24a0bae1e63d1f4923d6c7925925ea4e02743568a84b403677b5f6a718879fa
-    checkpoint: git:68d645bba9588135123e5d7177584382739bcbca
+    checkpoint: git:c88d3d188160137bc47616ad645edde96148eb59
 scope:
   authority_scope:
     - model/10-rtg-domain.sysml
@@ -190,7 +190,7 @@ findings:
     classification: implementation defect
     consequence: Identity validation proves only the broad object kind and silently treats a type-incompatible named identity as no jointly satisfying assignment.
     authority_refs:
-      - RTGSystem::'RTG System'::queryCurrentGraph
+      - RTGSystem::rtg_query
       - VellisVerification::invalidQuery
     evidence_refs:
       - command:uv run pytest tests/vellis/test_invalid_queries.py
@@ -291,6 +291,151 @@ findings:
     implementation_status: conforming
     nearest_wrong_system: Portable prose is neutral but the machine template teaches every adopter to use path:test-or-analysis#case.
     compatibility_effect: A convention-neutral placeholder preserves the schema while Vellis keeps path and command bindings locally.
+  - id: F018
+    summary: Absent proposal retrieval materializes the complete current graph.
+    classification: implementation defect
+    consequence: Asking whether a proposal exists decodes every unrelated graph object instead of reading the separately stored delta facet.
+    authority_refs:
+      - VellisRequirements::historyIndependentCurrentWork
+    evidence_refs:
+      - command:uv run pytest tests/vellis/test_current_work.py
+    disposition: implementation-work
+    owner_work_item_id: W007
+    implementation_status: partial
+    nearest_wrong_system: Definition summaries are facet-specific but definitionDelta still routes through complete-state assembly even when the delta is absent.
+    compatibility_effect: Proposal result meaning is unchanged; absence reads only revision, definitions, and delta facets.
+  - id: F019
+    summary: Accepted history entries can carry a later evaluated revision.
+    classification: implementation defect
+    consequence: Another connection can commit between ledger selection and current-revision retrieval, producing a history result for a tuple no committed state held.
+    authority_refs:
+      - RTG::'History Result'
+      - VellisRequirements::atomicCanonicalRevision
+    evidence_refs:
+      - command:uv run pytest tests/vellis/test_activity_history.py
+    disposition: implementation-work
+    owner_work_item_id: W007
+    implementation_status: partial
+    nearest_wrong_system: Per-call reads are individually committed but entries and evaluated revision do not share a SQLite read snapshot.
+    compatibility_effect: History selection and result shape remain unchanged while their revision binding becomes atomic.
+  - id: F020
+    summary: Multiple assigned link restrictions overwrite rather than intersect candidate sets.
+    classification: implementation defect
+    consequence: A later broad relationship can reintroduce endpoints excluded by an earlier relationship before property comparison.
+    authority_refs:
+      - VellisRequirements::historyIndependentCurrentWork
+      - VellisRequirements::semanticQueryMeaning
+    evidence_refs:
+      - command:uv run pytest tests/vellis/test_graph_queries.py
+    disposition: implementation-work
+    owner_work_item_id: W007
+    implementation_status: partial
+    nearest_wrong_system: Every link is ultimately checked, but early candidate narrowing preserves only the final applicable relationship.
+    compatibility_effect: Query rows remain identical; all applicable identity restrictions are intersected before data filtering.
+  - id: F021
+    summary: A resolved finding cites a nonexistent qualified model element.
+    classification: plan gap
+    consequence: Cold reconstruction cannot follow F010 from the evolution record to the accepted query operation authority.
+    authority_refs:
+      - RTGSystem::rtg_query
+    evidence_refs:
+      - command:just model-check
+    disposition: implementation-work
+    owner_work_item_id: W007
+    implementation_status: partial
+    nearest_wrong_system: The behavior and test conform while the durable evidence index points at an invented queryCurrentGraph name.
+    compatibility_effect: Correcting a navigation reference changes no model or product behavior.
+  - id: F022
+    summary: Evolution tests hard-code the prior active work item.
+    classification: implementation defect
+    consequence: Advancing from W006 to W004 makes the project gate fail and leaves completed W006 with non-passing evidence.
+    authority_refs:
+      - .agents/skills/sysml-evolution/references/evolution-record.md#baselines-and-lifecycle
+    evidence_refs:
+      - command:uv run pytest tests/test_system_evolution.py
+    disposition: implementation-work
+    owner_work_item_id: W008
+    implementation_status: partial
+    nearest_wrong_system: Tests address work by list position and assume one live record frontier forever.
+    compatibility_effect: Tests resolve stable IDs and continue to exercise the current active frontier.
+  - id: F023
+    summary: Final reviews are not bound to the exact target implementation checkpoint.
+    classification: plan gap
+    consequence: Old or off-history clean reviews can close a different implementation than the one declared as target.
+    authority_refs:
+      - .agents/skills/sysml-evolution/references/evolution-execution.md#review-and-remediation
+    evidence_refs:
+      - command:uv run pytest tests/test_system_evolution.py
+    disposition: implementation-work
+    owner_work_item_id: W008
+    implementation_status: partial
+    nearest_wrong_system: Review checkpoints need only resolve to some commit, not the exact target they claim to assess.
+    compatibility_effect: Final closure requires every declared lens at the reviewed target implementation checkpoint.
+  - id: F024
+    summary: Approval reconstruction ignores the approved consequence payload.
+    classification: plan gap
+    consequence: An accepted status can be retained while its reason or owner-facing gated consequence changes after the checkpoint.
+    authority_refs:
+      - .agents/skills/sysml-evolution/references/evolution-execution.md#approval-gates
+    evidence_refs:
+      - command:uv run pytest tests/test_system_evolution.py
+    disposition: implementation-work
+    owner_work_item_id: W008
+    implementation_status: partial
+    nearest_wrong_system: Historical validation sees accepted but does not compare the live approval reason, nearest wrong system, compatibility effect, or non-effects.
+    compatibility_effect: Vellis seals the consequence-bearing approval projection without adding Git to the portable contract.
+  - id: F025
+    summary: Complete closure permits an uncommitted evolution record.
+    classification: implementation defect
+    consequence: A dirty final record can validate although a cold agent cannot reconstruct that closure from the declared checkpoint.
+    authority_refs:
+      - .agents/skills/sysml-evolution/references/evolution-execution.md#closure-and-rebaseline
+    evidence_refs:
+      - command:uv run pytest tests/test_system_evolution.py
+    disposition: implementation-work
+    owner_work_item_id: W008
+    implementation_status: partial
+    nearest_wrong_system: Administrative record-only commits may follow implementation, so the validator also exempts an uncommitted record at complete lifecycle.
+    compatibility_effect: Active record transitions remain possible; complete validation requires a clean committed record.
+  - id: F026
+    summary: Historical baseline validation loses its declared dimension.
+    classification: plan gap
+    consequence: A model item can use an implementation Git commit and a target checkpoint can diverge from its implementation while still validating.
+    authority_refs:
+      - .agents/skills/sysml-evolution/references/evolution-record.md#baselines-and-lifecycle
+    evidence_refs:
+      - command:uv run pytest tests/test_system_evolution.py
+    disposition: implementation-work
+    owner_work_item_id: W008
+    implementation_status: partial
+    nearest_wrong_system: Any resolvable Git token bypasses historical identity recognition regardless of the dimension it occupies.
+    compatibility_effect: Vellis preserves dimension-specific identities and binds checkpoint to implementation Git state.
+  - id: F027
+    summary: Pytest command evidence need not resolve to an existing target.
+    classification: implementation defect
+    consequence: A syntactically safe but nonexistent test path can serve as closure evidence.
+    authority_refs:
+      - .agents/skills/sysml-evolution/references/evolution-record.md#work-items-and-evidence
+    evidence_refs:
+      - command:uv run pytest tests/test_system_evolution.py
+    disposition: implementation-work
+    owner_work_item_id: W008
+    implementation_status: partial
+    nearest_wrong_system: Prefix validation accepts uv run pytest tests/does_not_exist.py as a Vellis check.
+    compatibility_effect: Focused pytest evidence must resolve every named path or node.
+  - id: F028
+    summary: Out-of-scope findings can close without supporting evidence.
+    classification: plan gap
+    consequence: A disposition can remove an obligation from closure without attributable evidence that it is genuinely outside the evolution boundary.
+    authority_refs:
+      - .agents/skills/sysml-evolution/references/evolution-execution.md#closure-and-rebaseline
+    evidence_refs:
+      - command:uv run pytest tests/test_system_evolution.py
+    disposition: implementation-work
+    owner_work_item_id: W008
+    implementation_status: partial
+    nearest_wrong_system: Resolved and accepted findings require evidence, while out-of-scope is treated as self-proving.
+    compatibility_effect: Every closed disposition remains evidence-bearing.
 decisions:
   - id: D001
     summary: Keep live graph objects, definitions, and proposal state in addressable SQLite projections with no resident complete-state cache.
@@ -441,7 +586,7 @@ work_items:
     blocker: null
     checkpoint: git:284efc9
   - id: W004
-    order: 6
+    order: 9
     label: Review, reconcile, document, and rebaseline the evolution set
     kind: closure
     dependencies:
@@ -450,9 +595,11 @@ work_items:
       - W003
       - W005
       - W006
+      - W007
+      - W008
     planned_baseline:
       dimension: implementation
-      identity: git:68d645bba9588135123e5d7177584382739bcbca
+      identity: git:c88d3d188160137bc47616ad645edde96148eb59
     finding_ids:
       - F006
       - F007
@@ -471,8 +618,8 @@ work_items:
     non_effects:
       - The completed implementation campaign history is not rewritten.
       - User-owned .data content is not inspected or migrated.
-    lifecycle: active
-    implementation_status: partial
+    lifecycle: pending
+    implementation_status: not evaluated
     evidence_refs: []
     blocker: null
     checkpoint: null
@@ -558,6 +705,83 @@ work_items:
       - command:just system-evolution-check
     blocker: null
     checkpoint: git:68d645bba9588135123e5d7177584382739bcbca
+  - id: W007
+    order: 7
+    label: Correct final-review product semantics and resource defects
+    kind: implementation
+    dependencies:
+      - W006
+    planned_baseline:
+      dimension: implementation
+      identity: git:c88d3d188160137bc47616ad645edde96148eb59
+    finding_ids:
+      - F018
+      - F019
+      - F020
+      - F021
+    decision_ids: []
+    authority:
+      - refs:
+          - RTG::'History Result'
+          - RTGSystem::rtg_query
+          - VellisRequirements::atomicCanonicalRevision
+          - VellisRequirements::historyIndependentCurrentWork
+          - VellisRequirements::semanticQueryMeaning
+        coverage: full
+        remaining_work_item_ids: []
+    approval:
+      status: not-required
+      reason: Current accepted authority already distinguishes each product and evidence defect.
+      checkpoint: null
+    nearest_wrong_system: Public answers remain nominally correct while facet work, history revision binding, relationship pruning, or durable authority navigation is wrong.
+    compatibility_effect: Valid public result meaning and the unreleased store format decision remain unchanged.
+    non_effects:
+      - The SQLite-owned live-state decision remains accepted.
+      - The completed implementation campaign remains unchanged.
+      - User-owned .data remains untouched.
+    lifecycle: active
+    implementation_status: partial
+    evidence_refs: []
+    blocker: null
+    checkpoint: null
+  - id: W008
+    order: 8
+    label: Close final-review evolution-validator gaps
+    kind: implementation
+    dependencies:
+      - W007
+    planned_baseline:
+      dimension: implementation
+      identity: git:c88d3d188160137bc47616ad645edde96148eb59
+    finding_ids:
+      - F022
+      - F023
+      - F024
+      - F025
+      - F026
+      - F027
+      - F028
+    decision_ids: []
+    authority:
+      - refs:
+          - .agents/skills/sysml-evolution/references/evolution-record.md
+          - .agents/skills/sysml-evolution/references/evolution-execution.md
+        coverage: full
+        remaining_work_item_ids: []
+    approval:
+      status: not-required
+      reason: The changes enforce already documented closure, attribution, evidence, and baseline meaning.
+      checkpoint: null
+    nearest_wrong_system: The record looks closed but its review, approval, evidence, baseline, or committed-state attribution can describe another system.
+    compatibility_effect: Vellis binding validation strengthens without adding project technology to the portable contract.
+    non_effects:
+      - Portable schema semantics remain implementation and repository neutral.
+      - Completed campaign history remains immutable.
+    lifecycle: pending
+    implementation_status: not evaluated
+    evidence_refs: []
+    blocker: null
+    checkpoint: null
 closure:
   finding_disposition: open
   model_status: not evaluated

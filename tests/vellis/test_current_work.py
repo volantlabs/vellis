@@ -104,6 +104,26 @@ def test_definition_work_reads_only_the_durable_definition_facet(
         reopened.close()
 
 
+def test_absent_proposal_retrieval_decodes_no_graph_objects(tmp_path: Path) -> None:
+    system = _established(tmp_path)
+    try:
+        anchors = tuple(Anchor(f"a-{index}", "person", f"Person {index}") for index in range(500))
+        assert system.apply_graph_change(
+            GraphChange(anchor_upserts=anchors), provenance=Provenance(initiator="owner")
+        ).accepted
+        system.store.reset_instrumentation()
+
+        result = system.definition_delta()
+
+        assert result.accepted and result.definition_delta is None
+        assert system.store.current_projection_decodes == 0
+        assert system.store.current_graph_decodes == 0
+        assert system.store.current_graph_object_decodes == 0
+        assert system.store.current_definition_decodes == 1
+    finally:
+        system.close()
+
+
 def test_public_current_state_cannot_mutate_the_durable_projection(tmp_path: Path) -> None:
     system = _established(tmp_path)
     try:

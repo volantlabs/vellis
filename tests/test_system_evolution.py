@@ -1,12 +1,23 @@
 from __future__ import annotations
 
 import copy
+from typing import Any, cast
 
 from tools import system_evolution
 
 
 def _record() -> dict[str, object]:
     return system_evolution.load_record()
+
+
+def _work(record: dict[str, object], work_id: str) -> dict[str, object]:
+    items = cast(list[dict[str, object]], record["work_items"])
+    return next(item for item in items if item["id"] == work_id)
+
+
+def _active_work(record: dict[str, object]) -> dict[str, object]:
+    items = cast(list[dict[str, Any]], record["work_items"])
+    return next(item for item in items if item["lifecycle"] == "active")
 
 
 def test_committed_evolution_record_is_valid() -> None:
@@ -74,9 +85,10 @@ def test_complete_work_item_cannot_retain_open_owned_work() -> None:
 
 
 def test_status_reports_the_active_item_before_another_ready_item() -> None:
-    report = system_evolution.status(_record())  # type: ignore[arg-type]
+    record = _record()
+    report = system_evolution.status(record)  # type: ignore[arg-type]
 
-    assert "next_work: W006" in report
+    assert f"next_work: {_active_work(record)['id']}" in report
 
 
 def test_ready_work_requires_complete_dependencies() -> None:
@@ -100,14 +112,17 @@ def test_accepted_approval_requires_an_attributable_checkpoint() -> None:
 
 def test_active_work_cannot_remain_bound_only_to_a_source_baseline() -> None:
     record = copy.deepcopy(_record())
-    record["work_items"][5]["planned_baseline"] = {  # type: ignore[index]
+    active = _active_work(record)
+    active["planned_baseline"] = {
         "dimension": "implementation",
         "identity": record["baselines"]["source"]["implementation"],  # type: ignore[index]
     }
 
     findings = system_evolution.validate_record(record)  # type: ignore[arg-type]
 
-    assert any("active work item W006 has stale planned baseline" in each for each in findings)
+    assert any(
+        f"active work item {active['id']} has stale planned baseline" in each for each in findings
+    )
 
 
 def test_complete_work_requires_complete_dependencies() -> None:
@@ -271,14 +286,17 @@ def test_observed_baseline_is_derived_from_the_repository() -> None:
 
 def test_planned_baseline_names_one_dimension_not_any_matching_token() -> None:
     record = copy.deepcopy(_record())
-    record["work_items"][5]["planned_baseline"] = {  # type: ignore[index]
+    active = _active_work(record)
+    active["planned_baseline"] = {
         "dimension": "implementation",
         "identity": record["baselines"]["observed"]["execution_environment"],  # type: ignore[index]
     }
 
     findings = system_evolution.validate_record(record)  # type: ignore[arg-type]
 
-    assert any("active work item W006 has stale planned baseline" in each for each in findings)
+    assert any(
+        f"active work item {active['id']} has stale planned baseline" in each for each in findings
+    )
 
 
 def test_completed_work_rejects_an_unrecognized_historical_baseline() -> None:
@@ -327,7 +345,7 @@ def test_every_finding_requires_one_completion_owner() -> None:
 
 def test_dependency_order_must_precede_the_dependent() -> None:
     record = copy.deepcopy(_record())
-    record["work_items"][5]["order"] = 2  # type: ignore[index]
+    _work(record, "W006")["order"] = 2
 
     findings = system_evolution.validate_record(record)  # type: ignore[arg-type]
 
@@ -337,7 +355,7 @@ def test_dependency_order_must_precede_the_dependent() -> None:
 def test_lifecycle_rollup_requires_matching_executable_or_approval_frontier() -> None:
     ready = copy.deepcopy(_record())
     ready["evolution"]["lifecycle"] = "ready"  # type: ignore[index]
-    ready["work_items"][5]["lifecycle"] = "pending"  # type: ignore[index]
+    _work(ready, "W004")["lifecycle"] = "pending"
     awaiting = copy.deepcopy(ready)
     awaiting["evolution"]["lifecycle"] = "awaiting-approval"  # type: ignore[index]
 

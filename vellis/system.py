@@ -544,15 +544,23 @@ class RTGSystem:
     def definition_delta(self, *, provenance: Provenance = UNATTRIBUTED) -> DefinitionDeltaResult:
         """Return the sole proposal with a current assessment, or normal absence."""
         try:
-            state = self._working_state()
+            revision, _, delta = self._store.current_definitions()
+            if delta is None:
+                result = DefinitionDeltaResult(
+                    status=OperationStatus.ACCEPTED,
+                    summary="there is no proposal",
+                    evaluated_revision=revision,
+                )
+            else:
+                # A present proposal must still be assessed against all current graph
+                # objects. Normal absence needs only the separately stored delta facet.
+                result = _delta_result(self._working_state(), "the current proposal")
         except StoreError as error:
             result = DefinitionDeltaResult(
                 status=OperationStatus.FAILED,
                 summary=f"the proposal could not be retrieved: {error}",
                 findings=(ValidationFinding(summary=str(error)),),
             )
-        else:
-            result = _delta_result(state, "the current proposal")
         self._observe(
             "definitionDelta",
             result.status,
@@ -1222,15 +1230,13 @@ class RTGSystem:
 
     def _read_history(self, query: HistoryQuery) -> HistoryResult:
         try:
-            entries = (
-                _canonical_entries(self, query)
-                if query.kind is HistoryKind.CANONICAL
-                else _activity_entries(self, query)
-            )
-            # After the entries, not before: a commit landing between the two reads would
-            # otherwise produce a result claiming one revision while carrying records from
-            # another, which is a state the ledger never held.
-            revision = self._store.current_revision()
+            with self._store.read_snapshot():
+                entries = (
+                    _canonical_entries(self, query)
+                    if query.kind is HistoryKind.CANONICAL
+                    else _activity_entries(self, query)
+                )
+                revision = self._store.current_revision()
         except NotInitializedError as error:
             return HistoryResult(
                 status=OperationStatus.REJECTED,

@@ -1024,17 +1024,13 @@ def _component_assignments(query: GraphQuery, index: QueryCandidateIndex):
         group.name: index.anchor_candidates(group, allowed_by_endpoint.get(group.name))
         for group in query.anchor_groups
     }
-    anchor_by_uuid = {
-        name: {anchor.uuid: anchor for anchor in candidates}
-        for name, candidates in anchor_candidates.items()
-    }
 
     def walk_groups(position: int, assignment: _Assignment):
         if position == len(query.anchor_groups):
             yield from walk_conditions(0, assignment)
             return
         group = query.anchor_groups[position]
-        candidates = anchor_candidates[group.name]
+        permitted = {anchor.uuid for anchor in anchor_candidates[group.name]}
         for required in query.required_links:
             pair_maps = link_pair_maps.get(required.name)
             if pair_maps is None:
@@ -1045,22 +1041,16 @@ def _component_assignments(query: GraphQuery, index: QueryCandidateIndex):
                 and required.source_group in assignment.endpoints
             ):
                 source_uuid = assignment.endpoints[required.source_group].uuid
-                candidates = tuple(
-                    anchor_by_uuid[group.name][target_uuid]
-                    for target_uuid in targets_by_source.get(source_uuid, ())
-                    if target_uuid in anchor_by_uuid[group.name]
-                )
+                permitted &= targets_by_source.get(source_uuid, set())
             elif (
                 required.source_group == group.name
                 and required.target_group in assignment.endpoints
             ):
                 target_uuid = assignment.endpoints[required.target_group].uuid
-                candidates = tuple(
-                    anchor_by_uuid[group.name][source_uuid]
-                    for source_uuid in sources_by_target.get(target_uuid, ())
-                    if source_uuid in anchor_by_uuid[group.name]
-                )
-        for anchor in candidates:
+                permitted &= sources_by_target.get(target_uuid, set())
+        for anchor in anchor_candidates[group.name]:
+            if anchor.uuid not in permitted:
+                continue
             yield from walk_groups(
                 position + 1,
                 _Assignment(

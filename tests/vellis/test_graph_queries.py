@@ -312,6 +312,54 @@ def test_sparse_directed_links_constrain_endpoint_decoding_before_join(
     assert system.store.current_graph_decodes == 0
 
 
+def test_multiple_assigned_link_restrictions_are_intersected_before_data_filtering(
+    system: RTGSystem,
+) -> None:
+    assert system.apply_graph_change(
+        GraphChange(
+            associated_data_upserts=(
+                _note("project-note-1", ("p-1",), rating=4),
+                _note("project-note-2", ("p-2",), rating=4),
+            ),
+        ),
+        provenance=_owner(),
+    ).accepted
+    query = GraphQuery(
+        anchor_groups=(
+            _people("first", uuid_filter=AnchorUuidFilter(("a-1",))),
+            _people("second", uuid_filter=AnchorUuidFilter(("a-2",))),
+            AnchorGroup("projects", "project"),
+        ),
+        data_conditions=(
+            AssociatedDataCondition(
+                "projectNotes",
+                "projects",
+                "note",
+                property_conditions=(
+                    DataPropertyCondition(
+                        "rating", PropertyComparison.GREATER_THAN_OR_EQUAL, normalize(4)
+                    ),
+                ),
+            ),
+        ),
+        required_links=(
+            RequiredLink("firstWork", "first", "projects", "worksOn"),
+            RequiredLink("secondWork", "second", "projects", "worksOn"),
+        ),
+        return_shape=ReturnShape((AnchorProjection("project", "projects"),)),
+        maximum_rows=10,
+    )
+    system.store.reset_instrumentation()
+
+    result = system.query_graph(query)
+
+    assert result.accepted, result.findings
+    assert _bound_anchors(result) == {"p-1"}
+    # Four globally link-relevant anchors, both Orbit notes, and two returned links.
+    # Compiler's matching note is excluded before property comparison.
+    assert system.store.current_graph_object_decodes == 8
+
+
 def _worked_on(uuid_filter: LinkUuidFilter | None = None) -> GraphQuery:
     return GraphQuery(
         anchor_groups=(_people(), AnchorGroup(name="projects", anchor_type="project")),

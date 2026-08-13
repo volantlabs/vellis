@@ -512,6 +512,35 @@ def test_an_accepted_history_result_carries_its_evaluated_revision(system: RTGSy
     assert _activity(system).evaluated_revision == 1
 
 
+def test_history_entries_and_evaluated_revision_share_one_read_snapshot(
+    tmp_path: Path,
+) -> None:
+    reader = RTGSystem.open(tmp_path / "vellis.sqlite3")
+    assert reader.initialize_fresh(
+        build_rich_definitions(), provenance=_owner(), initialization_summary="a fresh start"
+    ).accepted
+    writer = RTGSystem.open(tmp_path / "vellis.sqlite3")
+    original = reader.store.current_revision
+
+    def commit_then_read_revision() -> int:
+        assert writer.apply_graph_change(
+            GraphChange(anchor_upserts=(ADA,)), provenance=Provenance(initiator="other process")
+        ).accepted
+        reader.store.current_revision = original  # type: ignore[method-assign]
+        return original()
+
+    reader.store.current_revision = commit_then_read_revision  # type: ignore[method-assign]
+    try:
+        result = _canonical(reader)
+
+        assert result.evaluated_revision == 0
+        assert [entry.revision for entry in result.canonical_entries] == [0]
+        assert writer.current_state().revision == 1
+    finally:
+        writer.close()
+        reader.close()
+
+
 # --- One interval means one thing, wherever the caller's clock is ----------------------
 
 
