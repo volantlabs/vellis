@@ -17,6 +17,7 @@ from pathlib import Path
 
 import pytest
 
+from tests.vellis.evolution_support import activate_clean_delta, stage_complete_fixture
 from vellis.canonical import Provenance, canonical_state_equal
 from vellis.changes import GraphChange
 from vellis.definitions import (
@@ -30,7 +31,13 @@ from vellis.graph import Anchor
 from vellis.history import RevisionSelection, TimeSelection
 from vellis.json_value import JsonKind
 from vellis.outcomes import OperationStatus
-from vellis.query import AnchorGroup, AnchorProjection, GraphQuery, ReturnShape
+from vellis.query import (
+    AnchorGroup,
+    AnchorProjection,
+    EvaluatedStateScope,
+    GraphQuery,
+    ReturnShape,
+)
 from vellis.system import RTGSystem
 
 PERSON = AnchorTypeDefinition(type_key="person", description="A person the owner knows.")
@@ -77,8 +84,8 @@ def system(tmp_path: Path):
     assert system.apply_graph_change(
         GraphChange(anchor_removals=("r-1",)), provenance=_owner()
     ).accepted
-    assert system.set_definition_delta(LATER, provenance=_owner()).accepted
-    assert system.activate_definition_delta(provenance=_owner()).accepted
+    assert stage_complete_fixture(system, LATER, provenance=_owner()).accepted
+    assert activate_clean_delta(system, provenance=_owner()).accepted
     assert system.current_state().revision == 5
     try:
         yield system
@@ -166,7 +173,11 @@ def test_a_time_resolves_to_the_greatest_revision_at_or_before_it(system: RTGSys
     """Excludes requiring a time to name a moment something happened."""
     between = _recorded_at(system, 2) + timedelta(microseconds=1)
 
-    result = system.definition_summary(selection=TimeSelection(between), provenance=_owner())
+    result = system.definition_summary(
+        state_scope=EvaluatedStateScope.HISTORICAL,
+        selection=TimeSelection(between),
+        provenance=_owner(),
+    )
 
     assert result.accepted, result.findings
     assert result.evaluated_revision == 2
@@ -175,7 +186,11 @@ def test_a_time_resolves_to_the_greatest_revision_at_or_before_it(system: RTGSys
 def test_a_time_exactly_at_a_commit_selects_that_revision(system: RTGSystem) -> None:
     at_two = _recorded_at(system, 2)
 
-    result = system.definition_summary(selection=TimeSelection(at_two), provenance=_owner())
+    result = system.definition_summary(
+        state_scope=EvaluatedStateScope.HISTORICAL,
+        selection=TimeSelection(at_two),
+        provenance=_owner(),
+    )
 
     assert result.accepted, result.findings
     assert result.evaluated_revision == 2
@@ -184,7 +199,11 @@ def test_a_time_exactly_at_a_commit_selects_that_revision(system: RTGSystem) -> 
 def test_a_time_before_anything_was_committed_resolves_to_nothing(system: RTGSystem) -> None:
     before = _recorded_at(system, 0) - timedelta(days=1)
 
-    result = system.definition_summary(selection=TimeSelection(before), provenance=_owner())
+    result = system.definition_summary(
+        state_scope=EvaluatedStateScope.HISTORICAL,
+        selection=TimeSelection(before),
+        provenance=_owner(),
+    )
 
     assert result.status is OperationStatus.REJECTED
     assert result.evaluated_revision is None
@@ -197,7 +216,11 @@ def test_a_summarys_resolved_revision_can_be_reused_for_inspection_and_query(
 ) -> None:
     """The arc the verification case names: resolve once by time, then ask by revision."""
     between = _recorded_at(system, 2) + timedelta(microseconds=1)
-    summary = system.definition_summary(selection=TimeSelection(between), provenance=_owner())
+    summary = system.definition_summary(
+        state_scope=EvaluatedStateScope.HISTORICAL,
+        selection=TimeSelection(between),
+        provenance=_owner(),
+    )
     assert summary.accepted, summary.findings
     resolved = summary.evaluated_revision
     assert resolved is not None
@@ -223,7 +246,11 @@ def test_a_summarys_resolved_revision_can_be_reused_for_inspection_and_query(
 
 def test_a_cold_agent_discovers_definitions_later_retired(system: RTGSystem) -> None:
     """Excludes answering historical discovery from the current vocabulary."""
-    then = system.definition_summary(selection=RevisionSelection(2), provenance=_owner())
+    then = system.definition_summary(
+        state_scope=EvaluatedStateScope.HISTORICAL,
+        selection=RevisionSelection(2),
+        provenance=_owner(),
+    )
     current = system.definition_summary(provenance=_owner())
 
     assert then.accepted and current.accepted
@@ -236,15 +263,27 @@ def test_a_historical_summary_reports_delta_presence_at_that_state(
 ) -> None:
     """A proposal stood at revision 4 and was activated at 5."""
     assert (
-        system.definition_summary(selection=RevisionSelection(4), provenance=_owner()).delta_present
+        system.definition_summary(
+            state_scope=EvaluatedStateScope.HISTORICAL,
+            selection=RevisionSelection(4),
+            provenance=_owner(),
+        ).delta_present
         is True
     )
     assert (
-        system.definition_summary(selection=RevisionSelection(3), provenance=_owner()).delta_present
+        system.definition_summary(
+            state_scope=EvaluatedStateScope.HISTORICAL,
+            selection=RevisionSelection(3),
+            provenance=_owner(),
+        ).delta_present
         is False
     )
     assert (
-        system.definition_summary(selection=RevisionSelection(5), provenance=_owner()).delta_present
+        system.definition_summary(
+            state_scope=EvaluatedStateScope.HISTORICAL,
+            selection=RevisionSelection(5),
+            provenance=_owner(),
+        ).delta_present
         is False
     )
 
@@ -290,7 +329,9 @@ def test_an_unresolved_selection_returns_no_content_and_no_evaluated_revision(
 ) -> None:
     before = system.current_state()
 
-    summary = system.definition_summary(selection=selection, provenance=_owner())
+    summary = system.definition_summary(
+        state_scope=EvaluatedStateScope.HISTORICAL, selection=selection, provenance=_owner()
+    )
     inspection = system.inspect_definitions(
         DefinitionInspectionRequest(anchor_type_keys=("person",)),
         selection=selection,
@@ -312,7 +353,9 @@ def test_a_time_selector_without_a_zone_is_refused(system: RTGSystem) -> None:
     from datetime import datetime
 
     result = system.definition_summary(
-        selection=TimeSelection(datetime(2020, 1, 1)), provenance=_owner()
+        state_scope=EvaluatedStateScope.HISTORICAL,
+        selection=TimeSelection(datetime(2020, 1, 1)),
+        provenance=_owner(),
     )
 
     assert result.status is OperationStatus.REJECTED
@@ -326,7 +369,11 @@ def test_a_historical_read_changes_no_canonical_state(system: RTGSystem) -> None
     assert system.query_graph(
         _people(), selection=RevisionSelection(1), provenance=_owner()
     ).accepted
-    assert system.definition_summary(selection=RevisionSelection(1), provenance=_owner()).accepted
+    assert system.definition_summary(
+        state_scope=EvaluatedStateScope.HISTORICAL,
+        selection=RevisionSelection(1),
+        provenance=_owner(),
+    ).accepted
 
     assert canonical_state_equal(system.current_state(), before)
     assert system.store.canonical_record_count() == records
@@ -368,13 +415,15 @@ def test_a_historical_summary_skips_the_graph_work_between_definition_changes(
                 EARLY, provenance=_owner(), initialization_summary="a fresh start"
             ).accepted
             _graph_history(system, mutations, "m")
-            assert system.set_definition_delta(LATER, provenance=_owner()).accepted
-            assert system.activate_definition_delta(provenance=_owner()).accepted
+            assert stage_complete_fixture(system, LATER, provenance=_owner()).accepted
+            assert activate_clean_delta(system, provenance=_owner()).accepted
             selected = system.current_state().revision
 
             system.store.reset_instrumentation()
             result = system.definition_summary(
-                selection=RevisionSelection(selected), provenance=_owner()
+                state_scope=EvaluatedStateScope.HISTORICAL,
+                selection=RevisionSelection(selected),
+                provenance=_owner(),
             )
             assert result.accepted, result.findings
             assert {each.type_key for each in result.anchor_types} == {"person"}
@@ -417,7 +466,11 @@ def test_resolving_a_time_selector_does_not_walk_the_ledger(tmp_path: Path) -> N
         _graph_history(system, 200, "later")
 
         system.store.reset_instrumentation()
-        result = system.definition_summary(selection=TimeSelection(early), provenance=_owner())
+        result = system.definition_summary(
+            state_scope=EvaluatedStateScope.HISTORICAL,
+            selection=TimeSelection(early),
+            provenance=_owner(),
+        )
 
         assert result.accepted, result.findings
         assert result.evaluated_revision == 2
@@ -433,8 +486,16 @@ def test_the_vocabulary_at_a_revision_is_the_one_in_force_then(system: RTGSystem
     Revision 4 stages the narrower proposal; revision 5 activates it. Only activation
     moves the active set.
     """
-    before = system.definition_summary(selection=RevisionSelection(4), provenance=_owner())
-    after = system.definition_summary(selection=RevisionSelection(5), provenance=_owner())
+    before = system.definition_summary(
+        state_scope=EvaluatedStateScope.HISTORICAL,
+        selection=RevisionSelection(4),
+        provenance=_owner(),
+    )
+    after = system.definition_summary(
+        state_scope=EvaluatedStateScope.HISTORICAL,
+        selection=RevisionSelection(5),
+        provenance=_owner(),
+    )
 
     assert {each.type_key for each in before.anchor_types} == {"person", "ritual"}
     assert {each.type_key for each in after.anchor_types} == {"person"}
@@ -465,7 +526,9 @@ def test_a_time_bound_in_another_zone_resolves_to_the_same_revision(
 
     assert (
         system.definition_summary(
-            selection=TimeSelection(elsewhere), provenance=_owner()
+            state_scope=EvaluatedStateScope.HISTORICAL,
+            selection=TimeSelection(elsewhere),
+            provenance=_owner(),
         ).evaluated_revision
         == 2
     )
@@ -507,7 +570,11 @@ def test_a_historical_read_is_observed_with_the_revision_it_reached(
 ) -> None:
     from vellis.activity import HistoryKind, HistoryQuery
 
-    assert system.definition_summary(selection=RevisionSelection(2), provenance=_owner()).accepted
+    assert system.definition_summary(
+        state_scope=EvaluatedStateScope.HISTORICAL,
+        selection=RevisionSelection(2),
+        provenance=_owner(),
+    ).accepted
     assert system.query_graph(
         _rituals(), selection=RevisionSelection(2), provenance=_owner()
     ).accepted
@@ -528,7 +595,11 @@ def test_a_store_that_cannot_answer_a_historical_read_reports_a_failure(
     system.store._connection.commit()  # noqa: SLF001
 
     # Revision 5 can answer from normalized definition rows; revision 2 needs graph rows.
-    summary = system.definition_summary(selection=RevisionSelection(5), provenance=_owner())
+    summary = system.definition_summary(
+        state_scope=EvaluatedStateScope.HISTORICAL,
+        selection=RevisionSelection(5),
+        provenance=_owner(),
+    )
     query = system.query_graph(_rituals(), selection=RevisionSelection(2), provenance=_owner())
 
     assert summary.accepted
@@ -546,8 +617,12 @@ def test_delta_retrieval_answers_about_now_however_far_back_was_just_read(
     influenced by the historical read would say otherwise.
     """
     assert (
-        system.definition_summary(selection=RevisionSelection(4), provenance=_owner()).delta_present
+        system.definition_summary(
+            state_scope=EvaluatedStateScope.HISTORICAL,
+            selection=RevisionSelection(4),
+            provenance=_owner(),
+        ).delta_present
         is True
     )
 
-    assert system.definition_delta(provenance=_owner()).definition_delta is None
+    assert system.definition_delta(provenance=_owner()).proposed_definition_identity is None

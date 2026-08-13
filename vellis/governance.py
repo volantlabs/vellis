@@ -23,8 +23,17 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from vellis.canonical import DefinitionDelta
-from vellis.definitions import GraphDefinitionSet, validate_definition_set
+from vellis.definitions import (
+    AnchorTypeDefinition,
+    AssociatedDataTypeDefinition,
+    DirectAssociationEnd,
+    GraphDefinitionSet,
+    LinkEnd,
+    LinkTypeDefinition,
+    RelationshipConstraint,
+    relationship_identity,
+    validate_definition_set,
+)
 from vellis.graph import Graph
 from vellis.outcomes import (
     OperationStatus,
@@ -34,19 +43,146 @@ from vellis.outcomes import (
 )
 from vellis.validation import assess_graph_conformance
 
-__all__ = ["DefinitionDeltaResult", "SetDefinitionDeltaRequest", "assess_proposal"]
+__all__ = [
+    "ActivateDefinitionDeltaRequest",
+    "DefinitionChange",
+    "DefinitionDeltaResult",
+    "DirectAssociationMultiplicitySelection",
+    "LinkMultiplicitySelection",
+    "SetDefinitionDeltaRequest",
+    "apply_definition_change",
+    "assess_proposal",
+    "definition_change_findings",
+]
+
+
+@dataclass(frozen=True, slots=True)
+class LinkMultiplicitySelection:
+    link_type_key: str
+    constrained_end: LinkEnd
+    constrained_endpoint_type_keys: tuple[str, ...]
+    opposite_endpoint_type_keys: tuple[str, ...]
+
+    def identity(self) -> tuple[object, ...]:
+        return (
+            "linkMultiplicity",
+            self.link_type_key,
+            self.constrained_end,
+            frozenset(self.constrained_endpoint_type_keys),
+            frozenset(self.opposite_endpoint_type_keys),
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class DirectAssociationMultiplicitySelection:
+    constrained_end: DirectAssociationEnd
+    anchor_type_keys: tuple[str, ...]
+    associated_data_type_keys: tuple[str, ...]
+
+    def identity(self) -> tuple[object, ...]:
+        return (
+            "directAssociationMultiplicity",
+            self.constrained_end,
+            frozenset(self.anchor_type_keys),
+            frozenset(self.associated_data_type_keys),
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class DefinitionChange:
+    """One bounded natural-keyed edit of proposed definition meaning."""
+
+    anchor_type_upserts: tuple[AnchorTypeDefinition, ...] = ()
+    associated_data_type_upserts: tuple[AssociatedDataTypeDefinition, ...] = ()
+    link_type_upserts: tuple[LinkTypeDefinition, ...] = ()
+    relationship_constraint_upserts: tuple[RelationshipConstraint, ...] = ()
+    type_removals: tuple[str, ...] = ()
+    link_multiplicity_removals: tuple[LinkMultiplicitySelection, ...] = ()
+    direct_association_multiplicity_removals: tuple[
+        DirectAssociationMultiplicitySelection, ...
+    ] = ()
+
+
+def definition_change_findings(change: DefinitionChange) -> tuple[ValidationFinding, ...]:
+    """Return duplicate and upsert/removal conflicts in one keyed edit."""
+    findings: list[ValidationFinding] = []
+    type_commands = [
+        *(each.type_key for each in change.anchor_type_upserts),
+        *(each.type_key for each in change.associated_data_type_upserts),
+        *(each.type_key for each in change.link_type_upserts),
+        *change.type_removals,
+    ]
+    seen: set[str] = set()
+    for key in type_commands:
+        if key in seen:
+            findings.append(
+                ValidationFinding(
+                    summary=f"type key {key!r} has more than one command in the edit",
+                    implicated_definitions=(f"type:{key}",),
+                )
+            )
+        seen.add(key)
+    relationship_commands = [
+        *(relationship_identity(each) for each in change.relationship_constraint_upserts),
+        *(each.identity() for each in change.link_multiplicity_removals),
+        *(each.identity() for each in change.direct_association_multiplicity_removals),
+    ]
+    seen_relationships: set[tuple[object, ...]] = set()
+    for identity in relationship_commands:
+        if identity in seen_relationships:
+            findings.append(
+                ValidationFinding(summary="a multiplicity natural identity has multiple commands")
+            )
+        seen_relationships.add(identity)
+    return tuple(findings)
+
+
+def apply_definition_change(
+    base: GraphDefinitionSet, change: DefinitionChange
+) -> GraphDefinitionSet:
+    """Apply one keyed edit; callers validate duplicate/conflicting commands first."""
+
+    replaced_types = {
+        *(each.type_key for each in change.anchor_type_upserts),
+        *(each.type_key for each in change.associated_data_type_upserts),
+        *(each.type_key for each in change.link_type_upserts),
+    }
+    removed_types = {*change.type_removals, *replaced_types}
+
+    def replaced(values, upserts):
+        kept = [each for each in values if each.type_key not in removed_types]
+        return (*kept, *upserts)
+
+    removal_identities = {
+        *(selection.identity() for selection in change.link_multiplicity_removals),
+        *(selection.identity() for selection in change.direct_association_multiplicity_removals),
+    }
+    upserts = {relationship_identity(each): each for each in change.relationship_constraint_upserts}
+    relationships = [
+        upserts.pop(relationship_identity(each), each)
+        for each in base.relationship_constraints
+        if relationship_identity(each) not in removal_identities
+    ]
+    return GraphDefinitionSet(
+        anchor_types=replaced(base.anchor_types, change.anchor_type_upserts),
+        associated_data_types=replaced(
+            base.associated_data_types, change.associated_data_type_upserts
+        ),
+        link_types=replaced(base.link_types, change.link_type_upserts),
+        relationship_constraints=(*relationships, *upserts.values()),
+    )
 
 
 @dataclass(frozen=True, slots=True)
 class SetDefinitionDeltaRequest:
-    """What an owner offers as the next vocabulary.
+    """One bounded keyed edit of the sole proposed vocabulary."""
 
-    A named request rather than a bare definition set, because that is what the model
-    declares the operation takes — and a request is the thing a later field would be
-    added to.
-    """
+    change: DefinitionChange
 
-    proposed_definitions: GraphDefinitionSet
+
+@dataclass(frozen=True, slots=True)
+class ActivateDefinitionDeltaRequest:
+    assessment_id: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -62,7 +198,12 @@ class DefinitionDeltaResult:
     status: OperationStatus
     summary: str
     findings: tuple[ValidationFinding, ...] = ()
-    definition_delta: DefinitionDelta | None = None
+    proposed_definition_identity: str | None = None
+    graph_overlay_identity: str | None = None
+    staged_anchor_count: int | None = None
+    staged_associated_data_count: int | None = None
+    staged_link_count: int | None = None
+    staged_removal_count: int | None = None
     assessment: ValidationReport | None = None
     evaluated_revision: int | None = None
     resulting_revision: int | None = None

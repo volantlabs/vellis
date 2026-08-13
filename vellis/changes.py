@@ -17,11 +17,25 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 from dataclasses import dataclass
+from enum import Enum
 
 from vellis.graph import Anchor, AssociatedDataObject, Graph, GraphObject, Link, ObjectKind
 from vellis.outcomes import ValidationFinding
 
-__all__ = ["GraphChange", "apply_change", "change_findings"]
+__all__ = [
+    "GraphChange",
+    "GraphChangeRequest",
+    "GraphChangeTarget",
+    "apply_change",
+    "change_findings",
+]
+
+
+class GraphChangeTarget(Enum):
+    """Select active canonical state or the sole prospective overlay."""
+
+    ACTIVE = "active"
+    DEFINITION_DELTA = "definitionDelta"
 
 
 @dataclass(frozen=True, slots=True)
@@ -47,6 +61,24 @@ class GraphChange:
             *((ObjectKind.ANCHOR, each) for each in self.anchor_removals),
             *((ObjectKind.ASSOCIATED_DATA, each) for each in self.associated_data_removals),
             *((ObjectKind.LINK, each) for each in self.link_removals),
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class GraphChangeRequest:
+    """One explicit change directed at active or prospective state."""
+
+    target: GraphChangeTarget
+    change: GraphChange
+    anchor_unstaging: tuple[str, ...] = ()
+    associated_data_unstaging: tuple[str, ...] = ()
+    link_unstaging: tuple[str, ...] = ()
+
+    def unstaging(self) -> tuple[tuple[ObjectKind, str], ...]:
+        return (
+            *((ObjectKind.ANCHOR, each) for each in self.anchor_unstaging),
+            *((ObjectKind.ASSOCIATED_DATA, each) for each in self.associated_data_unstaging),
+            *((ObjectKind.LINK, each) for each in self.link_unstaging),
         )
 
 

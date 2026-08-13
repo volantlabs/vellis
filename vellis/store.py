@@ -52,9 +52,30 @@ from vellis.canonical import (
     InitialStateRecord,
     Provenance,
     TransitionKind,
+    now,
 )
-from vellis.changes import GraphChange, apply_change, change_findings
-from vellis.definitions import GraphDefinitionSet
+from vellis.changes import (
+    GraphChange,
+    GraphChangeRequest,
+    GraphChangeTarget,
+    apply_change,
+    change_findings,
+)
+from vellis.definitions import (
+    AnchorTypeDefinition,
+    AssociatedDataTypeDefinition,
+    DirectAssociationEnd,
+    DirectAssociationMultiplicityConstraint,
+    EndpointConstraint,
+    GraphDefinitionSet,
+    LinkEnd,
+    LinkMultiplicityConstraint,
+    LinkTypeDefinition,
+    relationship_identity,
+    relationship_label,
+    validate_definition_set,
+)
+from vellis.governance import DefinitionChange, definition_change_findings
 from vellis.graph import (
     Anchor,
     AssociatedDataObject,
@@ -66,7 +87,10 @@ from vellis.graph import (
 )
 from vellis.json_value import JsonKind, json_equal
 from vellis.normalized import (
+    definition_content_stats,
+    definition_entry_digest,
     definition_identity,
+    definition_identity_from_stats,
     insert_definition_set,
     insert_object_value,
     json_storage_fields,
@@ -76,7 +100,13 @@ from vellis.normalized import (
     object_identity,
     semantic_identity,
 )
-from vellis.outcomes import OperationStatus, ValidationFinding
+from vellis.outcomes import (
+    OperationStatus,
+    RevisionedOutcome,
+    ValidationFinding,
+    ValidationReport,
+    ValidationScope,
+)
 from vellis.validation import assess_graph_conformance
 
 if TYPE_CHECKING:
@@ -89,6 +119,7 @@ __all__ = [
     "ForeignDatabaseError",
     "NotADatabaseError",
     "NotInitializedError",
+    "ProposalState",
     "StoreError",
     "UnreadableStoreError",
     "holds_established_memory",
@@ -163,7 +194,9 @@ CREATE INDEX activity_record_time ON activity_record (recorded_at);
 CREATE INDEX canonical_record_time ON canonical_record (recorded_at);
 CREATE INDEX canonical_record_kind ON canonical_record (record_kind, established_revision);
 CREATE TABLE definition_set (
-    identity TEXT PRIMARY KEY
+    identity TEXT PRIMARY KEY,
+    content_accumulator TEXT NOT NULL,
+    entry_count INTEGER NOT NULL
 );
 CREATE TABLE definition_type (
     definition_set_id TEXT NOT NULL REFERENCES definition_set(identity),
@@ -234,6 +267,7 @@ CREATE TABLE definition_endpoint_permission (
 CREATE TABLE definition_multiplicity_rule (
     definition_set_id TEXT NOT NULL REFERENCES definition_set(identity),
     occurrence INTEGER NOT NULL,
+    natural_key TEXT NOT NULL,
     rule_kind TEXT NOT NULL,
     link_type_key TEXT,
     constrained_end TEXT NOT NULL,
@@ -264,6 +298,12 @@ CREATE TABLE object_value (
 );
 CREATE INDEX object_value_selector
     ON object_value(object_kind, type_key, uuid, source_uuid, target_uuid);
+CREATE INDEX object_value_uuid ON object_value(uuid, id);
+CREATE INDEX object_value_type_key ON object_value(type_key, object_kind, id);
+CREATE INDEX object_value_link_source
+    ON object_value(source_uuid, type_key, id) WHERE object_kind = 'link';
+CREATE INDEX object_value_link_target
+    ON object_value(target_uuid, type_key, id) WHERE object_kind = 'link';
 CREATE TABLE object_metadata (
     object_value_id INTEGER NOT NULL REFERENCES object_value(id),
     ordinal INTEGER NOT NULL,
@@ -299,11 +339,15 @@ CREATE TABLE state_head (
     revision       INTEGER NOT NULL,
     established_by INTEGER NOT NULL REFERENCES canonical_record (established_revision),
     active_definition_set_id TEXT NOT NULL REFERENCES definition_set(identity),
-    proposed_definition_set_id TEXT REFERENCES definition_set(identity)
+    proposed_definition_set_id TEXT
 );
 CREATE TABLE graph_presence_interval (
     uuid TEXT NOT NULL,
     object_value_id INTEGER NOT NULL REFERENCES object_value(id),
+    object_kind TEXT NOT NULL,
+    type_key TEXT NOT NULL,
+    source_uuid TEXT,
+    target_uuid TEXT,
     valid_from_revision INTEGER NOT NULL,
     valid_to_revision INTEGER,
     PRIMARY KEY (uuid, valid_from_revision)
@@ -312,11 +356,20 @@ CREATE UNIQUE INDEX graph_presence_current_uuid
     ON graph_presence_interval(uuid) WHERE valid_to_revision IS NULL;
 CREATE INDEX graph_presence_current_value
     ON graph_presence_interval(object_value_id, uuid) WHERE valid_to_revision IS NULL;
+CREATE INDEX graph_presence_current_type
+    ON graph_presence_interval(object_kind, type_key, uuid)
+    WHERE valid_to_revision IS NULL;
+CREATE INDEX graph_presence_current_link_source
+    ON graph_presence_interval(source_uuid, type_key, uuid)
+    WHERE valid_to_revision IS NULL AND object_kind = 'link';
+CREATE INDEX graph_presence_current_link_target
+    ON graph_presence_interval(target_uuid, type_key, uuid)
+    WHERE valid_to_revision IS NULL AND object_kind = 'link';
 CREATE INDEX graph_presence_revision
     ON graph_presence_interval(valid_from_revision, valid_to_revision, uuid);
 CREATE VIEW current_graph_object AS
-SELECT p.uuid, v.object_kind, v.type_key, v.source_uuid, v.target_uuid, v.id AS object_value_id
-FROM graph_presence_interval p JOIN object_value v ON v.id = p.object_value_id
+SELECT p.uuid, p.object_kind, p.type_key, p.source_uuid, p.target_uuid, p.object_value_id
+FROM graph_presence_interval p
 WHERE p.valid_to_revision IS NULL;
 CREATE VIEW current_data_anchor AS
 SELECT v.uuid AS data_uuid, a.anchor_uuid
@@ -324,6 +377,114 @@ FROM current_graph_object c
 JOIN object_value v ON v.id = c.object_value_id
 JOIN object_anchor a ON a.object_value_id = v.id
 WHERE v.object_kind = 'associatedData';
+CREATE TABLE proposal_entry (
+    uuid TEXT PRIMARY KEY,
+    object_kind TEXT NOT NULL,
+    operation TEXT NOT NULL CHECK (operation IN ('upsert', 'delete')),
+    object_value_id INTEGER REFERENCES object_value(id),
+    base_object_value_id INTEGER REFERENCES object_value(id),
+    CHECK ((operation = 'upsert') = (object_value_id IS NOT NULL))
+);
+CREATE INDEX proposal_entry_kind ON proposal_entry(object_kind, operation, uuid);
+CREATE TABLE proposal_overlay_state (
+    id INTEGER PRIMARY KEY CHECK (id = 0),
+    accumulator TEXT NOT NULL,
+    entry_count INTEGER NOT NULL
+);
+CREATE TABLE proposal_overlay_count (
+    object_kind TEXT NOT NULL,
+    operation TEXT NOT NULL,
+    entry_count INTEGER NOT NULL,
+    PRIMARY KEY (object_kind, operation)
+);
+CREATE TRIGGER proposal_entry_count_insert AFTER INSERT ON proposal_entry BEGIN
+    UPDATE proposal_overlay_count SET entry_count = entry_count + 1
+    WHERE object_kind = NEW.object_kind AND operation = NEW.operation;
+END;
+CREATE TRIGGER proposal_entry_count_delete AFTER DELETE ON proposal_entry BEGIN
+    UPDATE proposal_overlay_count SET entry_count = entry_count - 1
+    WHERE object_kind = OLD.object_kind AND operation = OLD.operation;
+END;
+CREATE TRIGGER proposal_entry_count_update AFTER UPDATE ON proposal_entry
+WHEN OLD.object_kind != NEW.object_kind OR OLD.operation != NEW.operation BEGIN
+    UPDATE proposal_overlay_count SET entry_count = entry_count - 1
+    WHERE object_kind = OLD.object_kind AND operation = OLD.operation;
+    UPDATE proposal_overlay_count SET entry_count = entry_count + 1
+    WHERE object_kind = NEW.object_kind AND operation = NEW.operation;
+END;
+CREATE TABLE proposal_definition_state (
+    id INTEGER PRIMARY KEY CHECK (id = 0),
+    base_definition_set_id TEXT REFERENCES definition_set(identity),
+    accumulator TEXT NOT NULL,
+    entry_count INTEGER NOT NULL,
+    effective_accumulator TEXT,
+    effective_entry_count INTEGER,
+    identity TEXT
+);
+CREATE TABLE proposal_definition_type (
+    type_key TEXT PRIMARY KEY,
+    operation TEXT NOT NULL CHECK (operation IN ('upsert', 'delete')),
+    value_set_id TEXT REFERENCES definition_set(identity),
+    CHECK ((operation = 'upsert') = (value_set_id IS NOT NULL))
+);
+CREATE TABLE proposal_definition_relationship (
+    natural_key TEXT PRIMARY KEY,
+    operation TEXT NOT NULL CHECK (operation IN ('upsert', 'delete')),
+    value_set_id TEXT REFERENCES definition_set(identity),
+    CHECK ((operation = 'upsert') = (value_set_id IS NOT NULL))
+);
+CREATE VIEW prospective_graph_object AS
+SELECT c.uuid, c.object_kind, c.type_key, c.source_uuid, c.target_uuid, c.object_value_id
+FROM current_graph_object AS c
+WHERE NOT EXISTS (SELECT 1 FROM proposal_entry AS p WHERE p.uuid = c.uuid)
+UNION ALL
+SELECT v.uuid, v.object_kind, v.type_key, v.source_uuid, v.target_uuid, v.id
+FROM proposal_entry AS p JOIN object_value AS v ON v.id = p.object_value_id
+WHERE p.operation = 'upsert';
+CREATE VIEW prospective_data_anchor AS
+SELECT v.uuid AS data_uuid, a.anchor_uuid
+FROM prospective_graph_object AS c
+JOIN object_value AS v ON v.id = c.object_value_id
+JOIN object_anchor AS a ON a.object_value_id = v.id
+WHERE v.object_kind = 'associatedData';
+CREATE TABLE validation_assessment (
+    identity TEXT PRIMARY KEY,
+    scope TEXT NOT NULL,
+    evaluated_revision INTEGER NOT NULL,
+    proposed_definition_set_id TEXT,
+    graph_overlay_identity TEXT,
+    conforms INTEGER NOT NULL,
+    finding_count INTEGER NOT NULL,
+    completed_at TEXT NOT NULL
+);
+CREATE TABLE current_assessment (
+    scope TEXT PRIMARY KEY,
+    assessment_id TEXT NOT NULL REFERENCES validation_assessment(identity)
+);
+CREATE TABLE validation_finding (
+    assessment_id TEXT NOT NULL REFERENCES validation_assessment(identity),
+    ordinal INTEGER NOT NULL,
+    summary TEXT NOT NULL,
+    PRIMARY KEY (assessment_id, ordinal)
+);
+CREATE TABLE validation_finding_definition (
+    assessment_id TEXT NOT NULL,
+    finding_ordinal INTEGER NOT NULL,
+    ordinal INTEGER NOT NULL,
+    definition_ref TEXT NOT NULL,
+    PRIMARY KEY (assessment_id, finding_ordinal, ordinal),
+    FOREIGN KEY (assessment_id, finding_ordinal)
+      REFERENCES validation_finding(assessment_id, ordinal)
+);
+CREATE TABLE validation_finding_object (
+    assessment_id TEXT NOT NULL,
+    finding_ordinal INTEGER NOT NULL,
+    ordinal INTEGER NOT NULL,
+    object_uuid TEXT NOT NULL,
+    PRIMARY KEY (assessment_id, finding_ordinal, ordinal),
+    FOREIGN KEY (assessment_id, finding_ordinal)
+      REFERENCES validation_finding(assessment_id, ordinal)
+);
 CREATE TABLE canonical_graph_event (
     established_revision INTEGER NOT NULL REFERENCES canonical_record(established_revision),
     occurrence INTEGER NOT NULL,
@@ -333,11 +494,29 @@ CREATE TABLE canonical_graph_event (
     object_value_id INTEGER REFERENCES object_value(id),
     PRIMARY KEY (established_revision, occurrence)
 );
+CREATE TABLE canonical_proposal_event (
+    established_revision INTEGER NOT NULL REFERENCES canonical_record(established_revision),
+    occurrence INTEGER NOT NULL,
+    operation TEXT NOT NULL,
+    object_kind TEXT NOT NULL,
+    uuid TEXT NOT NULL,
+    object_value_id INTEGER REFERENCES object_value(id),
+    PRIMARY KEY (established_revision, occurrence)
+);
+CREATE TABLE canonical_definition_proposal_event (
+    established_revision INTEGER NOT NULL REFERENCES canonical_record(established_revision),
+    occurrence INTEGER NOT NULL,
+    entity_kind TEXT NOT NULL,
+    natural_key TEXT NOT NULL,
+    operation TEXT NOT NULL CHECK (operation IN ('upsert', 'delete', 'unstage')),
+    value_set_id TEXT REFERENCES definition_set(identity),
+    PRIMARY KEY (established_revision, occurrence)
+);
 CREATE TABLE canonical_definition_event (
     established_revision INTEGER PRIMARY KEY REFERENCES canonical_record(established_revision),
     active_definition_set_id TEXT REFERENCES definition_set(identity),
     delta_disposition TEXT NOT NULL,
-    proposed_definition_set_id TEXT REFERENCES definition_set(identity)
+    proposed_definition_set_id TEXT
 );
 """
 
@@ -470,6 +649,18 @@ class NotInitializedError(StoreError):
 
 class ConcurrentRevisionError(StoreError):
     """Raised when the revision a change was prepared against is no longer current."""
+
+
+@dataclass(frozen=True, slots=True)
+class ProposalState:
+    revision: int
+    proposed_definition_identity: str | None
+    graph_overlay_identity: str | None
+    staged_anchor_count: int = 0
+    staged_associated_data_count: int = 0
+    staged_link_count: int = 0
+    staged_removal_count: int = 0
+    assessment: ValidationReport | None = None
 
 
 @dataclass(slots=True)
@@ -791,7 +982,23 @@ def _change_identity(change: CanonicalChange) -> str:
             else definition_identity(change.active_definitions),
             None
             if change.definition_delta is None
-            else definition_identity(change.definition_delta.proposed_definitions),
+            else (
+                definition_identity(change.definition_delta.proposed_definitions),
+                (
+                    tuple(
+                        sorted(
+                            (kind.value, object_identity(value))
+                            for kind, value in change.definition_delta.graph_overlay.upserts()
+                        )
+                    ),
+                    tuple(
+                        sorted(
+                            (kind.value, uuid)
+                            for kind, uuid in change.definition_delta.graph_overlay.removals()
+                        )
+                    ),
+                ),
+            ),
         )
     )
 
@@ -999,7 +1206,10 @@ class CanonicalStore:
             definition_delta=(
                 None
                 if row[3] is None
-                else DefinitionDelta(proposed_definitions=self._load_definition_set(str(row[3])))
+                else DefinitionDelta(
+                    proposed_definitions=self._effective_proposed_definitions_unlocked(str(row[2])),
+                    graph_overlay=self._proposal_graph_change_unlocked(),
+                )
             ),
             revision=revision,
         )
@@ -1043,7 +1253,9 @@ class CanonicalStore:
                         raise NotInitializedError("no canonical state is established")
                     revision = _projection_revision(row)
                     definitions = self._load_definition_set(
-                        str(row[2]), type_keys=_query_type_keys(query), constrained_type_keys=set()
+                        str(row[2]),
+                        type_keys=_query_type_keys(query),
+                        constrained_type_keys=set(),
                     )
                     result = self._evaluate_sql_query_unlocked(query, definitions, revision)
                     self._connection.execute("COMMIT")
@@ -1089,6 +1301,50 @@ class CanonicalStore:
                 f"could not query revision {revision} at {self._path}: {error}"
             ) from error
 
+    def evaluate_prospective_query(self, query: GraphQuery) -> GraphQueryResult:
+        """Evaluate over the sole definition-and-graph proposal without copying it."""
+        try:
+            with self._lock:
+                self._connection.execute("BEGIN")
+                try:
+                    row = self._connection.execute(
+                        "SELECT revision, established_by, proposed_definition_set_id"
+                        " FROM state_head WHERE id = 0"
+                    ).fetchone()
+                    if not isinstance(row, tuple):
+                        raise NotInitializedError("no canonical state is established")
+                    revision = _projection_revision(row)
+                    if row[2] is None:
+                        self._connection.execute("ROLLBACK")
+                        return GraphQueryResult(
+                            status=OperationStatus.REJECTED,
+                            summary="there is no prospective definition delta to query",
+                            query=query,
+                            findings=(ValidationFinding(summary="no definition delta is present"),),
+                        )
+                    active = self._connection.execute(
+                        "SELECT active_definition_set_id FROM state_head WHERE id = 0"
+                    ).fetchone()
+                    assert active is not None
+                    definitions = self._effective_proposed_definitions_unlocked(
+                        str(active[0]),
+                        type_keys=_query_type_keys(query),
+                        constrained_type_keys=set(),
+                    )
+                    result = self._evaluate_sql_query_unlocked(
+                        query,
+                        definitions,
+                        revision,
+                        prospective=True,
+                    )
+                    self._connection.execute("COMMIT")
+                    return result
+                except BaseException:
+                    self._rollback_quietly()
+                    raise
+        except sqlite3.Error as error:
+            raise StoreError(f"could not query the proposal at {self._path}: {error}") from error
+
     def _evaluate_sql_query_unlocked(
         self,
         query: GraphQuery,
@@ -1096,6 +1352,7 @@ class CanonicalStore:
         revision: int,
         *,
         historical_revision: int | None = None,
+        prospective: bool = False,
         validate: bool = True,
         existence_only: bool = False,
     ) -> GraphQueryResult:
@@ -1117,7 +1374,7 @@ class CanonicalStore:
         response_query = query
         if validate:
             findings = indexed_query_findings(
-                query, definitions, _SQLiteQueryIndex(self, historical_revision)
+                query, definitions, _SQLiteQueryIndex(self, historical_revision, prospective)
             )
             if findings:
                 return GraphQueryResult(
@@ -1137,6 +1394,7 @@ class CanonicalStore:
                     definitions,
                     revision,
                     historical_revision=historical_revision,
+                    prospective=prospective,
                     validate=False,
                     existence_only=True,
                 )
@@ -1154,6 +1412,9 @@ class CanonicalStore:
         prefix_parameters: list[object] = []
         graph_relation = "current_graph_object"
         association_relation = "current_data_anchor"
+        if prospective:
+            graph_relation = "prospective_graph_object"
+            association_relation = "prospective_data_anchor"
         if historical_revision is not None:
             graph_relation = "selected_graph_object"
             association_relation = "selected_data_anchor"
@@ -1361,19 +1622,2381 @@ class CanonicalStore:
 
     def current_definitions(self) -> tuple[int, GraphDefinitionSet, DefinitionDelta | None]:
         """Read current definition facets without materializing the graph facet."""
-        row = self._fetchone(
-            "SELECT revision, established_by, active_definition_set_id, proposed_definition_set_id"
-            " FROM state_head WHERE id = 0"
+        with self._lock:
+            row = self._connection.execute(
+                "SELECT revision, established_by, active_definition_set_id,"
+                " proposed_definition_set_id FROM state_head WHERE id = 0"
+            ).fetchone()
+            if not isinstance(row, tuple):
+                raise NotInitializedError("no canonical state is established")
+            return (
+                _projection_revision(row),
+                self._load_definition_set(str(row[2])),
+                None
+                if row[3] is None
+                else DefinitionDelta(
+                    proposed_definitions=self._effective_proposed_definitions_unlocked(str(row[2])),
+                    graph_overlay=self._proposal_graph_change_unlocked(),
+                ),
+            )
+
+    def definition_view(self, *, prospective: bool = False) -> tuple[int, GraphDefinitionSet, bool]:
+        """Read evaluated definition meaning without reading staged graph objects."""
+        with self._lock:
+            row = self._connection.execute(
+                "SELECT revision, established_by, active_definition_set_id,"
+                " proposed_definition_set_id FROM state_head WHERE id = 0"
+            ).fetchone()
+            if not isinstance(row, tuple):
+                raise NotInitializedError("no canonical state is established")
+            revision = _projection_revision(row)
+            if prospective:
+                if row[3] is None:
+                    raise StoreError("no definition delta is present")
+                definitions = self._effective_proposed_definitions_unlocked(str(row[2]))
+            else:
+                definitions = self._load_definition_set(str(row[2]))
+            return revision, definitions, row[3] is not None
+
+    def _effective_proposed_definitions_unlocked(
+        self,
+        active_identity: str,
+        *,
+        type_keys: set[str] | None = None,
+        constrained_type_keys: set[str] | None = None,
+        relationship_keys: set[str] | None = None,
+    ) -> GraphDefinitionSet:
+        """Load only requested effective proposal definitions from sparse keyed edits."""
+        active = self._load_definition_set(
+            active_identity,
+            type_keys=type_keys,
+            constrained_type_keys=constrained_type_keys,
+            relationship_keys=relationship_keys,
         )
-        if not isinstance(row, tuple):
-            raise NotInitializedError("no canonical state is established")
-        return (
-            _projection_revision(row),
-            self._load_definition_set(str(row[2])),
-            None
-            if row[3] is None
-            else DefinitionDelta(proposed_definitions=self._load_definition_set(str(row[3]))),
+        type_rows = self._connection.execute(
+            "SELECT type_key, operation, value_set_id FROM proposal_definition_type"
+            + (
+                ""
+                if type_keys is None
+                else (
+                    " WHERE 0"
+                    if not type_keys
+                    else " WHERE type_key IN (" + ", ".join("?" for _ in type_keys) + ")"
+                )
+            ),
+            () if type_keys is None else tuple(sorted(type_keys)),
         )
+        edited_types = {str(row[0]): row for row in type_rows}
+        anchors = [each for each in active.anchor_types if each.type_key not in edited_types]
+        data = [each for each in active.associated_data_types if each.type_key not in edited_types]
+        links = [each for each in active.link_types if each.type_key not in edited_types]
+        for _, operation, value_set_id in edited_types.values():
+            if operation == "delete":
+                continue
+            value = self._load_definition_set(str(value_set_id), constrained_type_keys=set())
+            anchors.extend(value.anchor_types)
+            data.extend(value.associated_data_types)
+            links.extend(value.link_types)
+
+        relationship_sql = (
+            "SELECT natural_key, operation, value_set_id FROM proposal_definition_relationship"
+        )
+        parameters: tuple[object, ...] = ()
+        if relationship_keys is not None:
+            if not relationship_keys:
+                relationship_sql += " WHERE 0"
+            else:
+                relationship_sql += (
+                    " WHERE natural_key IN (" + ", ".join("?" for _ in relationship_keys) + ")"
+                )
+                parameters = tuple(sorted(relationship_keys))
+        elif constrained_type_keys is not None:
+            if not constrained_type_keys:
+                relationship_sql += " WHERE 0"
+            else:
+                placeholders = ", ".join("?" for _ in constrained_type_keys)
+                relationship_sql += (
+                    " AS e WHERE (e.operation = 'upsert' AND EXISTS ("
+                    " SELECT 1 FROM definition_multiplicity_rule AS r"
+                    " JOIN definition_multiplicity_participant AS p"
+                    " ON p.definition_set_id = r.definition_set_id"
+                    " AND p.rule_occurrence = r.occurrence AND p.role = 'first'"
+                    " WHERE r.definition_set_id = e.value_set_id"
+                    f" AND p.type_key IN ({placeholders})))"
+                    " OR (e.operation = 'delete' AND EXISTS ("
+                    " SELECT 1 FROM definition_multiplicity_rule AS r"
+                    " JOIN definition_multiplicity_participant AS p"
+                    " ON p.definition_set_id = r.definition_set_id"
+                    " AND p.rule_occurrence = r.occurrence AND p.role = 'first'"
+                    " WHERE r.definition_set_id = ? AND r.natural_key = e.natural_key"
+                    f" AND p.type_key IN ({placeholders})))"
+                )
+                selected = tuple(sorted(constrained_type_keys))
+                parameters = (*selected, active_identity, *selected)
+        relationship_rows = self._connection.execute(relationship_sql, parameters)
+        edited_relationships = {str(row[0]): row for row in relationship_rows}
+        relationships = [
+            each
+            for each in active.relationship_constraints
+            if semantic_identity(relationship_identity(each)) not in edited_relationships
+        ]
+        for _, operation, value_set_id in edited_relationships.values():
+            if operation == "delete":
+                continue
+            value = self._load_definition_set(
+                str(value_set_id), type_keys=set(), constrained_type_keys=None
+            )
+            relationships.extend(value.relationship_constraints)
+        return GraphDefinitionSet(tuple(anchors), tuple(data), tuple(links), tuple(relationships))
+
+    def _definition_entry_digest(self, key: str, operation: str, value: str | None) -> str:
+        return semantic_identity((key, operation, value))
+
+    def _definition_accumulator_update_unlocked(
+        self,
+        before: str | None,
+        after: str | None,
+        before_content: str | None,
+        after_content: str | None,
+    ) -> None:
+        row = self._connection.execute(
+            "SELECT accumulator, entry_count, effective_accumulator, effective_entry_count"
+            " FROM proposal_definition_state WHERE id = 0"
+        ).fetchone()
+        assert row is not None
+        accumulator, count = int(str(row[0]), 16), int(row[1])
+        if row[2] is None or row[3] is None:
+            raise StoreError("the proposal definition accumulator has no active base")
+        effective, effective_count = int(str(row[2]), 16), int(row[3])
+        if before is not None:
+            accumulator ^= int(before, 16)
+            count -= 1
+        if after is not None:
+            accumulator ^= int(after, 16)
+            count += 1
+        if before_content is not None:
+            effective = (effective - int(before_content, 16)) % (1 << 256)
+            effective_count -= 1
+        if after_content is not None:
+            effective = (effective + int(after_content, 16)) % (1 << 256)
+            effective_count += 1
+        self._connection.execute(
+            "UPDATE proposal_definition_state SET accumulator = ?, entry_count = ?,"
+            " effective_accumulator = ?, effective_entry_count = ? WHERE id = 0",
+            (f"{accumulator:064x}", count, f"{effective:064x}", effective_count),
+        )
+
+    def _proposal_definition_identity_unlocked(self, active_identity: str) -> str:
+        row = self._connection.execute(
+            "SELECT entry_count, effective_accumulator, effective_entry_count"
+            " FROM proposal_definition_state WHERE id = 0"
+        ).fetchone()
+        assert row is not None
+        if int(row[0]) == 0:
+            return active_identity
+        if row[1] is None or row[2] is None:
+            raise StoreError("the proposal definition identity has no content summary")
+        return definition_identity_from_stats(str(row[1]), int(row[2]))
+
+    def _definition_value_digest_unlocked(self, value_set_id: str) -> str:
+        row = self._connection.execute(
+            "SELECT content_accumulator, entry_count FROM definition_set WHERE identity = ?",
+            (value_set_id,),
+        ).fetchone()
+        if row is None or int(row[1]) != 1:
+            raise StoreError("a sparse definition entry does not reference exactly one value")
+        return str(row[0])
+
+    def stage_definition_change(
+        self, change: DefinitionChange, *, provenance: Provenance
+    ) -> RevisionedOutcome:
+        """Stage one bounded natural-keyed definition edit without copying the set."""
+        findings = definition_change_findings(change)
+        if findings:
+            return RevisionedOutcome(
+                OperationStatus.REJECTED,
+                f"the definition edit was rejected ({len(findings)} findings)",
+                findings,
+            )
+        with self._lock:
+            try:
+                self._connection.execute("BEGIN IMMEDIATE")
+                head = self._connection.execute(
+                    "SELECT revision, active_definition_set_id, proposed_definition_set_id"
+                    " FROM state_head WHERE id = 0"
+                ).fetchone()
+                if head is None:
+                    raise NotInitializedError("no canonical state is established")
+                revision, active_identity = int(head[0]), str(head[1])
+                before_proposed = None if head[2] is None else str(head[2])
+                effective = self._connection.execute(
+                    "SELECT effective_accumulator FROM proposal_definition_state WHERE id = 0"
+                ).fetchone()
+                if effective is None:
+                    raise StoreError("the proposal definition state is absent")
+                if effective[0] is None:
+                    active_stats = self._connection.execute(
+                        "SELECT content_accumulator, entry_count FROM definition_set"
+                        " WHERE identity = ?",
+                        (active_identity,),
+                    ).fetchone()
+                    if active_stats is None:
+                        raise StoreError("the active definition content summary is absent")
+                    self._connection.execute(
+                        "UPDATE proposal_definition_state SET effective_accumulator = ?,"
+                        " effective_entry_count = ? WHERE id = 0",
+                        (str(active_stats[0]), int(active_stats[1])),
+                    )
+                changed = False
+                definition_events: list[tuple[str, str, str, str | None]] = []
+
+                type_upserts = (
+                    *change.anchor_type_upserts,
+                    *change.associated_data_type_upserts,
+                    *change.link_type_upserts,
+                )
+                for type_key, value in (
+                    *((key, None) for key in change.type_removals),
+                    *((value.type_key, value) for value in type_upserts),
+                ):
+                    prior = self._connection.execute(
+                        "SELECT operation, value_set_id FROM proposal_definition_type"
+                        " WHERE type_key = ?",
+                        (type_key,),
+                    ).fetchone()
+                    prior_digest = (
+                        None
+                        if prior is None
+                        else self._definition_entry_digest(
+                            type_key,
+                            str(prior[0]),
+                            None if prior[1] is None else str(prior[1]),
+                        )
+                    )
+                    active = self._load_definition_set(
+                        active_identity,
+                        type_keys={type_key},
+                        constrained_type_keys=set(),
+                    )
+                    active_count = definition_content_stats(active)[1]
+                    active_content = None if active_count == 0 else definition_entry_digest(active)
+                    prior_content = (
+                        active_content
+                        if prior is None
+                        else None
+                        if str(prior[0]) == "delete"
+                        else self._definition_value_digest_unlocked(str(prior[1]))
+                    )
+                    if value is None:
+                        value_set_id = None
+                        operation = (
+                            "delete"
+                            if (
+                                active.anchor_types
+                                or active.associated_data_types
+                                or active.link_types
+                            )
+                            else None
+                        )
+                    else:
+                        if isinstance(value, AnchorTypeDefinition):
+                            single = GraphDefinitionSet(anchor_types=(value,))
+                        elif isinstance(value, AssociatedDataTypeDefinition):
+                            single = GraphDefinitionSet(associated_data_types=(value,))
+                        else:
+                            assert isinstance(value, LinkTypeDefinition)
+                            single = GraphDefinitionSet(link_types=(value,))
+                        value_set_id = insert_definition_set(self._connection, single)
+                        active_single = (
+                            GraphDefinitionSet(anchor_types=active.anchor_types)
+                            if active.anchor_types
+                            else GraphDefinitionSet(
+                                associated_data_types=active.associated_data_types
+                            )
+                            if active.associated_data_types
+                            else GraphDefinitionSet(link_types=active.link_types)
+                        )
+                        operation = (
+                            None if definition_identity(active_single) == value_set_id else "upsert"
+                        )
+                    if operation is None:
+                        self._connection.execute(
+                            "DELETE FROM proposal_definition_type WHERE type_key = ?",
+                            (type_key,),
+                        )
+                        after_digest = None
+                    else:
+                        self._connection.execute(
+                            "INSERT INTO proposal_definition_type VALUES (?, ?, ?)"
+                            " ON CONFLICT(type_key) DO UPDATE SET"
+                            " operation=excluded.operation, value_set_id=excluded.value_set_id",
+                            (type_key, operation, value_set_id),
+                        )
+                        after_digest = self._definition_entry_digest(
+                            type_key, operation, value_set_id
+                        )
+                    if prior_digest != after_digest:
+                        after_content = (
+                            active_content
+                            if operation is None
+                            else None
+                            if operation == "delete"
+                            else self._definition_value_digest_unlocked(str(value_set_id))
+                        )
+                        self._definition_accumulator_update_unlocked(
+                            prior_digest, after_digest, prior_content, after_content
+                        )
+                        changed = True
+                        definition_events.append(
+                            (
+                                "type",
+                                type_key,
+                                "unstage" if operation is None else operation,
+                                value_set_id if operation == "upsert" else None,
+                            )
+                        )
+
+                relationship_commands = (
+                    *(
+                        (selection.identity(), None)
+                        for selection in change.link_multiplicity_removals
+                    ),
+                    *(
+                        (selection.identity(), None)
+                        for selection in change.direct_association_multiplicity_removals
+                    ),
+                    *(
+                        (relationship_identity(value), value)
+                        for value in change.relationship_constraint_upserts
+                    ),
+                )
+                for natural_identity, value in relationship_commands:
+                    natural_key = semantic_identity(natural_identity)
+                    prior = self._connection.execute(
+                        "SELECT operation, value_set_id"
+                        " FROM proposal_definition_relationship WHERE natural_key = ?",
+                        (natural_key,),
+                    ).fetchone()
+                    prior_digest = (
+                        None
+                        if prior is None
+                        else self._definition_entry_digest(
+                            natural_key,
+                            str(prior[0]),
+                            None if prior[1] is None else str(prior[1]),
+                        )
+                    )
+                    active = self._load_definition_set(
+                        active_identity,
+                        type_keys=set(),
+                        relationship_keys={natural_key},
+                    )
+                    active_count = definition_content_stats(active)[1]
+                    active_content = None if active_count == 0 else definition_entry_digest(active)
+                    prior_content = (
+                        active_content
+                        if prior is None
+                        else None
+                        if str(prior[0]) == "delete"
+                        else self._definition_value_digest_unlocked(str(prior[1]))
+                    )
+                    if value is None:
+                        value_set_id = None
+                        operation = "delete" if active.relationship_constraints else None
+                    else:
+                        single = GraphDefinitionSet(relationship_constraints=(value,))
+                        value_set_id = insert_definition_set(self._connection, single)
+                        operation = (
+                            None
+                            if definition_identity(
+                                GraphDefinitionSet(
+                                    relationship_constraints=active.relationship_constraints
+                                )
+                            )
+                            == value_set_id
+                            else "upsert"
+                        )
+                    if operation is None:
+                        self._connection.execute(
+                            "DELETE FROM proposal_definition_relationship WHERE natural_key = ?",
+                            (natural_key,),
+                        )
+                        after_digest = None
+                    else:
+                        self._connection.execute(
+                            "INSERT INTO proposal_definition_relationship VALUES (?, ?, ?)"
+                            " ON CONFLICT(natural_key) DO UPDATE SET"
+                            " operation=excluded.operation, value_set_id=excluded.value_set_id",
+                            (natural_key, operation, value_set_id),
+                        )
+                        after_digest = self._definition_entry_digest(
+                            natural_key, operation, value_set_id
+                        )
+                    if prior_digest != after_digest:
+                        after_content = (
+                            active_content
+                            if operation is None
+                            else None
+                            if operation == "delete"
+                            else self._definition_value_digest_unlocked(str(value_set_id))
+                        )
+                        self._definition_accumulator_update_unlocked(
+                            prior_digest, after_digest, prior_content, after_content
+                        )
+                        changed = True
+                        definition_events.append(
+                            (
+                                "relationship",
+                                natural_key,
+                                "unstage" if operation is None else operation,
+                                value_set_id if operation == "upsert" else None,
+                            )
+                        )
+
+                definition_count = int(
+                    self._connection.execute(
+                        "SELECT entry_count FROM proposal_definition_state WHERE id = 0"
+                    ).fetchone()[0]
+                )
+                graph_count = int(
+                    self._connection.execute(
+                        "SELECT entry_count FROM proposal_overlay_state WHERE id = 0"
+                    ).fetchone()[0]
+                )
+                if not changed:
+                    self._connection.execute("ROLLBACK")
+                    return RevisionedOutcome(
+                        OperationStatus.ACCEPTED,
+                        "the proposed definition edit changes no proposal meaning",
+                    )
+                if definition_count == 0 and graph_count == 0:
+                    self._connection.execute("ROLLBACK")
+                    if before_proposed is None:
+                        return RevisionedOutcome(
+                            OperationStatus.ACCEPTED,
+                            "the definition edit matches active meaning; nothing was staged",
+                        )
+                    return RevisionedOutcome(
+                        OperationStatus.REJECTED,
+                        "the edit would remove the proposal's final semantic difference;"
+                        " use discard",
+                        (ValidationFinding(summary="a proposal cannot be discarded implicitly"),),
+                    )
+                proposed_identity = self._proposal_definition_identity_unlocked(active_identity)
+                self._connection.execute(
+                    "UPDATE proposal_definition_state SET base_definition_set_id = ?,"
+                    " identity = ? WHERE id = 0",
+                    (active_identity, proposed_identity),
+                )
+                resulting = revision + 1
+                self._append_proposal_transition_unlocked(
+                    revision,
+                    resulting,
+                    proposed_identity,
+                    [],
+                    provenance,
+                    definition_events=definition_events,
+                )
+                self._connection.execute("COMMIT")
+                return RevisionedOutcome(
+                    OperationStatus.ACCEPTED,
+                    f"staged definition work at revision {resulting}",
+                    resulting_revision=resulting,
+                )
+            except Exception as error:
+                self._rollback_quietly()
+                if isinstance(error, StoreError):
+                    raise
+                raise StoreError(f"could not stage definition work: {error}") from error
+
+    def _proposal_graph_change_unlocked(self) -> GraphChange:
+        anchors: list[Anchor] = []
+        data: list[AssociatedDataObject] = []
+        links: list[Link] = []
+        removals: dict[ObjectKind, list[str]] = {kind: [] for kind in ObjectKind}
+        for uuid, kind_name, operation, value_id in self._connection.execute(
+            "SELECT uuid, object_kind, operation, object_value_id FROM proposal_entry ORDER BY uuid"
+        ):
+            kind = ObjectKind(str(kind_name))
+            if operation == "delete":
+                removals[kind].append(str(uuid))
+                continue
+            value = self._load_object_value(int(value_id))
+            if isinstance(value, Anchor):
+                anchors.append(value)
+            elif isinstance(value, AssociatedDataObject):
+                data.append(value)
+            else:
+                links.append(value)
+        return GraphChange(
+            tuple(anchors),
+            tuple(data),
+            tuple(links),
+            tuple(removals[ObjectKind.ANCHOR]),
+            tuple(removals[ObjectKind.ASSOCIATED_DATA]),
+            tuple(removals[ObjectKind.LINK]),
+        )
+
+    def proposal_state(self) -> ProposalState:
+        """Return bounded identities, counts, and exact current assessment for the delta."""
+        try:
+            with self._lock:
+                row = self._connection.execute(
+                    "SELECT revision, established_by, proposed_definition_set_id"
+                    " FROM state_head WHERE id = 0"
+                ).fetchone()
+                if not isinstance(row, tuple):
+                    raise NotInitializedError("no canonical state is established")
+                revision = _projection_revision(row)
+                if row[2] is None:
+                    return ProposalState(revision, None, None)
+                proposed = str(row[2])
+                overlay = self._overlay_identity_unlocked()
+                counts = {
+                    (str(kind), str(operation)): int(count)
+                    for kind, operation, count in self._connection.execute(
+                        "SELECT object_kind, operation, entry_count FROM proposal_overlay_count"
+                    )
+                }
+                assessment = self._current_assessment_unlocked(
+                    ValidationScope.DEFINITION_DELTA,
+                    revision=revision,
+                    proposed_identity=proposed,
+                    overlay_identity=overlay,
+                )
+                return ProposalState(
+                    revision,
+                    proposed,
+                    overlay,
+                    sum(
+                        counts.get((ObjectKind.ANCHOR.value, operation), 0)
+                        for operation in ("upsert", "delete")
+                    ),
+                    sum(
+                        counts.get((ObjectKind.ASSOCIATED_DATA.value, operation), 0)
+                        for operation in ("upsert", "delete")
+                    ),
+                    sum(
+                        counts.get((ObjectKind.LINK.value, operation), 0)
+                        for operation in ("upsert", "delete")
+                    ),
+                    sum(counts.get((kind.value, "delete"), 0) for kind in ObjectKind),
+                    assessment,
+                )
+        except sqlite3.Error as error:
+            raise StoreError(f"could not read proposal state: {error}") from error
+
+    def _overlay_identity_unlocked(self) -> str:
+        row = self._connection.execute(
+            "SELECT accumulator, entry_count FROM proposal_overlay_state WHERE id = 0"
+        ).fetchone()
+        if row is None:
+            raise StoreError("the proposal overlay has no identity state")
+        return semantic_identity(("graphOverlay", str(row[0]), int(row[1])))
+
+    def _proposal_entry_digest_unlocked(self, uuid: str) -> str | None:
+        row = self._connection.execute(
+            "SELECT p.object_kind, p.operation, v.content_identity"
+            " FROM proposal_entry AS p LEFT JOIN object_value AS v"
+            " ON v.id = p.object_value_id WHERE p.uuid = ?",
+            (uuid,),
+        ).fetchone()
+        if row is None:
+            return None
+        return semantic_identity((uuid, *(None if each is None else str(each) for each in row)))
+
+    def _update_overlay_accumulator_unlocked(self, before: str | None, after: str | None) -> None:
+        row = self._connection.execute(
+            "SELECT accumulator, entry_count FROM proposal_overlay_state WHERE id = 0"
+        ).fetchone()
+        if row is None:
+            raise StoreError("the proposal overlay has no identity state")
+        accumulator = int(str(row[0]), 16)
+        count = int(row[1])
+        if before is not None:
+            accumulator ^= int(before, 16)
+            count -= 1
+        if after is not None:
+            accumulator ^= int(after, 16)
+            count += 1
+        self._connection.execute(
+            "UPDATE proposal_overlay_state SET accumulator = ?, entry_count = ? WHERE id = 0",
+            (f"{accumulator:064x}", count),
+        )
+
+    def stage_proposal_graph(
+        self, request: GraphChangeRequest, *, provenance: Provenance
+    ) -> RevisionedOutcome:
+        """Apply one bounded graph-overlay edit and record it atomically."""
+        if request.target is not GraphChangeTarget.DEFINITION_DELTA:
+            raise ValueError("stage_proposal_graph requires a definition-delta target")
+        with self._lock:
+            try:
+                self._connection.execute("BEGIN IMMEDIATE")
+                head = self._connection.execute(
+                    "SELECT revision, active_definition_set_id, proposed_definition_set_id"
+                    " FROM state_head WHERE id = 0"
+                ).fetchone()
+                if head is None:
+                    self._connection.execute("ROLLBACK")
+                    raise NotInitializedError("no canonical state is established")
+                revision = int(head[0])
+                findings = self._proposal_command_findings_unlocked(request)
+                if findings:
+                    self._connection.execute("ROLLBACK")
+                    return RevisionedOutcome(
+                        OperationStatus.REJECTED,
+                        f"the prospective graph change was rejected ({len(findings)} findings)",
+                        findings,
+                    )
+                before_definition = None if head[2] is None else str(head[2])
+                proposed_identity = before_definition or str(head[1])
+                before_overlay = self._overlay_identity_unlocked()
+                changed_events: list[tuple[str, ObjectKind, str, int | None]] = []
+                for kind, uuid in request.unstaging():
+                    prior_digest = self._proposal_entry_digest_unlocked(uuid)
+                    self._connection.execute("DELETE FROM proposal_entry WHERE uuid = ?", (uuid,))
+                    self._update_overlay_accumulator_unlocked(prior_digest, None)
+                    changed_events.append(("unstage", kind, uuid, None))
+                for kind, uuid in request.change.removals():
+                    prior_digest = self._proposal_entry_digest_unlocked(uuid)
+                    base = self._active_value_unlocked(uuid)
+                    if base is None:
+                        self._connection.execute(
+                            "DELETE FROM proposal_entry WHERE uuid = ?", (uuid,)
+                        )
+                        self._update_overlay_accumulator_unlocked(prior_digest, None)
+                        if prior_digest is not None:
+                            changed_events.append(("unstage", kind, uuid, None))
+                        continue
+                    self._connection.execute(
+                        "INSERT INTO proposal_entry"
+                        " (uuid, object_kind, operation, object_value_id, base_object_value_id)"
+                        " VALUES (?, ?, 'delete', NULL, ?)"
+                        " ON CONFLICT(uuid) DO UPDATE SET object_kind=excluded.object_kind,"
+                        " operation='delete', object_value_id=NULL,"
+                        " base_object_value_id=excluded.base_object_value_id",
+                        (uuid, kind.value, base),
+                    )
+                    after_digest = self._proposal_entry_digest_unlocked(uuid)
+                    if prior_digest != after_digest:
+                        self._update_overlay_accumulator_unlocked(prior_digest, after_digest)
+                        changed_events.append(("delete", kind, uuid, None))
+                for kind, value in request.change.upserts():
+                    prior_digest = self._proposal_entry_digest_unlocked(value.uuid)
+                    value_id = insert_object_value(self._connection, value)
+                    base = self._active_value_unlocked(value.uuid)
+                    if base == value_id:
+                        prior = self._connection.execute(
+                            "SELECT 1 FROM proposal_entry WHERE uuid = ?", (value.uuid,)
+                        ).fetchone()
+                        if prior is not None:
+                            self._connection.execute(
+                                "DELETE FROM proposal_entry WHERE uuid = ?", (value.uuid,)
+                            )
+                            self._update_overlay_accumulator_unlocked(prior_digest, None)
+                            changed_events.append(("unstage", kind, value.uuid, None))
+                        continue
+                    self._connection.execute(
+                        "INSERT INTO proposal_entry"
+                        " (uuid, object_kind, operation, object_value_id, base_object_value_id)"
+                        " VALUES (?, ?, 'upsert', ?, ?)"
+                        " ON CONFLICT(uuid) DO UPDATE SET object_kind=excluded.object_kind,"
+                        " operation='upsert', object_value_id=excluded.object_value_id,"
+                        " base_object_value_id=excluded.base_object_value_id",
+                        (value.uuid, kind.value, value_id, base),
+                    )
+                    after_digest = self._proposal_entry_digest_unlocked(value.uuid)
+                    if prior_digest != after_digest:
+                        self._update_overlay_accumulator_unlocked(prior_digest, after_digest)
+                        changed_events.append(("upsert", kind, value.uuid, value_id))
+                after_overlay = self._overlay_identity_unlocked()
+                if before_definition == proposed_identity and before_overlay == after_overlay:
+                    # Refreshing the conflict-detection base is realization metadata, not
+                    # modeled overlay meaning. Preserve it without creating a canonical
+                    # revision when the requested keyed overlay is otherwise identical.
+                    self._connection.execute("COMMIT")
+                    return RevisionedOutcome(
+                        OperationStatus.ACCEPTED,
+                        "the prospective graph edit changes no proposal meaning",
+                    )
+                proposal_count = int(
+                    self._connection.execute(
+                        "SELECT entry_count FROM proposal_overlay_state WHERE id = 0"
+                    ).fetchone()[0]
+                )
+                if (
+                    before_definition is not None
+                    and proposal_count == 0
+                    and proposed_identity == str(head[1])
+                ):
+                    self._connection.execute("ROLLBACK")
+                    return RevisionedOutcome(
+                        OperationStatus.REJECTED,
+                        "the edit would remove the proposal's final semantic difference; "
+                        "use discard",
+                        (
+                            ValidationFinding(
+                                summary=(
+                                    "the final proposal difference cannot be unstaged implicitly"
+                                )
+                            ),
+                        ),
+                    )
+                if (
+                    before_definition is None
+                    and proposal_count == 0
+                    and proposed_identity == str(head[1])
+                ):
+                    self._connection.execute("ROLLBACK")
+                    return RevisionedOutcome(
+                        OperationStatus.ACCEPTED,
+                        "the prospective graph edit changes no proposal meaning",
+                    )
+                resulting = revision + 1
+                self._append_proposal_transition_unlocked(
+                    revision,
+                    resulting,
+                    proposed_identity,
+                    changed_events,
+                    provenance,
+                )
+                self._connection.execute("COMMIT")
+                return RevisionedOutcome(
+                    OperationStatus.ACCEPTED,
+                    f"staged prospective graph work at revision {resulting}",
+                    resulting_revision=resulting,
+                )
+            except StoreError:
+                self._rollback_quietly()
+                raise
+            except Exception as error:
+                self._rollback_quietly()
+                raise StoreError(f"could not stage prospective graph work: {error}") from error
+
+    def _base_value_for_proposal_unlocked(self, uuid: str) -> int | None:
+        existing = self._connection.execute(
+            "SELECT base_object_value_id FROM proposal_entry WHERE uuid = ?", (uuid,)
+        ).fetchone()
+        if existing is not None:
+            return None if existing[0] is None else int(existing[0])
+        active = self._connection.execute(
+            "SELECT object_value_id FROM current_graph_object WHERE uuid = ?", (uuid,)
+        ).fetchone()
+        return None if active is None else int(active[0])
+
+    def _active_value_unlocked(self, uuid: str) -> int | None:
+        active = self._connection.execute(
+            "SELECT object_value_id FROM current_graph_object WHERE uuid = ?", (uuid,)
+        ).fetchone()
+        return None if active is None else int(active[0])
+
+    def _proposal_command_findings_unlocked(
+        self, request: GraphChangeRequest
+    ) -> tuple[ValidationFinding, ...]:
+        findings: list[ValidationFinding] = []
+        commands = [
+            *((value.uuid, kind, "upsert") for kind, value in request.change.upserts()),
+            *((uuid, kind, "delete") for kind, uuid in request.change.removals()),
+            *((uuid, kind, "unstage") for kind, uuid in request.unstaging()),
+        ]
+        seen: set[str] = set()
+        for uuid, kind, operation in commands:
+            if uuid in seen:
+                findings.append(
+                    ValidationFinding(
+                        summary=f"{uuid!r} has more than one command in the proposal edit",
+                        implicated_objects=(uuid,),
+                    )
+                )
+                continue
+            seen.add(uuid)
+            effective = self._connection.execute(
+                "SELECT object_kind FROM prospective_graph_object WHERE uuid = ?", (uuid,)
+            ).fetchone()
+            current = self._connection.execute(
+                "SELECT object_kind FROM current_graph_object WHERE uuid = ?", (uuid,)
+            ).fetchone()
+            if operation != "unstage" and current is not None and str(current[0]) != kind.value:
+                findings.append(
+                    ValidationFinding(
+                        summary=(
+                            f"{uuid!r} is currently {current[0]} and cannot be staged as"
+                            f" {kind.value}"
+                        ),
+                        implicated_objects=(uuid,),
+                    )
+                )
+                continue
+            if operation == "unstage":
+                staged = self._connection.execute(
+                    "SELECT object_kind FROM proposal_entry WHERE uuid = ?", (uuid,)
+                ).fetchone()
+                if staged is None or str(staged[0]) != kind.value:
+                    findings.append(
+                        ValidationFinding(
+                            summary=f"{uuid!r} is not staged as {kind.value}",
+                            implicated_objects=(uuid,),
+                        )
+                    )
+            elif operation == "delete":
+                if effective is None:
+                    findings.append(
+                        ValidationFinding(
+                            summary=(
+                                f"{uuid!r} is removed but no effective prospective object exists"
+                            ),
+                            implicated_objects=(uuid,),
+                        )
+                    )
+                elif str(effective[0]) != kind.value:
+                    findings.append(
+                        ValidationFinding(
+                            summary=f"{uuid!r} is removed as {kind.value} but is {effective[0]}",
+                            implicated_objects=(uuid,),
+                        )
+                    )
+            elif effective is not None and str(effective[0]) != kind.value:
+                findings.append(
+                    ValidationFinding(
+                        summary=f"{uuid!r} cannot change object kind in prospective state",
+                        implicated_objects=(uuid,),
+                    )
+                )
+        return tuple(findings)
+
+    def _append_proposal_transition_unlocked(
+        self,
+        prior_revision: int,
+        resulting_revision: int,
+        proposed_identity: str,
+        events: list[tuple[str, ObjectKind, str, int | None]],
+        provenance: Provenance,
+        *,
+        definition_events: list[tuple[str, str, str, str | None]] | None = None,
+    ) -> None:
+        previous = self._connection.execute(
+            "SELECT r.record_identity FROM canonical_record AS r"
+            " JOIN state_head AS h ON h.established_by = r.established_revision WHERE h.id = 0"
+        ).fetchone()
+        ledger = self._connection.execute("SELECT identity FROM ledger WHERE id = 0").fetchone()
+        if previous is None or ledger is None:
+            raise StoreError("the canonical ledger has no identity-bearing base")
+        recorded_at = now()
+        content = semantic_identity(
+            (
+                proposed_identity,
+                self._overlay_identity_unlocked(),
+                tuple(
+                    (operation, kind.value, uuid, value_id)
+                    for operation, kind, uuid, value_id in events
+                ),
+                tuple(definition_events or ()),
+            )
+        )
+        record_identity = self._record_identity(
+            str(ledger[0]),
+            str(previous[0]),
+            resulting_revision,
+            TransitionKind.DEFINITION_DELTA_CHANGE.value,
+            recorded_at,
+            provenance.initiator,
+            provenance.source,
+            str(prior_revision),
+            content,
+        )
+        self._connection.execute(
+            "INSERT INTO canonical_record (established_revision, ordinal, record_kind,"
+            " recorded_at, initiator, source, summary, prior_revision, record_identity,"
+            " prior_record_identity) VALUES (?, ("
+            + NEXT_ORDINAL_SQL
+            + "), ?, ?, ?, ?, ?, ?, ?, ?)",
+            (
+                resulting_revision,
+                TransitionKind.DEFINITION_DELTA_CHANGE.value,
+                _stored_time(recorded_at),
+                provenance.initiator,
+                provenance.source,
+                str(prior_revision),
+                prior_revision,
+                record_identity,
+                str(previous[0]),
+            ),
+        )
+        self._connection.execute(
+            "UPDATE state_head SET revision = ?, established_by = ?,"
+            " proposed_definition_set_id = ? WHERE id = 0",
+            (resulting_revision, resulting_revision, proposed_identity),
+        )
+        for occurrence, (operation, kind, uuid, value_id) in enumerate(events):
+            self._connection.execute(
+                "INSERT INTO canonical_proposal_event VALUES (?, ?, ?, ?, ?, ?)",
+                (resulting_revision, occurrence, operation, kind.value, uuid, value_id),
+            )
+        for occurrence, (entity_kind, natural_key, operation, value_set_id) in enumerate(
+            definition_events or ()
+        ):
+            self._connection.execute(
+                "INSERT INTO canonical_definition_proposal_event VALUES (?, ?, ?, ?, ?, ?)",
+                (
+                    resulting_revision,
+                    occurrence,
+                    entity_kind,
+                    natural_key,
+                    operation,
+                    value_set_id,
+                ),
+            )
+        self._connection.execute(
+            "INSERT INTO canonical_definition_event"
+            " (established_revision, active_definition_set_id, delta_disposition,"
+            " proposed_definition_set_id) VALUES (?, NULL, 'present', ?)",
+            (resulting_revision, proposed_identity),
+        )
+
+    def _current_assessment_unlocked(
+        self,
+        scope: ValidationScope,
+        *,
+        revision: int,
+        proposed_identity: str | None,
+        overlay_identity: str | None,
+    ) -> ValidationReport | None:
+        row = self._connection.execute(
+            "SELECT a.identity, a.evaluated_revision, a.proposed_definition_set_id,"
+            " a.graph_overlay_identity FROM current_assessment AS c"
+            " JOIN validation_assessment AS a ON a.identity = c.assessment_id"
+            " WHERE c.scope = ?",
+            (scope.value,),
+        ).fetchone()
+        if row is None:
+            return None
+        if (
+            int(row[1]) != revision
+            or (None if row[2] is None else str(row[2])) != proposed_identity
+            or (None if row[3] is None else str(row[3])) != overlay_identity
+        ):
+            return None
+        return self._assessment_report_unlocked(str(row[0]), 1, 1)
+
+    def assessment_page(
+        self, assessment_id: str, start_ordinal: int, maximum_findings: int
+    ) -> ValidationReport | None:
+        """Read one stable positive ordered interval without reassessment."""
+        if start_ordinal < 1 or maximum_findings < 1:
+            return None
+        with self._lock:
+            return self._assessment_report_unlocked(assessment_id, start_ordinal, maximum_findings)
+
+    def _assessment_report_unlocked(
+        self, assessment_id: str, start_ordinal: int, maximum_findings: int
+    ) -> ValidationReport | None:
+        row = self._connection.execute(
+            "SELECT scope, evaluated_revision, proposed_definition_set_id,"
+            " graph_overlay_identity, conforms, finding_count"
+            " FROM validation_assessment WHERE identity = ?",
+            (assessment_id,),
+        ).fetchone()
+        if row is None:
+            return None
+        count = int(row[5])
+        if start_ordinal > max(1, count):
+            return None
+        finding_rows = self._connection.execute(
+            "SELECT ordinal, summary FROM validation_finding"
+            " WHERE assessment_id = ? AND ordinal >= ? ORDER BY ordinal LIMIT ?",
+            (assessment_id, start_ordinal, maximum_findings),
+        ).fetchall()
+        findings: list[ValidationFinding] = []
+        for ordinal, summary in finding_rows:
+            definitions = tuple(
+                str(each[0])
+                for each in self._connection.execute(
+                    "SELECT definition_ref FROM validation_finding_definition"
+                    " WHERE assessment_id = ? AND finding_ordinal = ? ORDER BY ordinal",
+                    (assessment_id, ordinal),
+                )
+            )
+            objects = tuple(
+                str(each[0])
+                for each in self._connection.execute(
+                    "SELECT object_uuid FROM validation_finding_object"
+                    " WHERE assessment_id = ? AND finding_ordinal = ? ORDER BY ordinal",
+                    (assessment_id, ordinal),
+                )
+            )
+            findings.append(ValidationFinding(str(summary), definitions, objects))
+        returned_start = None if not finding_rows else int(finding_rows[0][0])
+        last = 0 if not finding_rows else int(finding_rows[-1][0])
+        scope = ValidationScope(str(row[0]))
+        return ValidationReport(
+            scope=scope,
+            conforms=bool(row[4]),
+            evaluated_revision=int(row[1]),
+            summary=(
+                "the assessed state conforms"
+                if bool(row[4])
+                else "the assessed state does not conform"
+            ),
+            assessment_id=assessment_id,
+            proposed_definition_identity=None if row[2] is None else str(row[2]),
+            graph_overlay_identity=None if row[3] is None else str(row[3]),
+            finding_count=count,
+            returned_start_ordinal=returned_start,
+            more_findings=last < count,
+            returned_findings=tuple(findings),
+        )
+
+    def publish_assessment(
+        self,
+        scope: ValidationScope,
+        evaluated_revision: int,
+        findings: Iterator[ValidationFinding],
+        *,
+        maximum_findings: int,
+        proposed_identity: str | None = None,
+        overlay_identity: str | None = None,
+    ) -> ValidationReport:
+        """Persist every streamed finding, then atomically publish the completed slot."""
+        with self._lock:
+            try:
+                self._connection.execute("BEGIN IMMEDIATE")
+                report = self._publish_assessment_unlocked(
+                    scope,
+                    evaluated_revision,
+                    findings,
+                    maximum_findings=maximum_findings,
+                    proposed_identity=proposed_identity,
+                    overlay_identity=overlay_identity,
+                )
+                self._connection.execute("COMMIT")
+                return report
+            except Exception as error:
+                self._rollback_quietly()
+                raise StoreError(f"could not publish validation assessment: {error}") from error
+
+    def assess_and_publish(
+        self, scope: ValidationScope, *, maximum_findings: int
+    ) -> ValidationReport:
+        """Bind, scan, and publish one complete assessment in one SQLite transaction."""
+        with self._lock:
+            try:
+                self._connection.execute("BEGIN IMMEDIATE")
+                revision, relation, definition_identity_value, overlay_identity = (
+                    self.conformance_context(scope)
+                )
+                assert definition_identity_value is not None
+                report = self._publish_assessment_unlocked(
+                    scope,
+                    revision,
+                    self.iter_conformance_findings(relation, definition_identity_value),
+                    maximum_findings=maximum_findings,
+                    proposed_identity=(
+                        definition_identity_value
+                        if scope is ValidationScope.DEFINITION_DELTA
+                        else None
+                    ),
+                    overlay_identity=overlay_identity,
+                )
+                self._connection.execute("COMMIT")
+                return report
+            except Exception as error:
+                self._rollback_quietly()
+                raise StoreError(f"could not publish validation assessment: {error}") from error
+
+    def _publish_assessment_unlocked(
+        self,
+        scope: ValidationScope,
+        evaluated_revision: int,
+        findings: Iterator[ValidationFinding],
+        *,
+        maximum_findings: int,
+        proposed_identity: str | None,
+        overlay_identity: str | None,
+    ) -> ValidationReport:
+        material = (
+            scope.value,
+            evaluated_revision,
+            proposed_identity,
+            overlay_identity,
+            secrets.token_hex(16),
+        )
+        assessment_id = semantic_identity(material)
+        self._connection.execute(
+            "INSERT INTO validation_assessment VALUES (?, ?, ?, ?, ?, 0, 0, ?)",
+            (
+                assessment_id,
+                scope.value,
+                evaluated_revision,
+                proposed_identity,
+                overlay_identity,
+                _stored_time(now()),
+            ),
+        )
+        count = 0
+        for count, finding in enumerate(findings, start=1):
+            self._connection.execute(
+                "INSERT INTO validation_finding VALUES (?, ?, ?)",
+                (assessment_id, count, finding.summary),
+            )
+            for ordinal, reference in enumerate(finding.implicated_definitions):
+                self._connection.execute(
+                    "INSERT INTO validation_finding_definition VALUES (?, ?, ?, ?)",
+                    (assessment_id, count, ordinal, reference),
+                )
+            for ordinal, uuid in enumerate(finding.implicated_objects):
+                self._connection.execute(
+                    "INSERT INTO validation_finding_object VALUES (?, ?, ?, ?)",
+                    (assessment_id, count, ordinal, uuid),
+                )
+        self._connection.execute(
+            "UPDATE validation_assessment SET conforms = ?, finding_count = ? WHERE identity = ?",
+            (int(count == 0), count, assessment_id),
+        )
+        prior = self._connection.execute(
+            "SELECT assessment_id FROM current_assessment WHERE scope = ?",
+            (scope.value,),
+        ).fetchone()
+        self._connection.execute(
+            "INSERT INTO current_assessment VALUES (?, ?)"
+            " ON CONFLICT(scope) DO UPDATE SET assessment_id=excluded.assessment_id",
+            (scope.value, assessment_id),
+        )
+        if prior is not None:
+            self._delete_assessment_unlocked(str(prior[0]))
+        report = self.assessment_page(assessment_id, 1, maximum_findings)
+        assert report is not None
+        return report
+
+    def conformance_context(
+        self, scope: ValidationScope
+    ) -> tuple[int, str, str | None, str | None]:
+        """Return exact assessment binding and the SQL relation to scan."""
+        with self._lock:
+            row = self._connection.execute(
+                "SELECT revision, established_by, active_definition_set_id,"
+                " proposed_definition_set_id FROM state_head WHERE id = 0"
+            ).fetchone()
+            if not isinstance(row, tuple):
+                raise NotInitializedError("no canonical state is established")
+            revision = _projection_revision(row)
+            if scope is ValidationScope.DEFINITION_DELTA:
+                if row[3] is None:
+                    raise StoreError("no definition delta is present")
+                proposed = str(row[3])
+                return (
+                    revision,
+                    "prospective_graph_object",
+                    proposed,
+                    self._overlay_identity_unlocked(),
+                )
+            return revision, "current_graph_object", str(row[2]), None
+
+    def iter_conformance_findings(
+        self, relation: str, definition_identity_value: str
+    ) -> Iterator[ValidationFinding]:
+        """Yield complete findings while retaining only one local object neighborhood."""
+        if relation not in {"current_graph_object", "prospective_graph_object"}:
+            raise ValueError("unknown conformance relation")
+        if relation == "prospective_graph_object":
+            for (uuid,) in self._connection.execute(
+                "SELECT p.uuid FROM proposal_entry AS p"
+                " LEFT JOIN graph_presence_interval AS c ON c.uuid = p.uuid"
+                " AND c.valid_to_revision IS NULL"
+                " WHERE (p.base_object_value_id IS NULL AND c.object_value_id IS NOT NULL)"
+                " OR (p.base_object_value_id IS NOT NULL"
+                " AND (c.object_value_id IS NULL"
+                " OR c.object_value_id != p.base_object_value_id)) ORDER BY p.uuid"
+            ):
+                yield ValidationFinding(
+                    summary="staged work has a stale active base; restage this identity",
+                    implicated_objects=(str(uuid),),
+                )
+        # Definition populations are much smaller than graph populations in normal use;
+        # W006 replaces this remaining aggregate validator with normalized row checks.
+        active_identity = str(
+            self._connection.execute(
+                "SELECT active_definition_set_id FROM state_head WHERE id = 0"
+            ).fetchone()[0]
+        )
+        if relation == "prospective_graph_object":
+            self._prepare_prospective_assessment_scope_unlocked(active_identity)
+        yield from self._iter_definition_findings_unlocked(relation, active_identity)
+        object_relation = (
+            "assessment_effective_object" if relation == "prospective_graph_object" else relation
+        )
+        object_sql = f"SELECT uuid, object_value_id FROM {object_relation}"
+        for uuid, value_id in self._connection.execute(object_sql + " ORDER BY uuid"):
+            root = self._load_object_value(int(value_id))
+            neighborhood = self._effective_neighborhood_unlocked(object_relation, root)
+            type_keys = {value.type_key for value in neighborhood.objects()}
+            object_definitions = self._definitions_for_relation_unlocked(
+                relation,
+                active_identity,
+                type_keys=type_keys,
+                constrained_type_keys=set(),
+                relationship_keys=set(),
+            )
+            for finding in assess_graph_conformance(neighborhood, object_definitions):
+                if finding.implicated_objects and finding.implicated_objects[0] == str(uuid):
+                    yield finding
+        yield from self._iter_multiplicity_findings_unlocked(relation, active_identity)
+
+    def _prepare_prospective_assessment_scope_unlocked(self, active_identity: str) -> None:
+        """Derive the changed-definition and staged-graph invariant closure in SQL."""
+        self._connection.execute(
+            "CREATE TEMP TABLE IF NOT EXISTS assessment_impacted_type"
+            " (type_key TEXT PRIMARY KEY) WITHOUT ROWID"
+        )
+        self._connection.execute(
+            "CREATE TEMP TABLE IF NOT EXISTS assessment_definition_type"
+            " (type_key TEXT PRIMARY KEY) WITHOUT ROWID"
+        )
+        self._connection.execute(
+            "CREATE TEMP TABLE IF NOT EXISTS assessment_impacted_uuid"
+            " (uuid TEXT PRIMARY KEY) WITHOUT ROWID"
+        )
+        self._connection.execute(
+            "CREATE TEMP TABLE IF NOT EXISTS assessment_definition_relationship"
+            " (natural_key TEXT PRIMARY KEY) WITHOUT ROWID"
+        )
+        self._connection.execute(
+            "CREATE TEMP TABLE IF NOT EXISTS assessment_impacted_relation"
+            " (uuid TEXT PRIMARY KEY) WITHOUT ROWID"
+        )
+        self._connection.execute("DELETE FROM assessment_impacted_type")
+        self._connection.execute("DELETE FROM assessment_definition_type")
+        self._connection.execute("DELETE FROM assessment_impacted_uuid")
+        self._connection.execute("DELETE FROM assessment_definition_relationship")
+        self._connection.execute("DELETE FROM assessment_impacted_relation")
+        self._connection.execute(
+            "INSERT OR IGNORE INTO assessment_definition_type"
+            " SELECT type_key FROM proposal_definition_type"
+        )
+        for type_key, operation, value_set_id in self._connection.execute(
+            "SELECT type_key, operation, value_set_id FROM proposal_definition_type"
+        ):
+            active = self._load_definition_set(
+                active_identity, type_keys={str(type_key)}, constrained_type_keys=set()
+            )
+            proposed = (
+                GraphDefinitionSet()
+                if str(operation) == "delete"
+                else self._load_definition_set(
+                    str(value_set_id), type_keys={str(type_key)}, constrained_type_keys=set()
+                )
+            )
+            if self._graph_validation_signature(active) != self._graph_validation_signature(
+                proposed
+            ):
+                self._connection.execute(
+                    "INSERT OR IGNORE INTO assessment_impacted_type VALUES (?)",
+                    (str(type_key),),
+                )
+        # Include every effective type definition that refers to an edited type. A
+        # removed anchor type, for example, must revalidate untouched data/link types
+        # that still permit it.
+        self._connection.execute(
+            "INSERT OR IGNORE INTO assessment_definition_type"
+            " SELECT DISTINCT t.type_key FROM definition_type AS t"
+            " JOIN definition_anchor_permission AS p"
+            " ON p.definition_set_id = t.definition_set_id"
+            " AND p.type_occurrence = t.occurrence"
+            " WHERE t.definition_set_id = ?"
+            " AND p.anchor_type_key IN (SELECT type_key FROM proposal_definition_type)"
+            " AND NOT EXISTS (SELECT 1 FROM proposal_definition_type AS e"
+            " WHERE e.type_key = t.type_key)"
+            " UNION SELECT DISTINCT t.type_key FROM definition_type AS t"
+            " JOIN definition_endpoint_permission AS p"
+            " ON p.definition_set_id = t.definition_set_id"
+            " AND p.type_occurrence = t.occurrence"
+            " WHERE t.definition_set_id = ?"
+            " AND p.type_key IN (SELECT type_key FROM proposal_definition_type)"
+            " AND NOT EXISTS (SELECT 1 FROM proposal_definition_type AS e"
+            " WHERE e.type_key = t.type_key)",
+            (active_identity, active_identity),
+        )
+        self._connection.execute(
+            "INSERT OR IGNORE INTO assessment_definition_type"
+            " SELECT DISTINCT t.type_key FROM proposal_definition_type AS e"
+            " JOIN definition_type AS t ON t.definition_set_id = e.value_set_id"
+            " JOIN definition_anchor_permission AS p"
+            " ON p.definition_set_id = t.definition_set_id"
+            " AND p.type_occurrence = t.occurrence"
+            " WHERE e.operation = 'upsert'"
+            " AND p.anchor_type_key IN (SELECT type_key FROM proposal_definition_type)"
+            " UNION SELECT DISTINCT t.type_key FROM proposal_definition_type AS e"
+            " JOIN definition_type AS t ON t.definition_set_id = e.value_set_id"
+            " JOIN definition_endpoint_permission AS p"
+            " ON p.definition_set_id = t.definition_set_id"
+            " AND p.type_occurrence = t.occurrence"
+            " WHERE e.operation = 'upsert'"
+            " AND p.type_key IN (SELECT type_key FROM proposal_definition_type)"
+        )
+        self._connection.execute(
+            "INSERT OR IGNORE INTO assessment_definition_relationship"
+            " SELECT DISTINCT r.natural_key FROM definition_multiplicity_rule AS r"
+            " JOIN definition_multiplicity_participant AS p"
+            " ON p.definition_set_id = r.definition_set_id"
+            " AND p.rule_occurrence = r.occurrence"
+            " WHERE r.definition_set_id = ?"
+            " AND p.type_key IN (SELECT type_key FROM proposal_definition_type)"
+            " AND NOT EXISTS (SELECT 1 FROM proposal_definition_relationship AS e"
+            " WHERE e.natural_key = r.natural_key)"
+            " UNION SELECT DISTINCT r.natural_key"
+            " FROM definition_multiplicity_rule AS r"
+            " WHERE r.definition_set_id = ? AND r.link_type_key IN"
+            " (SELECT type_key FROM proposal_definition_type)"
+            " AND NOT EXISTS (SELECT 1 FROM proposal_definition_relationship AS e"
+            " WHERE e.natural_key = r.natural_key)"
+            " UNION SELECT natural_key FROM proposal_definition_relationship"
+            " WHERE operation = 'upsert'",
+            (active_identity, active_identity),
+        )
+        self._connection.execute(
+            "INSERT OR IGNORE INTO assessment_definition_type"
+            " SELECT p.type_key FROM proposal_definition_relationship AS e"
+            " JOIN definition_multiplicity_participant AS p"
+            " ON p.definition_set_id = e.value_set_id WHERE e.operation = 'upsert'"
+        )
+        for natural_key, operation, value_set_id in self._connection.execute(
+            "SELECT natural_key, operation, value_set_id FROM proposal_definition_relationship"
+        ):
+            active_rule = self._load_definition_set(
+                active_identity, type_keys=set(), relationship_keys={str(natural_key)}
+            )
+            proposed_rule = (
+                GraphDefinitionSet()
+                if str(operation) == "delete"
+                else self._load_definition_set(
+                    str(value_set_id), type_keys=set(), relationship_keys={str(natural_key)}
+                )
+            )
+            if self._multiplicity_validation_signature(
+                active_rule
+            ) == self._multiplicity_validation_signature(proposed_rule):
+                continue
+            impacted_types: set[str] = set()
+            for rule in (
+                *active_rule.relationship_constraints,
+                *proposed_rule.relationship_constraints,
+            ):
+                if isinstance(rule, LinkMultiplicityConstraint):
+                    impacted_types.add(rule.link_type_key)
+                    impacted_types.update(rule.constrained_endpoint_type_keys)
+                    impacted_types.update(rule.opposite_endpoint_type_keys)
+                else:
+                    impacted_types.update(rule.anchor_type_keys)
+                    impacted_types.update(rule.associated_data_type_keys)
+            self._connection.executemany(
+                "INSERT OR IGNORE INTO assessment_impacted_type VALUES (?)",
+                ((type_key,) for type_key in impacted_types),
+            )
+        self._connection.execute(
+            "INSERT OR IGNORE INTO assessment_impacted_uuid"
+            " SELECT g.uuid FROM assessment_impacted_type AS t"
+            " CROSS JOIN graph_presence_interval AS g INDEXED BY graph_presence_current_type"
+            " ON g.object_kind IN ('anchor', 'associatedData', 'link')"
+            " AND g.type_key = t.type_key AND g.valid_to_revision IS NULL"
+            " WHERE NOT EXISTS (SELECT 1 FROM proposal_entry AS p WHERE p.uuid = g.uuid)"
+            " UNION SELECT v.uuid FROM proposal_entry AS p JOIN object_value AS v"
+            " ON v.id = p.object_value_id WHERE p.operation = 'upsert'"
+            " AND v.type_key IN (SELECT type_key FROM assessment_impacted_type)"
+        )
+        self._connection.execute(
+            "INSERT OR IGNORE INTO assessment_impacted_uuid SELECT uuid FROM proposal_entry"
+        )
+        self._connection.execute(
+            "INSERT OR IGNORE INTO assessment_impacted_uuid"
+            " SELECT source_uuid FROM object_value AS v JOIN proposal_entry AS p"
+            " ON v.id IN (p.object_value_id, p.base_object_value_id)"
+            " WHERE v.object_kind = 'link'"
+            " UNION SELECT target_uuid FROM object_value AS v JOIN proposal_entry AS p"
+            " ON v.id IN (p.object_value_id, p.base_object_value_id)"
+            " WHERE v.object_kind = 'link'"
+            " UNION SELECT a.anchor_uuid FROM object_anchor AS a JOIN proposal_entry AS p"
+            " ON a.object_value_id IN (p.object_value_id, p.base_object_value_id)"
+        )
+        # Expand seeds to the relationships whose invariants can change, then to those
+        # relationships' participants. This is deliberately not arbitrary graph
+        # reachability: unrelated links of an unchanged opposite endpoint are outside the
+        # affected invariant closure. Current and prospective edges are both required so
+        # removals and upserts receive identical treatment.
+        self._connection.execute(
+            "INSERT OR IGNORE INTO assessment_impacted_relation"
+            " SELECT g.uuid FROM assessment_impacted_uuid AS s"
+            " CROSS JOIN graph_presence_interval AS g"
+            " INDEXED BY graph_presence_current_link_source"
+            " ON g.source_uuid = s.uuid AND g.valid_to_revision IS NULL"
+            " WHERE g.object_kind = 'link'"
+            " AND NOT EXISTS (SELECT 1 FROM proposal_entry AS p WHERE p.uuid = g.uuid)"
+            " UNION SELECT g.uuid FROM assessment_impacted_uuid AS s"
+            " CROSS JOIN graph_presence_interval AS g"
+            " INDEXED BY graph_presence_current_link_target"
+            " ON g.target_uuid = s.uuid AND g.valid_to_revision IS NULL"
+            " WHERE g.object_kind = 'link'"
+            " AND NOT EXISTS (SELECT 1 FROM proposal_entry AS p WHERE p.uuid = g.uuid)"
+            " UNION SELECT v.uuid FROM proposal_entry AS p JOIN object_value AS v"
+            " ON v.id = p.object_value_id WHERE p.operation = 'upsert'"
+            " AND v.object_kind = 'link' AND v.source_uuid IN"
+            " (SELECT uuid FROM assessment_impacted_uuid)"
+            " UNION SELECT v.uuid FROM proposal_entry AS p JOIN object_value AS v"
+            " ON v.id = p.object_value_id WHERE p.operation = 'upsert'"
+            " AND v.object_kind = 'link' AND v.target_uuid IN"
+            " (SELECT uuid FROM assessment_impacted_uuid)"
+            " UNION SELECT v.uuid FROM assessment_impacted_uuid AS s"
+            " CROSS JOIN object_anchor AS a INDEXED BY object_anchor_reverse"
+            " ON a.anchor_uuid = s.uuid JOIN object_value AS v ON v.id = a.object_value_id"
+            " JOIN graph_presence_interval AS g"
+            " ON g.object_value_id = v.id AND g.valid_to_revision IS NULL"
+            " WHERE v.object_kind = 'associatedData'"
+            " AND NOT EXISTS (SELECT 1 FROM proposal_entry AS p WHERE p.uuid = v.uuid)"
+            " UNION SELECT v.uuid FROM proposal_entry AS p JOIN object_value AS v"
+            " ON v.id = p.object_value_id JOIN object_anchor AS a ON a.object_value_id = v.id"
+            " WHERE p.operation = 'upsert' AND v.object_kind = 'associatedData'"
+            " AND a.anchor_uuid IN (SELECT uuid FROM assessment_impacted_uuid)"
+            " UNION SELECT v.uuid FROM assessment_impacted_uuid AS i"
+            " CROSS JOIN graph_presence_interval AS g INDEXED BY graph_presence_current_uuid"
+            " ON g.uuid = i.uuid AND g.valid_to_revision IS NULL"
+            " JOIN object_value AS v ON v.id = g.object_value_id"
+            " WHERE v.object_kind IN ('link', 'associatedData')"
+            " UNION SELECT uuid FROM proposal_entry WHERE object_kind IN ('link', 'associatedData')"
+        )
+        self._connection.execute(
+            "INSERT OR IGNORE INTO assessment_impacted_uuid"
+            " SELECT uuid FROM assessment_impacted_relation"
+            " UNION SELECT g.source_uuid FROM assessment_impacted_relation AS r"
+            " CROSS JOIN graph_presence_interval AS g"
+            " INDEXED BY graph_presence_current_uuid ON g.uuid = r.uuid"
+            " AND g.valid_to_revision IS NULL WHERE g.object_kind = 'link'"
+            " UNION SELECT g.target_uuid FROM assessment_impacted_relation AS r"
+            " CROSS JOIN graph_presence_interval AS g"
+            " INDEXED BY graph_presence_current_uuid ON g.uuid = r.uuid"
+            " AND g.valid_to_revision IS NULL WHERE g.object_kind = 'link'"
+            " UNION SELECT v.source_uuid FROM proposal_entry AS p JOIN object_value AS v"
+            " ON v.id = p.object_value_id WHERE p.operation = 'upsert'"
+            " AND v.object_kind = 'link' AND v.uuid IN"
+            " (SELECT uuid FROM assessment_impacted_relation)"
+            " UNION SELECT v.target_uuid FROM proposal_entry AS p JOIN object_value AS v"
+            " ON v.id = p.object_value_id WHERE p.operation = 'upsert'"
+            " AND v.object_kind = 'link' AND v.uuid IN"
+            " (SELECT uuid FROM assessment_impacted_relation)"
+            " UNION SELECT a.anchor_uuid FROM assessment_impacted_relation AS r"
+            " CROSS JOIN graph_presence_interval AS g"
+            " INDEXED BY graph_presence_current_uuid ON g.uuid = r.uuid"
+            " AND g.valid_to_revision IS NULL JOIN object_anchor AS a"
+            " ON a.object_value_id = g.object_value_id"
+            " UNION SELECT a.anchor_uuid FROM assessment_impacted_relation AS r"
+            " CROSS JOIN proposal_entry AS p ON p.uuid = r.uuid"
+            " JOIN object_anchor AS a ON a.object_value_id = p.object_value_id"
+            " WHERE p.operation = 'upsert'"
+        )
+        self._connection.execute(
+            "INSERT OR IGNORE INTO assessment_impacted_type"
+            " SELECT v.type_key FROM graph_presence_interval AS g JOIN object_value AS v"
+            " ON v.id = g.object_value_id WHERE g.valid_to_revision IS NULL"
+            " AND g.uuid IN (SELECT uuid FROM assessment_impacted_uuid)"
+            " UNION SELECT v.type_key FROM proposal_entry AS p JOIN object_value AS v"
+            " ON v.id = p.object_value_id WHERE p.operation = 'upsert'"
+            " AND p.uuid IN (SELECT uuid FROM assessment_impacted_uuid)"
+        )
+        self._prepare_effective_assessment_relations_unlocked()
+
+    def _prepare_effective_assessment_relations_unlocked(self) -> None:
+        """Materialize only the affected effective objects and their incident relations."""
+        self._connection.execute("DROP TABLE IF EXISTS temp.assessment_effective_object")
+        self._connection.execute("DROP TABLE IF EXISTS temp.assessment_incident_link")
+        self._connection.execute("DROP TABLE IF EXISTS temp.assessment_effective_data_anchor")
+        self._connection.execute(
+            "CREATE TEMP TABLE assessment_effective_object AS"
+            " SELECT g.uuid, v.object_kind, v.type_key, v.source_uuid, v.target_uuid,"
+            " v.id AS object_value_id FROM assessment_impacted_uuid AS i"
+            " CROSS JOIN graph_presence_interval AS g INDEXED BY graph_presence_current_uuid"
+            " ON g.uuid = i.uuid AND g.valid_to_revision IS NULL"
+            " JOIN object_value AS v ON v.id = g.object_value_id WHERE 1 = 1"
+            " AND NOT EXISTS (SELECT 1 FROM proposal_entry AS p WHERE p.uuid = g.uuid)"
+            " UNION ALL SELECT v.uuid, v.object_kind, v.type_key, v.source_uuid,"
+            " v.target_uuid, v.id FROM proposal_entry AS p"
+            " JOIN object_value AS v ON v.id = p.object_value_id"
+            " WHERE p.operation = 'upsert' AND p.uuid IN"
+            " (SELECT uuid FROM assessment_impacted_uuid)"
+        )
+        self._connection.execute(
+            "CREATE UNIQUE INDEX assessment_effective_object_uuid"
+            " ON assessment_effective_object(uuid)"
+        )
+        self._connection.execute(
+            "CREATE INDEX assessment_effective_object_type"
+            " ON assessment_effective_object(object_kind, type_key, uuid)"
+        )
+        self._connection.execute(
+            "CREATE TEMP TABLE assessment_incident_link AS"
+            " SELECT v.uuid, v.type_key, v.source_uuid, v.target_uuid"
+            " FROM assessment_impacted_relation AS r"
+            " CROSS JOIN graph_presence_interval AS g INDEXED BY graph_presence_current_uuid"
+            " ON g.uuid = r.uuid AND g.valid_to_revision IS NULL"
+            " JOIN object_value AS v ON v.id = g.object_value_id"
+            " WHERE v.object_kind = 'link'"
+            " AND NOT EXISTS (SELECT 1 FROM proposal_entry AS p WHERE p.uuid = v.uuid)"
+            " UNION ALL SELECT v.uuid, v.type_key, v.source_uuid, v.target_uuid"
+            " FROM assessment_impacted_relation AS r CROSS JOIN proposal_entry AS p"
+            " ON p.uuid = r.uuid JOIN object_value AS v ON v.id = p.object_value_id"
+            " WHERE p.operation = 'upsert' AND v.object_kind = 'link'"
+        )
+        self._connection.execute(
+            "CREATE UNIQUE INDEX assessment_incident_link_uuid ON assessment_incident_link(uuid)"
+        )
+        self._connection.execute(
+            "CREATE INDEX assessment_incident_link_source"
+            " ON assessment_incident_link(source_uuid, type_key, target_uuid)"
+        )
+        self._connection.execute(
+            "CREATE INDEX assessment_incident_link_target"
+            " ON assessment_incident_link(target_uuid, type_key, source_uuid)"
+        )
+        self._connection.execute(
+            "CREATE TEMP TABLE assessment_effective_data_anchor AS"
+            " SELECT a.data_uuid, a.anchor_uuid FROM current_data_anchor AS a"
+            " WHERE NOT EXISTS (SELECT 1 FROM proposal_entry AS p WHERE p.uuid = a.data_uuid)"
+            " AND a.data_uuid IN (SELECT uuid FROM assessment_impacted_relation)"
+            " UNION ALL SELECT v.uuid, a.anchor_uuid FROM proposal_entry AS p"
+            " JOIN object_value AS v ON v.id = p.object_value_id"
+            " JOIN object_anchor AS a ON a.object_value_id = v.id"
+            " WHERE p.operation = 'upsert' AND v.object_kind = 'associatedData'"
+            " AND v.uuid IN (SELECT uuid FROM assessment_impacted_relation)"
+        )
+        self._connection.execute(
+            "CREATE INDEX assessment_data_anchor_anchor"
+            " ON assessment_effective_data_anchor(anchor_uuid, data_uuid)"
+        )
+        self._connection.execute(
+            "CREATE INDEX assessment_data_anchor_data"
+            " ON assessment_effective_data_anchor(data_uuid, anchor_uuid)"
+        )
+
+    @staticmethod
+    def _graph_validation_signature(definitions: GraphDefinitionSet) -> str:
+        """Return only definition meaning that can change graph conformance."""
+        members: list[object] = []
+        members.extend(("anchor", value.type_key) for value in definitions.anchor_types)
+        for value in definitions.associated_data_types:
+            rules: list[object] = []
+            for rule in value.property_constraints:
+                rules.append(
+                    (
+                        rule.property_name,
+                        rule.required,
+                        rule.json_kind.value,
+                        None
+                        if rule.value_shape is None
+                        else (rule.value_shape.minimum_size, rule.value_shape.maximum_size),
+                        None
+                        if rule.value_range is None
+                        else (
+                            rule.value_range.lower_bound,
+                            rule.value_range.upper_bound,
+                            tuple(sorted(rule.value_range.permitted_values, key=semantic_identity)),
+                        ),
+                        None if rule.pattern is None else rule.pattern.expression,
+                    )
+                )
+            members.append(
+                (
+                    "associatedData",
+                    value.type_key,
+                    tuple(sorted(value.permitted_anchor_type_keys)),
+                    tuple(sorted(rules, key=semantic_identity)),
+                )
+            )
+        members.extend(
+            (
+                "link",
+                value.type_key,
+                tuple(sorted(value.endpoint_constraint.permitted_source_type_keys)),
+                tuple(sorted(value.endpoint_constraint.permitted_target_type_keys)),
+            )
+            for value in definitions.link_types
+        )
+        return semantic_identity(tuple(sorted(members, key=semantic_identity)))
+
+    @staticmethod
+    def _multiplicity_validation_signature(definitions: GraphDefinitionSet) -> str:
+        """Return rule meaning that can change graph conformance, excluding prose."""
+        members: list[object] = []
+        for rule in definitions.relationship_constraints:
+            if isinstance(rule, LinkMultiplicityConstraint):
+                members.append(
+                    (
+                        "link",
+                        rule.link_type_key,
+                        rule.constrained_end.value,
+                        tuple(sorted(rule.constrained_endpoint_type_keys)),
+                        tuple(sorted(rule.opposite_endpoint_type_keys)),
+                        rule.lower_bound,
+                        rule.upper_bound,
+                    )
+                )
+            else:
+                members.append(
+                    (
+                        "directAssociation",
+                        rule.constrained_end.value,
+                        tuple(sorted(rule.anchor_type_keys)),
+                        tuple(sorted(rule.associated_data_type_keys)),
+                        rule.lower_bound,
+                        rule.upper_bound,
+                    )
+                )
+        return semantic_identity(tuple(sorted(members, key=semantic_identity)))
+
+    def _definitions_for_relation_unlocked(
+        self,
+        relation: str,
+        active_identity: str,
+        *,
+        type_keys: set[str] | None = None,
+        constrained_type_keys: set[str] | None = None,
+        relationship_keys: set[str] | None = None,
+    ) -> GraphDefinitionSet:
+        if relation == "prospective_graph_object":
+            return self._effective_proposed_definitions_unlocked(
+                active_identity,
+                type_keys=type_keys,
+                constrained_type_keys=constrained_type_keys,
+                relationship_keys=relationship_keys,
+            )
+        return self._load_definition_set(
+            active_identity,
+            type_keys=type_keys,
+            constrained_type_keys=constrained_type_keys,
+            relationship_keys=relationship_keys,
+        )
+
+    def _effective_type_keys_unlocked(self, relation: str, active_identity: str) -> Iterator[str]:
+        if relation == "current_graph_object":
+            rows = self._connection.execute(
+                "SELECT type_key FROM definition_type WHERE definition_set_id = ?"
+                " ORDER BY type_key",
+                (active_identity,),
+            )
+        else:
+            rows = self._connection.execute(
+                "SELECT type_key FROM assessment_definition_type ORDER BY type_key"
+            )
+        for (type_key,) in rows:
+            yield str(type_key)
+
+    def _definition_context_unlocked(
+        self, relation: str, active_identity: str, root: GraphDefinitionSet
+    ) -> GraphDefinitionSet:
+        referenced: set[str] = set()
+        for value in root.associated_data_types:
+            referenced.update(value.permitted_anchor_type_keys)
+        for value in root.link_types:
+            referenced.update(value.endpoint_constraint.permitted_source_type_keys)
+            referenced.update(value.endpoint_constraint.permitted_target_type_keys)
+        for rule in root.relationship_constraints:
+            if isinstance(rule, LinkMultiplicityConstraint):
+                referenced.add(rule.link_type_key)
+                referenced.update(rule.constrained_endpoint_type_keys)
+                referenced.update(rule.opposite_endpoint_type_keys)
+            else:
+                referenced.update(rule.anchor_type_keys)
+                referenced.update(rule.associated_data_type_keys)
+        resolved = self._definitions_for_relation_unlocked(
+            relation,
+            active_identity,
+            type_keys=referenced,
+            constrained_type_keys=set(),
+        )
+        root_keys = {
+            *(value.type_key for value in root.anchor_types),
+            *(value.type_key for value in root.associated_data_types),
+            *(value.type_key for value in root.link_types),
+        }
+        anchors = [
+            AnchorTypeDefinition(value.type_key, "reference")
+            for value in resolved.anchor_types
+            if value.type_key not in root_keys
+        ]
+        reference_anchor = "__vellis_validation_reference_anchor__"
+        needs_reference_anchor = any(
+            value.type_key not in root_keys for value in resolved.associated_data_types
+        ) or any(value.type_key not in root_keys for value in resolved.link_types)
+        if needs_reference_anchor and all(
+            value.type_key != reference_anchor for value in (*root.anchor_types, *anchors)
+        ):
+            anchors.append(AnchorTypeDefinition(reference_anchor, "reference"))
+        data = [
+            AssociatedDataTypeDefinition(
+                value.type_key,
+                permitted_anchor_type_keys=(reference_anchor,),
+                description="reference",
+            )
+            for value in resolved.associated_data_types
+            if value.type_key not in root_keys
+        ]
+        links = [
+            LinkTypeDefinition(
+                value.type_key,
+                EndpointConstraint((reference_anchor,), (reference_anchor,), "reference"),
+                "reference",
+            )
+            for value in resolved.link_types
+            if value.type_key not in root_keys
+        ]
+        return GraphDefinitionSet(
+            (*root.anchor_types, *anchors),
+            (*root.associated_data_types, *data),
+            (*root.link_types, *links),
+            root.relationship_constraints,
+        )
+
+    def _iter_definition_findings_unlocked(
+        self, relation: str, active_identity: str
+    ) -> Iterator[ValidationFinding]:
+        for type_key in self._effective_type_keys_unlocked(relation, active_identity):
+            root = self._definitions_for_relation_unlocked(
+                relation,
+                active_identity,
+                type_keys={type_key},
+                constrained_type_keys=set(),
+            )
+            yield from validate_definition_set(
+                self._definition_context_unlocked(relation, active_identity, root),
+                require_descriptions=True,
+            )
+        if relation == "current_graph_object":
+            keys = self._connection.execute(
+                "SELECT natural_key FROM definition_multiplicity_rule"
+                " WHERE definition_set_id = ? ORDER BY natural_key",
+                (active_identity,),
+            )
+        else:
+            keys = self._connection.execute(
+                "SELECT natural_key FROM assessment_definition_relationship ORDER BY natural_key"
+            )
+        for (natural_key,) in keys:
+            root = self._definitions_for_relation_unlocked(
+                relation,
+                active_identity,
+                type_keys=set(),
+                relationship_keys={str(natural_key)},
+            )
+            yield from validate_definition_set(
+                self._definition_context_unlocked(relation, active_identity, root),
+                require_descriptions=True,
+            )
+
+    def _iter_multiplicity_findings_unlocked(
+        self, relation: str, active_identity: str
+    ) -> Iterator[ValidationFinding]:
+        if relation == "current_graph_object":
+            keys = self._connection.execute(
+                "SELECT natural_key FROM definition_multiplicity_rule"
+                " WHERE definition_set_id = ? ORDER BY natural_key",
+                (active_identity,),
+            )
+        else:
+            keys = self._connection.execute(
+                "SELECT r.natural_key FROM definition_multiplicity_rule AS r"
+                " WHERE r.definition_set_id = ? AND NOT EXISTS"
+                " (SELECT 1 FROM proposal_definition_relationship AS p"
+                " WHERE p.natural_key = r.natural_key)"
+                " AND EXISTS (SELECT 1 FROM definition_multiplicity_participant AS p"
+                " WHERE p.definition_set_id = r.definition_set_id"
+                " AND p.rule_occurrence = r.occurrence"
+                " AND p.type_key IN (SELECT type_key FROM assessment_impacted_type))"
+                " UNION ALL SELECT natural_key FROM proposal_definition_relationship"
+                " WHERE operation = 'upsert' ORDER BY 1",
+                (active_identity,),
+            )
+        for (natural_key,) in keys:
+            definitions = self._definitions_for_relation_unlocked(
+                relation,
+                active_identity,
+                type_keys=set(),
+                relationship_keys={str(natural_key)},
+            )
+            yield from self._multiplicity_findings_unlocked(relation, definitions)
+
+    def _effective_neighborhood_unlocked(self, relation: str, root: GraphObject) -> Graph:
+        wanted = {root.uuid}
+        if isinstance(root, AssociatedDataObject):
+            wanted.update(root.anchor_uuids)
+        elif isinstance(root, Link):
+            wanted.update((root.source_uuid, root.target_uuid))
+        values: list[GraphObject] = [root]
+        pending = wanted - {root.uuid}
+        if pending:
+            placeholders = ", ".join("?" for _ in pending)
+            for (value_id,) in self._connection.execute(
+                f"SELECT object_value_id FROM {relation} WHERE uuid IN ({placeholders})",
+                tuple(pending),
+            ):
+                values.append(self._load_object_value(int(value_id)))
+        anchors = [each for each in values if isinstance(each, Anchor)]
+        data = [each for each in values if isinstance(each, AssociatedDataObject)]
+        links = [each for each in values if isinstance(each, Link)]
+        # Data used as a link endpoint brings its grounding anchors into the local
+        # neighborhood so its own reference checks do not create false findings.
+        extra_anchor_ids = {
+            anchor_uuid
+            for each in data
+            for anchor_uuid in each.anchor_uuids
+            if all(anchor.uuid != anchor_uuid for anchor in anchors)
+        }
+        if extra_anchor_ids:
+            placeholders = ", ".join("?" for _ in extra_anchor_ids)
+            for (value_id,) in self._connection.execute(
+                f"SELECT object_value_id FROM {relation}"
+                f" WHERE object_kind = 'anchor' AND uuid IN ({placeholders})",
+                tuple(extra_anchor_ids),
+            ):
+                value = self._load_object_value(int(value_id))
+                assert isinstance(value, Anchor)
+                anchors.append(value)
+        return Graph(tuple(anchors), tuple(data), tuple(links))
+
+    def _multiplicity_findings_unlocked(
+        self, relation: str, definitions: GraphDefinitionSet
+    ) -> Iterator[ValidationFinding]:
+        prospective = relation == "prospective_graph_object"
+        object_relation = "assessment_effective_object" if prospective else relation
+        link_relation = "assessment_incident_link" if prospective else relation
+        association_relation = (
+            "assessment_effective_data_anchor" if prospective else "current_data_anchor"
+        )
+        for constraint in definitions.relationship_constraints:
+            label = relationship_label(constraint)
+            lower, upper = constraint.lower_bound, constraint.upper_bound
+            if isinstance(constraint, LinkMultiplicityConstraint):
+                near = (
+                    "source_uuid" if constraint.constrained_end is LinkEnd.SOURCE else "target_uuid"
+                )
+                far = (
+                    "target_uuid" if constraint.constrained_end is LinkEnd.SOURCE else "source_uuid"
+                )
+                constrained = tuple(constraint.constrained_endpoint_type_keys)
+                opposite = tuple(constraint.opposite_endpoint_type_keys)
+                if not constrained or not opposite:
+                    continue
+                constrained_marks = ", ".join("?" for _ in constrained)
+                opposite_marks = ", ".join("?" for _ in opposite)
+                sql = (
+                    f"SELECT e.uuid, e.type_key, count(f.uuid) FROM {object_relation} AS e"
+                    f" LEFT JOIN {link_relation} AS l ON "
+                    + ("1 = 1" if prospective else "l.object_kind = 'link'")
+                    + f" AND l.type_key = ? AND l.{near} = e.uuid"
+                    + f" LEFT JOIN {object_relation} AS f ON f.uuid = l.{far}"
+                    + f" AND f.type_key IN ({opposite_marks})"
+                    + " WHERE e.object_kind IN ('anchor', 'associatedData')"
+                    + f" AND e.type_key IN ({constrained_marks})"
+                    + (
+                        " AND e.uuid IN (SELECT uuid FROM assessment_impacted_uuid)"
+                        if prospective
+                        else ""
+                    )
+                    + " GROUP BY e.uuid, e.type_key ORDER BY e.uuid"
+                )
+                parameters = (constraint.link_type_key, *opposite, *constrained)
+                rows = self._connection.execute(sql, parameters)
+                for uuid, type_key, count_value in rows:
+                    count = int(count_value)
+                    if count < lower or (upper is not None and count > upper):
+                        bound = f"{lower}..{'*' if upper is None else upper}"
+                        yield ValidationFinding(
+                            summary=(
+                                f"{type_key} {uuid!r} participates in {count}"
+                                f" {constraint.link_type_key!r} links at its"
+                                f" {constraint.constrained_end.value} end, outside {bound}"
+                            ),
+                            implicated_definitions=(label,),
+                            implicated_objects=(str(uuid),),
+                        )
+                continue
+            assert isinstance(constraint, DirectAssociationMultiplicityConstraint)
+            anchors = tuple(constraint.anchor_type_keys)
+            data_types = tuple(constraint.associated_data_type_keys)
+            if not anchors or not data_types:
+                continue
+            anchor_marks = ", ".join("?" for _ in anchors)
+            data_marks = ", ".join("?" for _ in data_types)
+            if constraint.constrained_end is DirectAssociationEnd.ANCHOR:
+                sql = (
+                    f"SELECT a.uuid, count(d.uuid) FROM {object_relation} AS a"
+                    f" LEFT JOIN {association_relation} AS da ON da.anchor_uuid = a.uuid"
+                    f" LEFT JOIN {object_relation} AS d ON d.uuid = da.data_uuid"
+                    f" AND d.type_key IN ({data_marks})"
+                    " WHERE a.object_kind = 'anchor'"
+                    f" AND a.type_key IN ({anchor_marks}) GROUP BY a.uuid ORDER BY a.uuid"
+                )
+                if prospective:
+                    sql = sql.replace(
+                        " GROUP BY",
+                        " AND a.uuid IN (SELECT uuid FROM assessment_impacted_uuid) GROUP BY",
+                    )
+                rows = self._connection.execute(sql, (*data_types, *anchors))
+            else:
+                sql = (
+                    f"SELECT d.uuid, count(DISTINCT a.uuid) FROM {object_relation} AS d"
+                    f" LEFT JOIN {association_relation} AS da ON da.data_uuid = d.uuid"
+                    f" LEFT JOIN {object_relation} AS a ON a.uuid = da.anchor_uuid"
+                    f" AND a.type_key IN ({anchor_marks})"
+                    " WHERE d.object_kind = 'associatedData'"
+                    f" AND d.type_key IN ({data_marks}) GROUP BY d.uuid ORDER BY d.uuid"
+                )
+                if prospective:
+                    sql = sql.replace(
+                        " GROUP BY",
+                        " AND d.uuid IN (SELECT uuid FROM assessment_impacted_uuid) GROUP BY",
+                    )
+                rows = self._connection.execute(sql, (*anchors, *data_types))
+            for uuid, count_value in rows:
+                count = int(count_value)
+                if count < lower or (upper is not None and count > upper):
+                    bound = f"{lower}..{'*' if upper is None else upper}"
+                    subject = (
+                        "anchor"
+                        if constraint.constrained_end is DirectAssociationEnd.ANCHOR
+                        else "associated data"
+                    )
+                    yield ValidationFinding(
+                        summary=(
+                            f"{subject} {uuid!r} has {count} matching direct associations, "
+                            f"outside {bound}"
+                        ),
+                        implicated_definitions=(label,),
+                        implicated_objects=(str(uuid),),
+                    )
+
+    def _delete_assessment_unlocked(self, assessment_id: str) -> None:
+        self._connection.execute(
+            "DELETE FROM validation_finding_definition WHERE assessment_id = ?",
+            (assessment_id,),
+        )
+        self._connection.execute(
+            "DELETE FROM validation_finding_object WHERE assessment_id = ?",
+            (assessment_id,),
+        )
+        self._connection.execute(
+            "DELETE FROM validation_finding WHERE assessment_id = ?", (assessment_id,)
+        )
+        self._connection.execute(
+            "DELETE FROM validation_assessment WHERE identity = ?", (assessment_id,)
+        )
+
+    def _materialize_proposed_definitions_unlocked(
+        self, active_identity: str, proposed_identity: str
+    ) -> str:
+        """Build the activated immutable set with fixed-size SQL row work."""
+        if self._connection.execute(
+            "SELECT 1 FROM definition_set WHERE identity = ?", (proposed_identity,)
+        ).fetchone():
+            return proposed_identity
+        content = self._connection.execute(
+            "SELECT effective_accumulator, effective_entry_count"
+            " FROM proposal_definition_state WHERE id = 0"
+        ).fetchone()
+        if content is None or content[0] is None or content[1] is None:
+            raise StoreError("the proposed definition content summary is absent")
+        canonical_identity = definition_identity_from_stats(str(content[0]), int(content[1]))
+        if canonical_identity != proposed_identity:
+            raise StoreError("the proposed definition identity does not match its content")
+        self._connection.execute(
+            "INSERT INTO definition_set(identity, content_accumulator, entry_count)"
+            " VALUES (?, ?, ?)",
+            (proposed_identity, str(content[0]), int(content[1])),
+        )
+        sources = self._connection.execute(
+            "SELECT t.definition_set_id, t.occurrence, t.type_key, t.object_kind"
+            " FROM definition_type AS t WHERE t.definition_set_id = ?"
+            " AND NOT EXISTS (SELECT 1 FROM proposal_definition_type AS p"
+            " WHERE p.type_key = t.type_key)"
+            " UNION ALL SELECT t.definition_set_id, t.occurrence, t.type_key, t.object_kind"
+            " FROM proposal_definition_type AS p JOIN definition_type AS t"
+            " ON t.definition_set_id = p.value_set_id WHERE p.operation = 'upsert'"
+            " ORDER BY 3, 4",
+            (active_identity,),
+        )
+        type_occurrence = 0
+        while batch := sources.fetchmany(128):
+            for source_set, source_occurrence, _, _ in batch:
+                self._connection.execute(
+                    "INSERT INTO definition_type SELECT ?, ?, object_kind, type_key, description"
+                    " FROM definition_type WHERE definition_set_id = ? AND occurrence = ?",
+                    (proposed_identity, type_occurrence, source_set, source_occurrence),
+                )
+                for table, columns in (
+                    (
+                        "definition_anchor_permission",
+                        "occurrence, anchor_type_key",
+                    ),
+                    (
+                        "definition_property_rule",
+                        "occurrence, property_name, required, json_kind, description,"
+                        " minimum_size, maximum_size, lower_kind, lower_value, upper_kind,"
+                        " upper_value, pattern",
+                    ),
+                    (
+                        "definition_endpoint_rule",
+                        "description",
+                    ),
+                    (
+                        "definition_endpoint_permission",
+                        "role, occurrence, type_key",
+                    ),
+                ):
+                    self._connection.execute(
+                        f"INSERT INTO {table} SELECT ?, ?, {columns} FROM {table}"
+                        " WHERE definition_set_id = ? AND type_occurrence = ?",
+                        (proposed_identity, type_occurrence, source_set, source_occurrence),
+                    )
+                self._connection.execute(
+                    "INSERT INTO definition_permitted_value"
+                    " SELECT ?, ?, v.property_occurrence, v.occurrence, v.json_kind, v.json_value"
+                    " FROM definition_permitted_value AS v WHERE v.definition_set_id = ?"
+                    " AND v.type_occurrence = ?",
+                    (proposed_identity, type_occurrence, source_set, source_occurrence),
+                )
+                type_occurrence += 1
+
+        rule_sources = self._connection.execute(
+            "SELECT r.definition_set_id, r.occurrence, r.natural_key"
+            " FROM definition_multiplicity_rule AS r WHERE r.definition_set_id = ?"
+            " AND NOT EXISTS (SELECT 1 FROM proposal_definition_relationship AS p"
+            " WHERE p.natural_key = r.natural_key)"
+            " UNION ALL SELECT r.definition_set_id, r.occurrence, r.natural_key"
+            " FROM proposal_definition_relationship AS p"
+            " JOIN definition_multiplicity_rule AS r"
+            " ON r.definition_set_id = p.value_set_id WHERE p.operation = 'upsert'"
+            " ORDER BY 3",
+            (active_identity,),
+        )
+        rule_occurrence = 0
+        while batch := rule_sources.fetchmany(128):
+            for source_set, source_occurrence, _ in batch:
+                self._connection.execute(
+                    "INSERT INTO definition_multiplicity_rule"
+                    " SELECT ?, ?, natural_key, rule_kind, link_type_key, constrained_end,"
+                    " lower_bound, upper_bound, description"
+                    " FROM definition_multiplicity_rule"
+                    " WHERE definition_set_id = ? AND occurrence = ?",
+                    (proposed_identity, rule_occurrence, source_set, source_occurrence),
+                )
+                self._connection.execute(
+                    "INSERT INTO definition_multiplicity_participant"
+                    " SELECT ?, ?, role, occurrence, type_key"
+                    " FROM definition_multiplicity_participant"
+                    " WHERE definition_set_id = ? AND rule_occurrence = ?",
+                    (proposed_identity, rule_occurrence, source_set, source_occurrence),
+                )
+                rule_occurrence += 1
+        return proposed_identity
+
+    def activate_proposal(self, assessment_id: str, *, provenance: Provenance) -> RevisionedOutcome:
+        """Atomically activate the exact assessed definition-and-graph proposal."""
+        with self._lock:
+            try:
+                self._connection.execute("BEGIN IMMEDIATE")
+                head = self._connection.execute(
+                    "SELECT revision, proposed_definition_set_id, active_definition_set_id"
+                    " FROM state_head WHERE id = 0"
+                ).fetchone()
+                if head is None:
+                    raise NotInitializedError("no canonical state is established")
+                revision = int(head[0])
+                if head[1] is None:
+                    self._connection.execute("ROLLBACK")
+                    return RevisionedOutcome(
+                        OperationStatus.REJECTED, "there is no proposal to activate"
+                    )
+                proposed = str(head[1])
+                overlay = self._overlay_identity_unlocked()
+                assessed = self._connection.execute(
+                    "SELECT evaluated_revision, proposed_definition_set_id,"
+                    " graph_overlay_identity, conforms FROM validation_assessment"
+                    " WHERE identity = ?",
+                    (assessment_id,),
+                ).fetchone()
+                if assessed is None or (
+                    int(assessed[0]) != revision
+                    or str(assessed[1]) != proposed
+                    or str(assessed[2]) != overlay
+                    or not bool(assessed[3])
+                ):
+                    self._connection.execute("ROLLBACK")
+                    return RevisionedOutcome(
+                        OperationStatus.REJECTED,
+                        "activation requires the exact current conforming proposal assessment",
+                        (
+                            ValidationFinding(
+                                summary=(
+                                    "the selected assessment is missing, stale, or nonconforming"
+                                )
+                            ),
+                        ),
+                    )
+                conflict = self._connection.execute(
+                    "SELECT p.uuid FROM proposal_entry AS p"
+                    " LEFT JOIN current_graph_object AS c ON c.uuid = p.uuid"
+                    " WHERE (p.base_object_value_id IS NULL AND c.object_value_id IS NOT NULL)"
+                    " OR (p.base_object_value_id IS NOT NULL"
+                    " AND (c.object_value_id IS NULL"
+                    " OR c.object_value_id != p.base_object_value_id))"
+                    " LIMIT 1"
+                ).fetchone()
+                if conflict is not None:
+                    self._connection.execute("ROLLBACK")
+                    return RevisionedOutcome(
+                        OperationStatus.REJECTED,
+                        "the active base of staged work changed; reassess after restaging",
+                        (
+                            ValidationFinding(
+                                summary="staged work has a stale active base",
+                                implicated_objects=(str(conflict[0]),),
+                            ),
+                        ),
+                    )
+                self._materialize_proposed_definitions_unlocked(str(head[2]), proposed)
+                resulting = revision + 1
+                previous = self._connection.execute(
+                    "SELECT r.record_identity FROM canonical_record AS r"
+                    " JOIN state_head AS h ON h.established_by = r.established_revision"
+                    " WHERE h.id = 0"
+                ).fetchone()
+                ledger = self._connection.execute(
+                    "SELECT identity FROM ledger WHERE id = 0"
+                ).fetchone()
+                assert previous is not None and ledger is not None
+                recorded_at = now()
+                record_identity = self._record_identity(
+                    str(ledger[0]),
+                    str(previous[0]),
+                    resulting,
+                    TransitionKind.DEFINITION_ACTIVATION.value,
+                    recorded_at,
+                    provenance.initiator,
+                    provenance.source,
+                    str(revision),
+                    semantic_identity((proposed, overlay, assessment_id)),
+                )
+                self._connection.execute(
+                    "INSERT INTO canonical_record (established_revision, ordinal, record_kind,"
+                    " recorded_at, initiator, source, summary, prior_revision, record_identity,"
+                    " prior_record_identity) VALUES (?, ("
+                    + NEXT_ORDINAL_SQL
+                    + "), ?, ?, ?, ?, ?, ?, ?, ?)",
+                    (
+                        resulting,
+                        TransitionKind.DEFINITION_ACTIVATION.value,
+                        _stored_time(recorded_at),
+                        provenance.initiator,
+                        provenance.source,
+                        str(revision),
+                        revision,
+                        record_identity,
+                        str(previous[0]),
+                    ),
+                )
+                entries = self._connection.execute(
+                    "SELECT uuid, object_kind, operation, object_value_id"
+                    " FROM proposal_entry ORDER BY uuid"
+                )
+                for occurrence, (uuid, kind, operation, value_id) in enumerate(entries):
+                    self._connection.execute(
+                        "UPDATE graph_presence_interval SET valid_to_revision = ?"
+                        " WHERE uuid = ? AND valid_to_revision IS NULL",
+                        (resulting, uuid),
+                    )
+                    if operation == "upsert":
+                        self._connection.execute(
+                            "INSERT INTO graph_presence_interval"
+                            " SELECT ?, id, object_kind, type_key, source_uuid, target_uuid,"
+                            " ?, NULL FROM object_value WHERE id = ?",
+                            (uuid, resulting, value_id),
+                        )
+                    self._connection.execute(
+                        "INSERT INTO canonical_graph_event VALUES (?, ?, ?, ?, ?, ?)",
+                        (resulting, occurrence, operation, kind, uuid, value_id),
+                    )
+                self._connection.execute(
+                    "UPDATE state_head SET revision = ?, established_by = ?,"
+                    " active_definition_set_id = ?, proposed_definition_set_id = NULL WHERE id = 0",
+                    (resulting, resulting, proposed),
+                )
+                self._connection.execute(
+                    "INSERT INTO canonical_definition_event VALUES (?, ?, 'absent', NULL)",
+                    (resulting, proposed),
+                )
+                self._connection.execute("DELETE FROM proposal_entry")
+                self._connection.execute(
+                    "UPDATE proposal_overlay_state SET accumulator = ?, entry_count = 0"
+                    " WHERE id = 0",
+                    ("0" * 64,),
+                )
+                self._connection.execute("DELETE FROM proposal_definition_type")
+                self._connection.execute("DELETE FROM proposal_definition_relationship")
+                self._connection.execute(
+                    "UPDATE proposal_definition_state SET base_definition_set_id = NULL,"
+                    " accumulator = ?, entry_count = 0, effective_accumulator = NULL,"
+                    " effective_entry_count = NULL, identity = NULL WHERE id = 0",
+                    ("0" * 64,),
+                )
+                self._connection.execute("COMMIT")
+                return RevisionedOutcome(
+                    OperationStatus.ACCEPTED,
+                    f"activated the assessed proposal at revision {resulting}",
+                    resulting_revision=resulting,
+                )
+            except StoreError:
+                self._rollback_quietly()
+                raise
+            except Exception as error:
+                self._rollback_quietly()
+                raise StoreError(f"could not activate the proposal: {error}") from error
+
+    def restore_revision(
+        self, selected_revision: int, *, provenance: Provenance
+    ) -> RevisionedOutcome:
+        """Restore historical graph/definitions through SQL set differences."""
+        with self._lock:
+            try:
+                self._connection.execute("BEGIN IMMEDIATE")
+                head = self._connection.execute(
+                    "SELECT revision, active_definition_set_id, proposed_definition_set_id"
+                    " FROM state_head WHERE id = 0"
+                ).fetchone()
+                if head is None:
+                    raise NotInitializedError("no canonical state is established")
+                if head[2] is not None:
+                    self._connection.execute("ROLLBACK")
+                    return RevisionedOutcome(
+                        OperationStatus.REJECTED,
+                        "a proposal is in flight; activate or discard it before restoring",
+                    )
+                target_definition = self._connection.execute(
+                    "SELECT active_definition_set_id FROM canonical_definition_event"
+                    " WHERE established_revision <= ? AND active_definition_set_id IS NOT NULL"
+                    " ORDER BY established_revision DESC LIMIT 1",
+                    (selected_revision,),
+                ).fetchone()
+                if target_definition is None:
+                    self._connection.execute("ROLLBACK")
+                    return RevisionedOutcome(
+                        OperationStatus.REJECTED,
+                        f"revision {selected_revision} is not established by this ledger",
+                    )
+                self._connection.execute("DROP TABLE IF EXISTS temp.restore_target")
+                self._connection.execute(
+                    "CREATE TEMP TABLE restore_target AS"
+                    " SELECT p.uuid, v.object_kind, p.object_value_id"
+                    " FROM graph_presence_interval AS p JOIN object_value AS v"
+                    " ON v.id = p.object_value_id WHERE p.valid_from_revision <= ?"
+                    " AND (p.valid_to_revision IS NULL OR p.valid_to_revision > ?)",
+                    (selected_revision, selected_revision),
+                )
+                difference = self._connection.execute(
+                    "SELECT uuid, object_value_id FROM restore_target"
+                    " EXCEPT SELECT uuid, object_value_id FROM current_graph_object"
+                    " UNION ALL SELECT uuid, object_value_id FROM current_graph_object"
+                    " EXCEPT SELECT uuid, object_value_id FROM restore_target LIMIT 1"
+                ).fetchone()
+                if difference is None and str(head[1]) == str(target_definition[0]):
+                    self._connection.execute("ROLLBACK")
+                    return RevisionedOutcome(
+                        OperationStatus.ACCEPTED,
+                        f"revision {selected_revision} is already current; nothing was restored",
+                    )
+                revision, resulting = int(head[0]), int(head[0]) + 1
+                previous = self._connection.execute(
+                    "SELECT r.record_identity FROM canonical_record AS r"
+                    " JOIN state_head AS h ON h.established_by = r.established_revision"
+                    " WHERE h.id = 0"
+                ).fetchone()
+                ledger = self._connection.execute(
+                    "SELECT identity FROM ledger WHERE id = 0"
+                ).fetchone()
+                assert previous is not None and ledger is not None
+                recorded_at = now()
+                record_identity = self._record_identity(
+                    str(ledger[0]),
+                    str(previous[0]),
+                    resulting,
+                    TransitionKind.HISTORICAL_RESTORATION.value,
+                    recorded_at,
+                    provenance.initiator,
+                    provenance.source,
+                    str(revision),
+                    semantic_identity(("restore", selected_revision, str(target_definition[0]))),
+                )
+                self._connection.execute(
+                    "INSERT INTO canonical_record (established_revision, ordinal, record_kind,"
+                    " recorded_at, initiator, source, summary, prior_revision, record_identity,"
+                    " prior_record_identity) VALUES (?, ("
+                    + NEXT_ORDINAL_SQL
+                    + "), ?, ?, ?, ?, ?, ?, ?, ?)",
+                    (
+                        resulting,
+                        TransitionKind.HISTORICAL_RESTORATION.value,
+                        _stored_time(recorded_at),
+                        provenance.initiator,
+                        provenance.source,
+                        str(revision),
+                        revision,
+                        record_identity,
+                        str(previous[0]),
+                    ),
+                )
+                events = self._connection.execute(
+                    "SELECT c.uuid, c.object_kind, 'delete', NULL"
+                    " FROM current_graph_object AS c LEFT JOIN restore_target AS t"
+                    " ON t.uuid = c.uuid WHERE t.uuid IS NULL"
+                    " UNION ALL SELECT t.uuid, t.object_kind, 'upsert', t.object_value_id"
+                    " FROM restore_target AS t LEFT JOIN current_graph_object AS c"
+                    " ON c.uuid = t.uuid WHERE c.object_value_id IS NULL"
+                    " OR c.object_value_id != t.object_value_id ORDER BY 1"
+                )
+                for occurrence, (uuid, kind, operation, value_id) in enumerate(events):
+                    self._connection.execute(
+                        "UPDATE graph_presence_interval SET valid_to_revision = ?"
+                        " WHERE uuid = ? AND valid_to_revision IS NULL",
+                        (resulting, uuid),
+                    )
+                    if operation == "upsert":
+                        self._connection.execute(
+                            "INSERT INTO graph_presence_interval"
+                            " SELECT ?, id, object_kind, type_key, source_uuid, target_uuid,"
+                            " ?, NULL FROM object_value WHERE id = ?",
+                            (uuid, resulting, value_id),
+                        )
+                    self._connection.execute(
+                        "INSERT INTO canonical_graph_event VALUES (?, ?, ?, ?, ?, ?)",
+                        (resulting, occurrence, operation, kind, uuid, value_id),
+                    )
+                self._connection.execute(
+                    "UPDATE state_head SET revision = ?, established_by = ?,"
+                    " active_definition_set_id = ? WHERE id = 0",
+                    (resulting, resulting, target_definition[0]),
+                )
+                self._connection.execute(
+                    "INSERT INTO canonical_definition_event VALUES (?, ?, 'absent', NULL)",
+                    (resulting, target_definition[0]),
+                )
+                self._connection.execute("COMMIT")
+                return RevisionedOutcome(
+                    OperationStatus.ACCEPTED,
+                    f"restored revision {selected_revision} as revision {resulting}",
+                    resulting_revision=resulting,
+                )
+            except StoreError:
+                self._rollback_quietly()
+                raise
+            except Exception as error:
+                self._rollback_quietly()
+                raise StoreError(
+                    f"could not restore revision {selected_revision}: {error}"
+                ) from error
 
     def definitions_at_revision(self, revision: int) -> tuple[GraphDefinitionSet, bool]:
         """Read definition meaning in force at a revision without graph or record replay."""
@@ -1613,6 +4236,24 @@ class CanonicalStore:
                 self._connection.execute(
                     "INSERT INTO ledger (id, identity) VALUES (0, ?)", (ledger_identity,)
                 )
+                self._connection.execute(
+                    "INSERT INTO proposal_overlay_state VALUES (0, ?, 0)", ("0" * 64,)
+                )
+                self._connection.executemany(
+                    "INSERT INTO proposal_overlay_count VALUES (?, ?, 0)",
+                    tuple(
+                        (kind.value, operation)
+                        for kind in ObjectKind
+                        for operation in ("upsert", "delete")
+                    ),
+                )
+                self._connection.execute(
+                    "INSERT INTO proposal_definition_state"
+                    " (id, base_definition_set_id, accumulator, entry_count,"
+                    " effective_accumulator, effective_entry_count, identity)"
+                    " VALUES (0, NULL, ?, 0, NULL, NULL, NULL)",
+                    ("0" * 64,),
+                )
                 active_identity = insert_definition_set(self._connection, state.active_definitions)
                 proposed_identity = (
                     None
@@ -1742,11 +4383,26 @@ class CanonicalStore:
         self, graph_object: GraphObject, revision: int
     ) -> int:
         value_id = insert_object_value(self._connection, graph_object)
+        kind = (
+            ObjectKind.ANCHOR
+            if isinstance(graph_object, Anchor)
+            else ObjectKind.ASSOCIATED_DATA
+            if isinstance(graph_object, AssociatedDataObject)
+            else ObjectKind.LINK
+        )
         self._connection.execute(
             "INSERT INTO graph_presence_interval"
-            " (uuid, object_value_id, valid_from_revision, valid_to_revision)"
-            " VALUES (?, ?, ?, NULL)",
-            (graph_object.uuid, value_id, revision),
+            " (uuid, object_value_id, object_kind, type_key, source_uuid, target_uuid,"
+            " valid_from_revision, valid_to_revision) VALUES (?, ?, ?, ?, ?, ?, ?, NULL)",
+            (
+                graph_object.uuid,
+                value_id,
+                kind.value,
+                graph_object.type_key,
+                graph_object.source_uuid if isinstance(graph_object, Link) else None,
+                graph_object.target_uuid if isinstance(graph_object, Link) else None,
+                revision,
+            ),
         )
         return value_id
 
@@ -1839,6 +4495,21 @@ class CanonicalStore:
                     "UPDATE state_head SET " + ", ".join(projection_assignments) + " WHERE id = 0",
                     tuple(projection_values),
                 )
+                if record.change.delta_disposition is DefinitionDeltaDisposition.ABSENT:
+                    self._connection.execute("DELETE FROM proposal_entry")
+                    self._connection.execute(
+                        "UPDATE proposal_overlay_state SET accumulator = ?, entry_count = 0"
+                        " WHERE id = 0",
+                        ("0" * 64,),
+                    )
+                    self._connection.execute("DELETE FROM proposal_definition_type")
+                    self._connection.execute("DELETE FROM proposal_definition_relationship")
+                    self._connection.execute(
+                        "UPDATE proposal_definition_state SET base_definition_set_id = NULL,"
+                        " accumulator = ?, entry_count = 0, effective_accumulator = NULL,"
+                        " effective_entry_count = NULL, identity = NULL WHERE id = 0",
+                        ("0" * 64,),
+                    )
                 if record.change.graph_change is not None:
                     self._apply_current_graph_change_unlocked(
                         record.change.graph_change, record.resulting_revision
@@ -1995,7 +4666,10 @@ class CanonicalStore:
         definition_delta = (
             None
             if proposed_id is None
-            else DefinitionDelta(proposed_definitions=self._load_definition_set(str(proposed_id)))
+            else DefinitionDelta(
+                proposed_definitions=self._proposal_definitions_at_unlocked(revision),
+                graph_overlay=self._proposal_graph_change_at_unlocked(revision),
+            )
         )
         replacement = (
             self._graph_at_unlocked(revision)
@@ -2015,6 +4689,118 @@ class CanonicalStore:
             ),
             delta_disposition=disposition,
             definition_delta=definition_delta,
+        )
+
+    def _proposal_definitions_at_unlocked(self, revision: int) -> GraphDefinitionSet:
+        """Rebuild sparse proposed-definition meaning from append-only keyed events."""
+        active_row = self._connection.execute(
+            "SELECT active_definition_set_id FROM canonical_definition_event"
+            " WHERE established_revision <= ? AND active_definition_set_id IS NOT NULL"
+            " ORDER BY established_revision DESC LIMIT 1",
+            (revision,),
+        ).fetchone()
+        if active_row is None:
+            raise StoreError(f"revision {revision} has no active definition base")
+        active = self._load_definition_set(str(active_row[0]))
+        last_absent = self._connection.execute(
+            "SELECT coalesce(max(established_revision), -1) FROM canonical_definition_event"
+            " WHERE established_revision <= ? AND delta_disposition = 'absent'",
+            (revision,),
+        ).fetchone()
+        start = -1 if last_absent is None else int(last_absent[0])
+        active_types: dict[str, object] = {
+            **{value.type_key: value for value in active.anchor_types},
+            **{value.type_key: value for value in active.associated_data_types},
+            **{value.type_key: value for value in active.link_types},
+        }
+        active_relationships = {
+            semantic_identity(relationship_identity(value)): value
+            for value in active.relationship_constraints
+        }
+        types = dict(active_types)
+        relationships = dict(active_relationships)
+        for entity_kind, natural_key, operation, value_set_id in self._connection.execute(
+            "SELECT entity_kind, natural_key, operation, value_set_id"
+            " FROM canonical_definition_proposal_event WHERE established_revision > ?"
+            " AND established_revision <= ? ORDER BY established_revision, occurrence",
+            (start, revision),
+        ):
+            key = str(natural_key)
+            if str(entity_kind) == "type":
+                if operation == "unstage":
+                    if key in active_types:
+                        types[key] = active_types[key]
+                    else:
+                        types.pop(key, None)
+                    continue
+                if operation == "delete":
+                    types.pop(key, None)
+                    continue
+                value = self._load_definition_set(str(value_set_id))
+                members = (*value.anchor_types, *value.associated_data_types, *value.link_types)
+                if len(members) != 1:
+                    raise StoreError("a definition proposal type event is not one value")
+                types[key] = members[0]
+            else:
+                if operation == "unstage":
+                    if key in active_relationships:
+                        relationships[key] = active_relationships[key]
+                    else:
+                        relationships.pop(key, None)
+                    continue
+                if operation == "delete":
+                    relationships.pop(key, None)
+                    continue
+                value = self._load_definition_set(str(value_set_id))
+                if len(value.relationship_constraints) != 1:
+                    raise StoreError("a definition proposal rule event is not one value")
+                relationships[key] = value.relationship_constraints[0]
+        return GraphDefinitionSet(
+            tuple(value for value in types.values() if isinstance(value, AnchorTypeDefinition)),
+            tuple(
+                value for value in types.values() if isinstance(value, AssociatedDataTypeDefinition)
+            ),
+            tuple(value for value in types.values() if isinstance(value, LinkTypeDefinition)),
+            tuple(relationships.values()),
+        )
+
+    def _proposal_graph_change_at_unlocked(self, revision: int) -> GraphChange:
+        last_absent = self._connection.execute(
+            "SELECT coalesce(max(established_revision), -1) FROM canonical_definition_event"
+            " WHERE established_revision <= ? AND delta_disposition = 'absent'",
+            (revision,),
+        ).fetchone()
+        start = -1 if last_absent is None else int(last_absent[0])
+        entries: dict[str, tuple[ObjectKind, str, int | None]] = {}
+        for operation, kind_name, uuid, value_id in self._connection.execute(
+            "SELECT operation, object_kind, uuid, object_value_id"
+            " FROM canonical_proposal_event WHERE established_revision > ?"
+            " AND established_revision <= ? ORDER BY established_revision, occurrence",
+            (start, revision),
+        ):
+            if operation == "unstage":
+                entries.pop(str(uuid), None)
+            else:
+                entries[str(uuid)] = (ObjectKind(str(kind_name)), str(operation), value_id)
+        upserts: dict[ObjectKind, list[GraphObject]] = {kind: [] for kind in ObjectKind}
+        removals: dict[ObjectKind, list[str]] = {kind: [] for kind in ObjectKind}
+        for uuid, (kind, operation, value_id) in sorted(entries.items()):
+            if operation == "delete":
+                removals[kind].append(uuid)
+            else:
+                assert value_id is not None
+                upserts[kind].append(self._load_object_value(int(value_id)))
+        return GraphChange(
+            tuple(each for each in upserts[ObjectKind.ANCHOR] if isinstance(each, Anchor)),
+            tuple(
+                each
+                for each in upserts[ObjectKind.ASSOCIATED_DATA]
+                if isinstance(each, AssociatedDataObject)
+            ),
+            tuple(each for each in upserts[ObjectKind.LINK] if isinstance(each, Link)),
+            tuple(removals[ObjectKind.ANCHOR]),
+            tuple(removals[ObjectKind.ASSOCIATED_DATA]),
+            tuple(removals[ObjectKind.LINK]),
         )
 
     def _recorded_at(self, text: str) -> datetime:
@@ -2258,6 +5044,80 @@ class CanonicalStore:
 
         return replay_records(self.initial_record(), self.transitions())
 
+    def verify_projection_from_ledger(self) -> tuple[ValidationFinding, ...]:
+        """Rebuild expected projection in temporary SQL and compare in both directions."""
+        with self._lock:
+            try:
+                self._connection.execute("BEGIN")
+                base = self._connection.execute(
+                    "SELECT established_revision FROM canonical_record WHERE ordinal = 0"
+                ).fetchone()
+                if base is None:
+                    raise NotInitializedError("no canonical state is established")
+                self._connection.execute("DROP TABLE IF EXISTS temp.replay_expected")
+                self._connection.execute(
+                    "CREATE TEMP TABLE replay_expected AS WITH candidates AS ("
+                    " SELECT p.uuid, p.object_value_id, p.valid_from_revision AS revision,"
+                    " -1 AS occurrence, 'upsert' AS operation"
+                    " FROM graph_presence_interval AS p WHERE p.valid_from_revision = ?"
+                    " UNION ALL SELECT uuid, object_value_id, established_revision, occurrence,"
+                    " operation FROM canonical_graph_event), ranked AS ("
+                    " SELECT *, row_number() OVER (PARTITION BY uuid"
+                    " ORDER BY revision DESC, occurrence DESC) AS rank FROM candidates)"
+                    " SELECT uuid, object_value_id FROM ranked"
+                    " WHERE rank = 1 AND operation = 'upsert'",
+                    (int(base[0]),),
+                )
+                differences = self._connection.execute(
+                    "SELECT uuid, object_value_id FROM replay_expected"
+                    " EXCEPT SELECT uuid, object_value_id FROM current_graph_object"
+                    " UNION ALL SELECT uuid, object_value_id FROM current_graph_object"
+                    " EXCEPT SELECT uuid, object_value_id FROM replay_expected LIMIT 1"
+                ).fetchone()
+                definition = self._connection.execute(
+                    "SELECT active_definition_set_id, proposed_definition_set_id"
+                    " FROM state_head WHERE id = 0"
+                ).fetchone()
+                expected_active = self._connection.execute(
+                    "SELECT active_definition_set_id FROM canonical_definition_event"
+                    " WHERE active_definition_set_id IS NOT NULL"
+                    " ORDER BY established_revision DESC LIMIT 1"
+                ).fetchone()
+                expected_delta = self._connection.execute(
+                    "SELECT delta_disposition, proposed_definition_set_id"
+                    " FROM canonical_definition_event WHERE delta_disposition != 'unchanged'"
+                    " ORDER BY established_revision DESC LIMIT 1"
+                ).fetchone()
+                findings: list[ValidationFinding] = []
+                if differences is not None:
+                    findings.append(
+                        ValidationFinding(
+                            summary="replayed graph rows differ from the current projection",
+                            implicated_objects=(str(differences[0]),),
+                        )
+                    )
+                expected_proposed = (
+                    None
+                    if expected_delta is None or expected_delta[0] == "absent"
+                    else expected_delta[1]
+                )
+                if (
+                    definition is None
+                    or expected_active is None
+                    or definition[0] != expected_active[0]
+                    or definition[1] != expected_proposed
+                ):
+                    findings.append(
+                        ValidationFinding(
+                            summary="replayed definition facets differ from the current projection"
+                        )
+                    )
+                self._connection.execute("ROLLBACK")
+                return tuple(findings)
+            except BaseException:
+                self._rollback_quietly()
+                raise
+
     def canonical_record_count(self) -> int:
         """Return how many canonical records the ledger holds.
 
@@ -2457,6 +5317,7 @@ class CanonicalStore:
         *,
         type_keys: set[str] | None = None,
         constrained_type_keys: set[str] | None = None,
+        relationship_keys: set[str] | None = None,
     ) -> GraphDefinitionSet:
         self._current_definition_decodes += 1
         try:
@@ -2465,6 +5326,7 @@ class CanonicalStore:
                 identity,
                 type_keys=type_keys,
                 constrained_type_keys=constrained_type_keys,
+                relationship_keys=relationship_keys,
             )
         except (ValueError, ArithmeticError) as error:
             raise StoreError(f"stored definitions do not decode: {error}") from error
@@ -2493,9 +5355,12 @@ class CanonicalStore:
 class _SQLiteQueryIndex:
     """Query-local access through the durable projection's identity indexes."""
 
-    def __init__(self, store: CanonicalStore, revision: int | None = None) -> None:
+    def __init__(
+        self, store: CanonicalStore, revision: int | None = None, prospective: bool = False
+    ) -> None:
         self._store = store
         self._revision = revision
+        self._prospective = prospective
         self._anchors: dict[object, tuple[Anchor, ...]] = {}
         self._data: dict[
             tuple[str, str, frozenset[str] | None], tuple[AssociatedDataObject, ...]
@@ -2526,10 +5391,11 @@ class _SQLiteQueryIndex:
                     (self._revision, self._revision, kind.value, type_key, *uuids),
                 )
             }
+        relation = "prospective_graph_object" if self._prospective else "current_graph_object"
         return {
             str(row[0])
             for row in self._store._connection.execute(  # noqa: SLF001
-                "SELECT uuid FROM current_graph_object"
+                f"SELECT uuid FROM {relation}"
                 f" WHERE object_kind = ? AND type_key = ? AND uuid IN ({placeholders})",
                 (kind.value, type_key, *uuids),
             ).fetchall()

@@ -42,7 +42,13 @@ from vellis.discovery import DefinitionInspectionRequest
 from vellis.graph import Anchor, graph_equal
 from vellis.history import RevisionSelection, TimeSelection
 from vellis.outcomes import OperationStatus
-from vellis.query import AnchorGroup, AnchorProjection, GraphQuery, ReturnShape
+from vellis.query import (
+    AnchorGroup,
+    AnchorProjection,
+    EvaluatedStateScope,
+    GraphQuery,
+    ReturnShape,
+)
 from vellis.replay import ReplayRequest
 from vellis.system import RTGSystem
 
@@ -461,13 +467,17 @@ def test_resolving_a_revision_or_a_time_does_not_depend_on_ledger_length(
         by_revision = measure(
             system,
             lambda: system.definition_summary(
-                selection=RevisionSelection(revision=wanted), provenance=OWNER
+                state_scope=EvaluatedStateScope.HISTORICAL,
+                selection=RevisionSelection(revision=wanted),
+                provenance=OWNER,
             ),
         )
         by_time = measure(
             system,
             lambda: system.definition_summary(
-                selection=TimeSelection(time=moment), provenance=OWNER
+                state_scope=EvaluatedStateScope.HISTORICAL,
+                selection=TimeSelection(time=moment),
+                provenance=OWNER,
             ),
         )
 
@@ -498,7 +508,9 @@ def test_a_historical_vocabulary_does_not_pay_for_unrelated_graph_transitions(
         summary = measure(
             system,
             lambda: system.definition_summary(
-                selection=RevisionSelection(revision=revision), provenance=OWNER
+                state_scope=EvaluatedStateScope.HISTORICAL,
+                selection=RevisionSelection(revision=revision),
+                provenance=OWNER,
             ),
         )
         inspection = measure(

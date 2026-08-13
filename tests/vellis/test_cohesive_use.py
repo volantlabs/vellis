@@ -38,6 +38,7 @@ import pytest
 from fastmcp import Client
 from fastmcp.client.transports import StdioTransport
 
+from tests.vellis.evolution_support import stage_complete_fixture
 from vellis.__main__ import EXIT_FAILED as SERVE_FAILED
 from vellis.__main__ import main as serve_main
 from vellis.canonical import (
@@ -181,7 +182,7 @@ def _stage_a_proposal(destination: Path) -> None:
             link_types=active.link_types,
             relationship_constraints=active.relationship_constraints,
         )
-        assert system.set_definition_delta(proposed, provenance=OWNER).accepted
+        assert stage_complete_fixture(system, proposed, provenance=OWNER).accepted
     finally:
         system.close()
 

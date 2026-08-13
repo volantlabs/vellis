@@ -49,6 +49,7 @@ __all__ = [
     "AssociatedDataProjection",
     "DataPropertyCondition",
     "DataPropertyProjection",
+    "EvaluatedStateScope",
     "GraphQuery",
     "GraphQueryResult",
     "GraphQueryRow",
@@ -81,6 +82,12 @@ class PropertyComparison(Enum):
     @property
     def ordered(self) -> bool:
         return self not in {PropertyComparison.EQUAL, PropertyComparison.NOT_EQUAL}
+
+
+class EvaluatedStateScope(Enum):
+    CURRENT = "current"
+    PROSPECTIVE = "prospective"
+    HISTORICAL = "historical"
 
 
 # --- What a query asks ---------------------------------------------------------------
@@ -198,6 +205,7 @@ class GraphQuery:
     required_links: tuple[RequiredLink, ...] = ()
     data_conditions: tuple[AssociatedDataCondition, ...] = ()
     historical_selection: HistoricalSelection | None = None
+    state_scope: EvaluatedStateScope = EvaluatedStateScope.CURRENT
     """Absent evaluates current state; present evaluates the state it names.
 
     Part of the question rather than beside it, so one query object means one complete

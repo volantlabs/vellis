@@ -206,9 +206,21 @@ def test_sqlite_candidate_joins_have_matching_indexes(system: RTGSystem) -> None
         ("link", "worksOn", "a-1", "p-1"),
     ).fetchall()
 
-    assert any("object_value_selector" in str(row) for row in anchor_plan)
+    assert any(
+        index in str(row)
+        for row in anchor_plan
+        for index in ("graph_presence_current_type", "object_value_type_key")
+    )
     assert any("object_anchor_reverse" in str(row) for row in data_plan)
-    assert any("object_value_selector" in str(row) for row in link_plan)
+    assert any(
+        index in str(row)
+        for row in link_plan
+        for index in (
+            "graph_presence_current_link_source",
+            "graph_presence_current_link_target",
+            "graph_presence_current_type",
+        )
+    )
 
 
 def test_known_uuids_narrow_an_anchor_group(system: RTGSystem) -> None:

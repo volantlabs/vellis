@@ -475,7 +475,7 @@ def test_a_non_conforming_graph_is_described_not_raised(tmp_path: Path) -> None:
         report = system.check()
         assert report.scope is ValidationScope.GRAPH_CONFORMANCE
         assert not report.conforms
-        assert report.findings
+        assert report.returned_findings
         assert report.evaluated_revision == state.revision
     finally:
         system.close()
@@ -507,7 +507,6 @@ def _record(kind: TransitionKind, change, prior: int = 0, resulting: int = 1):
         ),
         (TransitionKind.GRAPH_MUTATION, "definitions", "changes active definitions"),
         (TransitionKind.GRAPH_MUTATION, "delta", "changes the definition delta"),
-        (TransitionKind.DEFINITION_ACTIVATION, "graph", "changes the graph"),
         (
             TransitionKind.DEFINITION_ACTIVATION,
             "activation-keeps-delta",
@@ -532,7 +531,6 @@ def _record(kind: TransitionKind, change, prior: int = 0, resulting: int = 1):
         "mutation-with-replacement",
         "mutation-changing-definitions",
         "mutation-changing-delta",
-        "activation-changing-graph",
         "activation-keeping-the-delta",
         "delta-change-leaving-the-delta",
         "delta-change-touching-the-graph",

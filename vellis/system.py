@@ -28,6 +28,7 @@ collaborators.
 
 from __future__ import annotations
 
+from dataclasses import replace
 from datetime import datetime
 from pathlib import Path
 
@@ -46,7 +47,6 @@ from vellis.canonical import (
     CanonicalChange,
     CanonicalState,
     CanonicalTransitionRecord,
-    DefinitionDelta,
     DefinitionDeltaDisposition,
     InitialStateRecord,
     Provenance,
@@ -56,10 +56,9 @@ from vellis.canonical import (
     replay,
     transition_findings,
 )
-from vellis.changes import GraphChange
+from vellis.changes import GraphChange, GraphChangeRequest, GraphChangeTarget
 from vellis.definitions import (
     GraphDefinitionSet,
-    definition_set_equal,
 )
 from vellis.discovery import (
     AnchorDefinitionDetail,
@@ -70,8 +69,12 @@ from vellis.discovery import (
     inspection_findings,
     summarize_anchor_types,
 )
-from vellis.governance import DefinitionDeltaResult, assess_proposal
-from vellis.graph import Graph, graph_equal
+from vellis.governance import (
+    ActivateDefinitionDeltaRequest,
+    DefinitionChange,
+    DefinitionDeltaResult,
+)
+from vellis.graph import Graph
 from vellis.history import (
     MAXIMUM_REVISION,
     EvaluatedDefinitions,
@@ -85,9 +88,11 @@ from vellis.outcomes import (
     RevisionedOutcome,
     ValidationFinding,
     ValidationReport,
+    ValidationRequest,
+    ValidationRequestKind,
     ValidationScope,
 )
-from vellis.query import GraphQuery, GraphQueryResult
+from vellis.query import EvaluatedStateScope, GraphQuery, GraphQueryResult
 from vellis.replay import (
     CanonicalSnapshot,
     LedgerTail,
@@ -104,9 +109,9 @@ from vellis.store import (
     CanonicalStore,
     ConcurrentRevisionError,
     NotInitializedError,
+    ProposalState,
     StoreError,
 )
-from vellis.validation import assess_graph_conformance
 
 __all__ = ["UNATTRIBUTED", "RTGSystem"]
 
@@ -345,9 +350,50 @@ class RTGSystem:
     # --- Change -----------------------------------------------------------------------
 
     def apply_graph_change(
-        self, change: GraphChange, *, provenance: Provenance
+        self, request: GraphChangeRequest | GraphChange, *, provenance: Provenance
     ) -> RevisionedOutcome:
         """Validate a change whole, then commit it as one revision."""
+        if isinstance(request, GraphChange):
+            request = GraphChangeRequest(GraphChangeTarget.ACTIVE, request)
+        if request.target is GraphChangeTarget.DEFINITION_DELTA:
+            try:
+                outcome = self._store.stage_proposal_graph(request, provenance=provenance)
+            except StoreError as error:
+                outcome = RevisionedOutcome(
+                    status=(
+                        OperationStatus.REJECTED
+                        if isinstance(error, NotInitializedError)
+                        else OperationStatus.FAILED
+                    ),
+                    summary=f"the prospective graph edit could not be staged: {error}",
+                    findings=(ValidationFinding(summary=str(error)),),
+                )
+            self._observe_outcome(
+                "graphChange",
+                outcome.status,
+                scope="the sole prospective graph overlay",
+                summary=outcome.summary,
+                provenance=provenance,
+                evaluated_revision=outcome.resulting_revision,
+            )
+            return outcome
+        if request.unstaging():
+            outcome = RevisionedOutcome(
+                status=OperationStatus.REJECTED,
+                summary="active graph changes cannot unstage prospective entries",
+                findings=(
+                    ValidationFinding(summary="unstaging requires a definition-delta target"),
+                ),
+            )
+            self._observe_outcome(
+                "graphChange",
+                outcome.status,
+                scope="the active graph",
+                summary=outcome.summary,
+                provenance=provenance,
+            )
+            return outcome
+        change = request.change
         outcome = self._apply_graph_change(change, provenance=provenance)
         self._observe_outcome(
             "graphChange",
@@ -422,6 +468,7 @@ class RTGSystem:
         self,
         *,
         selection: HistoricalSelection | None = None,
+        state_scope: EvaluatedStateScope = EvaluatedStateScope.CURRENT,
         provenance: Provenance = UNATTRIBUTED,
     ) -> DefinitionSummaryResult:
         """Return every anchor type active at the current or a selected state.
@@ -430,7 +477,68 @@ class RTGSystem:
         were evaluated at, which is how a caller notices that the definitions moved
         between the two reads.
         """
-        if selection is not None:
+        if state_scope is EvaluatedStateScope.PROSPECTIVE:
+            if selection is not None:
+                result = DefinitionSummaryResult(
+                    OperationStatus.REJECTED,
+                    "prospective definition discovery forbids historical selection",
+                    findings=(ValidationFinding(summary="state selection is inconsistent"),),
+                )
+                self._observe(
+                    "definitionSummary",
+                    result.status,
+                    scope="every prospective anchor type",
+                    summary=result.summary,
+                    provenance=provenance,
+                )
+                return result
+            try:
+                revision, definitions, _ = self._store.definition_view(prospective=True)
+            except StoreError as error:
+                result = DefinitionSummaryResult(
+                    OperationStatus.REJECTED,
+                    f"the prospective definitions could not be selected: {error}",
+                    findings=(ValidationFinding(summary=str(error)),),
+                )
+                self._observe(
+                    "definitionSummary",
+                    result.status,
+                    scope="every prospective anchor type",
+                    summary=result.summary,
+                    provenance=provenance,
+                )
+                return result
+            result = DefinitionSummaryResult(
+                OperationStatus.ACCEPTED,
+                f"{len(definitions.anchor_types)} prospective anchor types",
+                anchor_types=summarize_anchor_types(definitions),
+                evaluated_revision=revision,
+                delta_present=True,
+            )
+            self._observe(
+                "definitionSummary",
+                result.status,
+                scope="every prospective anchor type",
+                summary=result.summary,
+                provenance=provenance,
+                evaluated_revision=revision,
+            )
+            return result
+        if state_scope is EvaluatedStateScope.HISTORICAL:
+            if selection is None:
+                result = DefinitionSummaryResult(
+                    OperationStatus.REJECTED,
+                    "historical definition discovery requires one historical selection",
+                    findings=(ValidationFinding(summary="no historical selection was provided"),),
+                )
+                self._observe(
+                    "definitionSummary",
+                    result.status,
+                    scope="every active anchor type at a selected state",
+                    summary=result.summary,
+                    provenance=provenance,
+                )
+                return result
             result = self._historical_summary(selection)
             self._observe(
                 "definitionSummary",
@@ -441,8 +549,22 @@ class RTGSystem:
                 evaluated_revision=result.evaluated_revision,
             )
             return result
+        if selection is not None:
+            result = DefinitionSummaryResult(
+                OperationStatus.REJECTED,
+                "current definition discovery forbids historical selection",
+                findings=(ValidationFinding(summary="state selection is inconsistent"),),
+            )
+            self._observe(
+                "definitionSummary",
+                result.status,
+                scope="every active anchor type",
+                summary=result.summary,
+                provenance=provenance,
+            )
+            return result
         try:
-            revision, definitions, delta = self._store.current_definitions()
+            revision, definitions, delta_present = self._store.definition_view()
         except StoreError as error:
             failed = DefinitionSummaryResult(
                 status=OperationStatus.FAILED,
@@ -462,7 +584,7 @@ class RTGSystem:
             summary=f"{len(definitions.anchor_types)} active anchor types",
             anchor_types=summarize_anchor_types(definitions),
             evaluated_revision=revision,
-            delta_present=delta is not None,
+            delta_present=delta_present,
         )
         self._observe(
             "definitionSummary",
@@ -487,7 +609,20 @@ class RTGSystem:
         details that happened to resolve — because a partial answer would read as a
         complete one.
         """
-        result = self._inspect(request, selection or request.historical_selection)
+        if selection is not None and request.historical_selection is not None:
+            result = DefinitionInspectionResult(
+                OperationStatus.REJECTED,
+                "an inspection carries more than one historical selector",
+                request,
+                findings=(ValidationFinding(summary="state selection is inconsistent"),),
+            )
+        else:
+            effective_request = (
+                replace(request, state_scope=EvaluatedStateScope.HISTORICAL)
+                if selection is not None
+                else request
+            )
+            result = self._inspect(effective_request, selection or request.historical_selection)
         self._observe(
             "definitionInspection",
             result.status,
@@ -501,17 +636,49 @@ class RTGSystem:
     def _inspect(
         self, request: DefinitionInspectionRequest, selection: HistoricalSelection | None = None
     ) -> DefinitionInspectionResult:
-        if selection is not None:
+        if request.state_scope is EvaluatedStateScope.PROSPECTIVE:
+            if selection is not None:
+                return DefinitionInspectionResult(
+                    OperationStatus.REJECTED,
+                    "prospective inspection forbids historical selection",
+                    request,
+                    findings=(ValidationFinding(summary="state selection is inconsistent"),),
+                )
+            try:
+                revision, definitions, _ = self._store.definition_view(prospective=True)
+            except StoreError as error:
+                return DefinitionInspectionResult(
+                    OperationStatus.REJECTED,
+                    f"the prospective definitions could not be selected: {error}",
+                    request,
+                    findings=(ValidationFinding(summary=str(error)),),
+                )
+        elif selection is not None:
+            if request.state_scope is not EvaluatedStateScope.HISTORICAL:
+                return DefinitionInspectionResult(
+                    OperationStatus.REJECTED,
+                    "historical selection requires historical state scope",
+                    request,
+                    findings=(ValidationFinding(summary="state selection is inconsistent"),),
+                )
             return self._historical_inspection(request, selection)
-        try:
-            revision, definitions, _ = self._store.current_definitions()
-        except StoreError as error:
-            return DefinitionInspectionResult(
-                status=OperationStatus.FAILED,
-                summary=f"the selection could not be answered completely: {error}",
-                request=request,
-                findings=(ValidationFinding(summary=str(error)),),
-            )
+        else:
+            if request.state_scope is EvaluatedStateScope.HISTORICAL:
+                return DefinitionInspectionResult(
+                    OperationStatus.REJECTED,
+                    "historical inspection requires one historical selection",
+                    request,
+                    findings=(ValidationFinding(summary="no historical selection was provided"),),
+                )
+            try:
+                revision, definitions, _ = self._store.definition_view()
+            except StoreError as error:
+                return DefinitionInspectionResult(
+                    status=OperationStatus.FAILED,
+                    summary=f"the selection could not be answered completely: {error}",
+                    request=request,
+                    findings=(ValidationFinding(summary=str(error)),),
+                )
         findings = inspection_findings(request, definitions)
         if findings:
             return DefinitionInspectionResult(
@@ -539,17 +706,7 @@ class RTGSystem:
     def definition_delta(self, *, provenance: Provenance = UNATTRIBUTED) -> DefinitionDeltaResult:
         """Return the sole proposal with a current assessment, or normal absence."""
         try:
-            revision, _, delta = self._store.current_definitions()
-            if delta is None:
-                result = DefinitionDeltaResult(
-                    status=OperationStatus.ACCEPTED,
-                    summary="there is no proposal",
-                    evaluated_revision=revision,
-                )
-            else:
-                # A present proposal must still be assessed against all current graph
-                # objects. Normal absence needs only the separately stored delta facet.
-                result = _delta_result(self._working_state(), "the current proposal")
+            result = _proposal_result(self._store.proposal_state(), "the current proposal")
         except StoreError as error:
             result = DefinitionDeltaResult(
                 status=OperationStatus.FAILED,
@@ -567,10 +724,10 @@ class RTGSystem:
         return result
 
     def set_definition_delta(
-        self, proposed: GraphDefinitionSet, *, provenance: Provenance
+        self, change: DefinitionChange, *, provenance: Provenance
     ) -> DefinitionDeltaResult:
-        """Create or replace the sole proposal."""
-        result = self._set_definition_delta(proposed, provenance=provenance)
+        """Create or edit the sole proposal through one bounded natural-keyed change."""
+        result = self._set_definition_delta(change, provenance=provenance)
         self._observe_outcome(
             "definitionDeltaChange",
             result.status,
@@ -582,7 +739,7 @@ class RTGSystem:
         return result
 
     def _set_definition_delta(
-        self, proposed: GraphDefinitionSet, *, provenance: Provenance
+        self, change: DefinitionChange, *, provenance: Provenance
     ) -> DefinitionDeltaResult:
         """Create or replace the sole proposal.
 
@@ -592,97 +749,56 @@ class RTGSystem:
         a discard: clearing a proposal is its own operation, and guessing here would
         throw away work the owner did not ask to lose.
         """
+        record_findings = _unstorable_record_text(provenance, None)
+        if record_findings:
+            return DefinitionDeltaResult(
+                status=OperationStatus.REJECTED,
+                summary="the record's own text cannot be stored; nothing was staged",
+                findings=record_findings,
+            )
         try:
-            revision, active_definitions, current = self._store.current_definitions()
+            outcome = self._store.stage_definition_change(change, provenance=provenance)
         except StoreError as error:
             return DefinitionDeltaResult(
                 status=OperationStatus.FAILED,
                 summary=f"the proposal could not be staged: {error}",
                 findings=(ValidationFinding(summary=str(error)),),
             )
-
-        # These outcomes depend only on the separately stored definition facets. A
-        # proposal that needs an impact assessment falls through to a complete graph
-        # read, but normal absence and deliberate refusal do not borrow that cost.
-        if current is None and definition_set_equal(proposed, active_definitions):
-            return DefinitionDeltaResult(
-                status=OperationStatus.ACCEPTED,
-                summary="the proposal matches the active definitions; nothing was staged",
-                evaluated_revision=revision,
-            )
-        if current is not None and definition_set_equal(proposed, active_definitions):
-            return DefinitionDeltaResult(
-                status=OperationStatus.REJECTED,
-                summary=(
-                    "staging the active definitions would discard the current proposal; use "
-                    "the discard operation to do that deliberately"
-                ),
-                findings=(
-                    ValidationFinding(
-                        summary="a proposal equal to the active set cannot implicitly discard"
-                    ),
-                ),
-            )
-
-        try:
-            state = self._working_state()
-        except StoreError as error:
-            return DefinitionDeltaResult(
-                status=OperationStatus.FAILED,
-                summary=f"the proposal could not be staged: {error}",
-                findings=(ValidationFinding(summary=str(error)),),
-            )
-        current = state.definition_delta
-
-        if current is not None and definition_set_equal(proposed, current.proposed_definitions):
-            return _delta_result(state, "the proposal is unchanged; no revision was created")
-        if current is None and definition_set_equal(proposed, state.active_definitions):
-            return _delta_result(
-                state,
-                "the proposal matches the active definitions; nothing was staged",
-                absent_summary="the proposal matches the active definitions; nothing was staged",
-            )
-        if current is not None and definition_set_equal(proposed, state.active_definitions):
-            return DefinitionDeltaResult(
-                status=OperationStatus.REJECTED,
-                summary=(
-                    "staging the active definitions would discard the current proposal; use "
-                    "the discard operation to do that deliberately"
-                ),
-                findings=(
-                    ValidationFinding(
-                        summary="a proposal equal to the active set cannot implicitly discard"
-                    ),
-                ),
-            )
-
-        delta = DefinitionDelta(proposed_definitions=proposed)
-        outcome = self._commit(
-            state.revision,
-            TransitionKind.DEFINITION_DELTA_CHANGE,
-            CanonicalChange(
-                delta_disposition=DefinitionDeltaDisposition.PRESENT, definition_delta=delta
-            ),
-            provenance=provenance,
-        )
         if not outcome.accepted:
             return DefinitionDeltaResult(
                 status=outcome.status, summary=outcome.summary, findings=outcome.findings
             )
-        return _delta_result(
-            CanonicalState(
-                graph=state.graph,
-                active_definitions=state.active_definitions,
-                revision=state.revision + 1,
-                definition_delta=delta,
-            ),
+        if outcome.resulting_revision is None:
+            state = self._store.proposal_state()
+            if state.proposed_definition_identity is None:
+                return DefinitionDeltaResult(
+                    OperationStatus.ACCEPTED,
+                    outcome.summary,
+                    evaluated_revision=state.revision,
+                )
+            return _proposal_result(state, outcome.summary)
+        return _proposal_result(
+            self._store.proposal_state(),
             f"staged the proposal at revision {outcome.resulting_revision}",
             resulting_revision=outcome.resulting_revision,
         )
 
-    def activate_definition_delta(self, *, provenance: Provenance) -> RevisionedOutcome:
+    def activate_definition_delta(
+        self, request: ActivateDefinitionDeltaRequest, *, provenance: Provenance
+    ) -> RevisionedOutcome:
         """Activate the sole proposal, or preserve everything."""
-        outcome = self._activate_definition_delta(provenance=provenance)
+        try:
+            outcome = self._store.activate_proposal(request.assessment_id, provenance=provenance)
+        except StoreError as error:
+            outcome = RevisionedOutcome(
+                status=(
+                    OperationStatus.REJECTED
+                    if isinstance(error, NotInitializedError)
+                    else OperationStatus.FAILED
+                ),
+                summary=f"the proposal could not be activated: {error}",
+                findings=(ValidationFinding(summary=str(error)),),
+            )
         self._observe_outcome(
             "definitionActivation",
             outcome.status,
@@ -692,47 +808,6 @@ class RTGSystem:
             evaluated_revision=outcome.resulting_revision,
         )
         return outcome
-
-    def _activate_definition_delta(self, *, provenance: Provenance) -> RevisionedOutcome:
-        """Activate the sole proposal, or preserve everything.
-
-        Activation is the gate the working proposal was allowed to skip: every
-        description present, the proposal internally valid, and the graph already
-        conforming under it.
-        """
-        try:
-            state = self._working_state()
-        except StoreError as error:
-            return RevisionedOutcome(
-                status=OperationStatus.FAILED,
-                summary=f"the proposal could not be activated: {error}",
-                findings=(ValidationFinding(summary=str(error)),),
-            )
-        if state.definition_delta is None:
-            return RevisionedOutcome(
-                status=OperationStatus.REJECTED,
-                summary="there is no proposal to activate",
-            )
-        proposed = state.definition_delta.proposed_definitions
-        assessment = assess_proposal(proposed, state.graph, state.revision)
-        if not assessment.conforms:
-            return RevisionedOutcome(
-                status=OperationStatus.REJECTED,
-                summary=(
-                    f"the proposal cannot be activated ({len(assessment.findings)} findings); "
-                    "graph, active definitions, proposal, and revision are unchanged"
-                ),
-                findings=assessment.findings,
-            )
-        return self._commit(
-            state.revision,
-            TransitionKind.DEFINITION_ACTIVATION,
-            CanonicalChange(
-                delta_disposition=DefinitionDeltaDisposition.ABSENT,
-                active_definitions=proposed,
-            ),
-            provenance=provenance,
-        )
 
     def discard_definition_delta(self, *, provenance: Provenance) -> RevisionedOutcome:
         """Clear the sole proposal, or report that there is none."""
@@ -749,20 +824,20 @@ class RTGSystem:
     def _discard_definition_delta(self, *, provenance: Provenance) -> RevisionedOutcome:
         """Clear the sole proposal, or report that there is none."""
         try:
-            revision, _, delta = self._store.current_definitions()
+            proposal = self._store.proposal_state()
         except StoreError as error:
             return RevisionedOutcome(
                 status=OperationStatus.FAILED,
                 summary=f"the proposal could not be discarded: {error}",
                 findings=(ValidationFinding(summary=str(error)),),
             )
-        if delta is None:
+        if proposal.proposed_definition_identity is None:
             return RevisionedOutcome(
                 status=OperationStatus.REJECTED,
                 summary="there is no proposal to discard",
             )
         return self._commit(
-            revision,
+            proposal.revision,
             TransitionKind.DEFINITION_DELTA_CHANGE,
             CanonicalChange(delta_disposition=DefinitionDeltaDisposition.ABSENT),
             provenance=provenance,
@@ -849,8 +924,67 @@ class RTGSystem:
         record either; a historical one replays the transitions it needs, which is the
         cost the model permits reconstruction and denies current work.
         """
+        if selection is not None and query.historical_selection is not None:
+            result = GraphQueryResult(
+                status=OperationStatus.REJECTED,
+                summary="a query carries more than one historical selector",
+                query=query,
+                findings=(ValidationFinding(summary="state selection is inconsistent"),),
+            )
+            self._observe(
+                "query",
+                result.status,
+                scope=_query_scope(query),
+                summary=result.summary,
+                provenance=provenance,
+            )
+            return result
+        if selection is not None:
+            query = replace(query, state_scope=EvaluatedStateScope.HISTORICAL)
         chosen = selection or query.historical_selection
+        if query.state_scope is EvaluatedStateScope.PROSPECTIVE:
+            if chosen is not None:
+                result = GraphQueryResult(
+                    status=OperationStatus.REJECTED,
+                    summary="prospective queries cannot carry a historical selection",
+                    query=query,
+                    findings=(ValidationFinding(summary="state selection is inconsistent"),),
+                )
+            else:
+                try:
+                    result = self._store.evaluate_prospective_query(query)
+                except StoreError as error:
+                    result = GraphQueryResult(
+                        status=OperationStatus.FAILED,
+                        summary=f"the prospective query could not be evaluated: {error}",
+                        findings=(ValidationFinding(summary=str(error)),),
+                        query=query,
+                    )
+            self._observe(
+                "query",
+                result.status,
+                scope=_query_scope(query),
+                summary=result.summary,
+                provenance=provenance,
+                evaluated_revision=result.evaluated_revision,
+            )
+            return result
         if chosen is not None:
+            if query.state_scope is not EvaluatedStateScope.HISTORICAL:
+                result = GraphQueryResult(
+                    status=OperationStatus.REJECTED,
+                    summary="a historical selection requires historical state scope",
+                    query=query,
+                    findings=(ValidationFinding(summary="state selection is inconsistent"),),
+                )
+                self._observe(
+                    "query",
+                    result.status,
+                    scope=_query_scope(query),
+                    summary=result.summary,
+                    provenance=provenance,
+                )
+                return result
             result = self._historical_query(query, chosen)
             self._observe(
                 "query",
@@ -859,6 +993,21 @@ class RTGSystem:
                 summary=result.summary,
                 provenance=provenance,
                 evaluated_revision=result.evaluated_revision,
+            )
+            return result
+        if query.state_scope is EvaluatedStateScope.HISTORICAL:
+            result = GraphQueryResult(
+                status=OperationStatus.REJECTED,
+                summary="historical state scope requires one historical selection",
+                query=query,
+                findings=(ValidationFinding(summary="no historical selection was provided"),),
+            )
+            self._observe(
+                "query",
+                result.status,
+                scope=_query_scope(query),
+                summary=result.summary,
+                provenance=provenance,
             )
             return result
         try:
@@ -1362,33 +1511,6 @@ class RTGSystem:
         The delta check comes first because it is decidable from state already in hand:
         refusing for a reason already known should not cost a replay of the whole tail.
         """
-        try:
-            state = self._working_state()
-        except NotInitializedError as error:
-            return RevisionedOutcome(
-                status=OperationStatus.REJECTED,
-                summary="no canonical state is established; initialize this RTG first",
-                findings=(ValidationFinding(summary=str(error)),),
-            )
-        except StoreError as error:
-            return RevisionedOutcome(
-                status=OperationStatus.FAILED,
-                summary=f"the current state could not be read: {error}",
-                findings=(ValidationFinding(summary=str(error)),),
-            )
-
-        if state.definition_delta is not None:
-            return RevisionedOutcome(
-                status=OperationStatus.REJECTED,
-                summary=(
-                    "a proposal is in flight; restoring would discard it, so activate or "
-                    "discard it first"
-                ),
-                findings=(
-                    ValidationFinding(summary="restoration requires no in-flight definition delta"),
-                ),
-            )
-
         revision, findings = self._resolve(selection)
         if findings:
             return RevisionedOutcome(
@@ -1397,80 +1519,113 @@ class RTGSystem:
                 findings=findings,
             )
         try:
-            historical = self._state_at(revision)
-        except (StoreError, ReplayError) as error:
+            return self._store.restore_revision(revision, provenance=provenance)
+        except StoreError as error:
             return RevisionedOutcome(
                 status=OperationStatus.FAILED,
-                summary=f"the selected state could not be reconstructed: {error}",
+                summary=f"the selected state could not be restored: {error}",
                 findings=(ValidationFinding(summary=str(error)),),
             )
 
-        if graph_equal(historical.graph, state.graph) and definition_set_equal(
-            historical.active_definitions, state.active_definitions
-        ):
-            # Already there. Every other family treats a change that changes nothing as an
-            # accepted no-op, and a revision recording that nothing happened is a record
-            # of nothing.
-            return RevisionedOutcome(
-                status=OperationStatus.ACCEPTED,
-                summary=f"revision {revision} is already the current state; nothing was restored",
-            )
-        return self._commit(
-            state.revision,
-            TransitionKind.HISTORICAL_RESTORATION,
-            CanonicalChange(
-                replacement_graph=historical.graph,
-                active_definitions=historical.active_definitions,
-                delta_disposition=DefinitionDeltaDisposition.ABSENT,
-            ),
-            provenance=provenance,
-        )
-
     # --- Assessment -------------------------------------------------------------------
 
-    def check(self, *, provenance: Provenance = UNATTRIBUTED) -> ValidationReport:
-        """Assess the current graph against the current active definitions.
+    def check(
+        self,
+        request: ValidationRequest | None = None,
+        *,
+        provenance: Provenance = UNATTRIBUTED,
+    ) -> ValidationReport:
+        """Publish a complete stored assessment or read one bounded finding page."""
+        request = request or ValidationRequest(
+            ValidationRequestKind.ASSESS, ValidationScope.GRAPH_CONFORMANCE, 100
+        )
+        scope_text = (
+            "the prospective graph against its proposed definitions"
+            if request.scope is ValidationScope.DEFINITION_DELTA
+            else "the current graph against its active definitions"
+        )
 
-        The assessment changes no canonical state or revision and reads no canonical
-        record; a false ``conforms`` describes the graph, it does not report a failure.
-        """
-        try:
-            state = self._working_state()
-        except StoreError as error:
+        def finish(report: ValidationReport) -> ValidationReport:
             self._observe(
                 "check",
-                (
-                    OperationStatus.REJECTED
-                    if isinstance(error, NotInitializedError)
-                    else OperationStatus.FAILED
-                ),
-                scope="the current graph against its active definitions",
-                summary=f"the graph could not be assessed: {error}",
+                report.status,
+                scope=scope_text,
+                summary=report.summary,
                 provenance=provenance,
+                evaluated_revision=report.evaluated_revision,
             )
-            raise
-        findings = assess_graph_conformance(state.graph, state.active_definitions)
-        report = ValidationReport(
-            scope=ValidationScope.GRAPH_CONFORMANCE,
-            conforms=not findings,
-            evaluated_revision=state.revision,
-            findings=findings,
-        )
+            return report
+
+        if request.maximum_findings < 1:
+            return finish(
+                ValidationReport(
+                    scope=request.scope,
+                    status=OperationStatus.REJECTED,
+                    summary="maximum findings must be positive",
+                )
+            )
+        if request.kind is ValidationRequestKind.READ_FINDINGS:
+            if request.assessment_id is None or request.start_ordinal is None:
+                return finish(
+                    ValidationReport(
+                        scope=request.scope,
+                        status=OperationStatus.REJECTED,
+                        summary="finding retrieval requires assessment ID and start ordinal",
+                    )
+                )
+            try:
+                report = self._store.assessment_page(
+                    request.assessment_id,
+                    request.start_ordinal,
+                    request.maximum_findings,
+                )
+            except StoreError as error:
+                return finish(
+                    ValidationReport(
+                        scope=request.scope,
+                        status=OperationStatus.FAILED,
+                        summary=f"the assessment page could not be read: {error}",
+                    )
+                )
+            if report is None or report.scope is not request.scope:
+                return finish(
+                    ValidationReport(
+                        scope=request.scope,
+                        status=OperationStatus.REJECTED,
+                        summary=(
+                            "the assessment page selection is unknown, expired, or out of range"
+                        ),
+                    )
+                )
+            return finish(report)
+        if request.assessment_id is not None or request.start_ordinal is not None:
+            return finish(
+                ValidationReport(
+                    scope=request.scope,
+                    status=OperationStatus.REJECTED,
+                    summary="a new assessment forbids prior assessment selectors",
+                )
+            )
+        try:
+            report = self._store.assess_and_publish(
+                request.scope, maximum_findings=request.maximum_findings
+            )
+        except StoreError as error:
+            return finish(
+                ValidationReport(
+                    scope=request.scope,
+                    status=(
+                        OperationStatus.REJECTED
+                        if isinstance(error, NotInitializedError)
+                        or "no definition delta" in str(error)
+                        else OperationStatus.FAILED
+                    ),
+                    summary=f"the graph could not be assessed: {error}",
+                )
+            )
         # A report has no status of its own: it succeeded, and says whether the graph
         # conforms. The observation records that the assessment ran and what it found.
-        self._observe(
-            "check",
-            OperationStatus.ACCEPTED,
-            scope="the current graph against its active definitions",
-            summary=(
-                "the graph conforms"
-                if report.conforms
-                else f"the graph does not conform ({len(findings)} findings)"
-            ),
-            provenance=provenance,
-            evaluated_revision=report.evaluated_revision,
-        )
-        return report
+        return finish(report)
 
 
 def _change_scope(change: GraphChange) -> str:
@@ -1534,15 +1689,15 @@ def _vocabulary_summary(definitions: GraphDefinitionSet) -> str:
     )
 
 
-def _delta_result(
-    state: CanonicalState,
+def _proposal_result(
+    state: ProposalState,
     summary: str,
     resulting_revision: int | None = None,
     *,
     absent_summary: str = "there is no proposal",
 ) -> DefinitionDeltaResult:
     """Return the proposal, or its absence, as the model shapes that answer."""
-    if state.definition_delta is None:
+    if state.proposed_definition_identity is None:
         return DefinitionDeltaResult(
             status=OperationStatus.ACCEPTED,
             summary=absent_summary,
@@ -1552,10 +1707,13 @@ def _delta_result(
     return DefinitionDeltaResult(
         status=OperationStatus.ACCEPTED,
         summary=summary,
-        definition_delta=state.definition_delta,
-        assessment=assess_proposal(
-            state.definition_delta.proposed_definitions, state.graph, state.revision
-        ),
+        proposed_definition_identity=state.proposed_definition_identity,
+        graph_overlay_identity=state.graph_overlay_identity,
+        staged_anchor_count=state.staged_anchor_count,
+        staged_associated_data_count=state.staged_associated_data_count,
+        staged_link_count=state.staged_link_count,
+        staged_removal_count=state.staged_removal_count,
+        assessment=state.assessment,
         evaluated_revision=state.revision,
         resulting_revision=resulting_revision,
     )

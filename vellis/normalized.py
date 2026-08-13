@@ -27,12 +27,16 @@ from vellis.definitions import (
     StringPattern,
     ValueRange,
     ValueShape,
+    relationship_identity,
 )
 from vellis.graph import Anchor, AssociatedDataObject, GraphObject, Link, ObjectKind, SystemMetadata
 from vellis.json_value import JsonKind, JsonValue, dumps, json_kind, loads
 
 __all__ = [
+    "definition_content_stats",
+    "definition_entry_digest",
     "definition_identity",
+    "definition_identity_from_stats",
     "insert_definition_set",
     "insert_object_value",
     "json_storage_fields",
@@ -81,6 +85,12 @@ def semantic_identity(value: object) -> str:
         if isinstance(each, (tuple, list)):
             digest.update(b"L" + len(each).to_bytes(8, "big"))
             for member in each:
+                add(member)
+            return
+        if isinstance(each, (set, frozenset)):
+            members = sorted(each, key=semantic_identity)
+            digest.update(b"U" + len(members).to_bytes(8, "big"))
+            for member in members:
                 add(member)
             return
         if isinstance(each, dict):
@@ -242,8 +252,11 @@ def load_object_value(connection: Connection, value_id: int) -> GraphObject:
     return Link(str(uuid), str(type_key), str(source_uuid), str(target_uuid), system_metadata)
 
 
-def definition_identity(definitions: GraphDefinitionSet) -> str:
-    """Return an identity exactly aligned with canonical definition-set equality."""
+_IDENTITY_MODULUS = 1 << 256
+
+
+def _definition_members(definitions: GraphDefinitionSet) -> tuple[object, ...]:
+    """Return independently hashable members of unordered definition-set meaning."""
 
     def ordered(values: list[object]) -> tuple[object, ...]:
         return tuple(sorted(values, key=semantic_identity))
@@ -327,24 +340,54 @@ def definition_identity(definitions: GraphDefinitionSet) -> str:
                     rule.description,
                 )
             )
-    return semantic_identity(
-        (
-            "definitionSet",
-            ordered(anchors),
-            ordered(data_types),
-            ordered(links),
-            ordered(relationships),
-        )
-    )
+    return (*anchors, *data_types, *links, *relationships)
+
+
+def definition_content_stats(definitions: GraphDefinitionSet) -> tuple[str, int]:
+    """Return a composable cryptographic multiset summary of definition meaning.
+
+    Modular addition preserves duplicate occurrences and lets a sparse proposal replace
+    one natural-keyed member without traversing the untouched definition population.
+    Member digests include their definition kind and complete canonical semantic value.
+    """
+
+    members = _definition_members(definitions)
+    accumulator = sum(int(semantic_identity(member), 16) for member in members)
+    return f"{accumulator % _IDENTITY_MODULUS:064x}", len(members)
+
+
+def definition_entry_digest(definitions: GraphDefinitionSet) -> str:
+    """Return the semantic digest of one normalized definition member."""
+
+    members = _definition_members(definitions)
+    if len(members) != 1:
+        raise ValueError("a definition entry digest requires exactly one member")
+    return semantic_identity(members[0])
+
+
+def definition_identity_from_stats(accumulator: str, entry_count: int) -> str:
+    """Derive the canonical set identity from its composable content summary."""
+
+    return semantic_identity(("definitionSet", entry_count, accumulator))
+
+
+def definition_identity(definitions: GraphDefinitionSet) -> str:
+    """Return a path-independent identity aligned with definition-set equality."""
+
+    return definition_identity_from_stats(*definition_content_stats(definitions))
 
 
 def insert_definition_set(connection: Connection, definitions: GraphDefinitionSet) -> str:
-    identity = definition_identity(definitions)
+    accumulator, entry_count = definition_content_stats(definitions)
+    identity = definition_identity_from_stats(accumulator, entry_count)
     if connection.execute(
         "SELECT 1 FROM definition_set WHERE identity = ?", (identity,)
     ).fetchone():
         return identity
-    connection.execute("INSERT INTO definition_set (identity) VALUES (?)", (identity,))
+    connection.execute(
+        "INSERT INTO definition_set (identity, content_accumulator, entry_count) VALUES (?, ?, ?)",
+        (identity, accumulator, entry_count),
+    )
     occurrence = 0
     for kind, values in (
         (ObjectKind.ANCHOR.value, definitions.anchor_types),
@@ -440,12 +483,14 @@ def insert_definition_set(connection: Connection, definitions: GraphDefinitionSe
             first, second = rule.anchor_type_keys, rule.associated_data_type_keys
         connection.execute(
             "INSERT INTO definition_multiplicity_rule"
-            " (definition_set_id, occurrence, rule_kind, link_type_key, constrained_end,"
+            " (definition_set_id, occurrence, natural_key, rule_kind, link_type_key,"
+            " constrained_end,"
             " lower_bound, upper_bound, description)"
-            " VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 identity,
                 occurrence,
+                semantic_identity(relationship_identity(rule)),
                 kind,
                 link_type_key,
                 constrained_end,
@@ -469,6 +514,7 @@ def load_definition_set(
     *,
     type_keys: set[str] | None = None,
     constrained_type_keys: set[str] | None = None,
+    relationship_keys: set[str] | None = None,
 ) -> GraphDefinitionSet:
     """Load complete or request-local definition meaning from normalized rows.
 
@@ -616,7 +662,19 @@ def load_definition_set(
         " FROM definition_multiplicity_rule AS r"
     )
     relationship_parameters: list[object] = [identity]
-    if constrained_type_keys is not None:
+    if relationship_keys is not None:
+        if not relationship_keys:
+            relationship_rows = ()
+        else:
+            placeholders = ", ".join("?" for _ in relationship_keys)
+            relationship_sql += (
+                f" WHERE r.definition_set_id = ? AND r.natural_key IN ({placeholders})"
+            )
+            relationship_parameters.extend(sorted(relationship_keys))
+            relationship_rows = connection.execute(
+                relationship_sql + " ORDER BY r.occurrence", tuple(relationship_parameters)
+            )
+    elif constrained_type_keys is not None:
         if not constrained_type_keys:
             relationship_rows = ()
         else:

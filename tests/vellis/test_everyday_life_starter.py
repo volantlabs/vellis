@@ -14,6 +14,7 @@ from pathlib import Path
 
 import pytest
 
+from tests.vellis.evolution_support import activate_clean_delta, stage_complete_fixture
 from vellis.canonical import Provenance
 from vellis.changes import GraphChange
 from vellis.definitions import definition_set_equal, validate_definition_set
@@ -204,10 +205,10 @@ def test_the_starter_is_governed_like_any_other_vocabulary(tmp_path: Path) -> No
             link_types=STARTER.link_types,
             relationship_constraints=STARTER.relationship_constraints,
         )
-        assert system.set_definition_delta(
-            widened, provenance=Provenance(initiator="owner")
+        assert stage_complete_fixture(
+            system, widened, provenance=Provenance(initiator="owner")
         ).accepted
-        assert system.activate_definition_delta(provenance=Provenance(initiator="owner")).accepted
+        assert activate_clean_delta(system, provenance=Provenance(initiator="owner")).accepted
 
         active = system.current_state().active_definitions
         assert active.anchor_type("life.pet") is not None

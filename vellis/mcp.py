@@ -48,13 +48,17 @@ from fastmcp.tools.base import ToolResult
 
 from vellis.activity import HistoryQuery, HistoryResult
 from vellis.canonical import Provenance
-from vellis.changes import GraphChange
+from vellis.changes import GraphChangeRequest
 from vellis.discovery import (
     DefinitionInspectionRequest,
     DefinitionInspectionResult,
     DefinitionSummaryResult,
 )
-from vellis.governance import DefinitionDeltaResult, SetDefinitionDeltaRequest
+from vellis.governance import (
+    ActivateDefinitionDeltaRequest,
+    DefinitionDeltaResult,
+    SetDefinitionDeltaRequest,
+)
 from vellis.history import HistoricalSelection
 from vellis.json_value import MAXIMUM_STORED_INTEGER_EXPONENT, JsonValueError
 from vellis.outcomes import (
@@ -62,9 +66,9 @@ from vellis.outcomes import (
     RevisionedOutcome,
     ValidationFinding,
     ValidationReport,
-    ValidationScope,
+    ValidationRequest,
 )
-from vellis.query import GraphQuery, GraphQueryResult
+from vellis.query import EvaluatedStateScope, GraphQuery, GraphQueryResult
 from vellis.store import StoreError
 from vellis.system import RTGSystem
 
@@ -115,10 +119,15 @@ def build_server(system: RTGSystem, *, name: str = "vellis") -> FastMCP:
     @server.tool
     def rtg_definition_summary(
         historical_selection: HistoricalSelection | None = None,
+        state_scope: EvaluatedStateScope = EvaluatedStateScope.CURRENT,
     ) -> DefinitionSummaryResult:
         """Discover every anchor type active at current or selected historical state."""
         return _result(
-            system.definition_summary(selection=historical_selection, provenance=_agent()),
+            system.definition_summary(
+                selection=historical_selection,
+                state_scope=state_scope,
+                provenance=_agent(),
+            ),
             lambda reason: DefinitionSummaryResult(
                 status=OperationStatus.FAILED,
                 summary=f"the summary could not be returned completely: {reason}",
@@ -167,10 +176,10 @@ def build_server(system: RTGSystem, *, name: str = "vellis") -> FastMCP:
         )
 
     @server.tool
-    def rtg_change(change: GraphChange) -> RevisionedOutcome:
+    def rtg_change(request: GraphChangeRequest) -> RevisionedOutcome:
         """Validate explicit upserts and removals, then atomically commit an effective change."""
         return _result(
-            system.apply_graph_change(change, provenance=_agent()),
+            system.apply_graph_change(request, provenance=_agent()),
             _unreturnable_outcome,
         )
 
@@ -178,7 +187,7 @@ def build_server(system: RTGSystem, *, name: str = "vellis") -> FastMCP:
     def rtg_set_definition_delta(request: SetDefinitionDeltaRequest) -> DefinitionDeltaResult:
         """Create or replace the sole complete proposal and return its current assessment."""
         return _result(
-            system.set_definition_delta(request.proposed_definitions, provenance=_agent()),
+            system.set_definition_delta(request.change, provenance=_agent()),
             lambda reason: DefinitionDeltaResult(
                 status=OperationStatus.FAILED,
                 summary=f"the assessment could not be returned completely: {reason}",
@@ -187,10 +196,12 @@ def build_server(system: RTGSystem, *, name: str = "vellis") -> FastMCP:
         )
 
     @server.tool
-    def rtg_activate_definition_delta() -> RevisionedOutcome:
+    def rtg_activate_definition_delta(
+        request: ActivateDefinitionDeltaRequest,
+    ) -> RevisionedOutcome:
         """Activate the valid sole proposal atomically or preserve all current canonical state."""
         return _result(
-            system.activate_definition_delta(provenance=_agent()),
+            system.activate_definition_delta(request, provenance=_agent()),
             _unreturnable_outcome,
         )
 
@@ -203,15 +214,14 @@ def build_server(system: RTGSystem, *, name: str = "vellis") -> FastMCP:
         )
 
     @server.tool
-    def rtg_check() -> ValidationReport:
-        """Assess complete current-graph conformance against active definitions without mutation."""
+    def rtg_check(request: ValidationRequest) -> ValidationReport:
+        """Create or page one complete SQLite-backed conformance assessment."""
         return _result(
-            system.check(provenance=_agent()),
+            system.check(request, provenance=_agent()),
             lambda reason: ValidationReport(
-                scope=ValidationScope.GRAPH_CONFORMANCE,
-                conforms=False,
-                evaluated_revision=0,
-                findings=(ValidationFinding(summary=reason),),
+                scope=request.scope,
+                status=OperationStatus.FAILED,
+                summary=f"the assessment could not be returned: {reason}",
             ),
         )
 

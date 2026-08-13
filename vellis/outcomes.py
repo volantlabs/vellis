@@ -23,6 +23,8 @@ __all__ = [
     "OperationStatus",
     "RevisionedOutcome",
     "ValidationFinding",
+    "ValidationRequest",
+    "ValidationRequestKind",
     "ValidationReport",
     "ValidationScope",
 ]
@@ -47,6 +49,20 @@ class ValidationScope(Enum):
 
     GRAPH_CONFORMANCE = "graphConformance"
     DEFINITION_DELTA = "definitionDelta"
+
+
+class ValidationRequestKind(Enum):
+    ASSESS = "assess"
+    READ_FINDINGS = "readFindings"
+
+
+@dataclass(frozen=True, slots=True)
+class ValidationRequest:
+    kind: ValidationRequestKind
+    scope: ValidationScope
+    maximum_findings: int
+    assessment_id: str | None = None
+    start_ordinal: int | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -85,6 +101,19 @@ class ValidationReport:
     """
 
     scope: ValidationScope
-    conforms: bool
-    evaluated_revision: int
+    conforms: bool | None = None
+    evaluated_revision: int | None = None
+    status: OperationStatus = OperationStatus.ACCEPTED
+    summary: str = ""
     findings: tuple[ValidationFinding, ...] = ()
+    assessment_id: str | None = None
+    proposed_definition_identity: str | None = None
+    graph_overlay_identity: str | None = None
+    finding_count: int | None = None
+    returned_start_ordinal: int | None = None
+    more_findings: bool | None = None
+    returned_findings: tuple[ValidationFinding, ...] = ()
+
+    @property
+    def accepted(self) -> bool:
+        return self.status is OperationStatus.ACCEPTED

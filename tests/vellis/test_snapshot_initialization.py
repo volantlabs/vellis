@@ -16,6 +16,7 @@ from pathlib import Path
 import pytest
 from conftest import build_rich_definitions
 
+from tests.vellis.evolution_support import activate_clean_delta, stage_complete_fixture
 from vellis.canonical import Provenance, canonical_state_equal
 from vellis.changes import GraphChange
 from vellis.definitions import (
@@ -58,8 +59,8 @@ def source(tmp_path: Path):
         assert system.apply_graph_change(
             GraphChange(anchor_upserts=(Anchor(uuid, "person", name),)), provenance=_owner()
         ).accepted
-    assert system.set_definition_delta(WIDER, provenance=_owner()).accepted
-    assert system.activate_definition_delta(provenance=_owner()).accepted
+    assert stage_complete_fixture(system, WIDER, provenance=_owner()).accepted
+    assert activate_clean_delta(system, provenance=_owner()).accepted
     assert system.current_state().revision == 4
     try:
         yield system
@@ -173,16 +174,16 @@ def test_query_and_replay_agree_with_the_supplied_state(tmp_path: Path, source: 
 
 
 def test_an_in_flight_proposal_travels_with_the_snapshot(tmp_path: Path, source: RTGSystem) -> None:
-    assert source.set_definition_delta(build_rich_definitions(), provenance=_owner()).accepted
+    assert stage_complete_fixture(source, build_rich_definitions(), provenance=_owner()).accepted
     snapshot = source.create_snapshot(provenance=_owner()).snapshot
     assert snapshot is not None
 
     fresh = _begin(tmp_path, ReplayRequest(snapshot=snapshot))
     try:
         delta = fresh.definition_delta(provenance=_owner())
-        assert delta.definition_delta is not None
+        assert delta.proposed_definition_identity is not None
         assert definition_set_equal(
-            delta.definition_delta.proposed_definitions, build_rich_definitions()
+            fresh.store.definition_view(prospective=True)[1], build_rich_definitions()
         )
     finally:
         fresh.close()

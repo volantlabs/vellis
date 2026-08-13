@@ -17,6 +17,7 @@ from pathlib import Path
 import pytest
 from conftest import build_rich_definitions
 
+from tests.vellis.evolution_support import stage_complete_fixture
 from vellis.canonical import (
     CanonicalChange,
     CanonicalTransitionRecord,
@@ -89,7 +90,7 @@ def test_a_snapshot_captures_the_whole_state_at_its_revision(system: RTGSystem) 
 
 def test_a_snapshot_carries_an_in_flight_delta(system: RTGSystem) -> None:
     """Excludes capturing only what is active: the proposal is canonical state too."""
-    assert system.set_definition_delta(WIDER, provenance=_owner()).accepted
+    assert stage_complete_fixture(system, WIDER, provenance=_owner()).accepted
 
     snapshot = system.create_snapshot(provenance=_owner()).snapshot
 
@@ -194,7 +195,7 @@ def test_a_snapshot_and_its_later_tail_reconstruct_the_current_state(
     assert system.apply_graph_change(
         GraphChange(anchor_upserts=(Anchor("a-2", "person", "Grace"),)), provenance=_owner()
     ).accepted
-    assert system.set_definition_delta(WIDER, provenance=_owner()).accepted
+    assert stage_complete_fixture(system, WIDER, provenance=_owner()).accepted
 
     tail = system.ledger_tail(after=captured_at)
     assert tail is not None

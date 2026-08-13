@@ -86,16 +86,40 @@ class Provenance:
 
 @dataclass(frozen=True, slots=True)
 class DefinitionDelta:
-    """The sole prospective next definition set."""
+    """The sole prospective definition set and keyed graph overlay."""
 
     proposed_definitions: GraphDefinitionSet
+    graph_overlay: GraphChange = GraphChange()
 
 
 def definition_delta_equal(left: DefinitionDelta | None, right: DefinitionDelta | None) -> bool:
     """Compare delta presence and, when present, proposed-definition content."""
     if left is None or right is None:
         return left is None and right is None
-    return definition_set_equal(left.proposed_definitions, right.proposed_definitions)
+    return definition_set_equal(
+        left.proposed_definitions, right.proposed_definitions
+    ) and _graph_change_equal(left.graph_overlay, right.graph_overlay)
+
+
+def _graph_change_equal(left: GraphChange, right: GraphChange) -> bool:
+    """Compare keyed overlay meaning without treating request tuple order as authority."""
+    return (
+        graph_equal(
+            Graph(
+                left.anchor_upserts,
+                left.associated_data_upserts,
+                left.link_upserts,
+            ),
+            Graph(
+                right.anchor_upserts,
+                right.associated_data_upserts,
+                right.link_upserts,
+            ),
+        )
+        and sorted(left.anchor_removals) == sorted(right.anchor_removals)
+        and sorted(left.associated_data_removals) == sorted(right.associated_data_removals)
+        and sorted(left.link_removals) == sorted(right.link_removals)
+    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -210,8 +234,8 @@ def transition_findings(record: CanonicalTransitionRecord) -> tuple[ValidationFi
         if change.delta_disposition is DefinitionDeltaDisposition.UNCHANGED:
             refuse("is a definition-delta change but leaves the delta unchanged")
     elif kind is TransitionKind.DEFINITION_ACTIVATION:
-        if change.graph_change is not None or change.replacement_graph is not None:
-            refuse("is an activation but changes the graph")
+        if change.replacement_graph is not None:
+            refuse("is an activation but carries a complete replacement graph")
         if change.active_definitions is None:
             refuse("is an activation but supplies no active definitions")
         if change.delta_disposition is not DefinitionDeltaDisposition.ABSENT:

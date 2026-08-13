@@ -56,6 +56,7 @@ from vellis.definitions import (
 )
 from vellis.history import HistoricalSelection
 from vellis.outcomes import OperationStatus, ValidationFinding
+from vellis.query import EvaluatedStateScope
 
 __all__ = [
     "AnchorDefinitionDetail",
@@ -112,6 +113,7 @@ class DefinitionInspectionRequest:
 
     anchor_type_keys: tuple[str, ...]
     historical_selection: HistoricalSelection | None = None
+    state_scope: EvaluatedStateScope = EvaluatedStateScope.CURRENT
 
 
 @dataclass(frozen=True, slots=True)

@@ -46,6 +46,7 @@ from typing import Any
 import pytest
 from fastmcp import Client
 
+from tests.vellis.evolution_support import activate_clean_delta, stage_complete_fixture
 from vellis.canonical import (
     CanonicalState,
     CanonicalTransitionRecord,
@@ -831,7 +832,8 @@ async def test_a_delta_is_built_from_rediscovered_current_definitions(
         )
 
     # The owner does their own vocabulary work between the analysis and the proposal.
-    assert memory.set_definition_delta(
+    assert stage_complete_fixture(
+        memory,
         GraphDefinitionSet(
             anchor_types=(
                 *_starting_vocabulary().anchor_types,
@@ -842,7 +844,7 @@ async def test_a_delta_is_built_from_rediscovered_current_definitions(
         ),
         provenance=OWNER,
     ).accepted
-    assert memory.activate_definition_delta(provenance=OWNER).accepted
+    assert activate_clean_delta(memory, provenance=OWNER).accepted
 
     async with agent:
         rediscovered, revision = await _rediscover_vocabulary(agent)

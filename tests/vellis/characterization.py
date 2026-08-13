@@ -28,6 +28,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
+from tests.vellis.evolution_support import activate_clean_delta, stage_complete_fixture
 from vellis.canonical import Provenance
 from vellis.changes import GraphChange
 from vellis.definitions import AnchorTypeDefinition, GraphDefinitionSet
@@ -91,9 +92,9 @@ def commit_definition_changes(system: RTGSystem, count: int, *, prefix: str = "k
             link_types=state.active_definitions.link_types,
             relationship_constraints=state.active_definitions.relationship_constraints,
         )
-        staged = system.set_definition_delta(proposed, provenance=OWNER)
+        staged = stage_complete_fixture(system, proposed, provenance=OWNER)
         assert staged.accepted, staged.findings
-        activated = system.activate_definition_delta(provenance=OWNER)
+        activated = activate_clean_delta(system, provenance=OWNER)
         assert activated.accepted, activated.findings
 
 

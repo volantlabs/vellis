@@ -15,12 +15,14 @@ from pathlib import Path
 import pytest
 from conftest import build_rich_definitions
 
+from tests.vellis.evolution_support import activate_clean_delta, stage_complete_fixture
 from vellis.canonical import Provenance, TransitionKind, canonical_state_equal, now
 from vellis.changes import GraphChange
 from vellis.definitions import AnchorTypeDefinition, GraphDefinitionSet
 from vellis.graph import Anchor, graph_equal
 from vellis.history import RevisionSelection, TimeSelection
 from vellis.outcomes import OperationStatus
+from vellis.query import EvaluatedStateScope
 from vellis.system import RTGSystem
 
 WIDER = GraphDefinitionSet(
@@ -157,7 +159,7 @@ def test_a_restoration_survives_an_ordinary_restart(tmp_path: Path) -> None:
 
 def test_a_proposal_in_flight_blocks_restoration(system: RTGSystem) -> None:
     """Excludes discarding an owner's draft to make room for the past."""
-    assert system.set_definition_delta(WIDER, provenance=_owner()).accepted
+    assert stage_complete_fixture(system, WIDER, provenance=_owner()).accepted
     before = system.current_state()
     records = _records(system)
 
@@ -171,7 +173,7 @@ def test_a_proposal_in_flight_blocks_restoration(system: RTGSystem) -> None:
 
 
 def test_restoring_after_the_proposal_is_resolved_succeeds(system: RTGSystem) -> None:
-    assert system.set_definition_delta(WIDER, provenance=_owner()).accepted
+    assert stage_complete_fixture(system, WIDER, provenance=_owner()).accepted
     assert not system.restore_historical_state(RevisionSelection(1), provenance=_owner()).accepted
 
     assert system.discard_definition_delta(provenance=_owner()).accepted
@@ -205,7 +207,7 @@ def test_an_unresolvable_selection_changes_nothing(
 def test_a_refused_restoration_is_observed(system: RTGSystem) -> None:
     from vellis.activity import HistoryKind, HistoryQuery
 
-    assert system.set_definition_delta(WIDER, provenance=_owner()).accepted
+    assert stage_complete_fixture(system, WIDER, provenance=_owner()).accepted
     assert not system.restore_historical_state(RevisionSelection(1), provenance=_owner()).accepted
 
     entries = system.history(
@@ -239,8 +241,8 @@ def widened(tmp_path: Path):
     assert system.apply_graph_change(
         GraphChange(anchor_upserts=(Anchor("a-1", "person", "Ada"),)), provenance=_owner()
     ).accepted
-    assert system.set_definition_delta(WIDER, provenance=_owner()).accepted
-    assert system.activate_definition_delta(provenance=_owner()).accepted
+    assert stage_complete_fixture(system, WIDER, provenance=_owner()).accepted
+    assert activate_clean_delta(system, provenance=_owner()).accepted
     assert {each.type_key for each in system.current_state().active_definitions.anchor_types} == {
         "person",
         "project",
@@ -289,7 +291,9 @@ def test_a_historical_summary_after_a_restoration_reports_the_restored_vocabular
     assert widened.restore_historical_state(RevisionSelection(1), provenance=_owner()).accepted
 
     summary = widened.definition_summary(
-        selection=RevisionSelection(widened.current_state().revision), provenance=_owner()
+        state_scope=EvaluatedStateScope.HISTORICAL,
+        selection=RevisionSelection(widened.current_state().revision),
+        provenance=_owner(),
     )
 
     assert summary.accepted, summary.findings
@@ -358,7 +362,7 @@ def test_a_ledger_that_cannot_be_replayed_reports_a_failure(system: RTGSystem) -
 def test_a_time_selection_is_named_in_its_observation(system: RTGSystem) -> None:
     from vellis.activity import HistoryKind, HistoryQuery
 
-    assert system.set_definition_delta(WIDER, provenance=_owner()).accepted
+    assert stage_complete_fixture(system, WIDER, provenance=_owner()).accepted
     moment = now()
     assert not system.restore_historical_state(TimeSelection(moment), provenance=_owner()).accepted
 
@@ -374,7 +378,7 @@ def test_a_time_selection_is_named_in_its_observation(system: RTGSystem) -> None
 
 def test_a_refused_restoration_replays_nothing(system: RTGSystem) -> None:
     """A refusal decidable from state already in hand does not pay for a reconstruction."""
-    assert system.set_definition_delta(WIDER, provenance=_owner()).accepted
+    assert stage_complete_fixture(system, WIDER, provenance=_owner()).accepted
 
     system.store.reset_instrumentation()
     assert not system.restore_historical_state(RevisionSelection(1), provenance=_owner()).accepted

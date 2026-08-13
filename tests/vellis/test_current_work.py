@@ -19,10 +19,18 @@ from vellis.canonical import Provenance, canonical_state_equal
 from vellis.changes import GraphChange
 from vellis.definitions import AnchorTypeDefinition, GraphDefinitionSet
 from vellis.discovery import DefinitionInspectionRequest
+from vellis.governance import DefinitionChange
 from vellis.graph import Anchor
 from vellis.history import RevisionSelection
 from vellis.outcomes import OperationStatus
-from vellis.query import AnchorGroup, AnchorProjection, AnchorUuidFilter, GraphQuery, ReturnShape
+from vellis.query import (
+    AnchorGroup,
+    AnchorProjection,
+    AnchorUuidFilter,
+    EvaluatedStateScope,
+    GraphQuery,
+    ReturnShape,
+)
 from vellis.system import RTGSystem
 from vellis.validation import assess_graph_conformance
 
@@ -120,19 +128,21 @@ def test_absent_proposal_retrieval_decodes_no_graph_objects(tmp_path: Path) -> N
 
         result = system.definition_delta()
 
-        assert result.accepted and result.definition_delta is None
+        assert result.accepted and result.proposed_definition_identity is None
         assert system.store.current_projection_decodes == 0
         assert system.store.current_graph_decodes == 0
         assert system.store.current_graph_object_decodes == 0
-        assert system.store.current_definition_decodes == 1
+        assert system.store.current_definition_decodes == 0
     finally:
         system.close()
 
 
 def test_definition_only_no_op_and_refusal_decode_no_graph_objects(tmp_path: Path) -> None:
     system = _established(tmp_path)
-    wider = GraphDefinitionSet(
-        anchor_types=(AnchorTypeDefinition(type_key="person", description="A described person."),)
+    wider = DefinitionChange(
+        anchor_type_upserts=(
+            AnchorTypeDefinition(type_key="person", description="A described person."),
+        )
     )
     try:
         anchors = tuple(Anchor(f"a-{index}", "person", f"Person {index}") for index in range(500))
@@ -142,7 +152,7 @@ def test_definition_only_no_op_and_refusal_decode_no_graph_objects(tmp_path: Pat
         system.store.reset_instrumentation()
 
         unchanged = system.set_definition_delta(
-            VOCABULARY, provenance=Provenance(initiator="owner")
+            DefinitionChange(), provenance=Provenance(initiator="owner")
         )
 
         assert unchanged.accepted and unchanged.resulting_revision is None
@@ -151,7 +161,10 @@ def test_definition_only_no_op_and_refusal_decode_no_graph_objects(tmp_path: Pat
         assert system.set_definition_delta(wider, provenance=Provenance(initiator="owner")).accepted
         system.store.reset_instrumentation()
 
-        refused = system.set_definition_delta(VOCABULARY, provenance=Provenance(initiator="owner"))
+        refused = system.set_definition_delta(
+            DefinitionChange(anchor_type_upserts=VOCABULARY.anchor_types),
+            provenance=Provenance(initiator="owner"),
+        )
 
         assert refused.status is OperationStatus.REJECTED
         assert system.store.current_graph_object_decodes == 0
@@ -161,8 +174,10 @@ def test_definition_only_no_op_and_refusal_decode_no_graph_objects(tmp_path: Pat
 
 def test_definition_delta_discard_decodes_no_graph_objects(tmp_path: Path) -> None:
     system = _established(tmp_path)
-    wider = GraphDefinitionSet(
-        anchor_types=(AnchorTypeDefinition(type_key="person", description="A described person."),)
+    wider = DefinitionChange(
+        anchor_type_upserts=(
+            AnchorTypeDefinition(type_key="person", description="A described person."),
+        )
     )
     try:
         anchors = tuple(Anchor(f"a-{index}", "person", f"Person {index}") for index in range(500))
@@ -391,6 +406,8 @@ def test_narrow_historical_query_does_not_materialize_the_revision_population(
             anchor_groups=(AnchorGroup("person", "person", AnchorUuidFilter(("a-0",))),),
             return_shape=ReturnShape((AnchorProjection("returned-person", "person"),)),
             maximum_rows=1,
+            historical_selection=RevisionSelection(1),
+            state_scope=EvaluatedStateScope.HISTORICAL,
         )
         steps = 0
 
@@ -401,7 +418,7 @@ def test_narrow_historical_query_does_not_materialize_the_revision_population(
 
         system.store._connection.set_progress_handler(progress, 1)  # noqa: SLF001
         try:
-            result = system.query_graph(query, selection=RevisionSelection(1))
+            result = system.query_graph(query)
         finally:
             system.store._connection.set_progress_handler(None, 0)  # noqa: SLF001
 

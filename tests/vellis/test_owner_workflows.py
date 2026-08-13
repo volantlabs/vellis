@@ -40,6 +40,7 @@ from typing import Any
 import pytest
 from fastmcp import Client
 
+from tests.vellis.evolution_support import activate_clean_delta, stage_complete_fixture
 from vellis.activity import ActivityRecord, HistoryKind, HistoryQuery, RetentionDecision
 from vellis.canonical import (
     CanonicalState,
@@ -718,8 +719,8 @@ def test_an_established_system_reaches_the_starter_only_through_ordinary_governa
     system = RTGSystem.open(began.store)
     try:
         assert not system.current_state().active_definitions.anchor_types
-        assert system.set_definition_delta(starter, provenance=OWNER).accepted
-        activated = system.activate_definition_delta(provenance=OWNER)
+        assert stage_complete_fixture(system, starter, provenance=OWNER).accepted
+        activated = activate_clean_delta(system, provenance=OWNER)
         adopted = system.current_state()
     finally:
         system.close()
@@ -957,7 +958,7 @@ def test_a_restoration_refuses_rather_than_discarding_a_proposal_in_flight(
 ) -> None:
     """The owner's staged work is not collateral of going back."""
     proposed = _plus_team(_starting_vocabulary(), description="A group of people.")
-    assert memory.set_definition_delta(proposed, provenance=OWNER).accepted
+    assert stage_complete_fixture(memory, proposed, provenance=OWNER).accepted
     before = _everything(memory)
 
     refused = memory.restore_historical_state(RevisionSelection(revision=1), provenance=OWNER)

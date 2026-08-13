@@ -24,6 +24,7 @@ from typing import Any
 import pytest
 from conftest import build_rich_definitions
 
+from tests.vellis.evolution_support import activate_clean_delta, stage_complete_fixture
 from vellis.canonical import Provenance, canonical_state_equal
 from vellis.changes import GraphChange
 from vellis.definitions import AnchorTypeDefinition, GraphDefinitionSet
@@ -82,8 +83,8 @@ def source(tmp_path: Path):
     assert system.apply_graph_change(
         GraphChange(anchor_upserts=(Anchor("a-1", "person", "Ada"),)), provenance=OWNER
     ).accepted
-    assert system.set_definition_delta(_wider(), provenance=OWNER).accepted
-    assert system.activate_definition_delta(provenance=OWNER).accepted
+    assert stage_complete_fixture(system, _wider(), provenance=OWNER).accepted
+    assert activate_clean_delta(system, provenance=OWNER).accepted
     try:
         yield system
     finally:
@@ -133,8 +134,8 @@ def test_a_document_reconstructs_the_state_it_captured(source: RTGSystem) -> Non
 
 def test_an_in_flight_proposal_travels_with_the_state(source: RTGSystem) -> None:
     """Excludes a document that reconstructs a state whose delta quietly went missing."""
-    assert source.set_definition_delta(
-        _plus(_wider(), "venue", "Somewhere things happen."), provenance=OWNER
+    assert stage_complete_fixture(
+        source, _plus(_wider(), "venue", "Somewhere things happen."), provenance=OWNER
     ).accepted
     expected = source.current_state()
     assert expected.definition_delta is not None
@@ -153,10 +154,10 @@ def test_a_tail_of_several_transition_kinds_replays_to_the_same_state(
     assert source.apply_graph_change(
         GraphChange(anchor_upserts=(Anchor("a-2", "team", "Orbit"),)), provenance=OWNER
     ).accepted
-    assert source.set_definition_delta(
-        _plus(_wider(), "venue", "Somewhere things happen."), provenance=OWNER
+    assert stage_complete_fixture(
+        source, _plus(_wider(), "venue", "Somewhere things happen."), provenance=OWNER
     ).accepted
-    assert source.activate_definition_delta(provenance=OWNER).accepted
+    assert activate_clean_delta(source, provenance=OWNER).accepted
     expected = source.current_state()
 
     result = reconstruct(decode_snapshot_document(_with_tail(source, snapshot)))
@@ -439,8 +440,8 @@ def test_a_start_names_the_proposal_it_would_establish(source: RTGSystem) -> Non
     without = start_summary(analyze_snapshot_document(_captured(source)))
     assert "no definition proposal in flight" in without
 
-    assert source.set_definition_delta(
-        _plus(_wider(), "venue", "Somewhere things happen."), provenance=OWNER
+    assert stage_complete_fixture(
+        source, _plus(_wider(), "venue", "Somewhere things happen."), provenance=OWNER
     ).accepted
 
     with_delta = start_summary(analyze_snapshot_document(_captured(source)))
