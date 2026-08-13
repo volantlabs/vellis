@@ -37,10 +37,11 @@ current model and record rather than copying the executor's prose.
 
 Use two independent, context-isolated reviews after focused evidence passes:
 
-Before generating their frames, put the current slice-attributable evidence references into the
-working active-slice record without advancing implementation status, lifecycle, or checkpoint. Make
-each reference resolve and name the nearest plausible wrong implementation it excludes. This gives
-both reviewers the same evidence surface without copying command output or findings into prompts.
+Before generating their frames, put the current slice-attributable evidence references and intended
+completion statuses into the working active-slice record without advancing lifecycle or checkpoint.
+Make each reference resolve and name the nearest plausible wrong implementation it excludes. This
+gives both reviewers the complete candidate evidence and disposition surface without copying command
+output or findings into prompts.
 
 1. **Authority and conformance:** verify baseline, slice scope, model meaning, partial/full coverage,
    dependencies, acceptance and failure non-effects, and absence of a model or plan gap.
@@ -75,12 +76,17 @@ nearby evidence, or inherited constraint does not establish that an owned decisi
 Missing selected behavior is an implementation defect. Do not ask the human to choose again unless
 new evidence changes stakeholder-visible meaning or the selected boundary.
 
-Collect the complete findings from both reviews, batch remediation, and perform a focused sweep for
-the same root cause before running one final independent review pair against the resulting slice.
-Repeat only if that final pair finds another in-scope material defect. After three consecutive
-non-clean final pairs, stop launching immediate pairs: summarize the recurring defect class, audit
-that boundary once, add the smallest discriminating evidence, and only then request another fresh
-pair. Review count never permits ignoring a material defect or creates a human authority gate.
+Bind both reviews to one deterministic token for the tracked and evidence state. If both are clean
+and that token is still current, the pair closes review. Afterward permit only one deterministic
+atomic bookkeeping transition: apply the already-reviewed lifecycle, aggregate roll-up, owned-
+decision status, and checkpoint identifiers. It may not change implementation, tests, documentation,
+evidence references, decision content, or plan-bearing state. If either reviewer reports a material finding,
+collect both complete results, batch remediation, perform a focused sweep for the same root cause,
+rerun affected evidence, and obtain a new pair against a new token. Any substantive mutation after a
+clean pair invalidates it. After three consecutive non-clean pairs, stop launching immediate pairs: summarize
+the recurring defect class, audit that boundary once, add the smallest discriminating evidence, and
+only then request another fresh pair. Review count never permits ignoring a material defect or
+creates a human authority gate.
 
 Do not substitute a numerical severity threshold or a demand for zero observations: disposition
 follows plausible consequence. Launch each reviewer exactly once per pair. Read-only reviewers may
@@ -91,7 +97,7 @@ record.
 
 ## Checkpoint and continue
 
-When both reviews produce no material finding:
+When both reviews produce no material finding against the unchanged substantive review state:
 
 - update the slice and affected aggregate authority status;
 - set every owned decision to conforming with evidence that is also attributable to this slice;

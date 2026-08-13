@@ -69,7 +69,7 @@
         "properties": {
           "checkpoint": {"type": "string", "minLength": 1},
           "checks": {"minItems": 1},
-          "review_pairs": {"minimum": 2},
+          "review_pairs": {"minimum": 1},
           "reason": {"type": "null"}
         }
       },

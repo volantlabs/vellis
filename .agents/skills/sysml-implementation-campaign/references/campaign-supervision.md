@@ -70,7 +70,9 @@ cannot be distinguished or reconciled safely.
 ## Keep handoffs compact
 
 The result reports the work item, outcome, checkpoint, executed checks, review-pair and material-
-finding counts, elapsed time, optional usage measurements, and a pause or failure reason. It does
+finding counts, elapsed time, optional usage measurements, and a pause or failure reason. A
+checkpointed result has at least one pair: the clean state-bound pair that authorized its checkpoint.
+It does
 not contain raw findings, review transcripts, implementation narratives, or hidden recovery notes.
 Those details belong in reproducible project artifacts or the work item's durable checkpoint.
 

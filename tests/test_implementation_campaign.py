@@ -1480,7 +1480,7 @@ def test_dispatch_resumes_dirty_work_only_for_an_active_slice(tmp_path: Path) ->
     assert "active-slice-has-working-state" in packet["reason_codes"]
 
 
-def test_dispatch_token_changes_when_dirty_work_changes(tmp_path: Path) -> None:
+def test_state_token_invalidates_clean_review_state_after_tracked_mutation(tmp_path: Path) -> None:
     campaign, _ = _approval_repository(tmp_path)
     campaign["campaign"]["lifecycle"] = "active"  # type: ignore[index]
     campaign["slices"][0]["lifecycle"] = "active"  # type: ignore[index]
@@ -1727,7 +1727,7 @@ def test_worker_result_contract_is_compact_and_rejects_transcripts() -> None:
     assert any("Additional properties" in finding for finding in findings)
 
 
-def test_checkpointed_worker_result_requires_both_review_pairs() -> None:
+def test_checkpointed_worker_result_accepts_one_clean_review_pair() -> None:
     result = {
         "schema_version": 1,
         "campaign_id": "example",
@@ -1741,9 +1741,26 @@ def test_checkpointed_worker_result_requires_both_review_pairs() -> None:
         "reason": None,
     }
 
+    assert implementation_campaign.worker_result_findings(result) == []
+
+
+def test_checkpointed_worker_result_rejects_zero_review_pairs() -> None:
+    result = {
+        "schema_version": 1,
+        "campaign_id": "example",
+        "work_item": "S014",
+        "outcome": "checkpointed",
+        "checkpoint": "slice:S014:123456789abc:1",
+        "checks": [{"name": "project gate", "outcome": "passed"}],
+        "review_pairs": 0,
+        "material_findings": [],
+        "elapsed_seconds": 42,
+        "reason": None,
+    }
+
     findings = implementation_campaign.worker_result_findings(result)
 
     assert any(
-        "review_pairs" in finding and "less than the minimum of 2" in finding
+        "review_pairs" in finding and "less than the minimum of 1" in finding
         for finding in findings
     )

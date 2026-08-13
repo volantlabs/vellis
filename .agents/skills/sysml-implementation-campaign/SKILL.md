@@ -55,15 +55,19 @@ The slice worker follows [Execution and resume](references/execution-and-resume.
 4. Invoke `$sysml-implementation` with the campaign slice contract. Let it choose the simplest
    conforming realization that respects project constraints and intentional deferrals.
 5. Run focused evidence and project checks. Prefer targeted checks during implementation and
-   remediation; normally run the whole-project gate once before the initial review pair and once
-   against the remediated state before the final pair.
-6. Obtain independent authority/conformance and engineering/evidence reviews. Collect their complete
-   in-scope findings, batch remediation, then run one final independent review pair against the
-   resulting slice. Repeat only when that final pair finds a plausible defect within the project's
-   declared authority, safety, evidence, or ordinary recovery boundary. After three consecutive
-   non-clean final pairs, perform a bounded root-cause audit before requesting another pair. Launch
-   each reviewer once and await it through a blocking join or serialized foreground execution; never
-   keep the worker alive with timers, polling, or overlapping wait tasks.
+   remediation; normally run the whole-project gate once against the state offered for review.
+6. Freeze one review-state token and obtain independent authority/conformance and
+   engineering/evidence reviews against that same state. Include all evidence references and
+   intended completion statuses in the frame before freezing it. If both are clean and substantive
+   tracked or evidence state has not changed, review is complete. The worker may then perform only
+   the deterministic atomic bookkeeping transition that applies those reviewed statuses and
+   checkpoint identifiers. Otherwise collect their complete in-scope findings,
+   batch remediation, sweep the root cause, rerun affected evidence, freeze the new state, and obtain
+   another pair. Any implementation, test, documentation, evidence-reference, decision-content, or
+   plan-bearing mutation invalidates a prior clean pair. After three consecutive non-clean
+   pairs, perform a bounded root-cause audit before requesting another pair. Launch each reviewer
+   once and await it through a blocking join or serialized foreground execution; never keep the
+   worker alive with timers, polling, or overlapping wait tasks.
 7. Mark the slice complete only when its bounded obligations conform, evidence discriminates the
    nearest plausible wrong implementation, every realization decision it owns is individually
    conforming with attributable evidence, dependencies remain valid, and a checkpoint can include

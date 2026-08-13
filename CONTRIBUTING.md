@@ -109,11 +109,15 @@ sit between that checkpoint and closure.
    never as an existing-system merge or adoption of v1 ledger history.
 6. After focused evidence passes, freeze one state token and use fresh read-only agents for separate
    authority/conformance and engineering/evidence reviews. Checkpoint after one pair in which both
-   lenses are clean and no tracked or evidence state changes afterward. If either lens finds a
-   material issue, one writer batches corrections, sweeps the root cause, reruns affected evidence,
-   and obtains a new clean pair. Any mutation invalidates a prior clean pair. After three consecutive
-   non-clean pairs, perform one bounded root-cause audit before another pair; do not ask reviewers to
-   invent mutants or speculative inputs merely to continue discovery. Commit the slice's
+   lenses are clean and no substantive tracked or evidence state changes afterward. Prepare all
+   evidence references and intended completion statuses before freezing the review state. After a
+   clean pair, permit only the deterministic atomic bookkeeping transition that applies those
+   reviewed statuses and checkpoint identifiers. Any implementation, test, documentation, evidence-
+   reference, decision-content, or plan-bearing mutation invalidates the pair. If either lens finds
+   a material issue, one writer batches corrections, sweeps the root cause, reruns affected evidence,
+   and obtains a new clean pair. After three consecutive non-clean pairs, perform one bounded root-
+   cause audit before another pair; do not ask reviewers to invent mutants or speculative inputs
+   merely to continue discovery. Commit the slice's
    implementation, tests, evidence, documentation truth, and campaign update together; return the
    compact worker result and stop without selecting the next slice.
 7. In the PR, distinguish modeled, selected, implemented, verified, and runnable. Do not claim an

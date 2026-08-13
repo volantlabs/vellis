@@ -90,10 +90,14 @@ throughput, startup, or storage targets until representative runtime, hardware, 
 
 Use one writer and two fresh, context-isolated read-only reviewers for a review pair: one
 authority/conformance lens and one engineering/evidence lens. Pause mutation while both inspect the
-same state token. A pair closes review when both lenses report no material finding and tracked files
-and evidence state remain unchanged afterward. Any mutation invalidates that clean pair; batch
-corrections, sweep the root cause, rerun affected evidence, and obtain another clean pair. After
-three consecutive non-clean pairs, perform one bounded root-cause audit before another pair.
+same state token. Before freezing it, put all evidence references and intended completion statuses in
+the review frame. A pair closes review when both lenses report no material finding and substantive
+tracked or evidence state remains unchanged afterward. The only permitted post-review mutation is
+the deterministic atomic bookkeeping transition that applies those already-reviewed statuses and
+checkpoint identifiers. Any implementation, test, documentation, evidence-reference, decision-
+content, or plan-bearing mutation invalidates the clean pair; batch corrections, sweep the root
+cause, rerun affected evidence, and obtain another clean pair. After three consecutive non-clean
+pairs, perform one bounded root-cause audit before another pair.
 
 For a complete implementation campaign, require a current validated human-approved plan, one active
 slice, one fresh worker per slice, and atomic checkpoints containing implementation, evidence,

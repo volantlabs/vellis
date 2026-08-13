@@ -65,7 +65,17 @@ def test_campaign_skill_separates_thin_manager_from_one_item_workers() -> None:
     assert "does not implement" in supervision
     assert "exactly one selected slice or closure contract" in supervision
     assert "without selecting or\n  activating the next slice" in execution
-    assert "three consecutive\nnon-clean final pairs" in execution
+    assert "deterministic\natomic bookkeeping transition" in execution
+    assert "Any substantive mutation after a\nclean pair invalidates it" in execution
+    assert "three consecutive non-clean pairs" in execution
+
+
+def test_portable_core_validation_is_risk_tiered() -> None:
+    guidance = (model_layout.ROOT / "AGENTS.md").read_text(encoding="utf-8")
+
+    assert "Editorial, link, or metadata-only" in guidance
+    assert "two\n  contrasting archetypes" in guidance
+    assert "Cross-domain semantic, construct-selection, readiness" in guidance
 
 
 def test_new_portable_skills_do_not_embed_project_bindings() -> None:
