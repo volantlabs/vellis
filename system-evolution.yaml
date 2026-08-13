@@ -20,16 +20,16 @@ baselines:
     checkpoint: git:e82e0e6161040baa4a4a728d05cabbd418c57d83
   target:
     model: sha256:ad02d24b6c6eeb38f904d551e0ae7dfd48101ff41e44db79effb3014e137e4c6
-    implementation: git:bc2cb85b85b82b689e75b2989e9a7a7799762fba
+    implementation: git:68d645bba9588135123e5d7177584382739bcbca
     language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
     execution_environment: sha256:c24a0bae1e63d1f4923d6c7925925ea4e02743568a84b403677b5f6a718879fa
-    checkpoint: git:bc2cb85b85b82b689e75b2989e9a7a7799762fba
+    checkpoint: git:68d645bba9588135123e5d7177584382739bcbca
   observed:
     model: sha256:ad02d24b6c6eeb38f904d551e0ae7dfd48101ff41e44db79effb3014e137e4c6
-    implementation: git:bc2cb85b85b82b689e75b2989e9a7a7799762fba
+    implementation: git:68d645bba9588135123e5d7177584382739bcbca
     language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
     execution_environment: sha256:c24a0bae1e63d1f4923d6c7925925ea4e02743568a84b403677b5f6a718879fa
-    checkpoint: git:bc2cb85b85b82b689e75b2989e9a7a7799762fba
+    checkpoint: git:68d645bba9588135123e5d7177584382739bcbca
 scope:
   authority_scope:
     - model/10-rtg-domain.sysml
@@ -220,9 +220,9 @@ findings:
       - .agents/skills/sysml-evolution/references/evolution-record.md#record-consistency
     evidence_refs:
       - command:uv run pytest tests/test_system_evolution.py
-    disposition: implementation-work
+    disposition: resolved
     owner_work_item_id: W006
-    implementation_status: partial
+    implementation_status: conforming
     nearest_wrong_system: Dictionaries are built before duplicates are counted, making duplicates within one record collection invisible.
     compatibility_effect: Invalid records are rejected; valid portable record shape is unchanged.
   - id: F013
@@ -233,9 +233,9 @@ findings:
       - .agents/skills/sysml-evolution/references/evolution-record.md#baselines-and-lifecycle
     evidence_refs:
       - command:uv run pytest tests/test_system_evolution.py
-    disposition: implementation-work
+    disposition: resolved
     owner_work_item_id: W006
-    implementation_status: partial
+    implementation_status: conforming
     nearest_wrong_system: Git references need only exist and declared target equals declared observed, even if neither represents the checked repository.
     compatibility_effect: Repository-derived Vellis bindings strengthen validation without imposing Git on the portable method.
   - id: F014
@@ -246,9 +246,9 @@ findings:
       - .agents/skills/sysml-evolution/references/evolution-execution.md#review-and-remediation
     evidence_refs:
       - command:uv run pytest tests/test_system_evolution.py
-    disposition: implementation-work
+    disposition: resolved
     owner_work_item_id: W006
-    implementation_status: partial
+    implementation_status: conforming
     nearest_wrong_system: A clean status string has no reviewed checkpoint or reviewer identity and evidence references prove only that a file exists.
     compatibility_effect: Review entries gain portable attribution fields while Vellis validates its own evidence convention.
   - id: F015
@@ -259,9 +259,9 @@ findings:
       - .agents/skills/sysml-evolution/references/evolution-execution.md#approval-gates
     evidence_refs:
       - command:uv run pytest tests/test_system_evolution.py
-    disposition: implementation-work
+    disposition: resolved
     owner_work_item_id: W006
-    implementation_status: partial
+    implementation_status: conforming
     nearest_wrong_system: Approval validation checks only status and non-null text while omitting the checkpoint from project resolution.
     compatibility_effect: Projects retain their own checkpoint convention; Vellis binds accepted gates to its durable record transition.
   - id: F016
@@ -273,9 +273,9 @@ findings:
       - .agents/skills/sysml-evolution/references/evolution-record.md#record-consistency
     evidence_refs:
       - command:uv run pytest tests/test_system_evolution.py
-    disposition: implementation-work
+    disposition: resolved
     owner_work_item_id: W006
-    implementation_status: partial
+    implementation_status: conforming
     nearest_wrong_system: Individual status tokens validate while their joint execution meaning is impossible or misleading.
     compatibility_effect: Invalid process states are rejected; projects remain free to bind lifecycle to their own continuation mechanism.
   - id: F017
@@ -286,9 +286,9 @@ findings:
       - .agents/skills/sysml-evolution/SKILL.md
     evidence_refs:
       - command:just skills-check
-    disposition: implementation-work
+    disposition: resolved
     owner_work_item_id: W006
-    implementation_status: partial
+    implementation_status: conforming
     nearest_wrong_system: Portable prose is neutral but the machine template teaches every adopter to use path:test-or-analysis#case.
     compatibility_effect: A convention-neutral placeholder preserves the schema while Vellis keeps path and command bindings locally.
 decisions:
@@ -452,7 +452,7 @@ work_items:
       - W006
     planned_baseline:
       dimension: implementation
-      identity: git:bc2cb85b85b82b689e75b2989e9a7a7799762fba
+      identity: git:68d645bba9588135123e5d7177584382739bcbca
     finding_ids:
       - F006
       - F007
@@ -471,8 +471,8 @@ work_items:
     non_effects:
       - The completed implementation campaign history is not rewritten.
       - User-owned .data content is not inspected or migrated.
-    lifecycle: pending
-    implementation_status: not evaluated
+    lifecycle: active
+    implementation_status: partial
     evidence_refs: []
     blocker: null
     checkpoint: null
@@ -550,11 +550,14 @@ work_items:
     non_effects:
       - The portable core does not select Git, repositories, SQLite, Python, or Vellis vocabulary.
       - The completed source implementation campaign is not rewritten.
-    lifecycle: active
-    implementation_status: partial
-    evidence_refs: []
+    lifecycle: complete
+    implementation_status: conforming
+    evidence_refs:
+      - command:uv run pytest tests/test_system_evolution.py
+      - command:just skills-check
+      - command:just system-evolution-check
     blocker: null
-    checkpoint: null
+    checkpoint: git:68d645bba9588135123e5d7177584382739bcbca
 closure:
   finding_disposition: open
   model_status: not evaluated
