@@ -396,6 +396,55 @@ def test_an_associated_data_group_may_be_a_link_endpoint(tmp_path: Path) -> None
         system.close()
 
 
+def test_sparse_links_prune_associated_data_before_property_comparison(tmp_path: Path) -> None:
+    system = _system_with(tmp_path, _endpoint_definitions())
+    try:
+        notes = tuple(
+            AssociatedDataObject(
+                uuid=f"n-{index}",
+                type_key="note",
+                anchor_uuids=("p-1",),
+                properties={"marker": normalize(None)},
+            )
+            for index in range(100)
+        )
+        assert system.apply_graph_change(
+            GraphChange(
+                anchor_upserts=(ADA, ORBIT),
+                associated_data_upserts=notes,
+                link_upserts=(Link("l-1", "mentions", source_uuid="a-1", target_uuid="n-1"),),
+            ),
+            provenance=_owner(),
+        ).accepted
+        query = GraphQuery(
+            anchor_groups=(_people(), AnchorGroup("projects", "project")),
+            data_conditions=(
+                AssociatedDataCondition(
+                    "projectNotes",
+                    "projects",
+                    "note",
+                    property_conditions=(
+                        DataPropertyCondition("marker", PropertyComparison.EQUAL, normalize(None)),
+                    ),
+                ),
+            ),
+            required_links=(RequiredLink("mentions", "people", "projectNotes", "mentions"),),
+            return_shape=ReturnShape((AssociatedDataProjection("note", "projectNotes"),)),
+            maximum_rows=10,
+        )
+        system.store.reset_instrumentation()
+
+        result = system.query_graph(query)
+
+        assert result.accepted, result.findings
+        assert [row.associated_data[0].associated_data.uuid for row in result.rows] == ["n-1"]
+        # Two anchors, the sole linked note, and the returned link are decoded. The
+        # other 99 directly associated, property-matching notes never reach comparison.
+        assert system.store.current_graph_object_decodes == 4
+    finally:
+        system.close()
+
+
 # --- Shaping --------------------------------------------------------------------------
 
 

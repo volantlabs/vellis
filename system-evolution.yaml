@@ -20,16 +20,16 @@ baselines:
     checkpoint: git:e82e0e6161040baa4a4a728d05cabbd418c57d83
   target:
     model: sha256:ad02d24b6c6eeb38f904d551e0ae7dfd48101ff41e44db79effb3014e137e4c6
-    implementation: git:ee86d59
+    implementation: git:da790ff
     language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
     execution_environment: python-and-sqlite-pins:uv.lock
-    checkpoint: git:ee86d59
+    checkpoint: git:da790ff
   observed:
     model: sha256:ad02d24b6c6eeb38f904d551e0ae7dfd48101ff41e44db79effb3014e137e4c6
-    implementation: git:ee86d59
+    implementation: git:da790ff
     language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
     execution_environment: python-and-sqlite-pins:uv.lock
-    checkpoint: git:ee86d59
+    checkpoint: git:da790ff
 scope:
   authority_scope:
     - model/10-rtg-domain.sysml
@@ -156,6 +156,141 @@ findings:
     implementation_status: conforming
     nearest_wrong_system: The record has exactly one active writer but status labels an earlier ready item as next work.
     compatibility_effect: Status output becomes consistent with existing lifecycle meaning; record shape and product behavior do not change.
+  - id: F008
+    summary: Complete-state assembly can mix committed revisions across SQLite connections.
+    classification: implementation defect
+    consequence: A writer can commit between projection metadata and graph reads, producing a state or snapshot tuple that no canonical revision established.
+    authority_refs:
+      - VellisRequirements::atomicCanonicalRevision
+      - VellisRequirements::canonicalSnapshotCompleteness
+    evidence_refs:
+      - path:tests/vellis/test_current_work.py
+      - path:tests/vellis/test_snapshot_replay.py
+    disposition: implementation-work
+    owner_work_item_id: W005
+    implementation_status: partial
+    nearest_wrong_system: Per-process locking prevents local overlap but separate committed reads assemble revision metadata and graph content from different SQLite snapshots.
+    compatibility_effect: One read transaction changes no public result shape or unreleased storage compatibility promise.
+  - id: F009
+    summary: Directed links do not pre-narrow associated-data endpoints.
+    classification: implementation defect
+    consequence: Property filtering decodes every type-and-association candidate even when a sparse directed relationship excludes nearly all of them.
+    authority_refs:
+      - VellisRequirements::historyIndependentCurrentWork
+      - VellisRequirements::semanticQueryMeaning
+    evidence_refs:
+      - path:tests/vellis/test_graph_queries.py
+    disposition: implementation-work
+    owner_work_item_id: W005
+    implementation_status: partial
+    nearest_wrong_system: Anchor endpoints use link-pair semijoins before decoding, but associated-data endpoints wait until after property comparison to test the same link.
+    compatibility_effect: Joint query results remain unchanged while irrelevant associated data is not decoded or compared.
+  - id: F010
+    summary: A UUID of another declared selector type is accepted as an empty result.
+    classification: implementation defect
+    consequence: Identity validation proves only the broad object kind and silently treats a type-incompatible named identity as no jointly satisfying assignment.
+    authority_refs:
+      - RTGSystem::'RTG System'::queryCurrentGraph
+      - VellisVerification::invalidQuery
+    evidence_refs:
+      - path:tests/vellis/test_invalid_queries.py
+    disposition: implementation-work
+    owner_work_item_id: W005
+    implementation_status: partial
+    nearest_wrong_system: A project UUID in a person selector passes known-anchor validation and later disappears in type candidate selection.
+    compatibility_effect: Invalid identity restrictions gain findings; compatible restrictions and accepted-empty joint results do not change.
+  - id: F011
+    summary: Projection-integrity tests stop at the transaction seal.
+    classification: plan gap
+    consequence: Removing selector-to-payload comparison would leave the new evidence green because deliberate corruption is rejected earlier as an unsealed write.
+    authority_refs:
+      - VellisRequirements::atomicCanonicalRevision
+    evidence_refs:
+      - path:tests/vellis/test_store_integrity.py
+    disposition: implementation-work
+    owner_work_item_id: W005
+    implementation_status: partial
+    nearest_wrong_system: The transaction seal is tested twice while the independent indexed-selector consistency checks have no discriminating case.
+    compatibility_effect: Test-only resealing separates the two integrity failure modes without changing product behavior.
+  - id: F012
+    summary: Duplicate evolution IDs can be collapsed before validation.
+    classification: implementation defect
+    consequence: One finding, decision, or work item can shadow another and let ownership or closure checks inspect only the final row.
+    authority_refs:
+      - .agents/skills/sysml-evolution/references/evolution-record.md#record-consistency
+    evidence_refs:
+      - path:tests/test_system_evolution.py
+    disposition: implementation-work
+    owner_work_item_id: W006
+    implementation_status: partial
+    nearest_wrong_system: Dictionaries are built before duplicates are counted, making duplicates within one record collection invisible.
+    compatibility_effect: Invalid records are rejected; valid portable record shape is unchanged.
+  - id: F013
+    summary: Vellis baseline freshness is self-asserted rather than derived.
+    classification: plan gap
+    consequence: A stale but internally repeated Git/model/environment identity can validate as current and complete against a different repository state.
+    authority_refs:
+      - .agents/skills/sysml-evolution/references/evolution-record.md#baselines-and-lifecycle
+    evidence_refs:
+      - path:tests/test_system_evolution.py
+    disposition: implementation-work
+    owner_work_item_id: W006
+    implementation_status: partial
+    nearest_wrong_system: Git references need only exist and declared target equals declared observed, even if neither represents the checked repository.
+    compatibility_effect: Repository-derived Vellis bindings strengthen validation without imposing Git on the portable method.
+  - id: F014
+    summary: Closure reviews and evidence can be fabricated or omit declared lenses.
+    classification: plan gap
+    consequence: Arbitrary commands, unresolved path fragments, and only two hard-coded clean labels can close a record whose declared review scope is broader.
+    authority_refs:
+      - .agents/skills/sysml-evolution/references/evolution-execution.md#review-and-remediation
+    evidence_refs:
+      - path:tests/test_system_evolution.py
+    disposition: implementation-work
+    owner_work_item_id: W006
+    implementation_status: partial
+    nearest_wrong_system: A clean status string has no reviewed checkpoint or reviewer identity and evidence references prove only that a file exists.
+    compatibility_effect: Review entries gain portable attribution fields while Vellis validates its own evidence convention.
+  - id: F015
+    summary: Accepted approvals can name nonexistent checkpoints.
+    classification: plan gap
+    consequence: Cold reconstruction cannot distinguish an owner gate from an arbitrary nonempty assertion.
+    authority_refs:
+      - .agents/skills/sysml-evolution/references/evolution-execution.md#approval-gates
+    evidence_refs:
+      - path:tests/test_system_evolution.py
+    disposition: implementation-work
+    owner_work_item_id: W006
+    implementation_status: partial
+    nearest_wrong_system: Approval validation checks only status and non-null text while omitting the checkpoint from project resolution.
+    compatibility_effect: Projects retain their own checkpoint convention; Vellis binds accepted gates to its durable record transition.
+  - id: F016
+    summary: Evolution lifecycle, dependency order, and completion ownership are under-constrained.
+    classification: plan gap
+    consequence: Resumption can accept inverted dependencies or lifecycle roll-ups with no matching work or approval frontier.
+    authority_refs:
+      - .agents/skills/sysml-evolution/references/evolution-record.md#baselines-and-lifecycle
+      - .agents/skills/sysml-evolution/references/evolution-record.md#record-consistency
+    evidence_refs:
+      - path:tests/test_system_evolution.py
+    disposition: implementation-work
+    owner_work_item_id: W006
+    implementation_status: partial
+    nearest_wrong_system: Individual status tokens validate while their joint execution meaning is impossible or misleading.
+    compatibility_effect: Invalid process states are rejected; projects remain free to bind lifecycle to their own continuation mechanism.
+  - id: F017
+    summary: The portable evolution template assumes file-based evidence.
+    classification: implementation defect
+    consequence: A supposedly neutral starter imports Vellis path syntax into projects whose evidence lives in another system of record.
+    authority_refs:
+      - .agents/skills/sysml-evolution/SKILL.md
+    evidence_refs:
+      - path:.agents/skills/sysml-evolution/assets/system-evolution.template.yaml
+    disposition: implementation-work
+    owner_work_item_id: W006
+    implementation_status: partial
+    nearest_wrong_system: Portable prose is neutral but the machine template teaches every adopter to use path:test-or-analysis#case.
+    compatibility_effect: A convention-neutral placeholder preserves the schema while Vellis keeps path and command bindings locally.
 decisions:
   - id: D001
     summary: Keep live graph objects, definitions, and proposal state in addressable SQLite projections with no resident complete-state cache.
@@ -168,13 +303,13 @@ decisions:
       - Normalize every property into fully relational storage and compile the complete query language to SQL.
       - Decode the complete current-state serialization on every operation.
     reversible: true
-    owner_work_item_id: W003
+    owner_work_item_id: W005
     evidence_intent:
       - Definition-only reads decode no graph objects.
       - Current query candidates are joined through identity, type, association, and directed-link indexes before property filtering.
       - Public complete-state inspection cannot mutate durable canonical state and no complete state is retained between calls.
       - A canonical transition and every affected projection row commit atomically.
-    implementation_status: conforming
+    implementation_status: partial
     evidence_refs:
       - path:tests/vellis/test_current_work.py
       - path:tests/vellis/test_graph_queries.py
@@ -271,13 +406,14 @@ work_items:
     finding_ids:
       - F001
     decision_ids:
-      - D001
       - D002
     authority:
       - refs:
           - VellisRequirements::atomicCanonicalRevision
           - VellisRequirements::durableCanonicalHistory
+          - VellisRequirements::historyIndependentCurrentWork
           - VellisRequirements::semanticQueryMeaning
+          - VellisRequirements::querySafety
         coverage: full
         remaining_work_item_ids: []
     approval:
@@ -300,14 +436,16 @@ work_items:
     blocker: null
     checkpoint: git:284efc9
   - id: W004
-    order: 4
+    order: 6
     label: Review, reconcile, document, and rebaseline the evolution set
     kind: closure
     dependencies:
       - W001
       - W002
       - W003
-    planned_baseline: git:ee86d59
+      - W005
+      - W006
+    planned_baseline: git:da790ff
     finding_ids:
       - F006
       - F007
@@ -326,7 +464,81 @@ work_items:
     non_effects:
       - The completed implementation campaign history is not rewritten.
       - User-owned .data content is not inspected or migrated.
+    lifecycle: pending
+    implementation_status: not evaluated
+    evidence_refs: []
+    blocker: null
+    checkpoint: null
+  - id: W005
+    order: 4
+    label: Correct review-exposed current-state and query defects
+    kind: implementation
+    dependencies:
+      - W003
+    planned_baseline: git:da790ff
+    finding_ids:
+      - F008
+      - F009
+      - F010
+      - F011
+    decision_ids:
+      - D001
+    authority:
+      - refs:
+          - VellisRequirements::atomicCanonicalRevision
+          - VellisRequirements::canonicalSnapshotCompleteness
+          - VellisRequirements::historyIndependentCurrentWork
+          - VellisRequirements::semanticQueryMeaning
+          - VellisVerification::invalidQuery
+        coverage: full
+        remaining_work_item_ids: []
+    approval:
+      status: not-required
+      reason: Accepted authority already distinguishes each review-exposed implementation and evidence defect.
+      checkpoint: null
+    nearest_wrong_system: Durable data is correct in isolation while multi-statement reads, endpoint narrowing, invalid identity handling, or integrity evidence still permit a wrong current answer.
+    compatibility_effect: Public valid-query meaning and durable history remain; no released database format requires migration.
+    non_effects:
+      - The accepted SQLite-owned live-state decision does not change.
+      - The completed source implementation campaign is not reopened or rewritten.
+      - User-owned .data content remains untouched.
     lifecycle: active
+    implementation_status: partial
+    evidence_refs: []
+    blocker: null
+    checkpoint: null
+  - id: W006
+    order: 5
+    label: Harden the portable evolution contract and Vellis bindings
+    kind: implementation
+    dependencies:
+      - W005
+    planned_baseline: git:da790ff
+    finding_ids:
+      - F012
+      - F013
+      - F014
+      - F015
+      - F016
+      - F017
+    decision_ids: []
+    authority:
+      - refs:
+          - .agents/skills/sysml-evolution/SKILL.md
+          - .agents/skills/sysml-evolution/references/evolution-record.md
+          - .agents/skills/sysml-evolution/references/evolution-execution.md
+        coverage: full
+        remaining_work_item_ids: []
+    approval:
+      status: not-required
+      reason: These corrections enforce the already documented portable method and project-binding boundary.
+      checkpoint: null
+    nearest_wrong_system: A plausible-looking record validates while duplicate, stale, unaudited, or impossible process state is hidden inside it.
+    compatibility_effect: The unreleased evolution schema can be corrected directly; project-specific checkpoint and evidence conventions stay in Vellis bindings.
+    non_effects:
+      - The portable core does not select Git, repositories, SQLite, Python, or Vellis vocabulary.
+      - The completed source implementation campaign is not rewritten.
+    lifecycle: pending
     implementation_status: not evaluated
     evidence_refs: []
     blocker: null

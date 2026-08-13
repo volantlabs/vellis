@@ -137,6 +137,38 @@ def test_an_external_commit_is_visible_without_a_resident_projection(tmp_path: P
         first.close()
 
 
+def test_complete_state_assembly_uses_one_cross_process_read_snapshot(tmp_path: Path) -> None:
+    path = tmp_path / "vellis.sqlite3"
+    reader = _established(tmp_path)
+    writer = RTGSystem.open(path)
+    committed = False
+
+    def commit_between_projection_statements(statement: str) -> None:
+        nonlocal committed
+        if committed or "FROM current_graph_object" not in statement:
+            return
+        committed = True
+        assert writer.apply_graph_change(
+            GraphChange(anchor_upserts=(Anchor("a-1", "person", "Ada"),)),
+            provenance=Provenance(initiator="other process"),
+        ).accepted
+
+    reader.store._connection.set_trace_callback(  # noqa: SLF001
+        commit_between_projection_statements
+    )
+    try:
+        state = reader.current_state()
+
+        assert committed
+        assert state.revision == 0
+        assert state.graph.anchors == ()
+        assert writer.current_state().revision == 1
+    finally:
+        reader.store._connection.set_trace_callback(None)  # noqa: SLF001
+        writer.close()
+        reader.close()
+
+
 def test_the_instrumentation_counts_a_real_record_access(tmp_path: Path) -> None:
     """Without this the zero-access assertions above would pass vacuously."""
     system = _established(tmp_path)

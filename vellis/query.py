@@ -271,16 +271,19 @@ class GraphQueryResult:
 class QueryCandidateIndex(Protocol):
     """The identity joins the query language needs from a current-state realization."""
 
-    def known_anchor_uuids(self, uuids: tuple[str, ...]) -> set[str]: ...
+    def known_anchor_uuids(self, anchor_type: str, uuids: tuple[str, ...]) -> set[str]: ...
 
-    def known_link_uuids(self, uuids: tuple[str, ...]) -> set[str]: ...
+    def known_link_uuids(self, link_type: str, uuids: tuple[str, ...]) -> set[str]: ...
 
     def anchor_candidates(
         self, group: AnchorGroup, allowed_uuids: frozenset[str] | None = None
     ) -> tuple[Anchor, ...]: ...
 
     def associated_data_candidates(
-        self, associated_data_type: str, anchor_uuid: str
+        self,
+        associated_data_type: str,
+        anchor_uuid: str,
+        allowed_uuids: frozenset[str] | None = None,
     ) -> tuple[AssociatedDataObject, ...]: ...
 
     def link_candidates(
@@ -315,11 +318,20 @@ class _InMemoryQueryIndex:
                 (link.source_uuid, link.target_uuid)
             )
 
-    def known_anchor_uuids(self, uuids: tuple[str, ...]) -> set[str]:
-        return set(uuids) & self._anchors_by_uuid.keys()
+    def known_anchor_uuids(self, anchor_type: str, uuids: tuple[str, ...]) -> set[str]:
+        return {
+            uuid
+            for uuid in uuids
+            if (anchor := self._anchors_by_uuid.get(uuid)) is not None
+            and anchor.type_key == anchor_type
+        }
 
-    def known_link_uuids(self, uuids: tuple[str, ...]) -> set[str]:
-        return set(uuids) & self._links_by_uuid.keys()
+    def known_link_uuids(self, link_type: str, uuids: tuple[str, ...]) -> set[str]:
+        return {
+            uuid
+            for uuid in uuids
+            if (link := self._links_by_uuid.get(uuid)) is not None and link.type_key == link_type
+        }
 
     def anchor_candidates(
         self, group: AnchorGroup, allowed_uuids: frozenset[str] | None = None
@@ -333,9 +345,15 @@ class _InMemoryQueryIndex:
         return tuple(anchor for anchor in candidates if anchor.uuid in permitted)
 
     def associated_data_candidates(
-        self, associated_data_type: str, anchor_uuid: str
+        self,
+        associated_data_type: str,
+        anchor_uuid: str,
+        allowed_uuids: frozenset[str] | None = None,
     ) -> tuple[AssociatedDataObject, ...]:
-        return tuple(self._data_by_type_and_anchor.get((associated_data_type, anchor_uuid), ()))
+        candidates = self._data_by_type_and_anchor.get((associated_data_type, anchor_uuid), ())
+        if allowed_uuids is None:
+            return tuple(candidates)
+        return tuple(data for data in candidates if data.uuid in allowed_uuids)
 
     def link_candidates(
         self, required: RequiredLink, source_uuid: str, target_uuid: str
@@ -445,7 +463,7 @@ def _group_findings(
             known=(
                 set()
                 if group.uuid_filter is None
-                else index.known_anchor_uuids(group.uuid_filter.uuids)
+                else index.known_anchor_uuids(group.anchor_type, group.uuid_filter.uuids)
             ),
             kind="anchor",
             findings=findings,
@@ -652,7 +670,7 @@ def _link_findings(
             known=(
                 set()
                 if link.uuid_filter is None
-                else index.known_link_uuids(link.uuid_filter.uuids)
+                else index.known_link_uuids(link.link_type, link.uuid_filter.uuids)
             ),
             kind="link",
             findings=findings,
@@ -987,15 +1005,9 @@ def _distinct_component_assignments(
 
 def _component_assignments(query: GraphQuery, index: QueryCandidateIndex):
     """Enumerate satisfying assignments within one connected selector component."""
-    anchor_group_names = frozenset(group.name for group in query.anchor_groups)
     link_pair_maps: dict[str, tuple[dict[str, set[str]], dict[str, set[str]]]] = {}
-    allowed_by_group: dict[str, frozenset[str]] = {}
+    allowed_by_endpoint: dict[str, frozenset[str]] = {}
     for required in query.required_links:
-        if (
-            required.source_group not in anchor_group_names
-            or required.target_group not in anchor_group_names
-        ):
-            continue
         targets_by_source: dict[str, set[str]] = {}
         sources_by_target: dict[str, set[str]] = {}
         for source_uuid, target_uuid in index.link_endpoint_pairs(required):
@@ -1006,10 +1018,10 @@ def _component_assignments(query: GraphQuery, index: QueryCandidateIndex):
             (required.source_group, frozenset(targets_by_source)),
             (required.target_group, frozenset(sources_by_target)),
         ):
-            prior = allowed_by_group.get(group_name)
-            allowed_by_group[group_name] = permitted if prior is None else prior & permitted
+            prior = allowed_by_endpoint.get(group_name)
+            allowed_by_endpoint[group_name] = permitted if prior is None else prior & permitted
     anchor_candidates = {
-        group.name: index.anchor_candidates(group, allowed_by_group.get(group.name))
+        group.name: index.anchor_candidates(group, allowed_by_endpoint.get(group.name))
         for group in query.anchor_groups
     }
     anchor_by_uuid = {
@@ -1062,7 +1074,27 @@ def _component_assignments(query: GraphQuery, index: QueryCandidateIndex):
             return
         condition = query.data_conditions[position]
         anchor = assignment.endpoints[condition.anchor_group]
-        for data in index.associated_data_candidates(condition.associated_data_type, anchor.uuid):
+        permitted = allowed_by_endpoint.get(condition.name)
+        for required in query.required_links:
+            pair_maps = link_pair_maps[required.name]
+            targets_by_source, sources_by_target = pair_maps
+            if (
+                required.target_group == condition.name
+                and required.source_group in assignment.endpoints
+            ):
+                source_uuid = assignment.endpoints[required.source_group].uuid
+                linked = frozenset(targets_by_source.get(source_uuid, ()))
+                permitted = linked if permitted is None else permitted & linked
+            elif (
+                required.source_group == condition.name
+                and required.target_group in assignment.endpoints
+            ):
+                target_uuid = assignment.endpoints[required.target_group].uuid
+                linked = frozenset(sources_by_target.get(target_uuid, ()))
+                permitted = linked if permitted is None else permitted & linked
+        for data in index.associated_data_candidates(
+            condition.associated_data_type, anchor.uuid, permitted
+        ):
             if not all(_satisfies(each, data) for each in condition.property_conditions):
                 continue
             yield from walk_conditions(

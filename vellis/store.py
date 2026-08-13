@@ -628,40 +628,57 @@ class CanonicalStore:
         """
         try:
             with self._lock:
-                row = self._connection.execute(
-                    "SELECT revision, established_by, projection_writes,"
-                    " sealed_projection_writes, active_definitions, definition_delta"
-                    " FROM current_state WHERE id = 0"
-                ).fetchone()
-                if not isinstance(row, tuple):
-                    raise NotInitializedError("no canonical state is established")
-                revision = _projection_revision(row)
-                _require_sealed_projection(row, 2)
-                state = CanonicalState(
-                    graph=self._current_graph_unlocked(),
-                    active_definitions=self._decode_current_definitions(row[4]),
-                    definition_delta=self._decode_current_delta(row[5]),
-                    revision=revision,
-                )
-                self._current_projection_decodes += 1
-                return state
+                self._connection.execute("BEGIN")
+                try:
+                    state = self._current_state_unlocked()
+                    self._connection.execute("COMMIT")
+                    return state
+                except BaseException:
+                    self._rollback_quietly()
+                    raise
         except sqlite3.Error as error:
             raise StoreError(f"could not read from the store at {self._path}: {error}") from error
+
+    def _current_state_unlocked(self) -> CanonicalState:
+        row = self._connection.execute(
+            "SELECT revision, established_by, projection_writes,"
+            " sealed_projection_writes, active_definitions, definition_delta"
+            " FROM current_state WHERE id = 0"
+        ).fetchone()
+        if not isinstance(row, tuple):
+            raise NotInitializedError("no canonical state is established")
+        revision = _projection_revision(row)
+        _require_sealed_projection(row, 2)
+        state = CanonicalState(
+            graph=self._current_graph_unlocked(),
+            active_definitions=self._decode_current_definitions(row[4]),
+            definition_delta=self._decode_current_delta(row[5]),
+            revision=revision,
+        )
+        self._current_projection_decodes += 1
+        return state
 
     def current_graph(self) -> Graph:
         """Assemble the complete current graph without reading canonical history."""
         try:
             with self._lock:
-                if self._connection.execute(INITIALIZED_SQL).fetchone() is None:
-                    raise NotInitializedError("no canonical state is established")
-                row = self._connection.execute(
-                    "SELECT revision, established_by, projection_writes,"
-                    " sealed_projection_writes FROM current_state WHERE id = 0"
-                ).fetchone()
-                assert isinstance(row, tuple)
-                _projection_revision(row)
-                _require_sealed_projection(row, 2)
-                return self._current_graph_unlocked()
+                self._connection.execute("BEGIN")
+                try:
+                    if self._connection.execute(INITIALIZED_SQL).fetchone() is None:
+                        raise NotInitializedError("no canonical state is established")
+                    row = self._connection.execute(
+                        "SELECT revision, established_by, projection_writes,"
+                        " sealed_projection_writes FROM current_state WHERE id = 0"
+                    ).fetchone()
+                    assert isinstance(row, tuple)
+                    _projection_revision(row)
+                    _require_sealed_projection(row, 2)
+                    graph = self._current_graph_unlocked()
+                    self._connection.execute("COMMIT")
+                    return graph
+                except BaseException:
+                    self._rollback_quietly()
+                    raise
         except sqlite3.Error as error:
             raise StoreError(f"could not read from the store at {self._path}: {error}") from error
 
@@ -979,6 +996,41 @@ class CanonicalStore:
             return revision, None
         record = _RecordRow(*row[2:])
         return revision, self._transition_from(record)
+
+    def snapshot_basis(
+        self,
+    ) -> tuple[
+        CanonicalState,
+        InitialStateRecord,
+        tuple[CanonicalTransitionRecord, ...],
+        str,
+    ]:
+        """Capture state and every value needed for its lineage in one read snapshot."""
+        try:
+            with self._lock:
+                self._connection.execute("BEGIN")
+                try:
+                    state = self._current_state_unlocked()
+                    initial = self.initial_record()
+                    transitions = self.transitions()
+                    identity = self.ledger_identity()
+                    if transitions and transitions[-1].resulting_revision != state.revision:
+                        raise StoreError(
+                            "the current projection and canonical ledger end at different revisions"
+                        )
+                    if not transitions and state.revision != initial.established_revision:
+                        raise StoreError(
+                            "the current projection and canonical history base disagree"
+                        )
+                    self._connection.execute("COMMIT")
+                    return state, initial, transitions, identity
+                except BaseException:
+                    self._rollback_quietly()
+                    raise
+        except sqlite3.Error as error:
+            raise StoreError(
+                f"could not capture a snapshot basis at {self._path}: {error}"
+            ) from error
 
     def revision_at(self, moment: datetime) -> int | None:
         """Return the greatest committed revision recorded at or before ``moment``.
@@ -1335,17 +1387,19 @@ class _SQLiteQueryIndex:
     def __init__(self, store: CanonicalStore) -> None:
         self._store = store
         self._anchors: dict[object, tuple[Anchor, ...]] = {}
-        self._data: dict[tuple[str, str], tuple[AssociatedDataObject, ...]] = {}
+        self._data: dict[
+            tuple[str, str, frozenset[str] | None], tuple[AssociatedDataObject, ...]
+        ] = {}
         self._links: dict[tuple[object, str, str], tuple[Link, ...]] = {}
         self._link_pairs: dict[object, frozenset[tuple[str, str]]] = {}
 
-    def known_anchor_uuids(self, uuids: tuple[str, ...]) -> set[str]:
-        return self._known_uuids(ObjectKind.ANCHOR, uuids)
+    def known_anchor_uuids(self, anchor_type: str, uuids: tuple[str, ...]) -> set[str]:
+        return self._known_uuids(ObjectKind.ANCHOR, anchor_type, uuids)
 
-    def known_link_uuids(self, uuids: tuple[str, ...]) -> set[str]:
-        return self._known_uuids(ObjectKind.LINK, uuids)
+    def known_link_uuids(self, link_type: str, uuids: tuple[str, ...]) -> set[str]:
+        return self._known_uuids(ObjectKind.LINK, link_type, uuids)
 
-    def _known_uuids(self, kind: ObjectKind, uuids: tuple[str, ...]) -> set[str]:
+    def _known_uuids(self, kind: ObjectKind, type_key: str, uuids: tuple[str, ...]) -> set[str]:
         if not uuids:
             return set()
         placeholders = ", ".join("?" for _ in uuids)
@@ -1353,8 +1407,8 @@ class _SQLiteQueryIndex:
             str(row[0])
             for row in self._store._connection.execute(  # noqa: SLF001
                 "SELECT uuid FROM current_graph_object"
-                f" WHERE object_kind = ? AND uuid IN ({placeholders})",
-                (kind.value, *uuids),
+                f" WHERE object_kind = ? AND type_key = ? AND uuid IN ({placeholders})",
+                (kind.value, type_key, *uuids),
             ).fetchall()
         }
 
@@ -1386,18 +1440,33 @@ class _SQLiteQueryIndex:
         return result
 
     def associated_data_candidates(
-        self, associated_data_type: str, anchor_uuid: str
+        self,
+        associated_data_type: str,
+        anchor_uuid: str,
+        allowed_uuids: frozenset[str] | None = None,
     ) -> tuple[AssociatedDataObject, ...]:
-        key = (associated_data_type, anchor_uuid)
+        key = (associated_data_type, anchor_uuid, allowed_uuids)
         cached = self._data.get(key)
         if cached is not None:
             return cached
+        clauses = ["da.anchor_uuid = ?", "o.object_kind = ?", "o.type_key = ?"]
+        parameters: list[object] = [
+            anchor_uuid,
+            ObjectKind.ASSOCIATED_DATA.value,
+            associated_data_type,
+        ]
+        if allowed_uuids is not None:
+            if not allowed_uuids:
+                return ()
+            placeholders = ", ".join("?" for _ in allowed_uuids)
+            clauses.append(f"o.uuid IN ({placeholders})")
+            parameters.extend(allowed_uuids)
         rows = self._store._connection.execute(  # noqa: SLF001
             "SELECT o.uuid, o.object_kind, o.type_key, o.source_uuid, o.target_uuid, o.payload"
             " FROM current_data_anchor AS da"
             " JOIN current_graph_object AS o ON o.uuid = da.data_uuid"
-            " WHERE da.anchor_uuid = ? AND o.object_kind = ? AND o.type_key = ?",
-            (anchor_uuid, ObjectKind.ASSOCIATED_DATA.value, associated_data_type),
+            " WHERE " + " AND ".join(clauses),
+            tuple(parameters),
         ).fetchall()
         result = tuple(self._data_from(rows))
         self._data[key] = result

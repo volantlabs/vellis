@@ -177,6 +177,11 @@ INVALID: tuple[tuple[str, GraphQuery, str], ...] = (
         "restricts unknown anchor UUID",
     ),
     (
+        "anchor-uuid-of-another-type",
+        _query(anchor_groups=(_people(uuid_filter=AnchorUuidFilter(uuids=("p-1",))),)),
+        "restricts unknown anchor UUID",
+    ),
+    (
         "unknown-link-uuid",
         _query(
             anchor_groups=(_people(), PROJECTS),

@@ -1094,17 +1094,10 @@ class RTGSystem:
         finished.
         """
         try:
-            revision, establishing = self._store.establishing_record()
-            state = self.current_state()
-            if state.revision != revision:
-                # Another writer committed between the two reads. A snapshot bound to a
-                # record that established a different revision is not a smaller capture;
-                # it is one of a state that never existed.
-                raise ConcurrentRevisionError(
-                    f"canonical state moved from revision {revision} to {state.revision} "
-                    "while it was being captured"
-                )
-            captured = self._identity_through(establishing)
+            state, initial, transitions, ledger_identity = self._store.snapshot_basis()
+            captured = record_identity(initial, follows=ledger_identity)
+            for transition in transitions:
+                captured = record_identity(transition, follows=captured)
         except NotInitializedError as error:
             result = SnapshotResult(
                 status=OperationStatus.REJECTED,
