@@ -9,7 +9,7 @@ evolution:
     reason: The owner accepted normalized SQLite state, prospective graph overlay, complete stored assessments with bounded retrieval, and streamed snapshots while preserving portable system meaning.
     checkpoint: git:8109ab24c4dc58d81fbfe2fee0181b395089a61d
   blocker: null
-  checkpoint: git:ce96868388086eb38253966d85b3dfb2e00ef0b5
+  checkpoint: git:369671bec766a0c6c72677f28c53d1efdcf1a330
 baselines:
   status: current
   source:
@@ -20,16 +20,16 @@ baselines:
     checkpoint: git:79840c2168e5d136571a89f7eb6ccd6ff7e56659
   target:
     model: sha256:23a0fa4c525a6e89ec0740c4d4f0af283cccae44abc23b73b99f7427d7c93c7e
-    implementation: git:ce96868388086eb38253966d85b3dfb2e00ef0b5
+    implementation: git:369671bec766a0c6c72677f28c53d1efdcf1a330
     language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
     execution_environment: sha256:c24a0bae1e63d1f4923d6c7925925ea4e02743568a84b403677b5f6a718879fa
-    checkpoint: git:ce96868388086eb38253966d85b3dfb2e00ef0b5
+    checkpoint: git:369671bec766a0c6c72677f28c53d1efdcf1a330
   observed:
     model: sha256:23a0fa4c525a6e89ec0740c4d4f0af283cccae44abc23b73b99f7427d7c93c7e
-    implementation: git:ce96868388086eb38253966d85b3dfb2e00ef0b5
+    implementation: git:369671bec766a0c6c72677f28c53d1efdcf1a330
     language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
     execution_environment: sha256:c24a0bae1e63d1f4923d6c7925925ea4e02743568a84b403677b5f6a718879fa
-    checkpoint: git:ce96868388086eb38253966d85b3dfb2e00ef0b5
+    checkpoint: git:369671bec766a0c6c72677f28c53d1efdcf1a330
 scope:
   authority_scope:
     - model/10-rtg-domain.sysml
@@ -268,8 +268,9 @@ decisions:
       - Ordinary current queries ignore prospective entries while explicit prospective queries evaluate the overlay.
       - Incompatible old and new states can cross in one assessed atomic activation.
       - Stale active bases block activation without discarding staged owner work.
-    implementation_status: not evaluated
-    evidence_refs: []
+    implementation_status: conforming
+    evidence_refs:
+      - command:uv run pytest tests/vellis/test_sqlite_prospective_state.py tests/vellis/test_definition_governance.py tests/vellis/test_current_work.py tests/vellis/test_graph_queries.py tests/vellis/test_graph_changes.py tests/vellis/test_store_integrity.py
   - id: D004
     summary: Canonical snapshot artifacts use incrementally hashed streamed NDJSON while SQLite remains the ordinary durable state store.
     authority_refs:
@@ -302,8 +303,9 @@ decisions:
       - One validation produces every finding once and records a complete count.
       - Bounded intervals retrieve the complete ordered set without revalidation.
       - Activation accepts only the exact current conforming prospective assessment.
-    implementation_status: not evaluated
-    evidence_refs: []
+    implementation_status: conforming
+    evidence_refs:
+      - command:uv run pytest tests/vellis/test_sqlite_prospective_state.py tests/vellis/test_definition_governance.py tests/vellis/test_current_work.py tests/vellis/test_graph_queries.py tests/vellis/test_graph_changes.py tests/vellis/test_store_integrity.py
   - id: D006
     summary: Production operations never construct or retain a complete Graph, CanonicalState, or definition-set aggregate.
     authority_refs:
@@ -483,11 +485,12 @@ work_items:
     non_effects:
       - Ordinary current queries and mutations ignore prospective state unless explicitly selected.
       - Rejected or stale activation preserves active and prospective state.
-    lifecycle: active
-    implementation_status: partial
-    evidence_refs: []
+    lifecycle: complete
+    implementation_status: conforming
+    evidence_refs:
+      - command:uv run pytest tests/vellis/test_current_work.py tests/vellis/test_graph_queries.py tests/vellis/test_graph_changes.py tests/vellis/test_store_integrity.py tests/vellis/test_sqlite_prospective_state.py tests/vellis/test_definition_governance.py
     blocker: null
-    checkpoint: null
+    checkpoint: git:369671bec766a0c6c72677f28c53d1efdcf1a330
   - id: W005
     order: 5
     label: Realize streaming snapshot, import, replay verification, and restoration
@@ -520,8 +523,8 @@ work_items:
     non_effects:
       - Snapshot completeness, record identity, tail lineage, and failure non-effects remain unchanged.
       - No user-owned store is inspected or migrated during implementation.
-    lifecycle: pending
-    implementation_status: not evaluated
+    lifecycle: active
+    implementation_status: partial
     evidence_refs: []
     blocker: null
     checkpoint: null
