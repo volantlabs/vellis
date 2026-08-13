@@ -39,6 +39,8 @@ __all__ = [
     "definition_entry_digest",
     "definition_identity",
     "definition_identity_from_stats",
+    "definition_set_stats_from_storage",
+    "proposal_definition_stats_from_storage",
     "insert_definition_entry",
     "insert_definition_entries",
     "insert_associated_data_value",
@@ -49,8 +51,14 @@ __all__ = [
     "load_object_value",
     "object_identity",
     "normalized_state_identity",
+    "adjust_semantic_summary",
+    "graph_entry_digest",
+    "proposal_entry_digest",
+    "recomputed_graph_summary",
     "semantic_identity",
     "semantic_row_summary",
+    "verify_state_summaries",
+    "verify_proposal_summaries",
     "verify_normalized_identities",
 ]
 
@@ -135,59 +143,90 @@ def semantic_row_summary(rows: Iterable[object]) -> tuple[int, str]:
     return count, f"{accumulator:064x}"
 
 
+_IDENTITY_MODULUS = 1 << 256
+
+
+def adjust_semantic_summary(
+    accumulator: str,
+    entry_count: int,
+    *,
+    removed: Iterable[str] = (),
+    added: Iterable[str] = (),
+) -> tuple[str, int]:
+    """Apply bounded member changes to one modular semantic summary."""
+    value = int(accumulator, 16)
+    count = entry_count
+    for digest in removed:
+        value = (value - int(digest, 16)) % _IDENTITY_MODULUS
+        count -= 1
+    for digest in added:
+        value = (value + int(digest, 16)) % _IDENTITY_MODULUS
+        count += 1
+    if count < 0:
+        raise ValueError("a semantic summary cannot contain a negative number of entries")
+    return f"{value:064x}", count
+
+
+def graph_entry_digest(uuid: str, content_identity: str) -> str:
+    """Return one current graph membership's independently composable digest."""
+    return semantic_identity((uuid, content_identity))
+
+
+def proposal_entry_digest(
+    uuid: str, object_kind: str, operation: str, content_identity: str | None
+) -> str:
+    """Return one keyed proposal entry's path-independent digest."""
+    return semantic_identity((uuid, object_kind, operation, content_identity))
+
+
+def recomputed_graph_summary(connection: Connection) -> tuple[int, str]:
+    """Recompute current graph meaning for an explicit full-state integrity boundary."""
+    return semantic_row_summary(
+        (str(uuid), str(identity))
+        for uuid, identity in connection.execute(
+            "SELECT c.uuid, v.content_identity FROM current_graph_object AS c"
+            " JOIN object_value AS v ON v.id = c.object_value_id"
+        )
+    )
+
+
 def normalized_state_identity(connection: Connection) -> str:
-    """Commit to the complete normalized current/prospective meaning in bounded memory."""
+    """Commit to normalized current/prospective meaning from maintained summaries."""
     head = connection.execute(
-        "SELECT revision, active_definition_set_id, proposed_definition_set_id"
+        "SELECT revision, active_definition_set_id, proposed_definition_set_id,"
+        " graph_entry_count, graph_accumulator"
         " FROM state_head WHERE id = 0"
     ).fetchone()
     if head is None:
         raise ValueError("normalized state has no head")
-    graph = semantic_row_summary(
-        (str(uuid), str(identity))
-        for uuid, identity in connection.execute(
-            "SELECT c.uuid, v.content_identity FROM current_graph_object AS c"
-            " JOIN object_value AS v ON v.id = c.object_value_id ORDER BY c.uuid"
-        )
-    )
-    overlay = semantic_row_summary(
-        (
-            str(uuid),
-            str(kind),
-            str(operation),
-            None if identity is None else str(identity),
-        )
-        for uuid, kind, operation, identity in connection.execute(
-            "SELECT p.uuid, p.object_kind, p.operation, v.content_identity"
-            " FROM proposal_entry AS p LEFT JOIN object_value AS v ON v.id = p.object_value_id"
-            " ORDER BY p.uuid"
-        )
-    )
-    definition_overlay = semantic_row_summary(
-        (
-            str(entity_kind),
-            str(natural_key),
-            str(operation),
-            None if value_set_id is None else str(value_set_id),
-        )
-        for entity_kind, natural_key, operation, value_set_id in connection.execute(
-            "SELECT 'type', type_key, operation, value_set_id"
-            " FROM proposal_definition_type"
-            " UNION ALL SELECT 'relationship', natural_key, operation, value_set_id"
-            " FROM proposal_definition_relationship ORDER BY 1, 2"
-        )
-    )
+    overlay = connection.execute(
+        "SELECT accumulator, entry_count FROM proposal_overlay_state WHERE id = 0"
+    ).fetchone()
+    if overlay is None:
+        raise ValueError("normalized state has no proposal-overlay summary")
     return semantic_identity(
         (
             "normalizedState",
             int(head[0]),
             str(head[1]),
             None if head[2] is None else str(head[2]),
-            graph,
-            overlay,
-            definition_overlay,
+            (int(head[3]), str(head[4])),
+            semantic_identity(("graphOverlay", str(overlay[0]), int(overlay[1]))),
         )
     )
+
+
+def verify_state_summaries(connection: Connection) -> str | None:
+    """Return the first maintained-state summary that differs from normalized rows."""
+    head = connection.execute(
+        "SELECT graph_entry_count, graph_accumulator FROM state_head WHERE id = 0"
+    ).fetchone()
+    if head is None:
+        return "normalized state has no maintained graph summary"
+    actual_count, actual_accumulator = recomputed_graph_summary(connection)
+    if (int(head[0]), str(head[1])) != (actual_count, actual_accumulator):
+        return "current graph summary does not match its normalized rows"
+    return None
 
 
 def json_storage_fields(value: JsonValue) -> tuple[str, int | None, str | None, str | None]:
@@ -385,9 +424,6 @@ def load_object_value(connection: Connection, value_id: int) -> GraphObject:
     return Link(str(uuid), str(type_key), str(source_uuid), str(target_uuid), system_metadata)
 
 
-_IDENTITY_MODULUS = 1 << 256
-
-
 def _definition_members(definitions: GraphDefinitionSet) -> tuple[object, ...]:
     """Return independently hashable members of unordered definition-set meaning."""
 
@@ -510,6 +546,243 @@ def definition_identity(definitions: GraphDefinitionSet) -> str:
     return definition_identity_from_stats(*definition_content_stats(definitions))
 
 
+def definition_set_stats_from_storage(connection: Connection, identity: str) -> tuple[str, int]:
+    """Recompute one physical or structurally shared definition-set summary."""
+    overlay = connection.execute(
+        "SELECT base_definition_set_id FROM definition_set_overlay WHERE definition_set_id = ?",
+        (identity,),
+    ).fetchone()
+    if overlay is None:
+        accumulator = 0
+        count = 0
+        for (type_key,) in connection.execute(
+            "SELECT DISTINCT type_key FROM definition_type WHERE definition_set_id = ?",
+            (identity,),
+        ):
+            value = load_definition_set(
+                connection, identity, type_keys={str(type_key)}, relationship_keys=set()
+            )
+            digest, member_count = definition_content_stats(value)
+            accumulator = (accumulator + int(digest, 16)) % _IDENTITY_MODULUS
+            count += member_count
+        for (natural_key,) in connection.execute(
+            "SELECT DISTINCT natural_key FROM definition_multiplicity_rule"
+            " WHERE definition_set_id = ?",
+            (identity,),
+        ):
+            value = load_definition_set(
+                connection, identity, type_keys=set(), relationship_keys={str(natural_key)}
+            )
+            digest, member_count = definition_content_stats(value)
+            accumulator = (accumulator + int(digest, 16)) % _IDENTITY_MODULUS
+            count += member_count
+        return f"{accumulator:064x}", count
+
+    base_identity = str(overlay[0])
+    base = connection.execute(
+        "SELECT content_accumulator, entry_count FROM definition_set WHERE identity = ?",
+        (base_identity,),
+    ).fetchone()
+    if base is None:
+        raise ValueError(f"unknown base definition-set identity {base_identity!r}")
+    accumulator, count = int(str(base[0]), 16), int(base[1])
+    for key, operation, value_set_id in connection.execute(
+        "SELECT type_key, operation, value_set_id FROM definition_set_type_override"
+        " WHERE definition_set_id = ?",
+        (identity,),
+    ):
+        prior_digest, prior_count = _definition_entry_stats_from_storage(
+            connection, base_identity, "type", str(key)
+        )
+        accumulator = (accumulator - int(prior_digest, 16)) % _IDENTITY_MODULUS
+        count -= prior_count
+        if operation == "upsert":
+            value = connection.execute(
+                "SELECT content_accumulator, entry_count FROM definition_set WHERE identity = ?",
+                (value_set_id,),
+            ).fetchone()
+            if value is None:
+                raise ValueError("definition override names an unknown value")
+            accumulator = (accumulator + int(str(value[0]), 16)) % _IDENTITY_MODULUS
+            count += int(value[1])
+    for key, operation, value_set_id in connection.execute(
+        "SELECT natural_key, operation, value_set_id"
+        " FROM definition_set_relationship_override WHERE definition_set_id = ?",
+        (identity,),
+    ):
+        prior_digest, prior_count = _definition_entry_stats_from_storage(
+            connection, base_identity, "relationship", str(key)
+        )
+        accumulator = (accumulator - int(prior_digest, 16)) % _IDENTITY_MODULUS
+        count -= prior_count
+        if operation == "upsert":
+            value = connection.execute(
+                "SELECT content_accumulator, entry_count FROM definition_set WHERE identity = ?",
+                (value_set_id,),
+            ).fetchone()
+            if value is None:
+                raise ValueError("definition override names an unknown value")
+            accumulator = (accumulator + int(str(value[0]), 16)) % _IDENTITY_MODULUS
+            count += int(value[1])
+    return f"{accumulator:064x}", count
+
+
+def _definition_entry_stats_from_storage(
+    connection: Connection, identity: str, entity_kind: str, key: str
+) -> tuple[str, int]:
+    overlay = connection.execute(
+        "SELECT base_definition_set_id FROM definition_set_overlay WHERE definition_set_id = ?",
+        (identity,),
+    ).fetchone()
+    if overlay is not None:
+        table, column = (
+            ("definition_set_type_override", "type_key")
+            if entity_kind == "type"
+            else ("definition_set_relationship_override", "natural_key")
+        )
+        override = connection.execute(
+            f"SELECT operation, value_set_id FROM {table}"  # noqa: S608
+            f" WHERE definition_set_id = ? AND {column} = ?",  # noqa: S608
+            (identity, key),
+        ).fetchone()
+        if override is not None:
+            if override[0] == "delete":
+                return "0" * 64, 0
+            row = connection.execute(
+                "SELECT content_accumulator, entry_count FROM definition_set WHERE identity = ?",
+                (override[1],),
+            ).fetchone()
+            if row is None:
+                raise ValueError("definition override names an unknown value")
+            return str(row[0]), int(row[1])
+        return _definition_entry_stats_from_storage(connection, str(overlay[0]), entity_kind, key)
+    value = load_definition_set(
+        connection,
+        identity,
+        type_keys={key} if entity_kind == "type" else set(),
+        relationship_keys={key} if entity_kind == "relationship" else set(),
+    )
+    return definition_content_stats(value)
+
+
+def proposal_definition_stats_from_storage(connection: Connection) -> tuple[str, int]:
+    """Recompute the effective proposal summary from active meaning and sparse edits."""
+    head = connection.execute(
+        "SELECT active_definition_set_id FROM state_head WHERE id = 0"
+    ).fetchone()
+    if head is None:
+        raise ValueError("proposal definitions have no active base")
+    active_identity = str(head[0])
+    active = connection.execute(
+        "SELECT content_accumulator, entry_count FROM definition_set WHERE identity = ?",
+        (active_identity,),
+    ).fetchone()
+    if active is None:
+        raise ValueError("proposal definitions name an unknown active set")
+    accumulator, count = int(str(active[0]), 16), int(active[1])
+    for entity_kind, key, operation, value_set_id in connection.execute(
+        "SELECT 'type', type_key, operation, value_set_id FROM proposal_definition_type"
+        " UNION ALL SELECT 'relationship', natural_key, operation, value_set_id"
+        " FROM proposal_definition_relationship"
+    ):
+        prior_digest, prior_count = _definition_entry_stats_from_storage(
+            connection, active_identity, str(entity_kind), str(key)
+        )
+        accumulator = (accumulator - int(prior_digest, 16)) % _IDENTITY_MODULUS
+        count -= prior_count
+        if operation == "upsert":
+            value = connection.execute(
+                "SELECT content_accumulator, entry_count FROM definition_set WHERE identity = ?",
+                (value_set_id,),
+            ).fetchone()
+            if value is None:
+                raise ValueError("proposal definition edit names an unknown value")
+            accumulator = (accumulator + int(str(value[0]), 16)) % _IDENTITY_MODULUS
+            count += int(value[1])
+    return f"{accumulator:064x}", count
+
+
+def verify_proposal_summaries(connection: Connection) -> str | None:
+    """Verify every maintained sparse-proposal summary and cross-row identity."""
+    overlay = connection.execute(
+        "SELECT accumulator, entry_count FROM proposal_overlay_state WHERE id = 0"
+    ).fetchone()
+    if overlay is None:
+        return "proposal overlay has no summary state"
+    actual_count = int(connection.execute("SELECT count(*) FROM proposal_entry").fetchone()[0])
+    actual_accumulator = 0
+    for uuid, kind, operation, identity in connection.execute(
+        "SELECT p.uuid, p.object_kind, p.operation, v.content_identity"
+        " FROM proposal_entry AS p LEFT JOIN object_value AS v ON v.id = p.object_value_id"
+    ):
+        actual_accumulator ^= int(
+            proposal_entry_digest(
+                str(uuid),
+                str(kind),
+                str(operation),
+                None if identity is None else str(identity),
+            ),
+            16,
+        )
+    if (str(overlay[0]), int(overlay[1])) != (f"{actual_accumulator:064x}", actual_count):
+        return "proposal overlay summary does not match its entries"
+    actual_counts = {
+        (str(kind), str(operation)): int(count)
+        for kind, operation, count in connection.execute(
+            "SELECT object_kind, operation, count(*) FROM proposal_entry"
+            " GROUP BY object_kind, operation"
+        )
+    }
+    stored_counts = {
+        (str(kind), str(operation)): int(count)
+        for kind, operation, count in connection.execute(
+            "SELECT object_kind, operation, entry_count FROM proposal_overlay_count"
+        )
+    }
+    if actual_counts != {key: value for key, value in stored_counts.items() if value}:
+        return "proposal overlay counts do not match its entries"
+    definition = connection.execute(
+        "SELECT accumulator, entry_count, effective_accumulator, effective_entry_count, identity"
+        " FROM proposal_definition_state WHERE id = 0"
+    ).fetchone()
+    if definition is None:
+        return "proposal definitions have no summary state"
+    edit_accumulator = 0
+    edit_count = 0
+    for key, operation, value in connection.execute(
+        "SELECT type_key, operation, value_set_id FROM proposal_definition_type"
+        " UNION ALL SELECT natural_key, operation, value_set_id"
+        " FROM proposal_definition_relationship"
+    ):
+        edit_accumulator ^= int(
+            semantic_identity((str(key), str(operation), None if value is None else str(value))),
+            16,
+        )
+        edit_count += 1
+    if (str(definition[0]), int(definition[1])) != (
+        f"{edit_accumulator:064x}",
+        edit_count,
+    ):
+        return "proposal definition summary does not match its keyed edits"
+    if definition[4] is None:
+        if any(value is not None for value in definition[2:]):
+            return "absent proposal definitions retain effective summary state"
+        return None
+    if definition[2] is None or definition[3] is None:
+        return "proposal definition identity has no effective content summary"
+    actual_effective = proposal_definition_stats_from_storage(connection)
+    if (str(definition[2]), int(definition[3])) != actual_effective:
+        return "proposal effective definition summary does not match its normalized edits"
+    if definition_identity_from_stats(*actual_effective) != str(definition[4]):
+        return "proposal definition identity does not match its effective content summary"
+    head = connection.execute(
+        "SELECT proposed_definition_set_id FROM state_head WHERE id = 0"
+    ).fetchone()
+    if head is None or str(head[0]) != str(definition[4]):
+        return "proposal definition identity does not match the state head"
+    return None
+
+
 def verify_normalized_identities(connection: Connection) -> str | None:
     """Return the first stale normalized content identity using bounded entry loads."""
     for value_id, stored_identity in connection.execute(
@@ -525,6 +798,24 @@ def verify_normalized_identities(connection: Connection) -> str | None:
     for (set_identity,) in connection.execute(
         "SELECT identity FROM definition_set ORDER BY identity"
     ):
+        overlay = connection.execute(
+            "SELECT 1 FROM definition_set_overlay WHERE definition_set_id = ?",
+            (set_identity,),
+        ).fetchone()
+        if overlay is not None:
+            computed_accumulator, count = definition_set_stats_from_storage(
+                connection, str(set_identity)
+            )
+            stored = connection.execute(
+                "SELECT content_accumulator, entry_count FROM definition_set WHERE identity = ?",
+                (set_identity,),
+            ).fetchone()
+            assert stored is not None
+            if (str(stored[0]), int(stored[1])) != (computed_accumulator, count):
+                return f"definition set {set_identity} does not match its content summary"
+            if definition_identity_from_stats(computed_accumulator, count) != str(set_identity):
+                return f"definition set {set_identity} does not match its semantic identity"
+            continue
         accumulator = 0
         count = 0
         for (type_key,) in connection.execute(
@@ -565,6 +856,26 @@ def verify_normalized_identities(connection: Connection) -> str | None:
             return f"definition set {set_identity} does not match its content summary"
         if definition_identity_from_stats(computed_accumulator, count) != str(set_identity):
             return f"definition set {set_identity} does not match its semantic identity"
+    head = connection.execute(
+        "SELECT active_definition_set_id FROM state_head WHERE id = 0"
+    ).fetchone()
+    if head is not None:
+        accumulator = 0
+        count = 0
+        for entity_kind, source_table, source_key in (
+            ("type", "current_definition_type_source", "type_key"),
+            ("relationship", "current_definition_relationship_source", "natural_key"),
+        ):
+            for key, value_set_id in connection.execute(
+                f"SELECT {source_key}, value_set_id FROM {source_table}"  # noqa: S608
+            ):
+                entry_accumulator, entry_count = _definition_entry_stats_from_storage(
+                    connection, str(value_set_id), entity_kind, str(key)
+                )
+                accumulator = (accumulator + int(entry_accumulator, 16)) % _IDENTITY_MODULUS
+                count += entry_count
+        if definition_identity_from_stats(f"{accumulator:064x}", count) != str(head[0]):
+            return "current definition membership does not match the active definition identity"
     return None
 
 
@@ -875,6 +1186,122 @@ def load_definition_set(
         is None
     ):
         raise ValueError(f"unknown definition-set identity {identity!r}")
+    overlay = connection.execute(
+        "SELECT base_definition_set_id FROM definition_set_overlay WHERE definition_set_id = ?",
+        (identity,),
+    ).fetchone()
+    if overlay is not None:
+        base = load_definition_set(
+            connection,
+            str(overlay[0]),
+            type_keys=type_keys,
+            constrained_type_keys=constrained_type_keys,
+            relationship_keys=relationship_keys,
+        )
+        anchor_map = {value.type_key: value for value in base.anchor_types}
+        data_type_map = {value.type_key: value for value in base.associated_data_types}
+        link_type_map = {value.type_key: value for value in base.link_types}
+        relationship_map = {
+            semantic_identity(relationship_identity(value)): value
+            for value in base.relationship_constraints
+        }
+        type_sql = (
+            "SELECT type_key, operation, value_set_id FROM definition_set_type_override"
+            " WHERE definition_set_id = ?"
+        )
+        overlay_type_parameters: tuple[object, ...] = (identity,)
+        if type_keys is not None:
+            if not type_keys:
+                type_rows = ()
+            else:
+                marks = ", ".join("?" for _ in type_keys)
+                type_rows = connection.execute(
+                    type_sql + f" AND type_key IN ({marks})",
+                    (identity, *sorted(type_keys)),
+                )
+        else:
+            type_rows = connection.execute(type_sql, overlay_type_parameters)
+        for key, operation, value_set_id in type_rows:
+            text_key = str(key)
+            anchor_map.pop(text_key, None)
+            data_type_map.pop(text_key, None)
+            link_type_map.pop(text_key, None)
+            if operation != "upsert":
+                continue
+            value = load_definition_set(
+                connection,
+                str(value_set_id),
+                type_keys={text_key},
+                relationship_keys=set(),
+                one_entry=True,
+            )
+            anchor_map.update((entry.type_key, entry) for entry in value.anchor_types)
+            data_type_map.update((entry.type_key, entry) for entry in value.associated_data_types)
+            link_type_map.update((entry.type_key, entry) for entry in value.link_types)
+        relationship_sql = (
+            "SELECT natural_key, operation, value_set_id"
+            " FROM definition_set_relationship_override WHERE definition_set_id = ?"
+        )
+        overlay_relationship_parameters: tuple[object, ...] = (identity,)
+        if relationship_keys is not None:
+            if not relationship_keys:
+                relationship_rows = ()
+            else:
+                marks = ", ".join("?" for _ in relationship_keys)
+                relationship_rows = connection.execute(
+                    relationship_sql + f" AND natural_key IN ({marks})",
+                    (identity, *sorted(relationship_keys)),
+                )
+        else:
+            relationship_rows = connection.execute(
+                relationship_sql, overlay_relationship_parameters
+            )
+        for key, operation, value_set_id in relationship_rows:
+            text_key = str(key)
+            if constrained_type_keys is not None and text_key not in relationship_map:
+                if operation != "upsert":
+                    continue
+                candidate = load_definition_set(
+                    connection,
+                    str(value_set_id),
+                    type_keys=set(),
+                    relationship_keys={text_key},
+                    one_entry=True,
+                )
+                if not any(
+                    type_key in constrained_type_keys
+                    for rule in candidate.relationship_constraints
+                    for type_key in (
+                        rule.constrained_endpoint_type_keys
+                        if isinstance(rule, LinkMultiplicityConstraint)
+                        else (
+                            rule.anchor_type_keys
+                            if rule.constrained_end.value == "anchor"
+                            else rule.associated_data_type_keys
+                        )
+                    )
+                ):
+                    continue
+            relationship_map.pop(text_key, None)
+            if operation != "upsert":
+                continue
+            value = load_definition_set(
+                connection,
+                str(value_set_id),
+                type_keys=set(),
+                relationship_keys={text_key},
+                one_entry=True,
+            )
+            relationship_map.update(
+                (semantic_identity(relationship_identity(entry)), entry)
+                for entry in value.relationship_constraints
+            )
+        return GraphDefinitionSet(
+            tuple(anchor_map[key] for key in sorted(anchor_map)),
+            tuple(data_type_map[key] for key in sorted(data_type_map)),
+            tuple(link_type_map[key] for key in sorted(link_type_map)),
+            tuple(relationship_map[key] for key in sorted(relationship_map)),
+        )
     anchors: list[AnchorTypeDefinition] = []
     data_types: list[AssociatedDataTypeDefinition] = []
     link_types: list[LinkTypeDefinition] = []

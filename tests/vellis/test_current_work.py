@@ -313,7 +313,7 @@ def test_broad_query_hydrates_only_the_bounded_answer(tmp_path: Path) -> None:
         system.close()
 
 
-def test_schema_four_has_no_whole_state_definition_object_or_change_payloads(
+def test_schema_five_has_no_whole_state_definition_object_or_change_payloads(
     tmp_path: Path,
 ) -> None:
     system = _established(tmp_path)
@@ -321,7 +321,7 @@ def test_schema_four_has_no_whole_state_definition_object_or_change_payloads(
         connection = system.store._connection  # noqa: SLF001
         assert connection.execute(
             "SELECT value FROM schema_meta WHERE key = 'schema_version'"
-        ).fetchone() == ("4",)
+        ).fetchone() == ("5",)
         forbidden = {"payload", "state", "graph", "definitions", "canonical_change"}
         for table in (
             "canonical_record",

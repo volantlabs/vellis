@@ -133,7 +133,7 @@ Use these words precisely:
   with bounded finding retrieval; fresh initialization from a streamed initial definition set at
   revision 0 with one initial-state
   record, no transitions, and an empty activity ledger; a
-  schema-version-4 local SQLite store that owns normalized current, prospective, historical, and
+  schema-version-5 local SQLite store that owns normalized current, prospective, historical, and
   ledger state, recovers identical memory across an ordinary restart, commits the canonical record
   and its addressable graph, definition, and proposal projections as one effect, and refuses a
   foreign or unsupported-version database. Complete assessments are published and retained as
@@ -141,6 +141,8 @@ Use these words precisely:
   resident graph, definition-set document, canonical-state document, or canonical-change document.
   Explicit graph changes are committed atomically as contiguous canonical transitions after
   validating their complete affected invariant closure; unaffected valid state is not revalidated.
+  Current graph and prospective-overlay semantic summaries are maintained in the same transaction
+  as their normalized rows, so sealing an ordinary transition does not rescan either population.
   The typed graph-conformance report and current definition discovery provide the complete
   shallow anchor vocabulary and the complete focused neighborhood of each selected anchor, each
   carrying the revision it was evaluated at so a caller can tell that the ground moved;
@@ -264,7 +266,7 @@ Use these words precisely:
   installed.
 
 Deployment realization remains open. This unreleased build intentionally starts a fresh normalized
-schema-version-4 store and refuses unsupported prototype schema versions rather than migrating them;
+schema-version-5 store and refuses unsupported prototype schema versions rather than migrating them;
 it never inspects or changes this repository's ignored `.data/` content during development. The
 initial contract assumes one trusted
 owner-configured client; its tools do not implement per-call authorization or decide owner approval.

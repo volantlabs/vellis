@@ -83,10 +83,12 @@ from vellis.graph import (
 )
 from vellis.json_value import JsonKind, json_equal
 from vellis.normalized import (
+    adjust_semantic_summary,
     definition_content_stats,
     definition_entry_digest,
     definition_identity,
     definition_identity_from_stats,
+    graph_entry_digest,
     insert_definition_entries,
     insert_definition_entry,
     insert_object_value,
@@ -96,8 +98,12 @@ from vellis.normalized import (
     load_object_value,
     normalized_state_identity,
     object_identity,
+    proposal_definition_stats_from_storage,
+    recomputed_graph_summary,
     semantic_identity,
     semantic_row_summary,
+    verify_proposal_summaries,
+    verify_state_summaries,
 )
 from vellis.outcomes import (
     OperationStatus,
@@ -125,7 +131,7 @@ __all__ = [
     "holds_established_memory",
 ]
 
-SCHEMA_VERSION = "4"
+SCHEMA_VERSION = "5"
 
 # The next ledger position. Counting rows would traverse the whole prefix on every
 # commit, which is exactly the work history-independent current operations may not do;
@@ -201,6 +207,32 @@ CREATE TABLE definition_set (
     content_accumulator TEXT NOT NULL,
     entry_count INTEGER NOT NULL
 );
+CREATE TABLE definition_set_overlay (
+    definition_set_id TEXT PRIMARY KEY REFERENCES definition_set(identity),
+    base_definition_set_id TEXT NOT NULL REFERENCES definition_set(identity)
+);
+CREATE TABLE definition_set_type_override (
+    definition_set_id TEXT NOT NULL REFERENCES definition_set(identity),
+    type_key TEXT NOT NULL,
+    operation TEXT NOT NULL CHECK (operation IN ('upsert', 'delete')),
+    value_set_id TEXT REFERENCES definition_set(identity),
+    PRIMARY KEY (definition_set_id, type_key)
+);
+CREATE TABLE definition_set_relationship_override (
+    definition_set_id TEXT NOT NULL REFERENCES definition_set(identity),
+    natural_key TEXT NOT NULL,
+    operation TEXT NOT NULL CHECK (operation IN ('upsert', 'delete')),
+    value_set_id TEXT REFERENCES definition_set(identity),
+    PRIMARY KEY (definition_set_id, natural_key)
+);
+CREATE TABLE current_definition_type_source (
+    type_key TEXT PRIMARY KEY,
+    value_set_id TEXT NOT NULL REFERENCES definition_set(identity)
+);
+CREATE TABLE current_definition_relationship_source (
+    natural_key TEXT PRIMARY KEY,
+    value_set_id TEXT NOT NULL REFERENCES definition_set(identity)
+);
 CREATE TABLE definition_type (
     definition_set_id TEXT NOT NULL REFERENCES definition_set(identity),
     occurrence INTEGER NOT NULL,
@@ -210,6 +242,8 @@ CREATE TABLE definition_type (
     PRIMARY KEY (definition_set_id, occurrence)
 );
 CREATE INDEX definition_type_lookup ON definition_type(definition_set_id, object_kind, type_key);
+CREATE INDEX definition_type_natural_key
+    ON definition_type(definition_set_id, type_key, occurrence);
 CREATE TABLE definition_anchor_permission (
     definition_set_id TEXT NOT NULL,
     type_occurrence INTEGER NOT NULL,
@@ -219,6 +253,14 @@ CREATE TABLE definition_anchor_permission (
     FOREIGN KEY (definition_set_id, type_occurrence)
       REFERENCES definition_type(definition_set_id, occurrence)
 );
+CREATE INDEX definition_anchor_permission_reverse
+    ON definition_anchor_permission(definition_set_id, anchor_type_key, type_occurrence);
+CREATE INDEX definition_anchor_permission_by_type
+    ON definition_anchor_permission(anchor_type_key, definition_set_id, type_occurrence);
+CREATE INDEX definition_anchor_permission_forward
+    ON definition_anchor_permission(
+        definition_set_id, type_occurrence, occurrence, anchor_type_key
+    );
 CREATE TABLE definition_property_rule (
     definition_set_id TEXT NOT NULL,
     type_occurrence INTEGER NOT NULL,
@@ -267,6 +309,14 @@ CREATE TABLE definition_endpoint_permission (
     FOREIGN KEY (definition_set_id, type_occurrence)
       REFERENCES definition_type(definition_set_id, occurrence)
 );
+CREATE INDEX definition_endpoint_permission_reverse
+    ON definition_endpoint_permission(definition_set_id, type_key, type_occurrence, role);
+CREATE INDEX definition_endpoint_permission_by_type
+    ON definition_endpoint_permission(type_key, definition_set_id, type_occurrence, role);
+CREATE INDEX definition_endpoint_permission_forward
+    ON definition_endpoint_permission(
+        definition_set_id, type_occurrence, role, occurrence, type_key
+    );
 CREATE TABLE definition_multiplicity_rule (
     definition_set_id TEXT NOT NULL REFERENCES definition_set(identity),
     occurrence INTEGER NOT NULL,
@@ -279,6 +329,8 @@ CREATE TABLE definition_multiplicity_rule (
     description TEXT,
     PRIMARY KEY (definition_set_id, occurrence)
 );
+CREATE UNIQUE INDEX definition_multiplicity_natural_key
+    ON definition_multiplicity_rule(definition_set_id, natural_key, occurrence);
 CREATE TABLE definition_multiplicity_participant (
     definition_set_id TEXT NOT NULL,
     rule_occurrence INTEGER NOT NULL,
@@ -289,6 +341,14 @@ CREATE TABLE definition_multiplicity_participant (
     FOREIGN KEY (definition_set_id, rule_occurrence)
       REFERENCES definition_multiplicity_rule(definition_set_id, occurrence)
 );
+CREATE INDEX definition_multiplicity_participant_reverse
+    ON definition_multiplicity_participant(definition_set_id, type_key, role, rule_occurrence);
+CREATE INDEX definition_multiplicity_participant_by_type
+    ON definition_multiplicity_participant(type_key, definition_set_id, role, rule_occurrence);
+CREATE INDEX definition_multiplicity_participant_forward
+    ON definition_multiplicity_participant(
+        definition_set_id, rule_occurrence, role, occurrence, type_key
+    );
 CREATE TABLE object_value (
     id INTEGER PRIMARY KEY,
     content_identity TEXT NOT NULL UNIQUE,
@@ -342,7 +402,9 @@ CREATE TABLE state_head (
     revision       INTEGER NOT NULL,
     established_by INTEGER NOT NULL REFERENCES canonical_record (established_revision),
     active_definition_set_id TEXT NOT NULL REFERENCES definition_set(identity),
-    proposed_definition_set_id TEXT
+    proposed_definition_set_id TEXT,
+    graph_entry_count INTEGER NOT NULL,
+    graph_accumulator TEXT NOT NULL
 );
 CREATE TABLE graph_presence_interval (
     uuid TEXT NOT NULL,
@@ -370,6 +432,8 @@ CREATE INDEX graph_presence_current_link_target
     WHERE valid_to_revision IS NULL AND object_kind = 'link';
 CREATE INDEX graph_presence_revision
     ON graph_presence_interval(valid_from_revision, valid_to_revision, uuid);
+CREATE INDEX graph_presence_uuid_revision
+    ON graph_presence_interval(uuid, valid_from_revision, valid_to_revision);
 CREATE VIEW current_graph_object AS
 SELECT p.uuid, p.object_kind, p.type_key, p.source_uuid, p.target_uuid, p.object_value_id
 FROM graph_presence_interval p
@@ -768,6 +832,8 @@ def _screen_marker(connection: sqlite3.Connection, path: Path) -> None:
         "established_by",
         "active_definition_set_id",
         "proposed_definition_set_id",
+        "graph_entry_count",
+        "graph_accumulator",
     }
     if not required.issubset(columns):
         missing = ", ".join(sorted(required - columns))
@@ -1552,25 +1618,42 @@ class CanonicalStore:
                         prospective=prospective, revision=revision
                     )
                 )
-                if not prospective:
-                    rows = self._connection.execute(
-                        "SELECT type_key, description FROM definition_type"
-                        " WHERE definition_set_id = ? AND object_kind = 'anchor'"
-                        " ORDER BY type_key",
-                        (active_identity,),
+                active_rows = (
+                    "SELECT t.type_key, t.description"
+                    " FROM current_definition_type_source AS s"
+                    " JOIN definition_type AS t ON t.definition_set_id = s.value_set_id"
+                    " AND t.type_key = s.type_key WHERE t.object_kind = 'anchor'"
+                )
+                if revision is not None:
+                    sources = self._definition_source_map_unlocked(
+                        active_identity, relationship=False
                     )
+                    historical_rows: list[tuple[str, str | None]] = []
+                    for key, source in sources.items():
+                        row = self._connection.execute(
+                            "SELECT description FROM definition_type"
+                            " WHERE definition_set_id = ? AND type_key = ?"
+                            " AND object_kind = 'anchor'",
+                            (source, key),
+                        ).fetchone()
+                        if row is not None:
+                            historical_rows.append((key, None if row[0] is None else str(row[0])))
+                    return evaluated, tuple(sorted(historical_rows)), delta_present
+                if not prospective:
+                    rows = self._connection.execute(active_rows + " ORDER BY t.type_key")
                 else:
                     rows = self._connection.execute(
-                        "SELECT t.type_key, t.description FROM definition_type AS t"
-                        " WHERE t.definition_set_id = ? AND t.object_kind = 'anchor'"
-                        " AND NOT EXISTS (SELECT 1 FROM proposal_definition_type AS p"
-                        " WHERE p.type_key = t.type_key)"
+                        "SELECT q.type_key, q.description FROM ("
+                        + active_rows
+                        + ") AS q WHERE NOT EXISTS"
+                        " (SELECT 1 FROM proposal_definition_type AS p"
+                        " WHERE p.type_key = q.type_key)"
                         " UNION ALL SELECT t.type_key, t.description"
                         " FROM proposal_definition_type AS p JOIN definition_type AS t"
                         " ON t.definition_set_id = p.value_set_id"
                         " WHERE p.operation = 'upsert' AND t.object_kind = 'anchor'"
-                        " ORDER BY type_key",
-                        (active_identity,),
+                        " ORDER BY 1",
+                        (),
                     )
                 return (
                     evaluated,
@@ -1583,6 +1666,85 @@ class CanonicalStore:
         except sqlite3.Error as error:
             raise StoreError(f"could not read from the store at {self._path}: {error}") from error
 
+    def _definition_source_map_unlocked(
+        self, identity: str, *, relationship: bool
+    ) -> dict[str, str]:
+        """Resolve keyed membership for complete-output and complete-scope operations."""
+        chain: list[str] = []
+        base = identity
+        while True:
+            row = self._connection.execute(
+                "SELECT base_definition_set_id FROM definition_set_overlay"
+                " WHERE definition_set_id = ?",
+                (base,),
+            ).fetchone()
+            if row is None:
+                break
+            chain.append(base)
+            base = str(row[0])
+        if relationship:
+            sources = {
+                str(key): str(source)
+                for key, source in self._connection.execute(
+                    "SELECT natural_key, definition_set_id"
+                    " FROM definition_multiplicity_rule WHERE definition_set_id = ?",
+                    (base,),
+                )
+            }
+            table, key_column = "definition_set_relationship_override", "natural_key"
+        else:
+            sources = {
+                str(key): str(source)
+                for key, source in self._connection.execute(
+                    "SELECT type_key, definition_set_id FROM definition_type"
+                    " WHERE definition_set_id = ?",
+                    (base,),
+                )
+            }
+            table, key_column = "definition_set_type_override", "type_key"
+        for overlay in reversed(chain):
+            for key, operation, value_set_id in self._connection.execute(
+                f"SELECT {key_column}, operation, value_set_id FROM {table}"  # noqa: S608
+                " WHERE definition_set_id = ?",
+                (overlay,),
+            ):
+                text_key = str(key)
+                if operation == "delete":
+                    sources.pop(text_key, None)
+                else:
+                    sources[text_key] = str(value_set_id)
+        return sources
+
+    def _definition_entry_source_unlocked(
+        self,
+        base: str,
+        chain: list[str],
+        relationship: bool,
+        key: str,
+    ) -> str | None:
+        """Resolve one natural key through a sparse newest-to-oldest overlay chain."""
+        table, key_column = (
+            ("definition_set_relationship_override", "natural_key")
+            if relationship
+            else ("definition_set_type_override", "type_key")
+        )
+        for overlay in chain:
+            row = self._connection.execute(
+                f"SELECT operation, value_set_id FROM {table}"  # noqa: S608
+                f" WHERE definition_set_id = ? AND {key_column} = ?",  # noqa: S608
+                (overlay, key),
+            ).fetchone()
+            if row is not None:
+                return None if row[0] == "delete" else str(row[1])
+        physical_table = "definition_multiplicity_rule" if relationship else "definition_type"
+        physical_key = "natural_key" if relationship else "type_key"
+        row = self._connection.execute(
+            f"SELECT definition_set_id FROM {physical_table}"  # noqa: S608
+            f" WHERE definition_set_id = ? AND {physical_key} = ? LIMIT 1",  # noqa: S608
+            (base, key),
+        ).fetchone()
+        return None if row is None else str(row[0])
+
     def definition_neighborhood(
         self,
         type_keys: tuple[str, ...],
@@ -1590,7 +1752,7 @@ class CanonicalStore:
         prospective: bool = False,
         revision: int | None = None,
     ) -> tuple[int, GraphDefinitionSet, bool]:
-        """Load only definitions transitively relevant to selected anchor types."""
+        """Load the indexed transitive definition frontier for selected types."""
         try:
             with self._lock:
                 evaluated, active_identity, delta_present = (
@@ -1598,165 +1760,376 @@ class CanonicalStore:
                         prospective=prospective, revision=revision
                     )
                 )
-                self._connection.executescript(
-                    "DROP TABLE IF EXISTS temp.definition_type_source;"
-                    "DROP TABLE IF EXISTS temp.definition_relationship_source;"
-                    "DROP TABLE IF EXISTS temp.definition_wanted_type;"
-                    "DROP TABLE IF EXISTS temp.definition_wanted_relationship;"
-                    "CREATE TEMP TABLE definition_type_source ("
-                    " type_key TEXT PRIMARY KEY, value_set_id TEXT NOT NULL);"
-                    "CREATE TEMP TABLE definition_relationship_source ("
-                    " natural_key TEXT PRIMARY KEY, value_set_id TEXT NOT NULL);"
-                    "CREATE TEMP TABLE definition_wanted_type (type_key TEXT PRIMARY KEY);"
-                    "CREATE TEMP TABLE definition_wanted_relationship ("
-                    " natural_key TEXT PRIMARY KEY);"
-                )
-                if prospective:
-                    self._connection.execute(
-                        "INSERT INTO definition_type_source"
-                        " SELECT type_key, definition_set_id FROM definition_type AS t"
-                        " WHERE definition_set_id = ? AND NOT EXISTS"
-                        " (SELECT 1 FROM proposal_definition_type AS p"
-                        " WHERE p.type_key = t.type_key) GROUP BY type_key",
-                        (active_identity,),
-                    )
-                    self._connection.execute(
-                        "INSERT INTO definition_type_source"
-                        " SELECT t.type_key, p.value_set_id FROM proposal_definition_type AS p"
-                        " JOIN definition_type AS t ON t.definition_set_id = p.value_set_id"
-                        " WHERE p.operation = 'upsert'"
-                    )
-                    self._connection.execute(
-                        "INSERT INTO definition_relationship_source"
-                        " SELECT natural_key, definition_set_id"
-                        " FROM definition_multiplicity_rule AS r WHERE definition_set_id = ?"
-                        " AND NOT EXISTS (SELECT 1 FROM proposal_definition_relationship AS p"
-                        " WHERE p.natural_key = r.natural_key) GROUP BY natural_key",
-                        (active_identity,),
-                    )
-                    self._connection.execute(
-                        "INSERT INTO definition_relationship_source"
-                        " SELECT r.natural_key, p.value_set_id"
-                        " FROM proposal_definition_relationship AS p"
-                        " JOIN definition_multiplicity_rule AS r"
-                        " ON r.definition_set_id = p.value_set_id"
-                        " WHERE p.operation = 'upsert'"
-                    )
-                else:
-                    self._connection.execute(
-                        "INSERT INTO definition_type_source"
-                        " SELECT type_key, definition_set_id FROM definition_type"
-                        " WHERE definition_set_id = ? GROUP BY type_key",
-                        (active_identity,),
-                    )
-                    self._connection.execute(
-                        "INSERT INTO definition_relationship_source"
-                        " SELECT natural_key, definition_set_id FROM definition_multiplicity_rule"
-                        " WHERE definition_set_id = ? GROUP BY natural_key",
-                        (active_identity,),
-                    )
-                self._connection.executemany(
-                    "INSERT OR IGNORE INTO definition_wanted_type VALUES (?)",
-                    ((key,) for key in type_keys),
-                )
-                # Grounding data, rules, links, then every type those included definitions name.
-                self._connection.execute(
-                    "INSERT OR IGNORE INTO definition_wanted_type"
-                    " SELECT DISTINCT t.type_key FROM definition_type_source AS s"
-                    " JOIN definition_type AS t ON t.definition_set_id = s.value_set_id"
-                    " AND t.type_key = s.type_key JOIN definition_anchor_permission AS p"
-                    " ON p.definition_set_id = t.definition_set_id"
-                    " AND p.type_occurrence = t.occurrence"
-                    " WHERE p.anchor_type_key IN (SELECT type_key FROM definition_wanted_type)"
-                )
-                self._connection.execute(
-                    "INSERT OR IGNORE INTO definition_wanted_relationship"
-                    " SELECT DISTINCT s.natural_key FROM definition_relationship_source AS s"
-                    " JOIN definition_multiplicity_rule AS r"
-                    " ON r.definition_set_id = s.value_set_id AND r.natural_key = s.natural_key"
-                    " JOIN definition_multiplicity_participant AS p"
-                    " ON p.definition_set_id = r.definition_set_id"
-                    " AND p.rule_occurrence = r.occurrence"
-                    " WHERE p.type_key IN (SELECT type_key FROM definition_wanted_type)"
-                )
-                self._connection.execute(
-                    "INSERT OR IGNORE INTO definition_wanted_type"
-                    " SELECT DISTINCT t.type_key FROM definition_type_source AS s"
-                    " JOIN definition_type AS t ON t.definition_set_id = s.value_set_id"
-                    " AND t.type_key = s.type_key JOIN definition_endpoint_permission AS p"
-                    " ON p.definition_set_id = t.definition_set_id"
-                    " AND p.type_occurrence = t.occurrence"
-                    " WHERE t.object_kind = 'link' AND p.type_key IN"
-                    " (SELECT type_key FROM definition_wanted_type)"
-                )
-                self._connection.execute(
-                    "INSERT OR IGNORE INTO definition_wanted_type"
-                    " SELECT DISTINCT r.link_type_key FROM definition_relationship_source AS s"
-                    " JOIN definition_multiplicity_rule AS r"
-                    " ON r.definition_set_id = s.value_set_id AND r.natural_key = s.natural_key"
-                    " WHERE s.natural_key IN"
-                    " (SELECT natural_key FROM definition_wanted_relationship)"
-                    " AND r.link_type_key IS NOT NULL"
-                )
-                self._connection.execute(
-                    "INSERT OR IGNORE INTO definition_wanted_type"
-                    " SELECT DISTINCT p.type_key FROM definition_type_source AS s"
-                    " JOIN definition_type AS t ON t.definition_set_id = s.value_set_id"
-                    " AND t.type_key = s.type_key JOIN definition_endpoint_permission AS p"
-                    " ON p.definition_set_id = t.definition_set_id"
-                    " AND p.type_occurrence = t.occurrence"
-                    " WHERE t.type_key IN (SELECT type_key FROM definition_wanted_type)"
-                )
-                self._connection.execute(
-                    "INSERT OR IGNORE INTO definition_wanted_type"
-                    " SELECT DISTINCT p.type_key FROM definition_relationship_source AS s"
-                    " JOIN definition_multiplicity_rule AS r"
-                    " ON r.definition_set_id = s.value_set_id AND r.natural_key = s.natural_key"
-                    " JOIN definition_multiplicity_participant AS p"
-                    " ON p.definition_set_id = r.definition_set_id"
-                    " AND p.rule_occurrence = r.occurrence"
-                    " WHERE s.natural_key IN"
-                    " (SELECT natural_key FROM definition_wanted_relationship)"
-                )
+                type_sources: dict[str, str] = {}
+                relationship_sources: dict[str, str] = {}
+                absent_types: set[str] = set()
+                absent_relationships: set[str] = set()
+                historical_chain: list[str] = []
+                historical_base = active_identity
+                if revision is not None:
+                    while True:
+                        row = self._connection.execute(
+                            "SELECT base_definition_set_id FROM definition_set_overlay"
+                            " WHERE definition_set_id = ?",
+                            (historical_base,),
+                        ).fetchone()
+                        if row is None:
+                            break
+                        historical_chain.append(historical_base)
+                        historical_base = str(row[0])
+
+                def placeholders(values: set[str]) -> str:
+                    return ", ".join("?" for _ in values)
+
+                def resolve_types(keys: set[str]) -> None:
+                    unresolved = keys - type_sources.keys() - absent_types
+                    if not unresolved:
+                        return
+                    edited: set[str] = set()
+                    if prospective:
+                        sql = (
+                            "SELECT type_key, operation, value_set_id"
+                            " FROM proposal_definition_type WHERE type_key IN ("
+                            + placeholders(unresolved)
+                            + ")"
+                        )
+                        for key, operation, value_set_id in self._connection.execute(
+                            sql, tuple(sorted(unresolved))
+                        ):
+                            text_key = str(key)
+                            edited.add(text_key)
+                            if operation == "upsert":
+                                type_sources[text_key] = str(value_set_id)
+                            else:
+                                absent_types.add(text_key)
+                    active_keys = unresolved - edited
+                    if active_keys:
+                        if revision is None:
+                            sql = (
+                                "SELECT type_key, value_set_id"
+                                " FROM current_definition_type_source WHERE type_key IN ("
+                                + placeholders(active_keys)
+                                + ")"
+                            )
+                            found_rows = tuple(
+                                self._connection.execute(sql, tuple(sorted(active_keys)))
+                            )
+                        else:
+                            found_rows = tuple(
+                                (key, source)
+                                for key in active_keys
+                                if (
+                                    source := self._definition_entry_source_unlocked(
+                                        historical_base, historical_chain, False, key
+                                    )
+                                )
+                                is not None
+                            )
+                        found = {str(row[0]) for row in found_rows}
+                        type_sources.update((str(key), str(source)) for key, source in found_rows)
+                        absent_types.update(active_keys - found)
+
+                def resolve_relationships(keys: set[str]) -> None:
+                    unresolved = keys - relationship_sources.keys() - absent_relationships
+                    if not unresolved:
+                        return
+                    edited: set[str] = set()
+                    if prospective:
+                        sql = (
+                            "SELECT natural_key, operation, value_set_id"
+                            " FROM proposal_definition_relationship WHERE natural_key IN ("
+                            + placeholders(unresolved)
+                            + ")"
+                        )
+                        for key, operation, value_set_id in self._connection.execute(
+                            sql, tuple(sorted(unresolved))
+                        ):
+                            text_key = str(key)
+                            edited.add(text_key)
+                            if operation == "upsert":
+                                relationship_sources[text_key] = str(value_set_id)
+                            else:
+                                absent_relationships.add(text_key)
+                    active_keys = unresolved - edited
+                    if active_keys:
+                        if revision is None:
+                            sql = (
+                                "SELECT natural_key, value_set_id"
+                                " FROM current_definition_relationship_source"
+                                " WHERE natural_key IN (" + placeholders(active_keys) + ")"
+                            )
+                            found_rows = tuple(
+                                self._connection.execute(sql, tuple(sorted(active_keys)))
+                            )
+                        else:
+                            found_rows = tuple(
+                                (key, source)
+                                for key in active_keys
+                                if (
+                                    source := self._definition_entry_source_unlocked(
+                                        historical_base, historical_chain, True, key
+                                    )
+                                )
+                                is not None
+                            )
+                        found = {str(row[0]) for row in found_rows}
+                        relationship_sources.update(
+                            (str(key), str(source)) for key, source in found_rows
+                        )
+                        absent_relationships.update(active_keys - found)
+
+                wanted_types = set(type_keys)
+                wanted_relationships: set[str] = set()
+                pending_types = set(type_keys)
+                pending_relationships: set[str] = set()
+
+                def want_types(values: Iterable[str]) -> None:
+                    for value in values:
+                        if value not in wanted_types:
+                            wanted_types.add(value)
+                            pending_types.add(value)
+
+                def want_relationships(values: Iterable[str]) -> None:
+                    for value in values:
+                        if value not in wanted_relationships:
+                            wanted_relationships.add(value)
+                            pending_relationships.add(value)
+
+                def historical_reverse_types(selected: set[str]) -> set[str]:
+                    candidates: set[tuple[str, str]] = set()
+                    marks = placeholders(selected)
+                    for source in (historical_base, *historical_chain):
+                        for sql in (
+                            "SELECT t.type_key, t.definition_set_id"
+                            " FROM definition_anchor_permission AS p"
+                            " INDEXED BY definition_anchor_permission_by_type"
+                            " JOIN definition_type AS t"
+                            " ON t.definition_set_id = p.definition_set_id"
+                            " AND t.occurrence = p.type_occurrence"
+                            " WHERE p.definition_set_id = ? AND p.anchor_type_key IN ("
+                            + marks
+                            + ")",
+                            "SELECT t.type_key, t.definition_set_id"
+                            " FROM definition_endpoint_permission AS p"
+                            " INDEXED BY definition_endpoint_permission_by_type"
+                            " JOIN definition_type AS t"
+                            " ON t.definition_set_id = p.definition_set_id"
+                            " AND t.occurrence = p.type_occurrence"
+                            " WHERE p.definition_set_id = ? AND p.type_key IN (" + marks + ")",
+                        ):
+                            candidates.update(
+                                (str(key), str(value_source))
+                                for key, value_source in self._connection.execute(
+                                    sql, (source, *sorted(selected))
+                                )
+                            )
+                    return {
+                        key
+                        for key, source in candidates
+                        if self._definition_entry_source_unlocked(
+                            historical_base, historical_chain, False, key
+                        )
+                        == source
+                    }
+
+                def historical_reverse_relationships(selected: set[str]) -> set[str]:
+                    candidates: set[tuple[str, str]] = set()
+                    marks = placeholders(selected)
+                    for source in (historical_base, *historical_chain):
+                        candidates.update(
+                            (str(key), str(value_source))
+                            for key, value_source in self._connection.execute(
+                                "SELECT r.natural_key, r.definition_set_id"
+                                " FROM definition_multiplicity_participant AS p"
+                                " INDEXED BY definition_multiplicity_participant_by_type"
+                                " JOIN definition_multiplicity_rule AS r"
+                                " ON r.definition_set_id = p.definition_set_id"
+                                " AND r.occurrence = p.rule_occurrence"
+                                " WHERE p.definition_set_id = ? AND p.type_key IN (" + marks + ")",
+                                (source, *sorted(selected)),
+                            )
+                        )
+                    return {
+                        key
+                        for key, source in candidates
+                        if self._definition_entry_source_unlocked(
+                            historical_base, historical_chain, True, key
+                        )
+                        == source
+                    }
+
+                resolve_types(wanted_types)
+                while True:
+                    resolve_types(pending_types)
+                    resolve_relationships(pending_relationships)
+                    selected = pending_types - absent_types
+                    relationship_frontier = pending_relationships - absent_relationships
+                    pending_types = set()
+                    pending_relationships = set()
+                    if not selected and not relationship_frontier:
+                        break
+                    if selected:
+                        selected_sql = placeholders(selected)
+                        if revision is not None:
+                            want_types(historical_reverse_types(selected))
+                            want_relationships(historical_reverse_relationships(selected))
+                        active_type_filter = (
+                            ""
+                            if not prospective
+                            else " AND NOT EXISTS (SELECT 1"
+                            " FROM proposal_definition_type AS e"
+                            " WHERE e.type_key = t.type_key)"
+                        )
+                        active_relationship_filter = (
+                            ""
+                            if not prospective
+                            else " AND NOT EXISTS (SELECT 1 FROM"
+                            " proposal_definition_relationship AS e"
+                            " WHERE e.natural_key = r.natural_key)"
+                        )
+                        current_reverse_queries = (
+                            "SELECT DISTINCT t.type_key"
+                            " FROM current_definition_type_source AS s"
+                            " JOIN definition_anchor_permission AS p"
+                            " INDEXED BY definition_anchor_permission_by_type"
+                            " ON p.definition_set_id = s.value_set_id"
+                            " JOIN definition_type AS t"
+                            " ON t.definition_set_id = p.definition_set_id"
+                            " AND t.occurrence = p.type_occurrence"
+                            " AND t.type_key = s.type_key"
+                            " WHERE p.anchor_type_key IN ("
+                            + selected_sql
+                            + ")"
+                            + active_type_filter,
+                            "SELECT DISTINCT t.type_key"
+                            " FROM current_definition_type_source AS s"
+                            " JOIN definition_endpoint_permission AS p"
+                            " INDEXED BY definition_endpoint_permission_by_type"
+                            " ON p.definition_set_id = s.value_set_id"
+                            " JOIN definition_type AS t"
+                            " ON t.definition_set_id = p.definition_set_id"
+                            " AND t.occurrence = p.type_occurrence"
+                            " AND t.type_key = s.type_key"
+                            " WHERE p.type_key IN (" + selected_sql + ")" + active_type_filter,
+                        )
+                        for sql in () if revision is not None else current_reverse_queries:
+                            want_types(
+                                str(row[0])
+                                for row in self._connection.execute(sql, tuple(sorted(selected)))
+                            )
+                        if revision is None:
+                            want_relationships(
+                                str(row[0])
+                                for row in self._connection.execute(
+                                    "SELECT DISTINCT r.natural_key"
+                                    " FROM current_definition_relationship_source AS s"
+                                    " JOIN definition_multiplicity_participant AS p"
+                                    " INDEXED BY definition_multiplicity_participant_by_type"
+                                    " ON p.definition_set_id = s.value_set_id"
+                                    " JOIN definition_multiplicity_rule AS r"
+                                    " ON r.definition_set_id = p.definition_set_id"
+                                    " AND r.occurrence = p.rule_occurrence"
+                                    " AND r.natural_key = s.natural_key"
+                                    " WHERE p.type_key IN ("
+                                    + selected_sql
+                                    + ")"
+                                    + active_relationship_filter,
+                                    tuple(sorted(selected)),
+                                )
+                            )
+                        if prospective:
+                            parameters = tuple(sorted(selected))
+                            for key, value_set_id in self._connection.execute(
+                                "SELECT e.type_key, e.value_set_id"
+                                " FROM proposal_definition_type AS e"
+                                " JOIN definition_type AS t ON t.definition_set_id = e.value_set_id"
+                                " JOIN definition_anchor_permission AS p"
+                                " ON p.definition_set_id = t.definition_set_id"
+                                " AND p.type_occurrence = t.occurrence"
+                                " WHERE e.operation = 'upsert' AND p.anchor_type_key IN ("
+                                + selected_sql
+                                + ") UNION SELECT e.type_key, e.value_set_id"
+                                " FROM proposal_definition_type AS e"
+                                " JOIN definition_type AS t ON t.definition_set_id = e.value_set_id"
+                                " JOIN definition_endpoint_permission AS p"
+                                " ON p.definition_set_id = t.definition_set_id"
+                                " AND p.type_occurrence = t.occurrence"
+                                " WHERE e.operation = 'upsert' AND p.type_key IN ("
+                                + selected_sql
+                                + ")",
+                                (*parameters, *parameters),
+                            ):
+                                want_types((str(key),))
+                                type_sources[str(key)] = str(value_set_id)
+                            for key, value_set_id in self._connection.execute(
+                                "SELECT e.natural_key, e.value_set_id"
+                                " FROM proposal_definition_relationship AS e"
+                                " JOIN definition_multiplicity_rule AS r"
+                                " ON r.definition_set_id = e.value_set_id"
+                                " JOIN definition_multiplicity_participant AS p"
+                                " ON p.definition_set_id = r.definition_set_id"
+                                " AND p.rule_occurrence = r.occurrence"
+                                " WHERE e.operation = 'upsert' AND p.type_key IN ("
+                                + selected_sql
+                                + ")",
+                                parameters,
+                            ):
+                                want_relationships((str(key),))
+                                relationship_sources[str(key)] = str(value_set_id)
+                    resolve_relationships(wanted_relationships)
+                    for key in selected:
+                        source = type_sources.get(key)
+                        if source is None:
+                            continue
+                        row = self._connection.execute(
+                            "SELECT occurrence, object_kind FROM definition_type"
+                            " WHERE definition_set_id = ? AND type_key = ? LIMIT 1",
+                            (source, key),
+                        ).fetchone()
+                        if row is None or str(row[1]) != ObjectKind.LINK.value:
+                            continue
+                        want_types(
+                            str(value[0])
+                            for value in self._connection.execute(
+                                "SELECT type_key FROM definition_endpoint_permission"
+                                " WHERE definition_set_id = ? AND type_occurrence = ?",
+                                (source, int(row[0])),
+                            )
+                        )
+                    for key in relationship_frontier:
+                        source = relationship_sources.get(key)
+                        if source is None:
+                            continue
+                        row = self._connection.execute(
+                            "SELECT occurrence, link_type_key FROM definition_multiplicity_rule"
+                            " WHERE definition_set_id = ? AND natural_key = ? LIMIT 1",
+                            (source, key),
+                        ).fetchone()
+                        if row is None:
+                            continue
+                        if row[1] is not None:
+                            want_types((str(row[1]),))
+                        want_types(
+                            str(value[0])
+                            for value in self._connection.execute(
+                                "SELECT type_key FROM definition_multiplicity_participant"
+                                " WHERE definition_set_id = ? AND rule_occurrence = ?",
+                                (source, int(row[0])),
+                            )
+                        )
+
                 definitions = GraphDefinitionSet()
-                for (set_id,) in self._connection.execute(
-                    "SELECT DISTINCT s.value_set_id FROM definition_type_source AS s"
-                    " WHERE s.type_key IN (SELECT type_key FROM definition_wanted_type)"
-                ):
-                    keys = {
-                        str(row[0])
-                        for row in self._connection.execute(
-                            "SELECT s.type_key FROM definition_type_source AS s"
-                            " WHERE s.value_set_id = ? AND s.type_key IN"
-                            " (SELECT type_key FROM definition_wanted_type)",
-                            (set_id,),
-                        )
-                    }
+                for source in sorted(set(type_sources.values())):
+                    keys = {key for key, value in type_sources.items() if value == source}
                     definitions = _merge_definition_sets(
                         definitions,
-                        self._load_definition_set(
-                            str(set_id), type_keys=keys, relationship_keys=set()
-                        ),
+                        self._load_definition_set(source, type_keys=keys, relationship_keys=set()),
                     )
-                for (set_id,) in self._connection.execute(
-                    "SELECT DISTINCT s.value_set_id FROM definition_relationship_source AS s"
-                    " WHERE s.natural_key IN"
-                    " (SELECT natural_key FROM definition_wanted_relationship)"
-                ):
-                    keys = {
-                        str(row[0])
-                        for row in self._connection.execute(
-                            "SELECT s.natural_key FROM definition_relationship_source AS s"
-                            " WHERE s.value_set_id = ? AND s.natural_key IN"
-                            " (SELECT natural_key FROM definition_wanted_relationship)",
-                            (set_id,),
-                        )
-                    }
+                for source in sorted(set(relationship_sources.values())):
+                    keys = {key for key, value in relationship_sources.items() if value == source}
                     definitions = _merge_definition_sets(
                         definitions,
-                        self._load_definition_set(
-                            str(set_id), type_keys=set(), relationship_keys=keys
-                        ),
+                        self._load_definition_set(source, type_keys=set(), relationship_keys=keys),
                     )
                 return evaluated, definitions, delta_present
         except sqlite3.Error as error:
@@ -2245,34 +2618,6 @@ class CanonicalStore:
                 if isinstance(error, StoreError):
                     raise
                 raise StoreError(f"could not stage definition work: {error}") from error
-
-    def _proposal_graph_change_unlocked(self) -> GraphChange:
-        anchors: list[Anchor] = []
-        data: list[AssociatedDataObject] = []
-        links: list[Link] = []
-        removals: dict[ObjectKind, list[str]] = {kind: [] for kind in ObjectKind}
-        for uuid, kind_name, operation, value_id in self._connection.execute(
-            "SELECT uuid, object_kind, operation, object_value_id FROM proposal_entry ORDER BY uuid"
-        ):
-            kind = ObjectKind(str(kind_name))
-            if operation == "delete":
-                removals[kind].append(str(uuid))
-                continue
-            value = self._load_object_value(int(value_id))
-            if isinstance(value, Anchor):
-                anchors.append(value)
-            elif isinstance(value, AssociatedDataObject):
-                data.append(value)
-            else:
-                links.append(value)
-        return GraphChange(
-            tuple(anchors),
-            tuple(data),
-            tuple(links),
-            tuple(removals[ObjectKind.ANCHOR]),
-            tuple(removals[ObjectKind.ASSOCIATED_DATA]),
-            tuple(removals[ObjectKind.LINK]),
-        )
 
     def proposal_state(self) -> ProposalState:
         """Return bounded identities, counts, and exact current assessment for the delta."""
@@ -2975,19 +3320,24 @@ class CanonicalStore:
         """Validate each object from normalized rows without assembling its neighborhood."""
         rows = self._connection.execute(
             f"SELECT uuid, object_value_id, object_kind, type_key, source_uuid, target_uuid"
-            f" FROM {object_relation} ORDER BY uuid"  # noqa: S608
+            f" FROM {object_relation} ORDER BY type_key, uuid"  # noqa: S608
         )
+        cached_type_key: str | None = None
+        cached_definitions = GraphDefinitionSet()
         for uuid_value, value_id, kind_value, type_key_value, source, target in rows:
             uuid = str(uuid_value)
             kind = ObjectKind(str(kind_value))
             type_key = str(type_key_value)
-            definitions = self._definitions_for_relation_unlocked(
-                relation,
-                active_identity,
-                type_keys={type_key},
-                constrained_type_keys=set(),
-                relationship_keys=set(),
-            )
+            if type_key != cached_type_key:
+                cached_definitions = self._definitions_for_relation_unlocked(
+                    relation,
+                    active_identity,
+                    type_keys={type_key},
+                    constrained_type_keys=set(),
+                    relationship_keys=set(),
+                )
+                cached_type_key = type_key
+            definitions = cached_definitions
             resolved = {
                 ObjectKind.ANCHOR: definitions.anchor_type(type_key) is not None,
                 ObjectKind.ASSOCIATED_DATA: definitions.associated_data_type(type_key) is not None,
@@ -3571,17 +3921,56 @@ class CanonicalStore:
 
     def _effective_type_keys_unlocked(self, relation: str, active_identity: str) -> Iterator[str]:
         if relation == "current_graph_object":
-            rows = self._connection.execute(
-                "SELECT type_key FROM definition_type WHERE definition_set_id = ?"
-                " ORDER BY type_key",
+            overlay = self._connection.execute(
+                "SELECT base_definition_set_id FROM definition_set_overlay"
+                " WHERE definition_set_id = ?",
                 (active_identity,),
-            )
+            ).fetchone()
+            if overlay is None:
+                rows = self._connection.execute(
+                    "SELECT type_key FROM definition_type WHERE definition_set_id = ?"
+                    " ORDER BY type_key",
+                    (active_identity,),
+                )
+            else:
+                rows = self._connection.execute(
+                    "SELECT type_key FROM definition_type AS t WHERE definition_set_id = ?"
+                    " AND NOT EXISTS (SELECT 1 FROM definition_set_type_override AS o"
+                    " WHERE o.definition_set_id = ? AND o.type_key = t.type_key)"
+                    " UNION ALL SELECT type_key FROM definition_set_type_override"
+                    " WHERE definition_set_id = ? AND operation = 'upsert' ORDER BY type_key",
+                    (str(overlay[0]), active_identity, active_identity),
+                )
         else:
             rows = self._connection.execute(
                 "SELECT type_key FROM assessment_definition_type ORDER BY type_key"
             )
         for (type_key,) in rows:
             yield str(type_key)
+
+    def _effective_relationship_keys_unlocked(self, active_identity: str) -> Iterator[str]:
+        overlay = self._connection.execute(
+            "SELECT base_definition_set_id FROM definition_set_overlay WHERE definition_set_id = ?",
+            (active_identity,),
+        ).fetchone()
+        if overlay is None:
+            rows = self._connection.execute(
+                "SELECT natural_key FROM definition_multiplicity_rule"
+                " WHERE definition_set_id = ? ORDER BY natural_key",
+                (active_identity,),
+            )
+        else:
+            rows = self._connection.execute(
+                "SELECT natural_key FROM definition_multiplicity_rule AS r"
+                " WHERE definition_set_id = ? AND NOT EXISTS"
+                " (SELECT 1 FROM definition_set_relationship_override AS o"
+                " WHERE o.definition_set_id = ? AND o.natural_key = r.natural_key)"
+                " UNION ALL SELECT natural_key FROM definition_set_relationship_override"
+                " WHERE definition_set_id = ? AND operation = 'upsert' ORDER BY natural_key",
+                (str(overlay[0]), active_identity, active_identity),
+            )
+        for (natural_key,) in rows:
+            yield str(natural_key)
 
     def _definition_context_unlocked(
         self, relation: str, active_identity: str, root: GraphDefinitionSet
@@ -3664,11 +4053,7 @@ class CanonicalStore:
                 require_descriptions=True,
             )
         if relation == "current_graph_object":
-            keys = self._connection.execute(
-                "SELECT natural_key FROM definition_multiplicity_rule"
-                " WHERE definition_set_id = ? ORDER BY natural_key",
-                (active_identity,),
-            )
+            keys = ((key,) for key in self._effective_relationship_keys_unlocked(active_identity))
         else:
             keys = self._connection.execute(
                 "SELECT natural_key FROM assessment_definition_relationship ORDER BY natural_key"
@@ -3689,11 +4074,7 @@ class CanonicalStore:
         self, relation: str, active_identity: str
     ) -> Iterator[ValidationFinding]:
         if relation == "current_graph_object":
-            keys = self._connection.execute(
-                "SELECT natural_key FROM definition_multiplicity_rule"
-                " WHERE definition_set_id = ? ORDER BY natural_key",
-                (active_identity,),
-            )
+            keys = ((key,) for key in self._effective_relationship_keys_unlocked(active_identity))
         else:
             keys = self._connection.execute(
                 "SELECT r.natural_key FROM definition_multiplicity_rule AS r"
@@ -3848,7 +4229,7 @@ class CanonicalStore:
     def _materialize_proposed_definitions_unlocked(
         self, active_identity: str, proposed_identity: str
     ) -> str:
-        """Build the activated immutable set with fixed-size SQL row work."""
+        """Create one immutable structurally shared definition-set membership."""
         if self._connection.execute(
             "SELECT 1 FROM definition_set WHERE identity = ?", (proposed_identity,)
         ).fetchone():
@@ -3867,91 +4248,77 @@ class CanonicalStore:
             " VALUES (?, ?, ?)",
             (proposed_identity, str(content[0]), int(content[1])),
         )
-        sources = self._connection.execute(
-            "SELECT t.definition_set_id, t.occurrence, t.type_key, t.object_kind"
-            " FROM definition_type AS t WHERE t.definition_set_id = ?"
-            " AND NOT EXISTS (SELECT 1 FROM proposal_definition_type AS p"
-            " WHERE p.type_key = t.type_key)"
-            " UNION ALL SELECT t.definition_set_id, t.occurrence, t.type_key, t.object_kind"
-            " FROM proposal_definition_type AS p JOIN definition_type AS t"
-            " ON t.definition_set_id = p.value_set_id WHERE p.operation = 'upsert'"
-            " ORDER BY 3, 4",
-            (active_identity,),
+        self._connection.execute(
+            "INSERT INTO definition_set_overlay VALUES (?, ?)",
+            (proposed_identity, active_identity),
         )
-        type_occurrence = 0
-        while batch := sources.fetchmany(128):
-            for source_set, source_occurrence, _, _ in batch:
-                self._connection.execute(
-                    "INSERT INTO definition_type SELECT ?, ?, object_kind, type_key, description"
-                    " FROM definition_type WHERE definition_set_id = ? AND occurrence = ?",
-                    (proposed_identity, type_occurrence, source_set, source_occurrence),
-                )
-                for table, columns in (
-                    (
-                        "definition_anchor_permission",
-                        "occurrence, anchor_type_key",
-                    ),
-                    (
-                        "definition_property_rule",
-                        "occurrence, property_name, required, json_kind, description,"
-                        " minimum_size, maximum_size, lower_kind, lower_value, upper_kind,"
-                        " upper_value, pattern",
-                    ),
-                    (
-                        "definition_endpoint_rule",
-                        "description",
-                    ),
-                    (
-                        "definition_endpoint_permission",
-                        "role, occurrence, type_key",
-                    ),
-                ):
-                    self._connection.execute(
-                        f"INSERT INTO {table} SELECT ?, ?, {columns} FROM {table}"
-                        " WHERE definition_set_id = ? AND type_occurrence = ?",
-                        (proposed_identity, type_occurrence, source_set, source_occurrence),
-                    )
-                self._connection.execute(
-                    "INSERT INTO definition_permitted_value"
-                    " SELECT ?, ?, v.property_occurrence, v.occurrence, v.json_kind, v.json_value"
-                    " FROM definition_permitted_value AS v WHERE v.definition_set_id = ?"
-                    " AND v.type_occurrence = ?",
-                    (proposed_identity, type_occurrence, source_set, source_occurrence),
-                )
-                type_occurrence += 1
-
-        rule_sources = self._connection.execute(
-            "SELECT r.definition_set_id, r.occurrence, r.natural_key"
-            " FROM definition_multiplicity_rule AS r WHERE r.definition_set_id = ?"
-            " AND NOT EXISTS (SELECT 1 FROM proposal_definition_relationship AS p"
-            " WHERE p.natural_key = r.natural_key)"
-            " UNION ALL SELECT r.definition_set_id, r.occurrence, r.natural_key"
-            " FROM proposal_definition_relationship AS p"
-            " JOIN definition_multiplicity_rule AS r"
-            " ON r.definition_set_id = p.value_set_id WHERE p.operation = 'upsert'"
-            " ORDER BY 3",
-            (active_identity,),
+        self._connection.execute(
+            "INSERT OR REPLACE INTO definition_set_type_override"
+            " SELECT ?, type_key, operation, value_set_id FROM proposal_definition_type",
+            (proposed_identity,),
         )
-        rule_occurrence = 0
-        while batch := rule_sources.fetchmany(128):
-            for source_set, source_occurrence, _ in batch:
-                self._connection.execute(
-                    "INSERT INTO definition_multiplicity_rule"
-                    " SELECT ?, ?, natural_key, rule_kind, link_type_key, constrained_end,"
-                    " lower_bound, upper_bound, description"
-                    " FROM definition_multiplicity_rule"
-                    " WHERE definition_set_id = ? AND occurrence = ?",
-                    (proposed_identity, rule_occurrence, source_set, source_occurrence),
-                )
-                self._connection.execute(
-                    "INSERT INTO definition_multiplicity_participant"
-                    " SELECT ?, ?, role, occurrence, type_key"
-                    " FROM definition_multiplicity_participant"
-                    " WHERE definition_set_id = ? AND rule_occurrence = ?",
-                    (proposed_identity, rule_occurrence, source_set, source_occurrence),
-                )
-                rule_occurrence += 1
+        self._connection.execute(
+            "INSERT OR REPLACE INTO definition_set_relationship_override"
+            " SELECT ?, natural_key, operation, value_set_id"
+            " FROM proposal_definition_relationship",
+            (proposed_identity,),
+        )
         return proposed_identity
+
+    def _replace_current_definition_sources_unlocked(self, identity: str) -> None:
+        """Rebuild keyed current membership with SQL-sized work and chain-sized memory."""
+        chain: list[str] = []
+        base = identity
+        while True:
+            row = self._connection.execute(
+                "SELECT base_definition_set_id FROM definition_set_overlay"
+                " WHERE definition_set_id = ?",
+                (base,),
+            ).fetchone()
+            if row is None:
+                break
+            chain.append(base)
+            base = str(row[0])
+        self._connection.execute("DELETE FROM current_definition_type_source")
+        self._connection.execute("DELETE FROM current_definition_relationship_source")
+        self._connection.execute(
+            "INSERT INTO current_definition_type_source"
+            " SELECT type_key, definition_set_id FROM definition_type"
+            " WHERE definition_set_id = ?",
+            (base,),
+        )
+        self._connection.execute(
+            "INSERT INTO current_definition_relationship_source"
+            " SELECT natural_key, definition_set_id FROM definition_multiplicity_rule"
+            " WHERE definition_set_id = ?",
+            (base,),
+        )
+        for overlay in reversed(chain):
+            self._connection.execute(
+                "DELETE FROM current_definition_type_source WHERE type_key IN"
+                " (SELECT type_key FROM definition_set_type_override"
+                " WHERE definition_set_id = ?)",
+                (overlay,),
+            )
+            self._connection.execute(
+                "INSERT INTO current_definition_type_source"
+                " SELECT type_key, value_set_id FROM definition_set_type_override"
+                " WHERE definition_set_id = ? AND operation = 'upsert'",
+                (overlay,),
+            )
+            self._connection.execute(
+                "DELETE FROM current_definition_relationship_source WHERE natural_key IN"
+                " (SELECT natural_key FROM definition_set_relationship_override"
+                " WHERE definition_set_id = ?)",
+                (overlay,),
+            )
+            self._connection.execute(
+                "INSERT INTO current_definition_relationship_source"
+                " SELECT natural_key, value_set_id"
+                " FROM definition_set_relationship_override"
+                " WHERE definition_set_id = ? AND operation = 'upsert'",
+                (overlay,),
+            )
 
     def activate_proposal(self, assessment_id: str, *, provenance: Provenance) -> RevisionedOutcome:
         """Atomically activate the exact assessed definition-and-graph proposal."""
@@ -4018,6 +4385,26 @@ class CanonicalStore:
                         ),
                     )
                 self._materialize_proposed_definitions_unlocked(str(head[2]), proposed)
+                self._connection.execute(
+                    "DELETE FROM current_definition_type_source"
+                    " WHERE type_key IN (SELECT type_key FROM proposal_definition_type)"
+                )
+                self._connection.execute(
+                    "INSERT INTO current_definition_type_source"
+                    " SELECT p.type_key, p.value_set_id FROM proposal_definition_type AS p"
+                    " WHERE p.operation = 'upsert'"
+                )
+                self._connection.execute(
+                    "DELETE FROM current_definition_relationship_source"
+                    " WHERE natural_key IN"
+                    " (SELECT natural_key FROM proposal_definition_relationship)"
+                )
+                self._connection.execute(
+                    "INSERT INTO current_definition_relationship_source"
+                    " SELECT p.natural_key, p.value_set_id"
+                    " FROM proposal_definition_relationship AS p"
+                    " WHERE p.operation = 'upsert'"
+                )
                 resulting = revision + 1
                 previous = self._connection.execute(
                     "SELECT r.record_identity FROM canonical_record AS r"
@@ -4060,11 +4447,39 @@ class CanonicalStore:
                         content_identity,
                     ),
                 )
+                graph_summary = self._connection.execute(
+                    "SELECT graph_accumulator, graph_entry_count FROM state_head WHERE id = 0"
+                ).fetchone()
+                assert graph_summary is not None
+                graph_accumulator, graph_count = str(graph_summary[0]), int(graph_summary[1])
                 entries = self._connection.execute(
-                    "SELECT uuid, object_kind, operation, object_value_id"
-                    " FROM proposal_entry ORDER BY uuid"
+                    "SELECT p.uuid, p.object_kind, p.operation, p.object_value_id,"
+                    " base.content_identity, next.content_identity FROM proposal_entry AS p"
+                    " LEFT JOIN object_value AS base ON base.id = p.base_object_value_id"
+                    " LEFT JOIN object_value AS next ON next.id = p.object_value_id ORDER BY p.uuid"
                 )
-                for occurrence, (uuid, kind, operation, value_id) in enumerate(entries):
+                for occurrence, (
+                    uuid,
+                    kind,
+                    operation,
+                    value_id,
+                    base_identity,
+                    next_identity,
+                ) in enumerate(entries):
+                    graph_accumulator, graph_count = adjust_semantic_summary(
+                        graph_accumulator,
+                        graph_count,
+                        removed=(
+                            ()
+                            if base_identity is None
+                            else (graph_entry_digest(str(uuid), str(base_identity)),)
+                        ),
+                        added=(
+                            ()
+                            if next_identity is None
+                            else (graph_entry_digest(str(uuid), str(next_identity)),)
+                        ),
+                    )
                     self._connection.execute(
                         "UPDATE graph_presence_interval SET valid_to_revision = ?"
                         " WHERE uuid = ? AND valid_to_revision IS NULL",
@@ -4083,8 +4498,9 @@ class CanonicalStore:
                     )
                 self._connection.execute(
                     "UPDATE state_head SET revision = ?, established_by = ?,"
-                    " active_definition_set_id = ?, proposed_definition_set_id = NULL WHERE id = 0",
-                    (resulting, resulting, proposed),
+                    " active_definition_set_id = ?, proposed_definition_set_id = NULL,"
+                    " graph_accumulator = ?, graph_entry_count = ? WHERE id = 0",
+                    (resulting, resulting, proposed, graph_accumulator, graph_count),
                 )
                 self._connection.execute(
                     "INSERT INTO canonical_definition_event VALUES (?, ?, 'absent', NULL)",
@@ -4149,20 +4565,49 @@ class CanonicalStore:
                         OperationStatus.REJECTED,
                         f"revision {selected_revision} is not established by this ledger",
                     )
+                self._connection.execute("DROP TABLE IF EXISTS temp.restore_candidate")
+                self._connection.execute("DROP TABLE IF EXISTS temp.restore_current")
                 self._connection.execute("DROP TABLE IF EXISTS temp.restore_target")
                 self._connection.execute(
+                    "CREATE TEMP TABLE restore_candidate (uuid TEXT PRIMARY KEY)"
+                )
+                self._connection.execute(
+                    "INSERT OR IGNORE INTO restore_candidate"
+                    " SELECT uuid FROM canonical_graph_event"
+                    " WHERE established_revision > ? AND established_revision <= ?",
+                    (selected_revision, int(head[0])),
+                )
+                self._connection.execute(
+                    "CREATE TEMP TABLE restore_current AS"
+                    " SELECT c.uuid, v.object_kind, g.object_value_id"
+                    " FROM restore_candidate AS c"
+                    " CROSS JOIN graph_presence_interval AS g"
+                    " INDEXED BY graph_presence_current_uuid"
+                    " ON g.uuid = c.uuid AND g.valid_to_revision IS NULL"
+                    " JOIN object_value AS v ON v.id = g.object_value_id"
+                )
+                self._connection.execute(
+                    "CREATE UNIQUE INDEX restore_current_uuid ON restore_current(uuid)"
+                )
+                self._connection.execute(
                     "CREATE TEMP TABLE restore_target AS"
-                    " SELECT p.uuid, v.object_kind, p.object_value_id"
-                    " FROM graph_presence_interval AS p JOIN object_value AS v"
+                    " SELECT c.uuid, v.object_kind, p.object_value_id"
+                    " FROM restore_candidate AS c"
+                    " CROSS JOIN graph_presence_interval AS p"
+                    " INDEXED BY graph_presence_uuid_revision ON p.uuid = c.uuid"
+                    " JOIN object_value AS v"
                     " ON v.id = p.object_value_id WHERE p.valid_from_revision <= ?"
                     " AND (p.valid_to_revision IS NULL OR p.valid_to_revision > ?)",
                     (selected_revision, selected_revision),
                 )
+                self._connection.execute(
+                    "CREATE UNIQUE INDEX restore_target_uuid ON restore_target(uuid)"
+                )
                 difference = self._connection.execute(
                     "SELECT uuid, object_value_id FROM (SELECT uuid, object_value_id"
                     " FROM restore_target EXCEPT SELECT uuid, object_value_id"
-                    " FROM current_graph_object) UNION ALL SELECT uuid, object_value_id"
-                    " FROM (SELECT uuid, object_value_id FROM current_graph_object"
+                    " FROM restore_current) UNION ALL SELECT uuid, object_value_id"
+                    " FROM (SELECT uuid, object_value_id FROM restore_current"
                     " EXCEPT SELECT uuid, object_value_id FROM restore_target) LIMIT 1"
                 ).fetchone()
                 if difference is None and str(head[1]) == str(target_definition[0]):
@@ -4217,14 +4662,45 @@ class CanonicalStore:
                 )
                 events = self._connection.execute(
                     "SELECT c.uuid, c.object_kind, 'delete', NULL"
-                    " FROM current_graph_object AS c LEFT JOIN restore_target AS t"
+                    " FROM restore_current AS c LEFT JOIN restore_target AS t"
                     " ON t.uuid = c.uuid WHERE t.uuid IS NULL"
                     " UNION ALL SELECT t.uuid, t.object_kind, 'upsert', t.object_value_id"
-                    " FROM restore_target AS t LEFT JOIN current_graph_object AS c"
+                    " FROM restore_target AS t LEFT JOIN restore_current AS c"
                     " ON c.uuid = t.uuid WHERE c.object_value_id IS NULL"
                     " OR c.object_value_id != t.object_value_id ORDER BY 1"
                 )
+                graph_summary = self._connection.execute(
+                    "SELECT graph_accumulator, graph_entry_count FROM state_head WHERE id = 0"
+                ).fetchone()
+                assert graph_summary is not None
+                graph_accumulator, graph_count = str(graph_summary[0]), int(graph_summary[1])
                 for occurrence, (uuid, kind, operation, value_id) in enumerate(events):
+                    prior_identity = self._connection.execute(
+                        "SELECT v.content_identity FROM current_graph_object AS c"
+                        " JOIN object_value AS v ON v.id = c.object_value_id WHERE c.uuid = ?",
+                        (uuid,),
+                    ).fetchone()
+                    next_identity = (
+                        None
+                        if value_id is None
+                        else self._connection.execute(
+                            "SELECT content_identity FROM object_value WHERE id = ?", (value_id,)
+                        ).fetchone()
+                    )
+                    graph_accumulator, graph_count = adjust_semantic_summary(
+                        graph_accumulator,
+                        graph_count,
+                        removed=(
+                            ()
+                            if prior_identity is None
+                            else (graph_entry_digest(str(uuid), str(prior_identity[0])),)
+                        ),
+                        added=(
+                            ()
+                            if next_identity is None
+                            else (graph_entry_digest(str(uuid), str(next_identity[0])),)
+                        ),
+                    )
                     self._connection.execute(
                         "UPDATE graph_presence_interval SET valid_to_revision = ?"
                         " WHERE uuid = ? AND valid_to_revision IS NULL",
@@ -4241,10 +4717,19 @@ class CanonicalStore:
                         "INSERT INTO canonical_graph_event VALUES (?, ?, ?, ?, ?, ?)",
                         (resulting, occurrence, operation, kind, uuid, value_id),
                     )
+                if str(head[1]) != str(target_definition[0]):
+                    self._replace_current_definition_sources_unlocked(str(target_definition[0]))
                 self._connection.execute(
                     "UPDATE state_head SET revision = ?, established_by = ?,"
-                    " active_definition_set_id = ? WHERE id = 0",
-                    (resulting, resulting, target_definition[0]),
+                    " active_definition_set_id = ?, graph_accumulator = ?,"
+                    " graph_entry_count = ? WHERE id = 0",
+                    (
+                        resulting,
+                        resulting,
+                        target_definition[0],
+                        graph_accumulator,
+                        graph_count,
+                    ),
                 )
                 self._connection.execute(
                     "INSERT INTO canonical_definition_event VALUES (?, ?, 'absent', NULL)",
@@ -4570,6 +5055,18 @@ class CanonicalStore:
                     active_identity = active_definition_identity
                 else:
                     raise StoreError("the normalized initial definition set is absent")
+                self._connection.execute(
+                    "INSERT INTO current_definition_type_source"
+                    " SELECT type_key, definition_set_id FROM definition_type"
+                    " WHERE definition_set_id = ?",
+                    (active_identity,),
+                )
+                self._connection.execute(
+                    "INSERT INTO current_definition_relationship_source"
+                    " SELECT natural_key, definition_set_id FROM definition_multiplicity_rule"
+                    " WHERE definition_set_id = ?",
+                    (active_identity,),
+                )
                 content_identity = semantic_identity(("pendingInitialState", secrets.token_hex(16)))
                 record_identity = self._record_identity(
                     ledger_identity,
@@ -4600,13 +5097,14 @@ class CanonicalStore:
                 self._connection.execute(
                     "INSERT INTO state_head"
                     " (id, revision, established_by, active_definition_set_id,"
-                    " proposed_definition_set_id)"
-                    " VALUES (0, ?, ?, ?, ?)",
+                    " proposed_definition_set_id, graph_entry_count, graph_accumulator)"
+                    " VALUES (0, ?, ?, ?, ?, 0, ?)",
                     (
                         revision,
                         revision,
                         active_identity,
                         None,
+                        "0" * 64,
                     ),
                 )
                 if use_staged_graph:
@@ -4618,6 +5116,12 @@ class CanonicalStore:
                         " v.source_uuid, v.target_uuid, ?, NULL FROM recovery_object AS r"
                         " JOIN object_value AS v ON v.id = r.object_value_id",
                         (revision,),
+                    )
+                    graph_count, graph_accumulator = recomputed_graph_summary(self._connection)
+                    self._connection.execute(
+                        "UPDATE state_head SET graph_entry_count = ?, graph_accumulator = ?"
+                        " WHERE id = 0",
+                        (graph_count, graph_accumulator),
                     )
                 self._connection.execute(
                     "INSERT INTO canonical_definition_event"
@@ -4809,8 +5313,26 @@ class CanonicalStore:
     def _apply_current_graph_change_unlocked(self, change: GraphChange, revision: int) -> None:
         removals = tuple(uuid for _, uuid in change.removals())
         replaced = (*removals, *(value.uuid for _, value in change.upserts()))
+        summary = self._connection.execute(
+            "SELECT graph_accumulator, graph_entry_count FROM state_head WHERE id = 0"
+        ).fetchone()
+        if summary is None:
+            raise StoreError("the current graph has no maintained semantic summary")
+        accumulator, entry_count = str(summary[0]), int(summary[1])
         if replaced:
             placeholders = ", ".join("?" for _ in replaced)
+            removed = tuple(
+                graph_entry_digest(str(uuid), str(identity))
+                for uuid, identity in self._connection.execute(
+                    "SELECT c.uuid, v.content_identity FROM current_graph_object AS c"
+                    " JOIN object_value AS v ON v.id = c.object_value_id"
+                    f" WHERE c.uuid IN ({placeholders})",
+                    replaced,
+                )
+            )
+            accumulator, entry_count = adjust_semantic_summary(
+                accumulator, entry_count, removed=removed
+            )
             self._connection.execute(
                 f"UPDATE graph_presence_interval SET valid_to_revision = ?"
                 f" WHERE valid_to_revision IS NULL AND uuid IN ({placeholders})",
@@ -4818,6 +5340,15 @@ class CanonicalStore:
             )
         for _, graph_object in change.upserts():
             self._upsert_current_graph_object_unlocked(graph_object, revision)
+            accumulator, entry_count = adjust_semantic_summary(
+                accumulator,
+                entry_count,
+                added=(graph_entry_digest(graph_object.uuid, object_identity(graph_object)),),
+            )
+        self._connection.execute(
+            "UPDATE state_head SET graph_accumulator = ?, graph_entry_count = ? WHERE id = 0",
+            (accumulator, entry_count),
+        )
 
     def _upsert_current_graph_object_unlocked(
         self, graph_object: GraphObject, revision: int
@@ -5228,6 +5759,45 @@ class CanonicalStore:
                     " JOIN canonical_record AS r ON r.established_revision = h.established_by"
                     " WHERE h.id = 0"
                 ).fetchone()
+                summary_error = verify_state_summaries(
+                    self._connection
+                ) or verify_proposal_summaries(self._connection)
+                if not findings and summary_error is not None:
+                    findings.append(ValidationFinding(summary=summary_error))
+                proposal_summary = self._connection.execute(
+                    "SELECT effective_accumulator, effective_entry_count, identity"
+                    " FROM proposal_definition_state WHERE id = 0"
+                ).fetchone()
+                head_proposal = self._connection.execute(
+                    "SELECT proposed_definition_set_id FROM state_head WHERE id = 0"
+                ).fetchone()
+                if not findings and proposal_summary is not None:
+                    if proposal_summary[2] is None:
+                        if proposal_summary[0] is not None or proposal_summary[1] is not None:
+                            findings.append(
+                                ValidationFinding(
+                                    summary="absent proposal retains effective definition summary"
+                                )
+                            )
+                    else:
+                        actual_proposal = proposal_definition_stats_from_storage(self._connection)
+                        if (
+                            (
+                                str(proposal_summary[0]),
+                                int(proposal_summary[1]),
+                            )
+                            != actual_proposal
+                            or head_proposal is None
+                            or str(head_proposal[0]) != str(proposal_summary[2])
+                        ):
+                            findings.append(
+                                ValidationFinding(
+                                    summary=(
+                                        "proposal effective definition summary does not match"
+                                        " normalized state"
+                                    )
+                                )
+                            )
                 if not findings and (
                     record_count == 0
                     or head_record is None
@@ -5577,13 +6147,199 @@ class CanonicalStore:
     ) -> GraphDefinitionSet:
         self._current_definition_decodes += 1
         try:
-            return load_definition_set(
-                self._connection,
-                identity,
+            head = self._connection.execute(
+                "SELECT active_definition_set_id FROM state_head WHERE id = 0"
+            ).fetchone()
+            if (
+                head is not None
+                and str(head[0]) == identity
+                and not one_entry
+                and (
+                    type_keys is not None
+                    or constrained_type_keys is not None
+                    or relationship_keys is not None
+                )
+            ):
+                type_sql = "SELECT type_key, value_set_id FROM current_definition_type_source"
+                current_type_parameters: tuple[object, ...] = ()
+                if type_keys is not None:
+                    if not type_keys:
+                        type_sql += " WHERE 0"
+                    else:
+                        marks = ", ".join("?" for _ in type_keys)
+                        type_sql += f" WHERE type_key IN ({marks})"
+                        current_type_parameters = tuple(sorted(type_keys))
+                relationship_sql = (
+                    "SELECT s.natural_key, s.value_set_id"
+                    " FROM current_definition_relationship_source AS s"
+                )
+                current_relationship_parameters: tuple[object, ...] = ()
+                if relationship_keys is not None:
+                    if not relationship_keys:
+                        relationship_sql += " WHERE 0"
+                    else:
+                        marks = ", ".join("?" for _ in relationship_keys)
+                        relationship_sql += f" WHERE s.natural_key IN ({marks})"
+                        current_relationship_parameters = tuple(sorted(relationship_keys))
+                elif constrained_type_keys is not None:
+                    if not constrained_type_keys:
+                        relationship_sql += " WHERE 0"
+                    else:
+                        marks = ", ".join("?" for _ in constrained_type_keys)
+                        relationship_sql += (
+                            " JOIN definition_multiplicity_rule AS r"
+                            " ON r.definition_set_id = s.value_set_id"
+                            " AND r.natural_key = s.natural_key"
+                            " JOIN definition_multiplicity_participant AS p"
+                            " ON p.definition_set_id = r.definition_set_id"
+                            " AND p.rule_occurrence = r.occurrence"
+                            " WHERE p.role = 'first' AND p.type_key IN (" + marks + ")"
+                        )
+                        current_relationship_parameters = tuple(sorted(constrained_type_keys))
+                definitions = GraphDefinitionSet()
+                type_sources: dict[str, set[str]] = {}
+                for key, source in self._connection.execute(type_sql, current_type_parameters):
+                    type_sources.setdefault(str(source), set()).add(str(key))
+                for source, keys in type_sources.items():
+                    definitions = _merge_definition_sets(
+                        definitions,
+                        load_definition_set(
+                            self._connection,
+                            source,
+                            type_keys=keys,
+                            relationship_keys=set(),
+                        ),
+                    )
+                relationship_sources: dict[str, set[str]] = {}
+                for key, source in self._connection.execute(
+                    relationship_sql, current_relationship_parameters
+                ):
+                    relationship_sources.setdefault(str(source), set()).add(str(key))
+                for source, keys in relationship_sources.items():
+                    definitions = _merge_definition_sets(
+                        definitions,
+                        load_definition_set(
+                            self._connection,
+                            source,
+                            type_keys=set(),
+                            relationship_keys=keys,
+                        ),
+                    )
+                return definitions
+            overlay = self._connection.execute(
+                "SELECT base_definition_set_id FROM definition_set_overlay"
+                " WHERE definition_set_id = ?",
+                (identity,),
+            ).fetchone()
+            if overlay is None:
+                return load_definition_set(
+                    self._connection,
+                    identity,
+                    type_keys=type_keys,
+                    constrained_type_keys=constrained_type_keys,
+                    relationship_keys=relationship_keys,
+                    one_entry=one_entry,
+                )
+            if one_entry:
+                raise ValueError("an aggregate definition overlay is not one definition entry")
+            base_identity = str(overlay[0])
+            type_sql = (
+                "SELECT type_key, operation, value_set_id"
+                " FROM definition_set_type_override WHERE definition_set_id = ?"
+            )
+            type_parameters: tuple[object, ...] = (identity,)
+            if type_keys is not None:
+                if not type_keys:
+                    type_sql += " AND 0"
+                else:
+                    type_sql += " AND type_key IN (" + ", ".join("?" for _ in type_keys) + ")"
+                    type_parameters = (identity, *sorted(type_keys))
+            edited_types = {
+                str(row[0]): row for row in self._connection.execute(type_sql, type_parameters)
+            }
+            base = self._load_definition_set(
+                base_identity,
                 type_keys=type_keys,
                 constrained_type_keys=constrained_type_keys,
                 relationship_keys=relationship_keys,
-                one_entry=one_entry,
+            )
+            anchors = [v for v in base.anchor_types if v.type_key not in edited_types]
+            data = [v for v in base.associated_data_types if v.type_key not in edited_types]
+            links = [v for v in base.link_types if v.type_key not in edited_types]
+            for _, operation, value_set_id in edited_types.values():
+                if operation == "delete":
+                    continue
+                value = load_definition_set(
+                    self._connection, str(value_set_id), constrained_type_keys=set()
+                )
+                anchors.extend(value.anchor_types)
+                data.extend(value.associated_data_types)
+                links.extend(value.link_types)
+
+            relationship_sql = (
+                "SELECT natural_key, operation, value_set_id"
+                " FROM definition_set_relationship_override WHERE definition_set_id = ?"
+            )
+            relationship_parameters: tuple[object, ...] = (identity,)
+            if relationship_keys is not None:
+                if not relationship_keys:
+                    relationship_sql += " AND 0"
+                else:
+                    relationship_sql += (
+                        " AND natural_key IN (" + ", ".join("?" for _ in relationship_keys) + ")"
+                    )
+                    relationship_parameters = (identity, *sorted(relationship_keys))
+            elif constrained_type_keys is not None:
+                if not constrained_type_keys:
+                    relationship_sql += " AND 0"
+                else:
+                    marks = ", ".join("?" for _ in constrained_type_keys)
+                    relationship_sql += (
+                        " AND ((operation = 'upsert' AND EXISTS (SELECT 1"
+                        " FROM definition_multiplicity_rule AS r"
+                        " JOIN definition_multiplicity_participant AS p"
+                        " ON p.definition_set_id = r.definition_set_id"
+                        " AND p.rule_occurrence = r.occurrence AND p.role = 'first'"
+                        " WHERE r.definition_set_id = value_set_id"
+                        f" AND p.type_key IN ({marks})))"
+                        " OR (operation = 'delete' AND EXISTS (SELECT 1"
+                        " FROM definition_multiplicity_rule AS r"
+                        " JOIN definition_multiplicity_participant AS p"
+                        " ON p.definition_set_id = r.definition_set_id"
+                        " AND p.rule_occurrence = r.occurrence AND p.role = 'first'"
+                        " WHERE r.definition_set_id = ?"
+                        " AND r.natural_key ="
+                        " definition_set_relationship_override.natural_key"
+                        f" AND p.type_key IN ({marks}))))"
+                    )
+                    selected = tuple(sorted(constrained_type_keys))
+                    relationship_parameters = (
+                        identity,
+                        *selected,
+                        base_identity,
+                        *selected,
+                    )
+            edited_relationships = {
+                str(row[0]): row
+                for row in self._connection.execute(relationship_sql, relationship_parameters)
+            }
+            relationships = [
+                v
+                for v in base.relationship_constraints
+                if semantic_identity(relationship_identity(v)) not in edited_relationships
+            ]
+            for _, operation, value_set_id in edited_relationships.values():
+                if operation == "delete":
+                    continue
+                value = load_definition_set(
+                    self._connection,
+                    str(value_set_id),
+                    type_keys=set(),
+                    constrained_type_keys=None,
+                )
+                relationships.extend(value.relationship_constraints)
+            return GraphDefinitionSet(
+                tuple(anchors), tuple(data), tuple(links), tuple(relationships)
             )
         except (ValueError, ArithmeticError) as error:
             raise StoreError(f"stored definitions do not decode: {error}") from error

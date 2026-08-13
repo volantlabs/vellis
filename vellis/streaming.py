@@ -16,14 +16,19 @@ from typing import TextIO
 from vellis.canonical import now
 from vellis.definitions import relationship_identity
 from vellis.normalized import (
+    adjust_semantic_summary,
     definition_content_stats,
     definition_entry_digest,
     definition_identity_from_stats,
+    graph_entry_digest,
     load_definition_set,
     normalized_state_identity,
+    proposal_entry_digest,
     semantic_identity,
     semantic_row_summary,
     verify_normalized_identities,
+    verify_proposal_summaries,
+    verify_state_summaries,
 )
 from vellis.outcomes import ValidationScope
 from vellis.store import APPLICATION_ID, SCHEMA_VERSION, CanonicalStore, StoreError
@@ -45,6 +50,11 @@ TAIL_FORMAT = "vellis-normalized-tail-ndjson"
 # owned history base at the captured revision rather than claiming the source history.
 TABLES = (
     "definition_set",
+    "definition_set_overlay",
+    "definition_set_type_override",
+    "definition_set_relationship_override",
+    "current_definition_type_source",
+    "current_definition_relationship_source",
     "definition_type",
     "definition_anchor_permission",
     "definition_property_rule",
@@ -68,8 +78,9 @@ TABLES = (
     "proposal_definition_relationship",
 )
 
-DEFINITION_TABLES = TABLES[:9]
-OBJECT_TABLES = TABLES[9:13]
+CURRENT_DEFINITION_TABLES = TABLES[4:6]
+DEFINITION_TABLES = (*TABLES[:4], *TABLES[6:14])
+OBJECT_TABLES = TABLES[14:18]
 TAIL_TABLES = (
     *DEFINITION_TABLES,
     *OBJECT_TABLES,
@@ -81,13 +92,27 @@ TAIL_TABLES = (
 )
 
 _CAPTURED_DEFINITION_IDS = """(
-    SELECT active_definition_set_id FROM state_head WHERE id = 0
-    UNION SELECT proposed_definition_set_id FROM state_head
-          WHERE id = 0 AND proposed_definition_set_id IS NOT NULL
-    UNION SELECT base_definition_set_id FROM proposal_definition_state
-          WHERE id = 0 AND base_definition_set_id IS NOT NULL
-    UNION SELECT value_set_id FROM proposal_definition_type WHERE value_set_id IS NOT NULL
-    UNION SELECT value_set_id FROM proposal_definition_relationship WHERE value_set_id IS NOT NULL
+    WITH RECURSIVE captured(identity) AS (
+        SELECT active_definition_set_id FROM state_head WHERE id = 0
+        UNION SELECT proposed_definition_set_id FROM state_head
+              WHERE id = 0 AND proposed_definition_set_id IS NOT NULL
+        UNION SELECT base_definition_set_id FROM proposal_definition_state
+              WHERE id = 0 AND base_definition_set_id IS NOT NULL
+        UNION SELECT value_set_id FROM proposal_definition_type
+              WHERE value_set_id IS NOT NULL
+        UNION SELECT value_set_id FROM proposal_definition_relationship
+              WHERE value_set_id IS NOT NULL
+        UNION SELECT value_set_id FROM current_definition_type_source
+        UNION SELECT value_set_id FROM current_definition_relationship_source
+        UNION SELECT o.base_definition_set_id FROM definition_set_overlay AS o
+              JOIN captured AS c ON c.identity = o.definition_set_id
+        UNION SELECT o.value_set_id FROM definition_set_type_override AS o
+              JOIN captured AS c ON c.identity = o.definition_set_id
+              WHERE o.value_set_id IS NOT NULL
+        UNION SELECT o.value_set_id FROM definition_set_relationship_override AS o
+              JOIN captured AS c ON c.identity = o.definition_set_id
+              WHERE o.value_set_id IS NOT NULL
+    ) SELECT identity FROM captured
 )"""
 
 _CAPTURED_OBJECT_VALUE_IDS = """(
@@ -98,6 +123,13 @@ _CAPTURED_OBJECT_VALUE_IDS = """(
 
 FILTERS = {
     "definition_set": f" WHERE identity IN {_CAPTURED_DEFINITION_IDS}",
+    "definition_set_overlay": f" WHERE definition_set_id IN {_CAPTURED_DEFINITION_IDS}",
+    "definition_set_type_override": (f" WHERE definition_set_id IN {_CAPTURED_DEFINITION_IDS}"),
+    "definition_set_relationship_override": (
+        f" WHERE definition_set_id IN {_CAPTURED_DEFINITION_IDS}"
+    ),
+    "current_definition_type_source": "",
+    "current_definition_relationship_source": "",
     "definition_type": f" WHERE definition_set_id IN {_CAPTURED_DEFINITION_IDS}",
     "definition_anchor_permission": (f" WHERE definition_set_id IN {_CAPTURED_DEFINITION_IDS}"),
     "definition_property_rule": f" WHERE definition_set_id IN {_CAPTURED_DEFINITION_IDS}",
@@ -179,76 +211,44 @@ def _captured_state_identity(connection: sqlite3.Connection) -> str:
         raise StoreError(str(error)) from error
 
 
-def _verify_proposal_summaries(connection: sqlite3.Connection) -> str | None:
-    overlay = connection.execute(
+def _stored_proposal_entry_digest(connection: sqlite3.Connection, uuid: object) -> str | None:
+    row = connection.execute(
+        "SELECT p.object_kind, p.operation, v.content_identity FROM proposal_entry AS p"
+        " LEFT JOIN object_value AS v ON v.id = p.object_value_id WHERE p.uuid = ?",
+        (uuid,),
+    ).fetchone()
+    if row is None:
+        return None
+    return proposal_entry_digest(
+        str(uuid), str(row[0]), str(row[1]), None if row[2] is None else str(row[2])
+    )
+
+
+def _adjust_proposal_summary(
+    connection: sqlite3.Connection, before: str | None, after: str | None
+) -> None:
+    row = connection.execute(
         "SELECT accumulator, entry_count FROM proposal_overlay_state WHERE id = 0"
     ).fetchone()
-    if overlay is None:
-        return "proposal overlay has no summary state"
-    actual_count = int(connection.execute("SELECT count(*) FROM proposal_entry").fetchone()[0])
-    actual_accumulator = 0
-    for uuid, kind, operation, identity in connection.execute(
-        "SELECT p.uuid, p.object_kind, p.operation, v.content_identity"
-        " FROM proposal_entry AS p LEFT JOIN object_value AS v ON v.id = p.object_value_id"
-    ):
-        actual_accumulator ^= int(
-            semantic_identity(
-                (
-                    str(uuid),
-                    str(kind),
-                    str(operation),
-                    None if identity is None else str(identity),
-                )
-            ),
-            16,
-        )
-    if (str(overlay[0]), int(overlay[1])) != (f"{actual_accumulator:064x}", actual_count):
-        return "proposal overlay summary does not match its entries"
-    actual_counts = {
-        (str(kind), str(operation)): int(count)
-        for kind, operation, count in connection.execute(
-            "SELECT object_kind, operation, count(*) FROM proposal_entry"
-            " GROUP BY object_kind, operation"
-        )
-    }
-    stored_counts = {
-        (str(kind), str(operation)): int(count)
-        for kind, operation, count in connection.execute(
-            "SELECT object_kind, operation, entry_count FROM proposal_overlay_count"
-        )
-    }
-    if any(stored_counts.get(key, 0) != value for key, value in actual_counts.items()) or any(
-        value != actual_counts.get(key, 0) for key, value in stored_counts.items()
-    ):
-        return "proposal overlay counts do not match its entries"
-    definition = connection.execute(
-        "SELECT accumulator, entry_count, effective_accumulator, effective_entry_count, identity"
-        " FROM proposal_definition_state WHERE id = 0"
-    ).fetchone()
-    if definition is None:
-        return "proposal definitions have no summary state"
-    edit_accumulator = 0
-    edit_count = 0
-    for key, operation, value in connection.execute(
-        "SELECT type_key, operation, value_set_id FROM proposal_definition_type"
-        " UNION ALL SELECT natural_key, operation, value_set_id"
-        " FROM proposal_definition_relationship"
-    ):
-        edit_accumulator ^= int(
-            semantic_identity((str(key), str(operation), None if value is None else str(value))),
-            16,
-        )
-        edit_count += 1
-    if (str(definition[0]), int(definition[1])) != (f"{edit_accumulator:064x}", edit_count):
-        return "proposal definition summary does not match its keyed edits"
-    if definition[4] is not None:
-        if definition[2] is None or definition[3] is None:
-            return "proposal definition identity has no effective content summary"
-        if definition_identity_from_stats(str(definition[2]), int(definition[3])) != str(
-            definition[4]
-        ):
-            return "proposal definition identity does not match its effective content summary"
-    return None
+    if row is None:
+        raise StoreError("the proposal overlay has no maintained summary")
+    accumulator, count = int(str(row[0]), 16), int(row[1])
+    if before is not None:
+        accumulator ^= int(before, 16)
+        count -= 1
+    if after is not None:
+        accumulator ^= int(after, 16)
+        count += 1
+    if count < 0:
+        raise StoreError("the proposal overlay summary has a negative entry count")
+    connection.execute(
+        "UPDATE proposal_overlay_state SET accumulator = ?, entry_count = ? WHERE id = 0",
+        (f"{accumulator:064x}", count),
+    )
+
+
+def _verify_proposal_summaries(connection: sqlite3.Connection) -> str | None:
+    return verify_proposal_summaries(connection)
 
 
 def export_ndjson(path: Path, output: TextIO, *, batch_size: int = 256) -> SnapshotMetadata:
@@ -260,6 +260,9 @@ def export_ndjson(path: Path, output: TextIO, *, batch_size: int = 256) -> Snaps
         if int(connection.execute("PRAGMA application_id").fetchone()[0]) != APPLICATION_ID:
             raise StoreError("the source is not a Vellis store")
         connection.execute("BEGIN")
+        summary_error = verify_state_summaries(connection) or _verify_proposal_summaries(connection)
+        if summary_error is not None:
+            raise StoreError(summary_error)
         head = connection.execute(
             "SELECT h.revision, r.record_identity FROM state_head AS h"
             " JOIN canonical_record AS r ON r.established_revision = h.established_by"
@@ -350,6 +353,9 @@ def export_tail_ndjson(
         if int(connection.execute("PRAGMA application_id").fetchone()[0]) != APPLICATION_ID:
             raise StoreError("the source is not a Vellis store")
         connection.execute("BEGIN")
+        summary_error = verify_state_summaries(connection) or _verify_proposal_summaries(connection)
+        if summary_error is not None:
+            raise StoreError(summary_error)
         preceding = connection.execute(
             "SELECT record_identity FROM canonical_record WHERE established_revision = ?",
             (after_revision,),
@@ -374,6 +380,19 @@ def export_tail_ndjson(
             " UNION SELECT value_set_id FROM canonical_definition_proposal_event"
             " WHERE established_revision > ? AND value_set_id IS NOT NULL",
             (after_revision, after_revision, after_revision),
+        )
+        connection.execute(
+            "INSERT OR IGNORE INTO tail_definition_id"
+            " WITH RECURSIVE related(identity) AS ("
+            " SELECT identity FROM tail_definition_id"
+            " UNION SELECT o.base_definition_set_id FROM definition_set_overlay AS o"
+            " JOIN related AS r ON r.identity = o.definition_set_id"
+            " UNION SELECT o.value_set_id FROM definition_set_type_override AS o"
+            " JOIN related AS r ON r.identity = o.definition_set_id"
+            " WHERE o.value_set_id IS NOT NULL"
+            " UNION SELECT o.value_set_id FROM definition_set_relationship_override AS o"
+            " JOIN related AS r ON r.identity = o.definition_set_id"
+            " WHERE o.value_set_id IS NOT NULL) SELECT identity FROM related"
         )
         connection.execute("CREATE TEMP TABLE tail_object_id(id INTEGER PRIMARY KEY)")
         connection.execute(
@@ -855,6 +874,61 @@ def _activation_events_match_overlay(connection: sqlite3.Connection, revision: i
     return difference is None
 
 
+def _replace_current_definition_sources(connection: sqlite3.Connection, identity: str) -> None:
+    """Rebuild current keyed definition membership without materializing definitions."""
+    chain: list[str] = []
+    base = identity
+    while True:
+        row = connection.execute(
+            "SELECT base_definition_set_id FROM definition_set_overlay WHERE definition_set_id = ?",
+            (base,),
+        ).fetchone()
+        if row is None:
+            break
+        chain.append(base)
+        base = str(row[0])
+    connection.execute("DELETE FROM current_definition_type_source")
+    connection.execute("DELETE FROM current_definition_relationship_source")
+    connection.execute(
+        "INSERT INTO current_definition_type_source"
+        " SELECT type_key, definition_set_id FROM definition_type"
+        " WHERE definition_set_id = ?",
+        (base,),
+    )
+    connection.execute(
+        "INSERT INTO current_definition_relationship_source"
+        " SELECT natural_key, definition_set_id FROM definition_multiplicity_rule"
+        " WHERE definition_set_id = ?",
+        (base,),
+    )
+    for overlay in reversed(chain):
+        connection.execute(
+            "DELETE FROM current_definition_type_source WHERE type_key IN"
+            " (SELECT type_key FROM definition_set_type_override"
+            " WHERE definition_set_id = ?)",
+            (overlay,),
+        )
+        connection.execute(
+            "INSERT INTO current_definition_type_source"
+            " SELECT type_key, value_set_id FROM definition_set_type_override"
+            " WHERE definition_set_id = ? AND operation = 'upsert'",
+            (overlay,),
+        )
+        connection.execute(
+            "DELETE FROM current_definition_relationship_source WHERE natural_key IN"
+            " (SELECT natural_key FROM definition_set_relationship_override"
+            " WHERE definition_set_id = ?)",
+            (overlay,),
+        )
+        connection.execute(
+            "INSERT INTO current_definition_relationship_source"
+            " SELECT natural_key, value_set_id"
+            " FROM definition_set_relationship_override"
+            " WHERE definition_set_id = ? AND operation = 'upsert'",
+            (overlay,),
+        )
+
+
 def _apply_tail_stream(
     connection: sqlite3.Connection,
     tail: TextIO,
@@ -1010,11 +1084,43 @@ def _apply_tail_stream(
         if event_error is not None:
             raise StoreError(event_error)
 
+        graph_summary = connection.execute(
+            "SELECT graph_accumulator, graph_entry_count FROM state_head WHERE id = 0"
+        ).fetchone()
+        if graph_summary is None:
+            raise StoreError("tail transition has no maintained current-graph summary")
+        graph_accumulator, graph_count = str(graph_summary[0]), int(graph_summary[1])
         for operation, _object_kind, uuid, value_id in connection.execute(
             "SELECT operation, object_kind, uuid, object_value_id FROM canonical_graph_event"
             " WHERE established_revision = ? ORDER BY occurrence",
             (revision,),
         ):
+            prior_identity = connection.execute(
+                "SELECT v.content_identity FROM current_graph_object AS c"
+                " JOIN object_value AS v ON v.id = c.object_value_id WHERE c.uuid = ?",
+                (uuid,),
+            ).fetchone()
+            next_identity = (
+                None
+                if value_id is None
+                else connection.execute(
+                    "SELECT content_identity FROM object_value WHERE id = ?", (value_id,)
+                ).fetchone()
+            )
+            graph_accumulator, graph_count = adjust_semantic_summary(
+                graph_accumulator,
+                graph_count,
+                removed=(
+                    ()
+                    if prior_identity is None
+                    else (graph_entry_digest(str(uuid), str(prior_identity[0])),)
+                ),
+                added=(
+                    ()
+                    if next_identity is None
+                    else (graph_entry_digest(str(uuid), str(next_identity[0])),)
+                ),
+            )
             connection.execute(
                 "UPDATE graph_presence_interval SET valid_to_revision = ?"
                 " WHERE uuid = ? AND valid_to_revision IS NULL",
@@ -1029,11 +1135,16 @@ def _apply_tail_stream(
                 )
             elif operation != "delete":
                 raise StoreError("tail has an invalid graph event")
+        connection.execute(
+            "UPDATE state_head SET graph_accumulator = ?, graph_entry_count = ? WHERE id = 0",
+            (graph_accumulator, graph_count),
+        )
         for operation, object_kind, uuid, value_id in connection.execute(
             "SELECT operation, object_kind, uuid, object_value_id FROM canonical_proposal_event"
             " WHERE established_revision = ? ORDER BY occurrence",
             (revision,),
         ):
+            before_entry = _stored_proposal_entry_digest(connection, uuid)
             if operation == "unstage":
                 connection.execute("DELETE FROM proposal_entry WHERE uuid = ?", (uuid,))
             else:
@@ -1053,6 +1164,9 @@ def _apply_tail_stream(
                         None if base is None else base[0],
                     ),
                 )
+            _adjust_proposal_summary(
+                connection, before_entry, _stored_proposal_entry_digest(connection, uuid)
+            )
         for entity_kind, natural_key, operation, value_set_id in connection.execute(
             "SELECT entity_kind, natural_key, operation, value_set_id"
             " FROM canonical_definition_proposal_event WHERE established_revision = ?"
@@ -1074,6 +1188,27 @@ def _apply_tail_stream(
                 )
         active, disposition, proposed = definition
         if active is not None:
+            if kind == "definitionActivation":
+                connection.execute(
+                    "DELETE FROM current_definition_type_source WHERE type_key IN"
+                    " (SELECT type_key FROM proposal_definition_type)"
+                )
+                connection.execute(
+                    "INSERT INTO current_definition_type_source"
+                    " SELECT type_key, value_set_id FROM proposal_definition_type"
+                    " WHERE operation = 'upsert'"
+                )
+                connection.execute(
+                    "DELETE FROM current_definition_relationship_source WHERE natural_key IN"
+                    " (SELECT natural_key FROM proposal_definition_relationship)"
+                )
+                connection.execute(
+                    "INSERT INTO current_definition_relationship_source"
+                    " SELECT natural_key, value_set_id FROM proposal_definition_relationship"
+                    " WHERE operation = 'upsert'"
+                )
+            else:
+                _replace_current_definition_sources(connection, str(active))
             connection.execute(
                 "UPDATE state_head SET active_definition_set_id = ? WHERE id = 0", (active,)
             )
@@ -1083,6 +1218,10 @@ def _apply_tail_stream(
             )
         elif disposition == "absent":
             connection.execute("DELETE FROM proposal_entry")
+            connection.execute(
+                "UPDATE proposal_overlay_state SET accumulator = ?, entry_count = 0 WHERE id = 0",
+                ("0" * 64,),
+            )
             connection.execute("DELETE FROM proposal_definition_type")
             connection.execute("DELETE FROM proposal_definition_relationship")
             connection.execute(
@@ -1263,6 +1402,9 @@ def import_ndjson(
             identity_error = verify_normalized_identities(connection)
             if identity_error is not None:
                 raise StoreError(identity_error)
+            state_summary_error = verify_state_summaries(connection)
+            if state_summary_error is not None:
+                raise StoreError(state_summary_error)
             proposal_error = _verify_proposal_summaries(connection)
             if proposal_error is not None:
                 raise StoreError(proposal_error)
@@ -1302,6 +1444,9 @@ def import_ndjson(
             identity_error = verify_normalized_identities(connection)
             if identity_error is not None:
                 raise StoreError(identity_error)
+            state_summary_error = verify_state_summaries(connection)
+            if state_summary_error is not None:
+                raise StoreError(state_summary_error)
             proposal_error = _verify_proposal_summaries(connection)
             if proposal_error is not None:
                 raise StoreError(proposal_error)

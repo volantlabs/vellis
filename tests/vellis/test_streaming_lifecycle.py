@@ -15,7 +15,12 @@ from vellis.definitions import AnchorTypeDefinition, GraphDefinitionSet
 from vellis.governance import ActivateDefinitionDeltaRequest, DefinitionChange
 from vellis.graph import Anchor
 from vellis.history import RevisionSelection
-from vellis.normalized import object_identity, semantic_identity, semantic_row_summary
+from vellis.normalized import (
+    object_identity,
+    recomputed_graph_summary,
+    semantic_identity,
+    semantic_row_summary,
+)
 from vellis.outcomes import ValidationRequest, ValidationRequestKind, ValidationScope
 from vellis.query import (
     AnchorGroup,
@@ -264,8 +269,7 @@ def test_snapshot_state_is_bound_to_the_exact_captured_record(tmp_path: Path) ->
             str(head["values"]["active_definition_set_id"]),
             head["values"]["proposed_definition_set_id"],
             semantic_row_summary(graph_rows),
-            (0, "0" * 64),
-            (0, "0" * 64),
+            semantic_identity(("graphOverlay", "0" * 64, 0)),
         )
     )
     captured_record["values"]["resulting_state_identity"] = header["stateIdentity"]
@@ -393,6 +397,11 @@ def test_scale_snapshot_and_tail_import_keep_their_database_row_buffer_fixed(
             " (uuid, object_value_id, object_kind, type_key, source_uuid, target_uuid,"
             " valid_from_revision, valid_to_revision)"
             " SELECT uuid, id, object_kind, type_key, NULL, NULL, 0, NULL FROM object_value"
+        )
+        graph_count, graph_accumulator = recomputed_graph_summary(connection)
+        connection.execute(
+            "UPDATE state_head SET graph_entry_count = ?, graph_accumulator = ? WHERE id = 0",
+            (graph_count, graph_accumulator),
         )
         system.store._seal_record_identity_unlocked(0)  # noqa: SLF001
         connection.execute("COMMIT")

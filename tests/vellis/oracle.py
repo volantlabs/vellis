@@ -6,6 +6,7 @@ oracle, so tests assemble those values directly from normalized SQLite rows here
 """
 
 from tests.vellis.semantic_state import DefinitionDelta, SemanticState
+from vellis.changes import GraphChange
 from vellis.definitions import (
     AnchorTypeDefinition,
     AssociatedDataTypeDefinition,
@@ -14,8 +15,8 @@ from vellis.definitions import (
     RelationshipConstraint,
 )
 from vellis.everyday_life import everyday_life_entries
-from vellis.graph import Anchor, AssociatedDataObject, Graph, Link
-from vellis.normalized import load_definition_set, load_object_value
+from vellis.graph import Anchor, AssociatedDataObject, Graph, Link, ObjectKind
+from vellis.normalized import load_object_value
 from vellis.query import (
     AnchorGroup,
     GraphQuery,
@@ -131,42 +132,23 @@ def materialize_definitions(
         "SELECT active_definition_set_id, proposed_definition_set_id FROM state_head WHERE id = 0"
     ).fetchone()
     assert head is not None
+    active_type_keys = set(
+        store._effective_type_keys_unlocked("current_graph_object", str(head[0]))
+    )  # noqa: SLF001
+    active_relationship_keys = set(store._effective_relationship_keys_unlocked(str(head[0])))  # noqa: SLF001
     if not prospective:
-        type_keys = {
-            str(row[0])
-            for row in connection.execute(
-                "SELECT type_key FROM definition_type WHERE definition_set_id = ?", (str(head[0]),)
-            )
-        }
-        relationship_keys = {
-            str(row[0])
-            for row in connection.execute(
-                "SELECT natural_key FROM definition_multiplicity_rule WHERE definition_set_id = ?",
-                (str(head[0]),),
-            )
-        }
-        return load_definition_set(
-            connection,
+        return store._load_definition_set(  # noqa: SLF001
             str(head[0]),
-            type_keys=type_keys,
-            relationship_keys=relationship_keys,
+            type_keys=active_type_keys,
+            relationship_keys=active_relationship_keys,
         )
     assert head[1] is not None
-    type_keys = {
-        str(row[0])
-        for row in connection.execute(
-            "SELECT type_key FROM definition_type WHERE definition_set_id = ?"
-            " UNION SELECT type_key FROM proposal_definition_type",
-            (str(head[0]),),
-        )
+    type_keys = active_type_keys | {
+        str(row[0]) for row in connection.execute("SELECT type_key FROM proposal_definition_type")
     }
-    relationship_keys = {
+    relationship_keys = active_relationship_keys | {
         str(row[0])
-        for row in connection.execute(
-            "SELECT natural_key FROM definition_multiplicity_rule WHERE definition_set_id = ?"
-            " UNION SELECT natural_key FROM proposal_definition_relationship",
-            (str(head[0]),),
-        )
+        for row in connection.execute("SELECT natural_key FROM proposal_definition_relationship")
     }
     return store._effective_proposed_definitions_unlocked(  # noqa: SLF001
         str(head[0]), type_keys=type_keys, relationship_keys=relationship_keys
@@ -201,9 +183,39 @@ def materialize_state(system: RTGSystem | CanonicalStore) -> SemanticState:
             proposed = materialize_definitions(store, prospective=True)
             delta = DefinitionDelta(
                 proposed_definitions=proposed,
-                graph_overlay=store._proposal_graph_change_unlocked(),  # noqa: SLF001
+                graph_overlay=_materialize_graph_overlay(store),
             )
         return SemanticState(graph, active, revision, delta)
+
+
+def _materialize_graph_overlay(store: CanonicalStore) -> GraphChange:
+    """Assemble the keyed prospective overlay only inside this test oracle."""
+    anchors: list[Anchor] = []
+    data: list[AssociatedDataObject] = []
+    links: list[Link] = []
+    removals: dict[ObjectKind, list[str]] = {kind: [] for kind in ObjectKind}
+    for uuid, kind_name, operation, value_id in store._connection.execute(  # noqa: SLF001
+        "SELECT uuid, object_kind, operation, object_value_id FROM proposal_entry ORDER BY uuid"
+    ):
+        kind = ObjectKind(str(kind_name))
+        if operation == "delete":
+            removals[kind].append(str(uuid))
+            continue
+        value = load_object_value(store._connection, int(value_id))  # noqa: SLF001
+        if isinstance(value, Anchor):
+            anchors.append(value)
+        elif isinstance(value, AssociatedDataObject):
+            data.append(value)
+        else:
+            links.append(value)
+    return GraphChange(
+        tuple(anchors),
+        tuple(data),
+        tuple(links),
+        tuple(removals[ObjectKind.ANCHOR]),
+        tuple(removals[ObjectKind.ASSOCIATED_DATA]),
+        tuple(removals[ObjectKind.LINK]),
+    )
 
 
 def materialize_replay(system: RTGSystem | CanonicalStore) -> SemanticState:

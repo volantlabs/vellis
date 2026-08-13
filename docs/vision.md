@@ -15,7 +15,8 @@ projections, indexes, caches, checkpoints, snapshot cadence, and persistence tec
 implementation choices rather than modeled subsystems. Vellis currently selects one SQLite-owned
 live and historical state: immutable object and definition values, membership intervals, the sole
 prospective overlay, complete assessments, canonical events, and activity history are normalized and
-addressable through identity and semantic indexes. No production operation constructs or retains a
+addressable through identity and semantic indexes. Maintained semantic summaries make ordinary
+transition identity proportional to the change rather than the stored population. No production operation constructs or retains a
 complete graph, definition set, canonical state, or canonical change. Ordinary work uses affected
 neighborhoods, complete checks use bounded set-based scans, and lifecycle work streams. The
 realization is characterized along each of those dimensions — what its work

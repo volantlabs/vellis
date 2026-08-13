@@ -534,19 +534,23 @@ def test_refusing_a_non_vellis_database_named_like_ours_leaves_it_untouched(
     assert sorted(each.name for each in tmp_path.iterdir()) == siblings
 
 
-def test_a_store_written_by_a_later_build_is_refused(tmp_path: Path) -> None:
-    """Excludes reading a schema this build does not understand."""
+@pytest.mark.parametrize("unsupported_version", ("4", "999"))
+def test_an_unsupported_schema_is_refused(tmp_path: Path, unsupported_version: str) -> None:
+    """Excludes both migration of schema four and reading an unknown later schema."""
     path = tmp_path / "vellis.sqlite3"
     _established(path)
 
     connection = sqlite3.connect(path)
     try:
-        connection.execute("UPDATE schema_meta SET value = '999' WHERE key = 'schema_version'")
+        connection.execute(
+            "UPDATE schema_meta SET value = ? WHERE key = 'schema_version'",
+            (unsupported_version,),
+        )
         connection.commit()
     finally:
         connection.close()
 
-    with pytest.raises(StoreError, match="schema version 999"):
+    with pytest.raises(StoreError, match=f"schema version {unsupported_version}"):
         CanonicalStore(path)
 
 

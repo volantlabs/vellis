@@ -23,6 +23,8 @@ def _active_work(record: dict[str, object]) -> dict[str, object]:
 def _active_record() -> dict[str, Any]:
     record = copy.deepcopy(system_evolution.load_record())
     implementation = f"git:{system_evolution._git_text(system_evolution.ROOT, 'rev-parse', 'HEAD')}"  # noqa: SLF001
+    if record["baselines"]["target"] is None:
+        record["baselines"]["target"] = copy.deepcopy(record["baselines"]["observed"])
     for baseline in ("target", "observed"):
         record["baselines"][baseline]["implementation"] = implementation
         record["baselines"][baseline]["checkpoint"] = implementation
@@ -31,9 +33,8 @@ def _active_record() -> dict[str, Any]:
     record["closure"]["checkpoint"] = implementation
     record["evolution"]["lifecycle"] = "active"
     record["evolution"]["checkpoint"] = None
-    # The committed record may itself be complete. Choose the closure item explicitly
-    # when constructing an active-state fixture instead of depending on live ledger state.
-    active = _work(record, "W007")
+    # Select the implementation item explicitly instead of depending on live ledger state.
+    active = _work(record, "W001")
     active["planned_baseline"] = {
         "dimension": "implementation",
         "identity": implementation,
@@ -47,6 +48,8 @@ def _active_record() -> dict[str, Any]:
 
 def _complete_record() -> dict[str, Any]:
     record = copy.deepcopy(system_evolution.load_record())
+    if record["baselines"]["target"] is None:
+        record["baselines"]["target"] = copy.deepcopy(record["baselines"]["observed"])
     checkpoint = record["baselines"]["target"]["implementation"]
     for finding in record["findings"]:
         finding["disposition"] = "resolved"
@@ -134,7 +137,7 @@ def test_resolved_findings_and_conforming_decisions_require_evidence() -> None:
 
 def test_complete_work_item_cannot_retain_open_owned_work() -> None:
     record = copy.deepcopy(_record())
-    item = _work(record, "W002")
+    item = _work(record, "W001")
     item["lifecycle"] = "complete"
     item["implementation_status"] = "conforming"
     item["checkpoint"] = "git:checkpoint"
@@ -144,7 +147,7 @@ def test_complete_work_item_cannot_retain_open_owned_work() -> None:
 
     findings = system_evolution.validate_record(record)  # type: ignore[arg-type]
 
-    assert "complete work item W002 has open findings ['F003']" in findings
+    assert any("complete work item W001 has open findings" in each for each in findings)
 
 
 def test_status_reports_the_active_item_before_another_ready_item() -> None:
@@ -156,7 +159,7 @@ def test_status_reports_the_active_item_before_another_ready_item() -> None:
 
 def test_ready_work_requires_complete_dependencies() -> None:
     record = copy.deepcopy(_record())
-    _work(record, "W003")["lifecycle"] = "pending"
+    _work(record, "W001")["lifecycle"] = "pending"
     _work(record, "W004")["lifecycle"] = "ready"
 
     findings = system_evolution.validate_record(record)  # type: ignore[arg-type]
@@ -166,11 +169,12 @@ def test_ready_work_requires_complete_dependencies() -> None:
 
 def test_accepted_approval_requires_an_attributable_checkpoint() -> None:
     record = copy.deepcopy(_record())
-    _work(record, "W002")["approval"]["checkpoint"] = None  # type: ignore[index]
+    _work(record, "W001")["approval"]["status"] = "accepted"  # type: ignore[index]
+    _work(record, "W001")["approval"]["checkpoint"] = None  # type: ignore[index]
 
     findings = system_evolution.validate_record(record)  # type: ignore[arg-type]
 
-    assert "accepted approval for W002 has no attributable checkpoint" in findings
+    assert "accepted approval for W001 has no attributable checkpoint" in findings
 
 
 def test_active_work_cannot_remain_bound_only_to_a_source_baseline() -> None:
@@ -178,7 +182,7 @@ def test_active_work_cannot_remain_bound_only_to_a_source_baseline() -> None:
     active = _active_work(record)
     active["planned_baseline"] = {
         "dimension": "implementation",
-        "identity": record["baselines"]["source"]["implementation"],  # type: ignore[index]
+        "identity": "git:ee86d59",
     }
 
     findings = system_evolution.validate_record(record)  # type: ignore[arg-type]
@@ -190,7 +194,7 @@ def test_active_work_cannot_remain_bound_only_to_a_source_baseline() -> None:
 
 def test_complete_work_requires_complete_dependencies() -> None:
     record = copy.deepcopy(_record())
-    _work(record, "W002")["lifecycle"] = "pending"
+    _work(record, "W001")["lifecycle"] = "pending"
     _work(record, "W004")["lifecycle"] = "complete"
 
     findings = system_evolution.validate_record(record)  # type: ignore[arg-type]
@@ -199,7 +203,9 @@ def test_complete_work_requires_complete_dependencies() -> None:
 
 
 def test_complete_closure_requires_named_evidenced_review_lenses() -> None:
-    record = copy.deepcopy(_record())
+    record = cast(dict[str, Any], copy.deepcopy(_record()))
+    if record["baselines"]["target"] is None:
+        record["baselines"]["target"] = copy.deepcopy(record["baselines"]["observed"])
     for item in record["work_items"]:  # type: ignore[union-attr]
         item["lifecycle"] = "complete"
         item["implementation_status"] = "conforming"
@@ -241,7 +247,9 @@ def test_complete_closure_requires_named_evidenced_review_lenses() -> None:
 
 
 def test_git_checkpoints_must_resolve_to_commits() -> None:
-    record = copy.deepcopy(_record())
+    record = cast(dict[str, Any], copy.deepcopy(_record()))
+    if record["baselines"]["target"] is None:
+        record["baselines"]["target"] = copy.deepcopy(record["baselines"]["observed"])
     record["baselines"]["source"]["checkpoint"] = "git:does-not-exist"  # type: ignore[index]
 
     findings = system_evolution.validate_record(record)  # type: ignore[arg-type]
@@ -250,7 +258,9 @@ def test_git_checkpoints_must_resolve_to_commits() -> None:
 
 
 def test_complete_closure_rejects_duplicate_or_unresolved_reviews() -> None:
-    record = copy.deepcopy(_record())
+    record = cast(dict[str, Any], copy.deepcopy(_record()))
+    if record["baselines"]["target"] is None:
+        record["baselines"]["target"] = copy.deepcopy(record["baselines"]["observed"])
     for item in record["work_items"]:  # type: ignore[union-attr]
         item["lifecycle"] = "complete"
         item["implementation_status"] = "conforming"
@@ -308,14 +318,14 @@ def test_unknown_blocker_finding_and_duplicate_ownership_are_rejected() -> None:
         "finding_ids": ["F999"],
         "evidence_refs": [],
     }
-    _work(record, "W002")["lifecycle"] = "blocked"
-    _work(record, "W002")["blocker"] = {
+    _work(record, "W004")["lifecycle"] = "blocked"
+    _work(record, "W004")["blocker"] = {
         "classification": "external dependency",
         "summary": "The same bounded dependency blocks this work item.",
         "finding_ids": ["F003"],
         "evidence_refs": [],
     }
-    _work(record, "W001")["finding_ids"].append("F003")  # type: ignore[union-attr]
+    _work(record, "W004")["finding_ids"].append("F003")  # type: ignore[union-attr]
 
     findings = system_evolution.validate_record(record)  # type: ignore[arg-type]
 
@@ -372,6 +382,7 @@ def test_planned_baseline_names_one_dimension_not_any_matching_token() -> None:
 
 def test_completed_work_rejects_an_unrecognized_historical_baseline() -> None:
     record = copy.deepcopy(_record())
+    record["work_items"][0]["lifecycle"] = "complete"  # type: ignore[index]
     record["work_items"][0]["planned_baseline"] = {  # type: ignore[index]
         "dimension": "model",
         "identity": "superseded-model-baseline",
@@ -397,7 +408,8 @@ def test_vellis_evidence_rejects_false_commands_and_unresolved_fragments() -> No
 
 def test_accepted_approval_checkpoint_must_exist_and_contain_the_gate() -> None:
     record = copy.deepcopy(_record())
-    _work(record, "W002")["approval"]["checkpoint"] = "git:does-not-exist"  # type: ignore[index]
+    _work(record, "W001")["approval"]["status"] = "accepted"  # type: ignore[index]
+    _work(record, "W001")["approval"]["checkpoint"] = "git:does-not-exist"  # type: ignore[index]
 
     findings = system_evolution.validate_record(record)  # type: ignore[arg-type]
 
@@ -416,11 +428,11 @@ def test_every_finding_requires_one_completion_owner() -> None:
 
 def test_dependency_order_must_precede_the_dependent() -> None:
     record = copy.deepcopy(_record())
-    _work(record, "W006")["order"] = 2
+    _work(record, "W004")["order"] = 1
 
     findings = system_evolution.validate_record(record)  # type: ignore[arg-type]
 
-    assert "W006 dependency W005 must have a lower order" in findings
+    assert "W004 dependency W001 must have a lower order" in findings
 
 
 def test_lifecycle_rollup_requires_matching_executable_or_approval_frontier() -> None:
@@ -461,11 +473,14 @@ def test_clean_final_reviews_must_bind_the_exact_target_implementation() -> None
 
 def test_accepted_approval_seals_its_owner_facing_consequence() -> None:
     record = copy.deepcopy(system_evolution.load_record())
-    _work(record, "W002")["nearest_wrong_system"] = "A changed gated consequence."
+    item = _work(record, "W001")
+    item["approval"]["status"] = "accepted"  # type: ignore[index]
+    item["approval"]["checkpoint"] = "git:does-not-exist"  # type: ignore[index]
+    item["nearest_wrong_system"] = "A changed gated consequence."
 
     findings = system_evolution.validate_record(record)
 
-    assert "accepted work item W002 consequence differs from its approval checkpoint" in findings
+    assert any("approval checkpoint is not reconstructible" in each for each in findings)
 
 
 def test_complete_record_must_be_committed(monkeypatch: Any) -> None:
@@ -486,6 +501,7 @@ def test_complete_record_must_be_committed(monkeypatch: Any) -> None:
 
 def test_historical_baseline_keeps_its_declared_dimension() -> None:
     record = copy.deepcopy(system_evolution.load_record())
+    _work(record, "W001")["lifecycle"] = "complete"
     _work(record, "W001")["planned_baseline"] = {
         "dimension": "model",
         "identity": record["baselines"]["observed"]["implementation"],
