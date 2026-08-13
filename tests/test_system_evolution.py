@@ -22,9 +22,20 @@ def _active_work(record: dict[str, object]) -> dict[str, object]:
 
 def _active_record() -> dict[str, Any]:
     record = copy.deepcopy(system_evolution.load_record())
+    implementation = f"git:{system_evolution._git_text(system_evolution.ROOT, 'rev-parse', 'HEAD')}"  # noqa: SLF001
+    for baseline in ("target", "observed"):
+        record["baselines"][baseline]["implementation"] = implementation
+        record["baselines"][baseline]["checkpoint"] = implementation
+    for review in record["closure"]["reviews"]:
+        review["checkpoint"] = implementation
+    record["closure"]["checkpoint"] = implementation
     record["evolution"]["lifecycle"] = "active"
     record["evolution"]["checkpoint"] = None
     active = _work(record, "W004")
+    active["planned_baseline"] = {
+        "dimension": "implementation",
+        "identity": implementation,
+    }
     active["lifecycle"] = "active"
     active["implementation_status"] = "partial"
     active["evidence_refs"] = []
@@ -322,6 +333,14 @@ def test_duplicate_ids_are_rejected_before_indexing() -> None:
 
 def test_observed_baseline_is_derived_from_the_repository() -> None:
     record = _active_record()
+    initial_findings = system_evolution.validate_record(record)  # type: ignore[arg-type]
+    assert (
+        "observed implementation baseline does not match the current repository"
+        not in initial_findings
+    )
+    assert (
+        "observed checkpoint baseline does not match the current repository" not in initial_findings
+    )
     record["baselines"]["target"]["implementation"] = "git:ee86d59"  # type: ignore[index]
     record["baselines"]["target"]["checkpoint"] = "git:ee86d59"  # type: ignore[index]
     record["baselines"]["observed"]["implementation"] = "git:ee86d59"  # type: ignore[index]
