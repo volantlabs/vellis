@@ -3,13 +3,13 @@ evolution:
   id: post-closure-evidence-subtraction
   objective: Remove redundant and realization-fragile tests while preserving every uniquely discriminating semantic, compatibility, failure, resource, integrity, and repository-workflow claim.
   observable_distinction: The smaller suite still rejects every plausible wrong system or workflow invariant currently carrying unique evidence, without retaining tests solely because they existed at closure.
-  lifecycle: active
+  lifecycle: complete
   approval:
     status: not-required
     reason: Accepted product authority and public behavior are unchanged; this is bounded realization and evidence subtraction.
     checkpoint: null
   blocker: null
-  checkpoint: null
+  checkpoint: git:79797f68d4f96d788e874696f7a4a210b5a4ac63
 baselines:
   status: current
   source:
@@ -20,16 +20,16 @@ baselines:
     checkpoint: git:2524d901de504b11fd7907f238121ff1333065e4
   target:
     model: sha256:23a0fa4c525a6e89ec0740c4d4f0af283cccae44abc23b73b99f7427d7c93c7e
-    implementation: git:2524d901de504b11fd7907f238121ff1333065e4
+    implementation: git:79797f68d4f96d788e874696f7a4a210b5a4ac63
     language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
     execution_environment: sha256:3315a10b5fcc8d62aa435d2f4e12165a147f334b01fad06ce367d11b6eb8191c
-    checkpoint: git:2524d901de504b11fd7907f238121ff1333065e4
+    checkpoint: git:79797f68d4f96d788e874696f7a4a210b5a4ac63
   observed:
     model: sha256:23a0fa4c525a6e89ec0740c4d4f0af283cccae44abc23b73b99f7427d7c93c7e
-    implementation: git:2524d901de504b11fd7907f238121ff1333065e4
+    implementation: git:79797f68d4f96d788e874696f7a4a210b5a4ac63
     language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
     execution_environment: sha256:3315a10b5fcc8d62aa435d2f4e12165a147f334b01fad06ce367d11b6eb8191c
-    checkpoint: git:2524d901de504b11fd7907f238121ff1333065e4
+    checkpoint: git:79797f68d4f96d788e874696f7a4a210b5a4ac63
 scope:
   authority_scope:
     - VellisRequirements::historyIndependentCurrentWork
@@ -156,7 +156,7 @@ work_items:
       - Historical campaign evidence remains reconstructible from its committed checkpoint.
       - Product behavior and user-owned data remain untouched.
       - Independent two-lens review remains required.
-    lifecycle: active
+    lifecycle: complete
     implementation_status: conforming
     evidence_refs:
       - command:uv run pytest tests/vellis/test_current_work.py tests/vellis/test_work_characterization.py tests/vellis/test_population_local_work.py -q
@@ -165,7 +165,7 @@ work_items:
       - command:uv run pytest tests/test_implementation_campaign.py tests/test_system_evolution.py -q
       - command:just check
     blocker: null
-    checkpoint: null
+    checkpoint: git:79797f68d4f96d788e874696f7a4a210b5a4ac63
   - id: W004
     order: 2
     label: Review and rebaseline the reduced evidence suite
@@ -192,28 +192,32 @@ work_items:
     non_effects:
       - No numerical reduction target becomes authority.
       - User-owned data remains untouched.
-    lifecycle: pending
-    implementation_status: not evaluated
-    evidence_refs: []
+    lifecycle: complete
+    implementation_status: conforming
+    evidence_refs:
+      - command:just check
     blocker: null
-    checkpoint: null
+    checkpoint: git:79797f68d4f96d788e874696f7a4a210b5a4ac63
 closure:
-  finding_disposition: open
-  model_status: unchanged
-  implementation_status: partial
-  integration_status: not evaluated
+  finding_disposition: complete
+  model_status: accepted
+  implementation_status: conforming
+  integration_status: conforming
   external_status: not applicable
   compatibility: Product, persistence, MCP, and compatibility behavior remain unchanged.
   reviews:
     - lens: authority and conformance
-      status: pending
-      reviewer: null
-      checkpoint: null
-      evidence_refs: []
+      status: clean
+      reviewer: agent:subtraction-clean-authority
+      checkpoint: git:79797f68d4f96d788e874696f7a4a210b5a4ac63
+      evidence_refs:
+        - command:just check
     - lens: engineering and evidence
-      status: pending
-      reviewer: null
-      checkpoint: null
-      evidence_refs: []
-  evidence_refs: []
-  checkpoint: null
+      status: clean
+      reviewer: agent:subtraction-clean-engineering
+      checkpoint: git:79797f68d4f96d788e874696f7a4a210b5a4ac63
+      evidence_refs:
+        - command:just check
+  evidence_refs:
+    - command:just check
+  checkpoint: git:79797f68d4f96d788e874696f7a4a210b5a4ac63
