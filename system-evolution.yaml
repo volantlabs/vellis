@@ -9,7 +9,7 @@ evolution:
     reason: The owner accepted normalized SQLite state, prospective graph overlay, complete stored assessments with bounded retrieval, and streamed snapshots while preserving portable system meaning.
     checkpoint: git:8109ab24c4dc58d81fbfe2fee0181b395089a61d
   blocker: null
-  checkpoint: git:ca30e817d74299f8b9865f9882f3e58f629ba5bf
+  checkpoint: git:d59d3c084d71275186d87b685403571f829cd54c
 baselines:
   status: current
   source:
@@ -20,16 +20,16 @@ baselines:
     checkpoint: git:79840c2168e5d136571a89f7eb6ccd6ff7e56659
   target:
     model: sha256:23a0fa4c525a6e89ec0740c4d4f0af283cccae44abc23b73b99f7427d7c93c7e
-    implementation: git:ca30e817d74299f8b9865f9882f3e58f629ba5bf
+    implementation: git:d59d3c084d71275186d87b685403571f829cd54c
     language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
     execution_environment: sha256:3315a10b5fcc8d62aa435d2f4e12165a147f334b01fad06ce367d11b6eb8191c
-    checkpoint: git:ca30e817d74299f8b9865f9882f3e58f629ba5bf
+    checkpoint: git:d59d3c084d71275186d87b685403571f829cd54c
   observed:
     model: sha256:23a0fa4c525a6e89ec0740c4d4f0af283cccae44abc23b73b99f7427d7c93c7e
-    implementation: git:ca30e817d74299f8b9865f9882f3e58f629ba5bf
+    implementation: git:d59d3c084d71275186d87b685403571f829cd54c
     language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
     execution_environment: sha256:3315a10b5fcc8d62aa435d2f4e12165a147f334b01fad06ce367d11b6eb8191c
-    checkpoint: git:ca30e817d74299f8b9865f9882f3e58f629ba5bf
+    checkpoint: git:d59d3c084d71275186d87b685403571f829cd54c
 scope:
   authority_scope:
     - model/10-rtg-domain.sysml
@@ -610,7 +610,7 @@ work_items:
     evidence_refs:
       - command:just check
     blocker: null
-    checkpoint: git:ca30e817d74299f8b9865f9882f3e58f629ba5bf
+    checkpoint: git:d59d3c084d71275186d87b685403571f829cd54c
 closure:
   finding_disposition: complete
   model_status: accepted
@@ -622,16 +622,16 @@ closure:
     - lens: authority and conformance
       status: clean
       reviewer: agent:w007_final_authority
-      checkpoint: git:ca30e817d74299f8b9865f9882f3e58f629ba5bf
+      checkpoint: git:d59d3c084d71275186d87b685403571f829cd54c
       evidence_refs:
         - command:just model-check
         - command:just system-evolution-check
     - lens: engineering and evidence
       status: clean
       reviewer: agent:w007_final_engineering
-      checkpoint: git:ca30e817d74299f8b9865f9882f3e58f629ba5bf
+      checkpoint: git:d59d3c084d71275186d87b685403571f829cd54c
       evidence_refs:
         - command:just check
   evidence_refs:
     - command:just check
-  checkpoint: git:ca30e817d74299f8b9865f9882f3e58f629ba5bf
+  checkpoint: git:d59d3c084d71275186d87b685403571f829cd54c
