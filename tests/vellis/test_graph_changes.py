@@ -454,6 +454,13 @@ def test_a_non_conforming_graph_is_described_not_raised(tmp_path: Path) -> None:
         system.store._upsert_current_graph_object_unlocked(  # noqa: SLF001
             Link("l-9", "worksOn", "a-2", "a-1")
         )
+        # This fixture intentionally creates a canonically established but
+        # non-conforming graph. A raw projection edit is a different failure
+        # mode, covered by test_store_integrity, so acknowledge this test-only
+        # write before asking the conformance checker to describe the graph.
+        system.store._connection.execute(  # noqa: SLF001
+            "UPDATE current_state SET sealed_projection_writes = projection_writes WHERE id = 0"
+        )
         report = system.check()
         assert report.scope is ValidationScope.GRAPH_CONFORMANCE
         assert not report.conforms

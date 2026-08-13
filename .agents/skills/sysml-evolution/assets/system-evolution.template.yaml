@@ -83,5 +83,12 @@ closure:
   integration_status: not applicable
   external_status: not applicable
   compatibility: Not yet evaluated.
+  reviews:
+    - lens: authority and conformance
+      status: pending
+      evidence_refs: []
+    - lens: engineering and evidence
+      status: pending
+      evidence_refs: []
   evidence_refs: []
   checkpoint: null

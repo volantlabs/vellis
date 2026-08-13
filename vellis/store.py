@@ -150,6 +150,8 @@ CREATE TABLE current_state (
     id             INTEGER PRIMARY KEY CHECK (id = 0),
     revision       INTEGER NOT NULL,
     established_by INTEGER NOT NULL REFERENCES canonical_record (established_revision),
+    projection_writes INTEGER NOT NULL DEFAULT 0,
+    sealed_projection_writes INTEGER NOT NULL DEFAULT 0,
     active_definitions TEXT NOT NULL,
     definition_delta TEXT
 );
@@ -172,6 +174,18 @@ CREATE INDEX current_graph_link_endpoints
     ON current_graph_object (object_kind, type_key, source_uuid, target_uuid);
 CREATE INDEX current_data_anchor_anchor
     ON current_data_anchor (anchor_uuid, data_uuid);
+CREATE TRIGGER current_graph_object_projection_insert AFTER INSERT ON current_graph_object
+BEGIN UPDATE current_state SET projection_writes = projection_writes + 1 WHERE id = 0; END;
+CREATE TRIGGER current_graph_object_projection_update AFTER UPDATE ON current_graph_object
+BEGIN UPDATE current_state SET projection_writes = projection_writes + 1 WHERE id = 0; END;
+CREATE TRIGGER current_graph_object_projection_delete AFTER DELETE ON current_graph_object
+BEGIN UPDATE current_state SET projection_writes = projection_writes + 1 WHERE id = 0; END;
+CREATE TRIGGER current_data_anchor_projection_insert AFTER INSERT ON current_data_anchor
+BEGIN UPDATE current_state SET projection_writes = projection_writes + 1 WHERE id = 0; END;
+CREATE TRIGGER current_data_anchor_projection_update AFTER UPDATE ON current_data_anchor
+BEGIN UPDATE current_state SET projection_writes = projection_writes + 1 WHERE id = 0; END;
+CREATE TRIGGER current_data_anchor_projection_delete AFTER DELETE ON current_data_anchor
+BEGIN UPDATE current_state SET projection_writes = projection_writes + 1 WHERE id = 0; END;
 """
 
 
@@ -236,6 +250,13 @@ def _projection_revision(row: tuple[object, ...]) -> int:
             f"{established_by}"
         )
     return revision
+
+
+def _require_sealed_projection(row: tuple[object, ...], writes_index: int) -> None:
+    writes = row[writes_index]
+    sealed = row[writes_index + 1]
+    if not isinstance(writes, int) or not isinstance(sealed, int) or writes != sealed:
+        raise StoreError("the current graph projection changed outside its canonical transaction")
 
 
 class StoreError(RuntimeError):
@@ -389,6 +410,8 @@ def _screen_marker(connection: sqlite3.Connection, path: Path) -> None:
         "id",
         "revision",
         "established_by",
+        "projection_writes",
+        "sealed_projection_writes",
         "active_definitions",
         "definition_delta",
     }
@@ -606,16 +629,18 @@ class CanonicalStore:
         try:
             with self._lock:
                 row = self._connection.execute(
-                    "SELECT revision, established_by, active_definitions, definition_delta"
+                    "SELECT revision, established_by, projection_writes,"
+                    " sealed_projection_writes, active_definitions, definition_delta"
                     " FROM current_state WHERE id = 0"
                 ).fetchone()
                 if not isinstance(row, tuple):
                     raise NotInitializedError("no canonical state is established")
                 revision = _projection_revision(row)
+                _require_sealed_projection(row, 2)
                 state = CanonicalState(
                     graph=self._current_graph_unlocked(),
-                    active_definitions=self._decode_current_definitions(row[2]),
-                    definition_delta=self._decode_current_delta(row[3]),
+                    active_definitions=self._decode_current_definitions(row[4]),
+                    definition_delta=self._decode_current_delta(row[5]),
                     revision=revision,
                 )
                 self._current_projection_decodes += 1
@@ -629,6 +654,13 @@ class CanonicalStore:
             with self._lock:
                 if self._connection.execute(INITIALIZED_SQL).fetchone() is None:
                     raise NotInitializedError("no canonical state is established")
+                row = self._connection.execute(
+                    "SELECT revision, established_by, projection_writes,"
+                    " sealed_projection_writes FROM current_state WHERE id = 0"
+                ).fetchone()
+                assert isinstance(row, tuple)
+                _projection_revision(row)
+                _require_sealed_projection(row, 2)
                 return self._current_graph_unlocked()
         except sqlite3.Error as error:
             raise StoreError(f"could not read from the store at {self._path}: {error}") from error
@@ -642,13 +674,15 @@ class CanonicalStore:
                 self._connection.execute("BEGIN")
                 try:
                     row = self._connection.execute(
-                        "SELECT revision, established_by, active_definitions"
+                        "SELECT revision, established_by, projection_writes,"
+                        " sealed_projection_writes, active_definitions"
                         " FROM current_state WHERE id = 0"
                     ).fetchone()
                     if not isinstance(row, tuple):
                         raise NotInitializedError("no canonical state is established")
                     revision = _projection_revision(row)
-                    definitions = self._decode_current_definitions(row[2])
+                    _require_sealed_projection(row, 2)
+                    definitions = self._decode_current_definitions(row[4])
                     result = evaluate_indexed_query(
                         query, definitions, _SQLiteQueryIndex(self), revision
                     )
@@ -663,23 +697,30 @@ class CanonicalStore:
     def current_definitions(self) -> tuple[int, GraphDefinitionSet, DefinitionDelta | None]:
         """Read current definition facets without materializing the graph facet."""
         row = self._fetchone(
-            "SELECT revision, established_by, active_definitions, definition_delta"
+            "SELECT revision, established_by, projection_writes, sealed_projection_writes,"
+            " active_definitions, definition_delta"
             " FROM current_state WHERE id = 0"
         )
         if not isinstance(row, tuple):
             raise NotInitializedError("no canonical state is established")
+        _require_sealed_projection(row, 2)
         return (
             _projection_revision(row),
-            self._decode_current_definitions(row[2]),
-            self._decode_current_delta(row[3]),
+            self._decode_current_definitions(row[4]),
+            self._decode_current_delta(row[5]),
         )
 
     def current_revision(self) -> int:
         """Read the established current revision without materializing any state facet."""
-        row = self._fetchone("SELECT revision, established_by FROM current_state WHERE id = 0")
+        row = self._fetchone(
+            "SELECT revision, established_by, projection_writes, sealed_projection_writes"
+            " FROM current_state WHERE id = 0"
+        )
         if not isinstance(row, tuple):
             raise NotInitializedError("no canonical state is established")
-        return _projection_revision(row)
+        revision = _projection_revision(row)
+        _require_sealed_projection(row, 2)
+        return revision
 
     # --- Owned history base ---------------------------------------------------------
 
@@ -725,6 +766,10 @@ class CanonicalStore:
                     ),
                 )
                 self._replace_current_graph_unlocked(state.graph)
+                self._connection.execute(
+                    "UPDATE current_state SET sealed_projection_writes = projection_writes"
+                    " WHERE id = 0"
+                )
                 # A read attempted before the system existed may already have observed itself
                 # here, and success promises an empty ledger.
                 self._connection.execute("DELETE FROM activity_record")
@@ -846,6 +891,10 @@ class CanonicalStore:
                     self._apply_current_graph_change_unlocked(record.change.graph_change)
                 elif record.change.replacement_graph is not None:
                     self._replace_current_graph_unlocked(record.change.replacement_graph)
+                self._connection.execute(
+                    "UPDATE current_state SET sealed_projection_writes = projection_writes"
+                    " WHERE id = 0"
+                )
                 self._connection.execute("COMMIT")
             except StoreError:
                 self._rollback_quietly()
@@ -1239,6 +1288,19 @@ class CanonicalStore:
                 f"stored current graph-object row {uuid!r} has selectors that disagree with"
                 " its payload"
             )
+        if isinstance(graph_object, AssociatedDataObject):
+            indexed_anchors = {
+                str(row[0])
+                for row in self._connection.execute(
+                    "SELECT anchor_uuid FROM current_data_anchor WHERE data_uuid = ?",
+                    (uuid,),
+                ).fetchall()
+            }
+            if indexed_anchors != set(graph_object.anchor_uuids):
+                raise StoreError(
+                    f"stored current associated-data row {uuid!r} has association selectors"
+                    " that disagree with its payload"
+                )
         self._current_graph_object_decodes += 1
         return graph_object
 

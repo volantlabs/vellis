@@ -22,6 +22,13 @@ from vellis.changes import GraphChange
 from vellis.definitions import GraphDefinitionSet
 from vellis.graph import Anchor
 from vellis.outcomes import OperationStatus
+from vellis.query import (
+    AnchorGroup,
+    AnchorProjection,
+    AssociatedDataCondition,
+    GraphQuery,
+    ReturnShape,
+)
 from vellis.store import APPLICATION_ID, CanonicalStore, NotADatabaseError, StoreError
 from vellis.system import RTGSystem
 
@@ -153,10 +160,63 @@ def test_indexed_selectors_that_disagree_with_payload_are_refused(tmp_path: Path
 
     store = CanonicalStore(path)
     try:
-        with pytest.raises(StoreError, match="selectors that disagree"):
+        with pytest.raises(StoreError, match="projection changed"):
             store.current_state()
     finally:
         store.close()
+
+
+@pytest.mark.parametrize("corruption", ["extra", "missing"])
+def test_association_selectors_that_disagree_with_payload_are_refused(
+    tmp_path: Path, corruption: str
+) -> None:
+    from vellis.graph import AssociatedDataObject
+
+    path = tmp_path / "vellis.sqlite3"
+    system = RTGSystem.open(path)
+    try:
+        assert system.initialize_fresh(
+            build_rich_definitions(),
+            provenance=Provenance(initiator="owner"),
+            initialization_summary="a fresh start",
+        ).accepted
+        assert system.apply_graph_change(
+            GraphChange(
+                anchor_upserts=(
+                    Anchor("a-1", "person", "Ada"),
+                    Anchor("a-2", "person", "Grace"),
+                ),
+                associated_data_upserts=(
+                    AssociatedDataObject(
+                        "d-1",
+                        "note",
+                        ("a-1",),
+                        {"title": "Note"},
+                    ),
+                ),
+            ),
+            provenance=Provenance(initiator="owner"),
+        ).accepted
+        if corruption == "extra":
+            system.store._connection.execute(  # noqa: SLF001
+                "INSERT INTO current_data_anchor VALUES ('d-1', 'a-2')"
+            )
+        else:
+            system.store._connection.execute(  # noqa: SLF001
+                "DELETE FROM current_data_anchor WHERE data_uuid = 'd-1'"
+            )
+
+        query = GraphQuery(
+            anchor_groups=(AnchorGroup("people", "person"),),
+            data_conditions=(AssociatedDataCondition("notes", "people", "note"),),
+            return_shape=ReturnShape((AnchorProjection("person", "people"),)),
+            maximum_rows=10,
+        )
+        assert system.query_graph(query).status is OperationStatus.FAILED
+        with pytest.raises(StoreError, match="projection changed"):
+            system.current_state()
+    finally:
+        system.close()
 
 
 def test_an_unrelated_database_is_refused_not_adopted(tmp_path: Path) -> None:

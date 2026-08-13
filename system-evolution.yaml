@@ -14,22 +14,22 @@ baselines:
   status: current
   source:
     model: sha256:0dbc79b3e2036ddda8fdd35e8ad4efe4616cdc5c5b89bd08a66c92972c004437
-    implementation: git:e82e0e6817c67a76c21d4d4a29c8d7cf70203a86
+    implementation: git:e82e0e6161040baa4a4a728d05cabbd418c57d83
     language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
     execution_environment: python-and-sqlite-pins:uv.lock
-    checkpoint: git:e82e0e6817c67a76c21d4d4a29c8d7cf70203a86
+    checkpoint: git:e82e0e6161040baa4a4a728d05cabbd418c57d83
   target:
     model: sha256:ad02d24b6c6eeb38f904d551e0ae7dfd48101ff41e44db79effb3014e137e4c6
-    implementation: working-tree:codex/model-implementation-evolution
+    implementation: git:ee86d59
     language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
     execution_environment: python-and-sqlite-pins:uv.lock
-    checkpoint: git:218bc71
+    checkpoint: git:ee86d59
   observed:
     model: sha256:ad02d24b6c6eeb38f904d551e0ae7dfd48101ff41e44db79effb3014e137e4c6
-    implementation: working-tree:codex/model-implementation-evolution
+    implementation: git:ee86d59
     language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
     execution_environment: python-and-sqlite-pins:uv.lock
-    checkpoint: git:218bc71
+    checkpoint: git:ee86d59
 scope:
   authority_scope:
     - model/10-rtg-domain.sysml
@@ -61,9 +61,9 @@ findings:
     evidence_refs:
       - path:vellis/store.py
       - path:tests/vellis/test_current_work.py
-    disposition: implementation-work
+    disposition: resolved
     owner_work_item_id: W003
-    implementation_status: partial
+    implementation_status: conforming
     nearest_wrong_system: Repeated current operations deserialize the unchanged complete graph and definition tuple from one durable blob.
     compatibility_effect: No released store format exists; replace the experimental layout without migration while preserving public state semantics.
   - id: F002
@@ -75,9 +75,9 @@ findings:
     evidence_refs:
       - path:vellis/store.py
       - path:tests/vellis/test_historical_selection.py
-    disposition: implementation-work
+    disposition: resolved
     owner_work_item_id: W002
-    implementation_status: conflicting
+    implementation_status: conforming
     nearest_wrong_system: A historical definition lookup returns few definition transitions while SQLite filters a linearly growing graph-only prefix underneath the result.
     compatibility_effect: Query results are unchanged; no migration of the unreleased experimental store layout is required.
   - id: F003
@@ -91,9 +91,9 @@ findings:
       - path:vellis/store.py
       - path:vellis/system.py
       - path:tests/vellis/test_activity_history.py
-    disposition: implementation-work
+    disposition: resolved
     owner_work_item_id: W002
-    implementation_status: conflicting
+    implementation_status: conforming
     nearest_wrong_system: A maximumRecords value of one still retrieves and decodes the complete matching history interval before whole-result rejection.
     compatibility_effect: Limiting retrieval to maximumRecords plus one preserves accepted and rejected result meaning.
   - id: F004
@@ -137,9 +137,9 @@ findings:
       - model/README.md
     evidence_refs:
       - path:implementation-campaign.yaml
-    disposition: plan-change
+    disposition: resolved
     owner_work_item_id: W004
-    implementation_status: conflicting
+    implementation_status: conforming
     nearest_wrong_system: A complete build closes without one owner for a consequential working-state realization and its discriminating resource evidence.
     compatibility_effect: The evolution record supplements the build record without treating an unreleased experimental layout as a compatibility boundary.
   - id: F007
@@ -151,9 +151,9 @@ findings:
     evidence_refs:
       - path:tools/system_evolution.py
       - path:tests/test_system_evolution.py
-    disposition: implementation-work
+    disposition: resolved
     owner_work_item_id: W004
-    implementation_status: partial
+    implementation_status: conforming
     nearest_wrong_system: The record has exactly one active writer but status labels an earlier ready item as next work.
     compatibility_effect: Status output becomes consistent with existing lifecycle meaning; record shape and product behavior do not change.
 decisions:
@@ -174,7 +174,7 @@ decisions:
       - Current query candidates are joined through identity, type, association, and directed-link indexes before property filtering.
       - Public complete-state inspection cannot mutate durable canonical state and no complete state is retained between calls.
       - A canonical transition and every affected projection row commit atomically.
-    implementation_status: partial
+    implementation_status: conforming
     evidence_refs:
       - path:tests/vellis/test_current_work.py
       - path:tests/vellis/test_graph_queries.py
@@ -192,7 +192,7 @@ decisions:
       - Evaluation order preserves identical rows and whole-result bounds.
       - Unprojected disconnected populations do not multiply projected assignment work.
       - Unsatisfied unprojected components still eliminate every result row.
-    implementation_status: partial
+    implementation_status: conforming
     evidence_refs:
       - path:tests/vellis/test_graph_queries.py
 work_items:
@@ -234,7 +234,7 @@ work_items:
     label: Make historical selection physically honor existing bounds
     kind: implementation
     dependencies: []
-    planned_baseline: git:e82e0e6817c67a76c21d4d4a29c8d7cf70203a86
+    planned_baseline: git:e82e0e6161040baa4a4a728d05cabbd418c57d83
     finding_ids:
       - F002
       - F003
@@ -254,13 +254,13 @@ work_items:
     non_effects:
       - Canonical and activity ledger ordering and contents do not change.
       - Whole-result rejection and inclusive interval semantics do not change.
-    lifecycle: ready
-    implementation_status: partial
+    lifecycle: complete
+    implementation_status: conforming
     evidence_refs:
       - path:tests/vellis/test_historical_selection.py
       - path:tests/vellis/test_activity_history.py
     blocker: null
-    checkpoint: null
+    checkpoint: git:284efc9
   - id: W003
     order: 3
     label: Establish efficient working state and projection-aware query evaluation
@@ -290,11 +290,15 @@ work_items:
       - SQLite owns live state and remains recoverably atomic with the canonical ledger.
       - Public current-state reads cannot mutate canonical state.
       - Query projections, distinctness, and bounds retain their modeled meaning.
-    lifecycle: active
-    implementation_status: partial
-    evidence_refs: []
+    lifecycle: complete
+    implementation_status: conforming
+    evidence_refs:
+      - path:tests/vellis/test_current_work.py
+      - path:tests/vellis/test_graph_queries.py
+      - path:tests/vellis/test_store_integrity.py
+      - command:uv run pytest tests/vellis/test_current_work.py tests/vellis/test_graph_queries.py tests/vellis/test_store_integrity.py
     blocker: null
-    checkpoint: null
+    checkpoint: git:284efc9
   - id: W004
     order: 4
     label: Review, reconcile, document, and rebaseline the evolution set
@@ -303,7 +307,7 @@ work_items:
       - W001
       - W002
       - W003
-    planned_baseline: working-tree:codex/model-implementation-evolution
+    planned_baseline: git:ee86d59
     finding_ids:
       - F006
       - F007
@@ -314,15 +318,15 @@ work_items:
         coverage: full
         remaining_work_item_ids: []
     approval:
-      status: pending
-      reason: Closure depends on acceptance of W001 and W003 and the final background-campaign checkpoint.
+      status: not-required
+      reason: Closure reconciles already accepted changes and the completed source campaign without selecting another consequential boundary.
       checkpoint: null
     nearest_wrong_system: Code, model, documentation, and records each pass locally but describe different baselines or leave findings without closure evidence.
     compatibility_effect: Rebaseline preserves campaign history but owes no migration for an unreleased implementation store.
     non_effects:
       - The completed implementation campaign history is not rewritten.
       - User-owned .data content is not inspected or migrated.
-    lifecycle: pending
+    lifecycle: active
     implementation_status: not evaluated
     evidence_refs: []
     blocker: null
@@ -334,5 +338,15 @@ closure:
   integration_status: not evaluated
   external_status: not evaluated
   compatibility: No released store format exists. The experimental layout is replaced without migration, and user-owned .data remains untouched.
+  reviews:
+    - lens: authority and conformance
+      status: findings
+      evidence_refs: []
+    - lens: engineering and evidence
+      status: findings
+      evidence_refs: []
+    - lens: portable evolution method
+      status: findings
+      evidence_refs: []
   evidence_refs: []
   checkpoint: null

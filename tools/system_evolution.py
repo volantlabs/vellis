@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import subprocess
 from collections import Counter
 from pathlib import Path
 from typing import Any, cast
@@ -84,6 +85,8 @@ def _reference_findings(record: dict[str, Any], *, root: Path) -> list[str]:
         if item["blocker"] is not None:
             refs.extend(item["blocker"]["evidence_refs"])
     refs.extend(record["closure"]["evidence_refs"])
+    for review in record["closure"]["reviews"]:
+        refs.extend(review["evidence_refs"])
     for reference in sorted(set(refs)):
         if reference.startswith("command:"):
             continue
@@ -99,6 +102,38 @@ def _reference_findings(record: dict[str, Any], *, root: Path) -> list[str]:
             continue
         if not candidate.exists():
             findings.append(f"evidence reference does not exist: {reference}")
+    return findings
+
+
+def _git_checkpoint_findings(record: dict[str, Any], *, root: Path) -> list[str]:
+    references: set[str] = set()
+    for baseline_name in ("source", "target", "observed"):
+        baseline = record["baselines"][baseline_name]
+        if baseline is not None:
+            references.update(
+                value
+                for value in baseline.values()
+                if isinstance(value, str) and value.startswith("git:")
+            )
+    for item in record["work_items"]:
+        for value in (item["planned_baseline"], item["checkpoint"]):
+            if isinstance(value, str) and value.startswith("git:"):
+                references.add(value)
+    for value in (record["evolution"]["checkpoint"], record["closure"]["checkpoint"]):
+        if isinstance(value, str) and value.startswith("git:"):
+            references.add(value)
+    findings: list[str] = []
+    for reference in sorted(references):
+        revision = reference.removeprefix("git:")
+        result = subprocess.run(
+            ["git", "cat-file", "-e", f"{revision}^{{commit}}"],
+            cwd=root,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        if result.returncode != 0:
+            findings.append(f"Git checkpoint does not resolve to a commit: {reference}")
     return findings
 
 
@@ -211,11 +246,7 @@ def validate_record(record: dict[str, Any], *, root: Path = ROOT) -> list[str]:
     if baselines["status"] == "stale" and baseline_matches:
         findings.append("stale baselines must differ from the observed target or source baseline")
     current_baseline_ids = {
-        value
-        for baseline in (baselines["source"], baselines["target"], baselines["observed"])
-        if baseline is not None
-        for value in baseline.values()
-        if isinstance(value, str)
+        value for value in baselines["observed"].values() if isinstance(value, str)
     }
     for item in work_by_id.values():
         if (
@@ -231,7 +262,7 @@ def validate_record(record: dict[str, Any], *, root: Path = ROOT) -> list[str]:
     if len(active) > 1:
         findings.append("more than one work item is active")
     for item in work_by_id.values():
-        if item["lifecycle"] not in {"ready", "active"}:
+        if item["lifecycle"] not in {"ready", "active", "complete"}:
             continue
         incomplete = [
             dependency
@@ -369,8 +400,30 @@ def validate_record(record: dict[str, Any], *, root: Path = ROOT) -> list[str]:
                 )
         if not closure["evidence_refs"]:
             findings.append("complete evolution has no closure evidence")
+        required_lenses = {"authority and conformance", "engineering and evidence"}
+        review_counts = Counter(review["lens"] for review in closure["reviews"])
+        duplicate_reviews = sorted(lens for lens, count in review_counts.items() if count > 1)
+        if duplicate_reviews:
+            findings.append(f"complete evolution has duplicate review lenses {duplicate_reviews}")
+        unresolved_reviews = sorted(
+            review["lens"] for review in closure["reviews"] if review["status"] != "clean"
+        )
+        if unresolved_reviews:
+            findings.append(f"complete evolution has unresolved reviews {unresolved_reviews}")
+        clean_reviews = {
+            review["lens"]: review for review in closure["reviews"] if review["status"] == "clean"
+        }
+        missing_lenses = required_lenses - clean_reviews.keys()
+        if missing_lenses:
+            findings.append(
+                f"complete evolution lacks clean required review lenses {sorted(missing_lenses)}"
+            )
+        for lens in required_lenses & clean_reviews.keys():
+            if not clean_reviews[lens]["evidence_refs"]:
+                findings.append(f"clean required review {lens!r} has no attributable evidence")
 
     findings.extend(_reference_findings(record, root=root))
+    findings.extend(_git_checkpoint_findings(record, root=root))
     return findings
 
 

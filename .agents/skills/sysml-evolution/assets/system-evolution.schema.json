@@ -312,6 +312,16 @@
         "checkpoint": {"$ref": "#/$defs/checkpoint"}
       }
     },
+    "review": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["lens", "status", "evidence_refs"],
+      "properties": {
+        "lens": {"$ref": "#/$defs/short_string"},
+        "status": {"enum": ["pending", "findings", "clean"]},
+        "evidence_refs": {"$ref": "#/$defs/reference_list"}
+      }
+    },
     "closure": {
       "type": "object",
       "additionalProperties": false,
@@ -322,6 +332,7 @@
         "integration_status",
         "external_status",
         "compatibility",
+        "reviews",
         "evidence_refs",
         "checkpoint"
       ],
@@ -332,6 +343,10 @@
         "integration_status": {"$ref": "#/$defs/status"},
         "external_status": {"$ref": "#/$defs/status"},
         "compatibility": {"type": "string", "minLength": 1, "maxLength": 700},
+        "reviews": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/review"}
+        },
         "evidence_refs": {"$ref": "#/$defs/reference_list"},
         "checkpoint": {"$ref": "#/$defs/checkpoint"}
       }
