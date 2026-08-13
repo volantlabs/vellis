@@ -9,7 +9,7 @@ evolution:
     reason: The owner accepted normalized SQLite state, prospective graph overlay, complete stored assessments with bounded retrieval, and streamed snapshots while preserving portable system meaning.
     checkpoint: git:8109ab24c4dc58d81fbfe2fee0181b395089a61d
   blocker: null
-  checkpoint: git:2d969dfc919acd7f0b1d2bd2e37e63e8b3a563a6
+  checkpoint: git:ce96868388086eb38253966d85b3dfb2e00ef0b5
 baselines:
   status: current
   source:
@@ -20,16 +20,16 @@ baselines:
     checkpoint: git:79840c2168e5d136571a89f7eb6ccd6ff7e56659
   target:
     model: sha256:23a0fa4c525a6e89ec0740c4d4f0af283cccae44abc23b73b99f7427d7c93c7e
-    implementation: git:2d969dfc919acd7f0b1d2bd2e37e63e8b3a563a6
+    implementation: git:ce96868388086eb38253966d85b3dfb2e00ef0b5
     language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
     execution_environment: sha256:c24a0bae1e63d1f4923d6c7925925ea4e02743568a84b403677b5f6a718879fa
-    checkpoint: git:2d969dfc919acd7f0b1d2bd2e37e63e8b3a563a6
+    checkpoint: git:ce96868388086eb38253966d85b3dfb2e00ef0b5
   observed:
     model: sha256:23a0fa4c525a6e89ec0740c4d4f0af283cccae44abc23b73b99f7427d7c93c7e
-    implementation: git:2d969dfc919acd7f0b1d2bd2e37e63e8b3a563a6
+    implementation: git:ce96868388086eb38253966d85b3dfb2e00ef0b5
     language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
     execution_environment: sha256:c24a0bae1e63d1f4923d6c7925925ea4e02743568a84b403677b5f6a718879fa
-    checkpoint: git:2d969dfc919acd7f0b1d2bd2e37e63e8b3a563a6
+    checkpoint: git:ce96868388086eb38253966d85b3dfb2e00ef0b5
 scope:
   authority_scope:
     - model/10-rtg-domain.sysml
@@ -146,9 +146,9 @@ findings:
       - VellisRequirements::canonicalSemanticEquality
     evidence_refs:
       - command:uv run pytest tests/vellis/test_store_integrity.py tests/vellis/test_serialization.py
-    disposition: implementation-work
+    disposition: resolved
     owner_work_item_id: W003
-    implementation_status: conflicting
+    implementation_status: conforming
     nearest_wrong_system: SQLite stores durable rows but meaningful definitions, object values, and ledger changes remain documents that must be decoded before relational selection or enforcement.
     compatibility_effect: A fresh unreleased database layout replaces the prototype layout with no migration obligation.
   - id: F007
@@ -250,8 +250,9 @@ decisions:
       - Schema inspection finds no whole-state, whole-definition-set, whole-object, or canonical-change document columns.
       - Natural identities, focused selection, and revision membership are directly addressable.
       - Fresh schema creation has no prototype migration path and never touches user-owned data.
-    implementation_status: not evaluated
-    evidence_refs: []
+    implementation_status: conforming
+    evidence_refs:
+      - command:uv run pytest tests/vellis/test_store_integrity.py tests/vellis/test_current_work.py tests/vellis/test_graph_queries.py tests/vellis/test_graph_changes.py
   - id: D003
     summary: The sole prospective state uses normalized complete-object upserts, tombstones, and explicit unstaging over active state.
     authority_refs:
@@ -444,11 +445,13 @@ work_items:
     non_effects:
       - Graph, definition, query, equality, revision, and ledger semantics remain model-controlled.
       - User-owned .data content remains untouched.
-    lifecycle: active
-    implementation_status: not evaluated
-    evidence_refs: []
+    lifecycle: complete
+    implementation_status: conforming
+    evidence_refs:
+      - command:uv run pytest tests/vellis/test_store_integrity.py tests/vellis/test_current_work.py tests/vellis/test_graph_queries.py tests/vellis/test_graph_changes.py
+      - command:just check
     blocker: null
-    checkpoint: null
+    checkpoint: git:ce96868388086eb38253966d85b3dfb2e00ef0b5
   - id: W004
     order: 4
     label: Realize prospective graph overlay, complete stored assessments, and atomic cutover
@@ -480,8 +483,8 @@ work_items:
     non_effects:
       - Ordinary current queries and mutations ignore prospective state unless explicitly selected.
       - Rejected or stale activation preserves active and prospective state.
-    lifecycle: pending
-    implementation_status: not evaluated
+    lifecycle: active
+    implementation_status: partial
     evidence_refs: []
     blocker: null
     checkpoint: null
