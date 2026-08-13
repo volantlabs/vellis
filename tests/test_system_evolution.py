@@ -20,6 +20,18 @@ def _active_work(record: dict[str, object]) -> dict[str, object]:
     return next(item for item in items if item["lifecycle"] == "active")
 
 
+def _active_record() -> dict[str, Any]:
+    record = copy.deepcopy(system_evolution.load_record())
+    record["evolution"]["lifecycle"] = "active"
+    record["evolution"]["checkpoint"] = None
+    active = _work(record, "W004")
+    active["lifecycle"] = "active"
+    active["implementation_status"] = "partial"
+    active["evidence_refs"] = []
+    active["checkpoint"] = None
+    return record
+
+
 def _complete_record() -> dict[str, Any]:
     record = copy.deepcopy(system_evolution.load_record())
     checkpoint = record["baselines"]["target"]["implementation"]
@@ -122,7 +134,7 @@ def test_complete_work_item_cannot_retain_open_owned_work() -> None:
 
 
 def test_status_reports_the_active_item_before_another_ready_item() -> None:
-    record = _record()
+    record = _active_record()
     report = system_evolution.status(record)  # type: ignore[arg-type]
 
     assert f"next_work: {_active_work(record)['id']}" in report
@@ -148,7 +160,7 @@ def test_accepted_approval_requires_an_attributable_checkpoint() -> None:
 
 
 def test_active_work_cannot_remain_bound_only_to_a_source_baseline() -> None:
-    record = copy.deepcopy(_record())
+    record = _active_record()
     active = _active_work(record)
     active["planned_baseline"] = {
         "dimension": "implementation",
@@ -309,7 +321,7 @@ def test_duplicate_ids_are_rejected_before_indexing() -> None:
 
 
 def test_observed_baseline_is_derived_from_the_repository() -> None:
-    record = copy.deepcopy(_record())
+    record = _active_record()
     record["baselines"]["target"]["implementation"] = "git:ee86d59"  # type: ignore[index]
     record["baselines"]["target"]["checkpoint"] = "git:ee86d59"  # type: ignore[index]
     record["baselines"]["observed"]["implementation"] = "git:ee86d59"  # type: ignore[index]
@@ -322,7 +334,7 @@ def test_observed_baseline_is_derived_from_the_repository() -> None:
 
 
 def test_planned_baseline_names_one_dimension_not_any_matching_token() -> None:
-    record = copy.deepcopy(_record())
+    record = _active_record()
     active = _active_work(record)
     active["planned_baseline"] = {
         "dimension": "implementation",
