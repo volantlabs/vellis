@@ -3,6 +3,8 @@ from __future__ import annotations
 import copy
 from typing import Any, cast
 
+import pytest
+
 from tools import system_evolution
 
 
@@ -157,14 +159,17 @@ def test_status_reports_the_active_item_before_another_ready_item() -> None:
     assert f"next_work: {_active_work(record)['id']}" in report
 
 
-def test_ready_work_requires_complete_dependencies() -> None:
+@pytest.mark.parametrize("lifecycle", ("ready", "complete"))
+def test_executable_work_requires_complete_dependencies(lifecycle: str) -> None:
     record = copy.deepcopy(_record())
     _work(record, "W001")["lifecycle"] = "pending"
-    _work(record, "W004")["lifecycle"] = "ready"
+    _work(record, "W004")["lifecycle"] = lifecycle
 
     findings = system_evolution.validate_record(record)  # type: ignore[arg-type]
 
-    assert any("ready work item W004 has incomplete dependencies" in each for each in findings)
+    assert any(
+        f"{lifecycle} work item W004 has incomplete dependencies" in each for each in findings
+    )
 
 
 def test_accepted_approval_requires_an_attributable_checkpoint() -> None:
@@ -190,16 +195,6 @@ def test_active_work_cannot_remain_bound_only_to_a_source_baseline() -> None:
     assert any(
         f"active work item {active['id']} has stale planned baseline" in each for each in findings
     )
-
-
-def test_complete_work_requires_complete_dependencies() -> None:
-    record = copy.deepcopy(_record())
-    _work(record, "W001")["lifecycle"] = "pending"
-    _work(record, "W004")["lifecycle"] = "complete"
-
-    findings = system_evolution.validate_record(record)  # type: ignore[arg-type]
-
-    assert any("complete work item W004 has incomplete dependencies" in each for each in findings)
 
 
 def test_complete_closure_requires_named_evidenced_review_lenses() -> None:
@@ -380,12 +375,20 @@ def test_planned_baseline_names_one_dimension_not_any_matching_token() -> None:
     )
 
 
-def test_completed_work_rejects_an_unrecognized_historical_baseline() -> None:
+@pytest.mark.parametrize("identity_source", ("unknown", "implementation-token"))
+def test_completed_work_rejects_unrecognized_or_cross_dimension_historical_baselines(
+    identity_source: str,
+) -> None:
     record = copy.deepcopy(_record())
     record["work_items"][0]["lifecycle"] = "complete"  # type: ignore[index]
+    identity = (
+        "superseded-model-baseline"
+        if identity_source == "unknown"
+        else record["baselines"]["observed"]["implementation"]  # type: ignore[index]
+    )
     record["work_items"][0]["planned_baseline"] = {  # type: ignore[index]
         "dimension": "model",
-        "identity": "superseded-model-baseline",
+        "identity": identity,
     }
 
     findings = system_evolution.validate_record(record)  # type: ignore[arg-type]
@@ -497,19 +500,6 @@ def test_complete_record_must_be_committed(monkeypatch: Any) -> None:
     findings = system_evolution.validate_record(record)
 
     assert "complete evolution has dirty tracked state outside its record" in findings
-
-
-def test_historical_baseline_keeps_its_declared_dimension() -> None:
-    record = copy.deepcopy(system_evolution.load_record())
-    _work(record, "W001")["lifecycle"] = "complete"
-    _work(record, "W001")["planned_baseline"] = {
-        "dimension": "model",
-        "identity": record["baselines"]["observed"]["implementation"],
-    }
-
-    findings = system_evolution.validate_record(record)
-
-    assert "complete work item W001 has an unrecognized historical planned baseline" in findings
 
 
 def test_pytest_evidence_targets_must_exist() -> None:

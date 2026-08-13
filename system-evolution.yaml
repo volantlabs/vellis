@@ -1,232 +1,219 @@
 schema_version: "1.0"
 evolution:
-  id: streamed-reconstruction-transition-validity
-  objective: Reject any native snapshot tail whose individual canonical transitions do not reconstruct the exact valid state they claim while preserving bounded-memory replay and first-use v1 recovery behavior.
-  observable_distinction: A self-consistent tail with an invalid intermediate active graph or mismatched prospective-definition identity is refused even when a later record restores a valid final state.
-  lifecycle: complete
+  id: post-closure-evidence-subtraction
+  objective: Remove redundant and realization-fragile tests while preserving every uniquely discriminating semantic, compatibility, failure, resource, integrity, and repository-workflow claim.
+  observable_distinction: The smaller suite still rejects every plausible wrong system or workflow invariant currently carrying unique evidence, without retaining tests solely because they existed at closure.
+  lifecycle: active
   approval:
     status: not-required
-    reason: Accepted replay and canonical-history authority already requires every transition to be semantically valid and replay-equivalent.
+    reason: Accepted product authority and public behavior are unchanged; this is bounded realization and evidence subtraction.
     checkpoint: null
   blocker: null
-  checkpoint: git:8ff7aef4e5ed953b16edde5fd1eab0ae87e11446
+  checkpoint: null
 baselines:
   status: current
   source:
     model: sha256:23a0fa4c525a6e89ec0740c4d4f0af283cccae44abc23b73b99f7427d7c93c7e
-    implementation: git:fd49bcf2722013f67ccaf706d26ab6bb303383af
+    implementation: git:2524d901de504b11fd7907f238121ff1333065e4
     language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
     execution_environment: sha256:3315a10b5fcc8d62aa435d2f4e12165a147f334b01fad06ce367d11b6eb8191c
-    checkpoint: git:fd49bcf2722013f67ccaf706d26ab6bb303383af
+    checkpoint: git:2524d901de504b11fd7907f238121ff1333065e4
   target:
     model: sha256:23a0fa4c525a6e89ec0740c4d4f0af283cccae44abc23b73b99f7427d7c93c7e
-    implementation: git:8ff7aef4e5ed953b16edde5fd1eab0ae87e11446
+    implementation: git:2524d901de504b11fd7907f238121ff1333065e4
     language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
     execution_environment: sha256:3315a10b5fcc8d62aa435d2f4e12165a147f334b01fad06ce367d11b6eb8191c
-    checkpoint: git:8ff7aef4e5ed953b16edde5fd1eab0ae87e11446
+    checkpoint: git:2524d901de504b11fd7907f238121ff1333065e4
   observed:
     model: sha256:23a0fa4c525a6e89ec0740c4d4f0af283cccae44abc23b73b99f7427d7c93c7e
-    implementation: git:8ff7aef4e5ed953b16edde5fd1eab0ae87e11446
+    implementation: git:2524d901de504b11fd7907f238121ff1333065e4
     language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
     execution_environment: sha256:3315a10b5fcc8d62aa435d2f4e12165a147f334b01fad06ce367d11b6eb8191c
-    checkpoint: git:8ff7aef4e5ed953b16edde5fd1eab0ae87e11446
+    checkpoint: git:2524d901de504b11fd7907f238121ff1333065e4
 scope:
   authority_scope:
-    - RTG::Canonical State
-    - RTG::Canonical Transition Record
-    - RTG::Ledger Tail
-    - VellisRequirements::durableCanonicalHistory
-    - VellisRequirements::replayEquivalence
-    - VellisRequirements::canonicalSemanticEquality
     - VellisRequirements::historyIndependentCurrentWork
+    - VellisRequirements::boundedHistoricalSelectionWork
+    - VellisRequirements::canonicalSemanticEquality
+    - VellisRequirements::durableCanonicalHistory
     - VellisRequirements::v1SnapshotCompatibility
-    - VellisRequirements::freshInitialization
-    - VellisVerification::snapshotReplay
-    - VellisVerification::invalidTail
-    - VellisVerification::v1Compatibility
+    - VellisVerification::currentWorkScaling
+    - VellisVerification::historicalSelectionScaling
+    - VellisVerification::replayCharacterization
+    - AGENTS.md
   implementation_scope:
-    - vellis/streaming.py
-    - vellis/v1_streaming.py
-    - vellis/store.py
-    - tests/vellis/test_streaming_lifecycle.py
-    - tests/vellis/test_v1_streaming.py
+    - tests
+    - tools/implementation_campaign.py
+    - tools/system_evolution.py
   review_lenses:
     - authority and conformance
     - engineering and evidence
   non_goals:
-    - Changing the native snapshot or tail wire formats.
-    - Changing v1 translation meaning or adding migration for unreleased formats.
-    - Introducing a generic streaming framework or new modeled subsystem.
-    - Inspecting or modifying user-owned .data content.
+    - Changing product APIs, MCP contracts, SysML authority, persistence formats, or compatibility meaning.
+    - Preserving a test merely because a historical campaign checkpoint cited it.
+    - Establishing a numerical test-count or line-reduction target.
 findings:
   - id: F001
-    summary: Tail replay does not bind each prospective-definition edit to its claimed proposal identity.
-    classification: implementation defect
-    consequence: A self-consistent definition-delta transition can stage different definition meaning than its resulting state identity claims and still be accepted when a later record discards the evidence.
+    summary: Current-work resource evidence is spread across overlapping scenario and measurement surfaces.
+    classification: realization decision
+    consequence: Equivalent histories, local mutations, and bounded query behavior are rebuilt and reread in several large files, increasing maintenance and review context without unique discrimination.
     authority_refs:
-      - VellisRequirements::durableCanonicalHistory
-      - VellisRequirements::replayEquivalence
-      - VellisRequirements::canonicalSemanticEquality
-      - VellisVerification::invalidTail
-    evidence_refs:
-      - path:tests/vellis/test_streaming_lifecycle.py#test_tail_rejects_a_proposal_identity_mismatch_hidden_by_later_discard
-    disposition: resolved
-    owner_work_item_id: W001
-    implementation_status: conforming
-    nearest_wrong_system: Tail lineage and final state are valid, but an intermediate proposal record claims a definition identity not produced by its own events.
-    compatibility_effect: Correct native tails remain unchanged; malformed unreleased tails are refused earlier.
-  - id: F002
-    summary: Tail replay validates graph conformance only after the final transition.
-    classification: implementation defect
-    consequence: An invalid active graph transition can be accepted when a later transition repairs it, despite every canonical revision being required to establish valid state.
-    authority_refs:
-      - VellisRequirements::durableCanonicalHistory
-      - VellisRequirements::replayEquivalence
       - VellisRequirements::historyIndependentCurrentWork
-      - VellisVerification::invalidTail
+      - VellisRequirements::boundedHistoricalSelectionWork
+      - VellisVerification::currentWorkScaling
+      - VellisVerification::historicalSelectionScaling
     evidence_refs:
-      - path:tests/vellis/test_streaming_lifecycle.py#test_tail_rejects_an_invalid_active_revision_hidden_by_later_repair
+      - command:uv run pytest tests/vellis/test_current_work.py tests/vellis/test_work_characterization.py tests/vellis/test_population_local_work.py -q
+      - path:tests/vellis/test_work_characterization.py#test_a_narrow_historical_query_does_not_materialize_the_revision_population
+      - path:tests/vellis/test_work_characterization.py#test_a_returned_result_is_bounded_without_scanning_or_hydrating_the_matching_population
     disposition: resolved
     owner_work_item_id: W001
     implementation_status: conforming
-    nearest_wrong_system: The reconstructed final graph conforms, but one intermediate canonical revision uses unknown types or violates another graph invariant.
-    compatibility_effect: Correct native tails remain unchanged; malformed unreleased tails are refused earlier.
-  - id: F003
-    summary: Tail activation does not revalidate the staged proposal against its current active base.
-    classification: implementation defect
-    consequence: A proposal made stale by an intervening active change can be activated during replay even though live operation would refuse that transition.
+    nearest_wrong_system: Removing overlapping cases also removes the sole evidence for one allowed scale driver, forbidden population dependency, or state-wide exception.
+    compatibility_effect: Test organization changes only; resource authority and SQLite realization remain unchanged.
+  - id: F002
+    summary: Some realization-integrity tests assert source text or internal shape where dynamic behavior can discriminate the same property.
+    classification: realization decision
+    consequence: Harmless refactoring invalidates evidence even when population-local and bounded-memory behavior remains conforming.
     authority_refs:
-      - VellisRequirements::durableCanonicalHistory
-      - VellisRequirements::replayEquivalence
-      - VellisRequirements::nonDisruptiveDefinitionWork
-      - VellisVerification::invalidTail
+      - VellisRequirements::historyIndependentCurrentWork
+      - VellisVerification::currentWorkScaling
     evidence_refs:
-      - path:tests/vellis/test_streaming_lifecycle.py#test_tail_rejects_activation_after_its_staged_base_became_stale
+      - path:tests/vellis/test_population_local_work.py#test_one_tail_record_adds_bounded_vm_work_over_the_snapshot_import
+      - path:tests/vellis/test_population_local_work.py#test_ordinary_writes_are_independent_of_unrelated_graph_population
     disposition: resolved
     owner_work_item_id: W001
     implementation_status: conforming
-    nearest_wrong_system: Activation events equal the staged overlay and produce a conforming final state, but the overlay no longer applies to the active values it was staged against.
-    compatibility_effect: Correct native tails remain unchanged; stale activation transitions are refused.
+    nearest_wrong_system: A full-state scan or recomputation returns correct answers and passes semantic tests while violating accepted resource shape.
+    compatibility_effect: Retained dynamic SQLite instrumentation continues to verify the selected realization.
+  - id: F003
+    summary: Workflow validators and rich product fixtures contain repetitive cases and setup that can share tables or helpers without merging distinct lifecycle rules.
+    classification: realization decision
+    consequence: Repository-process and product evidence carries unnecessary setup and assertion volume, increasing context cost and churn.
+    authority_refs:
+      - AGENTS.md
+    evidence_refs:
+      - command:just check
+    disposition: resolved
+    owner_work_item_id: W001
+    implementation_status: conforming
+    nearest_wrong_system: Mechanical consolidation accidentally erases a distinct stale-state, checkpoint, interruption, compatibility, or failure non-effect boundary.
+    compatibility_effect: Validator contracts and product behavior remain unchanged.
 decisions:
   - id: D001
-    summary: Validate each reconstructed transition from maintained proposal summaries, affected-neighborhood graph checks, and state-wide activation or restoration checks.
+    summary: Retain the classified 1,053 starting cases by unique discriminating value and consolidate mechanics beneath semantic scenarios.
     authority_refs:
-      - VellisRequirements::replayEquivalence
-      - VellisRequirements::historyIndependentCurrentWork
-      - VellisRequirements::canonicalSemanticEquality
+      - VellisVerification::currentWorkScaling
+      - VellisVerification::historicalSelectionScaling
+      - AGENTS.md
     alternatives:
-      - Validate only the final reconstructed state.
-      - Run a complete graph assessment after every tail record.
+      - Preserve the closure-era suite unchanged.
+      - Delete tests by size or count without claim-level review.
     reversible: true
     owner_work_item_id: W001
     evidence_intent:
-      - A proposal mismatch masked by discard is rejected.
-      - An invalid local graph mutation masked by a later repair is rejected.
-      - Local graph-transition validation remains independent of unrelated graph population.
+      - Classify cases as semantic behavior, compatibility or recovery, failure non-effect, resource characterization, realization integrity, or repository/process validation.
+      - Keep prospective/governance and streaming/integrity cases separate where they reject different failures.
+      - Every retained category names the plausible wrong system or workflow invariant it uniquely rejects.
+      - Narrow cluster suites and the complete repository gate remain clean after subtraction.
+      - Current evolution evidence references resolve to retained test nodes.
     implementation_status: conforming
     evidence_refs:
-      - path:tests/vellis/test_streaming_lifecycle.py#test_tail_rejects_a_proposal_identity_mismatch_hidden_by_later_discard
-      - path:tests/vellis/test_streaming_lifecycle.py#test_tail_rejects_an_invalid_active_revision_hidden_by_later_repair
-      - path:tests/vellis/test_streaming_lifecycle.py#test_tail_rejects_activation_after_its_staged_base_became_stale
-      - path:tests/vellis/test_population_local_work.py#test_one_tail_record_adds_bounded_vm_work_over_the_snapshot_import
+      - command:uv run pytest tests/vellis/test_current_work.py tests/vellis/test_work_characterization.py tests/vellis/test_population_local_work.py -q
+      - command:uv run pytest tests/test_implementation_campaign.py tests/test_system_evolution.py -q
+      - command:just check
 work_items:
   - id: W001
     order: 1
-    label: Enforce per-transition semantic validity during streamed reconstruction
+    label: Subtract redundant whole-suite evidence while preserving unique discrimination
     kind: implementation
     dependencies: []
     planned_baseline:
       dimension: implementation
-      identity: git:fd49bcf2722013f67ccaf706d26ab6bb303383af
-    finding_ids:
-      - F001
-      - F002
-      - F003
-    decision_ids:
-      - D001
+      identity: git:2524d901de504b11fd7907f238121ff1333065e4
+    finding_ids: [F001, F002, F003]
+    decision_ids: [D001]
     authority:
       - refs:
-          - VellisRequirements::durableCanonicalHistory
-          - VellisRequirements::replayEquivalence
-          - VellisRequirements::canonicalSemanticEquality
           - VellisRequirements::historyIndependentCurrentWork
-          - VellisVerification::snapshotReplay
-          - VellisVerification::invalidTail
+          - VellisRequirements::boundedHistoricalSelectionWork
+          - VellisRequirements::canonicalSemanticEquality
+          - VellisRequirements::durableCanonicalHistory
+          - VellisRequirements::v1SnapshotCompatibility
+          - VellisVerification::currentWorkScaling
+          - VellisVerification::historicalSelectionScaling
+          - VellisVerification::replayCharacterization
+          - AGENTS.md
         coverage: full
         remaining_work_item_ids: []
     approval:
       status: not-required
-      reason: The correction enforces already accepted transition validity without changing external behavior or format.
+      reason: Evidence subtraction preserves accepted authority and selected realization boundaries.
       checkpoint: null
-    nearest_wrong_system: Final-only validation accepts a tail whose intermediate state is not the state established by its canonical events.
-    compatibility_effect: No released store or stream format changes; only invalid tails lose acceptance.
+    nearest_wrong_system: A smaller green suite no longer detects one accepted semantic, recovery, resource, or workflow violation.
+    compatibility_effect: No product or workflow contract changes; only redundant test realization is removed.
     non_effects:
-      - Correct snapshot and tail bytes retain their current meaning.
-      - V1 recovery translation and confirmation remain unchanged.
-      - Replay retains bounded memory and local graph mutations avoid full-population validation.
-      - User-owned .data content remains untouched.
-    lifecycle: complete
+      - Historical campaign evidence remains reconstructible from its committed checkpoint.
+      - Product behavior and user-owned data remain untouched.
+      - Independent two-lens review remains required.
+    lifecycle: active
     implementation_status: conforming
     evidence_refs:
-      - command:uv run pytest tests/vellis/test_streaming_lifecycle.py tests/vellis/test_population_local_work.py tests/vellis/test_v1_streaming.py -q
+      - command:uv run pytest tests/vellis/test_current_work.py tests/vellis/test_work_characterization.py tests/vellis/test_population_local_work.py -q
+      - command:uv run pytest tests/vellis/test_definition_governance.py tests/vellis/test_sqlite_prospective_state.py -q
+      - command:uv run pytest tests/vellis/test_streaming_lifecycle.py tests/vellis/test_store_integrity.py tests/vellis/test_population_local_work.py -q
+      - command:uv run pytest tests/test_implementation_campaign.py tests/test_system_evolution.py -q
+      - command:just check
     blocker: null
-    checkpoint: git:8ff7aef4e5ed953b16edde5fd1eab0ae87e11446
+    checkpoint: null
   - id: W004
     order: 2
-    label: Review and rebaseline streamed reconstruction validity
+    label: Review and rebaseline the reduced evidence suite
     kind: closure
-    dependencies:
-      - W001
+    dependencies: [W001]
     planned_baseline:
       dimension: implementation
-      identity: git:fd49bcf2722013f67ccaf706d26ab6bb303383af
+      identity: git:2524d901de504b11fd7907f238121ff1333065e4
     finding_ids: []
     decision_ids: []
     authority:
       - refs:
-          - VellisRequirements::durableCanonicalHistory
-          - VellisRequirements::replayEquivalence
-          - VellisRequirements::v1SnapshotCompatibility
-          - VellisVerification::invalidTail
-          - VellisVerification::v1Compatibility
+          - VellisVerification::currentWorkScaling
+          - VellisVerification::historicalSelectionScaling
+          - AGENTS.md
         coverage: full
         remaining_work_item_ids: []
     approval:
       status: not-required
-      reason: Closure reconciles the unchanged authority, corrected implementation, evidence, and compatibility truth.
+      reason: Closure checks retained evidence, documentation truth, and repository integrity.
       checkpoint: null
-    nearest_wrong_system: Focused streamed-reconstruction tests pass while an invalid transition or v1 recovery regression remains outside the reviewed evidence.
-    compatibility_effect: No released store or stream format changes; correct native streams and v1 recovery inputs retain their meaning.
+    nearest_wrong_system: Narrow clusters pass while the assembled suite or evidence index is stale.
+    compatibility_effect: No public or persisted compatibility changes.
     non_effects:
-      - No streaming framework or modeled subsystem is introduced.
-      - User-owned .data content remains untouched.
-    lifecycle: complete
-    implementation_status: conforming
-    evidence_refs:
-      - command:uv run pytest tests/vellis/test_streaming_lifecycle.py tests/vellis/test_population_local_work.py tests/vellis/test_v1_streaming.py -q
-      - command:just check
+      - No numerical reduction target becomes authority.
+      - User-owned data remains untouched.
+    lifecycle: pending
+    implementation_status: not evaluated
+    evidence_refs: []
     blocker: null
-    checkpoint: git:8ff7aef4e5ed953b16edde5fd1eab0ae87e11446
+    checkpoint: null
 closure:
-  finding_disposition: complete
-  model_status: accepted
-  implementation_status: conforming
-  integration_status: conforming
+  finding_disposition: open
+  model_status: unchanged
+  implementation_status: partial
+  integration_status: not evaluated
   external_status: not applicable
-  compatibility: Correct native streams and v1 recovery inputs retain their existing meaning; malformed native tails are refused.
+  compatibility: Product, persistence, MCP, and compatibility behavior remain unchanged.
   reviews:
     - lens: authority and conformance
-      status: clean
-      reviewer: agent:streaming-authority-review
-      checkpoint: git:8ff7aef4e5ed953b16edde5fd1eab0ae87e11446
-      evidence_refs:
-        - command:uv run pytest tests/vellis/test_streaming_lifecycle.py tests/vellis/test_population_local_work.py tests/vellis/test_v1_streaming.py -q
+      status: pending
+      reviewer: null
+      checkpoint: null
+      evidence_refs: []
     - lens: engineering and evidence
-      status: clean
-      reviewer: agent:streaming-engineering-review
-      checkpoint: git:8ff7aef4e5ed953b16edde5fd1eab0ae87e11446
-      evidence_refs:
-        - command:uv run pytest tests/vellis/test_streaming_lifecycle.py tests/vellis/test_population_local_work.py tests/vellis/test_v1_streaming.py -q
-  evidence_refs:
-    - command:just check
-  checkpoint: git:8ff7aef4e5ed953b16edde5fd1eab0ae87e11446
+      status: pending
+      reviewer: null
+      checkpoint: null
+      evidence_refs: []
+  evidence_refs: []
+  checkpoint: null

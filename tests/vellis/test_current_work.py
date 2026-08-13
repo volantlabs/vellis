@@ -13,8 +13,6 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import pytest
-
 from tests.vellis.oracle import materialize_replay, materialize_state
 from tests.vellis.semantic_state import semantic_state_equal
 from vellis.canonical import Provenance
@@ -23,18 +21,8 @@ from vellis.definitions import AnchorTypeDefinition, GraphDefinitionSet
 from vellis.discovery import DefinitionInspectionRequest
 from vellis.governance import DefinitionChange
 from vellis.graph import Anchor
-from vellis.history import RevisionSelection
 from vellis.outcomes import OperationStatus
-from vellis.query import (
-    AnchorGroup,
-    AnchorProjection,
-    AnchorUuidFilter,
-    EvaluatedStateScope,
-    GraphQuery,
-    ReturnShape,
-)
 from vellis.system import RTGSystem
-from vellis.validation import assess_object_neighborhood
 
 VOCABULARY = GraphDefinitionSet(
     anchor_types=(AnchorTypeDefinition(type_key="person", description="A person."),)
@@ -50,25 +38,6 @@ def _established(tmp_path: Path) -> RTGSystem:
     )
     system.store.reset_instrumentation()
     return system
-
-
-def test_current_conformance_assessment_visits_no_canonical_record(tmp_path: Path) -> None:
-    system = _established(tmp_path)
-    try:
-        state = materialize_state(system)
-        assert assess_object_neighborhood(state.graph.objects(), state.active_definitions) == ()
-        assert system.store.record_reads == 0
-    finally:
-        system.close()
-
-
-def test_asking_whether_state_exists_visits_no_canonical_record(tmp_path: Path) -> None:
-    system = _established(tmp_path)
-    try:
-        assert system.is_initialized
-        assert system.store.record_reads == 0
-    finally:
-        system.close()
 
 
 def test_definition_work_reads_only_the_durable_definition_facet(
@@ -234,85 +203,6 @@ def test_the_projection_is_the_replayed_state_not_a_second_authority(tmp_path: P
         system.close()
 
 
-def test_current_work_issues_no_statement_against_the_ledger(tmp_path: Path) -> None:
-    """Excludes an implementation that reaches the ledger without going through the counter.
-
-    The counter is incremented by hand, so on its own it cannot prove that current work
-    left the ledger alone. Tracing the statements actually issued can.
-    """
-    system = _established(tmp_path)
-    statements: list[str] = []
-    # Reaching the connection directly is the point: this observes what was really run.
-    system.store._connection.set_trace_callback(statements.append)  # noqa: SLF001
-    try:
-        state = materialize_state(system)
-        assess_object_neighborhood(state.graph.objects(), state.active_definitions)
-        assert system.is_initialized
-        assert not any("canonical_record" in statement for statement in statements)
-        assert statements
-
-        statements.clear()
-        materialize_replay(system)
-        assert any("canonical_record" in statement for statement in statements)
-    finally:
-        system.store._connection.set_trace_callback(None)  # noqa: SLF001
-        system.close()
-
-
-@pytest.mark.parametrize("unrelated_population", (250, 1_000, 4_000))
-def test_one_object_mutation_decodes_only_its_affected_neighborhood(
-    tmp_path: Path, unrelated_population: int
-) -> None:
-    """A fixed mutation is independent of unrelated current graph population."""
-    system = _established(tmp_path)
-    try:
-        anchors = tuple(
-            Anchor(f"a-{index}", "person", f"Person {index}")
-            for index in range(unrelated_population)
-        )
-        assert system.apply_graph_change(
-            GraphChange(anchor_upserts=anchors), provenance=Provenance(initiator="owner")
-        ).accepted
-        system.store.reset_instrumentation()
-
-        outcome = system.apply_graph_change(
-            GraphChange(anchor_upserts=(Anchor("a-0", "person", "Renamed"),)),
-            provenance=Provenance(initiator="owner"),
-        )
-
-        assert outcome.accepted
-        assert system.store.current_graph_decodes == 0
-        assert system.store.current_graph_object_decodes == 1
-        assert system.store.record_reads == 0
-    finally:
-        system.close()
-
-
-def test_broad_query_hydrates_only_the_bounded_answer(tmp_path: Path) -> None:
-    system = _established(tmp_path)
-    try:
-        anchors = tuple(Anchor(f"a-{index}", "person", f"Person {index}") for index in range(500))
-        assert system.apply_graph_change(
-            GraphChange(anchor_upserts=anchors), provenance=Provenance(initiator="owner")
-        ).accepted
-        system.store.reset_instrumentation()
-
-        result = system.query_graph(
-            GraphQuery(
-                anchor_groups=(AnchorGroup("person", "person"),),
-                return_shape=ReturnShape((AnchorProjection("person", "person"),)),
-                maximum_rows=10,
-            )
-        )
-
-        assert result.status is OperationStatus.REJECTED
-        assert result.rows == ()
-        assert system.store.current_graph_decodes == 0
-        assert system.store.current_graph_object_decodes == 0
-    finally:
-        system.close()
-
-
 def test_schema_five_has_no_whole_state_definition_object_or_change_payloads(
     tmp_path: Path,
 ) -> None:
@@ -335,70 +225,5 @@ def test_schema_five_has_no_whole_state_definition_object_or_change_payloads(
                 str(row[1]).lower() for row in connection.execute(f"PRAGMA table_info({table})")
             }
             assert columns.isdisjoint(forbidden), (table, columns & forbidden)
-    finally:
-        system.close()
-
-
-def test_definition_discovery_decodes_only_the_requested_neighborhood(
-    tmp_path: Path,
-) -> None:
-    definitions = GraphDefinitionSet(
-        anchor_types=tuple(
-            AnchorTypeDefinition(f"type-{index}", f"Type {index}.") for index in range(1_000)
-        )
-    )
-    system = RTGSystem.open(tmp_path / "definitions.sqlite3")
-    try:
-        assert system.initialize_fresh(
-            definitions, provenance=Provenance("owner"), initialization_summary="large"
-        ).accepted
-        system.store.reset_instrumentation()
-        summary = system.definition_summary()
-        assert summary.accepted and len(summary.anchor_types) == 1_000
-        assert system.store.current_definition_decodes == 0
-
-        inspection = system.inspect_definitions(DefinitionInspectionRequest(("type-0",)))
-        assert inspection.accepted and len(inspection.anchor_details) == 1
-        assert system.store.current_definition_decodes == 1
-    finally:
-        system.close()
-
-
-@pytest.mark.parametrize("population", (10, 1_000, 4_000))
-def test_narrow_historical_query_does_not_materialize_the_revision_population(
-    tmp_path: Path, population: int
-) -> None:
-    system = _established(tmp_path)
-    try:
-        assert system.apply_graph_change(
-            GraphChange(
-                anchor_upserts=tuple(
-                    Anchor(f"a-{index}", "person", f"Person {index}") for index in range(population)
-                )
-            ),
-            provenance=Provenance(initiator="owner"),
-        ).accepted
-        query = GraphQuery(
-            anchor_groups=(AnchorGroup("person", "person", AnchorUuidFilter(("a-0",))),),
-            return_shape=ReturnShape((AnchorProjection("returned-person", "person"),)),
-            maximum_rows=1,
-            historical_selection=RevisionSelection(1),
-            state_scope=EvaluatedStateScope.HISTORICAL,
-        )
-        steps = 0
-
-        def progress() -> int:
-            nonlocal steps
-            steps += 1
-            return 0
-
-        system.store._connection.set_progress_handler(progress, 1)  # noqa: SLF001
-        try:
-            result = system.query_graph(query)
-        finally:
-            system.store._connection.set_progress_handler(None, 0)  # noqa: SLF001
-
-        assert result.accepted and len(result.rows) == 1
-        assert steps < 2_000
     finally:
         system.close()

@@ -46,6 +46,7 @@ from vellis.outcomes import OperationStatus
 from vellis.query import (
     AnchorGroup,
     AnchorProjection,
+    AnchorUuidFilter,
     EvaluatedStateScope,
     GraphQuery,
     ReturnShape,
@@ -220,15 +221,32 @@ def test_current_work_still_grows_with_the_things_it_is_allowed_to_grow_with(
         system.close()
 
 
-def test_a_returned_result_is_bounded_by_what_was_asked_for_not_by_history(
-    histories: tuple[RTGSystem, RTGSystem],
+@pytest.mark.parametrize("population", (10, 4_000))
+def test_a_returned_result_is_bounded_without_scanning_or_hydrating_the_matching_population(
+    tmp_path: Path, population: int
 ) -> None:
-    """Requested return bounds are the other permitted dimension, and they still bind."""
-    _, long = histories
-    refused = long.query_graph(_people(maximum_rows=2), provenance=OWNER)
+    """Requested return bounds bind before an over-limit population is materialized."""
+    system = establish(tmp_path / f"vellis-{population}.sqlite3")
+    try:
+        assert system.apply_graph_change(
+            GraphChange(
+                anchor_upserts=tuple(
+                    Anchor(f"a-{index}", "person", f"Person {index}") for index in range(population)
+                )
+            ),
+            provenance=OWNER,
+        ).accepted
+        measured = measure(
+            system, lambda: system.query_graph(_people(maximum_rows=2), provenance=OWNER)
+        )
 
-    assert refused.status is OperationStatus.REJECTED
-    assert not refused.rows
+        assert measured.value.status is OperationStatus.REJECTED
+        assert not measured.value.rows
+        assert measured.cost.canonical_record_visits == 0
+        assert measured.cost.current_graph_object_decodes == 0
+        assert measured.cost.sqlite_vm_steps < 1_000
+    finally:
+        system.close()
 
 
 # --- One mutation, and the prefix it leaves alone -------------------------------------
@@ -553,7 +571,43 @@ def test_a_historical_query_uses_intervals_not_transition_replay(tmp_path: Path)
         system.close()
 
 
-@pytest.mark.parametrize("selected_revision", [4, 16, 32])
+@pytest.mark.parametrize("population", (10, 4_000))
+def test_a_narrow_historical_query_does_not_materialize_the_revision_population(
+    tmp_path: Path, population: int
+) -> None:
+    """Required rows, not unrelated revision population, bound historical selection."""
+    system = establish(tmp_path / f"vellis-{population}.sqlite3")
+    try:
+        assert system.apply_graph_change(
+            GraphChange(
+                anchor_upserts=tuple(
+                    Anchor(f"a-{index}", "person", f"Person {index}") for index in range(population)
+                )
+            ),
+            provenance=OWNER,
+        ).accepted
+        measured = measure(
+            system,
+            lambda: system.query_graph(
+                GraphQuery(
+                    anchor_groups=(AnchorGroup("person", "person", AnchorUuidFilter(("a-0",))),),
+                    return_shape=ReturnShape((AnchorProjection("returned-person", "person"),)),
+                    maximum_rows=1,
+                    historical_selection=RevisionSelection(revision=1),
+                    state_scope=EvaluatedStateScope.HISTORICAL,
+                ),
+                provenance=OWNER,
+            ),
+        )
+
+        assert measured.value.accepted and len(measured.value.rows) == 1
+        assert measured.cost.canonical_record_visits == 1
+        assert measured.cost.sqlite_vm_steps < 2_000
+    finally:
+        system.close()
+
+
+@pytest.mark.parametrize("selected_revision", [4, 32])
 def test_restoring_a_past_state_uses_set_difference_not_ledger_replay(
     tmp_path: Path, selected_revision: int
 ) -> None:

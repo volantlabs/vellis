@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import ast
-import inspect
 import io
 import sqlite3
 from collections.abc import Callable
@@ -11,7 +9,6 @@ from pathlib import Path
 
 import pytest
 
-import vellis.store as store_module
 import vellis.streaming as streaming
 from vellis.canonical import Provenance
 from vellis.changes import GraphChange, GraphChangeRequest, GraphChangeTarget
@@ -608,13 +605,6 @@ def test_every_proposal_summary_drift_is_rejected(
         system.close()
 
 
-def test_tail_record_application_never_recomputes_a_complete_graph_summary() -> None:
-    source = inspect.getsource(streaming._apply_tail_stream)  # noqa: SLF001
-
-    assert "recomputed_graph_summary" not in source
-    assert "verify_state_summaries" not in source
-
-
 @pytest.mark.parametrize("population", (10, 4_000))
 def test_one_tail_record_adds_bounded_vm_work_over_the_snapshot_import(
     tmp_path: Path, population: int, monkeypatch: pytest.MonkeyPatch
@@ -673,24 +663,6 @@ def test_one_tail_record_adds_bounded_vm_work_over_the_snapshot_import(
     tail_steps = measured(tmp_path / f"with-tail-{population}.sqlite3", with_tail=True)
 
     assert abs(tail_steps - snapshot_steps) < 20_000
-
-
-def test_every_current_graph_sql_scan_is_bounded_or_an_explicit_integrity_scan() -> None:
-    tree = ast.parse(Path(store_module.__file__).read_text(encoding="utf-8"))
-    accesses = [
-        node.value
-        for node in ast.walk(tree)
-        if isinstance(node, ast.Constant)
-        and isinstance(node.value, str)
-        and "FROM current_graph_object" in node.value
-    ]
-
-    assert accesses
-    assert all(
-        " WHERE " in sql
-        or "replay_expected EXCEPT SELECT uuid, object_value_id FROM current_graph_object" in sql
-        for sql in accesses
-    )
 
 
 def test_graph_rows_head_summary_and_record_roll_back_together(tmp_path: Path) -> None:

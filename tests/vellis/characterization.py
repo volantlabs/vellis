@@ -121,6 +121,8 @@ class Measurement:
 
     canonical_record_visits: int
     activity_record_visits: int
+    current_graph_object_decodes: int
+    sqlite_vm_steps: int
     duration_seconds: float
     statements: tuple[str, ...]
 
@@ -144,19 +146,30 @@ def measure[T](system: RTGSystem, work: Callable[[], T]) -> Measured[T]:
     that setup statements are not counted as the operation's own.
     """
     statements: list[str] = []
+    sqlite_vm_steps = 0
+
+    def count_sqlite_vm_step() -> int:
+        nonlocal sqlite_vm_steps
+        sqlite_vm_steps += 1
+        return 0
+
     system.store.reset_instrumentation()
     system.store._connection.set_trace_callback(statements.append)  # noqa: SLF001
+    system.store._connection.set_progress_handler(count_sqlite_vm_step, 1)  # noqa: SLF001
     started = time.perf_counter()
     try:
         value = work()
     finally:
         elapsed = time.perf_counter() - started
+        system.store._connection.set_progress_handler(None, 0)  # noqa: SLF001
         system.store._connection.set_trace_callback(None)  # noqa: SLF001
     return Measured(
         value=value,
         cost=Measurement(
             canonical_record_visits=system.store.record_reads,
             activity_record_visits=system.store.activity_reads,
+            current_graph_object_decodes=system.store.current_graph_object_decodes,
+            sqlite_vm_steps=sqlite_vm_steps,
             duration_seconds=elapsed,
             statements=tuple(statements),
         ),

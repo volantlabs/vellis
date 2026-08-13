@@ -304,13 +304,12 @@ def test_the_whole_proposal_can_be_compared_with_focused_active_views(tmp_path: 
         system.close()
 
 
-@pytest.mark.parametrize("duplicate", (("person", "person"),), ids=("permitted anchors",))
 def test_correcting_a_duplicated_member_of_a_referenced_set_is_a_real_change(
-    tmp_path: Path, duplicate: tuple[str, ...]
+    tmp_path: Path,
 ) -> None:
     system = _system(tmp_path)
     try:
-        invalid = AssociatedDataTypeDefinition("note", duplicate, description="A note.")
+        invalid = AssociatedDataTypeDefinition("note", ("person", "person"), description="A note.")
         first = system.set_definition_delta(
             DefinitionChange(
                 anchor_type_upserts=(PROJECT,), associated_data_type_upserts=(invalid,)
