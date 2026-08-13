@@ -288,6 +288,6 @@ approval, lifecycle, and evidence-reference invariants. `just system-evolution-s
 approval, next work, and open-finding count.
 
 The repository exposes the selected MCP tool contract over local standard input and output. Matching
-user-scoped Codex and Claude Code entries are configured to launch it, while live closure remains
-partial until both named clients have reproducible bounded invocation evidence. Use modeled,
-selected, implemented, verified, and runnable precisely.
+user-scoped Codex and Claude Code entries are configured to launch it, and accepted bounded
+invocations through both clients complete the selected live boundary. Use modeled, selected,
+implemented, verified, and runnable precisely.

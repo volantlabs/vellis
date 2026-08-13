@@ -258,5 +258,6 @@ acceptance cannot substitute for that semantic review.
 Do not introduce realization machinery without a current modeled need. Product source under
 `vellis/` is authored, not generated. The selected MCP tool contract is implemented and runnable over
 local standard input and output, and a real client launching it over that transport is exercised.
-Matching user-scoped Codex and Claude Code entries are configured to launch it; whole-system live
-closure remains partial until both named clients have reproducible bounded invocation evidence.
+Matching user-scoped Codex and Claude Code entries are configured to launch it. Whole-system live
+closure is complete, with accepted bounded invocations through both named clients and reproducible
+project evidence for the selected boundary.

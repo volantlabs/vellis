@@ -8,11 +8,11 @@ campaign:
     checkpoint: null
   blocker:
     classification: stale baseline
-    summary: Post-build evolution changes current-work and query resource authority and records escaped historical-selection defects, so this completed-plan record remains a source baseline and cannot authorize work against the proposed authority.
+    summary: The implementation campaign completed at closure checkpoint closure:5afe36b2bc26:1; post-build evolution now changes current-work and query resource authority, so this record remains the completed source baseline and cannot authorize new work against the changed authority.
     authority_ids: [A006, A007, A008, A016]
     evidence_refs:
       - command:just system-evolution-check
-  checkpoint: approval:5afe36b2bc261e726a1679596e4ef30ef0bf95f2
+  checkpoint: closure:5afe36b2bc26:1
 model_baseline:
   status: stale
   authority_files:
@@ -483,6 +483,7 @@ authority:
       - path:tests/vellis/test_client_setup.py#test_claude_output_without_scope_is_reported_as_unparseable
       - path:tests/vellis/test_client_setup.py#test_linux_and_windows_render_paths_and_non_default_destinations_without_loss
       - path:README.md#implementation-status
+      - 'command:claude -p --allowedTools mcp__vellis__rtg_definition_summary -- "Call rtg_definition_summary once."'
       - command:uv run pytest tests/vellis
   - id: A018
     label: Typed validation across every selected scope
@@ -1273,7 +1274,7 @@ slices:
 closure:
   authority_coverage: full
   integration_status: conforming
-  runnable_status: partial
+  runnable_status: conforming
   realization_decisions:
     - id: D003
       summary: Cover blank, Everyday Life, v2 snapshot and optional tail, and v1 preview/confirmation; use temporary test directories and a configurable platform user-data default that never resolves to .data/.
@@ -1302,8 +1303,12 @@ closure:
         - Exclude stale authorization by reading both entries through public CLIs and requiring the dry run to match exactly the selected destination and two authorized transitions with no effect.
         - Exclude partial-retry duplication or overreach by accepting matching enabled entries as no-ops, applying only the absent authorized remainder, and pausing on all conflicting or unparseable state.
         - Exclude registration without runnable proof by rereading both entries and making one bounded read-only MCP invocation through each real client without changing approval policy.
-      implementation_status: partial
+      implementation_status: conforming
       evidence_refs:
+        - path:tests/vellis/test_cohesive_use.py#test_a_client_launched_server_serves_exactly_the_selected_ten_tools
+        - path:tests/vellis/test_cohesive_use.py#test_the_command_an_owner_registers_is_the_one_that_launches
+        - path:tests/vellis/test_cohesive_use.py#test_approved_context_outlives_the_session_and_the_process
+        - path:tests/vellis/test_cohesive_use.py#test_the_owner_governs_the_sole_proposal_through_the_launched_client
         - command:uv run python -m vellis.setup --client codex --client claude --dry-run
         - command:codex mcp get vellis
         - command:claude mcp get vellis
@@ -1340,4 +1345,4 @@ closure:
     - 'command:claude -p --allowedTools mcp__vellis__rtg_definition_summary -- "Call rtg_definition_summary once."'
     - command:uv run pytest tests/vellis
     - command:just check
-  checkpoint: null
+  checkpoint: closure:5afe36b2bc26:1

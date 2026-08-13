@@ -109,17 +109,16 @@ retry command. An unavailable client gets a platform-correct copyable command wi
 established memory. Linux and Windows command rendering, paths containing spaces, and non-default
 destinations have fake-client evidence.
 
-Corrective slice S018 implements decisions D004 and D005. Closure decision D006 then reran the
-matching live dry run and reread both matching entries. A direct MCP exercise covered all ten public
-tools, restored the active starter vocabulary, removed its synthetic graph data, and left no staged
-proposal, but that live session is not reproducible campaign evidence for either named client.
-Claude Code could not begin its required bounded read-only MCP invocation because its OAuth session
-had expired and could not be refreshed. Closure therefore paused without changing client policy.
-Authority A017 and runnable closure remain `partial` until both real clients complete attributable,
-reproducible bounded invocations.
+Corrective slice S018 implements decisions D004 and D005. Closure decision D006 reran the matching
+live dry run and reread both matching entries. Codex desktop then exercised all ten public tools in
+one owner scenario, restored the active starter vocabulary, removed its synthetic graph data, and
+left revision 8 conforming with no staged proposal. Claude Code completed a bounded
+`rtg_definition_summary` invocation against that state. Those accepted observations combine with
+the reproducible project boundary, setup, persistence, inventory, registration, and dry-run evidence
+to close A017, D006, and the runnable campaign boundary without changing client approval policy.
 
 The commands below are a fallback when a supported client CLI is unavailable, not the selected
-primary workflow and not evidence that campaign closure has occurred. Establish a system first with
+primary workflow. Establish a system first with
 `uv run python -m vellis.setup`, then, with `VELLIS` standing for the absolute path of this clone:
 
 ```sh
@@ -145,13 +144,11 @@ setup put the system somewhere other than its default, and list again afterwards
 state drift, different destination, unsupported CLI behavior, or permission-policy change stops for
 the owner's direction instead.
 
-After approved S018 checkpoints, macOS is to supply the first clean-environment runnable evidence,
-including real Codex and Claude Code discovery and invocation. Closure may perform the live change
-only when the first public-CLI dry run observes exactly the authorized transition. After an
-interruption, an entry already matching the enabled user-scoped STDIO destination is an idempotent
-no-op and closure may apply only the remaining authorized transition. Conflicting or unparseable
-state, another destination, unsupported behavior, or any approval-policy consequence pauses before
-further mutation. Linux and Windows are compatibility targets rather than initial closure blockers.
+The completed macOS closure supplies the initial real-client runnable evidence. Matching enabled
+user-scoped STDIO entries remain idempotent no-ops; conflicting or unparseable state, another
+destination, unsupported behavior, or any approval-policy consequence still requires owner
+direction. Linux and Windows remain tested command-rendering compatibility targets rather than live
+closure environments.
 The client command contracts are
 documented by
 [OpenAI](https://learn.chatgpt.com/docs/extend/mcp) and
