@@ -31,7 +31,9 @@ def _active_record() -> dict[str, Any]:
     record["closure"]["checkpoint"] = implementation
     record["evolution"]["lifecycle"] = "active"
     record["evolution"]["checkpoint"] = None
-    active = _active_work(record)
+    # The committed record may itself be complete. Choose the closure item explicitly
+    # when constructing an active-state fixture instead of depending on live ledger state.
+    active = _work(record, "W007")
     active["planned_baseline"] = {
         "dimension": "implementation",
         "identity": implementation,
