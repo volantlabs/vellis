@@ -3,13 +3,13 @@ evolution:
   id: post-build-resource-and-evolution-review
   objective: Reconcile post-build resource-behavior findings and establish a portable model-and-implementation evolution workflow.
   observable_distinction: Live state is durably addressable without a resident whole graph, bounded reads stop at the caller bound, indexed identity joins constrain current queries before value filtering, and every change remains traceable to accepted authority.
-  lifecycle: active
+  lifecycle: complete
   approval:
     status: accepted
     reason: The owner accepted the strengthened resource behavior and selected SQLite-owned live state with no unreleased-format compatibility obligation.
     checkpoint: git:284efc9
   blocker: null
-  checkpoint: null
+  checkpoint: git:8f1a93e4c53b5e53fa377683de5b5e1eb5885abf
 baselines:
   status: current
   source:
@@ -618,11 +618,14 @@ work_items:
     non_effects:
       - The completed implementation campaign history is not rewritten.
       - User-owned .data content is not inspected or migrated.
-    lifecycle: active
-    implementation_status: partial
-    evidence_refs: []
+    lifecycle: complete
+    implementation_status: conforming
+    evidence_refs:
+      - command:just check
+      - command:just system-evolution-check
+      - command:uv run pytest tests/vellis/test_current_work.py tests/vellis/test_graph_queries.py tests/vellis/test_store_integrity.py tests/vellis/test_snapshot_replay.py tests/vellis/test_activity_history.py
     blocker: null
-    checkpoint: null
+    checkpoint: git:8f1a93e4c53b5e53fa377683de5b5e1eb5885abf
   - id: W005
     order: 4
     label: Correct review-exposed current-state and query defects
@@ -787,37 +790,42 @@ work_items:
     blocker: null
     checkpoint: git:8f1a93e4c53b5e53fa377683de5b5e1eb5885abf
 closure:
-  finding_disposition: open
-  model_status: not evaluated
-  implementation_status: partial
-  integration_status: not evaluated
-  external_status: not evaluated
+  finding_disposition: complete
+  model_status: accepted
+  implementation_status: conforming
+  integration_status: conforming
+  external_status: not applicable
   compatibility: No released store format exists. The experimental layout is replaced without migration, and user-owned .data remains untouched.
   reviews:
     - lens: authority and conformance
-      status: findings
-      reviewer: fresh-agent:final_authority_2
-      checkpoint: git:da790ff
+      status: clean
+      reviewer: fresh-agent:bounded_authority_final
+      checkpoint: git:8f1a93e4c53b5e53fa377683de5b5e1eb5885abf
       evidence_refs:
         - command:just model-check
-        - command:uv run pytest tests/vellis/test_current_work.py tests/vellis/test_graph_queries.py tests/vellis/test_snapshot_replay.py
+        - command:uv run pytest tests/vellis/test_current_work.py tests/vellis/test_graph_queries.py tests/vellis/test_snapshot_replay.py tests/vellis/test_activity_history.py
     - lens: engineering and evidence
-      status: findings
-      reviewer: fresh-agent:final_engineering_2
-      checkpoint: git:da790ff
+      status: clean
+      reviewer: fresh-agent:bounded_engineering_final
+      checkpoint: git:8f1a93e4c53b5e53fa377683de5b5e1eb5885abf
       evidence_refs:
         - command:just check
     - lens: resource behavior and durability
-      status: findings
-      reviewer: fresh-agent:final_engineering_2
-      checkpoint: git:da790ff
+      status: clean
+      reviewer: fresh-agent:bounded_engineering_final
+      checkpoint: git:8f1a93e4c53b5e53fa377683de5b5e1eb5885abf
       evidence_refs:
-        - command:uv run pytest tests/vellis/test_current_work.py tests/vellis/test_graph_queries.py tests/vellis/test_store_integrity.py
+        - command:uv run pytest tests/vellis/test_current_work.py tests/vellis/test_graph_queries.py tests/vellis/test_store_integrity.py tests/vellis/test_snapshot_replay.py tests/vellis/test_activity_history.py
     - lens: portable evolution method
-      status: findings
-      reviewer: fresh-agent:final_portable_2
-      checkpoint: git:da790ff
+      status: clean
+      reviewer: fresh-agent:bounded_process_final
+      checkpoint: git:8f1a93e4c53b5e53fa377683de5b5e1eb5885abf
       evidence_refs:
         - command:uv run pytest tests/test_system_evolution.py
-  evidence_refs: []
-  checkpoint: null
+        - command:just skills-check
+        - command:just system-evolution-check
+  evidence_refs:
+    - command:just check
+    - command:just system-evolution-check
+    - command:uv run pytest tests/vellis/test_current_work.py tests/vellis/test_graph_queries.py tests/vellis/test_store_integrity.py tests/vellis/test_snapshot_replay.py tests/vellis/test_activity_history.py
+  checkpoint: git:8f1a93e4c53b5e53fa377683de5b5e1eb5885abf
