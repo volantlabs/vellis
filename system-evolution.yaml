@@ -9,7 +9,7 @@ evolution:
     reason: The owner accepted the strengthened resource behavior and selected SQLite-owned live state with no unreleased-format compatibility obligation.
     checkpoint: git:284efc9
   blocker: null
-  checkpoint: git:8f1a93e4c53b5e53fa377683de5b5e1eb5885abf
+  checkpoint: git:a26a7ba4dcce5063700bf9b7b60c08bfbeee3b0a
 baselines:
   status: current
   source:
@@ -20,16 +20,16 @@ baselines:
     checkpoint: git:e82e0e6161040baa4a4a728d05cabbd418c57d83
   target:
     model: sha256:ad02d24b6c6eeb38f904d551e0ae7dfd48101ff41e44db79effb3014e137e4c6
-    implementation: git:8f1a93e4c53b5e53fa377683de5b5e1eb5885abf
+    implementation: git:a26a7ba4dcce5063700bf9b7b60c08bfbeee3b0a
     language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
     execution_environment: sha256:c24a0bae1e63d1f4923d6c7925925ea4e02743568a84b403677b5f6a718879fa
-    checkpoint: git:8f1a93e4c53b5e53fa377683de5b5e1eb5885abf
+    checkpoint: git:a26a7ba4dcce5063700bf9b7b60c08bfbeee3b0a
   observed:
     model: sha256:ad02d24b6c6eeb38f904d551e0ae7dfd48101ff41e44db79effb3014e137e4c6
-    implementation: git:8f1a93e4c53b5e53fa377683de5b5e1eb5885abf
+    implementation: git:a26a7ba4dcce5063700bf9b7b60c08bfbeee3b0a
     language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
     execution_environment: sha256:c24a0bae1e63d1f4923d6c7925925ea4e02743568a84b403677b5f6a718879fa
-    checkpoint: git:8f1a93e4c53b5e53fa377683de5b5e1eb5885abf
+    checkpoint: git:a26a7ba4dcce5063700bf9b7b60c08bfbeee3b0a
 scope:
   authority_scope:
     - model/10-rtg-domain.sysml
@@ -599,7 +599,7 @@ work_items:
       - W008
     planned_baseline:
       dimension: implementation
-      identity: git:8f1a93e4c53b5e53fa377683de5b5e1eb5885abf
+      identity: git:a26a7ba4dcce5063700bf9b7b60c08bfbeee3b0a
     finding_ids:
       - F006
       - F007
@@ -625,7 +625,7 @@ work_items:
       - command:just system-evolution-check
       - command:uv run pytest tests/vellis/test_current_work.py tests/vellis/test_graph_queries.py tests/vellis/test_store_integrity.py tests/vellis/test_snapshot_replay.py tests/vellis/test_activity_history.py
     blocker: null
-    checkpoint: git:8f1a93e4c53b5e53fa377683de5b5e1eb5885abf
+    checkpoint: git:a26a7ba4dcce5063700bf9b7b60c08bfbeee3b0a
   - id: W005
     order: 4
     label: Correct review-exposed current-state and query defects
@@ -799,27 +799,27 @@ closure:
   reviews:
     - lens: authority and conformance
       status: clean
-      reviewer: fresh-agent:bounded_authority_final
-      checkpoint: git:8f1a93e4c53b5e53fa377683de5b5e1eb5885abf
+      reviewer: fresh-agent:final_a26_authority
+      checkpoint: git:a26a7ba4dcce5063700bf9b7b60c08bfbeee3b0a
       evidence_refs:
         - command:just model-check
         - command:uv run pytest tests/vellis/test_current_work.py tests/vellis/test_graph_queries.py tests/vellis/test_snapshot_replay.py tests/vellis/test_activity_history.py
     - lens: engineering and evidence
       status: clean
-      reviewer: fresh-agent:bounded_engineering_final
-      checkpoint: git:8f1a93e4c53b5e53fa377683de5b5e1eb5885abf
+      reviewer: fresh-agent:final_a26_engineering
+      checkpoint: git:a26a7ba4dcce5063700bf9b7b60c08bfbeee3b0a
       evidence_refs:
         - command:just check
     - lens: resource behavior and durability
       status: clean
-      reviewer: fresh-agent:bounded_engineering_final
-      checkpoint: git:8f1a93e4c53b5e53fa377683de5b5e1eb5885abf
+      reviewer: fresh-agent:final_a26_engineering
+      checkpoint: git:a26a7ba4dcce5063700bf9b7b60c08bfbeee3b0a
       evidence_refs:
         - command:uv run pytest tests/vellis/test_current_work.py tests/vellis/test_graph_queries.py tests/vellis/test_store_integrity.py tests/vellis/test_snapshot_replay.py tests/vellis/test_activity_history.py
     - lens: portable evolution method
       status: clean
-      reviewer: fresh-agent:bounded_process_final
-      checkpoint: git:8f1a93e4c53b5e53fa377683de5b5e1eb5885abf
+      reviewer: fresh-agent:final_a26_process
+      checkpoint: git:a26a7ba4dcce5063700bf9b7b60c08bfbeee3b0a
       evidence_refs:
         - command:uv run pytest tests/test_system_evolution.py
         - command:just skills-check
@@ -828,4 +828,4 @@ closure:
     - command:just check
     - command:just system-evolution-check
     - command:uv run pytest tests/vellis/test_current_work.py tests/vellis/test_graph_queries.py tests/vellis/test_store_integrity.py tests/vellis/test_snapshot_replay.py tests/vellis/test_activity_history.py
-  checkpoint: git:8f1a93e4c53b5e53fa377683de5b5e1eb5885abf
+  checkpoint: git:a26a7ba4dcce5063700bf9b7b60c08bfbeee3b0a
