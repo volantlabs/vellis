@@ -16,7 +16,11 @@ from vellis.governance import ActivateDefinitionDeltaRequest, DefinitionChange
 from vellis.graph import Anchor
 from vellis.history import RevisionSelection
 from vellis.normalized import (
+    graph_entry_digest,
+    insert_definition_entry,
+    insert_object_value,
     object_identity,
+    proposal_entry_digest,
     recomputed_graph_summary,
     semantic_identity,
     semantic_row_summary,
@@ -132,6 +136,57 @@ def _reseal_single_graph_tail(
     )
     header["throughRecordIdentity"] = record["values"]["record_identity"]
     header["throughStateIdentity"] = resulting_state_identity
+
+
+def _reseal_source_records_from(system: RTGSystem, first_revision: int) -> None:
+    """Reseal a deliberately forged source suffix for importer counterexamples."""
+    connection = system.store._connection  # noqa: SLF001
+    ledger = connection.execute("SELECT identity FROM ledger WHERE id = 0").fetchone()
+    prior = connection.execute(
+        "SELECT record_identity FROM canonical_record WHERE established_revision = ?",
+        (first_revision - 1,),
+    ).fetchone()
+    assert ledger is not None and prior is not None
+    prior_identity = str(prior[0])
+    rows = connection.execute(
+        "SELECT established_revision, record_kind, recorded_at, initiator, source, summary,"
+        " resulting_state_identity FROM canonical_record WHERE established_revision >= ?"
+        " ORDER BY established_revision",
+        (first_revision,),
+    ).fetchall()
+    for revision, kind, recorded_at, initiator, source, summary, state_identity in rows:
+        revision = int(revision)
+        event_identity = system.store._record_event_identity_unlocked(  # noqa: SLF001
+            revision, str(kind)
+        )
+        content_identity = semantic_identity(
+            ("canonicalRecordContent", event_identity, str(state_identity))
+        )
+        record_identity = semantic_identity(
+            (
+                str(ledger[0]),
+                prior_identity,
+                revision,
+                str(kind),
+                str(recorded_at),
+                str(initiator),
+                source,
+                str(summary),
+                content_identity,
+            )
+        )
+        connection.execute(
+            "UPDATE canonical_record SET prior_record_identity = ?, event_identity = ?,"
+            " content_identity = ?, record_identity = ? WHERE established_revision = ?",
+            (
+                prior_identity,
+                event_identity,
+                content_identity,
+                record_identity,
+                revision,
+            ),
+        )
+        prior_identity = record_identity
 
 
 def test_import_rebuilds_live_meaning_on_one_fresh_history_base(
@@ -599,6 +654,216 @@ def test_invalid_streamed_tail_establishes_no_partial_destination(
     destination = tmp_path / f"{mutation}.sqlite3"
     with pytest.raises(StoreError):
         import_ndjson(snapshot, destination, tail=io.StringIO(_redigest(records)))
+    assert not destination.exists()
+
+
+def test_tail_rejects_a_proposal_identity_mismatch_hidden_by_later_discard(
+    tmp_path: Path,
+) -> None:
+    source_path = tmp_path / "definition-source.sqlite3"
+    system = _source(source_path, 0)
+    snapshot = io.StringIO()
+    captured = export_ndjson(source_path, snapshot)
+    assert system.set_definition_delta(
+        DefinitionChange(anchor_type_upserts=(AnchorTypeDefinition("team", "The claimed team."),)),
+        provenance=Provenance("owner"),
+    ).accepted
+    assert system.discard_definition_delta(provenance=Provenance("owner")).accepted
+
+    connection = system.store._connection  # noqa: SLF001
+    substituted = insert_definition_entry(
+        connection,
+        GraphDefinitionSet(anchor_types=(AnchorTypeDefinition("team", "Different team meaning."),)),
+    )
+    connection.execute(
+        "UPDATE canonical_definition_proposal_event SET value_set_id = ?"
+        " WHERE established_revision = ? AND entity_kind = 'type' AND natural_key = 'team'",
+        (substituted, captured.revision + 1),
+    )
+    _reseal_source_records_from(system, captured.revision + 1)
+    tail = io.StringIO()
+    export_tail_ndjson(
+        source_path,
+        tail,
+        after_revision=captured.revision,
+        after_record_identity=captured.record_identity,
+    )
+    system.close()
+
+    snapshot.seek(0)
+    tail.seek(0)
+    destination = tmp_path / "definition-mismatch.sqlite3"
+    with pytest.raises(StoreError, match="do not produce their claimed identity"):
+        import_ndjson(snapshot, destination, tail=tail)
+    assert not destination.exists()
+
+
+def test_tail_rejects_an_invalid_active_revision_hidden_by_later_repair(
+    tmp_path: Path,
+) -> None:
+    source_path = tmp_path / "graph-source.sqlite3"
+    system = _source(source_path, 0)
+    snapshot = io.StringIO()
+    captured = export_ndjson(source_path, snapshot)
+    assert system.apply_graph_change(
+        GraphChange(anchor_upserts=(Anchor("temporary", "person", "Temporary"),)),
+        provenance=Provenance("owner"),
+    ).accepted
+    assert system.apply_graph_change(
+        GraphChange(anchor_removals=("temporary",)), provenance=Provenance("owner")
+    ).accepted
+
+    connection = system.store._connection  # noqa: SLF001
+    invalid = Anchor("temporary", "unknown-type", "Temporary")
+    invalid_value_id = insert_object_value(connection, invalid)
+    invalid_graph_accumulator = graph_entry_digest(invalid.uuid, object_identity(invalid))
+    active = connection.execute(
+        "SELECT active_definition_set_id FROM state_head WHERE id = 0"
+    ).fetchone()
+    assert active is not None
+    invalid_state_identity = semantic_identity(
+        (
+            "normalizedState",
+            captured.revision + 1,
+            str(active[0]),
+            None,
+            (1, invalid_graph_accumulator),
+            semantic_identity(("graphOverlay", "0" * 64, 0)),
+        )
+    )
+    connection.execute(
+        "UPDATE canonical_graph_event SET object_value_id = ? WHERE established_revision = ?",
+        (invalid_value_id, captured.revision + 1),
+    )
+    connection.execute(
+        "UPDATE canonical_record SET resulting_state_identity = ? WHERE established_revision = ?",
+        (invalid_state_identity, captured.revision + 1),
+    )
+    _reseal_source_records_from(system, captured.revision + 1)
+    tail = io.StringIO()
+    export_tail_ndjson(
+        source_path,
+        tail,
+        after_revision=captured.revision,
+        after_record_identity=captured.record_identity,
+    )
+    system.close()
+
+    snapshot.seek(0)
+    tail.seek(0)
+    destination = tmp_path / "invalid-intermediate.sqlite3"
+    with pytest.raises(StoreError, match="unknown-type"):
+        import_ndjson(snapshot, destination, tail=tail)
+    assert not destination.exists()
+
+
+def test_tail_rejects_activation_after_its_staged_base_became_stale(
+    tmp_path: Path,
+) -> None:
+    source_path = tmp_path / "stale-activation-source.sqlite3"
+    system = _source(source_path, 1)
+    snapshot = io.StringIO()
+    captured = export_ndjson(source_path, snapshot)
+    proposed = Anchor("a-0", "person", "Proposed")
+    staged = system.apply_graph_change(
+        GraphChangeRequest(
+            GraphChangeTarget.DEFINITION_DELTA,
+            GraphChange(anchor_upserts=(proposed,)),
+        ),
+        provenance=Provenance("owner"),
+    )
+    assert staged.accepted and staged.resulting_revision is not None
+    active = system.apply_graph_change(
+        GraphChange(anchor_upserts=(Anchor("unrelated", "person", "Unrelated"),)),
+        provenance=Provenance("owner"),
+    )
+    assert active.accepted and active.resulting_revision is not None
+    assessment = system.check(
+        ValidationRequest(
+            ValidationRequestKind.ASSESS,
+            ValidationScope.DEFINITION_DELTA,
+            maximum_findings=10,
+        )
+    )
+    assert assessment.accepted and assessment.conforms and assessment.assessment_id is not None
+    activated = system.activate_definition_delta(
+        ActivateDefinitionDeltaRequest(assessment.assessment_id),
+        provenance=Provenance("owner"),
+    )
+    assert activated.accepted and activated.resulting_revision is not None
+
+    connection = system.store._connection  # noqa: SLF001
+    active_later = Anchor("a-0", "person", "Active later")
+    active_later_id = insert_object_value(connection, active_later)
+    connection.execute(
+        "UPDATE canonical_graph_event SET uuid = ?, object_value_id = ?"
+        " WHERE established_revision = ?",
+        (active_later.uuid, active_later_id, active.resulting_revision),
+    )
+    connection.execute(
+        "UPDATE graph_presence_interval SET valid_to_revision = ?"
+        " WHERE uuid = 'unrelated' AND valid_to_revision IS NULL",
+        (activated.resulting_revision,),
+    )
+    active_definition = connection.execute(
+        "SELECT active_definition_set_id FROM state_head WHERE id = 0"
+    ).fetchone()
+    assert active_definition is not None
+    empty_overlay = semantic_identity(("graphOverlay", "0" * 64, 0))
+    staged_digest = proposal_entry_digest(
+        proposed.uuid, "anchor", "upsert", object_identity(proposed)
+    )
+    staged_overlay = semantic_identity(("graphOverlay", staged_digest, 1))
+    active_later_digest = graph_entry_digest(active_later.uuid, object_identity(active_later))
+    proposed_digest = graph_entry_digest(proposed.uuid, object_identity(proposed))
+    proposal_identity = str(active_definition[0])
+    stale_state_identity = semantic_identity(
+        (
+            "normalizedState",
+            active.resulting_revision,
+            str(active_definition[0]),
+            proposal_identity,
+            (1, active_later_digest),
+            staged_overlay,
+        )
+    )
+    activated_state_identity = semantic_identity(
+        (
+            "normalizedState",
+            activated.resulting_revision,
+            str(active_definition[0]),
+            None,
+            (1, proposed_digest),
+            empty_overlay,
+        )
+    )
+    connection.execute(
+        "UPDATE canonical_record SET resulting_state_identity = ? WHERE established_revision = ?",
+        (stale_state_identity, active.resulting_revision),
+    )
+    connection.execute(
+        "UPDATE canonical_record SET resulting_state_identity = ? WHERE established_revision = ?",
+        (activated_state_identity, activated.resulting_revision),
+    )
+    connection.execute(
+        "UPDATE state_head SET graph_entry_count = 1, graph_accumulator = ? WHERE id = 0",
+        (proposed_digest,),
+    )
+    _reseal_source_records_from(system, active.resulting_revision)
+    tail = io.StringIO()
+    export_tail_ndjson(
+        source_path,
+        tail,
+        after_revision=captured.revision,
+        after_record_identity=captured.record_identity,
+    )
+    system.close()
+
+    snapshot.seek(0)
+    tail.seek(0)
+    destination = tmp_path / "stale-activation.sqlite3"
+    with pytest.raises(StoreError, match="stale active base"):
+        import_ndjson(snapshot, destination, tail=tail)
     assert not destination.exists()
 
 

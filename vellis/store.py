@@ -4778,76 +4778,9 @@ class CanonicalStore:
             with self._lock:
                 self._connection.execute("BEGIN")
                 try:
-                    head = self._connection.execute(
-                        "SELECT revision, established_by, active_definition_set_id"
-                        " FROM state_head WHERE id = 0"
-                    ).fetchone()
-                    if not isinstance(head, tuple):
-                        raise NotInitializedError("no canonical state is established")
-                    revision = _projection_revision(head)
-                    touched = {
-                        *(value.uuid for _, value in change.upserts()),
-                        *(uuid for _, uuid in change.removals()),
-                    }
-                    removed = {uuid for _, uuid in change.removals()}
-                    structural_ids = set(touched)
-                    structural_ids.update(self._referencing_uuids_unlocked(removed))
-                    structural_objects = self._objects_for_uuids_unlocked(structural_ids)
-                    structural = change_findings(change, structural_objects)
-                    if structural:
-                        self._connection.execute("COMMIT")
-                        return revision, structural, (), False
-
-                    existing_touched = {
-                        value.uuid: value for value in structural_objects if value.uuid in touched
-                    }
-                    affected = self._affected_participants_unlocked(change, existing_touched)
-                    closure_ids = set(touched) | affected
-                    closure_ids.update(self._incident_relationship_uuids_unlocked(affected))
-                    already_loaded = {value.uuid for value in structural_objects}
-                    current_neighborhood = _merge_objects(
-                        structural_objects,
-                        self._objects_for_uuids_unlocked(closure_ids - already_loaded),
-                    )
-
-                    referenced: set[str] = set()
-                    values = (*current_neighborhood, *(v for _, v in change.upserts()))
-                    for value in values:
-                        if isinstance(value, AssociatedDataObject):
-                            referenced.update(value.anchor_uuids)
-                        elif isinstance(value, Link):
-                            referenced.update((value.source_uuid, value.target_uuid))
-                    known = {value.uuid for value in current_neighborhood}
-                    missing_references = referenced - known
-                    if missing_references:
-                        current_neighborhood = _merge_objects(
-                            current_neighborhood,
-                            self._objects_for_uuids_unlocked(missing_references),
-                        )
-
-                    resulting = apply_change_to_objects(current_neighborhood, change)
-                    relevant = closure_ids
-                    type_keys = {value.type_key for value in resulting}
-                    constrained_type_keys = {
-                        value.type_key
-                        for value in resulting
-                        if value.uuid in relevant and not isinstance(value, Link)
-                    }
-                    definitions = self._load_definition_set(
-                        str(head[2]),
-                        type_keys=type_keys,
-                        constrained_type_keys=constrained_type_keys,
-                    )
-                    conformance = tuple(
-                        finding
-                        for finding in assess_object_neighborhood(resulting, definitions)
-                        if set(finding.implicated_objects) & relevant
-                    )
-                    no_op = {value.uuid: object_identity(value) for value in resulting} == {
-                        value.uuid: object_identity(value) for value in current_neighborhood
-                    }
+                    result = self._prepare_active_graph_change_unlocked(change)
                     self._connection.execute("COMMIT")
-                    return revision, (), conformance, no_op
+                    return result
                 except BaseException:
                     self._rollback_quietly()
                     raise
@@ -4855,6 +4788,83 @@ class CanonicalStore:
             raise StoreError(
                 f"could not validate a graph change at {self._path}: {error}"
             ) from error
+
+    def _prepare_active_graph_change_unlocked(
+        self, change: GraphChange
+    ) -> tuple[
+        int,
+        tuple[ValidationFinding, ...],
+        tuple[ValidationFinding, ...],
+        bool,
+    ]:
+        """Validate one active change inside the caller's existing transaction."""
+        head = self._connection.execute(
+            "SELECT revision, established_by, active_definition_set_id FROM state_head WHERE id = 0"
+        ).fetchone()
+        if not isinstance(head, tuple):
+            raise NotInitializedError("no canonical state is established")
+        revision = _projection_revision(head)
+        touched = {
+            *(value.uuid for _, value in change.upserts()),
+            *(uuid for _, uuid in change.removals()),
+        }
+        removed = {uuid for _, uuid in change.removals()}
+        structural_ids = set(touched)
+        structural_ids.update(self._referencing_uuids_unlocked(removed))
+        structural_objects = self._objects_for_uuids_unlocked(structural_ids)
+        structural = change_findings(change, structural_objects)
+        if structural:
+            return revision, structural, (), False
+
+        existing_touched = {
+            value.uuid: value for value in structural_objects if value.uuid in touched
+        }
+        affected = self._affected_participants_unlocked(change, existing_touched)
+        closure_ids = set(touched) | affected
+        closure_ids.update(self._incident_relationship_uuids_unlocked(affected))
+        already_loaded = {value.uuid for value in structural_objects}
+        current_neighborhood = _merge_objects(
+            structural_objects,
+            self._objects_for_uuids_unlocked(closure_ids - already_loaded),
+        )
+
+        referenced: set[str] = set()
+        values = (*current_neighborhood, *(v for _, v in change.upserts()))
+        for value in values:
+            if isinstance(value, AssociatedDataObject):
+                referenced.update(value.anchor_uuids)
+            elif isinstance(value, Link):
+                referenced.update((value.source_uuid, value.target_uuid))
+        known = {value.uuid for value in current_neighborhood}
+        missing_references = referenced - known
+        if missing_references:
+            current_neighborhood = _merge_objects(
+                current_neighborhood,
+                self._objects_for_uuids_unlocked(missing_references),
+            )
+
+        resulting = apply_change_to_objects(current_neighborhood, change)
+        relevant = closure_ids
+        type_keys = {value.type_key for value in resulting}
+        constrained_type_keys = {
+            value.type_key
+            for value in resulting
+            if value.uuid in relevant and not isinstance(value, Link)
+        }
+        definitions = self._load_definition_set(
+            str(head[2]),
+            type_keys=type_keys,
+            constrained_type_keys=constrained_type_keys,
+        )
+        conformance = tuple(
+            finding
+            for finding in assess_object_neighborhood(resulting, definitions)
+            if set(finding.implicated_objects) & relevant
+        )
+        no_op = {value.uuid: object_identity(value) for value in resulting} == {
+            value.uuid: object_identity(value) for value in current_neighborhood
+        }
+        return revision, (), conformance, no_op
 
     def _objects_for_uuids_unlocked(self, uuids: set[str]) -> tuple[GraphObject, ...]:
         objects: list[GraphObject] = []

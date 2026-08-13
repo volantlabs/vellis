@@ -14,7 +14,9 @@ from pathlib import Path
 from typing import TextIO
 
 from vellis.canonical import now
+from vellis.changes import GraphChange
 from vellis.definitions import relationship_identity
+from vellis.graph import Anchor, AssociatedDataObject, Link
 from vellis.normalized import (
     adjust_semantic_summary,
     definition_content_stats,
@@ -22,6 +24,7 @@ from vellis.normalized import (
     definition_identity_from_stats,
     graph_entry_digest,
     load_definition_set,
+    load_object_value,
     normalized_state_identity,
     proposal_entry_digest,
     semantic_identity,
@@ -716,97 +719,164 @@ def _tail_event_error(connection: sqlite3.Connection, revision: int) -> str | No
     return None
 
 
-def _rebuild_proposal_summaries(connection: sqlite3.Connection) -> None:
-    accumulator = 0
-    counts: dict[tuple[str, str], int] = {}
-    for uuid, kind, operation, identity in connection.execute(
-        "SELECT p.uuid, p.object_kind, p.operation, v.content_identity"
-        " FROM proposal_entry AS p LEFT JOIN object_value AS v ON v.id = p.object_value_id"
+def _tail_graph_change(connection: sqlite3.Connection, revision: int) -> GraphChange:
+    """Decode one normalized graph transition without materializing unrelated state."""
+    anchors: list[Anchor] = []
+    data: list[AssociatedDataObject] = []
+    links: list[Link] = []
+    anchor_removals: list[str] = []
+    data_removals: list[str] = []
+    link_removals: list[str] = []
+    for operation, object_kind, uuid, value_id in connection.execute(
+        "SELECT operation, object_kind, uuid, object_value_id FROM canonical_graph_event"
+        " WHERE established_revision = ? ORDER BY occurrence",
+        (revision,),
     ):
-        accumulator ^= int(
-            semantic_identity(
-                (str(uuid), str(kind), str(operation), None if identity is None else str(identity))
-            ),
-            16,
-        )
-        key = (str(kind), str(operation))
-        counts[key] = counts.get(key, 0) + 1
-    connection.execute(
-        "UPDATE proposal_overlay_state SET accumulator = ?, entry_count = ? WHERE id = 0",
-        (f"{accumulator:064x}", sum(counts.values())),
+        if operation == "upsert":
+            assert value_id is not None
+            value = load_object_value(connection, int(value_id))
+            if isinstance(value, Anchor):
+                anchors.append(value)
+            elif isinstance(value, AssociatedDataObject):
+                data.append(value)
+            else:
+                links.append(value)
+            continue
+        removals = {
+            "anchor": anchor_removals,
+            "associatedData": data_removals,
+            "link": link_removals,
+        }.get(str(object_kind))
+        if operation != "delete" or removals is None:
+            raise StoreError("tail has an invalid graph event")
+        removals.append(str(uuid))
+    return GraphChange(
+        tuple(anchors),
+        tuple(data),
+        tuple(links),
+        tuple(anchor_removals),
+        tuple(data_removals),
+        tuple(link_removals),
     )
-    connection.execute("UPDATE proposal_overlay_count SET entry_count = 0")
-    for (kind, operation), count in counts.items():
-        connection.execute(
-            "UPDATE proposal_overlay_count SET entry_count = ?"
-            " WHERE object_kind = ? AND operation = ?",
-            (count, kind, operation),
-        )
 
+
+def _initialize_tail_definition_summary(
+    connection: sqlite3.Connection, active_identity: str
+) -> None:
     state = connection.execute(
-        "SELECT active_definition_set_id, proposed_definition_set_id FROM state_head WHERE id = 0"
+        "SELECT effective_accumulator FROM proposal_definition_state WHERE id = 0"
     ).fetchone()
-    assert state is not None
-    active_identity, proposed_identity = str(state[0]), state[1]
-    edit_accumulator = 0
-    edit_count = 0
-    effective = connection.execute(
+    if state is None:
+        raise StoreError("tail has no maintained proposal-definition summary")
+    if state[0] is not None:
+        return
+    active = connection.execute(
         "SELECT content_accumulator, entry_count FROM definition_set WHERE identity = ?",
         (active_identity,),
     ).fetchone()
-    assert effective is not None
-    effective_accumulator, effective_count = int(str(effective[0]), 16), int(effective[1])
-    for entity_kind, key, operation, value_set_id in connection.execute(
-        "SELECT 'type', type_key, operation, value_set_id FROM proposal_definition_type"
-        " UNION ALL SELECT 'relationship', natural_key, operation, value_set_id"
-        " FROM proposal_definition_relationship"
-    ):
-        edit_accumulator ^= int(
-            semantic_identity(
-                (str(key), str(operation), None if value_set_id is None else str(value_set_id))
-            ),
-            16,
+    if active is None:
+        raise StoreError("tail proposal has no active definition base")
+    connection.execute(
+        "UPDATE proposal_definition_state SET effective_accumulator = ?,"
+        " effective_entry_count = ? WHERE id = 0",
+        (str(active[0]), int(active[1])),
+    )
+
+
+def _assert_tail_proposal_identity(
+    connection: sqlite3.Connection,
+    store: CanonicalStore,
+    active_identity: str,
+    expected_identity: object,
+) -> None:
+    state = connection.execute(
+        "SELECT base_definition_set_id, identity FROM proposal_definition_state WHERE id = 0"
+    ).fetchone()
+    if state is None:
+        raise StoreError("tail has no maintained proposal-definition state")
+    if expected_identity is None:
+        if state[0] is not None or state[1] is not None:
+            raise StoreError("tail retains proposal-definition state without a proposal")
+        return
+    if str(state[0]) != active_identity or str(state[1]) != str(expected_identity):
+        raise StoreError("tail proposal-definition state does not match its claimed identity")
+    actual = store._proposal_definition_identity_unlocked(active_identity)  # noqa: SLF001
+    if actual != str(expected_identity):
+        raise StoreError("tail proposal-definition events do not produce their claimed identity")
+
+
+def _apply_tail_definition_events(
+    connection: sqlite3.Connection,
+    store: CanonicalStore,
+    revision: int,
+    active_identity: str,
+) -> None:
+    events = connection.execute(
+        "SELECT entity_kind, natural_key, operation, value_set_id"
+        " FROM canonical_definition_proposal_event WHERE established_revision = ?"
+        " ORDER BY occurrence",
+        (revision,),
+    )
+    for entity_kind, natural_key, operation, value_set_id in events:
+        table, key = (
+            ("proposal_definition_type", "type_key")
+            if entity_kind == "type"
+            else ("proposal_definition_relationship", "natural_key")
         )
-        edit_count += 1
+        prior = connection.execute(
+            f"SELECT operation, value_set_id FROM {table} WHERE {key} = ?",  # noqa: S608
+            (natural_key,),
+        ).fetchone()
+        prior_digest = (
+            None
+            if prior is None
+            else store._definition_entry_digest(  # noqa: SLF001
+                str(natural_key),
+                str(prior[0]),
+                None if prior[1] is None else str(prior[1]),
+            )
+        )
         active = load_definition_set(
             connection,
             active_identity,
-            type_keys={str(key)} if entity_kind == "type" else set(),
-            relationship_keys={str(key)} if entity_kind == "relationship" else set(),
+            type_keys={str(natural_key)} if entity_kind == "type" else set(),
+            relationship_keys={str(natural_key)} if entity_kind == "relationship" else set(),
         )
         active_count = definition_content_stats(active)[1]
-        if active_count:
-            effective_accumulator = (
-                effective_accumulator - int(definition_entry_digest(active), 16)
-            ) % (1 << 256)
-            effective_count -= 1
-        if operation == "upsert":
-            value = connection.execute(
-                "SELECT content_accumulator, entry_count FROM definition_set WHERE identity = ?",
-                (value_set_id,),
-            ).fetchone()
-            if value is None or int(value[1]) != 1:
-                raise StoreError("tail proposal definition entry is not one normalized value")
-            effective_accumulator = (effective_accumulator + int(str(value[0]), 16)) % (1 << 256)
-            effective_count += 1
-    expected_identity = definition_identity_from_stats(
-        f"{effective_accumulator:064x}", effective_count
-    )
-    if proposed_identity is not None and expected_identity != str(proposed_identity):
-        raise StoreError("tail proposal definitions do not reconstruct their semantic identity")
-    connection.execute(
-        "UPDATE proposal_definition_state SET base_definition_set_id = ?, accumulator = ?,"
-        " entry_count = ?, effective_accumulator = ?, effective_entry_count = ?, identity = ?"
-        " WHERE id = 0",
-        (
-            None if proposed_identity is None else active_identity,
-            f"{edit_accumulator:064x}",
-            edit_count,
-            None if proposed_identity is None else f"{effective_accumulator:064x}",
-            None if proposed_identity is None else effective_count,
-            proposed_identity,
-        ),
-    )
+        active_content = None if active_count == 0 else definition_entry_digest(active)
+        prior_content = (
+            active_content
+            if prior is None
+            else None
+            if str(prior[0]) == "delete"
+            else store._definition_value_digest_unlocked(str(prior[1]))  # noqa: SLF001
+        )
+        if operation == "unstage":
+            connection.execute(
+                f"DELETE FROM {table} WHERE {key} = ?",  # noqa: S608
+                (natural_key,),
+            )
+            after_digest = None
+            after_content = active_content
+        else:
+            connection.execute(
+                f"INSERT INTO {table} VALUES (?, ?, ?) ON CONFLICT({key}) DO UPDATE SET"  # noqa: S608
+                " operation=excluded.operation, value_set_id=excluded.value_set_id",
+                (natural_key, operation, value_set_id),
+            )
+            after_digest = store._definition_entry_digest(  # noqa: SLF001
+                str(natural_key),
+                str(operation),
+                None if value_set_id is None else str(value_set_id),
+            )
+            after_content = (
+                None
+                if operation == "delete"
+                else store._definition_value_digest_unlocked(str(value_set_id))  # noqa: SLF001
+            )
+        store._definition_accumulator_update_unlocked(  # noqa: SLF001
+            prior_digest, after_digest, prior_content, after_content
+        )
 
 
 def _tail_record_is_compatible(
@@ -955,6 +1025,7 @@ def _apply_tail_stream(
         "CREATE TEMP TABLE tail_object_map ("
         "source_id INTEGER PRIMARY KEY, destination_id INTEGER NOT NULL)"
     )
+    replay_store = CanonicalStore._borrowed_connection(connection)  # noqa: SLF001
     for record, encoded in records:
         if record.get("kind") == "tailFooter":
             footer = record
@@ -1037,12 +1108,20 @@ def _apply_tail_stream(
         (previous_revision,),
     ):
         revision, kind = int(row[0]), str(row[1])
-        prior_proposal = connection.execute(
-            "SELECT proposed_definition_set_id FROM state_head WHERE id = 0"
+        prior_state = connection.execute(
+            "SELECT active_definition_set_id, proposed_definition_set_id"
+            " FROM state_head WHERE id = 0"
         ).fetchone()
-        if prior_proposal is None:
+        if prior_state is None:
             raise StoreError("tail transition has no reconstructed prior state")
-        prior_proposed_identity = prior_proposal[0]
+        active_identity = str(prior_state[0])
+        prior_proposed_identity = prior_state[1]
+        _assert_tail_proposal_identity(
+            connection,
+            replay_store,
+            active_identity,
+            prior_proposed_identity,
+        )
         if (
             revision != previous_revision + 1
             or row[6] != previous_revision
@@ -1083,6 +1162,32 @@ def _apply_tail_stream(
         event_error = _tail_event_error(connection, revision)
         if event_error is not None:
             raise StoreError(event_error)
+        if kind == "definitionActivation":
+            assert prior_proposed_identity is not None
+            first_finding = next(
+                replay_store.iter_conformance_findings(
+                    "prospective_graph_object", str(prior_proposed_identity)
+                ),
+                None,
+            )
+            if first_finding is not None:
+                raise StoreError(
+                    "tail activation does not apply one current conforming proposal: "
+                    f"{first_finding.summary}"
+                )
+        if kind == "graphMutation":
+            checked_revision, structural, conformance, no_op = (
+                replay_store._prepare_active_graph_change_unlocked(  # noqa: SLF001
+                    _tail_graph_change(connection, revision)
+                )
+            )
+            if checked_revision != previous_revision:
+                raise StoreError("tail graph transition was checked against the wrong revision")
+            findings = (*structural, *conformance)
+            if findings:
+                raise StoreError(f"tail graph transition is invalid: {findings[0].summary}")
+            if no_op:
+                raise StoreError("tail graph transition has no semantic effect")
 
         graph_summary = connection.execute(
             "SELECT graph_accumulator, graph_entry_count FROM state_head WHERE id = 0"
@@ -1167,26 +1272,10 @@ def _apply_tail_stream(
             _adjust_proposal_summary(
                 connection, before_entry, _stored_proposal_entry_digest(connection, uuid)
             )
-        for entity_kind, natural_key, operation, value_set_id in connection.execute(
-            "SELECT entity_kind, natural_key, operation, value_set_id"
-            " FROM canonical_definition_proposal_event WHERE established_revision = ?"
-            " ORDER BY occurrence",
-            (revision,),
-        ):
-            table, key = (
-                ("proposal_definition_type", "type_key")
-                if entity_kind == "type"
-                else ("proposal_definition_relationship", "natural_key")
-            )
-            if operation == "unstage":
-                connection.execute(f"DELETE FROM {table} WHERE {key} = ?", (natural_key,))
-            else:
-                connection.execute(
-                    f"INSERT INTO {table} VALUES (?, ?, ?) ON CONFLICT({key}) DO UPDATE SET"
-                    " operation=excluded.operation, value_set_id=excluded.value_set_id",
-                    (natural_key, operation, value_set_id),
-                )
         active, disposition, proposed = definition
+        if event_counts["canonical_definition_proposal_event"] or disposition == "present":
+            _initialize_tail_definition_summary(connection, active_identity)
+        _apply_tail_definition_events(connection, replay_store, revision, active_identity)
         if active is not None:
             if kind == "definitionActivation":
                 connection.execute(
@@ -1213,6 +1302,18 @@ def _apply_tail_stream(
                 "UPDATE state_head SET active_definition_set_id = ? WHERE id = 0", (active,)
             )
         if disposition == "present":
+            actual_proposed = replay_store._proposal_definition_identity_unlocked(  # noqa: SLF001
+                active_identity
+            )
+            if actual_proposed != str(proposed):
+                raise StoreError(
+                    "tail proposal-definition events do not produce their claimed identity"
+                )
+            connection.execute(
+                "UPDATE proposal_definition_state SET base_definition_set_id = ?, identity = ?"
+                " WHERE id = 0",
+                (active_identity, proposed),
+            )
             connection.execute(
                 "UPDATE state_head SET proposed_definition_set_id = ? WHERE id = 0", (proposed,)
             )
@@ -1225,6 +1326,12 @@ def _apply_tail_stream(
             connection.execute("DELETE FROM proposal_definition_type")
             connection.execute("DELETE FROM proposal_definition_relationship")
             connection.execute(
+                "UPDATE proposal_definition_state SET base_definition_set_id = NULL,"
+                " accumulator = ?, entry_count = 0, effective_accumulator = NULL,"
+                " effective_entry_count = NULL, identity = NULL WHERE id = 0",
+                ("0" * 64,),
+            )
+            connection.execute(
                 "UPDATE state_head SET proposed_definition_set_id = NULL WHERE id = 0"
             )
         elif disposition != "unchanged":
@@ -1233,6 +1340,21 @@ def _apply_tail_stream(
             "UPDATE state_head SET revision = ?, established_by = ? WHERE id = 0",
             (revision, revision),
         )
+        if kind in {"definitionActivation", "historicalRestoration"}:
+            current_definition = connection.execute(
+                "SELECT active_definition_set_id FROM state_head WHERE id = 0"
+            ).fetchone()
+            assert current_definition is not None
+            first_finding = next(
+                replay_store.iter_conformance_findings(
+                    "current_graph_object", str(current_definition[0])
+                ),
+                None,
+            )
+            if first_finding is not None:
+                raise StoreError(
+                    f"tail {kind} establishes nonconforming state: {first_finding.summary}"
+                )
         if disposition == "present":
             proposal_state = connection.execute(
                 "SELECT active_definition_set_id, proposed_definition_set_id,"
@@ -1270,7 +1392,6 @@ def _apply_tail_stream(
                 f" at revision {revision}: state {state_identity} != {row[10]}"
             )
         previous_revision, previous_identity = revision, str(row[7])
-    _rebuild_proposal_summaries(connection)
     if (
         previous_revision != int(str(header["throughRevision"]))
         or previous_identity != str(header["throughRecordIdentity"])
