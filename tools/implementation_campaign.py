@@ -307,6 +307,8 @@ def _completed_campaign_evidence_revision(campaign: dict[str, Any], *, root: Pat
         ).splitlines()
     except RuntimeError:
         return None
+    matched: list[str] = []
+    fallback: str | None = None
     for commit in commits:
         try:
             recorded = load_campaign_text(
@@ -316,13 +318,18 @@ def _completed_campaign_evidence_revision(campaign: dict[str, Any], *, root: Pat
         except RuntimeError, ValueError, yaml.YAMLError:
             continue
         if _without_observed_baseline(recorded) == _without_observed_baseline(campaign):
-            return commit
-        if (
+            matched.append(commit)
+        elif fallback is None and (
             recorded.get("campaign", {}).get("lifecycle") == "complete"
             and recorded.get("closure", {}).get("checkpoint") == checkpoint
         ):
-            return commit
-    return None
+            fallback = commit
+    # The earliest commit carrying this record is the one that recorded it. A later commit
+    # carries the same content only because nothing has edited it since, and resolving
+    # there would look for evidence in a tree that may have retired it in between.
+    if matched:
+        return matched[-1]
+    return fallback
 
 
 def _without_observed_baseline(campaign: dict[str, Any]) -> dict[str, Any]:
