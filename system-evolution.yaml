@@ -492,9 +492,9 @@ work_items:
         coverage: full
         remaining_work_item_ids: []
     approval:
-      status: pending
+      status: accepted
       reason: Extending ordered comparison to strings changes accepted query meaning the model states deliberately in three places, so the owner decides before implementation relies on it.
-      checkpoint: null
+      checkpoint: git:8baa73aa38a736e5920c25f466f31fa772d41801
     nearest_wrong_system: An agent quietly relaxes ordered string comparison, and pattern validation silently acquires the ordering the model says it must not add.
     compatibility_effect: Unresolved until the owner selects an approach.
     non_effects:
