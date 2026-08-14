@@ -323,3 +323,134 @@ def test_correcting_a_duplicated_member_of_a_referenced_set_is_a_real_change(
         assert corrected.resulting_revision == 2
     finally:
         system.close()
+
+
+def test_a_refused_activation_says_which_of_the_reasons_it_was(tmp_path: Path) -> None:
+    """The caller's next move differs by reason, so the refusal has to name one.
+
+    A nonconforming assessment means repair the proposal; a moved proposal or moved staged
+    work means assess again. Told only that the assessment is "missing, stale, or
+    nonconforming", a caller has to run another assessment to learn what it was already in
+    a position to be told.
+    """
+    from vellis.governance import ActivateDefinitionDeltaRequest
+
+    system = _system(tmp_path)
+    try:
+        assert system.set_definition_delta(
+            DefinitionChange(anchor_type_upserts=(AnchorTypeDefinition("project"),)),
+            provenance=OWNER,
+        ).accepted
+        nonconforming = _assessment(system)
+        assert not nonconforming.conforms and nonconforming.assessment_id is not None
+        refused = system.activate_definition_delta(
+            ActivateDefinitionDeltaRequest(nonconforming.assessment_id), provenance=OWNER
+        )
+        assert not refused.accepted
+        assert "nonconforming" in refused.findings[0].summary
+
+        unknown = system.activate_definition_delta(
+            ActivateDefinitionDeltaRequest("no-such-assessment"), provenance=OWNER
+        )
+        assert not unknown.accepted
+        assert "was ever recorded" in unknown.findings[0].summary
+
+        assert stage_complete_fixture(system, WIDER, provenance=OWNER).accepted
+        conforming = _assessment(system)
+        assert conforming.conforms and conforming.assessment_id is not None
+        assert system.set_definition_delta(
+            DefinitionChange(anchor_type_upserts=(AnchorTypeDefinition("team", "A team."),)),
+            provenance=OWNER,
+        ).accepted
+        moved = system.activate_definition_delta(
+            ActivateDefinitionDeltaRequest(conforming.assessment_id), provenance=OWNER
+        )
+        assert not moved.accepted
+        assert "definitions changed" in moved.findings[0].summary
+    finally:
+        system.close()
+
+
+def test_a_removal_that_orphans_a_reference_is_refused_after_an_earlier_activation(
+    tmp_path: Path,
+) -> None:
+    """Assessment must keep seeing referencing definitions once the set has an overlay.
+
+    Activating a proposal leaves the active vocabulary resolved through an overlay rather
+    than held in one set. Scope selection that looks only in the active set then stops
+    finding the untouched definitions that still name a removed type, and the owner is
+    told a proposal conforms when activating it would install a vocabulary this system's
+    own definition validation rejects. The removal here is the same one a fresh system
+    refuses, and the only difference is the unrelated activation before it.
+    """
+    system = _system(tmp_path)
+    try:
+        assert stage_complete_fixture(system, WIDER, provenance=OWNER).accepted
+        assert activate_clean_delta(system, provenance=OWNER).accepted
+
+        assert system.set_definition_delta(
+            DefinitionChange(type_removals=("person",)), provenance=OWNER
+        ).accepted
+        report = _assessment(system)
+
+        assert not report.conforms, "orphaning 'note' by removing 'person' must not conform"
+        assert any(
+            "note" in finding.summary and "person" in finding.summary
+            for finding in report.returned_findings
+        ), [finding.summary for finding in report.returned_findings]
+    finally:
+        system.close()
+
+
+def test_a_removal_that_orphans_a_multiplicity_rule_is_refused_after_an_activation(
+    tmp_path: Path,
+) -> None:
+    """The same overlay resolution has to reach multiplicity rules.
+
+    Here nothing but the rule names the removed type: the data type permits 'project', so
+    a permission check alone would find nothing. An untouched rule lives in the base set
+    after an activation exactly as an untouched type does.
+    """
+    from vellis.definitions import DirectAssociationEnd, DirectAssociationMultiplicityConstraint
+
+    note_on_project = AssociatedDataTypeDefinition(
+        "note",
+        ("project",),
+        (PropertyConstraint("title", True, JsonKind.STRING, description="A title."),),
+        "A note.",
+    )
+    rule = DirectAssociationMultiplicityConstraint(
+        constrained_end=DirectAssociationEnd.ANCHOR,
+        anchor_type_keys=("person",),
+        associated_data_type_keys=("note",),
+        lower_bound=0,
+        upper_bound=1,
+        description="Each person has at most one note.",
+    )
+    start = GraphDefinitionSet(
+        anchor_types=(PERSON, PROJECT),
+        associated_data_types=(note_on_project,),
+        relationship_constraints=(rule,),
+    )
+    system = RTGSystem.open(tmp_path / "vellis.sqlite3")
+    try:
+        assert system.initialize_fresh(
+            start, provenance=OWNER, initialization_summary="fresh"
+        ).accepted
+        assert system.set_definition_delta(
+            DefinitionChange(anchor_type_upserts=(AnchorTypeDefinition("place", "A place."),)),
+            provenance=OWNER,
+        ).accepted
+        assert activate_clean_delta(system, provenance=OWNER).accepted
+
+        assert system.set_definition_delta(
+            DefinitionChange(type_removals=("person",)), provenance=OWNER
+        ).accepted
+        report = _assessment(system)
+
+        assert not report.conforms, "a rule naming a removed anchor type must not conform"
+        assert any("person" in finding.summary for finding in report.returned_findings), [
+            finding.summary for finding in report.returned_findings
+        ]
+    finally:
+        system.close()

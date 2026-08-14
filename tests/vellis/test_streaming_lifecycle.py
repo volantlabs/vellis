@@ -196,7 +196,7 @@ def test_import_rebuilds_live_meaning_on_one_fresh_history_base(
     target_path = tmp_path / "target.sqlite3"
     system = _source(source_path)
     query = GraphQuery(
-        (AnchorGroup("people", "person"),),
+        (AnchorGroup("people", ("person",)),),
         ReturnShape((AnchorProjection("person", "people"),)),
         maximum_rows=26,
     )
@@ -373,7 +373,7 @@ def test_sql_replay_verification_and_restore_construct_no_graph(tmp_path: Path) 
     system = _source(path, 2)
     try:
         query = GraphQuery(
-            (AnchorGroup("people", "person"),),
+            (AnchorGroup("people", ("person",)),),
             ReturnShape((AnchorProjection("person", "people"),)),
             maximum_rows=3,
         )
@@ -551,7 +551,7 @@ def test_streamed_tail_reconstructs_later_graph_and_activation_atomically(
     try:
         assert rebuilt.revision == written_tail.through_revision == final_revision
         query = GraphQuery(
-            (AnchorGroup("teams", "team"),),
+            (AnchorGroup("teams", ("team",)),),
             ReturnShape((AnchorProjection("team", "teams"),)),
             maximum_rows=2,
             state_scope=EvaluatedStateScope.CURRENT,

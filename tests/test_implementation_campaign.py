@@ -1910,3 +1910,30 @@ def test_checkpointable_work_item_requires_an_active_slice_or_finished_slice_set
     for item in campaign["slices"]:  # type: ignore[union-attr]
         item["lifecycle"] = "complete"
     assert implementation_campaign.checkpointable_work_item(campaign) == "closure"
+
+
+def test_evidence_lookup_survives_updating_the_baseline_that_tracks_the_repository() -> None:
+    """The record must stay checkable while the change to it is still uncommitted.
+
+    A completed campaign's observed baseline is the one field that is supposed to move
+    when the model evolves, and it has to move in the working tree before it can be
+    committed. If evidence lookup matched on it, that edit would drop the search back to
+    the closure commit, where evidence renamed since then no longer exists — so the record
+    could only be validated after committing the change being validated.
+    """
+    campaign = implementation_campaign.load_campaign()
+    root = implementation_campaign.ROOT
+    before = implementation_campaign._completed_campaign_evidence_revision(campaign, root=root)  # noqa: SLF001
+    assert before is not None, "the committed campaign must resolve a revision to begin with"
+
+    drifted = copy.deepcopy(campaign)
+    drifted["model_baseline"]["observed"]["authority_sha256"] = "0" * 64
+
+    after = implementation_campaign._completed_campaign_evidence_revision(drifted, root=root)  # noqa: SLF001
+
+    assert after == before
+    # The drifted record should be refused for exactly one reason — the baseline no longer
+    # matching the repository — and never because its evidence stopped resolving.
+    findings = implementation_campaign.validate_campaign(drifted)
+    assert any("model_baseline.observed" in each for each in findings)
+    assert not [each for each in findings if "does not resolve at checkpoint" in each]

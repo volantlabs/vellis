@@ -45,13 +45,27 @@ package VellisRequirements {
          * associated-data groups by type and optional structured value
          * comparisons, require typed directed links between anchor or
          * associated-data groups, and return only bindings that reference the
-         * named projections in its return shape at an identified revision. An
+         * named projections in its return shape at an identified revision.
+         * An anchor group shall select anchors of any of one or more named
+         * active anchor types, so one group can span several shapes of thing.
+         * A query shall state projections, aggregations, or both, and at least
+         * one of them. Each aggregation shall count the matches of a named data
+         * condition, or sum, minimise, or maximise one present property of them,
+         * summing only number-valued properties and ordering number-valued and
+         * string-valued properties exactly as an ordered comparison does.
+         * Aggregation shall read every match rather than distinct projected
+         * tuples. A count shall be present and zero when nothing matches; a sum,
+         * minimum, or maximum shall be absent when no match carries the property. An
          * associated-data group with no property comparisons shall select by
          * direct association and type alone. Definitions governing the evaluated
          * state shall govern property kind, shape, range, pattern validation,
          * and endpoint validity.
          * Equality shall compare lossless JSON values; ordered comparisons shall
-         * be valid only for number-valued properties. A listed property
+         * be valid for number-valued properties by exact mathematical value and
+         * for string-valued properties by exact Unicode code-point sequence
+         * without normalization, and shall be rejected for every other JSON kind
+         * and whenever the expected value's kind differs from the property's.
+         * A listed property
          * comparison shall match only when that property is present; omission
          * shall remain distinct from a present null value.
          * Each result row shall be one jointly satisfying assignment and shall
@@ -79,9 +93,16 @@ package VellisRequirements {
          * endpoint roles, unknown or duplicate UUID restrictions, properties,
          * comparisons, projections, or unresolved
          * historical selections shall produce observable findings and no result
-         * rows. Every query shall provide a
+         * rows. An aggregation naming no data condition of the query, omitting a
+         * property its operator requires, naming a property its condition's type
+         * does not define, or naming a property whose kind its operator cannot
+         * sum or order, shall produce observable findings and no result.
+         * Every query shall provide a
          * positive row maximum; a result exceeding it, or one the system cannot
          * return completely, shall be rejected whole, never truncated or paged.
+         * The same maximum shall bound the matching objects an aggregation
+         * reads, and a selection exceeding it shall be rejected whole, so
+         * returning one number never licenses reading an unbounded population.
          * Evaluation shall not multiply work across selector components
          * disconnected from every projected selector. Such a component shall
          * affect the result only through whether it has at least one satisfying
@@ -568,8 +589,10 @@ package VellisRequirements {
          * conjunctively to present values, without requiring general
          * satisfiability analysis. Pattern expression text shall be discoverable
          * exactly and shall participate exactly in definition equality. Pattern
-         * validation shall add no regex query comparison or ordered string
-         * comparison.
+         * validation shall add no regex query comparison, and shall neither
+         * define nor constrain how string comparisons order values; a pattern
+         * describes which stored values are valid, never how any two of them
+         * compare.
          */
     }
 

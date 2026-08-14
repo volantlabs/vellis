@@ -97,7 +97,7 @@ def system(tmp_path: Path):
 
 def _people() -> GraphQuery:
     return GraphQuery(
-        anchor_groups=(AnchorGroup(name="who", anchor_type="person"),),
+        anchor_groups=(AnchorGroup(name="who", anchor_types=("person",)),),
         return_shape=ReturnShape(projections=(AnchorProjection(name="p", anchor_group="who"),)),
         maximum_rows=10,
     )
@@ -105,7 +105,7 @@ def _people() -> GraphQuery:
 
 def _rituals() -> GraphQuery:
     return GraphQuery(
-        anchor_groups=(AnchorGroup(name="what", anchor_type="ritual"),),
+        anchor_groups=(AnchorGroup(name="what", anchor_types=("ritual",)),),
         return_shape=ReturnShape(projections=(AnchorProjection(name="r", anchor_group="what"),)),
         maximum_rows=10,
     )
@@ -146,7 +146,7 @@ def test_historical_evaluation_keeps_current_query_semantics(system: RTGSystem) 
     """The bound, the shaping, and the refusals are the ones a current query would give."""
     over_bound = system.query_graph(
         GraphQuery(
-            anchor_groups=(AnchorGroup(name="who", anchor_type="person"),),
+            anchor_groups=(AnchorGroup(name="who", anchor_types=("person",)),),
             return_shape=ReturnShape(projections=(AnchorProjection(name="p", anchor_group="who"),)),
             maximum_rows=0,
         ),

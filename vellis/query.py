@@ -28,6 +28,7 @@ current state until then, and this module does not pretend to offer the choice.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from decimal import Decimal
 from enum import Enum
@@ -40,6 +41,8 @@ from vellis.json_value import JsonKind, JsonValue, json_equal, json_kind, unenco
 from vellis.outcomes import OperationStatus, ValidationFinding
 
 __all__ = [
+    "AggregateBinding",
+    "AggregationOperator",
     "AnchorBinding",
     "AnchorGroup",
     "AnchorProjection",
@@ -57,6 +60,7 @@ __all__ = [
     "LinkProjection",
     "LinkUuidFilter",
     "PropertyComparison",
+    "QueryAggregation",
     "QueryCandidateIndex",
     "RequiredLink",
     "ReturnShape",
@@ -80,6 +84,15 @@ class PropertyComparison(Enum):
     @property
     def ordered(self) -> bool:
         return self not in {PropertyComparison.EQUAL, PropertyComparison.NOT_EQUAL}
+
+
+# The kinds that carry an order of their own. A number orders by exact mathematical value
+# and a string by exact code-point sequence, which is the basis equality already uses, so
+# neither introduces a second notion of what a stored value is. The rest are left out
+# because any order over them would have to be invented here: null and Boolean have too
+# few values to be worth one, and an array or object would need a rule about members that
+# the model does not state.
+ORDERABLE_KINDS = frozenset({JsonKind.NUMBER, JsonKind.STRING})
 
 
 class EvaluatedStateScope(Enum):
@@ -107,10 +120,15 @@ class LinkUuidFilter:
 
 @dataclass(frozen=True, slots=True)
 class AnchorGroup:
-    """A named candidate set of anchors of exactly one active type."""
+    """A named candidate set of anchors of one or more active types.
+
+    Several types because one question is often about work that takes several
+    shapes — what is due, whoever owes it — and asking it once is the difference
+    between a graph and a pile of separate indexes.
+    """
 
     name: str
-    anchor_type: str
+    anchor_types: tuple[str, ...]
     uuid_filter: AnchorUuidFilter | None = None
 
 
@@ -186,6 +204,41 @@ ReturnProjection = (
 )
 
 
+class AggregationOperator(Enum):
+    """What arithmetic an aggregation performs over matching objects."""
+
+    COUNT = "count"
+    SUM = "sum"
+    MINIMUM = "minimum"
+    MAXIMUM = "maximum"
+
+    @property
+    def needs_property(self) -> bool:
+        return self is not AggregationOperator.COUNT
+
+    @property
+    def orderable_kinds(self) -> frozenset[JsonKind]:
+        """The property kinds this operator can work on."""
+        if self is AggregationOperator.SUM:
+            return frozenset({JsonKind.NUMBER})
+        return ORDERABLE_KINDS
+
+
+@dataclass(frozen=True, slots=True)
+class QueryAggregation:
+    """One arithmetic answer about a data condition's matching objects.
+
+    Returned instead of the objects. The point is not to save a round trip but to
+    save the caller from computing it themselves off a projection, where identical
+    tuples collapse and the arithmetic comes out wrong in a way nothing signals.
+    """
+
+    name: str
+    operator: AggregationOperator
+    data_condition: str
+    property_name: str | None = None
+
+
 @dataclass(frozen=True, slots=True)
 class ReturnShape:
     """The named bindings a query wants back."""
@@ -200,6 +253,7 @@ class GraphQuery:
     anchor_groups: tuple[AnchorGroup, ...]
     return_shape: ReturnShape
     maximum_rows: int
+    aggregations: tuple[QueryAggregation, ...] = ()
     required_links: tuple[RequiredLink, ...] = ()
     data_conditions: tuple[AssociatedDataCondition, ...] = ()
     historical_selection: HistoricalSelection | None = None
@@ -246,6 +300,20 @@ class ReturnedProperty:
 
 
 @dataclass(frozen=True, slots=True)
+class AggregateBinding:
+    """One aggregation's answer.
+
+    ``present`` carries the modeled ``[0..1]``: a count is always present and zero
+    when nothing matched, while a sum, minimum, or maximum is absent when no match
+    carried the property, because zero would be a different claim from none.
+    """
+
+    aggregation: str
+    present: bool
+    value: JsonValue = None
+
+
+@dataclass(frozen=True, slots=True)
 class GraphQueryRow:
     """One jointly satisfying assignment, carrying exactly the requested projections."""
 
@@ -269,6 +337,7 @@ class GraphQueryResult:
     findings: tuple[ValidationFinding, ...] = ()
     evaluated_revision: int | None = None
     rows: tuple[GraphQueryRow, ...] = ()
+    aggregates: tuple[AggregateBinding, ...] = ()
 
     @property
     def accepted(self) -> bool:
@@ -323,11 +392,14 @@ def _query_findings(
     _condition_findings(query, definitions, names, findings)
     _link_findings(query, definitions, index, names, findings)
     _projection_findings(query, definitions, names, findings)
+    _aggregation_findings(query, definitions, findings)
     if not query.anchor_groups:
         findings.append(ValidationFinding(summary="a query must select at least one anchor group"))
-    if not query.return_shape.projections:
+    if not query.return_shape.projections and not query.aggregations:
         findings.append(
-            ValidationFinding(summary="a return shape must request at least one binding")
+            ValidationFinding(
+                summary="a query must request at least one binding or one aggregation"
+            )
         )
     if query.maximum_rows < 1:
         findings.append(
@@ -342,6 +414,7 @@ def _named(query: GraphQuery) -> list[tuple[str, str]]:
         *((condition.name, "data condition") for condition in query.data_conditions),
         *((link.name, "required link") for link in query.required_links),
         *((projection.name, "projection") for projection in query.return_shape.projections),
+        *((aggregation.name, "aggregation") for aggregation in query.aggregations),
     ]
 
 
@@ -370,23 +443,34 @@ def _group_findings(
     findings: list[ValidationFinding],
 ) -> None:
     for group in query.anchor_groups:
-        if definitions.anchor_type(group.anchor_type) is None:
+        if not group.anchor_types:
+            findings.append(
+                ValidationFinding(summary=f"anchor group '{group.name}' names no anchor type")
+            )
+        for type_key in _repeats(group.anchor_types):
             findings.append(
                 ValidationFinding(
-                    summary=(
-                        f"anchor group '{group.name}' names '{group.anchor_type}', which is "
-                        f"{_why_not(group.anchor_type, 'an active anchor type', definitions)}"
-                    )
+                    summary=f"anchor group '{group.name}' names '{type_key}' more than once"
                 )
             )
+        for type_key in group.anchor_types:
+            if definitions.anchor_type(type_key) is None:
+                findings.append(
+                    ValidationFinding(
+                        summary=(
+                            f"anchor group '{group.name}' names '{type_key}', which is "
+                            f"{_why_not(type_key, 'an active anchor type', definitions)}"
+                        )
+                    )
+                )
+        known: set[str] = set()
+        if group.uuid_filter is not None:
+            for type_key in group.anchor_types:
+                known |= set(index.known_anchor_uuids(type_key, group.uuid_filter.uuids))
         _uuid_filter_findings(
             group.uuid_filter.uuids if group.uuid_filter is not None else None,
             label=f"anchor group '{group.name}'",
-            known=(
-                set()
-                if group.uuid_filter is None
-                else index.known_anchor_uuids(group.anchor_type, group.uuid_filter.uuids)
-            ),
+            known=known,
             kind="anchor",
             findings=findings,
         )
@@ -470,19 +554,18 @@ def _condition_findings(
             (group for group in query.anchor_groups if group.name == condition.anchor_group),
             None,
         )
-        if (
-            grounding is not None
-            and grounding.anchor_type not in data_type.permitted_anchor_type_keys
-        ):
-            findings.append(
-                ValidationFinding(
-                    summary=(
-                        f"data condition '{condition.name}' grounds on '{grounding.name}' of "
-                        f"type '{grounding.anchor_type}', which "
-                        f"'{condition.associated_data_type}' does not permit"
+        if grounding is not None:
+            for type_key in grounding.anchor_types:
+                if type_key not in data_type.permitted_anchor_type_keys:
+                    findings.append(
+                        ValidationFinding(
+                            summary=(
+                                f"data condition '{condition.name}' grounds on "
+                                f"'{grounding.name}' of type '{type_key}', which "
+                                f"'{condition.associated_data_type}' does not permit"
+                            )
+                        )
                     )
-                )
-            )
         for property_condition in condition.property_conditions:
             _comparison_findings(condition, property_condition, data_type, findings)
 
@@ -512,13 +595,13 @@ def _comparison_findings(
             )
         )
         return
-    if property_condition.comparison.ordered and constraint.json_kind is not JsonKind.NUMBER:
+    if property_condition.comparison.ordered and constraint.json_kind not in ORDERABLE_KINDS:
         findings.append(
             ValidationFinding(
                 summary=(
                     f"{label} orders property '{property_condition.property_name}', which is "
                     f"declared {constraint.json_kind.value}; ordered comparison is valid only "
-                    "for number-valued properties"
+                    "for number-valued and string-valued properties"
                 )
             )
         )
@@ -576,16 +659,20 @@ def _link_findings(
                 if role == "source"
                 else link_type.endpoint_constraint.permitted_target_type_keys
             )
-            type_key = endpoint_types[group_name]
-            if type_key not in permitted:
-                findings.append(
-                    ValidationFinding(
-                        summary=(
-                            f"required link '{link.name}' uses '{group_name}' of type "
-                            f"'{type_key}' as its {role}, which '{link.link_type}' does not permit"
+            # Every type the group names has to be permitted here. Accepting a
+            # group because one of its types fits would make the link silently
+            # mean less than the group says, which is worse than a refusal.
+            for type_key in endpoint_types[group_name]:
+                if type_key not in permitted:
+                    findings.append(
+                        ValidationFinding(
+                            summary=(
+                                f"required link '{link.name}' uses '{group_name}' of type "
+                                f"'{type_key}' as its {role}, which '{link.link_type}' "
+                                "does not permit"
+                            )
                         )
                     )
-                )
         _uuid_filter_findings(
             link.uuid_filter.uuids if link.uuid_filter is not None else None,
             label=f"required link '{link.name}'",
@@ -599,11 +686,94 @@ def _link_findings(
         )
 
 
-def _endpoint_type_keys(query: GraphQuery) -> dict[str, str]:
+def _aggregation_findings(
+    query: GraphQuery,
+    definitions: GraphDefinitionSet,
+    findings: list[ValidationFinding],
+) -> None:
+    """Report why an aggregation cannot be computed, before any of it is."""
+    conditions = {condition.name: condition for condition in query.data_conditions}
+    for aggregation in query.aggregations:
+        label = f"aggregation '{aggregation.name}'"
+        condition = conditions.get(aggregation.data_condition)
+        if condition is None:
+            findings.append(
+                ValidationFinding(
+                    summary=(
+                        f"{label} names '{aggregation.data_condition}', which is not a data "
+                        "condition in this query"
+                    )
+                )
+            )
+            continue
+        if not aggregation.operator.needs_property:
+            if aggregation.property_name is not None:
+                findings.append(
+                    ValidationFinding(summary=f"{label} counts matches, so it names no property")
+                )
+            continue
+        if aggregation.property_name is None:
+            findings.append(
+                ValidationFinding(
+                    summary=f"{label} applies {aggregation.operator.value} but names no property"
+                )
+            )
+            continue
+        data_type = definitions.associated_data_type(condition.associated_data_type)
+        if data_type is None:
+            continue
+        constraint = next(
+            (
+                rule
+                for rule in data_type.property_constraints
+                if rule.property_name == aggregation.property_name
+            ),
+            None,
+        )
+        if constraint is None:
+            findings.append(
+                ValidationFinding(
+                    summary=(
+                        f"{label} applies to property '{aggregation.property_name}', which "
+                        f"'{condition.associated_data_type}' does not define"
+                    )
+                )
+            )
+            continue
+        if constraint.json_kind not in aggregation.operator.orderable_kinds:
+            kinds = aggregation.operator.orderable_kinds
+            permitted = ", ".join(sorted(kind.value for kind in kinds))
+            findings.append(
+                ValidationFinding(
+                    summary=(
+                        f"{label} applies {aggregation.operator.value} to property "
+                        f"'{aggregation.property_name}', which is declared "
+                        f"{constraint.json_kind.value}; {aggregation.operator.value} applies "
+                        f"only to {permitted} properties"
+                    )
+                )
+            )
+
+
+def _endpoint_type_keys(query: GraphQuery) -> dict[str, tuple[str, ...]]:
+    """Return the types each candidate set may bind, by query-local name."""
     return {
-        **{group.name: group.anchor_type for group in query.anchor_groups},
-        **{condition.name: condition.associated_data_type for condition in query.data_conditions},
+        **{group.name: group.anchor_types for group in query.anchor_groups},
+        **{
+            condition.name: (condition.associated_data_type,) for condition in query.data_conditions
+        },
     }
+
+
+def _repeats(values: Sequence[str]) -> tuple[str, ...]:
+    """Return the values that appear more than once, each once, in first order."""
+    seen: set[str] = set()
+    repeated: list[str] = []
+    for value in values:
+        if value in seen and value not in repeated:
+            repeated.append(value)
+        seen.add(value)
+    return tuple(repeated)
 
 
 def _projection_findings(
@@ -704,7 +874,32 @@ def evaluate_indexed_query(
             query=query,
         )
 
-    rows = _distinct_rows(query, index)
+    rows, matches = _walk(query, index)
+    over_selection = next(
+        (
+            (name, len(objects))
+            for name, objects in matches.items()
+            if len(objects) > query.maximum_rows
+        ),
+        None,
+    )
+    if over_selection is not None:
+        name, _ = over_selection
+        # The bound means the same work it means for a projected result. Returning one
+        # number is not a reason to have read a population the caller did not permit.
+        return GraphQueryResult(
+            status=OperationStatus.REJECTED,
+            summary=(
+                f"the selection aggregated by '{name}' has more than {query.maximum_rows} "
+                "matches; it is refused whole rather than aggregated in part"
+            ),
+            findings=(
+                ValidationFinding(
+                    summary=(f"the matches of '{name}' exceed the maximum of {query.maximum_rows}")
+                ),
+            ),
+            query=query,
+        )
     unreturnable = _unreturnable_reason(rows)
     if unreturnable is not None:
         return GraphQueryResult(
@@ -727,12 +922,19 @@ def evaluate_indexed_query(
             ),
             query=query,
         )
+    aggregates = _aggregates(query, definitions, matches)
+    counts = []
+    if query.return_shape.projections:
+        counts.append(f"{len(rows)} rows")
+    if aggregates:
+        counts.append(f"{len(aggregates)} aggregates")
     return GraphQueryResult(
         status=OperationStatus.ACCEPTED,
-        summary=f"{len(rows)} rows at revision {revision}",
+        summary=f"{' and '.join(counts)} at revision {revision}",
         query=query,
         evaluated_revision=revision,
         rows=rows,
+        aggregates=aggregates,
     )
 
 
@@ -778,6 +980,103 @@ def _unreturnable_reason(rows: tuple[GraphQueryRow, ...]) -> str | None:
 
 def _first_unencodable(*values: str) -> str | None:
     return next((r for r in (unencodable_reason(each) for each in values) if r is not None), None)
+
+
+def _walk(
+    query: GraphQuery, index: QueryCandidateIndex
+) -> tuple[tuple[GraphQueryRow, ...], dict[str, dict[str, AssociatedDataObject]]]:
+    """Enumerate satisfying assignments once, collecting rows and aggregated matches.
+
+    Rows keep identical projected tuples once, as they always have. Matches keep each
+    object once by identity, which is a different thing and is the whole reason an
+    aggregate exists: two transactions of the same amount in the same category are one
+    row and two matches, and only the second reading answers "how much".
+
+    Stops one past the maximum on whichever the query actually asked for. Knowing an
+    answer is too large is all a refusal needs.
+    """
+    aggregated = {aggregation.data_condition for aggregation in query.aggregations}
+    matches: dict[str, dict[str, AssociatedDataObject]] = {name: {} for name in aggregated}
+    wants_rows = bool(query.return_shape.projections)
+    seen: set[tuple[object, ...]] = set()
+    rows: list[GraphQueryRow] = []
+    for assignment in _assignments(query, index):
+        if wants_rows and len(rows) <= query.maximum_rows:
+            row = _project(query, assignment)
+            key = _row_identity(row)
+            if key not in seen:
+                seen.add(key)
+                rows.append(row)
+        for name in aggregated:
+            bound = assignment.endpoints.get(name)
+            if isinstance(bound, AssociatedDataObject):
+                matches[name][bound.uuid] = bound
+        if any(len(objects) > query.maximum_rows for objects in matches.values()):
+            break
+        if not aggregated and wants_rows and len(rows) > query.maximum_rows:
+            break
+    return tuple(rows), matches
+
+
+def _aggregates(
+    query: GraphQuery,
+    definitions: GraphDefinitionSet,
+    matches: dict[str, dict[str, AssociatedDataObject]],
+) -> tuple[AggregateBinding, ...]:
+    """Compute each aggregation over the objects its condition matched."""
+    conditions = {condition.name: condition for condition in query.data_conditions}
+    bindings: list[AggregateBinding] = []
+    for aggregation in query.aggregations:
+        objects = tuple(matches.get(aggregation.data_condition, {}).values())
+        if aggregation.operator is AggregationOperator.COUNT:
+            bindings.append(
+                AggregateBinding(
+                    aggregation=aggregation.name, present=True, value=Decimal(len(objects))
+                )
+            )
+            continue
+        condition = conditions[aggregation.data_condition]
+        data_type = definitions.associated_data_type(condition.associated_data_type)
+        declared = next(
+            (
+                rule.json_kind
+                for rule in (data_type.property_constraints if data_type else ())
+                if rule.property_name == aggregation.property_name
+            ),
+            None,
+        )
+        # Only values of the declared kind take part. A conforming graph has no others,
+        # and on one that does not conform this refuses to invent an order between kinds.
+        values = [
+            value
+            for each in objects
+            if (value := each.properties.get(aggregation.property_name or "")) is not None
+            or aggregation.property_name in each.properties
+            if json_kind(value) is declared
+        ]
+        if not values:
+            bindings.append(AggregateBinding(aggregation=aggregation.name, present=False))
+            continue
+        bindings.append(
+            AggregateBinding(
+                aggregation=aggregation.name,
+                present=True,
+                value=_aggregate_value(aggregation.operator, values),
+            )
+        )
+    return tuple(bindings)
+
+
+def _aggregate_value(operator: AggregationOperator, values: list[JsonValue]) -> JsonValue:
+    """Reduce values of one kind, ordering exactly as an ordered comparison does."""
+    if operator is AggregationOperator.SUM:
+        total = Decimal(0)
+        for value in values:
+            assert isinstance(value, Decimal)
+            total += value
+        return total
+    ordered = sorted(values)  # pyright: ignore[reportArgumentType]
+    return ordered[0] if operator is AggregationOperator.MINIMUM else ordered[-1]
 
 
 def _distinct_rows(query: GraphQuery, index: QueryCandidateIndex) -> tuple[GraphQueryRow, ...]:
@@ -1043,13 +1342,26 @@ def _satisfies(condition: DataPropertyCondition, data: AssociatedDataObject) -> 
             return json_equal(stored, condition.expected_value)
         case PropertyComparison.NOT_EQUAL:
             return not json_equal(stored, condition.expected_value)
-    # The expected value is already known to be a number: an ordered comparison against
-    # anything else was refused. A stored value of another kind can only reach here from a
-    # graph that does not conform to its own definitions.
+    # The expected value is already known to be a number or a string, and to share the
+    # property's kind: an ordered comparison against anything else was refused. A stored
+    # value of another kind, or of the other orderable kind, can only reach here from a
+    # graph that does not conform to its own definitions, and a false answer is the one
+    # that claims least about it. Comparing a Decimal with a str would raise instead.
     expected = condition.expected_value
-    if not isinstance(stored, Decimal) or not isinstance(expected, Decimal):
-        return False
-    match condition.comparison:
+    if isinstance(stored, Decimal) and isinstance(expected, Decimal):
+        return _ordered_holds(condition.comparison, stored, expected)
+    if isinstance(stored, str) and isinstance(expected, str):
+        # Python orders str by code point, which is what the model asks for: no locale
+        # collation, no case folding, no normalization — the same basis as equality.
+        return _ordered_holds(condition.comparison, stored, expected)
+    return False
+
+
+def _ordered_holds[T: (Decimal, str)](
+    comparison: PropertyComparison, stored: T, expected: T
+) -> bool:
+    """Apply one ordered comparison to two values of the same orderable kind."""
+    match comparison:
         case PropertyComparison.LESS_THAN:
             return stored < expected
         case PropertyComparison.LESS_THAN_OR_EQUAL:

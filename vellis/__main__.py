@@ -4,6 +4,13 @@
 establishing a memory is the owner's decision and starting a server is not; a boundary
 that quietly created one would be making it for them.
 
+``python -m vellis restore`` is the owner's, for the same reason inverted. Restoring a
+past state is a modeled capability the ten agent tools deliberately leave out, because
+that surface decides no authorization and an agent that damaged a memory should not also
+hold the means of rewriting it. Leaving it off every surface, though, is not a decision —
+it is a capability nobody can reach, and an owner watching their history is owed a way to
+act on it.
+
 ``VellisVerification::simpleOperation`` names a connection failure alongside a failed
 setup attempt and holds both to the same minimum: the stage that failed, whether
 established memory changed, and an available corrective action. A generic failure lacking
@@ -16,11 +23,17 @@ from __future__ import annotations
 
 import argparse
 import sys
+from collections.abc import Callable
+from datetime import datetime
 from pathlib import Path
 from typing import TextIO
 
+from vellis.canonical import Provenance
+from vellis.history import HistoricalSelection, RevisionSelection, TimeSelection
 from vellis.mcp import ServeError, serve
 from vellis.paths import DestinationError, resolve_data_directory, store_path
+from vellis.store import StoreError
+from vellis.system import RTGSystem
 
 EXIT_SUCCESS = 0
 EXIT_FAILED = 1
@@ -31,6 +44,7 @@ class ConnectionStage:
 
     RESOLVE_DESTINATION = "resolve-destination"
     OPEN_MEMORY = "open-memory"
+    RESTORE_STATE = "restore-state"
 
 
 def _report(stage: str, summary: str, corrective_action: str, stream: TextIO) -> None:
@@ -46,8 +60,121 @@ def _report(stage: str, summary: str, corrective_action: str, stream: TextIO) ->
     print(f"  what to do next: {corrective_action}", file=stream)
 
 
-def main(argv: list[str] | None = None, *, stderr: TextIO | None = None) -> int:
+def _restore(
+    argv: list[str], *, error: TextIO, output: TextIO, confirm: Callable[[str], str]
+) -> int:
+    """Make a past state current again, on the owner's own say-so.
+
+    Restoration commits the selected state as the next revision rather than erasing what
+    followed, so this asks before acting and then says exactly what it did. The prompt is
+    the point: the owner is the only party the model lets decide this.
+    """
+    parser = argparse.ArgumentParser(
+        prog="python -m vellis restore",
+        description="Make one past state of this memory current again, as a new revision.",
+    )
+    parser.add_argument("--data-dir", default=None, help="Where the memory lives.")
+    selector = parser.add_mutually_exclusive_group(required=True)
+    selector.add_argument("--revision", type=int, help="The committed revision to restore.")
+    selector.add_argument(
+        "--time",
+        help=("Restore the greatest revision committed at or before this ISO-8601 instant."),
+    )
+    parser.add_argument("--yes", action="store_true", help="Skip the confirmation prompt.")
+    arguments = parser.parse_args(argv)
+    try:
+        directory: Path = resolve_data_directory(arguments.data_dir)
+    except DestinationError as unusable:
+        _report(
+            ConnectionStage.RESOLVE_DESTINATION,
+            f"no usable destination: {unusable}",
+            "pass --data-dir with the directory holding your Vellis system",
+            error,
+        )
+        return EXIT_FAILED
+
+    selection: HistoricalSelection
+    if arguments.revision is not None:
+        selection = RevisionSelection(revision=arguments.revision)
+        named = f"revision {arguments.revision}"
+    else:
+        try:
+            selection = TimeSelection(time=datetime.fromisoformat(arguments.time))
+        except ValueError:
+            _report(
+                ConnectionStage.RESTORE_STATE,
+                f"--time is not an ISO-8601 instant: {arguments.time!r}",
+                "pass an instant such as 2026-08-14T18:59:30+00:00",
+                error,
+            )
+            return EXIT_FAILED
+        named = f"the state at {arguments.time}"
+
+    path = store_path(directory)
+    if not path.exists():
+        _report(
+            ConnectionStage.OPEN_MEMORY,
+            f"no Vellis memory is established at {path}",
+            f"run `python -m vellis.setup --data-dir {directory}` to begin one here",
+            error,
+        )
+        return EXIT_FAILED
+    try:
+        system = RTGSystem.open(path)
+    except StoreError as unopenable:
+        _report(
+            ConnectionStage.OPEN_MEMORY,
+            f"the memory at {path} could not be opened: {unopenable}",
+            "check that this account can read and write that file",
+            error,
+        )
+        return EXIT_FAILED
+    try:
+        print(f"Vellis will restore {named} in {path}.", file=output)
+        print(
+            "  Everything already recorded stays where it is: the restored state is "
+            "committed as the next revision, so this is itself undoable.",
+            file=output,
+        )
+        if not arguments.yes and confirm("  Restore it? [y/N] ").strip().lower() not in {
+            "y",
+            "yes",
+        }:
+            print("  nothing was restored; established memory is unchanged", file=output)
+            return EXIT_SUCCESS
+        outcome = system.restore_historical_state(selection, provenance=Provenance("owner"))
+        if not outcome.accepted:
+            _report(
+                ConnectionStage.RESTORE_STATE,
+                outcome.summary,
+                "resolve what the finding names, then run this again",
+                error,
+            )
+            for finding in outcome.findings:
+                print(f"  finding: {finding.summary}", file=error)
+            return EXIT_FAILED
+        print(f"  restored: {outcome.summary}", file=output)
+        return EXIT_SUCCESS
+    finally:
+        system.close()
+
+
+def main(
+    argv: list[str] | None = None,
+    *,
+    stderr: TextIO | None = None,
+    stdout: TextIO | None = None,
+    confirm: Callable[[str], str] = input,
+) -> int:
     error: TextIO = sys.stderr if stderr is None else stderr
+    arguments_given = sys.argv[1:] if argv is None else argv
+    if arguments_given and arguments_given[0] == "restore":
+        return _restore(
+            list(arguments_given[1:]),
+            error=error,
+            output=sys.stdout if stdout is None else stdout,
+            confirm=confirm,
+        )
     parser = argparse.ArgumentParser(
         prog="python -m vellis",
         description="Serve one established Vellis memory over local standard input and output.",

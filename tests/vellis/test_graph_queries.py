@@ -26,6 +26,7 @@ from vellis.graph import Anchor, AssociatedDataObject, Link
 from vellis.json_value import normalize
 from vellis.outcomes import OperationStatus
 from vellis.query import (
+    AggregationOperator,
     AnchorGroup,
     AnchorProjection,
     AnchorUuidFilter,
@@ -38,6 +39,7 @@ from vellis.query import (
     LinkProjection,
     LinkUuidFilter,
     PropertyComparison,
+    QueryAggregation,
     RequiredLink,
     ReturnShape,
 )
@@ -145,12 +147,14 @@ def _endpoint_definitions():
 
 
 def _people(name: str = "people", **overrides: object) -> AnchorGroup:
-    return AnchorGroup(name=name, anchor_type="person", **overrides)  # pyright: ignore[reportArgumentType]
+    return AnchorGroup(name=name, anchor_types=("person",), **overrides)  # pyright: ignore[reportArgumentType]
 
 
 def _just_people(maximum_rows: int = 10, uuid_filter: AnchorUuidFilter | None = None) -> GraphQuery:
     return GraphQuery(
-        anchor_groups=(AnchorGroup(name="people", anchor_type="person", uuid_filter=uuid_filter),),
+        anchor_groups=(
+            AnchorGroup(name="people", anchor_types=("person",), uuid_filter=uuid_filter),
+        ),
         return_shape=ReturnShape(
             projections=(AnchorProjection(name="who", anchor_group="people"),)
         ),
@@ -343,7 +347,7 @@ def test_multiple_assigned_link_restrictions_are_intersected_before_data_filteri
         anchor_groups=(
             _people("first", uuid_filter=AnchorUuidFilter(("a-1",))),
             _people("second", uuid_filter=AnchorUuidFilter(("a-2",))),
-            AnchorGroup("projects", "project"),
+            AnchorGroup("projects", ("project",)),
         ),
         data_conditions=(
             AssociatedDataCondition(
@@ -377,7 +381,7 @@ def test_multiple_assigned_link_restrictions_are_intersected_before_data_filteri
 
 def _worked_on(uuid_filter: LinkUuidFilter | None = None) -> GraphQuery:
     return GraphQuery(
-        anchor_groups=(_people(), AnchorGroup(name="projects", anchor_type="project")),
+        anchor_groups=(_people(), AnchorGroup(name="projects", anchor_types=("project",))),
         required_links=(
             RequiredLink(
                 name="works",
@@ -428,7 +432,7 @@ def test_an_associated_data_group_may_be_a_link_endpoint(tmp_path: Path) -> None
         ).accepted
 
         query = GraphQuery(
-            anchor_groups=(_people(), AnchorGroup(name="projects", anchor_type="project")),
+            anchor_groups=(_people(), AnchorGroup(name="projects", anchor_types=("project",))),
             data_conditions=(
                 AssociatedDataCondition(
                     name="projectNotes", anchor_group="projects", associated_data_type="note"
@@ -480,7 +484,7 @@ def test_sparse_links_prune_associated_data_before_property_comparison(tmp_path:
             provenance=_owner(),
         ).accepted
         query = GraphQuery(
-            anchor_groups=(_people(), AnchorGroup("projects", "project")),
+            anchor_groups=(_people(), AnchorGroup("projects", ("project",))),
             data_conditions=(
                 AssociatedDataCondition(
                     "projectNotes",
@@ -517,7 +521,7 @@ def test_a_row_carries_only_the_requested_projections(system: RTGSystem) -> None
     The link and the notes below decide which rows exist and appear in none of them.
     """
     query = GraphQuery(
-        anchor_groups=(_people(), AnchorGroup(name="projects", anchor_type="project")),
+        anchor_groups=(_people(), AnchorGroup(name="projects", anchor_types=("project",))),
         data_conditions=(
             AssociatedDataCondition(
                 name="notes", anchor_group="people", associated_data_type="note"
@@ -689,7 +693,7 @@ def test_alternative_evaluation_orders_produce_equivalent_rows(system: RTGSystem
     """Excludes a join whose answer depends on the order the groups were written in."""
     forward = _worked_on()
     reversed_groups = GraphQuery(
-        anchor_groups=(AnchorGroup(name="projects", anchor_type="project"), _people()),
+        anchor_groups=(AnchorGroup(name="projects", anchor_types=("project",)), _people()),
         required_links=forward.required_links,
         return_shape=forward.return_shape,
         maximum_rows=forward.maximum_rows,
@@ -713,8 +717,8 @@ def test_unprojected_disconnected_population_does_not_multiply_projection_work(
 ) -> None:
     question = GraphQuery(
         anchor_groups=(
-            AnchorGroup(name="people", anchor_type="person"),
-            AnchorGroup(name="projects", anchor_type="project"),
+            AnchorGroup(name="people", anchor_types=("person",)),
+            AnchorGroup(name="projects", anchor_types=("project",)),
         ),
         return_shape=ReturnShape(
             projections=(AnchorProjection(name="who", anchor_group="people"),)
@@ -762,8 +766,8 @@ def test_unsatisfied_unprojected_component_still_removes_every_row(tmp_path: Pat
         result = system.query_graph(
             GraphQuery(
                 anchor_groups=(
-                    AnchorGroup(name="people", anchor_type="person"),
-                    AnchorGroup(name="projects", anchor_type="project"),
+                    AnchorGroup(name="people", anchor_types=("person",)),
+                    AnchorGroup(name="projects", anchor_types=("project",)),
                 ),
                 return_shape=ReturnShape(
                     projections=(AnchorProjection(name="who", anchor_group="people"),)
@@ -912,8 +916,8 @@ def sharp(tmp_path: Path):
 def _between(link_type: str = "knows") -> GraphQuery:
     return GraphQuery(
         anchor_groups=(
-            AnchorGroup(name="from", anchor_type="person"),
-            AnchorGroup(name="to", anchor_type="person"),
+            AnchorGroup(name="from", anchor_types=("person",)),
+            AnchorGroup(name="to", anchor_types=("person",)),
         ),
         required_links=(
             RequiredLink(name="edge", source_group="from", target_group="to", link_type=link_type),
@@ -1126,8 +1130,8 @@ def test_number_equality_does_not_distinguish_signed_zero(rated: RTGSystem) -> N
 def test_a_projected_link_returns_the_link_that_satisfied_it(sharp: RTGSystem) -> None:
     query = GraphQuery(
         anchor_groups=(
-            AnchorGroup(name="from", anchor_type="person"),
-            AnchorGroup(name="to", anchor_type="person"),
+            AnchorGroup(name="from", anchor_types=("person",)),
+            AnchorGroup(name="to", anchor_types=("person",)),
         ),
         required_links=(
             RequiredLink(name="edge", source_group="from", target_group="to", link_type="knows"),
@@ -1199,10 +1203,10 @@ def test_a_query_that_matches_nothing_is_accepted_with_no_rows(system: RTGSystem
             anchor_groups=(
                 AnchorGroup(
                     name="people",
-                    anchor_type="person",
+                    anchor_types=("person",),
                     uuid_filter=AnchorUuidFilter(uuids=("a-1",)),
                 ),
-                AnchorGroup(name="projects", anchor_type="project"),
+                AnchorGroup(name="projects", anchor_types=("project",)),
             ),
             # l-3 runs from Grace, and the group above admits only Ada, so no assignment
             # satisfies both.
@@ -1324,8 +1328,8 @@ def test_a_projected_link_participates_in_row_identity(sharp: RTGSystem) -> None
 
     query = GraphQuery(
         anchor_groups=(
-            AnchorGroup(name="from", anchor_type="person"),
-            AnchorGroup(name="to", anchor_type="person"),
+            AnchorGroup(name="from", anchor_types=("person",)),
+            AnchorGroup(name="to", anchor_types=("person",)),
         ),
         required_links=(
             RequiredLink(name="edge", source_group="from", target_group="to", link_type="knows"),
@@ -1341,3 +1345,323 @@ def test_a_projected_link_participates_in_row_identity(sharp: RTGSystem) -> None
         "l-1",
         "l-9",
     ]
+
+
+def test_a_string_property_orders_by_code_point(tmp_path: Path) -> None:
+    """Ordering a string is what makes a date range askable.
+
+    The starter writes dates as patterned strings, so an owner asking what falls before a
+    date is asking this. Code point is the basis equality already uses, so ordering adds
+    no second notion of what a stored string is — and it is deliberately not case folding
+    or locale collation, which is why an uppercase value that sorts before every lowercase
+    one is in the fixture rather than a tidier set.
+    """
+    system = RTGSystem.open(tmp_path / "vellis.sqlite3")
+    try:
+        assert system.initialize_fresh(
+            build_rich_definitions(), provenance=_owner(), initialization_summary="a fresh start"
+        ).accepted
+        assert system.apply_graph_change(
+            GraphChange(
+                anchor_upserts=(ADA,),
+                associated_data_upserts=(
+                    _note("n-1", ("a-1",), year="2024"),
+                    _note("n-2", ("a-1",), year="2026"),
+                    _note("n-3", ("a-1",), year="2028"),
+                    _note("n-4", ("a-1",), tag="green"),
+                ),
+            ),
+            provenance=_owner(),
+        ).accepted
+
+        def years(comparison: PropertyComparison, expected: str) -> set[str]:
+            result = system.query_graph(
+                GraphQuery(
+                    anchor_groups=(AnchorGroup(name="people", anchor_types=("person",)),),
+                    data_conditions=(
+                        AssociatedDataCondition(
+                            name="notes",
+                            anchor_group="people",
+                            associated_data_type="note",
+                            property_conditions=(
+                                DataPropertyCondition(
+                                    property_name="year",
+                                    comparison=comparison,
+                                    expected_value=normalize(expected),
+                                ),
+                            ),
+                        ),
+                    ),
+                    return_shape=ReturnShape(
+                        projections=(
+                            DataPropertyProjection(
+                                name="year", data_condition="notes", property_name="year"
+                            ),
+                        )
+                    ),
+                    maximum_rows=20,
+                )
+            )
+            assert result.status is OperationStatus.ACCEPTED, result.findings
+            return {
+                str(each.value) for row in result.rows for each in row.properties if each.present
+            }
+
+        assert years(PropertyComparison.LESS_THAN, "2026") == {"2024"}
+        assert years(PropertyComparison.LESS_THAN_OR_EQUAL, "2026") == {"2024", "2026"}
+        assert years(PropertyComparison.GREATER_THAN, "2026") == {"2028"}
+        assert years(PropertyComparison.GREATER_THAN_OR_EQUAL, "2024") == {"2024", "2026", "2028"}
+        # The note carrying no year is never selected: omission is not a value to order.
+        assert years(PropertyComparison.GREATER_THAN, "0000") == {"2024", "2026", "2028"}
+    finally:
+        system.close()
+
+
+def test_string_ordering_agrees_between_the_stored_and_replayed_graph(tmp_path: Path) -> None:
+    """Both realizations must order the same way, or memory depends on where it is read.
+
+    SQLite compares text byte-wise over UTF-8 while the in-memory path compares Python
+    strings by code point. Those agree, but only because UTF-8 byte order is code-point
+    order — a collation on the column would silently break it, and only a value outside
+    ASCII would notice.
+    """
+    system = RTGSystem.open(tmp_path / "vellis.sqlite3")
+    try:
+        assert system.initialize_fresh(
+            build_rich_definitions(), provenance=_owner(), initialization_summary="a fresh start"
+        ).accepted
+        assert system.apply_graph_change(
+            GraphChange(
+                anchor_upserts=(ADA,),
+                associated_data_upserts=(
+                    _note("n-1", ("a-1",), title="Zebra"),
+                    _note("n-2", ("a-1",), title="apple"),
+                    _note("n-3", ("a-1",), title="Ábaco"),
+                    _note("n-4", ("a-1",), title="🍞 bread"),
+                ),
+            ),
+            provenance=_owner(),
+        ).accepted
+        stored = materialize_state(system)
+        titles = sorted(str(each.properties["title"]) for each in stored.graph.associated_data)
+
+        selected = system.query_graph(
+            GraphQuery(
+                anchor_groups=(AnchorGroup(name="people", anchor_types=("person",)),),
+                data_conditions=(
+                    AssociatedDataCondition(
+                        name="notes",
+                        anchor_group="people",
+                        associated_data_type="note",
+                        property_conditions=(
+                            DataPropertyCondition(
+                                property_name="title",
+                                comparison=PropertyComparison.LESS_THAN,
+                                expected_value=normalize("apple"),
+                            ),
+                        ),
+                    ),
+                ),
+                return_shape=ReturnShape(
+                    projections=(
+                        DataPropertyProjection(
+                            name="title", data_condition="notes", property_name="title"
+                        ),
+                    )
+                ),
+                maximum_rows=20,
+            )
+        )
+        assert selected.status is OperationStatus.ACCEPTED, selected.findings
+        returned = {
+            str(each.value) for row in selected.rows for each in row.properties if each.present
+        }
+        # Python's own code-point order is the oracle; the query must reproduce exactly it.
+        assert returned == {title for title in titles if title < "apple"}
+        assert "Zebra" in returned and "apple" not in returned
+    finally:
+        system.close()
+
+
+def test_an_anchor_group_may_name_several_types(system: RTGSystem) -> None:
+    """One question about work of several shapes should be one question.
+
+    The union has to mean exactly what the separate queries meant together, or an owner
+    asking "everything" gets a different answer from an owner asking twice and adding.
+    """
+    both = system.query_graph(
+        GraphQuery(
+            anchor_groups=(AnchorGroup(name="things", anchor_types=("person", "project")),),
+            return_shape=ReturnShape(
+                projections=(AnchorProjection(name="thing", anchor_group="things"),)
+            ),
+            maximum_rows=20,
+        )
+    )
+    assert both.status is OperationStatus.ACCEPTED, both.findings
+    separate: set[str] = set()
+    for type_key in ("person", "project"):
+        one = system.query_graph(
+            GraphQuery(
+                anchor_groups=(AnchorGroup(name="things", anchor_types=(type_key,)),),
+                return_shape=ReturnShape(
+                    projections=(AnchorProjection(name="thing", anchor_group="things"),)
+                ),
+                maximum_rows=20,
+            )
+        )
+        assert one.status is OperationStatus.ACCEPTED, one.findings
+        separate |= {row.anchors[0].anchor.uuid for row in one.rows}
+    assert {row.anchors[0].anchor.uuid for row in both.rows} == separate
+    assert len(both.rows) == len(separate)
+
+
+def _rating_query(*aggregations: QueryAggregation, maximum: int = 20) -> GraphQuery:
+    return GraphQuery(
+        anchor_groups=(AnchorGroup(name="people", anchor_types=("person",)),),
+        data_conditions=(
+            AssociatedDataCondition(
+                name="notes", anchor_group="people", associated_data_type="note"
+            ),
+        ),
+        return_shape=ReturnShape(projections=()),
+        aggregations=aggregations,
+        maximum_rows=maximum,
+    )
+
+
+def test_aggregation_counts_matching_objects_not_distinct_projected_tuples(
+    tmp_path: Path,
+) -> None:
+    """The whole reason to aggregate in the system is that projections deduplicate.
+
+    Two notes carrying the same rating are one projected tuple and two objects. Summing a
+    projection of those values silently answers a smaller question, and nothing about the
+    result says so, which is why the arithmetic belongs here.
+    """
+    system = RTGSystem.open(tmp_path / "vellis.sqlite3")
+    try:
+        assert system.initialize_fresh(
+            build_rich_definitions(), provenance=_owner(), initialization_summary="a fresh start"
+        ).accepted
+        assert system.apply_graph_change(
+            GraphChange(
+                anchor_upserts=(ADA,),
+                associated_data_upserts=(
+                    _note("n-1", ("a-1",), rating=2),
+                    _note("n-2", ("a-1",), rating=2),
+                    _note("n-3", ("a-1",), rating=5),
+                    _note("n-4", ("a-1",)),
+                ),
+            ),
+            provenance=_owner(),
+        ).accepted
+
+        result = system.query_graph(
+            _rating_query(
+                QueryAggregation(
+                    name="howMany", operator=AggregationOperator.COUNT, data_condition="notes"
+                ),
+                QueryAggregation(
+                    name="total",
+                    operator=AggregationOperator.SUM,
+                    data_condition="notes",
+                    property_name="rating",
+                ),
+                QueryAggregation(
+                    name="lowest",
+                    operator=AggregationOperator.MINIMUM,
+                    data_condition="notes",
+                    property_name="rating",
+                ),
+                QueryAggregation(
+                    name="highest",
+                    operator=AggregationOperator.MAXIMUM,
+                    data_condition="notes",
+                    property_name="rating",
+                ),
+            )
+        )
+        assert result.status is OperationStatus.ACCEPTED, result.findings
+        answers = {each.aggregation: each for each in result.aggregates}
+        assert answers["howMany"].value == Decimal(4)
+        # Nine, not seven: the two ratings of 2 are two objects even though a projection
+        # of them would be one row.
+        assert answers["total"].value == Decimal(9)
+        assert answers["lowest"].value == Decimal(2)
+        assert answers["highest"].value == Decimal(5)
+    finally:
+        system.close()
+
+
+def test_an_aggregate_is_absent_when_nothing_carries_the_property(tmp_path: Path) -> None:
+    """None is not zero, and a total of nothing should not read as a total of zero."""
+    system = RTGSystem.open(tmp_path / "vellis.sqlite3")
+    try:
+        assert system.initialize_fresh(
+            build_rich_definitions(), provenance=_owner(), initialization_summary="a fresh start"
+        ).accepted
+        assert system.apply_graph_change(
+            GraphChange(anchor_upserts=(ADA,), associated_data_upserts=(_note("n-1", ("a-1",)),)),
+            provenance=_owner(),
+        ).accepted
+
+        result = system.query_graph(
+            _rating_query(
+                QueryAggregation(
+                    name="howMany", operator=AggregationOperator.COUNT, data_condition="notes"
+                ),
+                QueryAggregation(
+                    name="total",
+                    operator=AggregationOperator.SUM,
+                    data_condition="notes",
+                    property_name="rating",
+                ),
+            )
+        )
+        assert result.status is OperationStatus.ACCEPTED, result.findings
+        answers = {each.aggregation: each for each in result.aggregates}
+        assert answers["howMany"].present and answers["howMany"].value == Decimal(1)
+        assert not answers["total"].present
+        assert answers["total"].value is None
+    finally:
+        system.close()
+
+
+def test_an_aggregated_selection_larger_than_the_maximum_is_refused_whole(
+    tmp_path: Path,
+) -> None:
+    """Returning one number is not a licence to read an unbounded population.
+
+    The bound has always meant the work a query may do, not just the size of what comes
+    back. An aggregate that scanned past it would keep the promise's words and drop its
+    meaning, and nothing in the result would show the difference.
+    """
+    system = RTGSystem.open(tmp_path / "vellis.sqlite3")
+    try:
+        assert system.initialize_fresh(
+            build_rich_definitions(), provenance=_owner(), initialization_summary="a fresh start"
+        ).accepted
+        assert system.apply_graph_change(
+            GraphChange(
+                anchor_upserts=(ADA,),
+                associated_data_upserts=tuple(
+                    _note(f"n-{index}", ("a-1",), rating=1 + index % 5) for index in range(9)
+                ),
+            ),
+            provenance=_owner(),
+        ).accepted
+
+        result = system.query_graph(
+            _rating_query(
+                QueryAggregation(
+                    name="howMany", operator=AggregationOperator.COUNT, data_condition="notes"
+                ),
+                maximum=4,
+            )
+        )
+        assert result.status is OperationStatus.REJECTED
+        assert result.aggregates == ()
+        assert any("exceed the maximum" in each.summary for each in result.findings)
+    finally:
+        system.close()

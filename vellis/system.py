@@ -1402,6 +1402,23 @@ class RTGSystem:
         return finish(report)
 
 
+def _transition_summary(kind: str | None, revision: int) -> str:
+    """Say what a transition was, for an owner reading their own history.
+
+    Only what the ledger row already holds. Saying which objects moved would mean reading
+    the replay-sufficient change, and a review response that reads it becomes a second
+    replay authority — so this names the kind of change and its revision, in the words the
+    model uses for them, and stops there.
+    """
+    said = {
+        TransitionKind.GRAPH_MUTATION.value: "the graph changed",
+        TransitionKind.DEFINITION_DELTA_CHANGE.value: "the definition proposal changed",
+        TransitionKind.DEFINITION_ACTIVATION.value: "the definition proposal became active",
+        TransitionKind.HISTORICAL_RESTORATION.value: "earlier state was restored",
+    }.get(kind or "")
+    return f"{said}, reaching revision {revision}" if said else f"reached revision {revision}"
+
+
 def _change_scope(change: GraphChange) -> str:
     """Count what a change touched without copying any of it."""
     counts = (
@@ -1497,7 +1514,7 @@ def _canonical_entries(
         CanonicalHistoryEntry(
             recorded_at=recorded_at,
             provenance=Provenance(initiator=initiator, source=source),
-            summary=summary or f"{kind} to revision {revision}",
+            summary=summary or _transition_summary(kind, revision),
             revision=revision,
             prior_revision=prior,
             transition_kind=None if kind is None else TransitionKind(kind),

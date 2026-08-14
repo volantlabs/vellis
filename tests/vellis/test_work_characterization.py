@@ -61,7 +61,7 @@ ARRIVAL = Anchor(uuid="arrival", type_key="person", display_name="New")
 
 def _people(maximum_rows: int = 100) -> GraphQuery:
     return GraphQuery(
-        anchor_groups=(AnchorGroup(name="people", anchor_type="person"),),
+        anchor_groups=(AnchorGroup(name="people", anchor_types=("person",)),),
         return_shape=ReturnShape(
             projections=(AnchorProjection(name="who", anchor_group="people"),)
         ),
@@ -590,7 +590,7 @@ def test_a_narrow_historical_query_does_not_materialize_the_revision_population(
             system,
             lambda: system.query_graph(
                 GraphQuery(
-                    anchor_groups=(AnchorGroup("person", "person", AnchorUuidFilter(("a-0",))),),
+                    anchor_groups=(AnchorGroup("person", ("person",), AnchorUuidFilter(("a-0",))),),
                     return_shape=ReturnShape((AnchorProjection("returned-person", "person"),)),
                     maximum_rows=1,
                     historical_selection=RevisionSelection(revision=1),

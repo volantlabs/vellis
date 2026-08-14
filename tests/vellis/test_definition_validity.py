@@ -23,6 +23,7 @@ from vellis.definitions import (
     StringPattern,
     ValueRange,
     ValueShape,
+    relationship_label,
     validate_definition_set,
 )
 from vellis.json_value import JsonKind, normalize
@@ -719,3 +720,25 @@ def test_a_relationship_label_is_stable_across_declaration_order() -> None:
     reversed_order = _association_rule(anchors=("company", "person", "team"))
     assert relationship_label(forward) == relationship_label(reversed_order)
     assert "{company,person,team}" in relationship_label(forward)
+
+
+def test_a_multiplicity_label_names_its_end_in_the_model_s_own_words() -> None:
+    """A finding an owner reads should not carry a realization detail.
+
+    The label sits beside type keys that are already their modeled names, so an end
+    rendered as its enumeration member is the one part of the identity that stops being
+    the owner's vocabulary.
+    """
+    label = relationship_label(
+        DirectAssociationMultiplicityConstraint(
+            constrained_end=DirectAssociationEnd.ASSOCIATED_DATA,
+            anchor_type_keys=("person",),
+            associated_data_type_keys=("person.details",),
+            lower_bound=1,
+            upper_bound=1,
+            description="One each.",
+        )
+    )
+
+    assert label == "directAssociationMultiplicity:associatedData|{person}|{person.details}"
+    assert "DirectAssociationEnd" not in label

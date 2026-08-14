@@ -12,9 +12,29 @@ def _record() -> dict[str, object]:
     return system_evolution.load_record()
 
 
-def _work(record: dict[str, object], work_id: str) -> dict[str, object]:
-    items = cast(list[dict[str, object]], record["work_items"])
-    return next(item for item in items if item["id"] == work_id)
+# The live record is an execution index, not a fixture. Selecting by position in the
+# dependency graph keeps these cases about the rule being validated, so naming the next
+# evolution's work differently cannot fail a test that says nothing about names.
+def _root_work(record: dict[str, object]) -> dict[str, Any]:
+    """Return the earliest work item nothing else has to precede."""
+    items = cast(list[dict[str, Any]], record["work_items"])
+    return min(
+        (item for item in items if not item["dependencies"]),
+        key=lambda item: item["order"],
+    )
+
+
+def _dependent_work(record: dict[str, object]) -> dict[str, Any]:
+    """Return the work item that depends on the root."""
+    items = cast(list[dict[str, Any]], record["work_items"])
+    root = _root_work(record)
+    return next(item for item in items if root["id"] in item["dependencies"])
+
+
+def _owned_finding(record: dict[str, object], work_id: str) -> dict[str, Any]:
+    """Return one finding the named work item owns."""
+    findings = cast(list[dict[str, Any]], record["findings"])
+    return next(each for each in findings if each["owner_work_item_id"] == work_id)
 
 
 def _active_work(record: dict[str, object]) -> dict[str, object]:
@@ -36,7 +56,7 @@ def _active_record() -> dict[str, Any]:
     record["evolution"]["lifecycle"] = "active"
     record["evolution"]["checkpoint"] = None
     # Select the implementation item explicitly instead of depending on live ledger state.
-    active = _work(record, "W001")
+    active = _root_work(record)
     active["planned_baseline"] = {
         "dimension": "implementation",
         "identity": implementation,
@@ -139,17 +159,17 @@ def test_resolved_findings_and_conforming_decisions_require_evidence() -> None:
 
 def test_complete_work_item_cannot_retain_open_owned_work() -> None:
     record = copy.deepcopy(_record())
-    item = _work(record, "W001")
+    item = _root_work(record)
     item["lifecycle"] = "complete"
     item["implementation_status"] = "conforming"
     item["checkpoint"] = "git:checkpoint"
-    finding = next(each for each in record["findings"] if each["id"] == "F003")  # type: ignore[union-attr]
+    finding = _owned_finding(record, item["id"])
     finding["disposition"] = "implementation-work"
     finding["implementation_status"] = "partial"
 
     findings = system_evolution.validate_record(record)  # type: ignore[arg-type]
 
-    assert any("complete work item W001 has open findings" in each for each in findings)
+    assert any(f"complete work item {item['id']} has open findings" in each for each in findings)
 
 
 def test_status_reports_the_active_item_before_another_ready_item() -> None:
@@ -162,24 +182,27 @@ def test_status_reports_the_active_item_before_another_ready_item() -> None:
 @pytest.mark.parametrize("lifecycle", ("ready", "complete"))
 def test_executable_work_requires_complete_dependencies(lifecycle: str) -> None:
     record = copy.deepcopy(_record())
-    _work(record, "W001")["lifecycle"] = "pending"
-    _work(record, "W004")["lifecycle"] = lifecycle
+    _root_work(record)["lifecycle"] = "pending"
+    dependent = _dependent_work(record)
+    dependent["lifecycle"] = lifecycle
 
     findings = system_evolution.validate_record(record)  # type: ignore[arg-type]
 
     assert any(
-        f"{lifecycle} work item W004 has incomplete dependencies" in each for each in findings
+        f"{lifecycle} work item {dependent['id']} has incomplete dependencies" in each
+        for each in findings
     )
 
 
 def test_accepted_approval_requires_an_attributable_checkpoint() -> None:
     record = copy.deepcopy(_record())
-    _work(record, "W001")["approval"]["status"] = "accepted"  # type: ignore[index]
-    _work(record, "W001")["approval"]["checkpoint"] = None  # type: ignore[index]
+    root = _root_work(record)
+    root["approval"]["status"] = "accepted"
+    root["approval"]["checkpoint"] = None
 
     findings = system_evolution.validate_record(record)  # type: ignore[arg-type]
 
-    assert "accepted approval for W001 has no attributable checkpoint" in findings
+    assert f"accepted approval for {root['id']} has no attributable checkpoint" in findings
 
 
 def test_active_work_cannot_remain_bound_only_to_a_source_baseline() -> None:
@@ -313,19 +336,21 @@ def test_unknown_blocker_finding_and_duplicate_ownership_are_rejected() -> None:
         "finding_ids": ["F999"],
         "evidence_refs": [],
     }
-    _work(record, "W004")["lifecycle"] = "blocked"
-    _work(record, "W004")["blocker"] = {
+    dependent = _dependent_work(record)
+    shared = _owned_finding(record, _root_work(record)["id"])["id"]
+    dependent["lifecycle"] = "blocked"
+    dependent["blocker"] = {
         "classification": "external dependency",
         "summary": "The same bounded dependency blocks this work item.",
-        "finding_ids": ["F003"],
+        "finding_ids": [shared],
         "evidence_refs": [],
     }
-    _work(record, "W004")["finding_ids"].append("F003")  # type: ignore[union-attr]
+    dependent["finding_ids"].append(shared)
 
     findings = system_evolution.validate_record(record)  # type: ignore[arg-type]
 
     assert "evolution blocker names unknown finding F999" in findings
-    assert any("finding F003 is listed by" in finding for finding in findings)
+    assert any(f"finding {shared} is listed by" in finding for finding in findings)
 
 
 def test_duplicate_ids_are_rejected_before_indexing() -> None:
@@ -393,7 +418,8 @@ def test_completed_work_rejects_unrecognized_or_cross_dimension_historical_basel
 
     findings = system_evolution.validate_record(record)  # type: ignore[arg-type]
 
-    assert "complete work item W001 has an unrecognized historical planned baseline" in findings
+    first = cast(list[dict[str, Any]], record["work_items"])[0]["id"]
+    assert f"complete work item {first} has an unrecognized historical planned baseline" in findings
 
 
 def test_vellis_evidence_rejects_false_commands_and_unresolved_fragments() -> None:
@@ -411,8 +437,9 @@ def test_vellis_evidence_rejects_false_commands_and_unresolved_fragments() -> No
 
 def test_accepted_approval_checkpoint_must_exist_and_contain_the_gate() -> None:
     record = copy.deepcopy(_record())
-    _work(record, "W001")["approval"]["status"] = "accepted"  # type: ignore[index]
-    _work(record, "W001")["approval"]["checkpoint"] = "git:does-not-exist"  # type: ignore[index]
+    root = _root_work(record)
+    root["approval"]["status"] = "accepted"
+    root["approval"]["checkpoint"] = "git:does-not-exist"
 
     findings = system_evolution.validate_record(record)  # type: ignore[arg-type]
 
@@ -431,17 +458,31 @@ def test_every_finding_requires_one_completion_owner() -> None:
 
 def test_dependency_order_must_precede_the_dependent() -> None:
     record = copy.deepcopy(_record())
-    _work(record, "W004")["order"] = 1
+    dependent = _dependent_work(record)
+    dependent["order"] = 1
 
     findings = system_evolution.validate_record(record)  # type: ignore[arg-type]
 
-    assert "W004 dependency W001 must have a lower order" in findings
+    assert (
+        f"{dependent['id']} dependency {_root_work(record)['id']} must have a lower order"
+        in findings
+    )
 
 
 def test_lifecycle_rollup_requires_matching_executable_or_approval_frontier() -> None:
     ready = copy.deepcopy(_record())
     ready["evolution"]["lifecycle"] = "ready"  # type: ignore[index]
-    _work(ready, "W004")["lifecycle"] = "pending"
+    for item in cast(list[dict[str, Any]], ready["work_items"]):
+        item["lifecycle"] = "pending"
+        # The frontier these rules are about is what the record declares, not what the
+        # live one happens to hold. Stating both preconditions here keeps the case about
+        # the rollup rule, so an evolution that legitimately carries a pending approval
+        # cannot satisfy the very rule this asserts fires.
+        item["approval"] = {
+            "status": "not-required",
+            "reason": "Test frontier.",
+            "checkpoint": None,
+        }
     awaiting = copy.deepcopy(ready)
     awaiting["evolution"]["lifecycle"] = "awaiting-approval"  # type: ignore[index]
 
@@ -476,9 +517,9 @@ def test_clean_final_reviews_must_bind_the_exact_target_implementation() -> None
 
 def test_accepted_approval_seals_its_owner_facing_consequence() -> None:
     record = copy.deepcopy(system_evolution.load_record())
-    item = _work(record, "W001")
-    item["approval"]["status"] = "accepted"  # type: ignore[index]
-    item["approval"]["checkpoint"] = "git:does-not-exist"  # type: ignore[index]
+    item = _root_work(record)
+    item["approval"]["status"] = "accepted"
+    item["approval"]["checkpoint"] = "git:does-not-exist"
     item["nearest_wrong_system"] = "A changed gated consequence."
 
     findings = system_evolution.validate_record(record)

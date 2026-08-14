@@ -290,6 +290,13 @@ def _completed_campaign_evidence_revision(campaign: dict[str, Any], *, root: Pat
     A completed campaign is historical authority. Later model evolution may retire or
     consolidate its evidence files without erasing the exact committed evidence that
     justified closure.
+
+    The observed baseline is excluded from the match. It is the one part of the record
+    that is supposed to move as the repository evolves, and it must be updated in the
+    working tree before it can be committed. Matching on it would mean that editing it —
+    the only correct response to an evolved model — drops evidence lookup back to the
+    closure commit, where evidence renamed since then no longer resolves. The record
+    would then be checkable only after committing the very change being checked.
     """
     checkpoint = campaign["closure"]["checkpoint"]
     if checkpoint is None:
@@ -308,7 +315,7 @@ def _completed_campaign_evidence_revision(campaign: dict[str, Any], *, root: Pat
             )
         except RuntimeError, ValueError, yaml.YAMLError:
             continue
-        if recorded == campaign:
+        if _without_observed_baseline(recorded) == _without_observed_baseline(campaign):
             return commit
         if (
             recorded.get("campaign", {}).get("lifecycle") == "complete"
@@ -316,6 +323,15 @@ def _completed_campaign_evidence_revision(campaign: dict[str, Any], *, root: Pat
         ):
             return commit
     return None
+
+
+def _without_observed_baseline(campaign: dict[str, Any]) -> dict[str, Any]:
+    """Return one campaign record without the baseline that tracks the repository."""
+    value = copy.deepcopy(campaign)
+    baseline = value.get("model_baseline")
+    if isinstance(baseline, dict):
+        baseline.pop("observed", None)
+    return value
 
 
 def _all_evidence_references(campaign: dict[str, Any]) -> list[tuple[str, str]]:

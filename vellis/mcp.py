@@ -31,6 +31,17 @@ must arrive as a JSON number. The obvious automatic rendering turns every one in
 string, and because the model permits only complete-object upserts, an agent that read an
 object and wrote it back whole would be rewriting its owner's numbers into text — quietly,
 and into canonical state. Everything else follows the ordinary shape of the value.
+
+The input schemas are made self-contained here for the mirror-image reason. A stored
+property holds any JSON value, so every request type that carries one is recursive, and a
+recursive schema cannot be inlined — it is published as a reference into a definitions
+block instead. A client that does not resolve those references sees an untyped parameter
+and sends the whole request as text, which the tool then refuses as malformed: the three
+tools that carry owner values become the three tools nobody can call. The model requires
+every tool to stay usable through core discovery and invocation without any additional
+capability, so the recursion is replaced by the permissive value it stands for and
+everything else is inlined. This changes only what a caller is told a request looks like,
+never what the system accepts; validation still runs against the real types.
 """
 
 from __future__ import annotations
@@ -45,6 +56,7 @@ from typing import cast
 
 from fastmcp import FastMCP
 from fastmcp.tools.base import ToolResult
+from fastmcp.utilities.json_schema import dereference_refs
 
 from vellis.activity import HistoryQuery, HistoryResult
 from vellis.canonical import Provenance
@@ -116,7 +128,6 @@ def build_server(system: RTGSystem, *, name: str = "vellis") -> FastMCP:
     """
     server: FastMCP = FastMCP(name)
 
-    @server.tool
     def rtg_definition_summary(
         request: DefinitionSummaryRequest,
     ) -> DefinitionSummaryResult:
@@ -130,7 +141,6 @@ def build_server(system: RTGSystem, *, name: str = "vellis") -> FastMCP:
             ),
         )
 
-    @server.tool
     def rtg_definition_inspect(
         request: DefinitionInspectionRequest,
     ) -> DefinitionInspectionResult:
@@ -145,7 +155,6 @@ def build_server(system: RTGSystem, *, name: str = "vellis") -> FastMCP:
             ),
         )
 
-    @server.tool
     def rtg_definition_delta() -> DefinitionDeltaResult:
         """Retrieve proposal identities, staged counts, and assessment status, or absence."""
         return _result(
@@ -157,9 +166,14 @@ def build_server(system: RTGSystem, *, name: str = "vellis") -> FastMCP:
             ),
         )
 
-    @server.tool
     def rtg_query(query: GraphQuery) -> GraphQueryResult:
-        """Query selected current, prospective, or historical graph meaning with one bound."""
+        """Query current, prospective, or historical graph meaning, bounded, with optional totals.
+
+        Rows carry exactly the projections asked for, and identical projected tuples occur
+        once. Two objects with the same projected values are therefore one row, so adding
+        up a projection does not total the objects — use an aggregation for that, or
+        project something unique to each object alongside the values.
+        """
         return _result(
             system.query_graph(query, provenance=_agent()),
             lambda reason: GraphQueryResult(
@@ -170,7 +184,6 @@ def build_server(system: RTGSystem, *, name: str = "vellis") -> FastMCP:
             ),
         )
 
-    @server.tool
     def rtg_change(request: GraphChangeRequest) -> RevisionedOutcome:
         """Validate explicit upserts and removals, then atomically commit an effective change."""
         return _result(
@@ -178,7 +191,6 @@ def build_server(system: RTGSystem, *, name: str = "vellis") -> FastMCP:
             _unreturnable_outcome,
         )
 
-    @server.tool
     def rtg_set_definition_delta(request: SetDefinitionDeltaRequest) -> DefinitionDeltaResult:
         """Apply bounded keyed definition edits to the sole proposal."""
         return _result(
@@ -190,7 +202,6 @@ def build_server(system: RTGSystem, *, name: str = "vellis") -> FastMCP:
             ),
         )
 
-    @server.tool
     def rtg_activate_definition_delta(
         request: ActivateDefinitionDeltaRequest,
     ) -> RevisionedOutcome:
@@ -200,7 +211,6 @@ def build_server(system: RTGSystem, *, name: str = "vellis") -> FastMCP:
             _unreturnable_outcome,
         )
 
-    @server.tool
     def rtg_discard_definition_delta() -> RevisionedOutcome:
         """Discard the sole proposal atomically or report normal absence."""
         return _result(
@@ -208,7 +218,6 @@ def build_server(system: RTGSystem, *, name: str = "vellis") -> FastMCP:
             _unreturnable_outcome,
         )
 
-    @server.tool
     def rtg_check(request: ValidationRequest) -> ValidationReport:
         """Create or page one complete SQLite-backed conformance assessment."""
         return _result(
@@ -220,7 +229,6 @@ def build_server(system: RTGSystem, *, name: str = "vellis") -> FastMCP:
             ),
         )
 
-    @server.tool
     def rtg_history(query: HistoryQuery) -> HistoryResult:
         """Return one complete bounded canonical or activity history-entry interval."""
         return _result(
@@ -233,7 +241,119 @@ def build_server(system: RTGSystem, *, name: str = "vellis") -> FastMCP:
             ),
         )
 
+    # Registered explicitly rather than by decorator so each published schema can be made
+    # self-contained before any client sees it. The order is the model's order, and the
+    # names come from the functions, so this list and TOOL_NAMES say the same thing.
+    for function in (
+        rtg_definition_summary,
+        rtg_definition_inspect,
+        rtg_definition_delta,
+        rtg_query,
+        rtg_change,
+        rtg_set_definition_delta,
+        rtg_activate_definition_delta,
+        rtg_discard_definition_delta,
+        rtg_check,
+        rtg_history,
+    ):
+        registered = server.add_tool(function)
+        registered.parameters = _self_contained(registered.parameters)
+
     return server
+
+
+# What a recursive value stands for once it can no longer stand for itself. The real
+# constraint on a stored value is the owner's own definitions, which no tool schema could
+# express anyway; this says the true and useful thing instead of pretending to a bound.
+_ANY_JSON_SCHEMA: dict[str, object] = {
+    "description": "Any JSON value: an object, array, string, number, boolean, or null."
+}
+
+
+def _self_contained(schema: dict[str, object]) -> dict[str, object]:
+    """Return one input schema carrying no references a client must resolve.
+
+    Recursive definitions are replaced by the permissive value they stand for, because
+    they are the reason the rest cannot be inlined. Everything else is inlined as it
+    stands. A schema that was already self-contained comes back unchanged.
+    """
+    definitions = schema.get("$defs")
+    if not isinstance(definitions, dict) or not definitions:
+        return schema
+    recursive = _recursive_definitions(definitions)
+    if recursive:
+        substituted = cast("dict[str, object]", _without_references(schema, recursive))
+        remaining = cast("Mapping[str, object]", substituted.get("$defs", {}))
+        # The surviving definitions are the substituted ones. Taking them from the
+        # original would put back the very references this just removed, and leave the
+        # schema pointing at definitions that are no longer there.
+        schema = {
+            **substituted,
+            "$defs": {
+                name: definition for name, definition in remaining.items() if name not in recursive
+            },
+        }
+    return dereference_refs(schema)
+
+
+def _recursive_definitions(definitions: Mapping[str, object]) -> frozenset[str]:
+    """Return the definitions that can be reached from themselves.
+
+    Only these actually block inlining. Replacing every reference would throw away the
+    typed meaning of definitions that are perfectly capable of being written out.
+    """
+    reachable = {name: _referenced_names(definition) for name, definition in definitions.items()}
+    recursive: set[str] = set()
+    for start in reachable:
+        seen: set[str] = set()
+        pending = [start]
+        while pending:
+            for name in reachable.get(pending.pop(), frozenset()):
+                if name == start:
+                    recursive.add(start)
+                    pending.clear()
+                    break
+                if name not in seen:
+                    seen.add(name)
+                    pending.append(name)
+    return frozenset(recursive)
+
+
+def _referenced_names(node: object) -> frozenset[str]:
+    """Return every local definition name one schema fragment references."""
+    if isinstance(node, Mapping):
+        found: set[str] = set()
+        reference = node.get("$ref")
+        if isinstance(reference, str) and reference.startswith("#/$defs/"):
+            found.add(reference.removeprefix("#/$defs/"))
+        for member in node.values():
+            found |= _referenced_names(member)
+        return frozenset(found)
+    if isinstance(node, (list, tuple)):
+        found = set()
+        for member in node:
+            found |= _referenced_names(member)
+        return frozenset(found)
+    return frozenset()
+
+
+def _without_references(node: object, names: frozenset[str]) -> object:
+    """Replace references to the named definitions with the permissive value.
+
+    Sibling keywords survive the substitution. Pydantic writes a description or a default
+    alongside a reference, and dropping those would lose meaning the caller can use.
+    """
+    if isinstance(node, Mapping):
+        reference = node.get("$ref")
+        if isinstance(reference, str) and reference.removeprefix("#/$defs/") in names:
+            return {
+                **_ANY_JSON_SCHEMA,
+                **{key: value for key, value in node.items() if key != "$ref"},
+            }
+        return {key: _without_references(value, names) for key, value in node.items()}
+    if isinstance(node, (list, tuple)):
+        return [_without_references(member, names) for member in node]
+    return node
 
 
 def _wire(value: object) -> object:

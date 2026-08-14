@@ -267,10 +267,19 @@ def relationship_identity(constraint: RelationshipConstraint) -> tuple[object, .
 
 
 def relationship_label(constraint: RelationshipConstraint) -> str:
-    """Return a stable, readable identity for use in findings."""
+    """Return a stable, readable identity for use in findings.
+
+    An end is named by the word the model uses for it. Rendering the enumeration member
+    itself would put a realization detail into a finding an owner reads, beside type keys
+    that are already their modeled names.
+    """
     identity = relationship_identity(constraint)
     parts = [
-        "{" + ",".join(sorted(part)) + "}" if isinstance(part, frozenset) else str(part)
+        "{" + ",".join(sorted(part)) + "}"
+        if isinstance(part, frozenset)
+        else part.value
+        if isinstance(part, Enum)
+        else str(part)
         for part in identity[1:]
     ]
     return f"{identity[0]}:" + "|".join(parts)

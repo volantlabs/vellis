@@ -115,7 +115,7 @@ from vellis.outcomes import (
 from vellis.validation import assess_object_neighborhood, validate_property_value
 
 if TYPE_CHECKING:
-    from vellis.query import GraphQuery, GraphQueryResult
+    from vellis.query import AggregateBinding, GraphQuery, GraphQueryResult
 
 __all__ = [
     "AlreadyInitializedError",
@@ -651,6 +651,16 @@ def _property_comparison_sql(
         "greaterThan": ">",
         "greaterThanOrEqual": ">=",
     }
+    if kind == JsonKind.STRING.value:
+        # Stored text is UTF-8 and the column carries no collation, so SQLite's BINARY
+        # comparison is byte-wise — and UTF-8 byte order is code-point order, which is
+        # what the model asks for and what the in-memory path does. A collation here
+        # would silently make the two realizations disagree.
+        parameters.append(text)
+        return (
+            f"({alias}.json_kind = '{JsonKind.STRING.value}' AND "
+            f"{alias}.text_value {operators[operation]} ?)"
+        )
     parameters.append(number)
     return (
         f"({alias}.json_kind = '{JsonKind.NUMBER.value}' AND "
@@ -900,7 +910,7 @@ def _chunks(values: set[str], size: int = 400) -> Iterator[tuple[str, ...]]:
 
 def _query_type_keys(query: GraphQuery) -> set[str]:
     return {
-        *(group.anchor_type for group in query.anchor_groups),
+        *(key for group in query.anchor_groups for key in group.anchor_types),
         *(condition.associated_data_type for condition in query.data_conditions),
         *(required.link_type for required in query.required_links),
     }
@@ -954,6 +964,9 @@ def _projected_selector_names(query: GraphQuery) -> set[str]:
         elif isinstance(projection, LinkProjection):
             link = required[projection.required_link]
             names.update((link.source_group, link.target_group))
+    # An aggregated condition decides the answer as surely as a projected one, so its
+    # component may not be pruned to a mere existence check.
+    names.update(aggregation.data_condition for aggregation in query.aggregations)
     return names
 
 
@@ -996,6 +1009,11 @@ def _component_query(query: GraphQuery, names: set[str], *, projections: bool) -
         ),
         required_links=links,
         return_shape=ReturnShape(selected),
+        aggregations=tuple(
+            aggregation
+            for aggregation in (query.aggregations if projections else ())
+            if aggregation.data_condition in names
+        ),
         maximum_rows=query.maximum_rows,
         historical_selection=query.historical_selection,
     )
@@ -1109,6 +1127,22 @@ class CanonicalStore:
         return self._path
 
     def close(self) -> None:
+        """Fold the write-ahead log back into the store file, then let go of it.
+
+        Committed state otherwise lives partly in a sidecar until SQLite decides to move
+        it, and an owner who copies their memory file — the obvious way to keep a copy of
+        something that matters — gets a coherent state from some earlier moment with
+        nothing to indicate it is not today's. Checkpointing on the way out means a memory
+        this process closed cleanly is wholly in the file it is named after. It cannot help
+        a copy taken while the memory is open, which is a thing to say in the guidance
+        rather than a thing to solve here.
+        """
+        try:
+            self._connection.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+        except sqlite3.Error:
+            # Closing is not the moment to fail. A checkpoint that could not run leaves
+            # the log in place, which is exactly where it already was.
+            pass
         self._connection.close()
 
     def _ensure_schema(self) -> None:
@@ -1429,8 +1463,10 @@ class CanonicalStore:
             alias = f"a{index}"
             selector_alias[group.name] = alias
             tables.append(f"{graph_relation} AS {alias}")
-            predicates.extend((f"{alias}.object_kind = ?", f"{alias}.type_key = ?"))
-            where_parameters.extend((ObjectKind.ANCHOR.value, group.anchor_type))
+            placeholders = ", ".join("?" for _ in group.anchor_types)
+            predicates.extend((f"{alias}.object_kind = ?", f"{alias}.type_key IN ({placeholders})"))
+            where_parameters.append(ObjectKind.ANCHOR.value)
+            where_parameters.extend(group.anchor_types)
             if group.uuid_filter is not None:
                 placeholders = ", ".join("?" for _ in group.uuid_filter.uuids)
                 predicates.append(f"{alias}.uuid IN ({placeholders})")
@@ -1494,6 +1530,39 @@ class CanonicalStore:
                 placeholders = ", ".join("?" for _ in required.uuid_filter.uuids)
                 predicates.append(f"{alias}.uuid IN ({placeholders})")
                 where_parameters.extend(required.uuid_filter.uuids)
+
+        aggregates: tuple[AggregateBinding, ...] = ()
+        if query.aggregations and not existence_only:
+            aggregated = self._aggregate_bindings_unlocked(
+                query,
+                definitions,
+                selector_alias,
+                prefix=prefix,
+                prefix_parameters=prefix_parameters,
+                tables=tables,
+                predicates=predicates,
+                where_parameters=where_parameters,
+            )
+            if isinstance(aggregated, ValidationFinding):
+                return GraphQueryResult(
+                    status=OperationStatus.REJECTED,
+                    summary=(
+                        f"the aggregated selection has more than {query.maximum_rows} matches; "
+                        "it is refused whole rather than aggregated in part"
+                    ),
+                    findings=(aggregated,),
+                    query=response_query,
+                )
+            aggregates = aggregated
+            if not query.return_shape.projections:
+                # Nothing was projected, so there is no row query to run at all.
+                return GraphQueryResult(
+                    status=OperationStatus.ACCEPTED,
+                    summary=f"{len(aggregates)} aggregates at revision {revision}",
+                    query=response_query,
+                    evaluated_revision=revision,
+                    aggregates=aggregates,
+                )
 
         selected: list[str] = ["1"] if existence_only else []
         column_shapes: list[tuple[str, ReturnProjection]] = []
@@ -3489,6 +3558,120 @@ class CanonicalStore:
                         implicated_objects=(uuid,),
                     )
 
+    def _aggregate_bindings_unlocked(
+        self,
+        query: GraphQuery,
+        definitions: GraphDefinitionSet,
+        selector_alias: dict[str, str],
+        *,
+        prefix: str,
+        prefix_parameters: list[object],
+        tables: list[str],
+        predicates: list[str],
+        where_parameters: list[object],
+    ) -> tuple[AggregateBinding, ...] | ValidationFinding:
+        """Answer each aggregation from its own bounded selection.
+
+        One statement per aggregated condition, over the same joins the projected query
+        would use, selecting the matching objects by UUID. UUID rather than value identity
+        because two objects may legitimately carry identical content, and counting them
+        once would answer a question nobody asked.
+
+        The caller's maximum bounds these selections exactly as it bounds a projected
+        result: the statement stops one past it, and a larger selection is refused rather
+        than aggregated in part.
+        """
+        from vellis.json_value import JsonValue, json_kind
+        from vellis.query import AggregateBinding, AggregationOperator
+
+        conditions = {condition.name: condition for condition in query.data_conditions}
+        bindings: list[AggregateBinding] = []
+        for aggregation in query.aggregations:
+            alias = selector_alias[aggregation.data_condition]
+            columns = [f"{alias}.uuid"]
+            select_parameters: list[object] = []
+            if aggregation.operator is not AggregationOperator.COUNT:
+                for column in ("json_kind", "boolean_value", "number_value", "text_value"):
+                    columns.append(
+                        f"(SELECT ap.{column} FROM object_property AS ap"
+                        f" WHERE ap.object_value_id = {alias}.object_value_id"
+                        " AND ap.name = ? LIMIT 1)"
+                    )
+                    select_parameters.append(aggregation.property_name)
+            sql = (
+                prefix
+                + "SELECT DISTINCT "
+                + ", ".join(columns)
+                + " FROM "
+                + ", ".join(tables)
+                + " WHERE "
+                + " AND ".join(predicates)
+                + " LIMIT ?"
+            )
+            parameters = [
+                *prefix_parameters,
+                *select_parameters,
+                *where_parameters,
+                query.maximum_rows + 1,
+            ]
+            matched = self._connection.execute(sql, tuple(parameters)).fetchmany(
+                query.maximum_rows + 1
+            )
+            if len(matched) > query.maximum_rows:
+                return ValidationFinding(
+                    summary=(
+                        f"the matches of '{aggregation.data_condition}' exceed the maximum "
+                        f"of {query.maximum_rows}"
+                    )
+                )
+            if aggregation.operator is AggregationOperator.COUNT:
+                bindings.append(
+                    AggregateBinding(
+                        aggregation=aggregation.name, present=True, value=Decimal(len(matched))
+                    )
+                )
+                continue
+            condition = conditions[aggregation.data_condition]
+            data_type = definitions.associated_data_type(condition.associated_data_type)
+            declared = next(
+                (
+                    rule.json_kind
+                    for rule in (data_type.property_constraints if data_type else ())
+                    if rule.property_name == aggregation.property_name
+                ),
+                None,
+            )
+            values: list[JsonValue] = []
+            for row in matched:
+                stored = row[1:5]
+                if stored[0] is None:
+                    continue
+                value = json_storage_value(*stored)
+                # Only the declared kind takes part, so a graph that does not conform
+                # cannot make this invent an order between kinds.
+                if json_kind(value) is declared:
+                    values.append(value)
+            if not values:
+                bindings.append(AggregateBinding(aggregation=aggregation.name, present=False))
+                continue
+            if aggregation.operator is AggregationOperator.SUM:
+                total = Decimal(0)
+                for value in values:
+                    assert isinstance(value, Decimal)
+                    total += value
+                reduced: JsonValue = total
+            else:
+                ordered = sorted(values)  # pyright: ignore[reportArgumentType]
+                reduced = (
+                    ordered[0]
+                    if aggregation.operator is AggregationOperator.MINIMUM
+                    else ordered[-1]
+                )
+            bindings.append(
+                AggregateBinding(aggregation=aggregation.name, present=True, value=reduced)
+            )
+        return tuple(bindings)
+
     def _prepare_prospective_assessment_scope_unlocked(self, active_identity: str) -> None:
         """Derive the changed-definition and staged-graph invariant closure in SQL."""
         self._connection.execute(
@@ -3543,25 +3726,33 @@ class CanonicalStore:
         # Include every effective type definition that refers to an edited type. A
         # removed anchor type, for example, must revalidate untouched data/link types
         # that still permit it.
+        #
+        # Reached through the resolved current source rather than by definition-set
+        # identity. Once a proposal has been activated the active vocabulary is an overlay
+        # over a base set, so a type nobody has edited since still lives in the base and no
+        # row of it carries the active identity. Selecting by that identity finds nothing,
+        # and the removal that orphans it is reported as conforming — on every system past
+        # its first vocabulary change, which is every system that has been used.
         self._connection.execute(
             "INSERT OR IGNORE INTO assessment_definition_type"
-            " SELECT DISTINCT t.type_key FROM definition_type AS t"
+            " SELECT DISTINCT t.type_key FROM current_definition_type_source AS s"
+            " JOIN definition_type AS t ON t.definition_set_id = s.value_set_id"
+            " AND t.type_key = s.type_key"
             " JOIN definition_anchor_permission AS p"
             " ON p.definition_set_id = t.definition_set_id"
             " AND p.type_occurrence = t.occurrence"
-            " WHERE t.definition_set_id = ?"
-            " AND p.anchor_type_key IN (SELECT type_key FROM proposal_definition_type)"
+            " WHERE p.anchor_type_key IN (SELECT type_key FROM proposal_definition_type)"
             " AND NOT EXISTS (SELECT 1 FROM proposal_definition_type AS e"
             " WHERE e.type_key = t.type_key)"
-            " UNION SELECT DISTINCT t.type_key FROM definition_type AS t"
+            " UNION SELECT DISTINCT t.type_key FROM current_definition_type_source AS s"
+            " JOIN definition_type AS t ON t.definition_set_id = s.value_set_id"
+            " AND t.type_key = s.type_key"
             " JOIN definition_endpoint_permission AS p"
             " ON p.definition_set_id = t.definition_set_id"
             " AND p.type_occurrence = t.occurrence"
-            " WHERE t.definition_set_id = ?"
-            " AND p.type_key IN (SELECT type_key FROM proposal_definition_type)"
+            " WHERE p.type_key IN (SELECT type_key FROM proposal_definition_type)"
             " AND NOT EXISTS (SELECT 1 FROM proposal_definition_type AS e"
-            " WHERE e.type_key = t.type_key)",
-            (active_identity, active_identity),
+            " WHERE e.type_key = t.type_key)"
         )
         self._connection.execute(
             "INSERT OR IGNORE INTO assessment_definition_type"
@@ -3580,25 +3771,29 @@ class CanonicalStore:
             " WHERE e.operation = 'upsert'"
             " AND p.type_key IN (SELECT type_key FROM proposal_definition_type)"
         )
+        # Multiplicity rules are reached the same way, and for the same reason: a rule
+        # nobody has edited since an activation lives in the base set.
         self._connection.execute(
             "INSERT OR IGNORE INTO assessment_definition_relationship"
-            " SELECT DISTINCT r.natural_key FROM definition_multiplicity_rule AS r"
+            " SELECT DISTINCT r.natural_key"
+            " FROM current_definition_relationship_source AS s"
+            " JOIN definition_multiplicity_rule AS r"
+            " ON r.definition_set_id = s.value_set_id AND r.natural_key = s.natural_key"
             " JOIN definition_multiplicity_participant AS p"
             " ON p.definition_set_id = r.definition_set_id"
             " AND p.rule_occurrence = r.occurrence"
-            " WHERE r.definition_set_id = ?"
-            " AND p.type_key IN (SELECT type_key FROM proposal_definition_type)"
+            " WHERE p.type_key IN (SELECT type_key FROM proposal_definition_type)"
             " AND NOT EXISTS (SELECT 1 FROM proposal_definition_relationship AS e"
             " WHERE e.natural_key = r.natural_key)"
             " UNION SELECT DISTINCT r.natural_key"
-            " FROM definition_multiplicity_rule AS r"
-            " WHERE r.definition_set_id = ? AND r.link_type_key IN"
-            " (SELECT type_key FROM proposal_definition_type)"
+            " FROM current_definition_relationship_source AS s"
+            " JOIN definition_multiplicity_rule AS r"
+            " ON r.definition_set_id = s.value_set_id AND r.natural_key = s.natural_key"
+            " WHERE r.link_type_key IN (SELECT type_key FROM proposal_definition_type)"
             " AND NOT EXISTS (SELECT 1 FROM proposal_definition_relationship AS e"
             " WHERE e.natural_key = r.natural_key)"
             " UNION SELECT natural_key FROM proposal_definition_relationship"
-            " WHERE operation = 'upsert'",
-            (active_identity, active_identity),
+            " WHERE operation = 'upsert'"
         )
         self._connection.execute(
             "INSERT OR IGNORE INTO assessment_definition_type"
@@ -4345,23 +4540,38 @@ class CanonicalStore:
                     " WHERE identity = ?",
                     (assessment_id,),
                 ).fetchone()
-                if assessed is None or (
-                    int(assessed[0]) != revision
-                    or str(assessed[1]) != proposed
-                    or str(assessed[2]) != overlay
-                    or not bool(assessed[3])
-                ):
+                # Which of these it is decides what the caller does next: assess again,
+                # or repair the proposal first. One message covering all of them leaves
+                # them re-running an assessment to find out what they were already told.
+                reason: str | None = None
+                if assessed is None:
+                    reason = "no assessment with that identity was ever recorded"
+                elif not bool(assessed[3]):
+                    reason = (
+                        "that assessment found the proposal nonconforming; repair the "
+                        "proposal and assess it again"
+                    )
+                elif str(assessed[1]) != proposed:
+                    reason = (
+                        "the proposed definitions changed after that assessment; assess "
+                        "the current proposal again"
+                    )
+                elif str(assessed[2]) != overlay:
+                    reason = (
+                        "the staged graph work changed after that assessment; assess the "
+                        "current proposal again"
+                    )
+                elif int(assessed[0]) != revision:
+                    reason = (
+                        f"that assessment evaluated revision {int(assessed[0])} and the "
+                        f"current revision is {revision}; assess the current proposal again"
+                    )
+                if reason is not None:
                     self._connection.execute("ROLLBACK")
                     return RevisionedOutcome(
                         OperationStatus.REJECTED,
                         "activation requires the exact current conforming proposal assessment",
-                        (
-                            ValidationFinding(
-                                summary=(
-                                    "the selected assessment is missing, stale, or nonconforming"
-                                )
-                            ),
-                        ),
+                        (ValidationFinding(summary=reason),),
                     )
                 conflict = self._connection.execute(
                     "SELECT p.uuid FROM proposal_entry AS p"

@@ -64,7 +64,7 @@ class _TestGraphIndex:
         return tuple(
             value
             for value in self.anchors.values()
-            if value.type_key == group.anchor_type
+            if value.type_key in group.anchor_types
             and (permitted is None or value.uuid in permitted)
         )
 

@@ -44,6 +44,27 @@ package VellisVerification {
              * revision. Reject a comparison incompatible with its active property
              * definition, and distinguish an omitted property from a present null
              * when applying equality and inequality.
+             * Select one anchor group naming several active anchor types and show
+             * it returns the anchors of each, identically to the union of the
+             * per-type queries it replaces, and reject a group naming a type that
+             * is not active.
+             * Count, sum, minimise, and maximise a data condition's matches and
+             * show each answers over every match rather than over distinct
+             * projected tuples, including a population whose distinct values
+             * differ from its matches. Show a count of zero where nothing matches
+             * and an absent sum, minimum, and maximum where no match carries the
+             * property. Hold an aggregating query's maximum below its matching
+             * population and show it is refused whole exactly as a projected
+             * result is. Reject an aggregation whose property its condition does
+             * not define, whose operator cannot sum or order that property's
+             * kind, or which omits a property its operator requires.
+             * Order a number-valued property by exact mathematical value and a
+             * string-valued property by exact Unicode code-point sequence,
+             * including a value whose code-point order differs from its order
+             * under case folding or locale collation. Reject an ordered
+             * comparison of a null-, Boolean-, array-, or object-valued property,
+             * and one whose expected value is of a different JSON kind from the
+             * property.
              * Show each row is one jointly satisfying assignment with exactly one
              * binding per requested projection, including an absent-valued binding
              * only for a projected missing optional property, present-valued
@@ -533,7 +554,9 @@ package VellisVerification {
              * the exact active expression. Change only its text and show a
              * meaningful definition change even when the expressions recognize
              * the same language. Confirm query comparisons remain the existing
-             * closed set and ordered comparisons remain number-only.
+             * closed set, and that changing or removing a pattern moves no
+             * ordered string comparison result, so ordering follows the stored
+             * values rather than the pattern describing them.
              */
             verify VellisRequirements::stringPatternValidation;
         }

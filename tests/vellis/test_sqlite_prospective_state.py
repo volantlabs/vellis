@@ -88,14 +88,14 @@ def test_prospective_overlay_isolated_queryable_and_activates_atomically(tmp_pat
 
         current = system.query_graph(
             GraphQuery(
-                (AnchorGroup("people", "person"),),
+                (AnchorGroup("people", ("person",)),),
                 ReturnShape((AnchorProjection("person-result", "people"),)),
                 2,
             )
         )
         prospective = system.query_graph(
             GraphQuery(
-                (AnchorGroup("teams", "team"),),
+                (AnchorGroup("teams", ("team",)),),
                 ReturnShape((AnchorProjection("team-result", "teams"),)),
                 2,
                 state_scope=EvaluatedStateScope.PROSPECTIVE,
@@ -1149,7 +1149,7 @@ def test_query_and_inspection_reject_two_historical_selector_channels(tmp_path: 
     system = _system(tmp_path)
     try:
         query = GraphQuery(
-            anchor_groups=(AnchorGroup("people", "person"),),
+            anchor_groups=(AnchorGroup("people", ("person",)),),
             return_shape=ReturnShape((AnchorProjection("person", "people"),)),
             maximum_rows=10,
             historical_selection=RevisionSelection(0),

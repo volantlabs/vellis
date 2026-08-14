@@ -497,12 +497,19 @@ package RTG {
     }
 
     item def 'Anchor Group' :> 'Endpoint Group' {
-        attribute anchorType : 'Type Key';
+        attribute anchorTypes [1..*] : 'Type Key';
         item uuidFilter [0..1] : 'Anchor UUID Filter';
         doc /*
-         * A named anchor candidate set of exactly one type in the definitions
-         * governing the evaluated state. An
-         * absent UUID filter considers all anchors of that type.
+         * A named anchor candidate set of one or more types in the definitions
+         * governing the evaluated state. An anchor belongs to the set when its
+         * type is any of the named ones, so one group can ask about work that
+         * takes several shapes without the caller issuing a query for each. The
+         * named types are unordered and each is named once; every one of them
+         * must be an active anchor type. Where a group takes part in a required
+         * link, every type it names must be permitted in the endpoint role it
+         * plays there, so a link can never quietly mean less than the group says.
+         * An
+         * absent UUID filter considers all anchors of those types.
          */
     }
 
@@ -528,8 +535,13 @@ package RTG {
          * the definitions governing the evaluated state remains authoritative for JSON kind, shape,
          * permitted range, and stored-value pattern validation. Equal and
          * notEqual compare lossless JSON values;
-         * ordered comparisons are valid only for numberValue properties. Other
-         * combinations are rejected.
+         * ordered comparisons are valid for numberValue properties, compared by
+         * exact mathematical value, and for stringValue properties, compared by
+         * exact Unicode code-point sequence without normalization, which is the
+         * same basis equality already uses. Ordered comparison of a
+         * nullValue, booleanValue, arrayValue, or objectValue property, and any
+         * ordered comparison whose expected value is of a different JSON kind
+         * from the property, are rejected.
          */
         attribute propertyName : ScalarValues::String;
         attribute comparison : 'Property Comparison';
@@ -580,11 +592,44 @@ package RTG {
          */
     }
 
+    enum def 'Aggregation Operator' {
+        enum count;
+        enum sum;
+        enum minimum;
+        enum maximum;
+    }
+
+    item def 'Query Aggregation' {
+        attribute name : 'Query Name';
+        attribute operator : 'Aggregation Operator';
+        ref item dataCondition : 'Associated Data Condition';
+        attribute propertyName [0..1] : ScalarValues::String;
+        doc /*
+         * One arithmetic answer about the matching objects of a named data
+         * condition, returned instead of the objects themselves.
+         *
+         * Count takes no property and counts matches. Sum, minimum, and maximum
+         * name a present property of the condition's type and read only the
+         * matches that carry it: sum requires a numberValue property; minimum
+         * and maximum accept numberValue or stringValue and order values exactly
+         * as an ordered comparison does. An operator naming no property where one
+         * is required, a property the condition's type does not define, or a
+         * property whose kind the operator cannot order, is rejected.
+         *
+         * Aggregation reads every match rather than the distinct projected
+         * tuples a return shape would produce, because the question is about the
+         * objects rather than about their distinct values. An aggregate and a
+         * naive projection of the same property may therefore legitimately
+         * disagree, and the aggregate is the one that answers "how much".
+         */
+    }
+
     item def 'Graph Query' {
         item anchorGroups [1..*] : 'Anchor Group';
         item requiredLinks [*] : 'Required Link';
         item dataConditions [*] : 'Associated Data Condition';
         item returnShape : 'Return Shape';
+        item aggregations [*] : 'Query Aggregation';
         item historicalSelection [0..1] : 'Historical State Selection';
         attribute stateScope : 'Evaluated State Scope' default = 'Evaluated State Scope'::current;
         attribute maximumRows : ScalarValues::Positive;
@@ -602,6 +647,14 @@ package RTG {
          * the definitions active at that selected state and reuse its exact
          * evaluated revision for this query. The positive maximum bounds a
          * complete result rather than requesting a page.
+         *
+         * A query states projections, aggregations, or both, and at least one of
+         * them. The positive maximum bounds the matching objects an aggregation
+         * reads exactly as it bounds a projected result: a selection larger than
+         * the maximum is refused whole whether the caller asked for the objects
+         * or only for arithmetic over them. Returning one number therefore never
+         * licenses reading an unbounded population, and the maximum keeps meaning
+         * the same work it means for any other query.
          */
     }
 
@@ -723,18 +776,32 @@ package RTG {
          */
     }
 
+    item def 'Aggregate Binding' {
+        ref item aggregation : 'Query Aggregation';
+        attribute value [0..1] : 'JSON Value';
+        doc /*
+         * One aggregation's answer. A count is always present and is zero when
+         * nothing matched. Sum, minimum, and maximum are absent when no match
+         * carried the named property, because no value is the honest answer to
+         * "the largest of none" and zero would be a different claim.
+         */
+    }
+
     item def 'Graph Query Result' :> 'Operation Outcome' {
         ref item query : 'Graph Query';
         attribute evaluatedRevision [0..1] : 'Revision Number';
         item rows [*] : 'Graph Query Row';
+        item aggregates [*] : 'Aggregate Binding';
         doc /*
          * Accepted results contain exactly the bindings requested by the
-         * referenced query's return shape and the evaluated revision. Rejected
-         * or failed queries contain no rows or evaluated revision. Invalid
+         * referenced query's return shape, one aggregate for each of its
+         * aggregations, and the evaluated revision. Rejected
+         * or failed queries contain no rows, aggregates, or evaluated revision. Invalid
          * queries contain findings and change no canonical state. A
          * result that would exceed maximumRows, or cannot be returned completely,
-         * is rejected whole and never truncated. The operation attempt may still
-         * produce observational activity.
+         * is rejected whole and never truncated; a selection exceeding it is
+         * refused for an aggregating query on the same terms. The operation
+         * attempt may still produce observational activity.
          */
     }
 

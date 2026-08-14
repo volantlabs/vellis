@@ -8,7 +8,13 @@ import pytest
 from fastmcp import Client
 
 from vellis.canonical import Provenance
-from vellis.definitions import AnchorTypeDefinition, GraphDefinitionSet
+from vellis.definitions import (
+    AnchorTypeDefinition,
+    AssociatedDataTypeDefinition,
+    GraphDefinitionSet,
+    PropertyConstraint,
+)
+from vellis.json_value import JsonKind
 from vellis.mcp import TOOL_NAMES, build_server
 from vellis.system import RTGSystem
 
@@ -41,6 +47,136 @@ async def test_exactly_the_ten_selected_tools_are_exposed(client: Client) -> Non
     )
 
 
+def _references(node: object) -> bool:
+    """Report whether one schema fragment defers meaning to a reference."""
+    if isinstance(node, dict):
+        return "$ref" in node or any(_references(member) for member in node.values())
+    if isinstance(node, list):
+        return any(_references(member) for member in node)
+    return False
+
+
+@pytest.mark.anyio
+async def test_published_input_schemas_carry_their_whole_meaning(client: Client) -> None:
+    """A caller reading discovery must learn what a request looks like.
+
+    The other tests here hand ``call_tool`` a dictionary, so they never consult a schema
+    and cannot notice one that says nothing. A client that resolves no references sees
+    exactly what this asserts: a request type, or an untyped blank it can only guess at.
+    Resolving references is an additional capability the contract does not permit
+    requiring, and a tool whose semantic input arrives blank is a tool nobody can call.
+    """
+    async with client:
+        tools = await client.list_tools()
+    for tool in tools:
+        schema = tool.input_schema
+        assert "$defs" not in schema, f"{tool.name} publishes a separate definitions block"
+        assert not _references(schema), f"{tool.name} publishes an unresolved reference"
+        for parameter, declared in schema.get("properties", {}).items():
+            assert declared.get("type") == "object", (
+                f"{tool.name} declares no object meaning for {parameter}"
+            )
+            assert declared.get("properties"), f"{tool.name} declares no members for {parameter}"
+
+
+@pytest.fixture
+def valued_client(tmp_path: Path) -> Iterator[Client]:
+    value = RTGSystem.open(tmp_path / "valued.sqlite3")
+    assert value.initialize_fresh(
+        GraphDefinitionSet(
+            anchor_types=(AnchorTypeDefinition("person", "A person."),),
+            associated_data_types=(
+                AssociatedDataTypeDefinition(
+                    "person.stats",
+                    ("person",),
+                    (
+                        PropertyConstraint("count", False, JsonKind.NUMBER, "A count."),
+                        PropertyConstraint("flag", False, JsonKind.BOOLEAN, "A flag."),
+                        PropertyConstraint("blob", False, JsonKind.OBJECT, "An object."),
+                        PropertyConstraint("list", False, JsonKind.ARRAY, "An array."),
+                    ),
+                    "Stats.",
+                ),
+            ),
+        ),
+        provenance=Provenance("owner"),
+        initialization_summary="fresh",
+    ).accepted
+    yield Client(build_server(value))
+    value.close()
+
+
+@pytest.mark.anyio
+async def test_a_stored_value_keeps_the_json_kind_the_caller_sent(valued_client: Client) -> None:
+    """One and zero are numbers, and stay numbers wherever they sit.
+
+    A Boolean read leniently accepts both, so a value arriving through a tool can have its
+    kind decided by how it was parsed rather than by what it is. Where a declaration names
+    the kind that surfaces as a refusal an owner can see; inside an array or an object no
+    declaration reaches the member, and the substituted Boolean is committed silently. This
+    sends every kind, including the two numbers that collide, and reads them back.
+    """
+    sent: dict[str, object] = {
+        "count": 1,
+        "flag": True,
+        "blob": {"a": 1, "b": 0, "c": 2},
+        "list": [0, 1, 2, True, False],
+    }
+    async with valued_client as client:
+        changed = await client.call_tool(
+            "rtg_change",
+            {
+                "request": {
+                    "target": "active",
+                    "change": {
+                        "anchor_upserts": [
+                            {"uuid": "p-1", "type_key": "person", "display_name": "Ada"}
+                        ],
+                        "associated_data_upserts": [
+                            {
+                                "uuid": "d-1",
+                                "type_key": "person.stats",
+                                "anchor_uuids": ["p-1"],
+                                "properties": sent,
+                            }
+                        ],
+                    },
+                }
+            },
+        )
+        queried = await client.call_tool(
+            "rtg_query",
+            {
+                "query": {
+                    "anchor_groups": [{"name": "people", "anchor_types": ["person"]}],
+                    "data_conditions": [
+                        {
+                            "name": "stats",
+                            "anchor_group": "people",
+                            "associated_data_type": "person.stats",
+                        }
+                    ],
+                    "return_shape": {
+                        "projections": [
+                            {"name": name, "data_condition": "stats", "property_name": name}
+                            for name in sent
+                        ]
+                    },
+                    "maximum_rows": 2,
+                }
+            },
+        )
+    assert changed.structured_content is not None
+    assert changed.structured_content["status"] == "accepted", changed.structured_content
+    assert queried.structured_content is not None
+    returned = {
+        each["projection"]: each["value"]
+        for each in queried.structured_content["rows"][0]["properties"]
+    }
+    # Compared as JSON text so that True and 1 cannot pass for one another.
+    assert json.dumps(returned, sort_keys=True) == json.dumps(sent, sort_keys=True)
+
+
 @pytest.mark.anyio
 async def test_typed_current_change_and_bounded_query_round_trip(client: Client) -> None:
     async with client:
@@ -61,7 +197,7 @@ async def test_typed_current_change_and_bounded_query_round_trip(client: Client)
             "rtg_query",
             {
                 "query": {
-                    "anchor_groups": [{"name": "people", "anchor_type": "person"}],
+                    "anchor_groups": [{"name": "people", "anchor_types": ["person"]}],
                     "return_shape": {
                         "projections": [
                             {

@@ -49,7 +49,7 @@ def system(tmp_path: Path):
 
 def _anyone() -> GraphQuery:
     return GraphQuery(
-        anchor_groups=(AnchorGroup(name="people", anchor_type="person"),),
+        anchor_groups=(AnchorGroup(name="people", anchor_types=("person",)),),
         return_shape=ReturnShape(
             projections=(AnchorProjection(name="who", anchor_group="people"),)
         ),
@@ -86,7 +86,7 @@ def test_a_validation_a_rejection_and_a_failure_are_each_recorded(system: RTGSys
     system.check(provenance=_owner())
     refused = system.query_graph(
         GraphQuery(
-            anchor_groups=(AnchorGroup(name="people", anchor_type="unheard-of"),),
+            anchor_groups=(AnchorGroup(name="people", anchor_types=("unheard-of",)),),
             return_shape=ReturnShape(
                 projections=(AnchorProjection(name="who", anchor_group="people"),)
             ),
@@ -692,3 +692,30 @@ def test_overbroad_history_decodes_only_enough_records_to_reject(system: RTGSyst
 
     assert canonical.status is OperationStatus.REJECTED
     assert system.store.record_reads == 2
+
+
+def test_a_canonical_entry_says_what_happened_in_the_model_s_own_words(
+    system: RTGSystem,
+) -> None:
+    """An owner reading their history should learn what a transition was.
+
+    The row carries a transition kind, and the kind is modeled meaning. Handing back the
+    stored key names a realization detail; saying nothing at all leaves the owner to guess
+    from a revision number. Neither reads the replay-sufficient change, and neither should.
+    """
+    assert system.apply_graph_change(
+        GraphChange(anchor_upserts=(ADA,)), provenance=_owner()
+    ).accepted
+
+    result = system.history(
+        HistoryQuery(kind=HistoryKind.CANONICAL, maximum_records=10), provenance=_owner()
+    )
+
+    assert result.status is OperationStatus.ACCEPTED
+    mutation = next(
+        entry
+        for entry in result.canonical_entries
+        if entry.transition_kind is TransitionKind.GRAPH_MUTATION
+    )
+    assert mutation.summary == "the graph changed, reaching revision 1"
+    assert TransitionKind.GRAPH_MUTATION.value not in mutation.summary

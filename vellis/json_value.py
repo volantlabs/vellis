@@ -16,20 +16,29 @@ from decimal import Decimal, InvalidOperation
 from enum import Enum
 from typing import Annotated
 
-from pydantic import WithJsonSchema
+from pydantic import PlainValidator, WithJsonSchema
 
-# A stored number is a JSON number. The default schema for an exact decimal describes a
-# string, which would tell an agent the wrong thing about what it is holding and what it
-# may write back; the annotation says what the model says. Only the published shape is
-# affected — every comparison and every stored form still works in exact decimal.
-type JsonValue = (
-    None
-    | bool
-    | Annotated[Decimal, WithJsonSchema({"type": "number"})]
-    | str
-    | list[JsonValue]
-    | dict[str, JsonValue]
-)
+# Which JSON kind a value has is meaning here, not a detail of how it was parsed, so
+# reading one is this module's decision and not a union heuristic's. Left to the union, a
+# Boolean is tried before an exact decimal and read leniently accepts the numbers one and
+# zero: an owner who stores 1 gets back true. Where a declaration says the property is a
+# number that surfaces as a refusal, but inside an array or object no declaration reaches
+# the member, so the substitution is silent and canonical. Field-level strictness does not
+# repair it either, because a caller validating leniently overrides it. `normalize` already
+# reads a value exactly — Boolean before integer, and every number to exact decimal — so
+# validation goes through it and the union stands as the type it produces.
+#
+# The published shape says only that any JSON value belongs here. The default schema for an
+# exact decimal describes a string, which would tell an agent the wrong thing about what it
+# is holding and what it may write back, and the real constraint on a stored value is the
+# owner's own definitions, which this could not express in any case.
+type JsonValue = Annotated[
+    None | bool | Decimal | str | list[JsonValue] | dict[str, JsonValue],
+    PlainValidator(lambda value: normalize(value)),
+    WithJsonSchema(
+        {"description": "Any JSON value: an object, array, string, number, boolean, or null."}
+    ),
+]
 
 # Stored integers must satisfy abs(value) < 10 ** this exponent. The write-side validity
 # check and the decoder both use it, so the two directions describe exactly the same set

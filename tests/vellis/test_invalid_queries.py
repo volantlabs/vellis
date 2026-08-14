@@ -25,6 +25,7 @@ from vellis.graph import Anchor, AssociatedDataObject, Graph, Link, SystemMetada
 from vellis.json_value import normalize
 from vellis.outcomes import OperationStatus
 from vellis.query import (
+    AggregationOperator,
     AnchorGroup,
     AnchorProjection,
     AnchorUuidFilter,
@@ -36,6 +37,7 @@ from vellis.query import (
     LinkProjection,
     LinkUuidFilter,
     PropertyComparison,
+    QueryAggregation,
     RequiredLink,
     ReturnShape,
 )
@@ -78,7 +80,7 @@ def system(tmp_path: Path):
 
 
 def _people(**overrides: object) -> AnchorGroup:
-    return AnchorGroup(name="people", anchor_type="person", **overrides)  # pyright: ignore[reportArgumentType]
+    return AnchorGroup(name="people", anchor_types=("person",), **overrides)  # pyright: ignore[reportArgumentType]
 
 
 def _who(name: str = "who", group: str = "people") -> ReturnShape:
@@ -116,25 +118,25 @@ def _link(**overrides: object) -> RequiredLink:
     return RequiredLink(**fields)  # pyright: ignore[reportArgumentType]
 
 
-PROJECTS = AnchorGroup(name="projects", anchor_type="project")
+PROJECTS = AnchorGroup(name="projects", anchor_types=("project",))
 
 
 INVALID: tuple[tuple[str, GraphQuery, str], ...] = (
     (
         "empty-name",
-        _query(anchor_groups=(AnchorGroup(name="", anchor_type="person"),)),
+        _query(anchor_groups=(AnchorGroup(name="", anchor_types=("person",)),)),
         "empty query-local name",
     ),
     (
         "duplicate-name",
         _query(
-            anchor_groups=(_people(), AnchorGroup(name="people", anchor_type="project")),
+            anchor_groups=(_people(), AnchorGroup(name="people", anchor_types=("project",))),
         ),
         "used by more than one selector",
     ),
     (
         "unknown-anchor-type",
-        _query(anchor_groups=(AnchorGroup(name="people", anchor_type="unheard-of"),)),
+        _query(anchor_groups=(AnchorGroup(name="people", anchor_types=("unheard-of",)),)),
         "cannot be",
     ),
     (
@@ -219,21 +221,89 @@ INVALID: tuple[tuple[str, GraphQuery, str], ...] = (
         "does not define",
     ),
     (
-        "ordered-comparison-on-a-string",
+        "ordered-comparison-on-an-object",
         _query(
             data_conditions=(
                 _notes(
                     property_conditions=(
                         DataPropertyCondition(
-                            property_name="title",
+                            property_name="details",
                             comparison=PropertyComparison.GREATER_THAN,
-                            expected_value=normalize("a"),
+                            expected_value=normalize({"a": 1}),
                         ),
                     )
                 ),
             )
         ),
-        "ordered comparison is valid only for number-valued properties",
+        "ordered comparison is valid only for number-valued and string-valued properties",
+    ),
+    (
+        "aggregation-of-an-unknown-condition",
+        _query(
+            aggregations=(
+                QueryAggregation(
+                    name="total", operator=AggregationOperator.COUNT, data_condition="nowhere"
+                ),
+            )
+        ),
+        "not a data condition in this query",
+    ),
+    (
+        "aggregation-missing-its-property",
+        _query(
+            data_conditions=(_notes(),),
+            aggregations=(
+                QueryAggregation(
+                    name="total", operator=AggregationOperator.SUM, data_condition="notes"
+                ),
+            ),
+        ),
+        "names no property",
+    ),
+    (
+        "aggregation-of-an-undefined-property",
+        _query(
+            data_conditions=(_notes(),),
+            aggregations=(
+                QueryAggregation(
+                    name="total",
+                    operator=AggregationOperator.SUM,
+                    data_condition="notes",
+                    property_name="unheard-of",
+                ),
+            ),
+        ),
+        "does not define",
+    ),
+    (
+        "sum-of-a-string-property",
+        _query(
+            data_conditions=(_notes(),),
+            aggregations=(
+                QueryAggregation(
+                    name="total",
+                    operator=AggregationOperator.SUM,
+                    data_condition="notes",
+                    property_name="title",
+                ),
+            ),
+        ),
+        "applies only to",
+    ),
+    (
+        "maximum-of-an-object-property",
+        _query(
+            data_conditions=(_notes(),),
+            aggregations=(
+                QueryAggregation(
+                    name="biggest",
+                    operator=AggregationOperator.MAXIMUM,
+                    data_condition="notes",
+                    property_name="details",
+                ),
+            ),
+        ),
+        "applies only to",
     ),
     (
         "comparison-value-of-the-wrong-kind",
@@ -287,7 +357,7 @@ INVALID: tuple[tuple[str, GraphQuery, str], ...] = (
     ),
     (
         "incompatible-anchor-type",
-        _query(anchor_groups=(AnchorGroup(name="people", anchor_type="note"),)),
+        _query(anchor_groups=(AnchorGroup(name="people", anchor_types=("note",)),)),
         "which is not an active anchor type",
     ),
     (
