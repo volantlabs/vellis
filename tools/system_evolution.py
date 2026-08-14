@@ -291,7 +291,9 @@ def _approval_checkpoint_findings(record: dict[str, Any], *, root: Path) -> list
         if not isinstance(historical, dict):
             findings.append(f"accepted {label} approval checkpoint has no evolution record")
             continue
+        historical_subject: object
         if label == "evolution":
+            historical_subject = historical.get("evolution", {})
             historical_approval = historical.get("evolution", {}).get("approval", {})
             current_projection = {
                 "objective": record["evolution"]["objective"],
@@ -311,6 +313,7 @@ def _approval_checkpoint_findings(record: dict[str, Any], *, root: Path) -> list
                 (item for item in historical.get("work_items", []) if item.get("id") == item_id),
                 {},
             )
+            historical_subject = historical_item
             historical_approval = historical_item.get("approval", {})
             current_item = next(item for item in record["work_items"] if item["id"] == item_id)
             fields = (
@@ -328,7 +331,16 @@ def _approval_checkpoint_findings(record: dict[str, Any], *, root: Path) -> list
                 **{field: historical_item.get(field) for field in fields},
                 "reason": historical_approval.get("reason"),
             }
-        if historical_approval.get("status") != "accepted":
+        # The checkpoint has to show the decision was open, or already sealed. Requiring
+        # it to be already accepted has no base case: the first such record could only
+        # point at a commit that already contained it, so the accepted state was
+        # unreachable and no evolution ever recorded one. Pending is recordable, and
+        # still refuses a checkpoint where the question was never put.
+        if historical_approval.get("status") not in {"pending", "accepted"}:
+            findings.append(
+                f"accepted {label} approval names a checkpoint where it was not awaiting a decision"
+            )
+        elif not historical_subject:
             findings.append(f"accepted {label} approval is absent from its checkpoint")
         elif current_projection != historical_projection:
             findings.append(f"accepted {label} consequence differs from its approval checkpoint")

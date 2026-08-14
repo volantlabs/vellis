@@ -260,12 +260,13 @@ findings:
     consequence: The accepted approval state is unreachable. An owner's acceptance of a model change cannot be sealed durably, so a record that needs one stays pending however the work actually went, and no evolution in this repository's history has ever recorded one.
     authority_refs:
       - AGENTS.md
-    evidence_refs: []
-    disposition: open
+    evidence_refs:
+      - path:tests/test_system_evolution.py#test_an_accepted_approval_binds_to_a_checkpoint_that_had_the_decision_open
+    disposition: resolved
     owner_work_item_id: W003
-    implementation_status: not evaluated
+    implementation_status: conforming
     nearest_wrong_system: The workflow enforces owner acceptance rigorously and provides no way to record that it happened, so the rule is satisfied only by never using it.
-    compatibility_effect: Unresolved. Approvals recorded as pending today are not evidence that acceptance was withheld.
+    compatibility_effect: The accepted state becomes reachable. What a checkpoint must still show is that the decision was open and that its consequence has not changed since.
 decisions:
   - id: D001
     summary: Replace only self-reaching definitions with the permissive JSON value they stand for, then inline the rest, at the boundary that already owns the wire form.
@@ -396,6 +397,22 @@ decisions:
     implementation_status: conforming
     evidence_refs:
       - path:tests/vellis/test_historical_restore.py#test_the_owner_can_reach_restoration_from_the_command_line
+  - id: D008
+    summary: An accepted approval binds to a checkpoint where the decision was open or already sealed, and whose gated consequence matches, rather than to one that already recorded the acceptance.
+    authority_refs:
+      - AGENTS.md
+    alternatives:
+      - Drop the checkpoint requirement and record approvals in prose, which loses the only durable evidence of what was put up for decision.
+      - Allow an accepted approval with no checkpoint until a follow-up commit seals it, which leaves a window in which an unsealed acceptance validates.
+    reversible: true
+    owner_work_item_id: W003
+    evidence_intent:
+      - An acceptance can be recorded at all, against a checkpoint that shows the decision pending.
+      - A checkpoint where the subject needed no decision is refused.
+      - A consequence that changed since the checkpoint is refused.
+    implementation_status: conforming
+    evidence_refs:
+      - path:tests/test_system_evolution.py#test_an_accepted_approval_binds_to_a_checkpoint_that_had_the_decision_open
 work_items:
   - id: W001
     order: 1
@@ -476,7 +493,7 @@ work_items:
         remaining_work_item_ids: []
     approval:
       status: pending
-      reason: The owner accepted this in session; recording that acceptance durably is blocked by F015, so the record says pending rather than claiming a seal it does not have.
+      reason: Extending ordered comparison to strings changes accepted query meaning the model states deliberately in three places, so the owner decides before implementation relies on it.
       checkpoint: null
     nearest_wrong_system: An agent quietly relaxes ordered string comparison, and pattern validation silently acquires the ordering the model says it must not add.
     compatibility_effect: Unresolved until the owner selects an approach.

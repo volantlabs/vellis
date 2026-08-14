@@ -4,6 +4,7 @@ import copy
 from typing import Any, cast
 
 import pytest
+import yaml
 
 from tools import system_evolution
 
@@ -561,3 +562,50 @@ def test_out_of_scope_disposition_requires_evidence() -> None:
     findings = system_evolution.validate_record(record)
 
     assert "out-of-scope finding F001 has no disposition evidence" in findings
+
+
+def test_an_accepted_approval_binds_to_a_checkpoint_that_had_the_decision_open() -> None:
+    """Acceptance has to be recordable at all, and still has to mean something.
+
+    Requiring the checkpoint to already show the approval accepted has no base case: the
+    first such record could only point at a commit that already contained it. The state
+    was unreachable, and no evolution in this repository ever recorded one. What the
+    checkpoint can honestly carry is that the question was put, and that what was put has
+    not changed since — git cannot witness a person saying yes, and a prior 'accepted' was
+    only ever an earlier claim that they had.
+    """
+    record = copy.deepcopy(_record())
+    item = _root_work(record)
+    revision = system_evolution._git_text(system_evolution.ROOT, "rev-parse", "HEAD")  # noqa: SLF001
+    committed = yaml.safe_load(
+        system_evolution._git_text(  # noqa: SLF001
+            system_evolution.ROOT, "show", f"{revision}:system-evolution.yaml"
+        )
+    )
+    at_head = next(each for each in committed["work_items"] if each["id"] == item["id"])
+    # Mirror the committed consequence, so only the approval state is under test.
+    for field in ("label", "kind", "nearest_wrong_system", "compatibility_effect", "non_effects"):
+        item[field] = at_head[field]
+    item["approval"] = {
+        "status": "accepted",
+        "reason": at_head["approval"]["reason"],
+        "checkpoint": f"git:{revision}",
+    }
+
+    open_at_checkpoint = at_head["approval"]["status"] in {"pending", "accepted"}
+    findings = system_evolution.validate_record(record)  # type: ignore[arg-type]
+    unreachable = [each for each in findings if "absent from its checkpoint" in each]
+    if open_at_checkpoint:
+        assert not unreachable, findings
+    else:
+        # The committed item needed no decision, so claiming one against it is refused.
+        assert any("not awaiting a decision" in each for each in findings), findings
+
+    # Whatever the committed state, a changed consequence is still refused.
+    item["approval"]["status"] = "accepted"
+    item["nearest_wrong_system"] = "Something else entirely."
+    changed = system_evolution.validate_record(record)  # type: ignore[arg-type]
+    assert any(
+        "differs from its approval checkpoint" in each or "not awaiting a decision" in each
+        for each in changed
+    ), changed
