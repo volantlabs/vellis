@@ -70,11 +70,19 @@ cannot be distinguished or reconciled safely.
 ## Keep handoffs compact
 
 The result reports the work item, outcome, checkpoint, executed checks, review-pair and material-
-finding counts, elapsed time, optional usage measurements, and a pause or failure reason. A
-checkpointed result has at least one pair: the clean state-bound pair that authorized its checkpoint.
-It does
+finding counts, both final lens dispositions and reviewer identifiers, their shared review-state
+token, elapsed time, optional usage measurements, and a pause or failure reason. Validate a
+checkpointed result against the frozen token, recomputed current durable state, current campaign/work
+item, intended checkpoint, and reported passed checks before bookkeeping; internal agreement among result
+fields is not enough. A checkpointed result has at least one pair: the clean state-bound pair that
+authorized its checkpoint. It does
 not contain raw findings, review transcripts, implementation narratives, or hidden recovery notes.
 Those details belong in reproducible project artifacts or the work item's durable checkpoint.
+Reported check rows are compact assertions, not proof of execution or completeness; the manager
+still runs the required project gates and independently validates the resulting checkpoint.
+The worker validates the candidate result before deterministic bookkeeping. Once the commit changes
+the token, the manager consumes it and validates the checkpoint rather than rerunning the
+pre-bookkeeping result check.
 
 Store operational telemetry outside authored model authority and the approved plan projection.
 Telemetry may compare duration, checks, review convergence, and harness usage, but it cannot establish

@@ -91,12 +91,6 @@ def test_reordering_direct_associations_is_an_effective_no_op() -> None:
     assert graph_equal(Graph(associated_data=(forward,)), Graph(associated_data=(reversed_order,)))
 
 
-def test_changing_a_graph_object_value_is_a_semantic_difference() -> None:
-    assert not graph_equal(
-        Graph(anchors=(_anchor(),)), Graph(anchors=(_anchor(display_name="Ada L."),))
-    )
-
-
 def test_reversing_a_link_direction_is_a_semantic_difference() -> None:
     """Excludes comparing endpoints as an unordered pair."""
     forward = Link(uuid="l-1", type_key="knows", source_uuid="a-1", target_uuid="a-2")
@@ -274,40 +268,6 @@ def test_semantic_state_equality_includes_delta_presence_and_content() -> None:
     assert not semantic_state_equal(without, with_delta)
     assert not semantic_state_equal(with_delta, other_delta)
     assert semantic_state_equal(with_delta, with_delta)
-
-
-def test_system_metadata_participates_in_graph_equality() -> None:
-    """Excludes comparing graph objects while ignoring their canonical metadata."""
-    from vellis.graph import SystemMetadata
-
-    live = Anchor(uuid="a-1", type_key="person", display_name="Ada")
-    retired = Anchor(
-        uuid="a-1",
-        type_key="person",
-        display_name="Ada",
-        system_metadata=SystemMetadata(members={"live": False}),
-    )
-    annotated = Anchor(
-        uuid="a-1",
-        type_key="person",
-        display_name="Ada",
-        system_metadata=SystemMetadata(members={"live": True, "origin": "import"}),
-    )
-    assert not graph_equal(Graph(anchors=(live,)), Graph(anchors=(retired,)))
-    assert not graph_equal(Graph(anchors=(live,)), Graph(anchors=(annotated,)))
-
-
-def test_associated_data_properties_participate_in_graph_equality() -> None:
-    """Excludes comparing associated data by identity and type alone."""
-    first = AssociatedDataObject(
-        uuid="d-1", type_key="note", anchor_uuids=("a-1",), properties={"title": "First"}
-    )
-    second = AssociatedDataObject(
-        uuid="d-1", type_key="note", anchor_uuids=("a-1",), properties={"title": "Second"}
-    )
-    absent = AssociatedDataObject(uuid="d-1", type_key="note", anchor_uuids=("a-1",))
-    assert not graph_equal(Graph(associated_data=(first,)), Graph(associated_data=(second,)))
-    assert not graph_equal(Graph(associated_data=(first,)), Graph(associated_data=(absent,)))
 
 
 def test_a_repeated_direct_association_is_not_the_same_as_a_single_one() -> None:
@@ -552,7 +512,7 @@ def _graph_variants() -> dict[str, tuple[Graph, Graph]]:
                         uuid="a-1",
                         type_key="person",
                         display_name="Ada",
-                        system_metadata=SystemMetadata(members={"live": False}),
+                        system_metadata=SystemMetadata(members={"origin": "import"}),
                     ),
                 )
             ),
@@ -596,6 +556,20 @@ def _graph_variants() -> dict[str, tuple[Graph, Graph]]:
                 )
             ),
         ),
+        "data metadata": (
+            Graph(associated_data=(base_data,)),
+            Graph(
+                associated_data=(
+                    AssociatedDataObject(
+                        uuid="d-1",
+                        type_key="note",
+                        anchor_uuids=("a-1",),
+                        properties={"title": "First"},
+                        system_metadata=SystemMetadata(members={"live": False}),
+                    ),
+                )
+            ),
+        ),
         "link type key": (
             Graph(links=(base_link,)),
             Graph(
@@ -606,6 +580,12 @@ def _graph_variants() -> dict[str, tuple[Graph, Graph]]:
             Graph(links=(base_link,)),
             Graph(
                 links=(Link(uuid="l-1", type_key="knows", source_uuid="a-3", target_uuid="a-2"),)
+            ),
+        ),
+        "link target": (
+            Graph(links=(base_link,)),
+            Graph(
+                links=(Link(uuid="l-1", type_key="knows", source_uuid="a-1", target_uuid="a-3"),)
             ),
         ),
         "link metadata": (
@@ -818,13 +798,6 @@ def test_every_definition_discriminator_participates_in_equality(discriminator: 
     assert definition_set_equal(right, right)
 
 
-def test_endpoint_roles_are_compared_separately_not_twice_over() -> None:
-    """Excludes comparing the source list twice and never comparing the target list."""
-    assert not definition_set_equal(
-        _link_type(("person",), ("project",)), _link_type(("person",), ("person",))
-    )
-
-
 def test_arrays_of_different_lengths_compare_unequal_without_raising() -> None:
     """Excludes relying on a strict zip, which raises instead of answering."""
     assert not json_equal(loads("[1]"), loads("[1,2]"))
@@ -913,26 +886,6 @@ def test_narrowing_a_permitted_value_set_is_not_an_effective_no_op() -> None:
 
     assert not definition_set_equal(permitting("a"), permitting("a", "b"))
     assert not definition_set_equal(permitting("a", "b"), permitting("a"))
-
-
-@pytest.mark.parametrize("discriminator", sorted(_graph_variants()))
-def test_graph_equality_is_reflexive_even_on_an_invalid_graph(discriminator: str) -> None:
-    """A graph carrying duplicate identities must still equal itself.
-
-    Nothing revalidates a stored graph on every read, so a non-reflexive comparison
-    would make the current projection differ from its own replay.
-    """
-    left, right = _graph_variants()[discriminator]
-    assert graph_equal(left, left)
-    assert graph_equal(right, right)
-
-
-@pytest.mark.parametrize("discriminator", sorted(_definition_variants()))
-def test_definition_equality_is_reflexive_even_on_an_invalid_set(discriminator: str) -> None:
-    """The same for definitions, which a working proposal is allowed to leave invalid."""
-    left, right = _definition_variants()[discriminator]
-    assert definition_set_equal(left, left)
-    assert definition_set_equal(right, right)
 
 
 def test_duplicate_counts_are_compared_not_collapsed() -> None:

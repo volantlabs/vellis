@@ -77,7 +77,13 @@ Missing selected behavior is an implementation defect. Do not ask the human to c
 new evidence changes stakeholder-visible meaning or the selected boundary.
 
 Bind both reviews to one deterministic token for the tracked and evidence state. If both are clean
-and that token is still current, the pair closes review. Afterward permit only one deterministic
+and that token is still current, record both distinct reviewer identifiers, lens dispositions, and
+the shared token in the compact result, then validate that result against the frozen token,
+recomputed current durable state, current campaign/work item, intended checkpoint, and reported passed checks.
+The manager still enforces fresh-agent independence and independently validates the checkpoint.
+It also runs required project gates; reported check rows do not prove execution or completeness.
+Aggregate pair and finding counts alone never establish this binding. The pair then closes review. Afterward
+permit only one deterministic
 atomic bookkeeping transition: apply the already-reviewed lifecycle, aggregate roll-up, owned-
 decision status, and checkpoint identifiers. It may not change implementation, tests, documentation,
 evidence references, decision content, or plan-bearing state. If either reviewer reports a material finding,

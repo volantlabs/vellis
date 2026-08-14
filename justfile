@@ -54,9 +54,9 @@ implementation-campaign-dispatch identical_failures="0" expected_state_token="":
 implementation-campaign-review-frame work_item lens:
     @uv run python tools/implementation_campaign.py review-frame --slice {{quote(work_item)}} --lens {{quote(lens)}}
 
-# Validate a compact campaign worker result before a manager consumes it.
-implementation-campaign-worker-result-check result:
-    @uv run python tools/implementation_campaign.py worker-result-check --result {{quote(result)}}
+# Validate the candidate result against frozen pre-bookkeeping state.
+implementation-campaign-worker-result-check result state_token checkpoint:
+    @uv run python tools/implementation_campaign.py worker-result-check --result {{quote(result)}} --expect-state-token {{quote(state_token)}} --expect-checkpoint {{quote(checkpoint)}}
 
 # Print current model, language, and validator baseline digests without changing the campaign.
 implementation-campaign-baseline:

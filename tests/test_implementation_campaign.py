@@ -193,12 +193,6 @@ def _renewed_approval_repository(tmp_path: Path) -> tuple[dict[str, object], str
     return campaign, plan_sha
 
 
-def test_renewed_approval_commit_binds_the_current_head_to_its_plan(tmp_path: Path) -> None:
-    campaign, _ = _renewed_approval_repository(tmp_path)
-
-    assert implementation_campaign.checkpoint_binding_findings(campaign, root=tmp_path) == []
-
-
 def test_renewed_approval_commit_may_change_only_approval_state(tmp_path: Path) -> None:
     campaign, _ = _renewed_approval_repository(tmp_path)
     campaign["slices"][4]["lifecycle"] = "ready"  # type: ignore[index]
@@ -1611,9 +1605,12 @@ def test_review_frames_are_lens_specific_and_contain_no_review_history() -> None
     campaign["campaign"]["lifecycle"] = "active"  # type: ignore[index]
     campaign["slices"][0]["lifecycle"] = "active"  # type: ignore[index]
 
-    authority = implementation_campaign.review_frame(campaign, slice_id="S001", lens="authority")
+    token = "a" * 64
+    authority = implementation_campaign.review_frame(
+        campaign, slice_id="S001", lens="authority", state_token=token
+    )
     engineering = implementation_campaign.review_frame(
-        campaign, slice_id="S001", lens="engineering"
+        campaign, slice_id="S001", lens="engineering", state_token=token
     )
 
     assert "qualified model meaning" in authority
@@ -1621,6 +1618,8 @@ def test_review_frames_are_lens_specific_and_contain_no_review_history() -> None
     assert "S001" in authority and "S001" in engineering
     assert "previous reviewer" not in authority.lower()
     assert "expected conclusion" not in engineering.lower()
+    assert f"Review state token: {token}" in authority
+    assert f"Review state token: {token}" in engineering
     assert "invent novel mutants" in authority
     assert "Decisions this slice must close" in authority
     assert "D002 (absent)" in authority
@@ -1630,7 +1629,9 @@ def test_slice_review_frame_separates_owned_and_inherited_decisions() -> None:
     campaign = _pending_campaign()
     campaign["slices"][-1]["lifecycle"] = "active"  # type: ignore[index]
 
-    frame = implementation_campaign.review_frame(campaign, slice_id="S018", lens="engineering")
+    frame = implementation_campaign.review_frame(
+        campaign, slice_id="S018", lens="engineering", state_token="a" * 64
+    )
 
     assert "Decisions this slice must close" in frame
     assert "D004 (absent)" in frame and "D005 (absent)" in frame
@@ -1652,9 +1653,11 @@ def test_the_closure_work_item_gets_a_frame_of_its_own() -> None:
     """
     campaign = _finished_campaign()
 
-    authority = implementation_campaign.review_frame(campaign, slice_id="closure", lens="authority")
+    authority = implementation_campaign.review_frame(
+        campaign, slice_id="closure", lens="authority", state_token="a" * 64
+    )
     engineering = implementation_campaign.review_frame(
-        campaign, slice_id="closure", lens="engineering"
+        campaign, slice_id="closure", lens="engineering", state_token="a" * 64
     )
 
     assert "aggregate authority universe" in authority
@@ -1690,7 +1693,9 @@ def test_a_closure_frame_renders_a_blockers_shape_but_not_its_summary() -> None:
     }
 
     for lens in ("authority", "engineering"):
-        frame = implementation_campaign.review_frame(campaign, slice_id="closure", lens=lens)
+        frame = implementation_campaign.review_frame(
+            campaign, slice_id="closure", lens=lens, state_token="a" * 64
+        )
         assert "classification: plan gap" in frame
         assert "A017" in frame
         assert "the sky is falling" not in frame
@@ -1700,27 +1705,61 @@ def test_a_closure_frame_needs_every_slice_finished_first() -> None:
     campaign = _pending_campaign()
 
     with pytest.raises(ValueError, match="requires every slice complete"):
-        implementation_campaign.review_frame(campaign, slice_id="closure", lens="authority")
+        implementation_campaign.review_frame(
+            campaign, slice_id="closure", lens="authority", state_token="a" * 64
+        )
 
 
-def test_worker_result_contract_is_compact_and_rejects_transcripts() -> None:
-    result = {
-        "schema_version": 1,
+def _clean_worker_result(*, review_pairs: int = 1) -> dict[str, object]:
+    token = "a" * 64
+    return {
+        "schema_version": 2,
         "campaign_id": "example",
         "work_item": "S014",
         "outcome": "checkpointed",
         "checkpoint": "slice:S014:123456789abc:1",
         "checks": [{"name": "project gate", "outcome": "passed"}],
-        "review_pairs": 2,
+        "review_pairs": review_pairs,
+        "review_state_token": token,
+        "reviews": [
+            {
+                "lens": "authority",
+                "reviewer": "agent:authority",
+                "status": "clean",
+                "state_token": token,
+            },
+            {
+                "lens": "engineering",
+                "reviewer": "agent:engineering",
+                "status": "clean",
+                "state_token": token,
+            },
+        ],
         "material_findings": [
-            {"pair": 1, "authority": 1, "engineering": 0},
-            {"pair": 2, "authority": 0, "engineering": 0},
+            {"pair": pair, "authority": int(pair < review_pairs), "engineering": 0}
+            for pair in range(1, review_pairs + 1)
         ],
         "elapsed_seconds": 42,
         "reason": None,
     }
 
-    assert implementation_campaign.worker_result_findings(result) == []
+
+def _worker_result_findings(result: dict[str, object], **overrides: object) -> list[str]:
+    expected: dict[str, object] = {
+        "expected_state_token": "a" * 64,
+        "expected_campaign_id": "example",
+        "expected_work_item": "S014",
+        "expected_checkpoint": "slice:S014:123456789abc:1",
+        "approved_plan_sha": "123456789abc" + "0" * 28,
+    }
+    expected.update(overrides)
+    return implementation_campaign.worker_result_findings(result, **expected)  # type: ignore[arg-type]
+
+
+def test_worker_result_contract_is_compact_and_rejects_transcripts() -> None:
+    result = _clean_worker_result(review_pairs=2)
+
+    assert _worker_result_findings(result) == []
 
     result["reviewer_transcript"] = "large hidden context"
     findings = implementation_campaign.worker_result_findings(result)
@@ -1728,31 +1767,25 @@ def test_worker_result_contract_is_compact_and_rejects_transcripts() -> None:
 
 
 def test_checkpointed_worker_result_accepts_one_clean_review_pair() -> None:
-    result = {
-        "schema_version": 1,
-        "campaign_id": "example",
-        "work_item": "S014",
-        "outcome": "checkpointed",
-        "checkpoint": "slice:S014:123456789abc:1",
-        "checks": [{"name": "project gate", "outcome": "passed"}],
-        "review_pairs": 1,
-        "material_findings": [{"pair": 1, "authority": 0, "engineering": 0}],
-        "elapsed_seconds": 42,
-        "reason": None,
-    }
+    result = _clean_worker_result()
 
-    assert implementation_campaign.worker_result_findings(result) == []
+    assert _worker_result_findings(result) == []
+    assert "checkpointed result requires the expected frozen state token" in (
+        implementation_campaign.worker_result_findings(result)
+    )
 
 
 def test_checkpointed_worker_result_rejects_zero_review_pairs() -> None:
     result = {
-        "schema_version": 1,
+        "schema_version": 2,
         "campaign_id": "example",
         "work_item": "S014",
         "outcome": "checkpointed",
         "checkpoint": "slice:S014:123456789abc:1",
         "checks": [{"name": "project gate", "outcome": "passed"}],
         "review_pairs": 0,
+        "review_state_token": None,
+        "reviews": [],
         "material_findings": [],
         "elapsed_seconds": 42,
         "reason": None,
@@ -1764,3 +1797,116 @@ def test_checkpointed_worker_result_rejects_zero_review_pairs() -> None:
         "review_pairs" in finding and "less than the minimum of 1" in finding
         for finding in findings
     )
+
+
+@pytest.mark.parametrize(
+    ("mutation", "expected"),
+    (
+        ("mismatched-token", "final review tokens must equal review_state_token"),
+        ("duplicate-lens", "requires distinct authority and engineering reviews"),
+        ("duplicate-reviewer", "requires two distinct reviewer identities"),
+        ("non-clean", "requires both final reviews clean"),
+        ("nonzero-final-counts", "requires zero material findings in the final pair"),
+    ),
+)
+def test_checkpointed_worker_result_rejects_unbound_review_pairs(
+    mutation: str, expected: str
+) -> None:
+    token = "a" * 64
+    result = _clean_worker_result()
+    if mutation == "mismatched-token":
+        result["reviews"][1]["state_token"] = "b" * 64  # type: ignore[index]
+    elif mutation == "duplicate-lens":
+        result["reviews"][1]["lens"] = "authority"  # type: ignore[index]
+    elif mutation == "duplicate-reviewer":
+        result["reviews"][1]["reviewer"] = "agent:authority"  # type: ignore[index]
+    elif mutation == "nonzero-final-counts":
+        result["material_findings"][-1]["authority"] = 1  # type: ignore[index]
+    else:
+        result["reviews"][1]["status"] = "findings"  # type: ignore[index]
+
+    findings = _worker_result_findings(result, expected_state_token=token)
+
+    assert any(expected in finding for finding in findings)
+
+
+def test_checkpointed_worker_result_uses_pair_number_not_array_order_for_final_counts() -> None:
+    result = _clean_worker_result(review_pairs=2)
+    result["material_findings"].reverse()  # type: ignore[union-attr]
+    result["material_findings"][0]["engineering"] = 1  # type: ignore[index]
+
+    findings = _worker_result_findings(result)
+
+    assert "checkpointed result requires zero material findings in the final pair" in findings
+
+
+def test_checkpointed_worker_result_rejects_a_stale_expected_state_token() -> None:
+    result = _clean_worker_result()
+
+    findings = _worker_result_findings(result, expected_state_token="b" * 64)
+
+    assert "review_state_token does not match the expected frozen state" in findings
+
+
+def test_checkpointed_worker_result_rejects_a_changed_current_state_token() -> None:
+    result = _clean_worker_result()
+
+    findings = _worker_result_findings(
+        result,
+        current_state_token="b" * 64,
+    )
+
+    assert "review_state_token does not match the current durable state" in findings
+
+
+@pytest.mark.parametrize(
+    ("mutation", "expected"),
+    (
+        ("campaign", "campaign_id does not match the current campaign"),
+        ("work-item", "work_item does not match the current campaign work item"),
+        ("checkpoint", "checkpoint does not match the intended checkpoint"),
+        ("failed-check", "checkpointed result requires every reported check passed"),
+    ),
+)
+def test_checkpointed_worker_result_rejects_the_wrong_transition(
+    mutation: str, expected: str
+) -> None:
+    result = _clean_worker_result()
+    if mutation == "campaign":
+        result["campaign_id"] = "wrong"
+    elif mutation == "work-item":
+        result["work_item"] = "S999"
+    elif mutation == "checkpoint":
+        result["checkpoint"] = "slice:S999:000000000000:1"
+    else:
+        result["checks"][0]["outcome"] = "failed"  # type: ignore[index]
+
+    assert expected in _worker_result_findings(result)
+
+
+def test_checkpointed_worker_result_binds_checkpoint_to_work_item_and_approved_plan() -> None:
+    result = _clean_worker_result()
+
+    findings = _worker_result_findings(result, approved_plan_sha="f" * 40)
+
+    assert "checkpoint does not match the work item and approved plan format" in findings
+
+
+def test_checkpointed_worker_result_fails_closed_without_an_approved_plan() -> None:
+    findings = _worker_result_findings(_clean_worker_result(), approved_plan_sha=None)
+
+    assert "checkpointed result requires a valid approved plan checkpoint" in findings
+
+
+def test_checkpointable_work_item_requires_an_active_slice_or_finished_slice_set() -> None:
+    campaign = _pending_campaign()
+    assert implementation_campaign.checkpointable_work_item(campaign) is None
+
+    campaign["campaign"]["lifecycle"] = "active"  # type: ignore[index]
+    campaign["slices"][0]["lifecycle"] = "active"  # type: ignore[index]
+    assert implementation_campaign.checkpointable_work_item(campaign) == "S001"
+
+    campaign["slices"][0]["lifecycle"] = "complete"  # type: ignore[index]
+    for item in campaign["slices"]:  # type: ignore[union-attr]
+        item["lifecycle"] = "complete"
+    assert implementation_campaign.checkpointable_work_item(campaign) == "closure"

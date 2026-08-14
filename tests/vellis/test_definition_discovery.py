@@ -331,28 +331,18 @@ def test_a_revision_that_moved_between_the_two_reads_is_visible_to_the_caller(
 # --- Non-effects --------------------------------------------------------------------
 
 
-def test_discovery_changes_no_canonical_state(tmp_path: Path) -> None:
+def test_discovery_neither_changes_state_nor_reads_canonical_history(tmp_path: Path) -> None:
     system = _system(tmp_path)
     try:
         before = materialize_state(system)
         records = system.store.canonical_record_count()
-        system.definition_summary()
-        system.inspect_definitions(DefinitionInspectionRequest(("person",)))
-        system.inspect_definitions(DefinitionInspectionRequest(("ghost",)))
-        assert semantic_state_equal(materialize_state(system), before)
-        assert system.store.canonical_record_count() == records
-    finally:
-        system.close()
-
-
-def test_discovery_reads_no_canonical_record(tmp_path: Path) -> None:
-    """Discovery is current work, so it may not traverse history to answer."""
-    system = _system(tmp_path)
-    try:
         system.store.reset_instrumentation()
         system.definition_summary()
         system.inspect_definitions(DefinitionInspectionRequest(("person", "recipe")))
+        system.inspect_definitions(DefinitionInspectionRequest(("ghost",)))
         assert system.store.record_reads == 0
+        assert semantic_state_equal(materialize_state(system), before)
+        assert system.store.canonical_record_count() == records
     finally:
         system.close()
 

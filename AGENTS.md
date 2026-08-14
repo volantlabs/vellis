@@ -92,7 +92,12 @@ Use one writer and two fresh, context-isolated read-only reviewers for a review 
 authority/conformance lens and one engineering/evidence lens. Pause mutation while both inspect the
 same state token. Before freezing it, put all evidence references and intended completion statuses in
 the review frame. A pair closes review when both lenses report no material finding and substantive
-tracked or evidence state remains unchanged afterward. The only permitted post-review mutation is
+tracked or evidence state remains unchanged afterward. The compact result must name both distinct
+reviewer identifiers and lenses, their clean dispositions, and the exact shared token; validate it against the
+frozen token, recomputed current durable state, current campaign/work item, intended checkpoint, and
+reported passed checks before bookkeeping. Fresh-agent independence remains an operational manager
+obligation, and the manager independently runs required project gates rather than treating reported
+check rows as proof of execution or completeness. The only permitted post-review mutation is
 the deterministic atomic bookkeeping transition that applies those already-reviewed statuses and
 checkpoint identifiers. Any implementation, test, documentation, evidence-reference, decision-
 content, or plan-bearing mutation invalidates the clean pair; batch corrections, sweep the root
@@ -106,6 +111,8 @@ implements or reads reviewer transcripts. Model or plan gaps, stale baselines, a
 visible feasibility consequences stop execution; implementation defects and model-preserving
 realization decisions remain campaign work. Detailed checkpoint and harness rules are in
 `CONTRIBUTING.md` and the campaign skill.
+Candidate-result validation occurs before deterministic bookkeeping. After the commit changes the
+state token, the manager validates the checkpoint independently rather than rerunning that check.
 
 For post-build evolution, validate `system-evolution.yaml`. It is an execution and evidence index,
 never product authority. Changed system meaning requires acceptance before implementation relies on

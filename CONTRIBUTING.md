@@ -111,7 +111,12 @@ sit between that checkpoint and closure.
    authority/conformance and engineering/evidence reviews. Checkpoint after one pair in which both
    lenses are clean and no substantive tracked or evidence state changes afterward. Prepare all
    evidence references and intended completion statuses before freezing the review state. After a
-   clean pair, permit only the deterministic atomic bookkeeping transition that applies those
+   clean pair, record each distinct reviewer identifier, lens, clean disposition, and the exact shared token in
+   the compact worker result, and validate it against the frozen token and recomputed current durable
+   state. These identifiers record attribution; the manager still enforces fresh-agent independence
+   and independently runs required project gates and validates the resulting checkpoint. Reported
+   check rows are not proof of execution or completeness. Pair counts alone do not bind
+   review state. Then permit only the deterministic atomic bookkeeping transition that applies those
    reviewed statuses and checkpoint identifiers. Any implementation, test, documentation, evidence-
    reference, decision-content, or plan-bearing mutation invalidates the pair. If either lens finds
    a material issue, one writer batches corrections, sweeps the root cause, reruns affected evidence,
@@ -153,10 +158,13 @@ work. After activation,
 generate each fixed review prompt with
 `just implementation-campaign-review-frame <work-item> <lens>`, naming the active slice or
 `closure`.
-Validate the compact handoff with `just implementation-campaign-worker-result-check <path>` and put
+Before deterministic bookkeeping, validate the candidate compact handoff with
+`just implementation-campaign-worker-result-check <path> <review-state-token> <checkpoint>` and put
 optional JSONL timing, review-count, check-count, and harness-usage telemetry under the ignored
 `.cache/implementation-campaign/` directory. Wait ten minutes only after transient launcher or quota
 failure when no child is live, and stop after three identical failures against one state token.
+After the bookkeeping commit changes that token, the manager consumes the result and independently
+runs checkpoint validation; it does not rerun the pre-bookkeeping result check.
 The completed campaign's plan directly pins FastMCP and FastMCP Slim 4.0.0b1, selects local STDIO,
 and selected clean macOS onboarding through a documented Python setup path. The
 pins, the STDIO boundary, and the setup path's three starting inputs — a confirmed fresh vocabulary,

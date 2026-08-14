@@ -1,223 +1,241 @@
 schema_version: "1.0"
 evolution:
-  id: post-closure-evidence-subtraction
-  objective: Remove redundant and realization-fragile tests while preserving every uniquely discriminating semantic, compatibility, failure, resource, integrity, and repository-workflow claim.
-  observable_distinction: The smaller suite still rejects every plausible wrong system or workflow invariant currently carrying unique evidence, without retaining tests solely because they existed at closure.
-  lifecycle: complete
+  id: evidence-suite-corrective-audit
+  objective: Narrow the prior subtraction claim, bind clean reviews to current state, restore scan discrimination, and remove reconstructed duplicate evidence.
+  observable_distinction: The record names only audited removals; handoff validation binds both clean lenses to current state; and restored guards reject the identified wrong systems.
+  lifecycle: active
   approval:
     status: not-required
-    reason: Accepted product authority and public behavior are unchanged; this is bounded realization and evidence subtraction.
+    reason: This corrects repository workflow and conformance evidence without changing accepted product meaning or external behavior.
     checkpoint: null
   blocker: null
-  checkpoint: git:79797f68d4f96d788e874696f7a4a210b5a4ac63
+  checkpoint: null
 baselines:
   status: current
   source:
     model: sha256:23a0fa4c525a6e89ec0740c4d4f0af283cccae44abc23b73b99f7427d7c93c7e
-    implementation: git:2524d901de504b11fd7907f238121ff1333065e4
+    implementation: git:872bec762f826e20450976e430046f6af6533e8f
     language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
     execution_environment: sha256:3315a10b5fcc8d62aa435d2f4e12165a147f334b01fad06ce367d11b6eb8191c
-    checkpoint: git:2524d901de504b11fd7907f238121ff1333065e4
+    checkpoint: git:872bec762f826e20450976e430046f6af6533e8f
   target:
     model: sha256:23a0fa4c525a6e89ec0740c4d4f0af283cccae44abc23b73b99f7427d7c93c7e
-    implementation: git:79797f68d4f96d788e874696f7a4a210b5a4ac63
+    implementation: git:872bec762f826e20450976e430046f6af6533e8f
     language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
     execution_environment: sha256:3315a10b5fcc8d62aa435d2f4e12165a147f334b01fad06ce367d11b6eb8191c
-    checkpoint: git:79797f68d4f96d788e874696f7a4a210b5a4ac63
+    checkpoint: git:872bec762f826e20450976e430046f6af6533e8f
   observed:
     model: sha256:23a0fa4c525a6e89ec0740c4d4f0af283cccae44abc23b73b99f7427d7c93c7e
-    implementation: git:79797f68d4f96d788e874696f7a4a210b5a4ac63
+    implementation: git:872bec762f826e20450976e430046f6af6533e8f
     language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
     execution_environment: sha256:3315a10b5fcc8d62aa435d2f4e12165a147f334b01fad06ce367d11b6eb8191c
-    checkpoint: git:79797f68d4f96d788e874696f7a4a210b5a4ac63
+    checkpoint: git:872bec762f826e20450976e430046f6af6533e8f
 scope:
   authority_scope:
     - VellisRequirements::historyIndependentCurrentWork
     - VellisRequirements::boundedHistoricalSelectionWork
-    - VellisRequirements::canonicalSemanticEquality
-    - VellisRequirements::durableCanonicalHistory
-    - VellisRequirements::v1SnapshotCompatibility
     - VellisVerification::currentWorkScaling
     - VellisVerification::historicalSelectionScaling
-    - VellisVerification::replayCharacterization
     - AGENTS.md
   implementation_scope:
-    - tests
+    - .agents/skills/sysml-implementation-campaign
+    - CONTRIBUTING.md
+    - README.md
+    - justfile
     - tools/implementation_campaign.py
-    - tools/system_evolution.py
+    - tests/test_implementation_campaign.py
+    - tests/test_system_evolution.py
+    - tests/vellis
   review_lenses:
     - authority and conformance
     - engineering and evidence
   non_goals:
-    - Changing product APIs, MCP contracts, SysML authority, persistence formats, or compatibility meaning.
-    - Preserving a test merely because a historical campaign checkpoint cited it.
-    - Establishing a numerical test-count or line-reduction target.
+    - Changing product APIs, MCP contracts, SysML authority, persistence formats, or compatibility behavior.
+    - Claiming that every retained repository test has unique value without a claim-level audit.
+    - Claiming that unchanged large suites were audited merely because their tests pass.
+    - Reducing tests to a numerical target or deleting distinct boundary and failure evidence.
 findings:
   - id: F001
-    summary: Current-work resource evidence is spread across overlapping scenario and measurement surfaces.
-    classification: realization decision
-    consequence: Equivalent histories, local mutations, and bounded query behavior are rebuilt and reread in several large files, increasing maintenance and review context without unique discrimination.
-    authority_refs:
-      - VellisRequirements::historyIndependentCurrentWork
-      - VellisRequirements::boundedHistoricalSelectionWork
-      - VellisVerification::currentWorkScaling
-      - VellisVerification::historicalSelectionScaling
-    evidence_refs:
-      - command:uv run pytest tests/vellis/test_current_work.py tests/vellis/test_work_characterization.py tests/vellis/test_population_local_work.py -q
-      - path:tests/vellis/test_work_characterization.py#test_a_narrow_historical_query_does_not_materialize_the_revision_population
-      - path:tests/vellis/test_work_characterization.py#test_a_returned_result_is_bounded_without_scanning_or_hydrating_the_matching_population
-    disposition: resolved
-    owner_work_item_id: W001
-    implementation_status: conforming
-    nearest_wrong_system: Removing overlapping cases also removes the sole evidence for one allowed scale driver, forbidden population dependency, or state-wide exception.
-    compatibility_effect: Test organization changes only; resource authority and SQLite realization remain unchanged.
-  - id: F002
-    summary: Some realization-integrity tests assert source text or internal shape where dynamic behavior can discriminate the same property.
-    classification: realization decision
-    consequence: Harmless refactoring invalidates evidence even when population-local and bounded-memory behavior remains conforming.
-    authority_refs:
-      - VellisRequirements::historyIndependentCurrentWork
-      - VellisVerification::currentWorkScaling
-    evidence_refs:
-      - path:tests/vellis/test_population_local_work.py#test_one_tail_record_adds_bounded_vm_work_over_the_snapshot_import
-      - path:tests/vellis/test_population_local_work.py#test_ordinary_writes_are_independent_of_unrelated_graph_population
-    disposition: resolved
-    owner_work_item_id: W001
-    implementation_status: conforming
-    nearest_wrong_system: A full-state scan or recomputation returns correct answers and passes semantic tests while violating accepted resource shape.
-    compatibility_effect: Retained dynamic SQLite instrumentation continues to verify the selected realization.
-  - id: F003
-    summary: Workflow validators and rich product fixtures contain repetitive cases and setup that can share tables or helpers without merging distinct lifecycle rules.
-    classification: realization decision
-    consequence: Repository-process and product evidence carries unnecessary setup and assertion volume, increasing context cost and churn.
+    summary: The prior evolution closed a whole-suite subtraction claim after changing only six test files and removing nine collected cases.
+    classification: plan gap
+    consequence: The durable record says all retained cases have unique discriminating value although the largest suites were not audited at claim level.
     authority_refs:
       - AGENTS.md
     evidence_refs:
-      - command:just check
+      - command:just system-evolution-check
     disposition: resolved
     owner_work_item_id: W001
     implementation_status: conforming
-    nearest_wrong_system: Mechanical consolidation accidentally erases a distinct stale-state, checkpoint, interruption, compatibility, or failure non-effect boundary.
-    compatibility_effect: Validator contracts and product behavior remain unchanged.
+    nearest_wrong_system: A green suite and closed ledger are treated as proof that every retained case is necessary.
+    compatibility_effect: Correcting the record changes no product behavior.
+  - id: F002
+    summary: A checkpointed campaign worker result does not bind both review lenses to the exact reviewed state token.
+    classification: implementation defect
+    consequence: A thin manager can accept one reported pair without recording distinct reviewer identifiers, lens disposition, shared state, or equality with current durable state.
+    authority_refs:
+      - AGENTS.md
+    evidence_refs:
+      - path:tests/test_implementation_campaign.py#test_checkpointed_worker_result_rejects_unbound_review_pairs
+      - path:tests/test_implementation_campaign.py#test_checkpointed_worker_result_rejects_a_stale_expected_state_token
+    disposition: resolved
+    owner_work_item_id: W001
+    implementation_status: conforming
+    nearest_wrong_system: Two clean reviews inspect different or stale states while the compact result still authorizes checkpointing.
+    compatibility_effect: The compact internal worker-result contract gains review bindings; product interfaces are unchanged.
+  - id: F003
+    summary: Removing the literal current-graph SQL guard left no equivalent coverage of unexercised literal query paths.
+    classification: implementation defect
+    consequence: A new unbounded literal projection scan on an unexercised ordinary path can pass runtime characterization.
+    authority_refs:
+      - VellisRequirements::historyIndependentCurrentWork
+      - VellisVerification::currentWorkScaling
+    evidence_refs:
+      - path:tests/vellis/test_population_local_work.py#test_every_literal_current_graph_read_is_bounded_or_selected_state_wide
+    disposition: resolved
+    owner_work_item_id: W001
+    implementation_status: conforming
+    nearest_wrong_system: An ordinary literal query scans the complete current graph but returns a correct answer on every exercised scenario.
+    compatibility_effect: SQLite realization-integrity evidence changes; product behavior is unchanged.
+  - id: F004
+    summary: Canonical equality, definition discovery, and campaign validation contain reconstructible duplicate claims or setup.
+    classification: plan gap
+    consequence: Repeated cases in these selected groups add context and maintenance cost without rejecting another wrong system.
+    authority_refs:
+      - AGENTS.md
+    evidence_refs:
+      - command:uv run pytest tests/vellis/test_canonical_equality.py tests/vellis/test_definition_discovery.py tests/vellis/test_population_local_work.py -q
+      - command:uv run pytest tests/test_implementation_campaign.py -q
+    disposition: resolved
+    owner_work_item_id: W001
+    implementation_status: conforming
+    nearest_wrong_system: Several tests reject the same failure through duplicated fixtures while distinct cases are retained only by inertia.
+    compatibility_effect: Only test realization and repository validation change.
 decisions:
   - id: D001
-    summary: Retain the classified 1,053 starting cases by unique discriminating value and consolidate mechanics beneath semantic scenarios.
+    summary: Audit explicit claim-equivalence groups in canonical equality, definition discovery, and campaign validation while leaving other suites unclaimed.
     authority_refs:
-      - VellisVerification::currentWorkScaling
-      - VellisVerification::historicalSelectionScaling
       - AGENTS.md
     alternatives:
-      - Preserve the closure-era suite unchanged.
-      - Delete tests by size or count without claim-level review.
+      - Preserve the remaining suite by default.
+      - Delete tests by file size or count.
     reversible: true
     owner_work_item_id: W001
     evidence_intent:
-      - Classify cases as semantic behavior, compatibility or recovery, failure non-effect, resource characterization, realization integrity, or repository/process validation.
-      - Keep prospective/governance and streaming/integrity cases separate where they reject different failures.
-      - Every retained category names the plausible wrong system or workflow invariant it uniquely rejects.
-      - Narrow cluster suites and the complete repository gate remain clean after subtraction.
-      - Current evolution evidence references resolve to retained test nodes.
+      - Each audited group names the distinct wrong system or workflow transition retained cases reject.
+      - Repeated setup and parameter axes are consolidated without erasing distinct boundaries.
+      - The durable record names unaudited scope instead of implying universal retention value.
     implementation_status: conforming
     evidence_refs:
-      - command:uv run pytest tests/vellis/test_current_work.py tests/vellis/test_work_characterization.py tests/vellis/test_population_local_work.py -q
-      - command:uv run pytest tests/test_implementation_campaign.py tests/test_system_evolution.py -q
-      - command:just check
+      - path:tests/vellis/test_canonical_equality.py#test_every_graph_discriminator_participates_in_equality
+      - path:tests/vellis/test_canonical_equality.py#test_every_definition_discriminator_participates_in_equality
+      - path:tests/vellis/test_definition_discovery.py#test_discovery_neither_changes_state_nor_reads_canonical_history
+      - path:tests/test_implementation_campaign.py#test_a_slice_finished_since_the_renewal_binds_cleanly_under_the_renewed_plan
+  - id: D002
+    summary: A checkpointed worker result carries one exact review state token and two distinct clean lens records tied to it.
+    authority_refs:
+      - AGENTS.md
+    alternatives:
+      - Trust an aggregate pair count.
+      - Restore a redundant unconditional second pair.
+    reversible: true
+    owner_work_item_id: W001
+    evidence_intent:
+      - Missing, duplicate, non-clean, or mismatched review bindings reject checkpointing.
+      - Mutation changes the state token and invalidates the result.
+      - The live campaign/work item and approved-plan checkpoint format bind the transition; all reported checks are passed.
+    implementation_status: conforming
+    evidence_refs:
+      - path:tests/test_implementation_campaign.py#test_review_frames_are_lens_specific_and_contain_no_review_history
+      - path:tests/test_implementation_campaign.py#test_checkpointed_worker_result_rejects_unbound_review_pairs
+      - path:tests/test_implementation_campaign.py#test_checkpointed_worker_result_rejects_a_stale_expected_state_token
+      - path:tests/test_implementation_campaign.py#test_checkpointed_worker_result_rejects_a_changed_current_state_token
+      - path:tests/test_implementation_campaign.py#test_state_token_invalidates_clean_review_state_after_tracked_mutation
+      - path:tests/test_implementation_campaign.py#test_checkpointed_worker_result_rejects_the_wrong_transition
+      - path:tests/test_implementation_campaign.py#test_checkpointed_worker_result_binds_checkpoint_to_work_item_and_approved_plan
 work_items:
   - id: W001
     order: 1
-    label: Subtract redundant whole-suite evidence while preserving unique discrimination
+    label: Correct review binding and perform claim-level evidence subtraction
     kind: implementation
     dependencies: []
     planned_baseline:
       dimension: implementation
-      identity: git:2524d901de504b11fd7907f238121ff1333065e4
-    finding_ids: [F001, F002, F003]
-    decision_ids: [D001]
+      identity: git:872bec762f826e20450976e430046f6af6533e8f
+    finding_ids: [F001, F002, F003, F004]
+    decision_ids: [D001, D002]
     authority:
       - refs:
           - VellisRequirements::historyIndependentCurrentWork
           - VellisRequirements::boundedHistoricalSelectionWork
-          - VellisRequirements::canonicalSemanticEquality
-          - VellisRequirements::durableCanonicalHistory
-          - VellisRequirements::v1SnapshotCompatibility
           - VellisVerification::currentWorkScaling
           - VellisVerification::historicalSelectionScaling
-          - VellisVerification::replayCharacterization
           - AGENTS.md
-        coverage: full
-        remaining_work_item_ids: []
+        coverage: partial
+        remaining_work_item_ids: [W004]
     approval:
       status: not-required
-      reason: Evidence subtraction preserves accepted authority and selected realization boundaries.
+      reason: Repository evidence and workflow enforcement are corrected under unchanged authority.
       checkpoint: null
-    nearest_wrong_system: A smaller green suite no longer detects one accepted semantic, recovery, resource, or workflow violation.
-    compatibility_effect: No product or workflow contract changes; only redundant test realization is removed.
+    nearest_wrong_system: Passing checks conceal an unbound review result or redundant evidence suite.
+    compatibility_effect: No product behavior changes; the worker-result contract becomes stricter.
     non_effects:
-      - Historical campaign evidence remains reconstructible from its committed checkpoint.
-      - Product behavior and user-owned data remain untouched.
-      - Independent two-lens review remains required.
-    lifecycle: complete
+      - Historical campaign evidence remains reconstructible at its committed checkpoint.
+      - Product source and user-owned data remain untouched.
+      - Both independent review lenses remain mandatory.
+    lifecycle: active
     implementation_status: conforming
     evidence_refs:
-      - command:uv run pytest tests/vellis/test_current_work.py tests/vellis/test_work_characterization.py tests/vellis/test_population_local_work.py -q
-      - command:uv run pytest tests/vellis/test_definition_governance.py tests/vellis/test_sqlite_prospective_state.py -q
-      - command:uv run pytest tests/vellis/test_streaming_lifecycle.py tests/vellis/test_store_integrity.py tests/vellis/test_population_local_work.py -q
-      - command:uv run pytest tests/test_implementation_campaign.py tests/test_system_evolution.py -q
+      - command:uv run pytest tests/test_implementation_campaign.py tests/vellis/test_canonical_equality.py tests/vellis/test_definition_discovery.py tests/vellis/test_population_local_work.py -q
       - command:just check
     blocker: null
-    checkpoint: git:79797f68d4f96d788e874696f7a4a210b5a4ac63
+    checkpoint: null
   - id: W004
     order: 2
-    label: Review and rebaseline the reduced evidence suite
+    label: Review and close the bounded corrective audit
     kind: closure
     dependencies: [W001]
     planned_baseline:
       dimension: implementation
-      identity: git:2524d901de504b11fd7907f238121ff1333065e4
+      identity: git:872bec762f826e20450976e430046f6af6533e8f
     finding_ids: []
     decision_ids: []
     authority:
       - refs:
           - VellisVerification::currentWorkScaling
-          - VellisVerification::historicalSelectionScaling
           - AGENTS.md
         coverage: full
         remaining_work_item_ids: []
     approval:
       status: not-required
-      reason: Closure checks retained evidence, documentation truth, and repository integrity.
+      reason: Closure reconciles the bounded audited scope and exact review binding.
       checkpoint: null
-    nearest_wrong_system: Narrow clusters pass while the assembled suite or evidence index is stale.
+    nearest_wrong_system: Focused checks pass while the record again claims more than was audited.
     compatibility_effect: No public or persisted compatibility changes.
     non_effects:
-      - No numerical reduction target becomes authority.
+      - Unaudited test scope remains explicitly named.
       - User-owned data remains untouched.
-    lifecycle: complete
-    implementation_status: conforming
-    evidence_refs:
-      - command:just check
+    lifecycle: pending
+    implementation_status: not evaluated
+    evidence_refs: []
     blocker: null
-    checkpoint: git:79797f68d4f96d788e874696f7a4a210b5a4ac63
+    checkpoint: null
 closure:
-  finding_disposition: complete
-  model_status: accepted
-  implementation_status: conforming
-  integration_status: conforming
+  finding_disposition: open
+  model_status: unchanged
+  implementation_status: partial
+  integration_status: not evaluated
   external_status: not applicable
   compatibility: Product, persistence, MCP, and compatibility behavior remain unchanged.
   reviews:
     - lens: authority and conformance
-      status: clean
-      reviewer: agent:subtraction-clean-authority
-      checkpoint: git:79797f68d4f96d788e874696f7a4a210b5a4ac63
-      evidence_refs:
-        - command:just check
+      status: pending
+      reviewer: null
+      checkpoint: null
+      evidence_refs: []
     - lens: engineering and evidence
-      status: clean
-      reviewer: agent:subtraction-clean-engineering
-      checkpoint: git:79797f68d4f96d788e874696f7a4a210b5a4ac63
-      evidence_refs:
-        - command:just check
-  evidence_refs:
-    - command:just check
-  checkpoint: git:79797f68d4f96d788e874696f7a4a210b5a4ac63
+      status: pending
+      reviewer: null
+      checkpoint: null
+      evidence_refs: []
+  evidence_refs: []
+  checkpoint: null

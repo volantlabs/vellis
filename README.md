@@ -105,8 +105,9 @@ Useful commands:
   item, checkpoint, worktree condition, Git identity, reason codes, and state token without mutation.
 - `just implementation-campaign-review-frame <work-item> <lens>`: generate one fixed, finding-free
   prompt for the `authority` or `engineering` review lens of the active slice, or of `closure`.
-- `just implementation-campaign-worker-result-check <path>`: validate a compact worker handoff that
-  contains counts and checkpoint state rather than review transcripts.
+- `just implementation-campaign-worker-result-check <path> <review-state-token> <checkpoint>`:
+  validate the candidate handoff against frozen pre-bookkeeping state. After commit, the manager uses
+  checkpoint validation because bookkeeping intentionally changes the token.
 - `just implementation-campaign-baseline`: print the currently observed model, language, and
   validator digests without changing files.
 - `just implementation-campaign-checkpoint-check`: after a checkpoint commit, verify clean tracked

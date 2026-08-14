@@ -58,10 +58,15 @@ The slice worker follows [Execution and resume](references/execution-and-resume.
    remediation; normally run the whole-project gate once against the state offered for review.
 6. Freeze one review-state token and obtain independent authority/conformance and
    engineering/evidence reviews against that same state. Include all evidence references and
-   intended completion statuses in the frame before freezing it. If both are clean and substantive
-   tracked or evidence state has not changed, review is complete. The worker may then perform only
-   the deterministic atomic bookkeeping transition that applies those reviewed statuses and
-   checkpoint identifiers. Otherwise collect their complete in-scope findings,
+   intended completion statuses in the frame before freezing it. Each frame carries the exact state
+   token; the compact result names both distinct reviewer identifiers, lenses, clean dispositions, and that same
+   token. Validate the result against the frozen token, recomputed current durable state, current
+   campaign/work item, intended checkpoint, and reported passed checks before bookkeeping. The manager
+   still enforces fresh-agent independence, runs required project gates, and independently validates
+   the checkpoint; reported rows do not prove execution or completeness. If both are clean and
+   substantive tracked or evidence state has not changed, review is complete. The worker may then
+   perform only the deterministic atomic bookkeeping transition that applies those reviewed statuses
+   and checkpoint identifiers. Otherwise collect their complete in-scope findings,
    batch remediation, sweep the root cause, rerun affected evidence, freeze the new state, and obtain
    another pair. Any implementation, test, documentation, evidence-reference, decision-content, or
    plan-bearing mutation invalidates a prior clean pair. After three consecutive non-clean

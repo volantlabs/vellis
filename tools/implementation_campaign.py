@@ -1461,7 +1461,7 @@ def dispatch_packet(
     }
 
 
-def _closure_review_frame(campaign: dict[str, Any], *, lens: str) -> str:
+def _closure_review_frame(campaign: dict[str, Any], *, lens: str, state_token: str) -> str:
     """Frame the whole-system closure item rather than one slice.
 
     Closure has no slice row to read, so its frame is the aggregate: every authority entry
@@ -1525,6 +1525,9 @@ def _closure_review_frame(campaign: dict[str, Any], *, lens: str) -> str:
     return "\n".join(
         [
             f"# Read-only {lens} review for closure",
+            "",
+            f"Review state token: {state_token}",
+            "Return this exact token with your disposition.",
             "",
             "Work independently from the current workspace. Read and obey AGENTS.md and the named",
             "complete authored model sources. Do not mutate files, inspect protected user data, or",
@@ -1592,7 +1595,7 @@ def _closure_review_frame(campaign: dict[str, Any], *, lens: str) -> str:
     )
 
 
-def review_frame(campaign: dict[str, Any], *, slice_id: str, lens: str) -> str:
+def review_frame(campaign: dict[str, Any], *, slice_id: str, lens: str, state_token: str) -> str:
     """Build a project-bound, finding-free prompt for one read-only review lens.
 
     Dispatch names two kinds of work item, so this names the same two. ``closure`` is the
@@ -1600,8 +1603,10 @@ def review_frame(campaign: dict[str, Any], *, slice_id: str, lens: str) -> str:
     """
     if lens not in REVIEW_LENSES:
         raise ValueError(f"unknown review lens: {lens}")
+    if re.fullmatch(r"[0-9a-f]{64}", state_token) is None:
+        raise ValueError("review frame requires a 64-character lowercase hexadecimal state token")
     if slice_id == CLOSURE_WORK_ITEM:
-        return _closure_review_frame(campaign, lens=lens)
+        return _closure_review_frame(campaign, lens=lens, state_token=state_token)
     try:
         selected = next(entry for entry in campaign["slices"] if entry["id"] == slice_id)
     except StopIteration as error:
@@ -1679,6 +1684,9 @@ def review_frame(campaign: dict[str, Any], *, slice_id: str, lens: str) -> str:
         [
             f"# Read-only {lens} review for {slice_id}",
             "",
+            f"Review state token: {state_token}",
+            "Return this exact token with your disposition.",
+            "",
             "Work independently from the current workspace. Read and obey AGENTS.md and the named",
             "qualified model sources and their transitive semantic dependencies. Do not mutate",
             "files, inspect protected user data, or assume",
@@ -1746,7 +1754,16 @@ def review_frame(campaign: dict[str, Any], *, slice_id: str, lens: str) -> str:
     )
 
 
-def worker_result_findings(result: Any) -> list[str]:
+def worker_result_findings(
+    result: Any,
+    *,
+    expected_state_token: str | None = None,
+    current_state_token: str | None = None,
+    expected_campaign_id: str | None = None,
+    expected_work_item: str | None = None,
+    expected_checkpoint: str | None = None,
+    approved_plan_sha: str | None = None,
+) -> list[str]:
     schema = _schema(WORKER_RESULT_SCHEMA_PATH)
     findings = [
         f"{_json_path(error.absolute_path)}: {error.message}"
@@ -1756,6 +1773,63 @@ def worker_result_findings(result: Any) -> list[str]:
         )
     ]
     if isinstance(result, dict):
+        outcome = result.get("outcome")
+        review_state_token = result.get("review_state_token")
+        reviews = result.get("reviews")
+        if outcome == "checkpointed":
+            if result.get("campaign_id") != expected_campaign_id:
+                findings.append("campaign_id does not match the current campaign")
+            if result.get("work_item") != expected_work_item:
+                findings.append("work_item does not match the current campaign work item")
+            if result.get("checkpoint") != expected_checkpoint:
+                findings.append("checkpoint does not match the intended checkpoint")
+            checkpoint = result.get("checkpoint")
+            if approved_plan_sha is None:
+                findings.append("checkpointed result requires a valid approved plan checkpoint")
+            elif isinstance(checkpoint, str):
+                if expected_work_item == CLOSURE_WORK_ITEM:
+                    match = CLOSURE_CHECKPOINT.fullmatch(checkpoint)
+                    valid_checkpoint = (
+                        match is not None and match.group("plan") == approved_plan_sha[:12]
+                    )
+                else:
+                    match = SLICE_CHECKPOINT.fullmatch(checkpoint)
+                    valid_checkpoint = (
+                        match is not None
+                        and match.group("slice") == expected_work_item
+                        and match.group("plan") == approved_plan_sha[:12]
+                    )
+                if not valid_checkpoint:
+                    findings.append(
+                        "checkpoint does not match the work item and approved plan format"
+                    )
+            if any(
+                not isinstance(check, dict) or check.get("outcome") != "passed"
+                for check in result.get("checks", [])
+            ):
+                findings.append("checkpointed result requires every reported check passed")
+            if expected_state_token is None:
+                findings.append("checkpointed result requires the expected frozen state token")
+            elif review_state_token != expected_state_token:
+                findings.append("review_state_token does not match the expected frozen state")
+            if current_state_token is not None and review_state_token != current_state_token:
+                findings.append("review_state_token does not match the current durable state")
+        if outcome == "checkpointed" and isinstance(reviews, list):
+            valid_reviews = [item for item in reviews if isinstance(item, dict)]
+            lenses = [item.get("lens") for item in valid_reviews]
+            reviewers = [item.get("reviewer") for item in valid_reviews]
+            tokens = [item.get("state_token") for item in valid_reviews]
+            statuses = [item.get("status") for item in valid_reviews]
+            if sorted(lens for lens in lenses if isinstance(lens, str)) != list(REVIEW_LENSES):
+                findings.append(
+                    "checkpointed result requires distinct authority and engineering reviews"
+                )
+            if len(set(reviewer for reviewer in reviewers if isinstance(reviewer, str))) != 2:
+                findings.append("checkpointed result requires two distinct reviewer identities")
+            if any(status != "clean" for status in statuses):
+                findings.append("checkpointed result requires both final reviews clean")
+            if any(token != review_state_token for token in tokens):
+                findings.append("final review tokens must equal review_state_token")
         review_pairs = result.get("review_pairs")
         material_findings = result.get("material_findings")
         if isinstance(review_pairs, int) and isinstance(material_findings, list):
@@ -1772,7 +1846,36 @@ def worker_result_findings(result: Any) -> list[str]:
                 findings.append("material_findings must report counts for every review pair")
             if pairs and sorted(pairs) != list(range(1, review_pairs + 1)):
                 findings.append("material_findings pair numbers must be unique and contiguous")
+            if outcome == "checkpointed" and material_findings:
+                final_counts = next(
+                    (
+                        item
+                        for item in material_findings
+                        if isinstance(item, dict) and item.get("pair") == review_pairs
+                    ),
+                    None,
+                )
+                if isinstance(final_counts, dict) and any(
+                    final_counts.get(lens) != 0 for lens in REVIEW_LENSES
+                ):
+                    findings.append(
+                        "checkpointed result requires zero material findings in the final pair"
+                    )
     return findings
+
+
+def checkpointable_work_item(campaign: dict[str, Any]) -> str | None:
+    """Return only the slice or closure item whose reviewed checkpoint can advance now."""
+    active = [item["id"] for item in campaign["slices"] if item["lifecycle"] == "active"]
+    if len(active) == 1:
+        return active[0]
+    if (
+        not active
+        and campaign["campaign"]["lifecycle"] == "active"
+        and all(item["lifecycle"] == "complete" for item in campaign["slices"])
+    ):
+        return CLOSURE_WORK_ITEM
+    return None
 
 
 def _unreadable_dispatch_packet(error: Exception, *, root: Path = ROOT) -> dict[str, Any]:
@@ -1821,6 +1924,7 @@ def main() -> int:
     parser.add_argument("--slice", help=f"slice ID, or {CLOSURE_WORK_ITEM!r}, for review-frame")
     parser.add_argument("--lens", choices=REVIEW_LENSES, help="review-frame lens")
     parser.add_argument("--result", type=Path, help="worker result JSON path")
+    parser.add_argument("--expect-checkpoint", help="intended checkpoint for worker-result-check")
     parser.add_argument(
         "--expect-state-token",
         help="reject a dispatch if durable state no longer matches this token",
@@ -1840,9 +1944,40 @@ def main() -> int:
     if arguments.command == "worker-result-check":
         if arguments.result is None:
             parser.error("worker-result-check requires --result")
+        if arguments.expect_state_token is None:
+            parser.error("worker-result-check requires --expect-state-token")
+        if arguments.expect_checkpoint is None:
+            parser.error("worker-result-check requires --expect-checkpoint")
         try:
+            campaign = load_campaign(arguments.campaign)
+            campaign_findings = validate_campaign(campaign)
+            if not campaign_findings:
+                campaign_findings.extend(qualified_model_reference_findings(campaign))
+            if campaign_findings:
+                for finding in campaign_findings:
+                    print(f"ERROR {finding}")
+                return 1
+            worktree = _worktree_condition(arguments.campaign.parent)
+            current_state_token = _state_token(
+                campaign, root=arguments.campaign.parent, worktree=worktree
+            )
             result = json.loads(arguments.result.read_text(encoding="utf-8"))
-            result_findings = worker_result_findings(result)
+            expected_work_item = checkpointable_work_item(campaign)
+            if expected_work_item is None:
+                print("ERROR campaign has no checkpointable active slice or closure item")
+                return 1
+            approval = APPROVAL_CHECKPOINT.fullmatch(
+                campaign["campaign"]["plan_approval"]["checkpoint"] or ""
+            )
+            result_findings = worker_result_findings(
+                result,
+                expected_state_token=arguments.expect_state_token,
+                current_state_token=current_state_token,
+                expected_campaign_id=campaign["campaign"]["id"],
+                expected_work_item=expected_work_item,
+                expected_checkpoint=arguments.expect_checkpoint,
+                approved_plan_sha=approval.group("plan") if approval is not None else None,
+            )
         except (OSError, ValueError, json.JSONDecodeError) as error:
             print(f"ERROR {error}")
             return 1
@@ -1889,7 +2024,16 @@ def main() -> int:
         if arguments.slice is None or arguments.lens is None:
             parser.error("review-frame requires --slice and --lens")
         try:
-            print(review_frame(campaign, slice_id=arguments.slice, lens=arguments.lens))
+            worktree = _worktree_condition(arguments.campaign.parent)
+            state_token = _state_token(campaign, root=arguments.campaign.parent, worktree=worktree)
+            print(
+                review_frame(
+                    campaign,
+                    slice_id=arguments.slice,
+                    lens=arguments.lens,
+                    state_token=state_token,
+                )
+            )
         except ValueError as error:
             print(f"ERROR {error}")
             return 1

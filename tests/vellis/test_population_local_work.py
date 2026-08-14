@@ -2,10 +2,14 @@
 
 from __future__ import annotations
 
+import ast
+import hashlib
 import io
 import sqlite3
+from collections import Counter
 from collections.abc import Callable
 from pathlib import Path
+from typing import cast
 
 import pytest
 
@@ -663,6 +667,333 @@ def test_one_tail_record_adds_bounded_vm_work_over_the_snapshot_import(
     tail_steps = measured(tmp_path / f"with-tail-{population}.sqlite3", with_tail=True)
 
     assert abs(tail_steps - snapshot_steps) < 20_000
+
+
+_SELECTED_CURRENT_GRAPH_READS = Counter(
+    {
+        (
+            "normalized.py",
+            "recomputed_graph_summary",
+            "b93b2819f096fdd64391513b57c66a4831b35f03f88fb99cd274e459a691ce14",
+            1,
+        ): 1,
+        ("store.py", "", "612fc13a8a811b1f48d3312765e07f1ff9387e08809074c0ee6ed99e234a0f2a", 3): 1,
+        (
+            "store.py",
+            "_evaluate_sql_query_unlocked",
+            "1955bafb8db41dd91b583f4bfdffe6e4472caef5224e4eef96b07ecbbb0fe7cb",
+            1,
+        ): 1,
+        (
+            "store.py",
+            "_effective_type_keys_unlocked",
+            "1955bafb8db41dd91b583f4bfdffe6e4472caef5224e4eef96b07ecbbb0fe7cb",
+            1,
+        ): 1,
+        (
+            "store.py",
+            "_iter_definition_findings_unlocked",
+            "1955bafb8db41dd91b583f4bfdffe6e4472caef5224e4eef96b07ecbbb0fe7cb",
+            1,
+        ): 1,
+        (
+            "store.py",
+            "_iter_multiplicity_findings_unlocked",
+            "1955bafb8db41dd91b583f4bfdffe6e4472caef5224e4eef96b07ecbbb0fe7cb",
+            1,
+        ): 1,
+        (
+            "store.py",
+            "_known_uuids",
+            "1955bafb8db41dd91b583f4bfdffe6e4472caef5224e4eef96b07ecbbb0fe7cb",
+            1,
+        ): 1,
+        (
+            "store.py",
+            "conformance_context",
+            "1955bafb8db41dd91b583f4bfdffe6e4472caef5224e4eef96b07ecbbb0fe7cb",
+            1,
+        ): 1,
+        (
+            "store.py",
+            "iter_conformance_findings",
+            "1955bafb8db41dd91b583f4bfdffe6e4472caef5224e4eef96b07ecbbb0fe7cb",
+            1,
+        ): 1,
+        (
+            "store.py",
+            "_base_value_for_proposal_unlocked",
+            "9bc0788b864d2f68b5b5fb316b398dad9d874c68d3f3efec7ad24e3d811421ee",
+            1,
+        ): 1,
+        (
+            "store.py",
+            "_initialize_base",
+            "1955bafb8db41dd91b583f4bfdffe6e4472caef5224e4eef96b07ecbbb0fe7cb",
+            1,
+        ): 1,
+        (
+            "store.py",
+            "_active_value_unlocked",
+            "9bc0788b864d2f68b5b5fb316b398dad9d874c68d3f3efec7ad24e3d811421ee",
+            1,
+        ): 1,
+        (
+            "store.py",
+            "_objects_for_uuids_unlocked",
+            "969b5d2f5237b8b7062ca85d6dcc40c6ae1b102bedc324137ebbf277a6de7219",
+            1,
+        ): 1,
+        (
+            "store.py",
+            "_proposal_command_findings_unlocked",
+            "fd59d4942eb498e7708c09ed8a4edd8d5b54b5cde403870ed7214d50266b598d",
+            1,
+        ): 1,
+        (
+            "store.py",
+            "activate_proposal",
+            "ef483f98dc1743bd69d029f958349f3cc9649df767e7179f8cc563f0e385232a",
+            1,
+        ): 1,
+        (
+            "store.py",
+            "verify_projection_from_ledger",
+            "98321e2e4df0ed502359fd23a5a97a57e8ae7ac1d90f780e07fe4188517a0c71",
+            2,
+        ): 1,
+        (
+            "store.py",
+            "restore_revision",
+            "b2afeb6120336cb1130335365dfef5319499bac04505c476e40f81f498aa40c9",
+            1,
+        ): 1,
+        (
+            "store.py",
+            "_referencing_uuids_unlocked",
+            "7c1223c1f2a1f102424dacd9802a038416d7df3da1ce7b3317206ac8e43b460e",
+            1,
+        ): 1,
+        (
+            "store.py",
+            "_incident_relationship_uuids_unlocked",
+            "e90e7e86b66e3b3fcff22256b818ee8cc715ce8d1c4ddc2f2852985ae22eaf07",
+            1,
+        ): 1,
+        (
+            "store.py",
+            "_apply_current_graph_change_unlocked",
+            "419bee92849096d4eb0c01edcd9d901aef8a704684f6f1f2ffdbf96331d2a95b",
+            1,
+        ): 1,
+        (
+            "streaming.py",
+            "_tail_event_error",
+            "a3fd5105391b9da18f8a95f8881985b00102f4d25042f8f971c214a448c8aba9",
+            1,
+        ): 2,
+        (
+            "streaming.py",
+            "_apply_tail_stream",
+            "1955bafb8db41dd91b583f4bfdffe6e4472caef5224e4eef96b07ecbbb0fe7cb",
+            1,
+        ): 1,
+        (
+            "streaming.py",
+            "_apply_tail_stream",
+            "b2afeb6120336cb1130335365dfef5319499bac04505c476e40f81f498aa40c9",
+            1,
+        ): 1,
+        (
+            "streaming.py",
+            "_apply_tail_stream",
+            "9bc0788b864d2f68b5b5fb316b398dad9d874c68d3f3efec7ad24e3d811421ee",
+            1,
+        ): 1,
+    }
+)
+
+
+def _static_string_value(node: ast.AST) -> str | None:
+    if isinstance(node, ast.Constant) and isinstance(node.value, str):
+        return node.value
+    if isinstance(node, ast.BinOp) and isinstance(node.op, ast.Add):
+        left = _static_string_value(node.left)
+        right = _static_string_value(node.right)
+        return left + right if left is not None and right is not None else None
+    if isinstance(node, ast.FormattedValue) and node.format_spec is None:
+        value = _static_string_value(node.value)
+        if value is None:
+            return None
+        if node.conversion == ord("r"):
+            return repr(value)
+        if node.conversion == ord("a"):
+            return ascii(value)
+        return value
+    if isinstance(node, ast.JoinedStr):
+        parts = [_static_string_value(part) for part in node.values]
+        return "".join(cast(list[str], parts)) if all(part is not None for part in parts) else None
+    if (
+        isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Attribute)
+        and node.func.attr == "join"
+        and len(node.args) == 1
+        and isinstance(node.args[0], (ast.List, ast.Tuple))
+    ):
+        separator = _static_string_value(node.func.value)
+        parts = [_static_string_value(part) for part in node.args[0].elts]
+        if separator is not None and all(part is not None for part in parts):
+            return separator.join(part for part in parts if part is not None)
+    return None
+
+
+def _literal_current_graph_read_violations(
+    path_name: str, source: str
+) -> tuple[list[str], Counter[tuple[str, str, str, int]]]:
+    """Inventory exact reviewed production literals; every changed shape requires review."""
+    observed: Counter[tuple[str, str, str, int]] = Counter()
+    violations: list[str] = []
+    tree = ast.parse(source)
+    parents: dict[ast.AST, ast.AST] = {}
+    for node in ast.walk(tree):
+        for child in ast.iter_child_nodes(node):
+            parents[child] = node
+    for node in ast.walk(tree):
+        value = _static_string_value(node)
+        if value is None:
+            continue
+        parent = parents.get(node)
+        while parent is not None and not isinstance(
+            parent, (ast.FunctionDef, ast.AsyncFunctionDef)
+        ):
+            if _static_string_value(parent) is not None:
+                break
+            parent = parents.get(parent)
+        if parent is not None and _static_string_value(parent) is not None:
+            continue
+        owner: ast.AST = node
+        while owner in parents and not isinstance(owner, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            owner = parents[owner]
+        function = owner.name if isinstance(owner, (ast.FunctionDef, ast.AsyncFunctionDef)) else ""
+        normalized = " ".join(value.upper().split())
+        reference_count = normalized.count("CURRENT_GRAPH_OBJECT")
+        if not reference_count:
+            continue
+        fingerprint = hashlib.sha256(normalized.encode()).hexdigest()
+        key = (path_name, function, fingerprint, reference_count)
+        observed[key] += 1
+        if observed[key] > _SELECTED_CURRENT_GRAPH_READS[key]:
+            violations.append(
+                f"{path_name}:{getattr(node, 'lineno', 0)}:{function}:unselected-literal"
+            )
+    return violations, observed
+
+
+def _current_graph_read_inventory(
+    source_root: Path,
+) -> tuple[list[str], Counter[tuple[str, str, str, int]]]:
+    violations: list[str] = []
+    observed: Counter[tuple[str, str, str, int]] = Counter()
+    for path in sorted(source_root.rglob("*.py")):
+        relative_path = path.relative_to(source_root).as_posix()
+        path_violations, path_observed = _literal_current_graph_read_violations(
+            relative_path, path.read_text(encoding="utf-8")
+        )
+        violations.extend(path_violations)
+        observed.update(path_observed)
+    return violations, observed
+
+
+@pytest.mark.parametrize(
+    "query",
+    (
+        "SELECT uuid FROM\ncurrent_graph_object",
+        "SELECT value.id FROM object_value AS value JOIN current_graph_object AS current ON true",
+        "SELECT uuid FROM current_graph_object; SELECT 1 WHERE 1",
+        "SELECT 1 WHERE 1 UNION ALL SELECT uuid FROM current_graph_object",
+        "SELECT uuid FROM current_graph_object WHERE 1",
+        "WITH x AS (SELECT uuid FROM current_graph_object) SELECT uuid FROM x WHERE uuid = ?",
+        "SELECT uuid FROM current_graph_object WHERE uuid = ? OR 1",
+        "SELECT uuid FROM current_graph_object WHERE object_kind = 'link' OR 1",
+        "SELECT uuid FROM current_graph_object WHERE uuid IN "
+        "(SELECT uuid FROM current_graph_object)",
+        "SELECT c.uuid FROM current_graph_object c JOIN current_graph_object other ON true "
+        "WHERE c.uuid = ?",
+        "-- ordinary read\nSELECT uuid FROM current_graph_object",
+        "INSERT INTO scratch SELECT uuid FROM current_graph_object",
+    ),
+)
+def test_current_graph_scan_guard_rejects_unbounded_literal_shapes(query: str) -> None:
+    source = f"def ordinary_read():\n    return {query!r}\n"
+
+    violations, _ = _literal_current_graph_read_violations("ordinary.py", source)
+
+    assert violations == ["ordinary.py:2:ordinary_read:unselected-literal"]
+
+
+def test_current_graph_scan_guard_rejects_a_concatenated_table_literal() -> None:
+    source = "def ordinary_read():\n    return 'SELECT uuid FROM current_' + 'graph_object'\n"
+
+    violations, _ = _literal_current_graph_read_violations("ordinary.py", source)
+
+    assert violations == ["ordinary.py:2:ordinary_read:unselected-literal"]
+
+
+def test_current_graph_scan_guard_rejects_a_joined_table_literal() -> None:
+    source = (
+        "def ordinary_read():\n    return ''.join(('SELECT uuid FROM current_', 'graph_object'))\n"
+    )
+
+    violations, _ = _literal_current_graph_read_violations("ordinary.py", source)
+
+    assert violations == ["ordinary.py:2:ordinary_read:unselected-literal"]
+
+
+def test_current_graph_scan_guard_rejects_a_literal_only_f_string() -> None:
+    source = "def ordinary_read():\n    return f\"SELECT uuid FROM current_{'graph_object'}\"\n"
+
+    violations, _ = _literal_current_graph_read_violations("ordinary.py", source)
+
+    assert violations == ["ordinary.py:2:ordinary_read:unselected-literal"]
+
+
+def test_current_graph_scan_guard_discovers_nested_production_modules(tmp_path: Path) -> None:
+    nested = tmp_path / "feature" / "ordinary.py"
+    nested.parent.mkdir()
+    nested.write_text(
+        "def ordinary_read():\n    return 'SELECT uuid FROM current_graph_object'\n",
+        encoding="utf-8",
+    )
+
+    violations, observed = _current_graph_read_inventory(tmp_path)
+
+    assert observed
+    assert violations == ["feature/ordinary.py:2:ordinary_read:unselected-literal"]
+
+
+def test_current_graph_scan_guard_rejects_changed_selected_state_wide_literals() -> None:
+    source = (
+        "def recomputed_graph_summary():\n"
+        "    first = 'SELECT uuid FROM current_graph_object'\n"
+        "    return first, 'SELECT object_value_id FROM current_graph_object'\n"
+    )
+
+    violations, selected = _literal_current_graph_read_violations("normalized.py", source)
+
+    assert selected
+    assert violations == [
+        "normalized.py:2:recomputed_graph_summary:unselected-literal",
+        "normalized.py:3:recomputed_graph_summary:unselected-literal",
+    ]
+
+
+def test_every_literal_current_graph_read_is_bounded_or_selected_state_wide() -> None:
+    """Guard unexercised SQLite paths while runtime characterization remains primary evidence."""
+    source_root = Path(__file__).parents[2] / "vellis"
+    violations, observed = _current_graph_read_inventory(source_root)
+
+    assert observed == _SELECTED_CURRENT_GRAPH_READS
+    assert violations == []
 
 
 def test_graph_rows_head_summary_and_record_roll_back_together(tmp_path: Path) -> None:

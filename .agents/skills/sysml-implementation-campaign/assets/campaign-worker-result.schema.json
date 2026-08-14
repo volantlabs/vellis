@@ -12,12 +12,14 @@
     "checkpoint",
     "checks",
     "review_pairs",
+    "review_state_token",
+    "reviews",
     "material_findings",
     "elapsed_seconds",
     "reason"
   ],
   "properties": {
-    "schema_version": {"const": 1},
+    "schema_version": {"const": 2},
     "campaign_id": {"type": "string", "minLength": 1},
     "work_item": {"type": "string", "pattern": "^(S[0-9]{3}|closure)$"},
     "outcome": {"enum": ["checkpointed", "paused", "failed"]},
@@ -35,6 +37,24 @@
       }
     },
     "review_pairs": {"type": "integer", "minimum": 0},
+    "review_state_token": {
+      "type": ["string", "null"],
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "reviews": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["lens", "reviewer", "status", "state_token"],
+        "properties": {
+          "lens": {"enum": ["authority", "engineering"]},
+          "reviewer": {"type": "string", "minLength": 1},
+          "status": {"enum": ["clean", "findings"]},
+          "state_token": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+        }
+      }
+    },
     "material_findings": {
       "type": "array",
       "items": {
@@ -70,6 +90,8 @@
           "checkpoint": {"type": "string", "minLength": 1},
           "checks": {"minItems": 1},
           "review_pairs": {"minimum": 1},
+          "review_state_token": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+          "reviews": {"minItems": 2, "maxItems": 2},
           "reason": {"type": "null"}
         }
       },
