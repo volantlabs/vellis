@@ -3,13 +3,13 @@ evolution:
   id: evidence-suite-corrective-audit
   objective: Narrow the prior subtraction claim, bind clean reviews to current state, restore scan discrimination, and remove reconstructed duplicate evidence.
   observable_distinction: The record names only audited removals; handoff validation binds both clean lenses to current state; and restored guards reject the identified wrong systems.
-  lifecycle: active
+  lifecycle: complete
   approval:
     status: not-required
     reason: This corrects repository workflow and conformance evidence without changing accepted product meaning or external behavior.
     checkpoint: null
   blocker: null
-  checkpoint: null
+  checkpoint: git:2d94223451cc95da43b9a3cfc6552e8d1cf7f085
 baselines:
   status: current
   source:
@@ -20,16 +20,16 @@ baselines:
     checkpoint: git:872bec762f826e20450976e430046f6af6533e8f
   target:
     model: sha256:23a0fa4c525a6e89ec0740c4d4f0af283cccae44abc23b73b99f7427d7c93c7e
-    implementation: git:872bec762f826e20450976e430046f6af6533e8f
+    implementation: git:2d94223451cc95da43b9a3cfc6552e8d1cf7f085
     language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
     execution_environment: sha256:3315a10b5fcc8d62aa435d2f4e12165a147f334b01fad06ce367d11b6eb8191c
-    checkpoint: git:872bec762f826e20450976e430046f6af6533e8f
+    checkpoint: git:2d94223451cc95da43b9a3cfc6552e8d1cf7f085
   observed:
     model: sha256:23a0fa4c525a6e89ec0740c4d4f0af283cccae44abc23b73b99f7427d7c93c7e
-    implementation: git:872bec762f826e20450976e430046f6af6533e8f
+    implementation: git:2d94223451cc95da43b9a3cfc6552e8d1cf7f085
     language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
     execution_environment: sha256:3315a10b5fcc8d62aa435d2f4e12165a147f334b01fad06ce367d11b6eb8191c
-    checkpoint: git:872bec762f826e20450976e430046f6af6533e8f
+    checkpoint: git:2d94223451cc95da43b9a3cfc6552e8d1cf7f085
 scope:
   authority_scope:
     - VellisRequirements::historyIndependentCurrentWork
@@ -182,13 +182,13 @@ work_items:
       - Historical campaign evidence remains reconstructible at its committed checkpoint.
       - Product source and user-owned data remain untouched.
       - Both independent review lenses remain mandatory.
-    lifecycle: active
+    lifecycle: complete
     implementation_status: conforming
     evidence_refs:
       - command:uv run pytest tests/test_implementation_campaign.py tests/vellis/test_canonical_equality.py tests/vellis/test_definition_discovery.py tests/vellis/test_population_local_work.py -q
       - command:just check
     blocker: null
-    checkpoint: null
+    checkpoint: git:2d94223451cc95da43b9a3cfc6552e8d1cf7f085
   - id: W004
     order: 2
     label: Review and close the bounded corrective audit
@@ -214,28 +214,40 @@ work_items:
     non_effects:
       - Unaudited test scope remains explicitly named.
       - User-owned data remains untouched.
-    lifecycle: pending
-    implementation_status: not evaluated
-    evidence_refs: []
+    lifecycle: complete
+    implementation_status: conforming
+    evidence_refs:
+      - command:just skills-check
+      - command:just implementation-campaign-check
+      - command:just system-evolution-check
+      - command:just check
     blocker: null
-    checkpoint: null
+    checkpoint: git:2d94223451cc95da43b9a3cfc6552e8d1cf7f085
 closure:
-  finding_disposition: open
+  finding_disposition: complete
   model_status: unchanged
-  implementation_status: partial
-  integration_status: not evaluated
+  implementation_status: conforming
+  integration_status: conforming
   external_status: not applicable
   compatibility: Product, persistence, MCP, and compatibility behavior remain unchanged.
   reviews:
     - lens: authority and conformance
-      status: pending
-      reviewer: null
-      checkpoint: null
-      evidence_refs: []
+      status: clean
+      reviewer: agent:/root/bounded_final_authority
+      checkpoint: git:2d94223451cc95da43b9a3cfc6552e8d1cf7f085
+      evidence_refs:
+        - command:just system-evolution-check
+        - command:just check
     - lens: engineering and evidence
-      status: pending
-      reviewer: null
-      checkpoint: null
-      evidence_refs: []
-  evidence_refs: []
-  checkpoint: null
+      status: clean
+      reviewer: agent:/root/bounded_final_engineering
+      checkpoint: git:2d94223451cc95da43b9a3cfc6552e8d1cf7f085
+      evidence_refs:
+        - command:just system-evolution-check
+        - command:just check
+  evidence_refs:
+    - command:just skills-check
+    - command:just implementation-campaign-check
+    - command:just system-evolution-check
+    - command:just check
+  checkpoint: git:2d94223451cc95da43b9a3cfc6552e8d1cf7f085
