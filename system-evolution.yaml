@@ -435,20 +435,21 @@ findings:
     nearest_wrong_system: Prepared-dictionary tests preserve every apparent value while the production stdio decoder silently rounds a fractional token before the same request reaches them.
     compatibility_effect: Fractional JSON numbers retain their exact literal mathematical value through stdio input and output; integers, Booleans, schemas, tool names, and stored forms are unchanged.
   - id: F026
-    summary: The public server command reported every ServeError as an open-memory failure with unchanged established memory, including close-time checkpoint contention after a mutating session.
+    summary: The public server command reported every ServeError as an open-memory failure with unchanged established memory, and its first correction overlooked activity-ledger changes from read-only sessions.
     classification: implementation defect
-    consequence: An owner was told the wrong failed stage and that memory was unchanged even when the same report acknowledged that already-committed changes remained committed.
+    consequence: An owner could be told the wrong failed stage or that memory was unchanged even though committed canonical or activity history had changed during the completed session.
     authority_refs:
       - VellisRequirements::simpleIndividualOperation
       - VellisRequirements::observableFailure
     evidence_refs:
       - path:tests/vellis/test_cleanup_boundaries.py#test_public_server_command_keeps_the_close_stage_and_state_effect
       - path:tests/vellis/test_cleanup_boundaries.py#test_mcp_shutdown_reports_whether_the_completed_session_changed_memory
+      - path:tests/vellis/test_cleanup_boundaries.py#test_mcp_shutdown_counts_read_activity_as_a_changed_memory
     disposition: resolved
     owner_work_item_id: W005
     implementation_status: conforming
     nearest_wrong_system: The server diagnoses close contention accurately while the owner-facing command rewrites it into a pre-service failure and a false non-effect.
-    compatibility_effect: Serve failures gain their accurate stage and revision-change effect; clean serving, open failures, tool behavior, and canonical meaning are unchanged.
+    compatibility_effect: Serve failures gain their accurate stage and complete established-memory effect across canonical and activity history; clean serving, open failures, tool behavior, and canonical meaning are unchanged.
 decisions:
   - id: D001
     summary: Replace only self-reaching definitions with the permissive JSON value they stand for, then inline the rest, at the boundary that already owns the wire form.
@@ -773,7 +774,7 @@ work_items:
       reason: Both findings are implementation defects already decided by accepted exact-value and actionable-failure authority.
       checkpoint: null
     nearest_wrong_system: Unit-level tool calls and direct serve tests pass while raw stdio rounds a fraction or the public command contradicts a completed mutating session's close failure.
-    compatibility_effect: Exact fractional JSON values survive stdio round trips, and close failures report their true stage and revision effect; existing tool names, schemas, stored meaning, and clean outcomes remain unchanged.
+    compatibility_effect: Exact fractional JSON values survive stdio round trips, and close failures report their true stage and complete canonical-or-activity state effect; existing tool names, schemas, stored meaning, and clean outcomes remain unchanged.
     non_effects:
       - No model authority, persistence format, tool inventory, request schema, or owner data changes.
       - Malformed input remains distinct from a completed domain result.
@@ -783,6 +784,7 @@ work_items:
     evidence_refs:
       - path:tests/vellis/test_mcp_boundary.py#test_raw_stdio_preserves_a_high_precision_fraction_in_both_directions
       - path:tests/vellis/test_cleanup_boundaries.py#test_public_server_command_keeps_the_close_stage_and_state_effect
+      - path:tests/vellis/test_cleanup_boundaries.py#test_mcp_shutdown_counts_read_activity_as_a_changed_memory
       - command:uv run pytest tests/vellis/test_mcp_boundary.py tests/vellis/test_cleanup_boundaries.py tests/vellis/test_setup_path.py -q
       - command:just check
     blocker: null
@@ -793,7 +795,7 @@ closure:
   implementation_status: conforming
   integration_status: conforming
   external_status: not applicable
-  compatibility: Published schemas are self-contained; former scalar single-type queries remain accepted and normalize to the canonical collection; ordered string comparison adds answers for formerly refused queries; exact fractional JSON numbers now survive raw stdio round trips; close failures report their true stage and observed revision effect; persistence and canonical stored meaning are unchanged.
+  compatibility: Published schemas are self-contained; former scalar single-type queries remain accepted and normalize to the canonical collection; ordered string comparison adds answers for formerly refused queries; exact fractional JSON numbers now survive raw stdio round trips; close failures report their true stage and observed canonical-or-activity state effect; persistence and canonical stored meaning are unchanged.
   reviews:
     - lens: authority and conformance
       status: pending

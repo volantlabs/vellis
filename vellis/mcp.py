@@ -743,8 +743,8 @@ def serve(path: Path, *, name: str = "vellis") -> None:
             "check that this account can read and write that file and the directory "
             "holding it, and that --data-dir names your Vellis system's directory",
         ) from error
-    starting_revision: int | None = None
-    ending_revision: int | None = None
+    starting_position: tuple[int, int] | None = None
+    ending_position: tuple[int, int] | None = None
     try:
         try:
             established = system.is_initialized
@@ -765,19 +765,25 @@ def serve(path: Path, *, name: str = "vellis") -> None:
                 "system",
             )
         try:
-            starting_revision = system.store.current_revision()
+            starting_position = (
+                system.store.current_revision(),
+                system.store.activity_record_count(),
+            )
         except StoreError as error:
             raise ServeError(
-                f"the memory at {path} could not report its starting revision: {error}",
+                f"the memory at {path} could not report its starting position: {error}",
                 "check that this account can read and write that file, and that nothing "
                 "else is holding it open",
             ) from error
         build_server(system, name=name).run(transport="stdio")
         try:
-            ending_revision = system.store.current_revision()
+            ending_position = (
+                system.store.current_revision(),
+                system.store.activity_record_count(),
+            )
         except StoreError as error:
             raise ServeError(
-                f"the server stopped, but its memory could not report its final revision: {error}",
+                f"the server stopped, but its memory could not report its final position: {error}",
                 "resolve the reported store problem, then inspect history before restarting",
                 stage=ServeStage.CLOSE_MEMORY,
                 memory_changed=None,
@@ -801,8 +807,8 @@ def serve(path: Path, *, name: str = "vellis") -> None:
             "before copying the memory file",
             stage=ServeStage.CLOSE_MEMORY,
             memory_changed=(
-                starting_revision is not None
-                and ending_revision is not None
-                and ending_revision != starting_revision
+                starting_position is not None
+                and ending_position is not None
+                and ending_position != starting_position
             ),
         ) from error

@@ -21,9 +21,13 @@ class _BlockedCloseSystem:
 
     class _Store:
         revision = 0
+        activity_count = 0
 
         def current_revision(self) -> int:
             return self.revision
+
+        def activity_record_count(self) -> int:
+            return self.activity_count
 
     def __init__(self) -> None:
         self.store = self._Store()
@@ -66,6 +70,28 @@ def test_mcp_shutdown_reports_whether_the_completed_session_changed_memory(
         def run(self, *, transport: str) -> None:
             assert transport == "stdio"
             system.store.revision = 1
+
+    monkeypatch.setattr(mcp_boundary.RTGSystem, "open", lambda path: system)
+    monkeypatch.setattr(mcp_boundary, "build_server", lambda value, name: _Server())
+
+    with pytest.raises(mcp_boundary.ServeError) as raised:
+        mcp_boundary.serve(memory)
+
+    assert raised.value.stage == mcp_boundary.ServeStage.CLOSE_MEMORY
+    assert raised.value.memory_changed
+
+
+def test_mcp_shutdown_counts_read_activity_as_a_changed_memory(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    memory = tmp_path / "vellis.sqlite3"
+    memory.touch()
+    system = _BlockedCloseSystem()
+
+    class _Server:
+        def run(self, *, transport: str) -> None:
+            assert transport == "stdio"
+            system.store.activity_count = 1
 
     monkeypatch.setattr(mcp_boundary.RTGSystem, "open", lambda path: system)
     monkeypatch.setattr(mcp_boundary, "build_server", lambda value, name: _Server())
