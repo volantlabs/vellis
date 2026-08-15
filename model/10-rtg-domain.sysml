@@ -582,13 +582,14 @@ package RTG {
     }
 
     item def 'Return Shape' {
-        item projections [1..*] : 'Return Projection';
+        item projections [*] : 'Return Projection';
         doc /*
          * Selects named anchor, link, associated-data, and property bindings.
          * Every projection references a selector owned by its graph query, and
-         * every projection name is unique within that query.
-         * Aggregation, sorting, pagination, traversal, and computed expressions
-         * are outside this query model.
+         * every projection name is unique within that query. A return shape may
+         * be empty only when its graph query asks for at least one aggregation.
+         * Sorting, pagination, traversal, and computed expressions are outside
+         * this query model.
          */
     }
 

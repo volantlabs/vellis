@@ -38,7 +38,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
-from threading import RLock
+from threading import Lock, RLock
 from typing import TYPE_CHECKING
 from urllib.parse import quote
 
@@ -685,6 +685,9 @@ class StoreError(RuntimeError):
     """Raised when durable state cannot be read or written safely."""
 
 
+_CHECKPOINT_LOCK = Lock()
+
+
 class NotADatabaseError(StoreError):
     """Raised when the file at a store path is not a database at all.
 
@@ -1137,13 +1140,31 @@ class CanonicalStore:
         a copy taken while the memory is open, which is a thing to say in the guidance
         rather than a thing to solve here.
         """
-        try:
-            self._connection.execute("PRAGMA wal_checkpoint(TRUNCATE)")
-        except sqlite3.Error:
-            # Closing is not the moment to fail. A checkpoint that could not run leaves
-            # the log in place, which is exactly where it already was.
-            pass
+        # Release this connection before checkpointing. Several Vellis connections may
+        # be ending together (the initialization race is a deliberate example); holding
+        # this reader while waiting for theirs would make each close prevent the others.
         self._connection.close()
+        try:
+            with (
+                _CHECKPOINT_LOCK,
+                closing(sqlite3.connect(self._path, isolation_level=None)) as checkpoint_connection,
+            ):
+                checkpoint_connection.execute("PRAGMA busy_timeout = 1000")
+                checkpoint = checkpoint_connection.execute(
+                    "PRAGMA wal_checkpoint(TRUNCATE)"
+                ).fetchone()
+                if checkpoint is None or int(checkpoint[0]) != 0:
+                    raise StoreError(
+                        f"could not finish closing the canonical store at {self._path}: "
+                        "another database reader prevented the write-ahead log checkpoint; "
+                        "close that reader and open then close Vellis again before copying the file"
+                    )
+        except StoreError:
+            raise
+        except sqlite3.Error as error:
+            raise StoreError(
+                f"could not finish closing the canonical store at {self._path}: {error}"
+            ) from error
 
     def _ensure_schema(self) -> None:
         if not _schema_present(self._connection):

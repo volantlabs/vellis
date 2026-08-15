@@ -104,12 +104,13 @@ package VellisRequirements {
          * reads, and a selection exceeding it shall be rejected whole, so
          * returning one number never licenses reading an unbounded population.
          * Evaluation shall not multiply work across selector components
-         * disconnected from every projected selector. Such a component shall
-         * affect the result only through whether it has at least one satisfying
-         * assignment. Query work may scale with candidates and conditions inside
-         * a component that can change a projected tuple, with combinations of
-         * projected components, and with distinct rows needed to decide the
-         * caller's maximum.
+         * disconnected from every projected or aggregated selector. Such a
+         * component shall affect the result only through whether it has at least
+         * one satisfying assignment. Query work may scale with candidates and
+         * conditions inside a component that can change a projected tuple or an
+         * aggregated population, with combinations of result-bearing components,
+         * and with distinct rows or matched objects needed to decide the caller's
+         * maximum.
          * Evaluation shall stop after enough distinct projected rows to decide
          * the caller's bound and shall not materialize an unbounded candidate
          * population merely because its type participates in the query.

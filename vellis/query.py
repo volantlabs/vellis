@@ -1101,18 +1101,19 @@ def _distinct_rows(query: GraphQuery, index: QueryCandidateIndex) -> tuple[Graph
 
 
 def _assignments(query: GraphQuery, index: QueryCandidateIndex):
-    """Enumerate projected assignments without multiplying irrelevant components.
+    """Enumerate result-bearing assignments without multiplying irrelevant components.
 
-    A disconnected component with no projection is an existence condition: zero
-    satisfying assignments removes every row, while one or a million have the same
-    effect. Projected components are deduplicated by their own projected tuple before
-    they are combined, so unprojected variation inside a component cannot manufacture
-    repeated global assignments either.
+    A disconnected component with neither a projection nor an aggregation is an
+    existence condition: zero satisfying assignments removes every result, while one or
+    a million have the same effect. Result-bearing components are deduplicated by their
+    own projected tuple and aggregated object identities before they are combined, so
+    variation that can change neither answer cannot manufacture repeated global
+    assignments either.
     """
     projected_components: list[tuple[_Assignment, ...]] = []
     for names in _selector_components(query):
         component = _component_query(query, names)
-        if not component.return_shape.projections:
+        if not component.return_shape.projections and not component.aggregations:
             if next(_component_assignments(component, index), None) is None:
                 return
             continue
@@ -1196,23 +1197,44 @@ def _component_query(query: GraphQuery, names: frozenset[str]) -> GraphQuery:
         ),
         required_links=links,
         return_shape=ReturnShape(projections=projections),
+        aggregations=tuple(
+            aggregation for aggregation in query.aggregations if aggregation.data_condition in names
+        ),
         maximum_rows=query.maximum_rows,
+        historical_selection=query.historical_selection,
+        state_scope=query.state_scope,
     )
 
 
 def _distinct_component_assignments(
     query: GraphQuery, index: QueryCandidateIndex
 ) -> tuple[_Assignment, ...]:
-    """Keep one assignment for each distinct projection inside one component."""
+    """Keep assignments that can change a projection or aggregated population."""
+    aggregated_conditions = tuple(
+        dict.fromkeys(aggregation.data_condition for aggregation in query.aggregations)
+    )
     seen: set[tuple[object, ...]] = set()
     assignments: list[_Assignment] = []
     for assignment in _component_assignments(query, index):
-        key = _row_identity(_project(query, assignment))
+        key = (
+            _row_identity(_project(query, assignment)),
+            tuple(
+                (
+                    name,
+                    bound.uuid if (bound := assignment.endpoints.get(name)) is not None else None,
+                )
+                for name in aggregated_conditions
+            ),
+        )
         if key in seen:
             continue
         seen.add(key)
         assignments.append(assignment)
-        if len(assignments) > query.maximum_rows:
+        # A projection can decide refusal one row past the bound. An aggregation is
+        # bounded by distinct matched objects rather than by joint assignments, so it
+        # must see the whole connected component unless one of its own populations has
+        # already crossed the bound in _walk.
+        if not aggregated_conditions and len(assignments) > query.maximum_rows:
             break
     return tuple(assignments)
 

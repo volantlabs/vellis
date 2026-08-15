@@ -218,6 +218,29 @@ async def test_typed_current_change_and_bounded_query_round_trip(client: Client)
 
 
 @pytest.mark.anyio
+async def test_the_former_single_anchor_type_spelling_remains_callable(client: Client) -> None:
+    """A multi-type extension must not invalidate already accepted singleton requests."""
+    async with client:
+        queried = await client.call_tool(
+            "rtg_query",
+            {
+                "query": {
+                    "anchor_groups": [{"name": "people", "anchor_type": "person"}],
+                    "return_shape": {"projections": [{"name": "person", "anchor_group": "people"}]},
+                    "maximum_rows": 2,
+                }
+            },
+            raise_on_error=False,
+        )
+    assert not queried.is_error
+    assert queried.structured_content is not None
+    assert queried.structured_content["status"] == "accepted"
+    returned_query = queried.structured_content["query"]
+    assert returned_query["anchor_groups"][0]["anchor_types"] == ["person"]
+    assert "anchor_type" not in returned_query["anchor_groups"][0]
+
+
+@pytest.mark.anyio
 async def test_proposal_assessment_and_exact_activation_use_typed_requests(
     client: Client,
 ) -> None:

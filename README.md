@@ -189,8 +189,10 @@ Use these words precisely:
   refusal and every execution failure in those workflows reaches the caller and leaves graph,
   definitions, delta, revision, and canonical history where they were. The owner-only operations —
   activity retention, snapshots, the recovery check, and restoration — are verified at the system
-  boundary that realizes them; of those, only preserving a snapshot has an owner-facing command,
-  because that document is one of the inputs setup takes. Support for incremental
+  boundary that realizes them. Preserving a snapshot has the owner-facing
+  `uv run python -m vellis.preserve --out FILE` command because that document is one of the inputs
+  setup takes; restoration has `uv run python -m vellis restore --revision REVISION` (or `--time`)
+  and confirms before committing the selected historical state forward. Support for incremental
   owner-visible improvement analysis is verified the same way: an externally scheduled agent reads
   explicit bounded intervals of both ledgers, discovers the vocabulary those states had, asks
   bounded current and historical questions, and continues a later run from the interval it already

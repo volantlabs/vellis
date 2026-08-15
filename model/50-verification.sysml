@@ -58,6 +58,9 @@ package VellisVerification {
              * result is. Reject an aggregation whose property its condition does
              * not define, whose operator cannot sum or order that property's
              * kind, or which omits a property its operator requires.
+             * Issue an aggregation-only query and repeat it through the durable
+             * and in-memory indexed realizations; show both return the same count,
+             * sum, minimum, and maximum over the same object identities.
              * Order a number-valued property by exact mathematical value and a
              * string-valued property by exact Unicode code-point sequence,
              * including a value whose code-point order differs from its order

@@ -18,7 +18,7 @@ from pathlib import Path
 import pytest
 from conftest import build_rich_definitions
 
-from tests.vellis.oracle import materialize_state
+from tests.vellis.oracle import evaluate_query, materialize_state
 from tests.vellis.semantic_state import semantic_state_equal
 from vellis.canonical import Provenance
 from vellis.changes import GraphChange
@@ -1590,6 +1590,51 @@ def test_aggregation_counts_matching_objects_not_distinct_projected_tuples(
         assert answers["total"].value == Decimal(9)
         assert answers["lowest"].value == Decimal(2)
         assert answers["highest"].value == Decimal(5)
+    finally:
+        system.close()
+
+
+def test_aggregation_agrees_between_the_stored_and_in_memory_graph(tmp_path: Path) -> None:
+    """Component pruning must retain every identity that can change an aggregate."""
+    system = RTGSystem.open(tmp_path / "vellis.sqlite3")
+    try:
+        definitions = build_rich_definitions()
+        assert system.initialize_fresh(
+            definitions, provenance=_owner(), initialization_summary="a fresh start"
+        ).accepted
+        assert system.apply_graph_change(
+            GraphChange(
+                anchor_upserts=(ADA,),
+                associated_data_upserts=(
+                    _note("n-1", ("a-1",), rating=2),
+                    _note("n-2", ("a-1",), rating=5),
+                ),
+            ),
+            provenance=_owner(),
+        ).accepted
+        query = _rating_query(
+            QueryAggregation(
+                name="howMany", operator=AggregationOperator.COUNT, data_condition="notes"
+            ),
+            QueryAggregation(
+                name="total",
+                operator=AggregationOperator.SUM,
+                data_condition="notes",
+                property_name="rating",
+            ),
+        )
+
+        stored = system.query_graph(query)
+        state = materialize_state(system)
+        in_memory = evaluate_query(query, definitions, state.graph, state.revision)
+
+        assert stored.status is OperationStatus.ACCEPTED, stored.findings
+        assert in_memory.status is OperationStatus.ACCEPTED, in_memory.findings
+        assert in_memory.aggregates == stored.aggregates
+        assert [(each.aggregation, each.present, each.value) for each in in_memory.aggregates] == [
+            ("howMany", True, Decimal(2)),
+            ("total", True, Decimal(7)),
+        ]
     finally:
         system.close()
 

@@ -15,6 +15,7 @@ import sqlite3
 from datetime import UTC, datetime
 from decimal import Decimal
 from pathlib import Path
+from shutil import copyfile
 
 import pytest
 from conftest import build_rich_definitions
@@ -80,6 +81,47 @@ def test_the_journal_mode_and_application_marker_are_set(tmp_path: Path) -> None
         assert int(inspect.execute("PRAGMA application_id").fetchone()[0]) == APPLICATION_ID
     finally:
         inspect.close()
+
+
+def test_close_reports_a_reader_that_prevents_a_complete_checkpoint(tmp_path: Path) -> None:
+    """A busy WAL checkpoint cannot be reported as a clean single-file close."""
+    path = tmp_path / "vellis.sqlite3"
+    system = RTGSystem.open(path)
+    assert system.initialize_fresh(
+        GraphDefinitionSet(anchor_types=(AnchorTypeDefinition("person", "A person."),)),
+        provenance=Provenance("owner"),
+        initialization_summary="fresh",
+    ).accepted
+
+    reader = sqlite3.connect(path)
+    try:
+        reader.execute("BEGIN")
+        assert reader.execute("SELECT revision FROM state_head WHERE id = 0").fetchone() == (0,)
+        assert system.apply_graph_change(
+            GraphChange(anchor_upserts=(Anchor("a-1", "person", "Ada"),)),
+            provenance=Provenance("owner"),
+        ).accepted
+
+        with pytest.raises(StoreError, match="reader prevented the write-ahead log checkpoint"):
+            system.close()
+        assert path.with_name(f"{path.name}-wal").exists()
+    finally:
+        reader.close()
+
+    # Once the conflicting reader is gone, a subsequent clean lifecycle can make the
+    # named file independently copyable. No WAL or SHM file is copied with it.
+    reopened = RTGSystem.open(path)
+    assert materialize_state(reopened).revision == 1
+    reopened.close()
+    copied = tmp_path / "copied.sqlite3"
+    copyfile(path, copied)
+    copy = RTGSystem.open(copied)
+    try:
+        copied_state = materialize_state(copy)
+        assert copied_state.revision == 1
+        assert {anchor.uuid for anchor in copied_state.graph.anchors} == {"a-1"}
+    finally:
+        copy.close()
 
 
 def test_normalized_object_identity_frames_collections_and_fields(tmp_path: Path) -> None:

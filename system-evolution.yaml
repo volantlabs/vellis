@@ -1,8 +1,8 @@
 schema_version: "1.0"
 evolution:
   id: callable-tool-surface-and-value-fidelity
-  objective: Make every selected MCP tool callable by a client that resolves no references, keep a stored value's JSON kind the one its caller sent, and let an owner ask a date-range question of their own patterned dates.
-  observable_distinction: Discovery returns ten self-contained input schemas with no definitions block and no unresolved reference, the three tools carrying owner values become callable instead of arriving as untyped blanks, a stored one or zero reads back as a number wherever it sits rather than as a Boolean, a patterned date range is answerable, and a removal that orphans a reference is refused on a system that has already activated a proposal.
+  objective: Close the callable-tool and scale-simulation findings so queries preserve one meaning across realizations and request generations, clean close reports checkpoint contention, and owner guidance matches the runnable surface.
+  observable_distinction: Discovery returns ten self-contained input schemas, stored JSON kinds remain exact, aggregate-only queries agree between durable and in-memory evaluation, former single-type MCP requests remain callable, a clean close either consolidates the WAL or reports the reader preventing it, restoration is documented, patterned dates are queryable, and orphaning definition edits are refused.
   lifecycle: active
   approval:
     status: not-required
@@ -18,18 +18,26 @@ baselines:
     language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
     execution_environment: sha256:3315a10b5fcc8d62aa435d2f4e12165a147f334b01fad06ce367d11b6eb8191c
     checkpoint: git:8baa73aa38a736e5920c25f466f31fa772d41801
-  target: null
-  observed:
-    model: sha256:bba8d6a7ad85c9dc2964f036186aa4e91ef7191f7862570a450d5c6e709c3e94
-    implementation: git:8baa73aa38a736e5920c25f466f31fa772d41801
+  target:
+    model: sha256:be5f4a65ecdb214133cef80424595bd84053f62ad3b4b4e34bb75c50e46fab6d
+    implementation: git:ad14986e0490f4578b3806a6773f65fa8c6ffb56
     language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
     execution_environment: sha256:3315a10b5fcc8d62aa435d2f4e12165a147f334b01fad06ce367d11b6eb8191c
-    checkpoint: git:8baa73aa38a736e5920c25f466f31fa772d41801
+    checkpoint: git:ad14986e0490f4578b3806a6773f65fa8c6ffb56
+  observed:
+    model: sha256:be5f4a65ecdb214133cef80424595bd84053f62ad3b4b4e34bb75c50e46fab6d
+    implementation: git:ad14986e0490f4578b3806a6773f65fa8c6ffb56
+    language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
+    execution_environment: sha256:3315a10b5fcc8d62aa435d2f4e12165a147f334b01fad06ce367d11b6eb8191c
+    checkpoint: git:ad14986e0490f4578b3806a6773f65fa8c6ffb56
 scope:
   authority_scope:
     - VellisRequirements::mcpAgentToolContract
     - VellisRequirements::mcpOutcomeIntegrity
     - VellisRequirements::canonicalSemanticEquality
+    - VellisRequirements::semanticQueryMeaning
+    - VellisRequirements::querySafety
+    - VellisRequirements::durableCanonicalHistory
     - RTGSystem
     - AGENTS.md
   implementation_scope:
@@ -54,12 +62,14 @@ scope:
     - tests/test_system_evolution.py
     - vellis/__main__.py
     - tests/vellis/test_historical_restore.py
+    - tests/vellis/test_store_integrity.py
+    - README.md
   review_lenses:
     - authority and conformance
     - engineering and evidence
   non_goals:
-    - Changing the ten selected tool names, their semantics, or any operation's validation.
-    - Changing SysML authority, persistence formats, canonical meaning, or compatibility behavior.
+    - Changing the ten selected tool names or their authorization boundary.
+    - Changing persistence formats or canonical stored meaning.
     - Constraining a stored property value more tightly than the owner's own definitions do.
     - Replacing definitions that are capable of being written out with a permissive value.
 findings:
@@ -209,6 +219,7 @@ findings:
       - VellisRequirements::semanticQueryMeaning
     evidence_refs:
       - path:tests/vellis/test_graph_queries.py#test_aggregation_counts_matching_objects_not_distinct_projected_tuples
+      - path:tests/vellis/test_graph_queries.py#test_aggregation_agrees_between_the_stored_and_in_memory_graph
     disposition: resolved
     owner_work_item_id: W001
     implementation_status: conforming
@@ -222,11 +233,12 @@ findings:
       - VellisRequirements::semanticQueryMeaning
     evidence_refs:
       - path:tests/vellis/test_graph_queries.py#test_an_anchor_group_may_name_several_types
+      - path:tests/vellis/test_mcp_boundary.py#test_the_former_single_anchor_type_spelling_remains_callable
     disposition: resolved
     owner_work_item_id: W001
     implementation_status: conforming
     nearest_wrong_system: A caller merges per-type results by hand and silently omits a type the vocabulary gained since they wrote the query.
-    compatibility_effect: A group now names one or more types; every existing single-type query means exactly what it meant.
+    compatibility_effect: A group now names one or more types; the former scalar wire spelling remains accepted as the same singleton group while discovery and returned queries use the canonical collection.
   - id: F013
     summary: Historical restoration was modelled, implemented, and covered by twenty tests, with no path by which any owner or agent could invoke it.
     classification: implementation defect
@@ -248,12 +260,12 @@ findings:
     authority_refs:
       - VellisRequirements::durableCanonicalHistory
     evidence_refs:
-      - command:uv run pytest tests/vellis/test_store_integrity.py -q
+      - path:tests/vellis/test_store_integrity.py#test_close_reports_a_reader_that_prevents_a_complete_checkpoint
     disposition: resolved
     owner_work_item_id: W001
     implementation_status: conforming
     nearest_wrong_system: An owner keeps a backup of their memory that is quietly a snapshot of a different day.
-    compatibility_effect: A cleanly closed store is wholly in its own file. A copy taken while the memory is open remains a guidance matter rather than something the store can decide.
+    compatibility_effect: A clean close leaves the store wholly in its named file; a reader that prevents that guarantee now makes close fail with a corrective action instead of silently reporting success.
   - id: F015
     summary: An accepted approval must name a checkpoint whose own record already shows it accepted, so the first such record can never be written.
     classification: implementation defect
@@ -267,6 +279,22 @@ findings:
     implementation_status: conforming
     nearest_wrong_system: The workflow enforces owner acceptance rigorously and provides no way to record that it happened, so the rule is satisfied only by never using it.
     compatibility_effect: The accepted state becomes reachable. What a checkpoint must still show is that the decision was open and that its consequence has not changed since.
+  - id: F016
+    summary: Return Shape required at least one projection while Graph Query and the implementation permit a query containing only aggregations.
+    classification: implementation defect
+    consequence: Accepted authority described aggregation-only queries as both valid and impossible, so model conformance could not be assessed consistently and the in-memory evaluator pruned their result-bearing component.
+    authority_refs:
+      - RTG::'Return Shape'
+      - RTG::'Graph Query'
+      - VellisRequirements::querySafety
+    evidence_refs:
+      - path:tests/vellis/test_graph_queries.py#test_aggregation_agrees_between_the_stored_and_in_memory_graph
+      - command:just model-check
+    disposition: resolved
+    owner_work_item_id: W001
+    implementation_status: conforming
+    nearest_wrong_system: The durable evaluator returns a correct total while replayed graph evaluation returns zero, and both claim to realize the same accepted query.
+    compatibility_effect: No accepted query changes meaning; the projection multiplicity and disconnected-component rule now express the aggregation-only behavior the Graph Query authority already selected.
 decisions:
   - id: D001
     summary: Replace only self-reaching definitions with the permissive JSON value they stand for, then inline the rest, at the boundary that already owns the wire form.
@@ -416,13 +444,13 @@ decisions:
 work_items:
   - id: W001
     order: 1
-    label: Publish self-contained input schemas for the selected tool surface
+    label: Close callable-tool and scale-simulation defects across the selected boundary
     kind: implementation
     dependencies: []
     planned_baseline:
       dimension: implementation
-      identity: git:8baa73aa38a736e5920c25f466f31fa772d41801
-    finding_ids: [F001, F002, F003, F004, F005, F006, F007, F009, F010, F011, F012, F013, F014]
+      identity: git:ad14986e0490f4578b3806a6773f65fa8c6ffb56
+    finding_ids: [F001, F002, F003, F004, F005, F006, F007, F009, F010, F011, F012, F013, F014, F016]
     decision_ids: [D001, D002, D003, D005, D006, D007]
     authority:
       - refs:
@@ -434,7 +462,7 @@ work_items:
       reason: An implementation defect already decided by accepted MCP contract meaning is ordinary implementation work.
       checkpoint: null
     nearest_wrong_system: The surface exposes ten correct tools and a caller can only invoke seven of them.
-    compatibility_effect: Callers gain typed request schemas; no accepted request or result changes shape.
+    compatibility_effect: Callers gain typed schemas and multi-type groups while the former scalar singleton spelling remains accepted; canonical results use the collection shape.
     non_effects:
       - Validation still runs against the real request types, not the published schema.
       - Stored property values remain constrained only by the owner's definitions.
@@ -443,6 +471,7 @@ work_items:
     implementation_status: conforming
     evidence_refs:
       - command:uv run pytest tests/vellis/test_mcp_boundary.py -q
+      - command:uv run pytest tests/vellis/test_graph_queries.py tests/vellis/test_store_integrity.py -q
     blocker: null
     checkpoint: null
   - id: W002
@@ -481,7 +510,7 @@ work_items:
     dependencies: []
     planned_baseline:
       dimension: model
-      identity: sha256:bba8d6a7ad85c9dc2964f036186aa4e91ef7191f7862570a450d5c6e709c3e94
+      identity: sha256:be5f4a65ecdb214133cef80424595bd84053f62ad3b4b4e34bb75c50e46fab6d
     finding_ids: [F008, F015]
     decision_ids: [D004, D008]
     authority:
@@ -511,7 +540,7 @@ closure:
   implementation_status: partial
   integration_status: not evaluated
   external_status: not applicable
-  compatibility: Published input schemas become self-contained; accepted requests, results, persistence, and canonical meaning are unchanged.
+  compatibility: Published schemas are self-contained; former scalar single-type queries remain accepted and normalize to the canonical collection; persistence and canonical stored meaning are unchanged.
   reviews:
     - lens: authority and conformance
       status: pending
