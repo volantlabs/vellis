@@ -5,9 +5,9 @@ evolution:
   observable_distinction: Discovery returns ten self-contained input schemas, stored JSON kinds remain exact, aggregate-only queries agree between durable and in-memory evaluation, former single-type MCP requests remain callable, a clean close either consolidates the WAL or reports the reader preventing it, restoration is documented, patterned dates are queryable, and orphaning definition edits are refused.
   lifecycle: active
   approval:
-    status: pending
-    reason: The owner must seal the modeling correction that resolves contradictory aggregation-only query authority before closure.
-    checkpoint: null
+    status: accepted
+    reason: The owner explicitly directed "fix all findings," accepting the reviewed aggregation-only authority correction whose decision was open at the bound checkpoint.
+    checkpoint: git:aaf09834ca798b571f30b99c4426c77aee04b1df
   blocker: null
   checkpoint: null
 baselines:
@@ -292,7 +292,7 @@ findings:
       - path:tests/vellis/test_graph_queries.py#test_aggregation_agrees_between_the_stored_and_in_memory_graph
       - path:tests/vellis/test_graph_queries.py#test_in_memory_aggregation_stops_when_the_maximum_is_decided
       - command:just model-check
-    disposition: model-change
+    disposition: resolved
     owner_work_item_id: W004
     implementation_status: conforming
     nearest_wrong_system: The durable evaluator returns a correct total while replayed graph evaluation returns zero, and both claim to realize the same accepted query.
@@ -572,9 +572,9 @@ work_items:
         coverage: full
         remaining_work_item_ids: []
     approval:
-      status: pending
+      status: accepted
       reason: Resolving contradictory projection cardinality selects one coherent accepted meaning for aggregation-only queries, and the owner explicitly requested that reviewed correction.
-      checkpoint: null
+      checkpoint: git:aaf09834ca798b571f30b99c4426c77aee04b1df
     nearest_wrong_system: One accepted declaration permits aggregation-only queries while another makes every such query an impossible model instance.
     compatibility_effect: Aggregation-only queries become consistently modeled; existing projected and aggregated requests retain their accepted results.
     non_effects:
