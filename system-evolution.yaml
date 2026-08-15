@@ -5,9 +5,9 @@ evolution:
   observable_distinction: Discovery returns ten self-contained input schemas, stored JSON kinds remain exact, aggregate-only queries agree between durable and in-memory evaluation, former single-type MCP requests remain callable, a clean close either consolidates the WAL or reports the reader preventing it, restoration is documented, patterned dates are queryable, and orphaning definition edits are refused.
   lifecycle: active
   approval:
-    status: pending
-    reason: The owner must seal the modeling correction that resolves contradictory aggregation-only query authority before closure.
-    checkpoint: null
+    status: accepted
+    reason: The owner explicitly directed "fix all findings," accepting the reviewed aggregation-only authority correction whose decision was open at the bound checkpoint.
+    checkpoint: git:428faa3753365862626aa108ae55ad79535f97e8
   blocker: null
   checkpoint: null
 baselines:
@@ -81,7 +81,7 @@ findings:
       - VellisRequirements::mcpAgentToolContract
     evidence_refs:
       - path:tests/vellis/test_mcp_boundary.py#test_published_input_schemas_carry_their_whole_meaning
-    disposition: model-change
+    disposition: resolved
     owner_work_item_id: W001
     implementation_status: conforming
     nearest_wrong_system: Every tool body and every validation behaves correctly while three of the ten tools are unreachable through core discovery and invocation.
@@ -572,9 +572,9 @@ work_items:
         coverage: full
         remaining_work_item_ids: []
     approval:
-      status: pending
+      status: accepted
       reason: Resolving contradictory projection cardinality selects one coherent accepted meaning for aggregation-only queries, and the owner explicitly requested that reviewed correction.
-      checkpoint: null
+      checkpoint: git:428faa3753365862626aa108ae55ad79535f97e8
     nearest_wrong_system: One accepted declaration permits aggregation-only queries while another makes every such query an impossible model instance.
     compatibility_effect: Aggregation-only queries become consistently modeled; existing projected and aggregated requests retain their accepted results.
     non_effects:
