@@ -37,7 +37,14 @@ from typing import Protocol
 from vellis.definitions import AssociatedDataTypeDefinition, GraphDefinitionSet
 from vellis.graph import Anchor, AssociatedDataObject, Link, LinkEndpoint
 from vellis.history import HistoricalSelection
-from vellis.json_value import JsonKind, JsonValue, json_equal, json_kind, unencodable_reason
+from vellis.json_value import (
+    MAXIMUM_STORED_INTEGER_EXPONENT,
+    JsonKind,
+    JsonValue,
+    json_equal,
+    json_kind,
+    unencodable_reason,
+)
 from vellis.outcomes import OperationStatus, ValidationFinding
 
 __all__ = [
@@ -1087,7 +1094,8 @@ def _exact_decimal_sum(values: Sequence[JsonValue]) -> Decimal:
     """Add finite decimals with context-free integer coefficient arithmetic."""
     if not values:
         return Decimal(0)
-    coefficients: list[tuple[int, int]] = []
+    coefficients: dict[int, int] = {}
+    input_digits = 0
     for value in values:
         assert isinstance(value, Decimal)
         shape = value.as_tuple()
@@ -1095,11 +1103,33 @@ def _exact_decimal_sum(values: Sequence[JsonValue]) -> Decimal:
         coefficient = 0
         for digit in shape.digits:
             coefficient = coefficient * 10 + digit
-        coefficients.append((shape.exponent, -coefficient if shape.sign else coefficient))
-    lowest_place = min(exponent for exponent, _ in coefficients)
-    total = sum(
-        coefficient * 10 ** (exponent - lowest_place) for exponent, coefficient in coefficients
+        input_digits += len(shape.digits)
+        exponent = shape.exponent
+        while coefficient and coefficient % 10 == 0:
+            coefficient //= 10
+            exponent += 1
+        signed = -coefficient if shape.sign else coefficient
+        coefficients[exponent] = coefficients.get(exponent, 0) + signed
+    terms: list[tuple[int, int]] = []
+    for exponent, coefficient in coefficients.items():
+        while coefficient and coefficient % 10 == 0:
+            coefficient //= 10
+            exponent += 1
+        if coefficient:
+            terms.append((exponent, coefficient))
+    if not terms:
+        return Decimal(0)
+    lowest_place = min(exponent for exponent, _ in terms)
+    highest_place = max(
+        exponent + _integer_digit_count(coefficient) - 1 for exponent, coefficient in terms
     )
+    permitted_span = max(MAXIMUM_STORED_INTEGER_EXPONENT, input_digits + len(str(len(values))))
+    if highest_place - lowest_place + 1 > permitted_span:
+        raise ArithmeticError(
+            "the exact aggregate sum would require expanding compact numeric inputs "
+            "beyond the finite result materialization bound"
+        )
+    total = sum(coefficient * 10 ** (exponent - lowest_place) for exponent, coefficient in terms)
     if total == 0:
         return Decimal(0)
     while total % 10 == 0:
@@ -1118,6 +1148,16 @@ def _exact_decimal_sum(values: Sequence[JsonValue]) -> Decimal:
         raise ArithmeticError(
             "the exact aggregate sum is outside the finite decimal result range"
         ) from error
+
+
+def _integer_digit_count(value: int) -> int:
+    """Count coefficient digits without the interpreter's integer-to-text limit."""
+    remaining = abs(value)
+    digits = 1
+    while remaining >= 10:
+        remaining //= 10
+        digits += 1
+    return digits
 
 
 def _distinct_rows(query: GraphQuery, index: QueryCandidateIndex) -> tuple[GraphQueryRow, ...]:

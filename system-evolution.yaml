@@ -406,6 +406,20 @@ findings:
     implementation_status: conforming
     nearest_wrong_system: Exact coefficient arithmetic succeeds, then result construction raises at the representation boundary through both otherwise-agreeing evaluators.
     compatibility_effect: Representable sums remain exact; an exact sum outside the finite decimal result range is now refused whole with a typed finding instead of raising.
+  - id: F024
+    summary: Exact summation aligned widely separated exponents by materializing a power-of-ten coefficient before deciding whether the result was returnable.
+    classification: implementation defect
+    consequence: Two compact accepted numeric inputs could trigger population-sized allocation or MemoryError instead of a bounded whole-query refusal.
+    authority_refs:
+      - VellisRequirements::querySafety
+      - VellisRequirements::mcpOutcomeIntegrity
+    evidence_refs:
+      - path:tests/vellis/test_graph_queries.py#test_sum_refuses_compact_inputs_that_require_population_sized_expansion
+    disposition: resolved
+    owner_work_item_id: W001
+    implementation_status: conforming
+    nearest_wrong_system: Match count stays within the caller's bound while two short exponent spellings cause unbounded transient coefficient materialization.
+    compatibility_effect: Exact sums whose coefficient span is proportional to accepted input size remain unchanged; superlinear compact-input expansion is refused whole with a typed finding before allocation.
 decisions:
   - id: D001
     summary: Replace only self-reaching definitions with the permissive JSON value they stand for, then inline the rest, at the boundary that already owns the wire form.
@@ -561,7 +575,7 @@ work_items:
     planned_baseline:
       dimension: implementation
       identity: git:a64a71948d17ac7229464f572a9cdb7f052ec3c9
-    finding_ids: [F001, F002, F003, F004, F005, F006, F007, F009, F010, F011, F012, F013, F014, F017, F018, F019, F020, F022, F023]
+    finding_ids: [F001, F002, F003, F004, F005, F006, F007, F009, F010, F011, F012, F013, F014, F017, F018, F019, F020, F022, F023, F024]
     decision_ids: [D001, D002, D003, D005, D006, D007]
     authority:
       - refs:

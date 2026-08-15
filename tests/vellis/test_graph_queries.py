@@ -1766,6 +1766,47 @@ def test_sum_preserves_exact_numbers_at_the_decimal_exponent_boundary(tmp_path: 
         assert "outside the finite decimal result range" in result.findings[0].summary
 
 
+def test_sum_refuses_compact_inputs_that_require_population_sized_expansion() -> None:
+    """A wide exponent gap is decided before constructing its million-digit coefficient."""
+    base = build_rich_definitions()
+    note_type = base.associated_data_types[0]
+    definitions = replace(
+        base,
+        associated_data_types=(
+            replace(
+                note_type,
+                property_constraints=tuple(
+                    replace(rule, value_range=None) if rule.property_name == "rating" else rule
+                    for rule in note_type.property_constraints
+                ),
+            ),
+        ),
+    )
+    result = evaluate_query(
+        _rating_query(
+            QueryAggregation(
+                name="total",
+                operator=AggregationOperator.SUM,
+                data_condition="notes",
+                property_name="rating",
+            )
+        ),
+        definitions,
+        Graph(
+            anchors=(ADA,),
+            associated_data=(
+                _note("n-1", ("a-1",), rating=Decimal(1)),
+                _note("n-2", ("a-1",), rating=Decimal("1e-1000000")),
+            ),
+        ),
+        0,
+    )
+
+    assert result.status is OperationStatus.REJECTED
+    assert not result.rows and not result.aggregates
+    assert "expanding compact numeric inputs" in result.findings[0].summary
+
+
 def test_aggregation_agrees_between_the_stored_and_in_memory_graph(tmp_path: Path) -> None:
     """Component pruning must retain every identity that can change an aggregate."""
     system = RTGSystem.open(tmp_path / "vellis.sqlite3")
