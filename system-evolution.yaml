@@ -457,16 +457,28 @@ work_items:
           - VellisRequirements::mcpAgentToolContract
         coverage: partial
         remaining_work_item_ids: [W002]
+      - refs:
+          - RTG::'Return Shape'
+          - RTG::'Graph Query'
+          - VellisRequirements::semanticQueryMeaning
+          - VellisRequirements::querySafety
+        coverage: partial
+        remaining_work_item_ids: [W002]
+      - refs:
+          - VellisRequirements::durableCanonicalHistory
+        coverage: partial
+        remaining_work_item_ids: [W002]
     approval:
       status: not-required
       reason: An implementation defect already decided by accepted MCP contract meaning is ordinary implementation work.
       checkpoint: null
-    nearest_wrong_system: The surface exposes ten correct tools and a caller can only invoke seven of them.
+    nearest_wrong_system: The surface is callable while one evaluator returns wrong or population-sized aggregate work, a legacy request is malformed, or close silently leaves the named file incomplete.
     compatibility_effect: Callers gain typed schemas and multi-type groups while the former scalar singleton spelling remains accepted; canonical results use the collection shape.
     non_effects:
       - Validation still runs against the real request types, not the published schema.
       - Stored property values remain constrained only by the owner's definitions.
       - Canonical state, persistence format, and user-owned data are untouched.
+      - A rejected over-bound query returns no partial rows or aggregates.
     lifecycle: active
     implementation_status: conforming
     evidence_refs:
@@ -487,6 +499,11 @@ work_items:
     authority:
       - refs:
           - VellisRequirements::mcpAgentToolContract
+          - RTG::'Return Shape'
+          - RTG::'Graph Query'
+          - VellisRequirements::semanticQueryMeaning
+          - VellisRequirements::querySafety
+          - VellisRequirements::durableCanonicalHistory
         coverage: full
         remaining_work_item_ids: []
     approval:

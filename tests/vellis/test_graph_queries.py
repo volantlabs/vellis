@@ -18,11 +18,11 @@ from pathlib import Path
 import pytest
 from conftest import build_rich_definitions
 
-from tests.vellis.oracle import evaluate_query, materialize_state
+from tests.vellis.oracle import _TestGraphIndex, evaluate_query, materialize_state
 from tests.vellis.semantic_state import semantic_state_equal
 from vellis.canonical import Provenance
 from vellis.changes import GraphChange
-from vellis.graph import Anchor, AssociatedDataObject, Link
+from vellis.graph import Anchor, AssociatedDataObject, Graph, Link
 from vellis.json_value import normalize
 from vellis.outcomes import OperationStatus
 from vellis.query import (
@@ -42,6 +42,7 @@ from vellis.query import (
     QueryAggregation,
     RequiredLink,
     ReturnShape,
+    evaluate_indexed_query,
 )
 from vellis.system import RTGSystem
 
@@ -1622,6 +1623,18 @@ def test_aggregation_agrees_between_the_stored_and_in_memory_graph(tmp_path: Pat
                 data_condition="notes",
                 property_name="rating",
             ),
+            QueryAggregation(
+                name="lowest",
+                operator=AggregationOperator.MINIMUM,
+                data_condition="notes",
+                property_name="rating",
+            ),
+            QueryAggregation(
+                name="highest",
+                operator=AggregationOperator.MAXIMUM,
+                data_condition="notes",
+                property_name="rating",
+            ),
         )
 
         stored = system.query_graph(query)
@@ -1634,9 +1647,55 @@ def test_aggregation_agrees_between_the_stored_and_in_memory_graph(tmp_path: Pat
         assert [(each.aggregation, each.present, each.value) for each in in_memory.aggregates] == [
             ("howMany", True, Decimal(2)),
             ("total", True, Decimal(7)),
+            ("lowest", True, Decimal(2)),
+            ("highest", True, Decimal(5)),
         ]
     finally:
         system.close()
+
+
+class _GuardedCandidateTuple(tuple[AssociatedDataObject, ...]):
+    """Fail if one candidate stream is consumed past an aggregation's decision point."""
+
+    def __iter__(self):
+        for position, value in enumerate(super().__iter__()):
+            if position >= 5:
+                raise AssertionError("aggregation consumed candidates after its bound was decided")
+            yield value
+
+
+class _BoundedAggregationIndex(_TestGraphIndex):
+    def associated_data_candidates(
+        self,
+        associated_data_type: str,
+        anchor_uuid: str,
+        allowed_uuids: frozenset[str] | None = None,
+    ) -> tuple[AssociatedDataObject, ...]:
+        candidates = super().associated_data_candidates(
+            associated_data_type, anchor_uuid, allowed_uuids
+        )
+        return _GuardedCandidateTuple(candidates)
+
+
+def test_in_memory_aggregation_stops_when_the_maximum_is_decided() -> None:
+    """Refusal at five matches must not retain or walk the remaining population."""
+    definitions = build_rich_definitions()
+    graph = Graph(
+        anchors=(ADA,),
+        associated_data=tuple(_note(f"n-{index}", ("a-1",), rating=index) for index in range(100)),
+    )
+    query = _rating_query(
+        QueryAggregation(
+            name="howMany", operator=AggregationOperator.COUNT, data_condition="notes"
+        ),
+        maximum=4,
+    )
+
+    result = evaluate_indexed_query(query, definitions, _BoundedAggregationIndex(graph), revision=1)
+
+    assert result.status is OperationStatus.REJECTED
+    assert result.aggregates == ()
+    assert any("exceed the maximum" in finding.summary for finding in result.findings)
 
 
 def test_an_aggregate_is_absent_when_nothing_carries_the_property(tmp_path: Path) -> None:

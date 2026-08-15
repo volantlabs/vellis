@@ -28,7 +28,7 @@ current state until then, and this module does not pretend to offer the choice.
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Iterator, Sequence
 from dataclasses import dataclass, field
 from decimal import Decimal
 from enum import Enum
@@ -1013,7 +1013,7 @@ def _walk(
                 matches[name][bound.uuid] = bound
         if any(len(objects) > query.maximum_rows for objects in matches.values()):
             break
-        if not aggregated and wants_rows and len(rows) > query.maximum_rows:
+        if wants_rows and len(rows) > query.maximum_rows:
             break
     return tuple(rows), matches
 
@@ -1110,25 +1110,32 @@ def _assignments(query: GraphQuery, index: QueryCandidateIndex):
     variation that can change neither answer cannot manufacture repeated global
     assignments either.
     """
-    projected_components: list[tuple[_Assignment, ...]] = []
+    result_components: list[GraphQuery] = []
     for names in _selector_components(query):
         component = _component_query(query, names)
         if not component.return_shape.projections and not component.aggregations:
             if next(_component_assignments(component, index), None) is None:
                 return
             continue
-        distinct = _distinct_component_assignments(component, index)
-        if not distinct:
+        # Establish emptiness once before combining components. Without this check an
+        # empty later component would make an earlier one run to exhaustion without ever
+        # yielding an assignment to _walk, where the caller's bound is enforced.
+        if next(_component_assignments(component, index), None) is None:
             return
-        projected_components.append(distinct)
+        result_components.append(component)
 
-    def combine(index: int, assignment: _Assignment):
-        if index == len(projected_components):
+    def combine(position: int, assignment: _Assignment):
+        if position == len(result_components):
             yield assignment
             return
-        for component_assignment in projected_components[index]:
+        # This is deliberately a fresh lazy stream for each outer assignment. Caching a
+        # whole component would make an over-bound aggregation consume and retain its
+        # entire population before _walk could refuse one past the caller's maximum.
+        for component_assignment in _distinct_component_assignments(
+            result_components[position], index
+        ):
             yield from combine(
-                index + 1,
+                position + 1,
                 _Assignment(
                     endpoints={**assignment.endpoints, **component_assignment.endpoints},
                     links={**assignment.links, **component_assignment.links},
@@ -1208,13 +1215,12 @@ def _component_query(query: GraphQuery, names: frozenset[str]) -> GraphQuery:
 
 def _distinct_component_assignments(
     query: GraphQuery, index: QueryCandidateIndex
-) -> tuple[_Assignment, ...]:
+) -> Iterator[_Assignment]:
     """Keep assignments that can change a projection or aggregated population."""
     aggregated_conditions = tuple(
         dict.fromkeys(aggregation.data_condition for aggregation in query.aggregations)
     )
     seen: set[tuple[object, ...]] = set()
-    assignments: list[_Assignment] = []
     for assignment in _component_assignments(query, index):
         key = (
             _row_identity(_project(query, assignment)),
@@ -1229,14 +1235,7 @@ def _distinct_component_assignments(
         if key in seen:
             continue
         seen.add(key)
-        assignments.append(assignment)
-        # A projection can decide refusal one row past the bound. An aggregation is
-        # bounded by distinct matched objects rather than by joint assignments, so it
-        # must see the whole connected component unless one of its own populations has
-        # already crossed the bound in _walk.
-        if not aggregated_conditions and len(assignments) > query.maximum_rows:
-            break
-    return tuple(assignments)
+        yield assignment
 
 
 def _component_assignments(query: GraphQuery, index: QueryCandidateIndex):
