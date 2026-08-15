@@ -297,6 +297,21 @@ findings:
     implementation_status: conforming
     nearest_wrong_system: The durable evaluator returns a correct total while replayed graph evaluation returns zero, and both claim to realize the same accepted query.
     compatibility_effect: The corrected authority selects aggregation-only queries consistently with the Graph Query behavior already presented to the owner; no previously accepted query is refused or changes its result.
+  - id: F017
+    summary: SQL existence pruning returned no aggregate bindings when a disconnected non-result selector component had no satisfying assignment.
+    classification: implementation defect
+    consequence: A valid empty selection returned an accepted result missing every requested aggregate, while in-memory evaluation returned the required zero count and absent arithmetic values.
+    authority_refs:
+      - RTG::'Graph Query Result'
+      - VellisRequirements::semanticQueryMeaning
+      - VellisRequirements::querySafety
+    evidence_refs:
+      - path:tests/vellis/test_graph_queries.py#test_unsatisfied_disconnected_component_keeps_empty_aggregate_bindings
+    disposition: resolved
+    owner_work_item_id: W001
+    implementation_status: conforming
+    nearest_wrong_system: Current, prospective, or historical SQL evaluation accepts an empty selection but omits the requested arithmetic answers, while replayed graph evaluation returns them.
+    compatibility_effect: Accepted empty selections now include one canonical zero/absent binding for every requested aggregation; nonempty results and rejected queries are unchanged.
 decisions:
   - id: D001
     summary: Replace only self-reaching definitions with the permissive JSON value they stand for, then inline the rest, at the boundary that already owns the wire form.
@@ -452,7 +467,7 @@ work_items:
     planned_baseline:
       dimension: implementation
       identity: git:aaf09834ca798b571f30b99c4426c77aee04b1df
-    finding_ids: [F001, F002, F003, F004, F005, F006, F007, F009, F010, F011, F012, F013, F014]
+    finding_ids: [F001, F002, F003, F004, F005, F006, F007, F009, F010, F011, F012, F013, F014, F017]
     decision_ids: [D001, D002, D003, D005, D006, D007]
     authority:
       - refs:

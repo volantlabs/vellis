@@ -783,6 +783,67 @@ def test_unsatisfied_unprojected_component_still_removes_every_row(tmp_path: Pat
         system.close()
 
 
+def test_unsatisfied_disconnected_component_keeps_empty_aggregate_bindings(
+    tmp_path: Path,
+) -> None:
+    """An empty global selection has zero/absent answers, not missing answers."""
+    system = _system_with(tmp_path, build_rich_definitions())
+    try:
+        assert system.apply_graph_change(
+            GraphChange(
+                anchor_upserts=(ADA,),
+                associated_data_upserts=(_note("n-1", ("a-1",), rating=4),),
+            ),
+            provenance=_owner(),
+        ).accepted
+        state = materialize_state(system)
+        for projections in (
+            (),
+            (AnchorProjection(name="who", anchor_group="people"),),
+        ):
+            query = GraphQuery(
+                anchor_groups=(
+                    AnchorGroup(name="people", anchor_types=("person",)),
+                    AnchorGroup(name="projects", anchor_types=("project",)),
+                ),
+                data_conditions=(
+                    AssociatedDataCondition(
+                        name="notes",
+                        anchor_group="people",
+                        associated_data_type="note",
+                    ),
+                ),
+                return_shape=ReturnShape(projections=projections),
+                aggregations=(
+                    QueryAggregation(
+                        name="howMany",
+                        operator=AggregationOperator.COUNT,
+                        data_condition="notes",
+                    ),
+                    QueryAggregation(
+                        name="total",
+                        operator=AggregationOperator.SUM,
+                        data_condition="notes",
+                        property_name="rating",
+                    ),
+                ),
+                maximum_rows=10,
+            )
+
+            stored = system.query_graph(query)
+            in_memory = evaluate_query(query, state.active_definitions, state.graph, state.revision)
+
+            assert stored.status is OperationStatus.ACCEPTED, stored.findings
+            assert stored.rows == in_memory.rows == ()
+            assert stored.aggregates == in_memory.aggregates
+            assert [(one.aggregation, one.present, one.value) for one in stored.aggregates] == [
+                ("howMany", True, Decimal(0)),
+                ("total", False, None),
+            ]
+    finally:
+        system.close()
+
+
 def test_a_query_changes_no_canonical_state_or_revision(system: RTGSystem) -> None:
 
     before = materialize_state(system)

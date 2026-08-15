@@ -1399,6 +1399,8 @@ class CanonicalStore:
         existence_only: bool = False,
     ) -> GraphQueryResult:
         from vellis.query import (
+            AggregateBinding,
+            AggregationOperator,
             AnchorBinding,
             AnchorProjection,
             AssociatedDataBinding,
@@ -1441,11 +1443,29 @@ class CanonicalStore:
                     existence_only=True,
                 )
                 if not existence.rows:
+                    empty_aggregates = tuple(
+                        AggregateBinding(
+                            aggregation=aggregation.name,
+                            present=aggregation.operator is AggregationOperator.COUNT,
+                            value=(
+                                Decimal(0)
+                                if aggregation.operator is AggregationOperator.COUNT
+                                else None
+                            ),
+                        )
+                        for aggregation in response_query.aggregations
+                    )
+                    counts = []
+                    if response_query.return_shape.projections:
+                        counts.append("0 rows")
+                    if empty_aggregates:
+                        counts.append(f"{len(empty_aggregates)} aggregates")
                     return GraphQueryResult(
                         status=OperationStatus.ACCEPTED,
-                        summary=f"0 rows at revision {revision}",
+                        summary=f"{' and '.join(counts)} at revision {revision}",
                         query=response_query,
                         evaluated_revision=revision,
+                        aggregates=empty_aggregates,
                     )
             kept = set().union(*projected_components)
             query = _component_query(query, kept, projections=True)
