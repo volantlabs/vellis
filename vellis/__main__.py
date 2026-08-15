@@ -15,8 +15,8 @@ act on it.
 setup attempt and holds both to the same minimum: the stage that failed, whether
 established memory changed, and an available corrective action. A generic failure lacking
 any of the three does not pass, so nothing here may reach the owner as a bare traceback
-or a one-line message. Every failure below happens before a single tool is served, so the
-state effect is always the same one and is always stated rather than left to be inferred.
+or a one-line message. A failure before serving leaves memory unchanged; a close-stage
+failure carries the revision effect observed across the completed server session.
 """
 
 from __future__ import annotations
@@ -54,7 +54,7 @@ def _report(
     corrective_action: str,
     stream: TextIO,
     *,
-    memory_changed: bool = False,
+    memory_changed: bool | None = False,
 ) -> None:
     """Say what failed, what it did to established memory, and what to do about it.
 
@@ -64,7 +64,13 @@ def _report(
     """
     print(f"Vellis could not serve this memory. Stage: {stage}", file=stream)
     print(f"  what happened: {summary}", file=stream)
-    changed = "changed" if memory_changed else "unchanged"
+    changed = (
+        "could not be determined"
+        if memory_changed is None
+        else "changed"
+        if memory_changed
+        else "unchanged"
+    )
     print(f"  established memory: {changed}", file=stream)
     print(f"  what to do next: {corrective_action}", file=stream)
 
@@ -234,10 +240,11 @@ def main(
         serve(store_path(directory))
     except ServeError as unavailable:
         _report(
-            ConnectionStage.OPEN_MEMORY,
+            unavailable.stage,
             unavailable.summary,
             unavailable.corrective_action,
             error,
+            memory_changed=unavailable.memory_changed,
         )
         return EXIT_FAILED
     return EXIT_SUCCESS

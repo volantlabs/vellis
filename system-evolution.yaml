@@ -3,13 +3,13 @@ evolution:
   id: callable-tool-surface-and-value-fidelity
   objective: Close the callable-tool and scale-simulation findings so queries preserve one meaning across realizations and request generations, clean close reports checkpoint contention, and owner guidance matches the runnable surface.
   observable_distinction: Discovery returns ten self-contained input schemas, stored JSON kinds remain exact, aggregate-only queries agree between durable and in-memory evaluation, former single-type MCP requests remain callable, a clean close either consolidates the WAL or reports the reader preventing it, restoration is documented, patterned dates are queryable, and orphaning definition edits are refused.
-  lifecycle: complete
+  lifecycle: active
   approval:
     status: accepted
     reason: The owner must seal the modeling correction that resolves contradictory aggregation-only query authority before closure.
     checkpoint: git:428faa3753365862626aa108ae55ad79535f97e8
   blocker: null
-  checkpoint: git:f52adf1ce01cbe1450acabab731d6def6aabbccb
+  checkpoint: null
 baselines:
   status: current
   source:
@@ -20,16 +20,16 @@ baselines:
     checkpoint: git:8baa73aa38a736e5920c25f466f31fa772d41801
   target:
     model: sha256:30decc89ce67a19b2f9720028ffb3eb8161edf37affd11fa49b12179b3018d3e
-    implementation: git:f52adf1ce01cbe1450acabab731d6def6aabbccb
+    implementation: git:ad6d99f912fb746259526ec8b4e90b5e119485dd
     language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
     execution_environment: sha256:3315a10b5fcc8d62aa435d2f4e12165a147f334b01fad06ce367d11b6eb8191c
-    checkpoint: git:f52adf1ce01cbe1450acabab731d6def6aabbccb
+    checkpoint: git:ad6d99f912fb746259526ec8b4e90b5e119485dd
   observed:
     model: sha256:30decc89ce67a19b2f9720028ffb3eb8161edf37affd11fa49b12179b3018d3e
-    implementation: git:f52adf1ce01cbe1450acabab731d6def6aabbccb
+    implementation: git:ad6d99f912fb746259526ec8b4e90b5e119485dd
     language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
     execution_environment: sha256:3315a10b5fcc8d62aa435d2f4e12165a147f334b01fad06ce367d11b6eb8191c
-    checkpoint: git:f52adf1ce01cbe1450acabab731d6def6aabbccb
+    checkpoint: git:ad6d99f912fb746259526ec8b4e90b5e119485dd
 scope:
   authority_scope:
     - VellisRequirements::mcpAgentToolContract
@@ -420,6 +420,35 @@ findings:
     implementation_status: conforming
     nearest_wrong_system: Match count stays within the caller's bound while two short exponent spellings cause unbounded transient coefficient materialization.
     compatibility_effect: Exact sums whose coefficient span is proportional to accepted input size remain unchanged; superlinear compact-input expansion is refused whole with a typed finding before allocation.
+  - id: F025
+    summary: The stdio MCP parser converted a high-precision fractional JSON number to binary float before Vellis could preserve its exact mathematical value.
+    classification: implementation defect
+    consequence: A caller could submit one exact JSON number and receive an accepted canonical mutation containing a different rounded number with no finding.
+    authority_refs:
+      - VellisRequirements::canonicalSemanticEquality
+      - VellisRequirements::mcpOutcomeIntegrity
+    evidence_refs:
+      - path:tests/vellis/test_mcp_boundary.py#test_raw_stdio_preserves_a_high_precision_fraction_in_both_directions
+    disposition: open
+    owner_work_item_id: W005
+    implementation_status: partial
+    nearest_wrong_system: Prepared-dictionary tests preserve every apparent value while the production stdio decoder silently rounds a fractional token before the same request reaches them.
+    compatibility_effect: Fractional JSON numbers retain their exact literal mathematical value through stdio input and output; integers, Booleans, schemas, tool names, and stored forms are unchanged.
+  - id: F026
+    summary: The public server command reported every ServeError as an open-memory failure with unchanged established memory, including close-time checkpoint contention after a mutating session.
+    classification: implementation defect
+    consequence: An owner was told the wrong failed stage and that memory was unchanged even when the same report acknowledged that already-committed changes remained committed.
+    authority_refs:
+      - VellisRequirements::simpleIndividualOperation
+      - VellisRequirements::observableFailure
+    evidence_refs:
+      - path:tests/vellis/test_cleanup_boundaries.py#test_public_server_command_keeps_the_close_stage_and_state_effect
+      - path:tests/vellis/test_cleanup_boundaries.py#test_mcp_shutdown_reports_whether_the_completed_session_changed_memory
+    disposition: open
+    owner_work_item_id: W005
+    implementation_status: partial
+    nearest_wrong_system: The server diagnoses close contention accurately while the owner-facing command rewrites it into a pre-service failure and a false non-effect.
+    compatibility_effect: Serve failures gain their accurate stage and revision-change effect; clean serving, open failures, tool behavior, and canonical meaning are unchanged.
 decisions:
   - id: D001
     summary: Replace only self-reaching definitions with the permissive JSON value they stand for, then inline the rest, at the boundary that already owns the wire form.
@@ -718,29 +747,61 @@ work_items:
       - path:tests/vellis/test_graph_queries.py#test_aggregation_agrees_between_the_stored_and_in_memory_graph
     blocker: null
     checkpoint: git:f52adf1ce01cbe1450acabab731d6def6aabbccb
+  - id: W005
+    order: 5
+    label: Preserve exact fractional wire values and truthful server cleanup outcomes
+    kind: implementation
+    dependencies: [W001, W002, W003, W004]
+    planned_baseline:
+      dimension: implementation
+      identity: git:ad6d99f912fb746259526ec8b4e90b5e119485dd
+    finding_ids: [F025, F026]
+    decision_ids: []
+    authority:
+      - refs:
+          - VellisRequirements::canonicalSemanticEquality
+          - VellisRequirements::mcpOutcomeIntegrity
+        coverage: partial
+        remaining_work_item_ids: [W001, W002]
+      - refs:
+          - VellisRequirements::simpleIndividualOperation
+          - VellisRequirements::observableFailure
+        coverage: partial
+        remaining_work_item_ids: [W002]
+    approval:
+      status: not-required
+      reason: Both findings are implementation defects already decided by accepted exact-value and actionable-failure authority.
+      checkpoint: null
+    nearest_wrong_system: Unit-level tool calls and direct serve tests pass while raw stdio rounds a fraction or the public command contradicts a completed mutating session's close failure.
+    compatibility_effect: Exact fractional JSON values survive stdio round trips, and close failures report their true stage and revision effect; existing tool names, schemas, stored meaning, and clean outcomes remain unchanged.
+    non_effects:
+      - No model authority, persistence format, tool inventory, request schema, or owner data changes.
+      - Malformed input remains distinct from a completed domain result.
+      - Open-memory failures continue to report unchanged memory.
+    lifecycle: active
+    implementation_status: partial
+    evidence_refs:
+      - path:tests/vellis/test_mcp_boundary.py#test_raw_stdio_preserves_a_high_precision_fraction_in_both_directions
+      - path:tests/vellis/test_cleanup_boundaries.py#test_public_server_command_keeps_the_close_stage_and_state_effect
+    blocker: null
+    checkpoint: null
 closure:
-  finding_disposition: complete
+  finding_disposition: open
   model_status: accepted
-  implementation_status: conforming
-  integration_status: conforming
+  implementation_status: partial
+  integration_status: not evaluated
   external_status: not applicable
   compatibility: Published schemas are self-contained; former scalar single-type queries remain accepted and normalize to the canonical collection; ordered string comparison adds answers for formerly refused queries; persistence and canonical stored meaning are unchanged.
   reviews:
     - lens: authority and conformance
-      status: clean
-      reviewer: agent:authority_review8
-      checkpoint: git:f52adf1ce01cbe1450acabab731d6def6aabbccb
-      evidence_refs:
-        - command:just system-evolution-check
+      status: pending
+      reviewer: null
+      checkpoint: null
+      evidence_refs: []
     - lens: engineering and evidence
-      status: clean
-      reviewer: agent:engineering_review8
-      checkpoint: git:f52adf1ce01cbe1450acabab731d6def6aabbccb
-      evidence_refs:
-        - command:just system-evolution-check
-        - command:uv run pytest tests/vellis/test_graph_queries.py tests/vellis/test_definition_governance.py tests/vellis/test_cleanup_boundaries.py -q
-  evidence_refs:
-    - command:just check
-    - command:just model-check
-    - command:just system-evolution-check
-  checkpoint: git:f52adf1ce01cbe1450acabab731d6def6aabbccb
+      status: pending
+      reviewer: null
+      checkpoint: null
+      evidence_refs: []
+  evidence_refs: []
+  checkpoint: null

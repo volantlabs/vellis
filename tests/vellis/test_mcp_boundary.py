@@ -1,7 +1,10 @@
 """Concise evidence for the accepted ten-tool MCP contract."""
 
 import json
+import subprocess
+import sys
 from collections.abc import Iterator
+from decimal import Decimal
 from pathlib import Path
 
 import pytest
@@ -175,6 +178,148 @@ async def test_a_stored_value_keeps_the_json_kind_the_caller_sent(valued_client:
     }
     # Compared as JSON text so that True and 1 cannot pass for one another.
     assert json.dumps(returned, sort_keys=True) == json.dumps(sent, sort_keys=True)
+
+
+def _raw_mcp_response(
+    process: subprocess.Popen[str], request_id: int
+) -> tuple[dict[str, object], str]:
+    assert process.stdout is not None
+    while line := process.stdout.readline():
+        response = json.loads(line, parse_float=Decimal)
+        if response.get("id") == request_id:
+            return response, line
+    raise AssertionError(f"the MCP server ended before answering request {request_id}")
+
+
+def test_raw_stdio_preserves_a_high_precision_fraction_in_both_directions(tmp_path: Path) -> None:
+    """The transport must not round a JSON number before Vellis can read its meaning."""
+    directory = tmp_path / "memory"
+    directory.mkdir()
+    memory = directory / "vellis.sqlite3"
+    system = RTGSystem.open(memory)
+    try:
+        assert system.initialize_fresh(
+            GraphDefinitionSet(
+                anchor_types=(AnchorTypeDefinition("person", "A person."),),
+                associated_data_types=(
+                    AssociatedDataTypeDefinition(
+                        "person.stats",
+                        ("person",),
+                        (PropertyConstraint("ratio", False, JsonKind.NUMBER, "A ratio."),),
+                        "Stats.",
+                    ),
+                ),
+            ),
+            provenance=Provenance("owner"),
+            initialization_summary="fresh",
+        ).accepted
+    finally:
+        system.close()
+
+    process = subprocess.Popen(
+        [sys.executable, "-m", "vellis", "--data-dir", str(directory)],
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        encoding="utf-8",
+    )
+    exact = Decimal("0.12345678901234567890123456789")
+    try:
+        assert process.stdin is not None
+
+        def send(message: dict[str, object]) -> None:
+            assert process.stdin is not None
+            process.stdin.write(json.dumps(message, separators=(",", ":")) + "\n")
+            process.stdin.flush()
+
+        send(
+            {
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "initialize",
+                "params": {
+                    "protocolVersion": "2025-11-25",
+                    "capabilities": {},
+                    "clientInfo": {"name": "exact-number-evidence", "version": "1"},
+                },
+            }
+        )
+        initialized, _ = _raw_mcp_response(process, 1)
+        assert "result" in initialized
+        send({"jsonrpc": "2.0", "method": "notifications/initialized", "params": {}})
+
+        # Written as raw text on purpose: constructing this request through Python's
+        # ordinary JSON encoder would round it before the transport test even began.
+        process.stdin.write(
+            '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"rtg_change",'
+            '"arguments":{"request":{"target":"active","change":{"anchor_upserts":['
+            '{"uuid":"p-1","type_key":"person","display_name":"Ada"}],'
+            '"associated_data_upserts":[{"uuid":"d-1","type_key":"person.stats",'
+            '"anchor_uuids":["p-1"],"properties":{"ratio":' + str(exact) + "}}]}}}}}\n"
+        )
+        process.stdin.flush()
+        changed, _ = _raw_mcp_response(process, 2)
+        changed_result = changed["result"]
+        assert isinstance(changed_result, dict)
+        changed_content = changed_result["structuredContent"]
+        assert isinstance(changed_content, dict)
+        assert changed_content["status"] == "accepted"
+
+        send(
+            {
+                "jsonrpc": "2.0",
+                "id": 3,
+                "method": "tools/call",
+                "params": {
+                    "name": "rtg_query",
+                    "arguments": {
+                        "query": {
+                            "anchor_groups": [{"name": "people", "anchor_types": ["person"]}],
+                            "data_conditions": [
+                                {
+                                    "name": "stats",
+                                    "anchor_group": "people",
+                                    "associated_data_type": "person.stats",
+                                }
+                            ],
+                            "return_shape": {
+                                "projections": [
+                                    {
+                                        "name": "ratio",
+                                        "data_condition": "stats",
+                                        "property_name": "ratio",
+                                    }
+                                ]
+                            },
+                            "maximum_rows": 2,
+                        }
+                    },
+                },
+            }
+        )
+        queried, raw_query = _raw_mcp_response(process, 3)
+        query_result = queried["result"]
+        assert isinstance(query_result, dict)
+        structured = query_result["structuredContent"]
+        assert isinstance(structured, dict)
+        rows = structured["rows"]
+        assert isinstance(rows, list)
+        assert structured["status"] == "accepted"
+        assert rows[0]["properties"][0]["value"] == exact, raw_query
+        assert f'"value":{exact}' in raw_query
+        content = query_result["content"]
+        assert isinstance(content, list)
+        text = content[0]["text"]
+        assert isinstance(text, str)
+        assert json.loads(text, parse_float=Decimal) == structured
+
+        process.stdin.close()
+        assert process.wait(timeout=10) == 0
+    finally:
+        if process.poll() is None:
+            process.kill()
+            process.wait(timeout=10)
 
 
 @pytest.mark.anyio

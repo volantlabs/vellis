@@ -19,6 +19,15 @@ from vellis.streaming import SnapshotMetadata
 class _BlockedCloseSystem:
     is_initialized = True
 
+    class _Store:
+        revision = 0
+
+        def current_revision(self) -> int:
+            return self.revision
+
+    def __init__(self) -> None:
+        self.store = self._Store()
+
     def close(self) -> None:
         raise StoreError("another database reader prevented the write-ahead log checkpoint")
 
@@ -42,6 +51,53 @@ def test_mcp_shutdown_reports_checkpoint_contention_without_recasting_commits(
 
     assert "changes already reported as committed remain committed" in raised.value.summary
     assert "close the other database reader" in raised.value.corrective_action
+    assert raised.value.stage == mcp_boundary.ServeStage.CLOSE_MEMORY
+    assert not raised.value.memory_changed
+
+
+def test_mcp_shutdown_reports_whether_the_completed_session_changed_memory(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    memory = tmp_path / "vellis.sqlite3"
+    memory.touch()
+    system = _BlockedCloseSystem()
+
+    class _Server:
+        def run(self, *, transport: str) -> None:
+            assert transport == "stdio"
+            system.store.revision = 1
+
+    monkeypatch.setattr(mcp_boundary.RTGSystem, "open", lambda path: system)
+    monkeypatch.setattr(mcp_boundary, "build_server", lambda value, name: _Server())
+
+    with pytest.raises(mcp_boundary.ServeError) as raised:
+        mcp_boundary.serve(memory)
+
+    assert raised.value.stage == mcp_boundary.ServeStage.CLOSE_MEMORY
+    assert raised.value.memory_changed
+
+
+def test_public_server_command_keeps_the_close_stage_and_state_effect(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    directory = tmp_path / "memory"
+    error = io.StringIO()
+
+    def failed_close(path: Path) -> None:
+        raise mcp_boundary.ServeError(
+            "the server stopped after committed changes",
+            "close the other database reader",
+            stage=mcp_boundary.ServeStage.CLOSE_MEMORY,
+            memory_changed=True,
+        )
+
+    monkeypatch.setattr(owner_command, "serve", failed_close)
+
+    code = owner_command.main(["--data-dir", str(directory)], stderr=error)
+
+    assert code == owner_command.EXIT_FAILED
+    assert "Stage: close-memory" in error.getvalue()
+    assert "established memory: changed" in error.getvalue()
 
 
 def test_restore_close_failure_names_the_committed_state_effect(

@@ -46,7 +46,10 @@ never what the system accepts; validation still runs against the real types.
 
 from __future__ import annotations
 
-from collections.abc import Callable, Mapping, Sequence
+import json
+import sys
+from collections.abc import AsyncIterator, Callable, Mapping, Sequence
+from contextlib import asynccontextmanager
 from dataclasses import fields, is_dataclass
 from datetime import datetime
 from decimal import Decimal
@@ -54,11 +57,25 @@ from enum import Enum
 from pathlib import Path
 from typing import cast
 
+import anyio
+import anyio.lowlevel
+import mcp_types
 from fastmcp import FastMCP
+from fastmcp.server.context import reset_transport, set_transport
 from fastmcp.server.middleware import CallNext, Middleware, MiddlewareContext
 from fastmcp.tools.base import ToolResult
+from fastmcp.utilities.cli import log_server_banner
 from fastmcp.utilities.json_schema import dereference_refs
-from mcp.types import CallToolRequestParams
+from fastmcp.utilities.logging import get_logger, temporary_log_level
+from mcp.server import stdio as sdk_stdio
+from mcp.server.lowlevel.server import NotificationOptions
+from mcp.shared._context_streams import (
+    ContextReceiveStream,
+    ContextSendStream,
+    create_context_streams,
+)
+from mcp.shared.message import SessionMessage
+from mcp.types import CallToolRequestParams, CallToolResult, TextContent
 
 from vellis.activity import HistoryQuery, HistoryResult
 from vellis.canonical import Provenance
@@ -86,7 +103,16 @@ from vellis.query import GraphQuery, GraphQueryResult
 from vellis.store import StoreError
 from vellis.system import RTGSystem
 
-__all__ = ["TOOL_NAMES", "ServeError", "build_server", "serve"]
+__all__ = ["TOOL_NAMES", "ServeError", "ServeStage", "build_server", "serve"]
+
+logger = get_logger(__name__)
+
+
+class ServeStage:
+    """The owner-visible stage at which serving failed."""
+
+    OPEN_MEMORY = "open-memory"
+    CLOSE_MEMORY = "close-memory"
 
 
 class ServeError(RuntimeError):
@@ -98,10 +124,207 @@ class ServeError(RuntimeError):
     does not pass.
     """
 
-    def __init__(self, summary: str, corrective_action: str) -> None:
+    def __init__(
+        self,
+        summary: str,
+        corrective_action: str,
+        *,
+        stage: str = ServeStage.OPEN_MEMORY,
+        memory_changed: bool | None = False,
+    ) -> None:
         super().__init__(summary)
         self.summary = summary
         self.corrective_action = corrective_action
+        self.stage = stage
+        self.memory_changed = memory_changed
+
+
+def _reject_non_json_number(spelling: str) -> None:
+    """Reject the non-finite constants the standard decoder otherwise accepts."""
+    raise ValueError(f"{spelling} is not a JSON number")
+
+
+def _exact_json_loads(text: str) -> object:
+    """Parse one wire message without routing a fractional number through binary float."""
+    return json.loads(
+        text,
+        parse_float=Decimal,
+        parse_constant=_reject_non_json_number,
+    )
+
+
+def _exact_json_dumps(value: object) -> str:
+    """Encode one protocol value while keeping every finite Decimal a JSON number."""
+    if value is None:
+        return "null"
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    if isinstance(value, int):
+        return str(value)
+    if isinstance(value, Decimal):
+        if not value.is_finite():
+            raise ValueError(f"{value!r} is not a JSON number")
+        return str(value)
+    if isinstance(value, float):
+        return json.dumps(value, allow_nan=False)
+    if isinstance(value, str):
+        return json.dumps(value, ensure_ascii=False)
+    if isinstance(value, Mapping):
+        members: list[str] = []
+        for key, member in value.items():
+            if not isinstance(key, str):
+                raise TypeError(
+                    f"JSON object member name must be a string, not {type(key).__name__}"
+                )
+            members.append(f"{json.dumps(key, ensure_ascii=False)}:{_exact_json_dumps(member)}")
+        return "{" + ",".join(members) + "}"
+    if isinstance(value, Sequence) and not isinstance(value, (str, bytes, bytearray)):
+        return "[" + ",".join(_exact_json_dumps(member) for member in value) + "]"
+    raise TypeError(f"no JSON wire form for {type(value).__name__}")
+
+
+def _restore_exact_structured_content(message: object) -> object:
+    """Restore structured tool content from its equivalent exact textual form.
+
+    FastMCP normalizes Decimal inside ``structuredContent`` to a string before the
+    transport sees the response. Vellis constructs the adjacent text block from the same
+    typed result with its exact JSON tokens intact, so that representation is the local
+    source for repairing the framework's lossy copy at the final wire boundary.
+    """
+    if not isinstance(message, Mapping):
+        return message
+    result = message.get("result")
+    if not isinstance(result, Mapping) or "structuredContent" not in result:
+        return message
+    content = result.get("content")
+    if not isinstance(content, Sequence) or isinstance(content, (str, bytes)) or not content:
+        return message
+    first = content[0]
+    if not isinstance(first, Mapping) or first.get("type") != "text":
+        return message
+    text = first.get("text")
+    if not isinstance(text, str):
+        return message
+    exact = _exact_json_loads(text)
+    if not isinstance(exact, Mapping):
+        return message
+    return {**message, "result": {**result, "structuredContent": exact}}
+
+
+@asynccontextmanager
+async def _exact_stdio_server(
+    stdin: anyio.AsyncFile[str] | None = None,
+    stdout: anyio.AsyncFile[str] | None = None,
+) -> AsyncIterator[
+    tuple[
+        ContextReceiveStream[SessionMessage | Exception],
+        ContextSendStream[SessionMessage],
+    ]
+]:
+    """Use the SDK's safe stdio claim while preserving exact JSON-number tokens."""
+    restore_stdin: Callable[[], None] | None = None
+    restore_stdout: Callable[[], None] | None = None
+    try:
+        if stdin is None:
+            stdin_buffer, restore_stdin = sdk_stdio._claim_fd(  # pyright: ignore[reportPrivateUsage]
+                0,
+                sys.stdin,
+                "rb",
+                sdk_stdio._open_stdin_diversion,  # pyright: ignore[reportPrivateUsage]
+            )
+            stdin = anyio.wrap_file(
+                sdk_stdio._UnownedTextWrapper(  # pyright: ignore[reportPrivateUsage]
+                    stdin_buffer, encoding="utf-8", errors="replace"
+                )
+            )
+        if stdout is None:
+            stdout_buffer, restore_stdout = sdk_stdio._claim_fd(  # pyright: ignore[reportPrivateUsage]
+                1,
+                sys.stdout,
+                "wb",
+                sdk_stdio._open_stdout_diversion,  # pyright: ignore[reportPrivateUsage]
+            )
+            stdout = anyio.wrap_file(
+                sdk_stdio._UnownedTextWrapper(  # pyright: ignore[reportPrivateUsage]
+                    stdout_buffer, encoding="utf-8"
+                )
+            )
+
+        read_writer, read_stream = create_context_streams[SessionMessage | Exception](0)
+        write_stream, write_reader = create_context_streams[SessionMessage](0)
+
+        async def read_messages() -> None:
+            assert stdin is not None
+            try:
+                async with read_writer:
+                    async for line in stdin:
+                        try:
+                            raw = _exact_json_loads(line)
+                            message = mcp_types.jsonrpc_message_adapter.validate_python(
+                                raw, by_name=False
+                            )
+                        except Exception as error:
+                            await read_writer.send(error)
+                            continue
+                        await read_writer.send(SessionMessage(message))
+            except anyio.ClosedResourceError:  # pragma: no cover - transport teardown race
+                await anyio.lowlevel.checkpoint()
+
+        async def write_messages() -> None:
+            assert stdout is not None
+            try:
+                async with write_reader:
+                    async for session_message in write_reader:
+                        raw = session_message.message.model_dump(
+                            by_alias=True, exclude_unset=True, mode="python"
+                        )
+                        await stdout.write(
+                            _exact_json_dumps(_restore_exact_structured_content(raw)) + "\n"
+                        )
+                        await stdout.flush()
+            except anyio.ClosedResourceError:  # pragma: no cover - transport teardown race
+                await anyio.lowlevel.checkpoint()
+
+        async with anyio.create_task_group() as task_group:
+            task_group.start_soon(read_messages)
+            task_group.start_soon(write_messages)
+            yield read_stream, write_stream
+    finally:
+        if restore_stdout is not None:
+            restore_stdout()
+        if restore_stdin is not None:
+            restore_stdin()
+
+
+class _VellisMCP(FastMCP):
+    """FastMCP with the exact-number stdio realization Vellis requires."""
+
+    async def run_stdio_async(
+        self,
+        show_banner: bool = True,
+        log_level: str | None = None,
+        stateless: bool = False,
+    ) -> None:
+        if show_banner:
+            log_server_banner(server=self)
+        token = set_transport("stdio")
+        try:
+            with temporary_log_level(log_level):
+                async with self._lifespan_manager():  # pyright: ignore[reportPrivateUsage]
+                    async with _exact_stdio_server() as (read_stream, write_stream):
+                        mode = " (stateless)" if stateless else ""
+                        logger.info(
+                            f"Starting MCP server {self.name!r} with transport 'stdio'{mode}"
+                        )
+                        await self._mcp_server.run(  # pyright: ignore[reportPrivateUsage]
+                            read_stream,
+                            write_stream,
+                            self._mcp_server.create_initialization_options(  # pyright: ignore[reportPrivateUsage]
+                                notification_options=NotificationOptions(tools_changed=True)
+                            ),
+                        )
+        finally:
+            reset_transport(token)
 
 
 # The selected surface, in the order the model declares it. Named here so a test can hold
@@ -128,7 +351,7 @@ def build_server(system: RTGSystem, *, name: str = "vellis") -> FastMCP:
     parameterless tools take nothing, so no empty request type enters the vocabulary an
     agent has to learn.
     """
-    server: FastMCP = FastMCP(name)
+    server: FastMCP = _VellisMCP(name)
     server.add_middleware(_LegacyAnchorTypeCompatibility())
 
     def rtg_definition_summary(
@@ -412,10 +635,9 @@ def _without_references(node: object, names: frozenset[str]) -> object:
 def _wire(value: object) -> object:
     """Render one result for the wire, preserving JSON kind.
 
-    A number goes out as a number: exactly for an integer of any size, and for a
-    fractional value only when it survives the trip. One that would arrive rounded is
-    refused, because an approximated memory is worse than one that says it could not
-    answer completely.
+    A number goes out as a number. Fractions that binary float can carry exactly keep the
+    ordinary framework form; every other fraction remains Decimal for the exact stdio
+    encoder rather than being rounded or turned into text.
     """
     if isinstance(value, Decimal):
         if value == value.to_integral_value():
@@ -423,11 +645,7 @@ def _wire(value: object) -> object:
                 raise JsonValueError(f"the number {value} is larger than a stored integer may be")
             return int(value)
         rendered = float(value)
-        if Decimal(repr(rendered)) != value:
-            raise JsonValueError(
-                f"the number {value} cannot be returned as a JSON number without rounding"
-            )
-        return rendered
+        return rendered if Decimal(repr(rendered)) == value else value
     if isinstance(value, Enum):
         return value.value
     if isinstance(value, datetime):
@@ -462,7 +680,17 @@ def _result[T](value: T, unreturnable: Callable[[str], T]) -> T:
         wired = _wire(value)
     except JsonValueError as error:
         wired = _wire(unreturnable(str(error)))
-    return cast("T", ToolResult(structured_content=wired))  # pyright: ignore[reportArgumentType]
+    # ToolResult's convenience constructor turns Decimal into a JSON string before the
+    # transport can encode it. Give it an already-formed protocol result, whose raw form
+    # it preserves, so both representations keep the same exact JSON-number token.
+    result = ToolResult.from_mcp_result(
+        CallToolResult(
+            content=[TextContent(type="text", text=_exact_json_dumps(wired))],
+            structured_content=wired,
+            is_error=False,
+        )
+    )
+    return cast("T", result)  # pyright: ignore[reportInvalidCast]
 
 
 def _unreturnable_outcome(reason: str) -> RevisionedOutcome:
@@ -515,6 +743,8 @@ def serve(path: Path, *, name: str = "vellis") -> None:
             "check that this account can read and write that file and the directory "
             "holding it, and that --data-dir names your Vellis system's directory",
         ) from error
+    starting_revision: int | None = None
+    ending_revision: int | None = None
     try:
         try:
             established = system.is_initialized
@@ -534,7 +764,24 @@ def serve(path: Path, *, name: str = "vellis") -> None:
                 "here, or point --data-dir at the directory that already holds your "
                 "system",
             )
+        try:
+            starting_revision = system.store.current_revision()
+        except StoreError as error:
+            raise ServeError(
+                f"the memory at {path} could not report its starting revision: {error}",
+                "check that this account can read and write that file, and that nothing "
+                "else is holding it open",
+            ) from error
         build_server(system, name=name).run(transport="stdio")
+        try:
+            ending_revision = system.store.current_revision()
+        except StoreError as error:
+            raise ServeError(
+                f"the server stopped, but its memory could not report its final revision: {error}",
+                "resolve the reported store problem, then inspect history before restarting",
+                stage=ServeStage.CLOSE_MEMORY,
+                memory_changed=None,
+            ) from error
     except BaseException:
         # Cleanup must not replace the boundary failure that already explains why no
         # service was provided. The connection itself is released before checkpointing,
@@ -552,4 +799,10 @@ def serve(path: Path, *, name: str = "vellis") -> None:
             "changes already reported as committed remain committed",
             "close the other database reader, then start and stop Vellis once more "
             "before copying the memory file",
+            stage=ServeStage.CLOSE_MEMORY,
+            memory_changed=(
+                starting_revision is not None
+                and ending_revision is not None
+                and ending_revision != starting_revision
+            ),
         ) from error
