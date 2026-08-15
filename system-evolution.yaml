@@ -3,13 +3,13 @@ evolution:
   id: callable-tool-surface-and-value-fidelity
   objective: Close the callable-tool and scale-simulation findings so queries preserve one meaning across realizations and request generations, clean close reports checkpoint contention, and owner guidance matches the runnable surface.
   observable_distinction: Discovery returns ten self-contained input schemas, stored JSON kinds remain exact, aggregate-only queries agree between durable and in-memory evaluation, former single-type MCP requests remain callable, a clean close either consolidates the WAL or reports the reader preventing it, restoration is documented, patterned dates are queryable, and orphaning definition edits are refused.
-  lifecycle: active
+  lifecycle: complete
   approval:
     status: accepted
     reason: The owner must seal the modeling correction that resolves contradictory aggregation-only query authority before closure.
     checkpoint: git:428faa3753365862626aa108ae55ad79535f97e8
   blocker: null
-  checkpoint: null
+  checkpoint: git:cdd309bbf946214622b33925b4272496a94004b2
 baselines:
   status: current
   source:
@@ -20,16 +20,16 @@ baselines:
     checkpoint: git:8baa73aa38a736e5920c25f466f31fa772d41801
   target:
     model: sha256:30decc89ce67a19b2f9720028ffb3eb8161edf37affd11fa49b12179b3018d3e
-    implementation: git:dfe65eea36cc95302deecaeee6ae8e0df7f93800
+    implementation: git:cdd309bbf946214622b33925b4272496a94004b2
     language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
     execution_environment: sha256:3315a10b5fcc8d62aa435d2f4e12165a147f334b01fad06ce367d11b6eb8191c
-    checkpoint: git:dfe65eea36cc95302deecaeee6ae8e0df7f93800
+    checkpoint: git:cdd309bbf946214622b33925b4272496a94004b2
   observed:
     model: sha256:30decc89ce67a19b2f9720028ffb3eb8161edf37affd11fa49b12179b3018d3e
-    implementation: git:dfe65eea36cc95302deecaeee6ae8e0df7f93800
+    implementation: git:cdd309bbf946214622b33925b4272496a94004b2
     language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
     execution_environment: sha256:3315a10b5fcc8d62aa435d2f4e12165a147f334b01fad06ce367d11b6eb8191c
-    checkpoint: git:dfe65eea36cc95302deecaeee6ae8e0df7f93800
+    checkpoint: git:cdd309bbf946214622b33925b4272496a94004b2
 scope:
   authority_scope:
     - VellisRequirements::mcpAgentToolContract
@@ -780,8 +780,8 @@ work_items:
       - No model authority, persistence format, tool inventory, request schema, or owner data changes.
       - Malformed input remains distinct from a completed domain result.
       - Open-memory failures continue to report unchanged memory.
-    lifecycle: active
-    implementation_status: partial
+    lifecycle: complete
+    implementation_status: conforming
     evidence_refs:
       - path:tests/vellis/test_mcp_boundary.py#test_raw_stdio_preserves_a_high_precision_fraction_in_both_directions
       - path:tests/vellis/test_cleanup_boundaries.py#test_public_server_command_keeps_the_close_stage_and_state_effect
@@ -790,9 +790,9 @@ work_items:
       - command:uv run pytest tests/vellis/test_mcp_boundary.py tests/vellis/test_cleanup_boundaries.py tests/vellis/test_setup_path.py -q
       - command:just check
     blocker: null
-    checkpoint: null
+    checkpoint: git:cdd309bbf946214622b33925b4272496a94004b2
 closure:
-  finding_disposition: open
+  finding_disposition: complete
   model_status: accepted
   implementation_status: conforming
   integration_status: conforming
@@ -800,14 +800,21 @@ closure:
   compatibility: Published schemas are self-contained; former scalar single-type queries remain accepted and normalize to the canonical collection; ordered string comparison adds answers for formerly refused queries; exact fractional JSON numbers now survive raw stdio round trips; close failures report their true stage and observed canonical-or-activity state effect; persistence and canonical stored meaning are unchanged.
   reviews:
     - lens: authority and conformance
-      status: pending
-      reviewer: null
-      checkpoint: null
-      evidence_refs: []
+      status: clean
+      reviewer: agent:boundary_authority_finalreview
+      checkpoint: git:cdd309bbf946214622b33925b4272496a94004b2
+      evidence_refs:
+        - command:uv run pytest tests/vellis/test_mcp_boundary.py tests/vellis/test_cleanup_boundaries.py tests/vellis/test_setup_path.py -q
+        - command:just check
     - lens: engineering and evidence
-      status: pending
-      reviewer: null
-      checkpoint: null
-      evidence_refs: []
-  evidence_refs: []
-  checkpoint: null
+      status: clean
+      reviewer: agent:boundary_engineering_finalreview
+      checkpoint: git:cdd309bbf946214622b33925b4272496a94004b2
+      evidence_refs:
+        - command:uv run pytest tests/vellis/test_mcp_boundary.py tests/vellis/test_cleanup_boundaries.py tests/vellis/test_setup_path.py -q
+        - command:just check
+  evidence_refs:
+    - command:just model-check
+    - command:just system-evolution-check
+    - command:just check
+  checkpoint: git:cdd309bbf946214622b33925b4272496a94004b2
