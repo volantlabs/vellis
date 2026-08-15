@@ -31,8 +31,10 @@ class _BlockedCloseSystem:
 
     def __init__(self) -> None:
         self.store = self._Store()
+        self.close_calls = 0
 
     def close(self) -> None:
+        self.close_calls += 1
         raise StoreError("another database reader prevented the write-ahead log checkpoint")
 
 
@@ -101,6 +103,49 @@ def test_mcp_shutdown_counts_read_activity_as_a_changed_memory(
 
     assert raised.value.stage == mcp_boundary.ServeStage.CLOSE_MEMORY
     assert raised.value.memory_changed
+
+
+def test_mcp_shutdown_reports_an_indeterminate_effect_when_final_position_is_unreadable(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    memory = tmp_path / "vellis.sqlite3"
+    memory.touch()
+    system = _BlockedCloseSystem()
+    revision_reads = 0
+
+    def current_revision() -> int:
+        nonlocal revision_reads
+        revision_reads += 1
+        if revision_reads == 2:
+            raise StoreError("final position unavailable")
+        return 0
+
+    class _Server:
+        def run(self, *, transport: str) -> None:
+            assert transport == "stdio"
+
+    monkeypatch.setattr(system.store, "current_revision", current_revision)
+    monkeypatch.setattr(mcp_boundary.RTGSystem, "open", lambda path: system)
+    monkeypatch.setattr(mcp_boundary, "build_server", lambda value, name: _Server())
+
+    with pytest.raises(mcp_boundary.ServeError) as raised:
+        mcp_boundary.serve(memory)
+
+    assert raised.value.stage == mcp_boundary.ServeStage.CLOSE_MEMORY
+    assert raised.value.memory_changed is None
+    assert system.close_calls == 1
+
+    error = io.StringIO()
+
+    def failed_close(path: Path) -> None:
+        raise raised.value
+
+    monkeypatch.setattr(owner_command, "serve", failed_close)
+    code = owner_command.main(["--data-dir", str(tmp_path / "memory")], stderr=error)
+
+    assert code == owner_command.EXIT_FAILED
+    assert "Stage: close-memory" in error.getvalue()
+    assert "established memory: could not be determined" in error.getvalue()
 
 
 def test_public_server_command_keeps_the_close_stage_and_state_effect(

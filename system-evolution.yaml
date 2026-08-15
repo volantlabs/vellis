@@ -445,6 +445,7 @@ findings:
       - path:tests/vellis/test_cleanup_boundaries.py#test_public_server_command_keeps_the_close_stage_and_state_effect
       - path:tests/vellis/test_cleanup_boundaries.py#test_mcp_shutdown_reports_whether_the_completed_session_changed_memory
       - path:tests/vellis/test_cleanup_boundaries.py#test_mcp_shutdown_counts_read_activity_as_a_changed_memory
+      - path:tests/vellis/test_cleanup_boundaries.py#test_mcp_shutdown_reports_an_indeterminate_effect_when_final_position_is_unreadable
     disposition: resolved
     owner_work_item_id: W005
     implementation_status: conforming
@@ -785,6 +786,7 @@ work_items:
       - path:tests/vellis/test_mcp_boundary.py#test_raw_stdio_preserves_a_high_precision_fraction_in_both_directions
       - path:tests/vellis/test_cleanup_boundaries.py#test_public_server_command_keeps_the_close_stage_and_state_effect
       - path:tests/vellis/test_cleanup_boundaries.py#test_mcp_shutdown_counts_read_activity_as_a_changed_memory
+      - path:tests/vellis/test_cleanup_boundaries.py#test_mcp_shutdown_reports_an_indeterminate_effect_when_final_position_is_unreadable
       - command:uv run pytest tests/vellis/test_mcp_boundary.py tests/vellis/test_cleanup_boundaries.py tests/vellis/test_setup_path.py -q
       - command:just check
     blocker: null
