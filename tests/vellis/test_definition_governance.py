@@ -1,5 +1,6 @@
 """Compact semantic evidence for bounded prospective-definition governance."""
 
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -8,7 +9,7 @@ from tests.vellis.evolution_support import activate_clean_delta, stage_complete_
 from tests.vellis.oracle import materialize_definitions, materialize_replay, materialize_state
 from tests.vellis.semantic_state import semantic_state_equal
 from vellis.canonical import Provenance
-from vellis.changes import GraphChange
+from vellis.changes import GraphChange, GraphChangeRequest, GraphChangeTarget
 from vellis.definitions import (
     AnchorTypeDefinition,
     AssociatedDataTypeDefinition,
@@ -17,7 +18,7 @@ from vellis.definitions import (
     definition_set_equal,
 )
 from vellis.governance import DefinitionChange
-from vellis.graph import Anchor
+from vellis.graph import Anchor, AssociatedDataObject
 from vellis.json_value import JsonKind
 from vellis.outcomes import (
     OperationStatus,
@@ -452,5 +453,58 @@ def test_a_removal_that_orphans_a_multiplicity_rule_is_refused_after_an_activati
         assert any("person" in finding.summary for finding in report.returned_findings), [
             finding.summary for finding in report.returned_findings
         ]
+    finally:
+        system.close()
+
+
+def test_an_inherited_multiplicity_rule_assesses_prospective_objects_after_activation(
+    tmp_path: Path,
+) -> None:
+    """Untouched base-set rules still constrain a later prospective graph overlay."""
+    from vellis.definitions import DirectAssociationEnd, DirectAssociationMultiplicityConstraint
+
+    rule = DirectAssociationMultiplicityConstraint(
+        constrained_end=DirectAssociationEnd.ANCHOR,
+        anchor_type_keys=("person",),
+        associated_data_type_keys=("note",),
+        lower_bound=0,
+        upper_bound=1,
+        description="Each person has at most one note.",
+    )
+    system = RTGSystem.open(tmp_path / "vellis.sqlite3")
+    try:
+        assert system.initialize_fresh(
+            replace(ACTIVE, relationship_constraints=(rule,)),
+            provenance=OWNER,
+            initialization_summary="fresh",
+        ).accepted
+        assert system.set_definition_delta(
+            DefinitionChange(anchor_type_upserts=(PROJECT,)), provenance=OWNER
+        ).accepted
+        assert activate_clean_delta(system, provenance=OWNER).accepted
+        assert system.apply_graph_change(
+            GraphChange(anchor_upserts=(Anchor("p-1", "person", "Ada"),)), provenance=OWNER
+        ).accepted
+        assert system.set_definition_delta(
+            DefinitionChange(anchor_type_upserts=(AnchorTypeDefinition("place", "A place."),)),
+            provenance=OWNER,
+        ).accepted
+        assert system.apply_graph_change(
+            GraphChangeRequest(
+                GraphChangeTarget.DEFINITION_DELTA,
+                GraphChange(
+                    associated_data_upserts=(
+                        AssociatedDataObject("n-1", "note", ("p-1",), {"title": "one"}),
+                        AssociatedDataObject("n-2", "note", ("p-1",), {"title": "two"}),
+                    )
+                ),
+            ),
+            provenance=OWNER,
+        ).accepted
+
+        report = _assessment(system)
+
+        assert not report.conforms
+        assert any("outside 0..1" in finding.summary for finding in report.returned_findings)
     finally:
         system.close()

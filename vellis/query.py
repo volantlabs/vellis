@@ -30,7 +30,7 @@ from __future__ import annotations
 
 from collections.abc import Iterator, Sequence
 from dataclasses import dataclass, field
-from decimal import MAX_EMAX, MIN_EMIN, Decimal, localcontext
+from decimal import Decimal, InvalidOperation
 from enum import Enum
 from typing import Protocol
 
@@ -922,7 +922,15 @@ def evaluate_indexed_query(
             ),
             query=query,
         )
-    aggregates = _aggregates(query, definitions, matches)
+    try:
+        aggregates = _aggregates(query, definitions, matches)
+    except ArithmeticError as error:
+        return GraphQueryResult(
+            status=OperationStatus.REJECTED,
+            summary="the complete aggregate could not be returned, so none of it was",
+            findings=(ValidationFinding(summary=str(error)),),
+            query=query,
+        )
     counts = []
     if query.return_shape.projections:
         counts.append(f"{len(rows)} rows")
@@ -1076,30 +1084,40 @@ def _aggregate_value(operator: AggregationOperator, values: list[JsonValue]) -> 
 
 
 def _exact_decimal_sum(values: Sequence[JsonValue]) -> Decimal:
-    """Add finite decimals without letting the process context round the answer."""
+    """Add finite decimals with context-free integer coefficient arithmetic."""
     if not values:
         return Decimal(0)
-    decimals: list[Decimal] = []
-    places: list[tuple[int, int]] = []
+    coefficients: list[tuple[int, int]] = []
     for value in values:
         assert isinstance(value, Decimal)
-        decimals.append(value)
         shape = value.as_tuple()
         assert isinstance(shape.exponent, int)
-        places.append((shape.exponent, len(shape.digits)))
-    lowest_place = min(exponent for exponent, _ in places)
-    highest_place = max(exponent + digits - 1 for exponent, digits in places)
-    # Align every input down to its least significant place and leave enough leading
-    # room for the largest possible carry from adding this many values.
-    precision = max(1, highest_place - lowest_place + 1 + len(str(len(values))))
-    with localcontext() as context:
-        context.prec = precision
-        context.Emax = MAX_EMAX
-        context.Emin = MIN_EMIN
-        total = Decimal(0)
-        for value in decimals:
-            total += value
-        return total
+        coefficient = 0
+        for digit in shape.digits:
+            coefficient = coefficient * 10 + digit
+        coefficients.append((shape.exponent, -coefficient if shape.sign else coefficient))
+    lowest_place = min(exponent for exponent, _ in coefficients)
+    total = sum(
+        coefficient * 10 ** (exponent - lowest_place) for exponent, coefficient in coefficients
+    )
+    if total == 0:
+        return Decimal(0)
+    while total % 10 == 0:
+        total //= 10
+        lowest_place += 1
+    sign = int(total < 0)
+    remaining = abs(total)
+    digits: list[int] = []
+    while remaining:
+        remaining, digit = divmod(remaining, 10)
+        digits.append(digit)
+    coefficient_text = "".join(str(digit) for digit in reversed(digits))
+    try:
+        return Decimal(f"{'-' if sign else ''}{coefficient_text}e{lowest_place}")
+    except InvalidOperation as error:
+        raise ArithmeticError(
+            "the exact aggregate sum is outside the finite decimal result range"
+        ) from error
 
 
 def _distinct_rows(query: GraphQuery, index: QueryCandidateIndex) -> tuple[GraphQueryRow, ...]:

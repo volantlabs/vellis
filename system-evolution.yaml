@@ -377,6 +377,35 @@ findings:
     implementation_status: conforming
     nearest_wrong_system: Product behavior and accepted model authority agree while the execution ledger continues to say the owner has not selected an approach.
     compatibility_effect: Record truth now names exact Unicode code-point ordering as the accepted additive behavior; product behavior is unchanged by this bookkeeping correction.
+  - id: F022
+    summary: Prospective multiplicity assessment enumerated active rules by the overlay set identity, dropping untouched rules inherited from its base after an activation.
+    classification: implementation defect
+    consequence: A prospective graph could violate an inherited upper bound, receive a conforming assessment, and become eligible for activation.
+    authority_refs:
+      - VellisRequirements::validationCoverage
+      - VellisRequirements::nonDisruptiveDefinitionWork
+    evidence_refs:
+      - path:tests/vellis/test_definition_governance.py#test_an_inherited_multiplicity_rule_assesses_prospective_objects_after_activation
+    disposition: resolved
+    owner_work_item_id: W001
+    implementation_status: conforming
+    nearest_wrong_system: Definition-reference validation reaches inherited rules correctly while final prospective graph conformance silently omits those same rules.
+    compatibility_effect: Prospective assessments now enforce untouched inherited multiplicity rules; conforming proposals and active-state validation are unchanged.
+  - id: F023
+    summary: Exact aggregation still used Decimal construction at the implementation exponent boundary, so a finite accepted input pair could raise Overflow or InvalidOperation while forming its sum.
+    classification: implementation defect
+    consequence: Both evaluators crashed on a valid aggregate request instead of returning either an exact result or a whole typed refusal when the exact result was outside the finite result representation.
+    authority_refs:
+      - VellisRequirements::canonicalSemanticEquality
+      - VellisRequirements::semanticQueryMeaning
+      - VellisRequirements::mcpOutcomeIntegrity
+    evidence_refs:
+      - path:tests/vellis/test_graph_queries.py#test_sum_preserves_exact_numbers_at_the_decimal_exponent_boundary
+    disposition: resolved
+    owner_work_item_id: W001
+    implementation_status: conforming
+    nearest_wrong_system: Exact coefficient arithmetic succeeds, then result construction raises at the representation boundary through both otherwise-agreeing evaluators.
+    compatibility_effect: Representable sums remain exact; an exact sum outside the finite decimal result range is now refused whole with a typed finding instead of raising.
 decisions:
   - id: D001
     summary: Replace only self-reaching definitions with the permissive JSON value they stand for, then inline the rest, at the boundary that already owns the wire form.
@@ -532,7 +561,7 @@ work_items:
     planned_baseline:
       dimension: implementation
       identity: git:65f138443e1ecbe8d9b067bd26d2ad2af1ef57c6
-    finding_ids: [F001, F002, F003, F004, F005, F006, F007, F009, F010, F011, F012, F013, F014, F017, F018, F019, F020]
+    finding_ids: [F001, F002, F003, F004, F005, F006, F007, F009, F010, F011, F012, F013, F014, F017, F018, F019, F020, F022, F023]
     decision_ids: [D001, D002, D003, D005, D006, D007]
     authority:
       - refs:

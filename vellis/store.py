@@ -1585,11 +1585,14 @@ class CanonicalStore:
                 where_parameters=where_parameters,
             )
             if isinstance(aggregated, ValidationFinding):
+                over_bound = "exceed the maximum" in aggregated.summary
                 return GraphQueryResult(
                     status=OperationStatus.REJECTED,
                     summary=(
                         f"the aggregated selection has more than {query.maximum_rows} matches; "
                         "it is refused whole rather than aggregated in part"
+                        if over_bound
+                        else "the complete aggregate could not be returned, so none of it was"
                     ),
                     findings=(aggregated,),
                     query=response_query,
@@ -3701,7 +3704,10 @@ class CanonicalStore:
                 bindings.append(AggregateBinding(aggregation=aggregation.name, present=False))
                 continue
             if aggregation.operator is AggregationOperator.SUM:
-                reduced: JsonValue = _exact_decimal_sum(values)
+                try:
+                    reduced: JsonValue = _exact_decimal_sum(values)
+                except ArithmeticError as error:
+                    return ValidationFinding(summary=str(error))
             else:
                 ordered = sorted(values)  # pyright: ignore[reportArgumentType]
                 reduced = (
@@ -4314,8 +4320,10 @@ class CanonicalStore:
             keys = ((key,) for key in self._effective_relationship_keys_unlocked(active_identity))
         else:
             keys = self._connection.execute(
-                "SELECT r.natural_key FROM definition_multiplicity_rule AS r"
-                " WHERE r.definition_set_id = ? AND NOT EXISTS"
+                "SELECT r.natural_key FROM current_definition_relationship_source AS s"
+                " JOIN definition_multiplicity_rule AS r"
+                " ON r.definition_set_id = s.value_set_id"
+                " AND r.natural_key = s.natural_key WHERE NOT EXISTS"
                 " (SELECT 1 FROM proposal_definition_relationship AS p"
                 " WHERE p.natural_key = r.natural_key)"
                 " AND EXISTS (SELECT 1 FROM definition_multiplicity_participant AS p"
@@ -4323,8 +4331,7 @@ class CanonicalStore:
                 " AND p.rule_occurrence = r.occurrence"
                 " AND p.type_key IN (SELECT type_key FROM assessment_impacted_type))"
                 " UNION ALL SELECT natural_key FROM proposal_definition_relationship"
-                " WHERE operation = 'upsert' ORDER BY 1",
-                (active_identity,),
+                " WHERE operation = 'upsert' ORDER BY 1"
             )
         for (natural_key,) in keys:
             definitions = self._definitions_for_relation_unlocked(

@@ -1709,6 +1709,63 @@ def test_sum_preserves_exact_numbers_beyond_the_decimal_context(tmp_path: Path) 
         system.close()
 
 
+def test_sum_preserves_exact_numbers_at_the_decimal_exponent_boundary(tmp_path: Path) -> None:
+    """An unrepresentable exact sum is a whole typed refusal, never an exception."""
+    enormous = Decimal("9e999999999999999999")
+    assert enormous.is_finite()
+    base = build_rich_definitions()
+    definitions = replace(
+        base,
+        associated_data_types=(
+            replace(
+                base.associated_data_types[0],
+                property_constraints=tuple(
+                    replace(rule, value_range=None) if rule.property_name == "rating" else rule
+                    for rule in base.associated_data_types[0].property_constraints
+                ),
+            ),
+        ),
+    )
+    graph = Graph(
+        anchors=(ADA,),
+        associated_data=(
+            _note("n-1", ("a-1",), rating=enormous),
+            _note("n-2", ("a-1",), rating=enormous),
+        ),
+    )
+    query = _rating_query(
+        QueryAggregation(
+            name="total",
+            operator=AggregationOperator.SUM,
+            data_condition="notes",
+            property_name="rating",
+        )
+    )
+    in_memory = evaluate_query(query, definitions, graph, 0)
+
+    system = RTGSystem.open(tmp_path / "vellis.sqlite3")
+    try:
+        assert system.initialize_fresh(
+            definitions, provenance=_owner(), initialization_summary="a fresh start"
+        ).accepted
+        assert system.apply_graph_change(
+            GraphChange(
+                anchor_upserts=graph.anchors,
+                associated_data_upserts=graph.associated_data,
+            ),
+            provenance=_owner(),
+        ).accepted
+        stored = system.query_graph(query)
+    finally:
+        system.close()
+
+    for result in (in_memory, stored):
+        assert result.status is OperationStatus.REJECTED
+        assert not result.rows and not result.aggregates
+        assert "could not be returned" in result.summary
+        assert "outside the finite decimal result range" in result.findings[0].summary
+
+
 def test_aggregation_agrees_between_the_stored_and_in_memory_graph(tmp_path: Path) -> None:
     """Component pruning must retain every identity that can change an aggregate."""
     system = RTGSystem.open(tmp_path / "vellis.sqlite3")
