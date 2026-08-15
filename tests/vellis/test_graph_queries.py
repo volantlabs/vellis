@@ -1711,6 +1711,24 @@ def test_aggregation_agrees_between_the_stored_and_in_memory_graph(tmp_path: Pat
             ("lowest", True, Decimal(2)),
             ("highest", True, Decimal(5)),
         ]
+
+        mixed = GraphQuery(
+            anchor_groups=query.anchor_groups,
+            data_conditions=query.data_conditions,
+            return_shape=ReturnShape(
+                projections=(AssociatedDataProjection(name="note", data_condition="notes"),)
+            ),
+            aggregations=query.aggregations,
+            maximum_rows=query.maximum_rows,
+        )
+        stored_mixed = system.query_graph(mixed)
+        in_memory_mixed = evaluate_query(mixed, definitions, state.graph, state.revision)
+
+        assert stored_mixed.status is OperationStatus.ACCEPTED, stored_mixed.findings
+        assert stored_mixed.rows == in_memory_mixed.rows
+        assert stored_mixed.aggregates == in_memory_mixed.aggregates
+        assert len(stored_mixed.rows) == 2
+        assert len(stored_mixed.aggregates) == 4
     finally:
         system.close()
 

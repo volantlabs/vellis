@@ -45,9 +45,17 @@ class ConnectionStage:
     RESOLVE_DESTINATION = "resolve-destination"
     OPEN_MEMORY = "open-memory"
     RESTORE_STATE = "restore-state"
+    CLOSE_MEMORY = "close-memory"
 
 
-def _report(stage: str, summary: str, corrective_action: str, stream: TextIO) -> None:
+def _report(
+    stage: str,
+    summary: str,
+    corrective_action: str,
+    stream: TextIO,
+    *,
+    memory_changed: bool = False,
+) -> None:
     """Say what failed, what it did to established memory, and what to do about it.
 
     The state effect is stated rather than omitted when nothing happened. "Unchanged" is
@@ -56,7 +64,8 @@ def _report(stage: str, summary: str, corrective_action: str, stream: TextIO) ->
     """
     print(f"Vellis could not serve this memory. Stage: {stage}", file=stream)
     print(f"  what happened: {summary}", file=stream)
-    print("  established memory: unchanged", file=stream)
+    changed = "changed" if memory_changed else "unchanged"
+    print(f"  established memory: {changed}", file=stream)
     print(f"  what to do next: {corrective_action}", file=stream)
 
 
@@ -82,6 +91,8 @@ def _restore(
     )
     parser.add_argument("--yes", action="store_true", help="Skip the confirmation prompt.")
     arguments = parser.parse_args(argv)
+    restored = False
+    result = EXIT_FAILED
     try:
         directory: Path = resolve_data_directory(arguments.data_dir)
     except DestinationError as unusable:
@@ -141,22 +152,42 @@ def _restore(
             "yes",
         }:
             print("  nothing was restored; established memory is unchanged", file=output)
-            return EXIT_SUCCESS
-        outcome = system.restore_historical_state(selection, provenance=Provenance("owner"))
-        if not outcome.accepted:
-            _report(
-                ConnectionStage.RESTORE_STATE,
-                outcome.summary,
-                "resolve what the finding names, then run this again",
-                error,
-            )
-            for finding in outcome.findings:
-                print(f"  finding: {finding.summary}", file=error)
-            return EXIT_FAILED
-        print(f"  restored: {outcome.summary}", file=output)
-        return EXIT_SUCCESS
-    finally:
+            result = EXIT_SUCCESS
+        else:
+            outcome = system.restore_historical_state(selection, provenance=Provenance("owner"))
+            if not outcome.accepted:
+                _report(
+                    ConnectionStage.RESTORE_STATE,
+                    outcome.summary,
+                    "resolve what the finding names, then run this again",
+                    error,
+                )
+                for finding in outcome.findings:
+                    print(f"  finding: {finding.summary}", file=error)
+            else:
+                restored = True
+                result = EXIT_SUCCESS
+                print(f"  restored: {outcome.summary}", file=output)
+    except StoreError as operation_error:
+        _report(
+            ConnectionStage.RESTORE_STATE,
+            f"the restoration could not complete: {operation_error}",
+            "resolve the reported store problem, then inspect history before retrying",
+            error,
+        )
+    try:
         system.close()
+    except StoreError as close_error:
+        _report(
+            ConnectionStage.CLOSE_MEMORY,
+            f"the restore operation finished, but cleanup could not: {close_error}",
+            "close the other database reader, then open and close Vellis again before "
+            "copying the memory file; inspect history before retrying a restore",
+            error,
+            memory_changed=restored,
+        )
+        return EXIT_FAILED
+    return result
 
 
 def main(

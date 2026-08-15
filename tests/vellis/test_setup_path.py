@@ -11,12 +11,14 @@ Every case uses a temporary destination; none touches the platform default.
 from __future__ import annotations
 
 import io
+import sqlite3
 from pathlib import Path
 
 import pytest
 
 from tests.vellis.oracle import materialize_replay, materialize_state
 from tests.vellis.semantic_state import semantic_state_equal
+from vellis.activity import HistoryKind, HistoryQuery
 from vellis.paths import (
     DATA_DIRECTORY_VARIABLE,
     DestinationError,
@@ -178,6 +180,37 @@ def test_a_second_attempt_fails_actionably_and_leaves_memory_unchanged(tmp_path:
         assert system.store.canonical_record_count() == 1
     finally:
         system.close()
+
+
+def test_a_checkpoint_blocker_cannot_replace_a_second_start_report(tmp_path: Path) -> None:
+    """Cleanup contention remains part of the staged, state-accurate setup outcome."""
+    destination = tmp_path / "vellis"
+    first = prepare_local_system(data_directory=destination, choice=FreshVocabularyChoice.BLANK)
+    assert first.succeeded and first.store is not None
+
+    reader = sqlite3.connect(first.store)
+    writer = RTGSystem.open(first.store)
+    try:
+        reader.execute("BEGIN")
+        assert reader.execute("SELECT revision FROM state_head WHERE id = 0").fetchone() == (0,)
+        assert writer.history(HistoryQuery(kind=HistoryKind.CANONICAL, maximum_records=1)).accepted
+
+        second = prepare_local_system(
+            data_directory=destination, choice=FreshVocabularyChoice.BLANK
+        )
+
+        assert second.is_actionable_failure
+        assert second.stage == SetupStage.INITIALIZE
+        assert not second.memory_changed
+        assert "already established" in second.summary
+        assert "cleanup could not finish" in second.summary
+        assert "use this system as it is" in (second.corrective_action or "")
+        assert "close the other database reader" in (second.corrective_action or "")
+    finally:
+        reader.close()
+        writer.close()
+
+    RTGSystem.open(first.store).close()
 
 
 def test_an_unusable_destination_fails_at_the_prepare_stage(tmp_path: Path) -> None:

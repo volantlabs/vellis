@@ -45,6 +45,7 @@ class PreserveStage:
     OPEN_MEMORY = "open-memory"
     CAPTURE = "capture"
     WRITE = "write"
+    CLOSE_MEMORY = "close-memory"
 
 
 def _failed(
@@ -182,7 +183,11 @@ def main(
                 observed=True,
             )
     finally:
-        system.close()
+        close_error: StoreError | None = None
+        try:
+            system.close()
+        except StoreError as unavailable_checkpoint:
+            close_error = unavailable_checkpoint
         if temporary_name is not None:
             Path(temporary_name).unlink(missing_ok=True)
     print(f"Preserved revision {metadata.revision} to {document}", file=out)
@@ -192,6 +197,22 @@ def main(
     # would have told them otherwise.
     print("  canonical memory and its revision are unchanged.", file=out)
     print("  the capture is recorded in this system's activity history.", file=out)
+    if close_error is not None:
+        print(
+            f"Vellis preserved the snapshot but could not finish closing. "
+            f"Stage: {PreserveStage.CLOSE_MEMORY}",
+            file=error,
+        )
+        print(f"  what happened: the memory could not finish closing: {close_error}", file=error)
+        print("  established memory: unchanged", file=error)
+        print("  snapshot document: written", file=error)
+        print(
+            "  what to do next: close the other database reader, then open and close "
+            "Vellis again before copying the memory file; the snapshot already written "
+            "does not need repeating",
+            file=error,
+        )
+        return EXIT_FAILED
     return EXIT_SUCCESS
 
 

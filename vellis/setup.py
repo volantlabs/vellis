@@ -400,7 +400,7 @@ def _initialize(
             # with nothing established. Telling the second owner to use the system they
             # have would be telling them to use one that does not exist.
             established = system.is_initialized
-            return SetupReport(
+            report = SetupReport(
                 stage=SetupStage.INITIALIZE,
                 succeeded=False,
                 memory_changed=False,
@@ -411,18 +411,19 @@ def _initialize(
                 choice=choice,
                 revision=_revision_if_readable(system) if established else None,
             )
-        return SetupReport(
-            stage=SetupStage.INITIALIZE,
-            succeeded=True,
-            memory_changed=True,
-            summary=f"{outcome.summary}; {choice.content_summary}",
-            destination=destination,
-            store=store_file,
-            choice=choice,
-            revision=outcome.resulting_revision,
-        )
+        else:
+            report = SetupReport(
+                stage=SetupStage.INITIALIZE,
+                succeeded=True,
+                memory_changed=True,
+                summary=f"{outcome.summary}; {choice.content_summary}",
+                destination=destination,
+                store=store_file,
+                choice=choice,
+                revision=outcome.resulting_revision,
+            )
     except StoreError as error:
-        return SetupReport(
+        report = SetupReport(
             stage=SetupStage.INITIALIZE,
             succeeded=False,
             memory_changed=False,
@@ -432,8 +433,21 @@ def _initialize(
             store=store_file,
             choice=choice,
         )
-    finally:
+    try:
         system.close()
+    except StoreError as error:
+        prior_action = report.corrective_action
+        retry = (
+            "close the other database reader, then open and close Vellis again before "
+            "copying the memory file"
+        )
+        return replace(
+            report,
+            succeeded=False,
+            summary=f"{report.summary}; cleanup could not finish: {error}",
+            corrective_action=f"{prior_action}; {retry}" if prior_action else retry,
+        )
+    return report
 
 
 def _corrective_action(error: StoreError, store_file: Path) -> str:

@@ -38,6 +38,7 @@ scope:
     - VellisRequirements::semanticQueryMeaning
     - VellisRequirements::querySafety
     - VellisRequirements::durableCanonicalHistory
+    - VellisRequirements::simpleIndividualOperation
     - RTGSystem
     - AGENTS.md
   implementation_scope:
@@ -53,6 +54,8 @@ scope:
     - vellis/query.py
     - vellis/store.py
     - vellis/system.py
+    - vellis/setup.py
+    - vellis/preserve.py
     - tests/vellis/test_mcp_boundary.py
     - tests/vellis/test_graph_queries.py
     - tests/vellis/test_invalid_queries.py
@@ -63,6 +66,8 @@ scope:
     - vellis/__main__.py
     - tests/vellis/test_historical_restore.py
     - tests/vellis/test_store_integrity.py
+    - tests/vellis/test_setup_path.py
+    - tests/vellis/test_cleanup_boundaries.py
     - README.md
   review_lenses:
     - authority and conformance
@@ -312,6 +317,38 @@ findings:
     implementation_status: conforming
     nearest_wrong_system: Current, prospective, or historical SQL evaluation accepts an empty selection but omits the requested arithmetic answers, while replayed graph evaluation returns them.
     compatibility_effect: Accepted empty selections now include one canonical zero/absent binding for every requested aggregation; nonempty results and rejected queries are unchanged.
+  - id: F018
+    summary: SQL evaluation computed aggregate bindings for a nonempty mixed projection-plus-aggregation query and then omitted them from the accepted result.
+    classification: implementation defect
+    consequence: A caller received the requested rows but none of the requested arithmetic answers, while in-memory evaluation of the same accepted query returned both parts.
+    authority_refs:
+      - RTG::'Graph Query Result'
+      - VellisRequirements::semanticQueryMeaning
+    evidence_refs:
+      - path:tests/vellis/test_graph_queries.py#test_aggregation_agrees_between_the_stored_and_in_memory_graph
+    disposition: resolved
+    owner_work_item_id: W001
+    implementation_status: conforming
+    nearest_wrong_system: Durable evaluation accepts a mixed query and returns its projected objects while silently discarding every aggregate it already computed.
+    compatibility_effect: Nonempty mixed results now include exactly the aggregate bindings the query requested; projected rows and aggregation-only results are unchanged.
+  - id: F019
+    summary: A checkpoint failure raised from close in an owner-facing finally block could replace a structured setup, serve, restore, or preserve outcome.
+    classification: implementation defect
+    consequence: A refused second setup surfaced as a raw StoreError, and an operation that had already committed could look wholly failed without saying that established memory changed.
+    authority_refs:
+      - VellisRequirements::simpleIndividualOperation
+      - VellisRequirements::durableCanonicalHistory
+      - VellisRequirements::mcpOutcomeIntegrity
+    evidence_refs:
+      - path:tests/vellis/test_setup_path.py#test_a_checkpoint_blocker_cannot_replace_a_second_start_report
+      - path:tests/vellis/test_cleanup_boundaries.py#test_mcp_shutdown_reports_checkpoint_contention_without_recasting_commits
+      - path:tests/vellis/test_cleanup_boundaries.py#test_restore_close_failure_names_the_committed_state_effect
+      - path:tests/vellis/test_cleanup_boundaries.py#test_preserve_close_failure_keeps_the_published_snapshot_truthful
+    disposition: resolved
+    owner_work_item_id: W001
+    implementation_status: conforming
+    nearest_wrong_system: The operation produces an accurate typed outcome, then cleanup contention erases it with a bare exception after any committed effect is already durable in the WAL.
+    compatibility_effect: Cleanup contention is now staged and actionable at owner boundaries; successful and refused domain outcomes retain their true state effect, and clean shutdown behavior is unchanged.
 decisions:
   - id: D001
     summary: Replace only self-reaching definitions with the permissive JSON value they stand for, then inline the rest, at the boundary that already owns the wire form.
@@ -467,7 +504,7 @@ work_items:
     planned_baseline:
       dimension: implementation
       identity: git:1f20646b2402b75846424647317b1d5fbfcf0136
-    finding_ids: [F001, F002, F003, F004, F005, F006, F007, F009, F010, F011, F012, F013, F014, F017]
+    finding_ids: [F001, F002, F003, F004, F005, F006, F007, F009, F010, F011, F012, F013, F014, F017, F018, F019]
     decision_ids: [D001, D002, D003, D005, D006, D007]
     authority:
       - refs:
@@ -483,13 +520,15 @@ work_items:
         remaining_work_item_ids: [W002]
       - refs:
           - VellisRequirements::durableCanonicalHistory
+          - VellisRequirements::simpleIndividualOperation
+          - VellisRequirements::mcpOutcomeIntegrity
         coverage: partial
         remaining_work_item_ids: [W002]
     approval:
       status: not-required
       reason: An implementation defect already decided by accepted MCP contract meaning is ordinary implementation work.
       checkpoint: null
-    nearest_wrong_system: The surface is callable while one evaluator returns wrong or population-sized aggregate work, a legacy request is malformed, or close silently leaves the named file incomplete.
+    nearest_wrong_system: The surface is callable while one evaluator returns wrong or population-sized aggregate work, a legacy request is malformed, or close silently leaves the named file incomplete or replaces the operation outcome.
     compatibility_effect: Callers gain typed schemas and multi-type groups while the former scalar singleton spelling remains accepted; canonical results use the collection shape.
     non_effects:
       - Validation still runs against the real request types, not the published schema.
@@ -501,6 +540,7 @@ work_items:
     evidence_refs:
       - command:uv run pytest tests/vellis/test_mcp_boundary.py -q
       - command:uv run pytest tests/vellis/test_graph_queries.py tests/vellis/test_store_integrity.py -q
+      - command:uv run pytest tests/vellis/test_setup_path.py tests/vellis/test_cleanup_boundaries.py -q
     blocker: null
     checkpoint: null
   - id: W002
@@ -521,6 +561,7 @@ work_items:
           - VellisRequirements::semanticQueryMeaning
           - VellisRequirements::querySafety
           - VellisRequirements::durableCanonicalHistory
+          - VellisRequirements::simpleIndividualOperation
         coverage: full
         remaining_work_item_ids: []
     approval:

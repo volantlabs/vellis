@@ -535,5 +535,21 @@ def serve(path: Path, *, name: str = "vellis") -> None:
                 "system",
             )
         build_server(system, name=name).run(transport="stdio")
-    finally:
+    except BaseException:
+        # Cleanup must not replace the boundary failure that already explains why no
+        # service was provided. The connection itself is released before checkpointing,
+        # so suppressing only this secondary checkpoint error leaks no live handle.
+        try:
+            system.close()
+        except StoreError:
+            pass
+        raise
+    try:
         system.close()
+    except StoreError as error:
+        raise ServeError(
+            f"the server stopped, but its memory could not finish closing: {error}; "
+            "changes already reported as committed remain committed",
+            "close the other database reader, then start and stop Vellis once more "
+            "before copying the memory file",
+        ) from error

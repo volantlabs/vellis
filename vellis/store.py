@@ -1711,10 +1711,15 @@ class CanonicalStore:
             rows.append(GraphQueryRow(tuple(anchors), tuple(links), tuple(data), tuple(properties)))
         return GraphQueryResult(
             status=OperationStatus.ACCEPTED,
-            summary=f"{len(rows)} rows at revision {revision}",
+            summary=(
+                f"{len(rows)} rows and {len(aggregates)} aggregates at revision {revision}"
+                if aggregates
+                else f"{len(rows)} rows at revision {revision}"
+            ),
             query=response_query,
             evaluated_revision=revision,
             rows=tuple(rows),
+            aggregates=aggregates,
         )
 
     def definition_summary_rows(
