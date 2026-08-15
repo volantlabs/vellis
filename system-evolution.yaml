@@ -3,13 +3,13 @@ evolution:
   id: callable-tool-surface-and-value-fidelity
   objective: Close the callable-tool and scale-simulation findings so queries preserve one meaning across realizations and request generations, clean close reports checkpoint contention, and owner guidance matches the runnable surface.
   observable_distinction: Discovery returns ten self-contained input schemas, stored JSON kinds remain exact, aggregate-only queries agree between durable and in-memory evaluation, former single-type MCP requests remain callable, a clean close either consolidates the WAL or reports the reader preventing it, restoration is documented, patterned dates are queryable, and orphaning definition edits are refused.
-  lifecycle: active
+  lifecycle: complete
   approval:
     status: accepted
     reason: The owner must seal the modeling correction that resolves contradictory aggregation-only query authority before closure.
     checkpoint: git:428faa3753365862626aa108ae55ad79535f97e8
   blocker: null
-  checkpoint: null
+  checkpoint: git:f52adf1ce01cbe1450acabab731d6def6aabbccb
 baselines:
   status: current
   source:
@@ -20,16 +20,16 @@ baselines:
     checkpoint: git:8baa73aa38a736e5920c25f466f31fa772d41801
   target:
     model: sha256:30decc89ce67a19b2f9720028ffb3eb8161edf37affd11fa49b12179b3018d3e
-    implementation: git:2250e43dc52571e90f475acc329de933ee3ca92a
+    implementation: git:f52adf1ce01cbe1450acabab731d6def6aabbccb
     language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
     execution_environment: sha256:3315a10b5fcc8d62aa435d2f4e12165a147f334b01fad06ce367d11b6eb8191c
-    checkpoint: git:2250e43dc52571e90f475acc329de933ee3ca92a
+    checkpoint: git:f52adf1ce01cbe1450acabab731d6def6aabbccb
   observed:
     model: sha256:30decc89ce67a19b2f9720028ffb3eb8161edf37affd11fa49b12179b3018d3e
-    implementation: git:2250e43dc52571e90f475acc329de933ee3ca92a
+    implementation: git:f52adf1ce01cbe1450acabab731d6def6aabbccb
     language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
     execution_environment: sha256:3315a10b5fcc8d62aa435d2f4e12165a147f334b01fad06ce367d11b6eb8191c
-    checkpoint: git:2250e43dc52571e90f475acc329de933ee3ca92a
+    checkpoint: git:f52adf1ce01cbe1450acabab731d6def6aabbccb
 scope:
   authority_scope:
     - VellisRequirements::mcpAgentToolContract
@@ -574,7 +574,7 @@ work_items:
     dependencies: []
     planned_baseline:
       dimension: implementation
-      identity: git:2250e43dc52571e90f475acc329de933ee3ca92a
+      identity: git:f52adf1ce01cbe1450acabab731d6def6aabbccb
     finding_ids: [F001, F002, F003, F004, F005, F006, F007, F009, F010, F011, F012, F013, F014, F017, F018, F019, F020, F022, F023, F024]
     decision_ids: [D001, D002, D003, D005, D006, D007]
     authority:
@@ -606,14 +606,14 @@ work_items:
       - Stored property values remain constrained only by the owner's definitions.
       - Canonical state, persistence format, and user-owned data are untouched.
       - A rejected over-bound query returns no partial rows or aggregates.
-    lifecycle: active
+    lifecycle: complete
     implementation_status: conforming
     evidence_refs:
       - command:uv run pytest tests/vellis/test_mcp_boundary.py -q
       - command:uv run pytest tests/vellis/test_graph_queries.py tests/vellis/test_store_integrity.py -q
       - command:uv run pytest tests/vellis/test_setup_path.py tests/vellis/test_cleanup_boundaries.py -q
     blocker: null
-    checkpoint: null
+    checkpoint: git:f52adf1ce01cbe1450acabab731d6def6aabbccb
   - id: W002
     order: 2
     label: Review and close the boundary schema correction
@@ -621,7 +621,7 @@ work_items:
     dependencies: [W001]
     planned_baseline:
       dimension: implementation
-      identity: git:2250e43dc52571e90f475acc329de933ee3ca92a
+      identity: git:f52adf1ce01cbe1450acabab731d6def6aabbccb
     finding_ids: []
     decision_ids: []
     authority:
@@ -644,11 +644,13 @@ work_items:
     non_effects:
       - The ten selected tool names and their order remain exactly as the model declares them.
       - User-owned data remains untouched.
-    lifecycle: pending
-    implementation_status: not evaluated
-    evidence_refs: []
+    lifecycle: complete
+    implementation_status: conforming
+    evidence_refs:
+      - command:just check
+      - command:just system-evolution-check
     blocker: null
-    checkpoint: null
+    checkpoint: git:f52adf1ce01cbe1450acabab731d6def6aabbccb
   - id: W003
     order: 3
     label: Decide how a date-range question is asked, then change the accepted meaning it needs
@@ -675,11 +677,13 @@ work_items:
     non_effects:
       - No accepted model meaning changes before the owner accepts it.
       - Existing starter graphs keep their stored date values whichever approach is chosen.
-    lifecycle: pending
-    implementation_status: not evaluated
-    evidence_refs: []
+    lifecycle: complete
+    implementation_status: conforming
+    evidence_refs:
+      - path:tests/vellis/test_graph_queries.py#test_a_string_property_orders_by_code_point
+      - path:tests/vellis/test_graph_queries.py#test_string_ordering_agrees_between_the_stored_and_replayed_graph
     blocker: null
-    checkpoint: null
+    checkpoint: git:f52adf1ce01cbe1450acabab731d6def6aabbccb
   - id: W004
     order: 4
     label: Accept the coherent aggregation-only query authority
@@ -707,30 +711,36 @@ work_items:
     non_effects:
       - No query gains sorting, pagination, traversal, or computed expressions.
       - Persistence and canonical graph meaning remain unchanged.
-    lifecycle: pending
+    lifecycle: complete
     implementation_status: conforming
     evidence_refs:
       - command:just model-check
       - path:tests/vellis/test_graph_queries.py#test_aggregation_agrees_between_the_stored_and_in_memory_graph
     blocker: null
-    checkpoint: null
+    checkpoint: git:f52adf1ce01cbe1450acabab731d6def6aabbccb
 closure:
-  finding_disposition: open
+  finding_disposition: complete
   model_status: accepted
-  implementation_status: partial
-  integration_status: not evaluated
+  implementation_status: conforming
+  integration_status: conforming
   external_status: not applicable
   compatibility: Published schemas are self-contained; former scalar single-type queries remain accepted and normalize to the canonical collection; ordered string comparison adds answers for formerly refused queries; persistence and canonical stored meaning are unchanged.
   reviews:
     - lens: authority and conformance
-      status: pending
-      reviewer: null
-      checkpoint: null
-      evidence_refs: []
+      status: clean
+      reviewer: agent:authority_review8
+      checkpoint: git:f52adf1ce01cbe1450acabab731d6def6aabbccb
+      evidence_refs:
+        - command:just system-evolution-check
     - lens: engineering and evidence
-      status: pending
-      reviewer: null
-      checkpoint: null
-      evidence_refs: []
-  evidence_refs: []
-  checkpoint: null
+      status: clean
+      reviewer: agent:engineering_review8
+      checkpoint: git:f52adf1ce01cbe1450acabab731d6def6aabbccb
+      evidence_refs:
+        - command:just system-evolution-check
+        - command:uv run pytest tests/vellis/test_graph_queries.py tests/vellis/test_definition_governance.py tests/vellis/test_cleanup_boundaries.py -q
+  evidence_refs:
+    - command:just check
+    - command:just model-check
+    - command:just system-evolution-check
+  checkpoint: git:f52adf1ce01cbe1450acabab731d6def6aabbccb
