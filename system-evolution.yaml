@@ -20,16 +20,16 @@ baselines:
     checkpoint: git:8baa73aa38a736e5920c25f466f31fa772d41801
   target:
     model: sha256:30decc89ce67a19b2f9720028ffb3eb8161edf37affd11fa49b12179b3018d3e
-    implementation: git:ad6d99f912fb746259526ec8b4e90b5e119485dd
+    implementation: git:b682ac7f7c015df9a0ddf990d05f23cb20da3f33
     language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
     execution_environment: sha256:3315a10b5fcc8d62aa435d2f4e12165a147f334b01fad06ce367d11b6eb8191c
-    checkpoint: git:ad6d99f912fb746259526ec8b4e90b5e119485dd
+    checkpoint: git:b682ac7f7c015df9a0ddf990d05f23cb20da3f33
   observed:
     model: sha256:30decc89ce67a19b2f9720028ffb3eb8161edf37affd11fa49b12179b3018d3e
-    implementation: git:ad6d99f912fb746259526ec8b4e90b5e119485dd
+    implementation: git:b682ac7f7c015df9a0ddf990d05f23cb20da3f33
     language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
     execution_environment: sha256:3315a10b5fcc8d62aa435d2f4e12165a147f334b01fad06ce367d11b6eb8191c
-    checkpoint: git:ad6d99f912fb746259526ec8b4e90b5e119485dd
+    checkpoint: git:b682ac7f7c015df9a0ddf990d05f23cb20da3f33
 scope:
   authority_scope:
     - VellisRequirements::mcpAgentToolContract
@@ -429,9 +429,9 @@ findings:
       - VellisRequirements::mcpOutcomeIntegrity
     evidence_refs:
       - path:tests/vellis/test_mcp_boundary.py#test_raw_stdio_preserves_a_high_precision_fraction_in_both_directions
-    disposition: open
+    disposition: resolved
     owner_work_item_id: W005
-    implementation_status: partial
+    implementation_status: conforming
     nearest_wrong_system: Prepared-dictionary tests preserve every apparent value while the production stdio decoder silently rounds a fractional token before the same request reaches them.
     compatibility_effect: Fractional JSON numbers retain their exact literal mathematical value through stdio input and output; integers, Booleans, schemas, tool names, and stored forms are unchanged.
   - id: F026
@@ -444,9 +444,9 @@ findings:
     evidence_refs:
       - path:tests/vellis/test_cleanup_boundaries.py#test_public_server_command_keeps_the_close_stage_and_state_effect
       - path:tests/vellis/test_cleanup_boundaries.py#test_mcp_shutdown_reports_whether_the_completed_session_changed_memory
-    disposition: open
+    disposition: resolved
     owner_work_item_id: W005
-    implementation_status: partial
+    implementation_status: conforming
     nearest_wrong_system: The server diagnoses close contention accurately while the owner-facing command rewrites it into a pre-service failure and a false non-effect.
     compatibility_effect: Serve failures gain their accurate stage and revision-change effect; clean serving, open failures, tool behavior, and canonical meaning are unchanged.
 decisions:
@@ -754,7 +754,7 @@ work_items:
     dependencies: [W001, W002, W003, W004]
     planned_baseline:
       dimension: implementation
-      identity: git:ad6d99f912fb746259526ec8b4e90b5e119485dd
+      identity: git:b682ac7f7c015df9a0ddf990d05f23cb20da3f33
     finding_ids: [F025, F026]
     decision_ids: []
     authority:
@@ -783,15 +783,17 @@ work_items:
     evidence_refs:
       - path:tests/vellis/test_mcp_boundary.py#test_raw_stdio_preserves_a_high_precision_fraction_in_both_directions
       - path:tests/vellis/test_cleanup_boundaries.py#test_public_server_command_keeps_the_close_stage_and_state_effect
+      - command:uv run pytest tests/vellis/test_mcp_boundary.py tests/vellis/test_cleanup_boundaries.py tests/vellis/test_setup_path.py -q
+      - command:just check
     blocker: null
     checkpoint: null
 closure:
   finding_disposition: open
   model_status: accepted
-  implementation_status: partial
-  integration_status: not evaluated
+  implementation_status: conforming
+  integration_status: conforming
   external_status: not applicable
-  compatibility: Published schemas are self-contained; former scalar single-type queries remain accepted and normalize to the canonical collection; ordered string comparison adds answers for formerly refused queries; persistence and canonical stored meaning are unchanged.
+  compatibility: Published schemas are self-contained; former scalar single-type queries remain accepted and normalize to the canonical collection; ordered string comparison adds answers for formerly refused queries; exact fractional JSON numbers now survive raw stdio round trips; close failures report their true stage and observed revision effect; persistence and canonical stored meaning are unchanged.
   reviews:
     - lens: authority and conformance
       status: pending
