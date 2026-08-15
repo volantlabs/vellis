@@ -28,7 +28,7 @@ model_baseline:
     validator_sha256: 1f6f2eb0eb43cf4a2154ef4989a0ed22c871051711c50b2f88399c299cad5bbf
     checkpoint: null
   observed:
-    authority_sha256: be5f4a65ecdb214133cef80424595bd84053f62ad3b4b4e34bb75c50e46fab6d
+    authority_sha256: 30decc89ce67a19b2f9720028ffb3eb8161edf37affd11fa49b12179b3018d3e
     language_sha256: 054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
     validator_sha256: 1f6f2eb0eb43cf4a2154ef4989a0ed22c871051711c50b2f88399c299cad5bbf
     checkpoint: null

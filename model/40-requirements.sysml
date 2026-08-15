@@ -39,8 +39,8 @@ package VellisRequirements {
     requirement def 'Semantic Query Meaning' {
         subject system : 'RTG System';
         doc /*
-         * A graph query shall select named anchor groups of one type in the
-         * definitions governing the evaluated state,
+         * A graph query shall select named anchor groups of one or more active
+         * types in the definitions governing the evaluated state,
          * optionally narrow anchors and links by known UUIDs, select directly
          * associated-data groups by type and optional structured value
          * comparisons, require typed directed links between anchor or
