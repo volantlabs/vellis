@@ -20,16 +20,16 @@ baselines:
     checkpoint: git:8baa73aa38a736e5920c25f466f31fa772d41801
   target:
     model: sha256:be5f4a65ecdb214133cef80424595bd84053f62ad3b4b4e34bb75c50e46fab6d
-    implementation: git:fe8fb31133d6abffb3380e37f85df5ca2d359545
+    implementation: git:b91c398e589c47875a468bdaa0f83b7311d2cb4e
     language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
     execution_environment: sha256:3315a10b5fcc8d62aa435d2f4e12165a147f334b01fad06ce367d11b6eb8191c
-    checkpoint: git:fe8fb31133d6abffb3380e37f85df5ca2d359545
+    checkpoint: git:b91c398e589c47875a468bdaa0f83b7311d2cb4e
   observed:
     model: sha256:be5f4a65ecdb214133cef80424595bd84053f62ad3b4b4e34bb75c50e46fab6d
-    implementation: git:fe8fb31133d6abffb3380e37f85df5ca2d359545
+    implementation: git:b91c398e589c47875a468bdaa0f83b7311d2cb4e
     language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
     execution_environment: sha256:3315a10b5fcc8d62aa435d2f4e12165a147f334b01fad06ce367d11b6eb8191c
-    checkpoint: git:fe8fb31133d6abffb3380e37f85df5ca2d359545
+    checkpoint: git:b91c398e589c47875a468bdaa0f83b7311d2cb4e
 scope:
   authority_scope:
     - VellisRequirements::mcpAgentToolContract
@@ -220,6 +220,7 @@ findings:
     evidence_refs:
       - path:tests/vellis/test_graph_queries.py#test_aggregation_counts_matching_objects_not_distinct_projected_tuples
       - path:tests/vellis/test_graph_queries.py#test_aggregation_agrees_between_the_stored_and_in_memory_graph
+      - path:tests/vellis/test_graph_queries.py#test_in_memory_aggregation_stops_when_the_maximum_is_decided
     disposition: resolved
     owner_work_item_id: W001
     implementation_status: conforming
@@ -289,6 +290,7 @@ findings:
       - VellisRequirements::querySafety
     evidence_refs:
       - path:tests/vellis/test_graph_queries.py#test_aggregation_agrees_between_the_stored_and_in_memory_graph
+      - path:tests/vellis/test_graph_queries.py#test_in_memory_aggregation_stops_when_the_maximum_is_decided
       - command:just model-check
     disposition: resolved
     owner_work_item_id: W001
@@ -449,7 +451,7 @@ work_items:
     dependencies: []
     planned_baseline:
       dimension: implementation
-      identity: git:fe8fb31133d6abffb3380e37f85df5ca2d359545
+      identity: git:b91c398e589c47875a468bdaa0f83b7311d2cb4e
     finding_ids: [F001, F002, F003, F004, F005, F006, F007, F009, F010, F011, F012, F013, F014, F016]
     decision_ids: [D001, D002, D003, D005, D006, D007]
     authority:
@@ -493,7 +495,7 @@ work_items:
     dependencies: [W001]
     planned_baseline:
       dimension: implementation
-      identity: git:fe8fb31133d6abffb3380e37f85df5ca2d359545
+      identity: git:b91c398e589c47875a468bdaa0f83b7311d2cb4e
     finding_ids: []
     decision_ids: []
     authority:
