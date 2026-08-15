@@ -3628,7 +3628,7 @@ class CanonicalStore:
         than aggregated in part.
         """
         from vellis.json_value import JsonValue, json_kind
-        from vellis.query import AggregateBinding, AggregationOperator
+        from vellis.query import AggregateBinding, AggregationOperator, _exact_decimal_sum
 
         conditions = {condition.name: condition for condition in query.data_conditions}
         bindings: list[AggregateBinding] = []
@@ -3701,11 +3701,7 @@ class CanonicalStore:
                 bindings.append(AggregateBinding(aggregation=aggregation.name, present=False))
                 continue
             if aggregation.operator is AggregationOperator.SUM:
-                total = Decimal(0)
-                for value in values:
-                    assert isinstance(value, Decimal)
-                    total += value
-                reduced: JsonValue = total
+                reduced: JsonValue = _exact_decimal_sum(values)
             else:
                 ordered = sorted(values)  # pyright: ignore[reportArgumentType]
                 reduced = (

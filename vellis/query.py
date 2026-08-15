@@ -30,7 +30,7 @@ from __future__ import annotations
 
 from collections.abc import Iterator, Sequence
 from dataclasses import dataclass, field
-from decimal import Decimal
+from decimal import MAX_EMAX, MIN_EMIN, Decimal, localcontext
 from enum import Enum
 from typing import Protocol
 
@@ -1070,13 +1070,36 @@ def _aggregates(
 def _aggregate_value(operator: AggregationOperator, values: list[JsonValue]) -> JsonValue:
     """Reduce values of one kind, ordering exactly as an ordered comparison does."""
     if operator is AggregationOperator.SUM:
-        total = Decimal(0)
-        for value in values:
-            assert isinstance(value, Decimal)
-            total += value
-        return total
+        return _exact_decimal_sum(values)
     ordered = sorted(values)  # pyright: ignore[reportArgumentType]
     return ordered[0] if operator is AggregationOperator.MINIMUM else ordered[-1]
+
+
+def _exact_decimal_sum(values: Sequence[JsonValue]) -> Decimal:
+    """Add finite decimals without letting the process context round the answer."""
+    if not values:
+        return Decimal(0)
+    decimals: list[Decimal] = []
+    places: list[tuple[int, int]] = []
+    for value in values:
+        assert isinstance(value, Decimal)
+        decimals.append(value)
+        shape = value.as_tuple()
+        assert isinstance(shape.exponent, int)
+        places.append((shape.exponent, len(shape.digits)))
+    lowest_place = min(exponent for exponent, _ in places)
+    highest_place = max(exponent + digits - 1 for exponent, digits in places)
+    # Align every input down to its least significant place and leave enough leading
+    # room for the largest possible carry from adding this many values.
+    precision = max(1, highest_place - lowest_place + 1 + len(str(len(values))))
+    with localcontext() as context:
+        context.prec = precision
+        context.Emax = MAX_EMAX
+        context.Emin = MIN_EMIN
+        total = Decimal(0)
+        for value in decimals:
+            total += value
+        return total
 
 
 def _distinct_rows(query: GraphQuery, index: QueryCandidateIndex) -> tuple[GraphQueryRow, ...]:

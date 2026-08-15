@@ -349,6 +349,34 @@ findings:
     implementation_status: conforming
     nearest_wrong_system: The operation produces an accurate typed outcome, then cleanup contention erases it with a bare exception after any committed effect is already durable in the WAL.
     compatibility_effect: Cleanup contention is now staged and actionable at owner boundaries; successful and refused domain outcomes retain their true state effect, and clean shutdown behavior is unchanged.
+  - id: F020
+    summary: Aggregate sums used the process decimal context and rounded accepted exact numbers beyond 28 significant digits.
+    classification: implementation defect
+    consequence: A query returned a plausible but numerically different total for values the system had stored exactly, and both evaluators agreed on the same rounded error.
+    authority_refs:
+      - VellisRequirements::canonicalSemanticEquality
+      - VellisRequirements::semanticQueryMeaning
+    evidence_refs:
+      - path:tests/vellis/test_graph_queries.py#test_sum_preserves_exact_numbers_beyond_the_decimal_context
+    disposition: resolved
+    owner_work_item_id: W001
+    implementation_status: conforming
+    nearest_wrong_system: Durable and in-memory evaluation agree perfectly while both silently round a carry-sensitive total under the host process's default arithmetic context.
+    compatibility_effect: Sum now preserves the exact mathematical value of every accepted decimal input; counts, minimum, maximum, selection, and stored values are unchanged.
+  - id: F021
+    summary: The accepted string-ordering work item still described its compatibility effect as unresolved, and the closure roll-up omitted the selected behavior.
+    classification: plan gap
+    consequence: The durable evolution record contradicted its accepted decision and conforming implementation, so a closure reader could not tell which compatibility effect had actually been selected.
+    authority_refs:
+      - AGENTS.md
+      - VellisRequirements::semanticQueryMeaning
+    evidence_refs:
+      - command:just system-evolution-check
+    disposition: resolved
+    owner_work_item_id: W003
+    implementation_status: conforming
+    nearest_wrong_system: Product behavior and accepted model authority agree while the execution ledger continues to say the owner has not selected an approach.
+    compatibility_effect: Record truth now names exact Unicode code-point ordering as the accepted additive behavior; product behavior is unchanged by this bookkeeping correction.
 decisions:
   - id: D001
     summary: Replace only self-reaching definitions with the permissive JSON value they stand for, then inline the rest, at the boundary that already owns the wire form.
@@ -504,7 +532,7 @@ work_items:
     planned_baseline:
       dimension: implementation
       identity: git:17db40d3d97be0be05b28c536847d70310d09c16
-    finding_ids: [F001, F002, F003, F004, F005, F006, F007, F009, F010, F011, F012, F013, F014, F017, F018, F019]
+    finding_ids: [F001, F002, F003, F004, F005, F006, F007, F009, F010, F011, F012, F013, F014, F017, F018, F019, F020]
     decision_ids: [D001, D002, D003, D005, D006, D007]
     authority:
       - refs:
@@ -586,7 +614,7 @@ work_items:
     planned_baseline:
       dimension: model
       identity: sha256:30decc89ce67a19b2f9720028ffb3eb8161edf37affd11fa49b12179b3018d3e
-    finding_ids: [F008, F015]
+    finding_ids: [F008, F015, F021]
     decision_ids: [D004, D008]
     authority:
       - refs:
@@ -596,11 +624,11 @@ work_items:
         coverage: full
         remaining_work_item_ids: []
     approval:
-      status: accepted
-      reason: Extending ordered comparison to strings changes accepted query meaning the model states deliberately in three places, so the owner decides before implementation relies on it.
-      checkpoint: git:8baa73aa38a736e5920c25f466f31fa772d41801
+      status: pending
+      reason: The corrected compatibility statement must be sealed against a checkpoint that already carries the accepted Unicode code-point ordering consequence.
+      checkpoint: null
     nearest_wrong_system: An agent quietly relaxes ordered string comparison, and pattern validation silently acquires the ordering the model says it must not add.
-    compatibility_effect: Unresolved until the owner selects an approach.
+    compatibility_effect: Ordered comparison now accepts string-valued properties by exact Unicode code point; stored values and existing query results are unchanged, while formerly refused ordered string queries are answered.
     non_effects:
       - No accepted model meaning changes before the owner accepts it.
       - Existing starter graphs keep their stored date values whichever approach is chosen.
@@ -649,7 +677,7 @@ closure:
   implementation_status: partial
   integration_status: not evaluated
   external_status: not applicable
-  compatibility: Published schemas are self-contained; former scalar single-type queries remain accepted and normalize to the canonical collection; persistence and canonical stored meaning are unchanged.
+  compatibility: Published schemas are self-contained; former scalar single-type queries remain accepted and normalize to the canonical collection; ordered string comparison adds answers for formerly refused queries; persistence and canonical stored meaning are unchanged.
   reviews:
     - lens: authority and conformance
       status: pending

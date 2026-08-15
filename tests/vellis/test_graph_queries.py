@@ -12,6 +12,7 @@ meaning they will have to agree with.
 
 from __future__ import annotations
 
+from dataclasses import replace
 from decimal import Decimal
 from pathlib import Path
 
@@ -1652,6 +1653,58 @@ def test_aggregation_counts_matching_objects_not_distinct_projected_tuples(
         assert answers["total"].value == Decimal(9)
         assert answers["lowest"].value == Decimal(2)
         assert answers["highest"].value == Decimal(5)
+    finally:
+        system.close()
+
+
+def test_sum_preserves_exact_numbers_beyond_the_decimal_context(tmp_path: Path) -> None:
+    """A carry beyond 28 digits must not be rounded by the process-wide context."""
+    system = RTGSystem.open(tmp_path / "vellis.sqlite3")
+    try:
+        definitions = build_rich_definitions()
+        note_type = definitions.associated_data_types[0]
+        definitions = replace(
+            definitions,
+            associated_data_types=(
+                replace(
+                    note_type,
+                    property_constraints=tuple(
+                        replace(rule, value_range=None) if rule.property_name == "rating" else rule
+                        for rule in note_type.property_constraints
+                    ),
+                ),
+            ),
+        )
+        assert system.initialize_fresh(
+            definitions, provenance=_owner(), initialization_summary="a fresh start"
+        ).accepted
+        assert system.apply_graph_change(
+            GraphChange(
+                anchor_upserts=(ADA,),
+                associated_data_upserts=(
+                    _note("n-1", ("a-1",), rating=Decimal("123456789012345678901234567890")),
+                    _note("n-2", ("a-1",), rating=1),
+                ),
+            ),
+            provenance=_owner(),
+        ).accepted
+        query = _rating_query(
+            QueryAggregation(
+                name="total",
+                operator=AggregationOperator.SUM,
+                data_condition="notes",
+                property_name="rating",
+            )
+        )
+
+        stored = system.query_graph(query)
+        state = materialize_state(system)
+        in_memory = evaluate_query(query, definitions, state.graph, state.revision)
+        exact = Decimal("123456789012345678901234567891")
+
+        assert stored.status is OperationStatus.ACCEPTED, stored.findings
+        assert stored.aggregates[0].value == exact
+        assert in_memory.aggregates[0].value == exact
     finally:
         system.close()
 
