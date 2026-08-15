@@ -5,9 +5,9 @@ evolution:
   observable_distinction: Discovery returns ten self-contained input schemas, stored JSON kinds remain exact, aggregate-only queries agree between durable and in-memory evaluation, former single-type MCP requests remain callable, a clean close either consolidates the WAL or reports the reader preventing it, restoration is documented, patterned dates are queryable, and orphaning definition edits are refused.
   lifecycle: active
   approval:
-    status: accepted
-    reason: The owner explicitly directed "fix all findings," accepting the reviewed aggregation-only authority correction whose decision was open at the bound checkpoint.
-    checkpoint: git:aaf09834ca798b571f30b99c4426c77aee04b1df
+    status: pending
+    reason: The owner must seal the modeling correction that resolves contradictory aggregation-only query authority before closure.
+    checkpoint: null
   blocker: null
   checkpoint: null
 baselines:
@@ -20,16 +20,16 @@ baselines:
     checkpoint: git:8baa73aa38a736e5920c25f466f31fa772d41801
   target:
     model: sha256:30decc89ce67a19b2f9720028ffb3eb8161edf37affd11fa49b12179b3018d3e
-    implementation: git:b91c398e589c47875a468bdaa0f83b7311d2cb4e
+    implementation: git:aaf09834ca798b571f30b99c4426c77aee04b1df
     language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
     execution_environment: sha256:3315a10b5fcc8d62aa435d2f4e12165a147f334b01fad06ce367d11b6eb8191c
-    checkpoint: git:b91c398e589c47875a468bdaa0f83b7311d2cb4e
+    checkpoint: git:aaf09834ca798b571f30b99c4426c77aee04b1df
   observed:
     model: sha256:30decc89ce67a19b2f9720028ffb3eb8161edf37affd11fa49b12179b3018d3e
-    implementation: git:b91c398e589c47875a468bdaa0f83b7311d2cb4e
+    implementation: git:aaf09834ca798b571f30b99c4426c77aee04b1df
     language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
     execution_environment: sha256:3315a10b5fcc8d62aa435d2f4e12165a147f334b01fad06ce367d11b6eb8191c
-    checkpoint: git:b91c398e589c47875a468bdaa0f83b7311d2cb4e
+    checkpoint: git:aaf09834ca798b571f30b99c4426c77aee04b1df
 scope:
   authority_scope:
     - VellisRequirements::mcpAgentToolContract
@@ -81,7 +81,7 @@ findings:
       - VellisRequirements::mcpAgentToolContract
     evidence_refs:
       - path:tests/vellis/test_mcp_boundary.py#test_published_input_schemas_carry_their_whole_meaning
-    disposition: resolved
+    disposition: model-change
     owner_work_item_id: W001
     implementation_status: conforming
     nearest_wrong_system: Every tool body and every validation behaves correctly while three of the ten tools are unreachable through core discovery and invocation.
@@ -451,7 +451,7 @@ work_items:
     dependencies: []
     planned_baseline:
       dimension: implementation
-      identity: git:b91c398e589c47875a468bdaa0f83b7311d2cb4e
+      identity: git:aaf09834ca798b571f30b99c4426c77aee04b1df
     finding_ids: [F001, F002, F003, F004, F005, F006, F007, F009, F010, F011, F012, F013, F014]
     decision_ids: [D001, D002, D003, D005, D006, D007]
     authority:
@@ -495,7 +495,7 @@ work_items:
     dependencies: [W001]
     planned_baseline:
       dimension: implementation
-      identity: git:b91c398e589c47875a468bdaa0f83b7311d2cb4e
+      identity: git:aaf09834ca798b571f30b99c4426c77aee04b1df
     finding_ids: []
     decision_ids: []
     authority:
@@ -572,9 +572,9 @@ work_items:
         coverage: full
         remaining_work_item_ids: []
     approval:
-      status: accepted
+      status: pending
       reason: Resolving contradictory projection cardinality selects one coherent accepted meaning for aggregation-only queries, and the owner explicitly requested that reviewed correction.
-      checkpoint: git:aaf09834ca798b571f30b99c4426c77aee04b1df
+      checkpoint: null
     nearest_wrong_system: One accepted declaration permits aggregation-only queries while another makes every such query an impossible model instance.
     compatibility_effect: Aggregation-only queries become consistently modeled; existing projected and aggregated requests retain their accepted results.
     non_effects:
