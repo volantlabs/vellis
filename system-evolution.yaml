@@ -6,7 +6,7 @@ evolution:
   lifecycle: active
   approval:
     status: accepted
-    reason: The owner explicitly directed "fix all findings," accepting the reviewed aggregation-only authority correction whose decision was open at the bound checkpoint.
+    reason: The owner must seal the modeling correction that resolves contradictory aggregation-only query authority before closure.
     checkpoint: git:428faa3753365862626aa108ae55ad79535f97e8
   blocker: null
   checkpoint: null
