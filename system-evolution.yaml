@@ -9,15 +9,15 @@ evolution:
     reason: The new findings are implementation, workflow-validation, and documentation defects under unchanged accepted authority.
     checkpoint: null
   blocker: null
-  checkpoint: git:2d4c8406e971dd57febb2f045d31b162d42b0544
+  checkpoint: git:b519b400476d9bd364d1110a30c3d3120d8b457c
 baselines:
   status: current
   source:
     model: sha256:30decc89ce67a19b2f9720028ffb3eb8161edf37affd11fa49b12179b3018d3e
-    implementation: git:2d4c8406e971dd57febb2f045d31b162d42b0544
+    implementation: git:b519b400476d9bd364d1110a30c3d3120d8b457c
     language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
     execution_environment: sha256:3315a10b5fcc8d62aa435d2f4e12165a147f334b01fad06ce367d11b6eb8191c
-    checkpoint: git:2d4c8406e971dd57febb2f045d31b162d42b0544
+    checkpoint: git:b519b400476d9bd364d1110a30c3d3120d8b457c
   target: null
   observed:
     model: sha256:30decc89ce67a19b2f9720028ffb3eb8161edf37affd11fa49b12179b3018d3e
@@ -461,9 +461,9 @@ findings:
     evidence_refs:
       - path:tests/vellis/test_cleanup_boundaries.py#test_preserve_never_replaces_a_concurrently_created_destination
       - path:tests/vellis/test_cleanup_boundaries.py#test_preserve_refuses_a_dangling_symlink_before_observing_memory
-    disposition: open
+    disposition: resolved
     owner_work_item_id: W006
-    implementation_status: conflicting
+    implementation_status: conforming
     nearest_wrong_system: Snapshot bytes are complete and valid while publication destroys another file that appeared during capture.
     compatibility_effect: Successful output is unchanged; publication now refuses every already-established destination name atomically.
   - id: F028
@@ -479,9 +479,9 @@ findings:
       - path:tests/vellis/test_cleanup_boundaries.py#test_preserve_reports_write_and_close_failures_together
       - path:tests/vellis/test_cleanup_boundaries.py#test_preserve_failure_before_capture_does_not_claim_an_observation
       - path:tests/vellis/test_cleanup_boundaries.py#test_preserve_reports_an_indeterminate_activity_effect_when_position_is_unreadable
-    disposition: open
+    disposition: resolved
     owner_work_item_id: W006
-    implementation_status: conflicting
+    implementation_status: conforming
     nearest_wrong_system: The primary failure is actionable while the secondary checkpoint failure and actual observational effect disappear.
     compatibility_effect: Failure output gains complete primary, cleanup, and measured activity effects; successful snapshots retain their existing content.
   - id: F029
@@ -494,9 +494,9 @@ findings:
       - VellisRequirements::dualLedgerSeparation
     evidence_refs:
       - path:tests/vellis/test_cleanup_boundaries.py#test_rejected_restore_reports_restore_and_its_activity_effect
-    disposition: open
+    disposition: resolved
     owner_work_item_id: W006
-    implementation_status: conflicting
+    implementation_status: conforming
     nearest_wrong_system: Canonical state is correctly preserved and activity history correctly records the refusal while the command denies that either operation or effect occurred.
     compatibility_effect: Restore failures use restore-specific language and report canonical-or-activity effects accurately; restore semantics are unchanged.
   - id: F030
@@ -510,9 +510,9 @@ findings:
       - path:tests/vellis/test_cleanup_boundaries.py#test_unexpected_mcp_runtime_failure_reports_its_stage_and_observed_effect
       - path:tests/vellis/test_cleanup_boundaries.py#test_unexpected_mcp_runtime_and_close_failures_are_both_reported
       - path:tests/vellis/test_cleanup_boundaries.py#test_mcp_process_control_failure_keeps_its_meaning_after_cleanup
-    disposition: open
+    disposition: resolved
     owner_work_item_id: W006
-    implementation_status: conflicting
+    implementation_status: conforming
     nearest_wrong_system: Domain tool outcomes are correct while the process boundary fails outside the actionable owner contract.
     compatibility_effect: Ordinary runtime exceptions become structured serve failures; process-control exceptions retain their existing propagation.
   - id: F031
@@ -526,9 +526,9 @@ findings:
       - path:tests/test_implementation_campaign.py#test_noncheckpointed_worker_result_is_bound_to_current_work_and_state
       - path:tests/test_implementation_campaign.py#test_noncheckpointed_worker_result_cannot_claim_a_checkpoint
       - path:tests/test_implementation_campaign.py#test_noncheckpointed_present_review_token_must_match_current_state
-    disposition: open
+    disposition: resolved
     owner_work_item_id: W007
-    implementation_status: conflicting
+    implementation_status: conforming
     nearest_wrong_system: Checkpoint advancement is strongly bound while a non-successful result from unrelated or stale work is accepted as current.
     compatibility_effect: Schema version 2 remains accepted; invalid paused and failed results are newly rejected.
   - id: F032
@@ -555,9 +555,9 @@ findings:
     evidence_refs:
       - path:tests/vellis/test_mcp_boundary.py#test_query_discovery_explains_identity_counts_and_multi_type_grounding
       - path:tests/vellis/test_graph_queries.py#test_projecting_anchors_preserves_identity_for_exact_object_counts
-    disposition: open
+    disposition: resolved
     owner_work_item_id: W006
-    implementation_status: partial
+    implementation_status: conforming
     nearest_wrong_system: Query semantics are correct but the tool surface encourages a plausible, silently smaller answer.
     compatibility_effect: Advisory description only; query schemas, rows, aggregations, and bounds remain unchanged.
 decisions:
@@ -930,13 +930,13 @@ work_items:
       - No tool name, request schema, query result, canonical meaning, or persistence format changes.
       - Process-control exceptions remain process-control exceptions.
       - User-owned data and protected ignored files remain untouched.
-    lifecycle: active
-    implementation_status: conflicting
+    lifecycle: complete
+    implementation_status: conforming
     evidence_refs:
       - command:uv run pytest tests/vellis/test_cleanup_boundaries.py tests/vellis/test_mcp_boundary.py tests/vellis/test_historical_restore.py -q
       - command:uv run pytest tests/vellis/test_graph_queries.py tests/vellis/test_invalid_queries.py -q
     blocker: null
-    checkpoint: null
+    checkpoint: git:b519b400476d9bd364d1110a30c3d3120d8b457c
   - id: W007
     order: 7
     label: Bind every campaign worker result to current work and durable state
@@ -962,13 +962,13 @@ work_items:
     non_effects:
       - Checkpointed clean-pair validation remains unchanged.
       - No implementation campaign record or product runtime behavior changes.
-    lifecycle: pending
-    implementation_status: not evaluated
+    lifecycle: complete
+    implementation_status: conforming
     evidence_refs:
       - command:uv run pytest tests/test_implementation_campaign.py -q
       - command:just implementation-campaign-check
     blocker: null
-    checkpoint: null
+    checkpoint: git:b519b400476d9bd364d1110a30c3d3120d8b457c
   - id: W008
     order: 8
     label: Synchronize public truth and close pre-release remediation
@@ -976,7 +976,7 @@ work_items:
     dependencies: [W006, W007]
     planned_baseline:
       dimension: implementation
-      identity: git:2d4c8406e971dd57febb2f045d31b162d42b0544
+      identity: git:b519b400476d9bd364d1110a30c3d3120d8b457c
     finding_ids: [F032]
     decision_ids: []
     authority:
@@ -995,8 +995,8 @@ work_items:
     non_effects:
       - Accepted model authority and the trusted local STDIO boundary remain unchanged.
       - Native anchor-group aggregation remains deferred.
-    lifecycle: pending
-    implementation_status: not evaluated
+    lifecycle: active
+    implementation_status: partial
     evidence_refs:
       - command:just model-check
       - command:just system-evolution-check
@@ -1006,7 +1006,7 @@ work_items:
 closure:
   finding_disposition: open
   model_status: accepted
-  implementation_status: conflicting
+  implementation_status: partial
   integration_status: not evaluated
   external_status: not applicable
   compatibility: Model, persistence, tool names, request schemas, and query meaning remain unchanged; failure reporting, campaign validation, and public guidance become stricter and more truthful.
