@@ -20,16 +20,16 @@ baselines:
     checkpoint: git:b519b400476d9bd364d1110a30c3d3120d8b457c
   target:
     model: sha256:30decc89ce67a19b2f9720028ffb3eb8161edf37affd11fa49b12179b3018d3e
-    implementation: git:383adb2ba11b6f0517203a73dd03d9886e5363be
+    implementation: git:243a2a8440dda3c57e80c4a0ec33692dc511cf71
     language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
     execution_environment: sha256:3315a10b5fcc8d62aa435d2f4e12165a147f334b01fad06ce367d11b6eb8191c
-    checkpoint: git:383adb2ba11b6f0517203a73dd03d9886e5363be
+    checkpoint: git:243a2a8440dda3c57e80c4a0ec33692dc511cf71
   observed:
     model: sha256:30decc89ce67a19b2f9720028ffb3eb8161edf37affd11fa49b12179b3018d3e
-    implementation: git:383adb2ba11b6f0517203a73dd03d9886e5363be
+    implementation: git:243a2a8440dda3c57e80c4a0ec33692dc511cf71
     language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
     execution_environment: sha256:3315a10b5fcc8d62aa435d2f4e12165a147f334b01fad06ce367d11b6eb8191c
-    checkpoint: git:383adb2ba11b6f0517203a73dd03d9886e5363be
+    checkpoint: git:243a2a8440dda3c57e80c4a0ec33692dc511cf71
 scope:
   authority_scope:
     - VellisRequirements::mcpAgentToolContract
@@ -982,7 +982,7 @@ work_items:
     dependencies: [W006, W007]
     planned_baseline:
       dimension: implementation
-      identity: git:383adb2ba11b6f0517203a73dd03d9886e5363be
+      identity: git:243a2a8440dda3c57e80c4a0ec33692dc511cf71
     finding_ids: [F032]
     decision_ids: []
     authority:
