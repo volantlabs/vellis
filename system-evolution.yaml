@@ -3,13 +3,13 @@ evolution:
   id: callable-tool-surface-and-value-fidelity
   objective: Close pre-release boundary, campaign-handoff, and public-guidance findings without changing accepted system meaning.
   observable_distinction: Snapshot publication never replaces another name, every owner-facing failure reports its true operation and complete known state effect, every campaign result is bound to current work, and security and query guidance match the runnable local surface.
-  lifecycle: active
+  lifecycle: complete
   approval:
     status: not-required
     reason: The new findings are implementation, workflow-validation, and documentation defects under unchanged accepted authority.
     checkpoint: null
   blocker: null
-  checkpoint: git:b519b400476d9bd364d1110a30c3d3120d8b457c
+  checkpoint: git:f35f2a1f7405915ecac6e82b715f1eb1de22c661
 baselines:
   status: current
   source:
@@ -20,16 +20,16 @@ baselines:
     checkpoint: git:b519b400476d9bd364d1110a30c3d3120d8b457c
   target:
     model: sha256:30decc89ce67a19b2f9720028ffb3eb8161edf37affd11fa49b12179b3018d3e
-    implementation: git:a57c30aa20c3db3968b7e00bad8ad46497fdca5d
+    implementation: git:f35f2a1f7405915ecac6e82b715f1eb1de22c661
     language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
     execution_environment: sha256:2e7ccaae53ccdd86b52125457654ff2448d45c02792e7e64aa878fd02185c9d3
-    checkpoint: git:a57c30aa20c3db3968b7e00bad8ad46497fdca5d
+    checkpoint: git:f35f2a1f7405915ecac6e82b715f1eb1de22c661
   observed:
     model: sha256:30decc89ce67a19b2f9720028ffb3eb8161edf37affd11fa49b12179b3018d3e
-    implementation: git:a57c30aa20c3db3968b7e00bad8ad46497fdca5d
+    implementation: git:f35f2a1f7405915ecac6e82b715f1eb1de22c661
     language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
     execution_environment: sha256:2e7ccaae53ccdd86b52125457654ff2448d45c02792e7e64aa878fd02185c9d3
-    checkpoint: git:a57c30aa20c3db3968b7e00bad8ad46497fdca5d
+    checkpoint: git:f35f2a1f7405915ecac6e82b715f1eb1de22c661
 scope:
   authority_scope:
     - VellisRequirements::mcpAgentToolContract
@@ -1033,31 +1033,37 @@ work_items:
     non_effects:
       - Accepted model authority and the trusted local STDIO boundary remain unchanged.
       - Native anchor-group aggregation remains deferred.
-    lifecycle: active
-    implementation_status: partial
+    lifecycle: complete
+    implementation_status: conforming
     evidence_refs:
       - command:just model-check
       - command:just system-evolution-check
       - command:just check
     blocker: null
-    checkpoint: null
+    checkpoint: git:f35f2a1f7405915ecac6e82b715f1eb1de22c661
 closure:
-  finding_disposition: open
+  finding_disposition: complete
   model_status: accepted
-  implementation_status: partial
-  integration_status: not evaluated
+  implementation_status: conforming
+  integration_status: conforming
   external_status: not applicable
-  compatibility: Model, persistence, tool names, request schemas, and query meaning remain unchanged; failure reporting, campaign validation, and public guidance become stricter and more truthful.
+  compatibility: Model, persistence, tool names, request schemas, and query meaning remain unchanged; failure reporting, campaign validation, and public guidance are stricter, while pypdf changes only in the development toolchain.
   reviews:
     - lens: authority and conformance
-      status: pending
-      reviewer: null
-      checkpoint: null
-      evidence_refs: []
+      status: clean
+      reviewer: /root/pre_release_authority_rerun
+      checkpoint: git:f35f2a1f7405915ecac6e82b715f1eb1de22c661
+      evidence_refs:
+        - command:just check
     - lens: engineering and evidence
-      status: pending
-      reviewer: null
-      checkpoint: null
-      evidence_refs: []
-  evidence_refs: []
-  checkpoint: null
+      status: clean
+      reviewer: /root/pre_release_engineering_rerun
+      checkpoint: git:f35f2a1f7405915ecac6e82b715f1eb1de22c661
+      evidence_refs:
+        - command:just check
+  evidence_refs:
+    - command:just model-check
+    - command:just implementation-campaign-check
+    - command:just system-evolution-check
+    - command:just check
+  checkpoint: git:f35f2a1f7405915ecac6e82b715f1eb1de22c661
