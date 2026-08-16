@@ -94,8 +94,9 @@ domain model: text and structured content communicate the same typed outcome, an
 changing advisory annotations cannot change authorization, validation, atomicity, or any promised
 failure non-effect.
 
-Query rows are distinct projected tuples. To count anchors exactly, project the identity-bearing
-anchor and count those rows; projecting only repeated property values may intentionally collapse
+Query rows are distinct projected tuples. To count anchors exactly, use an anchor-only return shape
+and count its rows, or count distinct projected anchor UUIDs when other projections can produce
+several tuples per anchor. Projecting only repeated property values may intentionally collapse
 several objects into one tuple. Aggregations count or total matches of a named associated-data
 condition without that projection collapse. A multi-type anchor group can project all of its anchors,
 but one associated-data condition over that group requires a data type permitted for every member

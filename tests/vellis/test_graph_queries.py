@@ -1601,6 +1601,33 @@ def test_projecting_anchors_preserves_identity_for_exact_object_counts(
     assert len(result.rows) == 4
 
 
+def test_anchor_count_uses_distinct_identity_when_other_projections_repeat_it(
+    system: RTGSystem,
+) -> None:
+    """One anchor with two matching data objects legitimately occupies two tuples."""
+    result = system.query_graph(
+        GraphQuery(
+            anchor_groups=(AnchorGroup(name="people", anchor_types=("person",)),),
+            data_conditions=(
+                AssociatedDataCondition(
+                    name="notes", anchor_group="people", associated_data_type="note"
+                ),
+            ),
+            return_shape=ReturnShape(
+                projections=(
+                    AnchorProjection(name="person", anchor_group="people"),
+                    AssociatedDataProjection(name="note", data_condition="notes"),
+                )
+            ),
+            maximum_rows=10,
+        )
+    )
+
+    assert result.accepted, result.findings
+    assert len(result.rows) == 3
+    assert {row.anchors[0].anchor.uuid for row in result.rows} == {"a-1", "a-2"}
+
+
 def _rating_query(*aggregations: QueryAggregation, maximum: int = 20) -> GraphQuery:
     return GraphQuery(
         anchor_groups=(AnchorGroup(name="people", anchor_types=("person",)),),

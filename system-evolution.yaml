@@ -22,13 +22,13 @@ baselines:
     model: sha256:30decc89ce67a19b2f9720028ffb3eb8161edf37affd11fa49b12179b3018d3e
     implementation: git:243a2a8440dda3c57e80c4a0ec33692dc511cf71
     language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
-    execution_environment: sha256:3315a10b5fcc8d62aa435d2f4e12165a147f334b01fad06ce367d11b6eb8191c
+    execution_environment: sha256:2e7ccaae53ccdd86b52125457654ff2448d45c02792e7e64aa878fd02185c9d3
     checkpoint: git:243a2a8440dda3c57e80c4a0ec33692dc511cf71
   observed:
     model: sha256:30decc89ce67a19b2f9720028ffb3eb8161edf37affd11fa49b12179b3018d3e
     implementation: git:243a2a8440dda3c57e80c4a0ec33692dc511cf71
     language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
-    execution_environment: sha256:3315a10b5fcc8d62aa435d2f4e12165a147f334b01fad06ce367d11b6eb8191c
+    execution_environment: sha256:2e7ccaae53ccdd86b52125457654ff2448d45c02792e7e64aa878fd02185c9d3
     checkpoint: git:243a2a8440dda3c57e80c4a0ec33692dc511cf71
 scope:
   authority_scope:
@@ -71,6 +71,8 @@ scope:
     - README.md
     - SECURITY.md
     - docs/mcp-realization.md
+    - pyproject.toml
+    - uv.lock
     - CONTRIBUTING.md
     - .agents/skills/sysml-implementation-campaign/SKILL.md
     - .agents/skills/sysml-implementation-campaign/references/campaign-supervision.md
@@ -546,9 +548,9 @@ findings:
       - SECURITY.md
     evidence_refs:
       - path:SECURITY.md#current-scope
-    disposition: open
+    disposition: resolved
     owner_work_item_id: W008
-    implementation_status: conflicting
+    implementation_status: conforming
     nearest_wrong_system: The application is runnable and locally stateful while its reporting policy describes only a model repository.
     compatibility_effect: Documentation only; no runtime or security boundary changes.
   - id: F033
@@ -566,6 +568,36 @@ findings:
     implementation_status: conforming
     nearest_wrong_system: Query semantics are correct but the tool surface encourages a plausible, silently smaller answer.
     compatibility_effect: Advisory description only; query schemas, rows, aggregations, and bounds remain unchanged.
+  - id: F034
+    summary: The locked development dependency pypdf 6.14.2 has two known vulnerabilities fixed in 6.15.0.
+    classification: implementation defect
+    consequence: Pre-release dependency evidence claims a clean repository toolchain while reference tooling resolves a package version affected by PYSEC-2026-3655 and PYSEC-2026-3656.
+    authority_refs:
+      - SECURITY.md
+      - AGENTS.md
+    evidence_refs:
+      - path:SECURITY.md#current-scope
+      - command:just check
+    disposition: resolved
+    owner_work_item_id: W008
+    implementation_status: conforming
+    nearest_wrong_system: The shipped runtime is unaffected, but the repository's development and reference-tooling dependency set carries known fixable vulnerabilities while release evidence says otherwise.
+    compatibility_effect: Development dependency refresh only; product runtime, stored meaning, and public interfaces are unchanged.
+  - id: F035
+    summary: Query guidance overstates row counting as an exact anchor count when other projections can repeat an anchor across distinct tuples.
+    classification: plan gap
+    consequence: A caller can overcount anchors when one anchor has several matching associated-data or link assignments, despite following the published identity guidance.
+    authority_refs:
+      - VellisRequirements::semanticQueryMeaning
+      - VellisRequirements::querySafety
+    evidence_refs:
+      - path:tests/vellis/test_graph_queries.py#test_anchor_count_uses_distinct_identity_when_other_projections_repeat_it
+      - path:tests/vellis/test_mcp_boundary.py#test_query_discovery_explains_identity_counts_and_multi_type_grounding
+    disposition: resolved
+    owner_work_item_id: W008
+    implementation_status: conforming
+    nearest_wrong_system: Anchor-only counting is exact, but adding a one-to-many projection makes row count larger than the number of distinct projected anchor identities.
+    compatibility_effect: Advisory description only; query schemas, evaluated tuples, aggregation, and bounds remain unchanged.
 decisions:
   - id: D001
     summary: Replace only self-reaching definitions with the permissive JSON value they stand for, then inline the rest, at the boundary that already owns the wire form.
@@ -983,7 +1015,7 @@ work_items:
     planned_baseline:
       dimension: implementation
       identity: git:243a2a8440dda3c57e80c4a0ec33692dc511cf71
-    finding_ids: [F032]
+    finding_ids: [F032, F034, F035]
     decision_ids: []
     authority:
       - refs:
@@ -996,8 +1028,8 @@ work_items:
       status: not-required
       reason: Closure aligns public reporting scope with the already implemented local boundary.
       checkpoint: null
-    nearest_wrong_system: All code and checks conform while public security scope and closure evidence describe a retired repository state.
-    compatibility_effect: Documentation and evolution bookkeeping only.
+    nearest_wrong_system: All product code and checks conform while public security scope, dependency evidence, or closure evidence describes a retired or vulnerable repository state.
+    compatibility_effect: Documentation, development dependency, lock, and evolution bookkeeping only.
     non_effects:
       - Accepted model authority and the trusted local STDIO boundary remain unchanged.
       - Native anchor-group aggregation remains deferred.

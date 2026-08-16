@@ -92,7 +92,8 @@ async def test_query_discovery_explains_identity_counts_and_multi_type_grounding
     description = " ".join((query.description or "").split())
 
     assert "identity-bearing anchor" in description
-    assert "exact object count" in description
+    assert "anchor-only return shape" in description
+    assert "count distinct projected anchor UUIDs" in description
     assert "permits every anchor type" in description
     assert "query each type separately" in description
 

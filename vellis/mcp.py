@@ -399,11 +399,12 @@ def build_server(system: RTGSystem, *, name: str = "vellis") -> FastMCP:
         Rows carry exactly the projections asked for, and identical projected tuples occur
         once. Two objects with the same projected values are therefore one row, so adding
         up a projection does not total the objects — use an aggregation for that, or
-        project the identity-bearing anchor or data object alongside the values. Counting
-        projected anchors is therefore an exact object count even when their visible values
-        match. A data condition grounded on a multi-type anchor group is valid only when its
-        associated-data type permits every anchor type in that group; otherwise query each
-        type separately and merge the bounded results.
+        project the identity-bearing anchor or data object alongside the values. An
+        anchor-only return shape has one row per matching anchor, even when visible values
+        match. When other projections can produce several tuples per anchor, count distinct
+        projected anchor UUIDs instead of rows. A data condition grounded on a multi-type
+        anchor group is valid only when its associated-data type permits every anchor type
+        in that group; otherwise query each type separately and merge the bounded results.
         """
         return _result(
             system.query_graph(query, provenance=_agent()),
