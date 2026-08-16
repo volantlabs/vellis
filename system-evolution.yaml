@@ -70,6 +70,7 @@ scope:
     - tests/vellis/test_cleanup_boundaries.py
     - README.md
     - SECURITY.md
+    - docs/mcp-realization.md
     - CONTRIBUTING.md
     - .agents/skills/sysml-implementation-campaign/SKILL.md
     - .agents/skills/sysml-implementation-campaign/references/campaign-supervision.md

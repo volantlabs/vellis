@@ -94,6 +94,15 @@ domain model: text and structured content communicate the same typed outcome, an
 changing advisory annotations cannot change authorization, validation, atomicity, or any promised
 failure non-effect.
 
+Query rows are distinct projected tuples. To count anchors exactly, project the identity-bearing
+anchor and count those rows; projecting only repeated property values may intentionally collapse
+several objects into one tuple. Aggregations count or total matches of a named associated-data
+condition without that projection collapse. A multi-type anchor group can project all of its anchors,
+but one associated-data condition over that group requires a data type permitted for every member
+anchor type. When the vocabulary instead uses separate per-type data, issue one bounded query per
+type and merge the results. Native aggregation over anchor groups remains a possible efficiency
+extension rather than a current capability gap.
+
 ## Local setup path
 
 The campaign selects a Python setup program as the primary local onboarding path, with the
