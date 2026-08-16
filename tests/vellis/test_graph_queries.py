@@ -1579,6 +1579,28 @@ def test_an_anchor_group_may_name_several_types(system: RTGSystem) -> None:
     assert len(both.rows) == len(separate)
 
 
+def test_projecting_anchors_preserves_identity_for_exact_object_counts(
+    system: RTGSystem,
+) -> None:
+    """Two indistinguishable display values remain two identity-bearing rows."""
+    changed = system.apply_graph_change(
+        GraphChange(
+            anchor_upserts=(
+                Anchor("a-3", "person", "Call the dentist"),
+                Anchor("a-4", "person", "Call the dentist"),
+            )
+        ),
+        provenance=_owner(),
+    )
+    assert changed.accepted, changed.findings
+
+    result = system.query_graph(_just_people(maximum_rows=10))
+
+    assert result.accepted, result.findings
+    assert _bound_anchors(result) == {"a-1", "a-2", "a-3", "a-4"}
+    assert len(result.rows) == 4
+
+
 def _rating_query(*aggregations: QueryAggregation, maximum: int = 20) -> GraphQuery:
     return GraphQuery(
         anchor_groups=(AnchorGroup(name="people", anchor_types=("person",)),),

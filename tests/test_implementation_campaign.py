@@ -1756,6 +1756,21 @@ def _worker_result_findings(result: dict[str, object], **overrides: object) -> l
     return implementation_campaign.worker_result_findings(result, **expected)  # type: ignore[arg-type]
 
 
+def _noncheckpointed_worker_result(outcome: str) -> dict[str, object]:
+    result = _clean_worker_result()
+    result.update(
+        outcome=outcome,
+        checkpoint=None,
+        checks=[],
+        review_pairs=0,
+        review_state_token="a" * 64,
+        reviews=[],
+        material_findings=[],
+        reason=f"worker {outcome}",
+    )
+    return result
+
+
 def test_worker_result_contract_is_compact_and_rejects_transcripts() -> None:
     result = _clean_worker_result(review_pairs=2)
 
@@ -1896,6 +1911,54 @@ def test_checkpointed_worker_result_fails_closed_without_an_approved_plan() -> N
     findings = _worker_result_findings(_clean_worker_result(), approved_plan_sha=None)
 
     assert "checkpointed result requires a valid approved plan checkpoint" in findings
+
+
+@pytest.mark.parametrize("outcome", ("paused", "failed"))
+def test_noncheckpointed_worker_result_is_bound_to_current_work_and_state(
+    outcome: str,
+) -> None:
+    result = _noncheckpointed_worker_result(outcome)
+
+    assert _worker_result_findings(result, current_state_token="a" * 64) == []
+
+    result["campaign_id"] = "wrong"
+    result["work_item"] = "S999"
+    findings = _worker_result_findings(result, current_state_token="b" * 64)
+    assert "campaign_id does not match the current campaign" in findings
+    assert "work_item does not match the current campaign work item" in findings
+    assert "expected frozen state does not match the current durable state" in findings
+
+
+@pytest.mark.parametrize("outcome", ("paused", "failed"))
+def test_noncheckpointed_worker_result_cannot_claim_a_checkpoint(outcome: str) -> None:
+    result = _noncheckpointed_worker_result(outcome)
+    result["checkpoint"] = "slice:S014:123456789abc:1"
+
+    findings = _worker_result_findings(result, current_state_token="a" * 64)
+
+    assert "paused or failed result must not claim a checkpoint" in findings
+
+
+@pytest.mark.parametrize("outcome", ("paused", "failed"))
+def test_noncheckpointed_present_review_token_must_match_current_state(outcome: str) -> None:
+    result = _noncheckpointed_worker_result(outcome)
+    result["review_state_token"] = "b" * 64
+
+    findings = _worker_result_findings(result, current_state_token="a" * 64)
+
+    assert "review_state_token does not match the expected frozen state" in findings
+    assert "review_state_token does not match the current durable state" in findings
+
+
+@pytest.mark.parametrize("outcome", ("paused", "failed"))
+def test_noncheckpointed_worker_result_requires_its_own_state_token(outcome: str) -> None:
+    result = _noncheckpointed_worker_result(outcome)
+    result["review_state_token"] = None
+
+    findings = _worker_result_findings(result, current_state_token="a" * 64)
+
+    assert any("review_state_token" in finding for finding in findings)
+    assert "paused or failed result requires the current durable state token" in findings
 
 
 def test_checkpointable_work_item_requires_an_active_slice_or_finished_slice_set() -> None:

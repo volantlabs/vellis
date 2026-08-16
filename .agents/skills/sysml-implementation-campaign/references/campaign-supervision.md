@@ -71,10 +71,14 @@ cannot be distinguished or reconciled safely.
 
 The result reports the work item, outcome, checkpoint, executed checks, review-pair and material-
 finding counts, both final lens dispositions and reviewer identifiers, their shared review-state
-token, elapsed time, optional usage measurements, and a pause or failure reason. Validate a
-checkpointed result against the frozen token, recomputed current durable state, current campaign/work
-item, intended checkpoint, and reported passed checks before bookkeeping; internal agreement among result
-fields is not enough. A checkpointed result has at least one pair: the clean state-bound pair that
+token, elapsed time, optional usage measurements, and a pause or failure reason. Bind every candidate
+result to the current campaign, current work item, and independently recomputed durable state before
+using it for advancement, pause, retry, or failure-limit handling. A paused or failed result has a
+reason, no checkpoint, and a review-state token that names the current durable state even when no
+review ran. Validate a
+checkpointed result additionally against the frozen token, intended checkpoint, and reported passed
+checks before bookkeeping; internal agreement among result fields is not enough. A checkpointed
+result has at least one pair: the clean state-bound pair that
 authorized its checkpoint. It does
 not contain raw findings, review transcripts, implementation narratives, or hidden recovery notes.
 Those details belong in reproducible project artifacts or the work item's durable checkpoint.

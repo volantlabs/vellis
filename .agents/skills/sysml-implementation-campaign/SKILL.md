@@ -60,8 +60,12 @@ The slice worker follows [Execution and resume](references/execution-and-resume.
    engineering/evidence reviews against that same state. Include all evidence references and
    intended completion statuses in the frame before freezing it. Each frame carries the exact state
    token; the compact result names both distinct reviewer identifiers, lenses, clean dispositions, and that same
-   token. Validate the result against the frozen token, recomputed current durable state, current
-   campaign/work item, intended checkpoint, and reported passed checks before bookkeeping. The manager
+   token. Validate every candidate result against the recomputed current durable state and current
+   campaign/work item. Every outcome carries the current durable state token; for a paused or failed
+   result it binds the handoff even when no review ran, while the result names its reason and claims
+   no checkpoint. Validate a
+   checkpointed result additionally against the frozen token, intended checkpoint, and reported passed
+   checks before bookkeeping. The manager
    still enforces fresh-agent independence, runs required project gates, and independently validates
    the checkpoint; reported rows do not prove execution or completeness. If both are clean and
    substantive tracked or evidence state has not changed, review is complete. The worker may then

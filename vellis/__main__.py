@@ -55,6 +55,7 @@ def _report(
     stream: TextIO,
     *,
     memory_changed: bool | None = False,
+    operation: str = "serve",
 ) -> None:
     """Say what failed, what it did to established memory, and what to do about it.
 
@@ -62,7 +63,7 @@ def _report(
     the answer an owner needs before deciding whether to retry, and an absent line is not
     that answer.
     """
-    print(f"Vellis could not serve this memory. Stage: {stage}", file=stream)
+    print(f"Vellis could not {operation} this memory. Stage: {stage}", file=stream)
     print(f"  what happened: {summary}", file=stream)
     changed = (
         "could not be determined"
@@ -73,6 +74,20 @@ def _report(
     )
     print(f"  established memory: {changed}", file=stream)
     print(f"  what to do next: {corrective_action}", file=stream)
+
+
+def _memory_position(system: RTGSystem) -> tuple[int, int] | None:
+    """Return canonical and observational positions, or preserve honest uncertainty."""
+    try:
+        return system.store.current_revision(), system.store.activity_record_count()
+    except StoreError:
+        return None
+
+
+def _position_changed(before: tuple[int, int] | None, after: tuple[int, int] | None) -> bool | None:
+    if before is None or after is None:
+        return None
+    return before != after
 
 
 def _restore(
@@ -97,7 +112,6 @@ def _restore(
     )
     parser.add_argument("--yes", action="store_true", help="Skip the confirmation prompt.")
     arguments = parser.parse_args(argv)
-    restored = False
     result = EXIT_FAILED
     try:
         directory: Path = resolve_data_directory(arguments.data_dir)
@@ -107,6 +121,7 @@ def _restore(
             f"no usable destination: {unusable}",
             "pass --data-dir with the directory holding your Vellis system",
             error,
+            operation="restore",
         )
         return EXIT_FAILED
 
@@ -123,6 +138,7 @@ def _restore(
                 f"--time is not an ISO-8601 instant: {arguments.time!r}",
                 "pass an instant such as 2026-08-14T18:59:30+00:00",
                 error,
+                operation="restore",
             )
             return EXIT_FAILED
         named = f"the state at {arguments.time}"
@@ -134,6 +150,7 @@ def _restore(
             f"no Vellis memory is established at {path}",
             f"run `python -m vellis.setup --data-dir {directory}` to begin one here",
             error,
+            operation="restore",
         )
         return EXIT_FAILED
     try:
@@ -144,8 +161,11 @@ def _restore(
             f"the memory at {path} could not be opened: {unopenable}",
             "check that this account can read and write that file",
             error,
+            operation="restore",
         )
         return EXIT_FAILED
+    starting_position = _memory_position(system)
+    ending_position = starting_position
     try:
         print(f"Vellis will restore {named} in {path}.", file=output)
         print(
@@ -161,25 +181,30 @@ def _restore(
             result = EXIT_SUCCESS
         else:
             outcome = system.restore_historical_state(selection, provenance=Provenance("owner"))
+            ending_position = _memory_position(system)
             if not outcome.accepted:
                 _report(
                     ConnectionStage.RESTORE_STATE,
                     outcome.summary,
                     "resolve what the finding names, then run this again",
                     error,
+                    memory_changed=_position_changed(starting_position, ending_position),
+                    operation="restore",
                 )
                 for finding in outcome.findings:
                     print(f"  finding: {finding.summary}", file=error)
             else:
-                restored = True
                 result = EXIT_SUCCESS
                 print(f"  restored: {outcome.summary}", file=output)
-    except StoreError as operation_error:
+    except Exception as operation_error:
+        ending_position = _memory_position(system)
         _report(
             ConnectionStage.RESTORE_STATE,
             f"the restoration could not complete: {operation_error}",
             "resolve the reported store problem, then inspect history before retrying",
             error,
+            memory_changed=_position_changed(starting_position, ending_position),
+            operation="restore",
         )
     try:
         system.close()
@@ -190,7 +215,8 @@ def _restore(
             "close the other database reader, then open and close Vellis again before "
             "copying the memory file; inspect history before retrying a restore",
             error,
-            memory_changed=restored,
+            memory_changed=_position_changed(starting_position, ending_position),
+            operation="restore",
         )
         return EXIT_FAILED
     return result

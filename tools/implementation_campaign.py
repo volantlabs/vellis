@@ -1799,11 +1799,24 @@ def worker_result_findings(
         outcome = result.get("outcome")
         review_state_token = result.get("review_state_token")
         reviews = result.get("reviews")
+        if result.get("campaign_id") != expected_campaign_id:
+            findings.append("campaign_id does not match the current campaign")
+        if result.get("work_item") != expected_work_item:
+            findings.append("work_item does not match the current campaign work item")
+        if (
+            expected_state_token is not None
+            and current_state_token is not None
+            and expected_state_token != current_state_token
+        ):
+            findings.append("expected frozen state does not match the current durable state")
+        if review_state_token is not None:
+            if expected_state_token is not None and review_state_token != expected_state_token:
+                findings.append("review_state_token does not match the expected frozen state")
+            if current_state_token is not None and review_state_token != current_state_token:
+                findings.append("review_state_token does not match the current durable state")
+        elif outcome in {"paused", "failed"}:
+            findings.append("paused or failed result requires the current durable state token")
         if outcome == "checkpointed":
-            if result.get("campaign_id") != expected_campaign_id:
-                findings.append("campaign_id does not match the current campaign")
-            if result.get("work_item") != expected_work_item:
-                findings.append("work_item does not match the current campaign work item")
             if result.get("checkpoint") != expected_checkpoint:
                 findings.append("checkpoint does not match the intended checkpoint")
             checkpoint = result.get("checkpoint")
@@ -1833,10 +1846,8 @@ def worker_result_findings(
                 findings.append("checkpointed result requires every reported check passed")
             if expected_state_token is None:
                 findings.append("checkpointed result requires the expected frozen state token")
-            elif review_state_token != expected_state_token:
-                findings.append("review_state_token does not match the expected frozen state")
-            if current_state_token is not None and review_state_token != current_state_token:
-                findings.append("review_state_token does not match the current durable state")
+        elif outcome in {"paused", "failed"} and result.get("checkpoint") is not None:
+            findings.append("paused or failed result must not claim a checkpoint")
         if outcome == "checkpointed" and isinstance(reviews, list):
             valid_reviews = [item for item in reviews if isinstance(item, dict)]
             lenses = [item.get("lens") for item in valid_reviews]

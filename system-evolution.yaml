@@ -1,35 +1,30 @@
 schema_version: "1.0"
 evolution:
   id: callable-tool-surface-and-value-fidelity
-  objective: Close the callable-tool and scale-simulation findings so queries preserve one meaning across realizations and request generations, clean close reports checkpoint contention, and owner guidance matches the runnable surface.
-  observable_distinction: Discovery returns ten self-contained input schemas, stored JSON kinds remain exact, aggregate-only queries agree between durable and in-memory evaluation, former single-type MCP requests remain callable, a clean close either consolidates the WAL or reports the reader preventing it, restoration is documented, patterned dates are queryable, and orphaning definition edits are refused.
-  lifecycle: complete
+  objective: Close pre-release boundary, campaign-handoff, and public-guidance findings without changing accepted system meaning.
+  observable_distinction: Snapshot publication never replaces another name, every owner-facing failure reports its true operation and complete known state effect, every campaign result is bound to current work, and security and query guidance match the runnable local surface.
+  lifecycle: active
   approval:
-    status: accepted
-    reason: The owner must seal the modeling correction that resolves contradictory aggregation-only query authority before closure.
-    checkpoint: git:428faa3753365862626aa108ae55ad79535f97e8
+    status: not-required
+    reason: The new findings are implementation, workflow-validation, and documentation defects under unchanged accepted authority.
+    checkpoint: null
   blocker: null
-  checkpoint: git:cdd309bbf946214622b33925b4272496a94004b2
+  checkpoint: git:2d4c8406e971dd57febb2f045d31b162d42b0544
 baselines:
   status: current
   source:
-    model: sha256:bba8d6a7ad85c9dc2964f036186aa4e91ef7191f7862570a450d5c6e709c3e94
-    implementation: git:8baa73aa38a736e5920c25f466f31fa772d41801
-    language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
-    execution_environment: sha256:3315a10b5fcc8d62aa435d2f4e12165a147f334b01fad06ce367d11b6eb8191c
-    checkpoint: git:8baa73aa38a736e5920c25f466f31fa772d41801
-  target:
     model: sha256:30decc89ce67a19b2f9720028ffb3eb8161edf37affd11fa49b12179b3018d3e
-    implementation: git:cdd309bbf946214622b33925b4272496a94004b2
+    implementation: git:2d4c8406e971dd57febb2f045d31b162d42b0544
     language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
     execution_environment: sha256:3315a10b5fcc8d62aa435d2f4e12165a147f334b01fad06ce367d11b6eb8191c
-    checkpoint: git:cdd309bbf946214622b33925b4272496a94004b2
+    checkpoint: git:2d4c8406e971dd57febb2f045d31b162d42b0544
+  target: null
   observed:
     model: sha256:30decc89ce67a19b2f9720028ffb3eb8161edf37affd11fa49b12179b3018d3e
-    implementation: git:cdd309bbf946214622b33925b4272496a94004b2
+    implementation: git:2d4c8406e971dd57febb2f045d31b162d42b0544
     language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
     execution_environment: sha256:3315a10b5fcc8d62aa435d2f4e12165a147f334b01fad06ce367d11b6eb8191c
-    checkpoint: git:cdd309bbf946214622b33925b4272496a94004b2
+    checkpoint: git:2d4c8406e971dd57febb2f045d31b162d42b0544
 scope:
   authority_scope:
     - VellisRequirements::mcpAgentToolContract
@@ -69,6 +64,10 @@ scope:
     - tests/vellis/test_setup_path.py
     - tests/vellis/test_cleanup_boundaries.py
     - README.md
+    - SECURITY.md
+    - CONTRIBUTING.md
+    - .agents/skills/sysml-implementation-campaign/SKILL.md
+    - .agents/skills/sysml-implementation-campaign/references/campaign-supervision.md
   review_lenses:
     - authority and conformance
     - engineering and evidence
@@ -77,6 +76,7 @@ scope:
     - Changing persistence formats or canonical stored meaning.
     - Constraining a stored property value more tightly than the owner's own definitions do.
     - Replacing definitions that are capable of being written out with a permissive value.
+    - Adding native aggregation over anchor groups or changing query result semantics.
 findings:
   - id: F001
     summary: The three request types carrying a stored JSON value publish a definitions block and an unresolved reference instead of an inlined request schema.
@@ -451,6 +451,115 @@ findings:
     implementation_status: conforming
     nearest_wrong_system: The server diagnoses close contention accurately while the owner-facing command rewrites it into a pre-service failure and a false non-effect.
     compatibility_effect: Serve failures gain their accurate stage and complete established-memory effect across canonical and activity history; clean serving, open failures, tool behavior, and canonical meaning are unchanged.
+  - id: F027
+    summary: Preservation checks an output name before capture, then publishes with unconditional replacement.
+    classification: implementation defect
+    consequence: A concurrently created file or dangling symbolic link can be overwritten after the preflight check even though the command promises never to write over an existing name.
+    authority_refs:
+      - Vellis::'Preserve personal memory snapshot'
+      - VellisRequirements::ownerControlledMemory
+    evidence_refs:
+      - path:tests/vellis/test_cleanup_boundaries.py#test_preserve_never_replaces_a_concurrently_created_destination
+      - path:tests/vellis/test_cleanup_boundaries.py#test_preserve_refuses_a_dangling_symlink_before_observing_memory
+    disposition: open
+    owner_work_item_id: W006
+    implementation_status: conflicting
+    nearest_wrong_system: Snapshot bytes are complete and valid while publication destroys another file that appeared during capture.
+    compatibility_effect: Successful output is unchanged; publication now refuses every already-established destination name atomically.
+  - id: F028
+    summary: A preservation capture or write failure can suppress a simultaneous close and checkpoint failure, and observation reporting is assumed rather than measured.
+    classification: implementation defect
+    consequence: The owner may miss WAL copy-safety guidance or be told an activity record exists when failure occurred before snapshot observation.
+    authority_refs:
+      - Vellis::'Preserve personal memory snapshot'
+      - VellisRequirements::observableFailure
+      - VellisRequirements::durableCanonicalHistory
+    evidence_refs:
+      - path:tests/vellis/test_cleanup_boundaries.py#test_preserve_reports_capture_and_close_failures_together
+      - path:tests/vellis/test_cleanup_boundaries.py#test_preserve_reports_write_and_close_failures_together
+      - path:tests/vellis/test_cleanup_boundaries.py#test_preserve_failure_before_capture_does_not_claim_an_observation
+      - path:tests/vellis/test_cleanup_boundaries.py#test_preserve_reports_an_indeterminate_activity_effect_when_position_is_unreadable
+    disposition: open
+    owner_work_item_id: W006
+    implementation_status: conflicting
+    nearest_wrong_system: The primary failure is actionable while the secondary checkpoint failure and actual observational effect disappear.
+    compatibility_effect: Failure output gains complete primary, cleanup, and measured activity effects; successful snapshots retain their existing content.
+  - id: F029
+    summary: A rejected restore is reported as an unchanged serve failure even though restoration appends an activity record.
+    classification: implementation defect
+    consequence: The owner receives the wrong operation name and a false state-effect claim after a normal semantic refusal.
+    authority_refs:
+      - Vellis::'Restore prior personal memory'
+      - VellisRequirements::observableFailure
+      - VellisRequirements::dualLedgerSeparation
+    evidence_refs:
+      - path:tests/vellis/test_cleanup_boundaries.py#test_rejected_restore_reports_restore_and_its_activity_effect
+    disposition: open
+    owner_work_item_id: W006
+    implementation_status: conflicting
+    nearest_wrong_system: Canonical state is correctly preserved and activity history correctly records the refusal while the command denies that either operation or effect occurred.
+    compatibility_effect: Restore failures use restore-specific language and report canonical-or-activity effects accurately; restore semantics are unchanged.
+  - id: F030
+    summary: An unexpected server construction or transport exception escapes the public command as a bare traceback.
+    classification: implementation defect
+    consequence: A connection failure lacks its failed stage, state effect, corrective action, and any simultaneous close/checkpoint warning.
+    authority_refs:
+      - VellisRequirements::simpleIndividualOperation
+      - VellisRequirements::observableFailure
+    evidence_refs:
+      - path:tests/vellis/test_cleanup_boundaries.py#test_unexpected_mcp_runtime_failure_reports_its_stage_and_observed_effect
+      - path:tests/vellis/test_cleanup_boundaries.py#test_unexpected_mcp_runtime_and_close_failures_are_both_reported
+      - path:tests/vellis/test_cleanup_boundaries.py#test_mcp_process_control_failure_keeps_its_meaning_after_cleanup
+    disposition: open
+    owner_work_item_id: W006
+    implementation_status: conflicting
+    nearest_wrong_system: Domain tool outcomes are correct while the process boundary fails outside the actionable owner contract.
+    compatibility_effect: Ordinary runtime exceptions become structured serve failures; process-control exceptions retain their existing propagation.
+  - id: F031
+    summary: Failed and paused campaign worker results bypass current campaign, work-item, checkpoint, and state-token bindings.
+    classification: implementation defect
+    consequence: A stale or misrouted result can pass candidate validation and drive retry or failure handling for the wrong work.
+    authority_refs:
+      - AGENTS.md
+      - .agents/skills/sysml-implementation-campaign/SKILL.md
+    evidence_refs:
+      - path:tests/test_implementation_campaign.py#test_noncheckpointed_worker_result_is_bound_to_current_work_and_state
+      - path:tests/test_implementation_campaign.py#test_noncheckpointed_worker_result_cannot_claim_a_checkpoint
+      - path:tests/test_implementation_campaign.py#test_noncheckpointed_present_review_token_must_match_current_state
+    disposition: open
+    owner_work_item_id: W007
+    implementation_status: conflicting
+    nearest_wrong_system: Checkpoint advancement is strongly bound while a non-successful result from unrelated or stale work is accepted as current.
+    compatibility_effect: Schema version 2 remains accepted; invalid paused and failed results are newly rejected.
+  - id: F032
+    summary: Security guidance still says the repository has no application implementation or runnable MCP server.
+    classification: plan gap
+    consequence: Reporters are directed by an obsolete threat and runtime scope that omits the implemented CLI, local store, snapshot, and STDIO boundary.
+    authority_refs:
+      - README.md
+      - SECURITY.md
+    evidence_refs:
+      - path:SECURITY.md#current-scope
+    disposition: open
+    owner_work_item_id: W008
+    implementation_status: conflicting
+    nearest_wrong_system: The application is runnable and locally stateful while its reporting policy describes only a model repository.
+    compatibility_effect: Documentation only; no runtime or security boundary changes.
+  - id: F033
+    summary: Query discovery guidance does not explicitly identify anchor projection as the exact object-count workaround or explain the shared-data condition for multi-type groups.
+    classification: plan gap
+    consequence: A caller may silently undercount property-only tuples or expect a union group to reach per-type associated data without learning the correct existing alternatives.
+    authority_refs:
+      - VellisRequirements::semanticQueryMeaning
+      - VellisRequirements::querySafety
+    evidence_refs:
+      - path:tests/vellis/test_mcp_boundary.py#test_query_discovery_explains_identity_counts_and_multi_type_grounding
+      - path:tests/vellis/test_graph_queries.py#test_projecting_anchors_preserves_identity_for_exact_object_counts
+    disposition: open
+    owner_work_item_id: W006
+    implementation_status: partial
+    nearest_wrong_system: Query semantics are correct but the tool surface encourages a plausible, silently smaller answer.
+    compatibility_effect: Advisory description only; query schemas, rows, aggregations, and bounds remain unchanged.
 decisions:
   - id: D001
     summary: Replace only self-reaching definitions with the permissive JSON value they stand for, then inline the rest, at the boundary that already owns the wire form.
@@ -791,30 +900,126 @@ work_items:
       - command:just check
     blocker: null
     checkpoint: git:cdd309bbf946214622b33925b4272496a94004b2
+  - id: W006
+    order: 6
+    label: Make owner-facing snapshot, restore, serve, and query guidance truthful
+    kind: implementation
+    dependencies: [W001, W002, W003, W004, W005]
+    planned_baseline:
+      dimension: implementation
+      identity: git:2d4c8406e971dd57febb2f045d31b162d42b0544
+    finding_ids: [F027, F028, F029, F030, F033]
+    decision_ids: []
+    authority:
+      - refs:
+          - Vellis::'Preserve personal memory snapshot'
+          - Vellis::'Restore prior personal memory'
+          - VellisRequirements::observableFailure
+          - VellisRequirements::simpleIndividualOperation
+          - VellisRequirements::semanticQueryMeaning
+          - VellisRequirements::querySafety
+        coverage: partial
+        remaining_work_item_ids: [W008]
+    approval:
+      status: not-required
+      reason: Accepted authority already decides publication non-destruction, observable failures, and query meaning.
+      checkpoint: null
+    nearest_wrong_system: Each nominal operation works while concurrent publication, rejected restoration, or runtime cleanup makes the owner-facing result false or incomplete.
+    compatibility_effect: Successful operations and query meaning are unchanged; failure diagnostics and advisory query guidance become more precise.
+    non_effects:
+      - No tool name, request schema, query result, canonical meaning, or persistence format changes.
+      - Process-control exceptions remain process-control exceptions.
+      - User-owned data and protected ignored files remain untouched.
+    lifecycle: active
+    implementation_status: conflicting
+    evidence_refs:
+      - command:uv run pytest tests/vellis/test_cleanup_boundaries.py tests/vellis/test_mcp_boundary.py tests/vellis/test_historical_restore.py -q
+      - command:uv run pytest tests/vellis/test_graph_queries.py tests/vellis/test_invalid_queries.py -q
+    blocker: null
+    checkpoint: null
+  - id: W007
+    order: 7
+    label: Bind every campaign worker result to current work and durable state
+    kind: implementation
+    dependencies: [W006]
+    planned_baseline:
+      dimension: implementation
+      identity: git:2d4c8406e971dd57febb2f045d31b162d42b0544
+    finding_ids: [F031]
+    decision_ids: []
+    authority:
+      - refs:
+          - AGENTS.md
+          - .agents/skills/sysml-implementation-campaign/SKILL.md
+        coverage: full
+        remaining_work_item_ids: []
+    approval:
+      status: not-required
+      reason: The correction makes candidate validation enforce the already-selected supervision boundary.
+      checkpoint: null
+    nearest_wrong_system: A compact result is schema-valid but belongs to another campaign, work item, checkpoint outcome, or durable state.
+    compatibility_effect: Worker-result schema version 2 is unchanged; invalid non-success results fail closed.
+    non_effects:
+      - Checkpointed clean-pair validation remains unchanged.
+      - No implementation campaign record or product runtime behavior changes.
+    lifecycle: pending
+    implementation_status: not evaluated
+    evidence_refs:
+      - command:uv run pytest tests/test_implementation_campaign.py -q
+      - command:just implementation-campaign-check
+    blocker: null
+    checkpoint: null
+  - id: W008
+    order: 8
+    label: Synchronize public truth and close pre-release remediation
+    kind: closure
+    dependencies: [W006, W007]
+    planned_baseline:
+      dimension: implementation
+      identity: git:2d4c8406e971dd57febb2f045d31b162d42b0544
+    finding_ids: [F032]
+    decision_ids: []
+    authority:
+      - refs:
+          - README.md
+          - SECURITY.md
+          - VellisRequirements::simpleIndividualOperation
+        coverage: full
+        remaining_work_item_ids: []
+    approval:
+      status: not-required
+      reason: Closure aligns public reporting scope with the already implemented local boundary.
+      checkpoint: null
+    nearest_wrong_system: All code and checks conform while public security scope and closure evidence describe a retired repository state.
+    compatibility_effect: Documentation and evolution bookkeeping only.
+    non_effects:
+      - Accepted model authority and the trusted local STDIO boundary remain unchanged.
+      - Native anchor-group aggregation remains deferred.
+    lifecycle: pending
+    implementation_status: not evaluated
+    evidence_refs:
+      - command:just model-check
+      - command:just system-evolution-check
+      - command:just check
+    blocker: null
+    checkpoint: null
 closure:
-  finding_disposition: complete
+  finding_disposition: open
   model_status: accepted
-  implementation_status: conforming
-  integration_status: conforming
+  implementation_status: conflicting
+  integration_status: not evaluated
   external_status: not applicable
-  compatibility: Published schemas are self-contained; former scalar single-type queries remain accepted and normalize to the canonical collection; ordered string comparison adds answers for formerly refused queries; exact fractional JSON numbers now survive raw stdio round trips; close failures report their true stage and observed canonical-or-activity state effect; persistence and canonical stored meaning are unchanged.
+  compatibility: Model, persistence, tool names, request schemas, and query meaning remain unchanged; failure reporting, campaign validation, and public guidance become stricter and more truthful.
   reviews:
     - lens: authority and conformance
-      status: clean
-      reviewer: agent:boundary_authority_finalreview
-      checkpoint: git:cdd309bbf946214622b33925b4272496a94004b2
-      evidence_refs:
-        - command:uv run pytest tests/vellis/test_mcp_boundary.py tests/vellis/test_cleanup_boundaries.py tests/vellis/test_setup_path.py -q
-        - command:just check
+      status: pending
+      reviewer: null
+      checkpoint: null
+      evidence_refs: []
     - lens: engineering and evidence
-      status: clean
-      reviewer: agent:boundary_engineering_finalreview
-      checkpoint: git:cdd309bbf946214622b33925b4272496a94004b2
-      evidence_refs:
-        - command:uv run pytest tests/vellis/test_mcp_boundary.py tests/vellis/test_cleanup_boundaries.py tests/vellis/test_setup_path.py -q
-        - command:just check
-  evidence_refs:
-    - command:just model-check
-    - command:just system-evolution-check
-    - command:just check
-  checkpoint: git:cdd309bbf946214622b33925b4272496a94004b2
+      status: pending
+      reviewer: null
+      checkpoint: null
+      evidence_refs: []
+  evidence_refs: []
+  checkpoint: null

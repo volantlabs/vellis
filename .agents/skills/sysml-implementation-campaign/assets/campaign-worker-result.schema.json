@@ -96,7 +96,10 @@
         }
       },
       "else": {
-        "properties": {"reason": {"type": "string", "minLength": 1}}
+        "properties": {
+          "review_state_token": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+          "reason": {"type": "string", "minLength": 1}
+        }
       }
     }
   ]

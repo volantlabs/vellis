@@ -82,6 +82,21 @@ async def test_published_input_schemas_carry_their_whole_meaning(client: Client)
             assert declared.get("properties"), f"{tool.name} declares no members for {parameter}"
 
 
+@pytest.mark.anyio
+async def test_query_discovery_explains_identity_counts_and_multi_type_grounding(
+    client: Client,
+) -> None:
+    async with client:
+        tools = await client.list_tools()
+    query = next(tool for tool in tools if tool.name == "rtg_query")
+    description = " ".join((query.description or "").split())
+
+    assert "identity-bearing anchor" in description
+    assert "exact object count" in description
+    assert "permits every anchor type" in description
+    assert "query each type separately" in description
+
+
 @pytest.fixture
 def valued_client(tmp_path: Path) -> Iterator[Client]:
     value = RTGSystem.open(tmp_path / "valued.sqlite3")

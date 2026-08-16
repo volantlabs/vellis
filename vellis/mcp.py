@@ -112,6 +112,7 @@ class ServeStage:
     """The owner-visible stage at which serving failed."""
 
     OPEN_MEMORY = "open-memory"
+    SERVE_MEMORY = "serve-memory"
     CLOSE_MEMORY = "close-memory"
 
 
@@ -398,7 +399,11 @@ def build_server(system: RTGSystem, *, name: str = "vellis") -> FastMCP:
         Rows carry exactly the projections asked for, and identical projected tuples occur
         once. Two objects with the same projected values are therefore one row, so adding
         up a projection does not total the objects — use an aggregation for that, or
-        project something unique to each object alongside the values.
+        project the identity-bearing anchor or data object alongside the values. Counting
+        projected anchors is therefore an exact object count even when their visible values
+        match. A data condition grounded on a multi-type anchor group is valid only when its
+        associated-data type permits every anchor type in that group; otherwise query each
+        type separately and merge the bounded results.
         """
         return _result(
             system.query_graph(query, provenance=_agent()),
@@ -745,6 +750,8 @@ def serve(path: Path, *, name: str = "vellis") -> None:
         ) from error
     starting_position: tuple[int, int] | None = None
     ending_position: tuple[int, int] | None = None
+    failure: ServeError | None = None
+    control_failure: BaseException | None = None
     try:
         try:
             established = system.is_initialized
@@ -788,18 +795,50 @@ def serve(path: Path, *, name: str = "vellis") -> None:
                 stage=ServeStage.CLOSE_MEMORY,
                 memory_changed=None,
             ) from error
-    except BaseException:
-        # Cleanup must not replace the boundary failure that already explains why no
-        # service was provided. The connection itself is released before checkpointing,
-        # so suppressing only this secondary checkpoint error leaks no live handle.
-        try:
-            system.close()
-        except StoreError:
-            pass
-        raise
+    except BaseException as error:
+        if isinstance(error, ServeError):
+            failure = error
+        elif isinstance(error, Exception):
+            try:
+                ending_position = (
+                    system.store.current_revision(),
+                    system.store.activity_record_count(),
+                )
+                changed: bool | None = (
+                    starting_position is not None and ending_position != starting_position
+                )
+            except StoreError:
+                changed = None
+            failure = ServeError(
+                f"the server stopped unexpectedly: {error}",
+                "inspect activity and canonical history, resolve the reported runtime problem, "
+                "then restart Vellis",
+                stage=ServeStage.SERVE_MEMORY,
+                memory_changed=changed,
+            )
+        else:
+            # Cancellation, KeyboardInterrupt, SystemExit, and other process-control
+            # signals keep their meaning. Cleanup still runs before they propagate.
+            control_failure = error
+    close_error: StoreError | None = None
     try:
         system.close()
     except StoreError as error:
+        close_error = error
+    if control_failure is not None:
+        raise control_failure
+    if failure is not None:
+        if close_error is not None:
+            failure = ServeError(
+                f"{failure.summary}; memory cleanup also failed: {close_error}",
+                f"{failure.corrective_action}; close the other database reader, then start and "
+                "stop Vellis once more before copying the memory file",
+                stage=failure.stage,
+                memory_changed=failure.memory_changed,
+            )
+        raise failure
+    if close_error is not None:
+        error = close_error
         raise ServeError(
             f"the server stopped, but its memory could not finish closing: {error}; "
             "changes already reported as committed remain committed",

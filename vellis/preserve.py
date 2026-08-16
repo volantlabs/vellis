@@ -30,6 +30,7 @@ from typing import TextIO
 from vellis.canonical import Provenance
 from vellis.paths import DestinationError, resolve_data_directory, store_path
 from vellis.store import StoreError
+from vellis.streaming import SnapshotMetadata
 from vellis.system import RTGSystem
 
 __all__ = ["EXIT_FAILED", "EXIT_SUCCESS", "PreserveStage", "main"]
@@ -54,7 +55,9 @@ def _failed(
     corrective_action: str,
     stream: TextIO,
     *,
-    observed: bool = False,
+    observed: bool | None = False,
+    close_error: Exception | None = None,
+    cleanup_error: OSError | None = None,
 ) -> int:
     """Say what failed, what it did to established memory, and what to do about it.
 
@@ -66,10 +69,42 @@ def _failed(
     print(f"Vellis could not preserve this memory. Stage: {stage}", file=stream)
     print(f"  what happened: {summary}", file=stream)
     print("  established memory: unchanged", file=stream)
-    if observed:
+    if observed is True:
         print("  the attempt is recorded in this system's activity history.", file=stream)
+    elif observed is None:
+        print(
+            "  whether the attempt was recorded in activity history could not be determined.",
+            file=stream,
+        )
     print(f"  what to do next: {corrective_action}", file=stream)
+    if cleanup_error is not None:
+        print(f"  temporary-file cleanup also failed: {cleanup_error}", file=stream)
+        print("  remove the named temporary snapshot after checking its contents", file=stream)
+    if close_error is not None:
+        print(
+            f"  memory cleanup also failed at {PreserveStage.CLOSE_MEMORY}: {close_error}",
+            file=stream,
+        )
+        print(
+            "  before copying the memory file: close the other database reader, then open "
+            "and close Vellis again so its write-ahead log can be checkpointed",
+            file=stream,
+        )
     return EXIT_FAILED
+
+
+def _activity_count(system: RTGSystem) -> int | None:
+    """Read the observable ledger position without turning uncertainty into a claim."""
+    try:
+        return system.store.activity_record_count()
+    except StoreError:
+        return None
+
+
+def _changed(before: int | None, after: int | None) -> bool | None:
+    if before is None or after is None:
+        return None
+    return before != after
 
 
 def main(
@@ -111,7 +146,7 @@ def main(
             error,
         )
     document = Path(arguments.out)
-    if document.exists():
+    if os.path.lexists(document):
         # Never over something that is already there, and asked before anything is read.
         # Writing the document is the one effect this command has, and the path an owner
         # is most likely to mistype is the store itself — which this would replace, and
@@ -149,7 +184,14 @@ def main(
             error,
         )
     unavailable = "try again once nothing else is writing to this system"
+    activity_before = _activity_count(system)
+    activity_after: int | None = None
     temporary_name: str | None = None
+    metadata: SnapshotMetadata | None = None
+    failure: tuple[str, str, str] | None = None
+    published = False
+    close_error: Exception | None = None
+    cleanup_error: OSError | None = None
     try:
         try:
             # Prefer the destination filesystem for an atomic publication.  If the named
@@ -163,40 +205,71 @@ def main(
                 metadata = system.export_snapshot(stream, provenance=Provenance(initiator="owner"))
                 stream.flush()
                 os.fsync(stream.fileno())
-        except (OSError, StoreError) as unavailable_snapshot:
-            return _failed(
+        except Exception as unavailable_snapshot:
+            failure = (
                 PreserveStage.CAPTURE,
                 f"the snapshot could not be streamed: {unavailable_snapshot}",
                 unavailable,
-                error,
-                observed=True,
             )
-        try:
-            os.replace(temporary_name, document)
-            temporary_name = None
-        except OSError as unwritable:
-            return _failed(
-                PreserveStage.WRITE,
-                f"the document could not be written to {document}: {unwritable}",
-                "pass --out a path in a directory that exists and this account can write to",
-                error,
-                observed=True,
-            )
+        if failure is None:
+            assert temporary_name is not None
+            try:
+                # A hard-link publication is atomic and refuses every established name,
+                # including a concurrent file and a dangling symbolic link. The temporary
+                # lives beside the destination whenever its parent exists, so both names
+                # are on the same filesystem.
+                os.link(temporary_name, document)
+                published = True
+            except OSError as unwritable:
+                failure = (
+                    PreserveStage.WRITE,
+                    f"the document could not be written to {document}: {unwritable}",
+                    "pass --out a path in a directory that exists and this account can write to",
+                )
     finally:
-        close_error: StoreError | None = None
+        activity_after = _activity_count(system)
         try:
             system.close()
-        except StoreError as unavailable_checkpoint:
+        except Exception as unavailable_checkpoint:
             close_error = unavailable_checkpoint
         if temporary_name is not None:
-            Path(temporary_name).unlink(missing_ok=True)
+            try:
+                Path(temporary_name).unlink(missing_ok=True)
+            except OSError as unavailable_cleanup:
+                cleanup_error = unavailable_cleanup
+    observed = _changed(activity_before, activity_after)
+    if failure is not None:
+        return _failed(
+            *failure,
+            error,
+            observed=observed,
+            close_error=close_error,
+            cleanup_error=cleanup_error,
+        )
+    assert metadata is not None and published
     print(f"Preserved revision {metadata.revision} to {document}", file=out)
     print(f"  normalized rows carried: {metadata.row_count}", file=out)
     # Both halves, because the second one is visible to the owner: the next activity
     # history they read will have this capture in it, and a line saying nothing changed
     # would have told them otherwise.
     print("  canonical memory and its revision are unchanged.", file=out)
-    print("  the capture is recorded in this system's activity history.", file=out)
+    if observed is True:
+        print("  the capture is recorded in this system's activity history.", file=out)
+    elif observed is False:
+        print("  the capture was not recorded in this system's activity history.", file=out)
+    else:
+        print("  whether activity history recorded the capture could not be determined.", file=out)
+    if cleanup_error is not None:
+        print(
+            f"Vellis preserved the snapshot but could not remove its temporary name: "
+            f"{cleanup_error}",
+            file=error,
+        )
+        print("  snapshot document: written", file=error)
+        print(
+            "  what to do next: remove the named temporary snapshot after checking its contents",
+            file=error,
+        )
     if close_error is not None:
         print(
             f"Vellis preserved the snapshot but could not finish closing. "
@@ -212,8 +285,7 @@ def main(
             "does not need repeating",
             file=error,
         )
-        return EXIT_FAILED
-    return EXIT_SUCCESS
+    return EXIT_FAILED if cleanup_error is not None or close_error is not None else EXIT_SUCCESS
 
 
 if __name__ == "__main__":
