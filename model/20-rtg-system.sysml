@@ -51,6 +51,7 @@ package RTGSystem {
         subject system : 'RTG System';
         actor client : 'RTG Client';
         objective {
+            require constraint {
             doc /*
              * Input: a current, prospective, or revision-or-time selector for the shallow
              * summary, followed by a non-empty unique selection of anchor type
@@ -73,6 +74,7 @@ package RTGSystem {
              * construct a valid bounded current, prospective, or historical query. A client
              * preparing a current mutation rediscovers current definitions.
              */
+            }
         }
     }
 
@@ -80,6 +82,7 @@ package RTGSystem {
         subject system : 'RTG System';
         actor client : 'RTG Client';
         objective {
+            require constraint {
             doc /*
              * Input: named anchor and directly associated-data endpoint groups,
              * optional known anchor UUIDs, required typed directed links with
@@ -100,6 +103,7 @@ package RTGSystem {
              * summary for inspection and query. Evidence: current and historical
              * evaluation preserve identical query meaning.
              */
+            }
         }
     }
 
@@ -107,6 +111,7 @@ package RTGSystem {
         subject system : 'RTG System';
         actor client : 'RTG Client';
         objective {
+            require constraint {
             doc /*
              * Input: an active or definition-delta target with complete-object
              * anchor, associated-data, and link upserts, explicit UUID removals,
@@ -128,6 +133,7 @@ package RTGSystem {
              * failure changes no canonical state or revision. Evidence: replay reconstructs the
              * same accepted graph transition without activity history.
              */
+            }
         }
     }
 
@@ -135,21 +141,28 @@ package RTGSystem {
         subject system : 'RTG System';
         actor client : 'RTG Client';
         objective {
+            require constraint {
             doc /*
              * Input: request a new complete current or prospective assessment,
              * or one bounded interval from a completed assessment. New-assessment
              * success publishes every finding once and returns its identity,
              * complete count, and first bounded interval. Publishing it replaces
              * the prior retrievable assessment for that scope; failure publishes
-             * nothing and preserves that prior assessment. Interval success reads
+             * nothing and preserves that prior assessment. Publishing a new
+             * assessment and its required activity observation is one atomic
+             * observational effect, so an observation failure also preserves the
+             * prior assessment. Interval success reads
              * another ordered interval without reassessment. Refusal or failure
              * produces no successful validation report. Canonical state and revision never change;
              * one observational validation, rejection, or failure record is
-             * appended after the outcome is determined. Evidence: findings identify
+             * appended after the outcome is determined; inability to append it is
+             * an unexpected failure with no completed validation result. Evidence:
+             * findings identify
              * implicated definitions and graph objects when available. Canonical
              * or proposal changes may make a retained assessment stale for
              * activation but do not rewrite its immutable findings.
              */
+            }
         }
     }
 
@@ -157,6 +170,7 @@ package RTGSystem {
         subject system : 'RTG System';
         actor client : 'RTG Client';
         objective {
+            require constraint {
             doc /*
              * Input: one bounded natural-keyed definition change. Success: create
              * or edit proposed definitions while retaining staged graph work,
@@ -181,6 +195,7 @@ package RTGSystem {
              * Evidence: prospective discovery, query, and replay show exactly
              * the accepted proposal and revision while active meaning is unchanged.
              */
+            }
         }
     }
 
@@ -188,6 +203,7 @@ package RTGSystem {
         subject system : 'RTG System';
         actor client : 'RTG Client';
         objective {
+            require constraint {
             doc /*
              * Input: none; inspect the current in-flight delta. Success: return
              * normal absence, or proposed-definition identity, staged graph
@@ -199,6 +215,7 @@ package RTGSystem {
              * outcome is determined. Evidence: a client can compare bounded
              * prospective and focused active views without a server-side diff.
              */
+            }
         }
     }
 
@@ -206,6 +223,7 @@ package RTGSystem {
         subject system : 'RTG System';
         actor client : 'RTG Client';
         objective {
+            require constraint {
             doc /*
              * Input: the identity of one complete conforming prospective
              * assessment; operate on the sole current delta. Success requires
@@ -216,6 +234,7 @@ package RTGSystem {
              * active set, delta, revision, and canonical history. Evidence: replay
              * reconstructs the singular accepted definition-and-graph activation.
              */
+            }
         }
     }
 
@@ -223,12 +242,14 @@ package RTGSystem {
         subject system : 'RTG System';
         actor client : 'RTG Client';
         objective {
+            require constraint {
             doc /*
              * Input: none; operate on the sole current delta. Success: clear it and
              * commit one revision. Refusal reports no delta; failure preserves
              * it. Graph and active definitions never change. Evidence: whole-
              * delta retrieval and replay show absence at the resulting revision.
              */
+            }
         }
     }
 
@@ -236,6 +257,7 @@ package RTGSystem {
         subject system : 'RTG System';
         actor client : 'RTG Client';
         objective {
+            require constraint {
             doc /*
              * Input: an optional chronological range and positive maximum.
              * Success: return one owner-facing entry for every matching canonical
@@ -248,6 +270,7 @@ package RTGSystem {
              * the outcome is determined. Evidence: every returned entry represents
              * one canonical record in the selected inclusive interval and order.
              */
+            }
         }
     }
 
@@ -255,6 +278,7 @@ package RTGSystem {
         subject system : 'RTG System';
         actor client : 'RTG Client';
         objective {
+            require constraint {
             doc /*
              * Input: an optional chronological range and positive maximum.
              * Success: return one owner-facing entry for every matching record
@@ -268,6 +292,7 @@ package RTGSystem {
              * record is appended after the outcome is determined. Evidence: changing
              * activity retention cannot change replayed canonical state.
              */
+            }
         }
     }
 
@@ -275,6 +300,7 @@ package RTGSystem {
         subject system : 'RTG System';
         actor client : 'RTG Client';
         objective {
+            require constraint {
             doc /*
              * Input: an owner-selected retention decision over observational
              * activity records. Success: retain or remove only the selected
@@ -285,6 +311,7 @@ package RTGSystem {
              * state-change history never change. Evidence: replay before and
              * after an accepted retention decision reconstructs equivalent state.
              */
+            }
         }
     }
 
@@ -292,6 +319,7 @@ package RTGSystem {
         subject system : 'RTG System';
         actor client : 'RTG Client';
         objective {
+            require constraint {
             doc /*
              * Input: exactly one initial record or complete snapshot and an
              * optional contiguous later ledger tail. A snapshot identifies the
@@ -307,6 +335,7 @@ package RTGSystem {
              * Evidence: the accepted reconstructed projection is canonically
              * equivalent to direct state at its reconstructed revision.
              */
+            }
         }
     }
 
@@ -314,6 +343,7 @@ package RTGSystem {
         subject system : 'RTG System';
         actor client : 'RTG Client';
         objective {
+            require constraint {
             doc /*
              * Input: current canonical state. Success: produce a self-contained
              * snapshot of graph, active definitions, optional delta, and total
@@ -325,6 +355,7 @@ package RTGSystem {
              * determined. Evidence: the snapshot initializes an
              * equivalent fresh RTG.
              */
+            }
         }
     }
 
@@ -333,6 +364,7 @@ package RTGSystem {
         actor client : 'RTG Client';
         in item initialDefinitions : 'Graph Definition Set';
         objective {
+            require constraint {
             doc /*
              * Input: one internally valid initial definition set, supplied only
              * for an RTG with no established canonical state. Success: establish
@@ -343,6 +375,7 @@ package RTGSystem {
              * state. Evidence: direct state, the initial record, and replay all
              * agree on the same revision-0 state.
              */
+            }
         }
     }
 
@@ -350,6 +383,7 @@ package RTGSystem {
         subject system : 'RTG System';
         actor client : 'RTG Client';
         objective {
+            require constraint {
             doc /*
              * Input: a complete snapshot bound to its exact source record and an
              * optional contiguous later same-ledger tail bound to the exact
@@ -364,6 +398,7 @@ package RTGSystem {
              * or activity state. Evidence: current query and replay agree with
              * the supplied snapshot and accepted tail at the established revision.
              */
+            }
         }
     }
 
@@ -371,6 +406,7 @@ package RTGSystem {
         subject system : 'RTG System';
         actor client : 'RTG Client';
         objective {
+            require constraint {
             doc /*
              * Input: a committed historical revision. Success: when no delta
              * is in flight, commit its graph and active definitions with no
@@ -379,6 +415,7 @@ package RTGSystem {
              * new current state equals the selected historical graph and active
              * definitions while the prior ledger prefix remains unchanged.
              */
+            }
         }
     }
 
@@ -387,6 +424,7 @@ package RTGSystem {
         actor client : 'RTG Client';
         in ref item candidate : 'Recovery Candidate';
         objective {
+            require constraint {
             doc /*
              * Input: one complete, validated transient recovery candidate for an
              * RTG with no established canonical state. Success: establish its
@@ -398,6 +436,7 @@ package RTGSystem {
              * canonical or activity state. Evidence: current query, the initial
              * record, and replay agree on the candidate's graph and definitions.
              */
+            }
         }
     }
 

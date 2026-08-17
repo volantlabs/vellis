@@ -77,6 +77,7 @@ model-setup:
 
 # Validate every authored SysML file with the pinned official validator.
 model-check:
+    @uv run python tools/model_policy.py
     @uv run python tools/sysml_validator.py validate --self-test
 
 # Regenerate the searchable specification corpus from the pinned PDFs.

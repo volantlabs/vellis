@@ -56,6 +56,7 @@ package Vellis {
         in attribute freshVocabularyChoice [0..1] : 'Fresh Vocabulary Choice';
         in attribute freshVocabularyConfirmed [0..1] : ScalarValues::Boolean;
         objective {
+            require constraint {
             doc /*
              * Input: one supported local environment and either no prior memory
              * with one explicitly confirmed fresh vocabulary choice, a complete
@@ -86,6 +87,7 @@ package Vellis {
              * cluster, server-fleet, database, or infrastructure administration and
              * no starter-created people, examples, or other graph objects exist.
              */
+            }
         }
     }
 
@@ -100,6 +102,7 @@ package Vellis {
         actor owner : Owner;
         actor agent : 'MCP Agent';
         objective {
+            require constraint {
             doc /*
              * Input: a bounded semantic graph query already within the trusted
              * agent's owner-established scope. Success: provide only the requested
@@ -109,6 +112,7 @@ package Vellis {
              * revision never change; the attempt is recorded observationally.
              * Evidence: returned named bindings satisfy exactly the query.
              */
+            }
         }
 
         include use case queryMemory[1] : 'Query graph' {
@@ -122,6 +126,7 @@ package Vellis {
         actor owner : Owner;
         actor agent : 'MCP Agent';
         objective {
+            require constraint {
             doc /*
              * Input: a trusted owner-configured agent with no prior graph knowledge.
              * Success: discover every currently active anchor concept, then inspect
@@ -132,6 +137,7 @@ package Vellis {
              * can construct a current query without predecessor knowledge or a
              * full definition dump.
              */
+            }
         }
 
         include use case discoverMemory[1] : 'Discover evaluated graph definitions' {
@@ -145,6 +151,7 @@ package Vellis {
         actor owner : Owner;
         actor agent : 'MCP Agent';
         objective {
+            require constraint {
             doc /*
              * Input: a complete graph change that the owner has already approved.
              * Success: the approved context becomes conforming personal memory at
@@ -154,6 +161,7 @@ package Vellis {
              * approved context while declined and rejected proposals change no
              * canonical memory.
              */
+            }
         }
 
         include use case retainMemory[1] : 'Apply graph change' {
@@ -167,6 +175,7 @@ package Vellis {
         actor owner : Owner;
         actor agent : 'MCP Agent';
         objective {
+            require constraint {
             doc /*
              * Input: an owner-selected bounded memory question within the trusted
              * agent's configured scope. Success: present current shaped facts at
@@ -175,6 +184,7 @@ package Vellis {
              * recorded observationally. Evidence: the result contains exactly the
              * owner-selected projections.
              */
+            }
         }
 
         include use case queryMemory[1] : 'Query graph' {
@@ -188,6 +198,7 @@ package Vellis {
         actor owner : Owner;
         actor agent : 'MCP Agent';
         objective {
+            require constraint {
             doc /*
              * Input: an owner-selected chronological range and positive maximum.
              * Success: present one bounded owner-facing entry per canonical
@@ -198,6 +209,7 @@ package Vellis {
              * entry represents one canonical record in the selected inclusive
              * interval and ledger order.
              */
+            }
         }
 
         include use case inspectChanges[1] : 'Inspect state-change history' {
@@ -211,6 +223,7 @@ package Vellis {
         actor owner : Owner;
         actor agent : 'MCP Agent';
         objective {
+            require constraint {
             doc /*
              * Input: an owner-selected chronological range and positive maximum.
              * Success: present one bounded owner-facing entry per permitted
@@ -221,6 +234,7 @@ package Vellis {
              * every entry represents one activity record in the selected inclusive
              * interval and ledger order.
              */
+            }
         }
 
         include use case inspectActivity[1] : 'Inspect activity history' {
@@ -233,6 +247,7 @@ package Vellis {
         subject system : 'Vellis System';
         actor owner : Owner;
         objective {
+            require constraint {
             doc /*
              * Input: an owner decision about permitted activity-history
              * retention. Success: apply that decision only to observational
@@ -242,6 +257,7 @@ package Vellis {
              * state-change history never change. Evidence: replay before and
              * after the retention change reconstructs equivalent canonical state.
              */
+            }
         }
 
         include use case retainActivity[1] : 'Manage activity retention' {
@@ -254,12 +270,14 @@ package Vellis {
         subject system : 'Vellis System';
         actor owner : Owner;
         objective {
+            require constraint {
             doc /*
              * Input: an owner-selected correction or forgetting request.
              * Success: commit one conforming graph change and retain canonical
              * history. Refusal or failure preserves memory. Evidence: current
              * query and replay both show the same accepted change.
              */
+            }
         }
 
         include use case changeMemory[1] : 'Apply graph change' {
@@ -273,6 +291,7 @@ package Vellis {
         actor owner : Owner;
         actor agent : 'MCP Agent';
         objective {
+            require constraint {
             doc /*
              * Input: owner changes to graph meaning. Success: create, edit,
              * retrieve, and assess the sole delta and review its descriptions for
@@ -285,6 +304,7 @@ package Vellis {
              * preserve staged work, while active discovery reflects exactly one
              * assessed activation or the prior active set after discard or failure.
              */
+            }
         }
     }
 
@@ -305,6 +325,7 @@ package Vellis {
         actor owner : Owner;
         actor agent : 'MCP Agent';
         objective {
+            require constraint {
             doc /*
              * Input: request a complete current or prospective assessment or one
              * bounded interval of its findings. Success: present the assessment
@@ -313,6 +334,7 @@ package Vellis {
              * the validation attempt is recorded observationally. Evidence:
              * findings identify implicated definitions and graph objects when available.
              */
+            }
         }
 
         include use case assessMemory[1] : 'Assess graph conformance' {
@@ -326,6 +348,7 @@ package Vellis {
         actor owner : Owner;
         actor agent : 'MCP Agent';
         objective {
+            require constraint {
             doc /*
              * Input: an owner-selected revision or time. Success: first discover
              * the definitions active at the resolved revision, then use that exact
@@ -336,6 +359,7 @@ package Vellis {
              * observationally. Evidence: the result identifies and matches the
              * resolved canonical revision using the discovered historical vocabulary.
              */
+            }
         }
 
         include use case discoverHistoricalVocabulary[1] : 'Discover evaluated graph definitions' {
@@ -354,6 +378,7 @@ package Vellis {
         actor owner : Owner;
         actor agent : 'MCP Agent';
         objective {
+            require constraint {
             doc /*
              * Input: an external owner-configured agent's explicit bounded
              * canonical and activity intervals, plus bounded historical or
@@ -370,6 +395,7 @@ package Vellis {
              * agent can explain each proposal from bounded observations and the
              * exact evaluated revisions it used.
              */
+            }
         }
     }
 
@@ -386,6 +412,7 @@ package Vellis {
         subject system : 'Vellis System';
         actor owner : Owner;
         objective {
+            require constraint {
             doc /*
              * Input: the owner's current personal memory. Success: produce a
              * complete self-contained canonical snapshot suitable for fresh
@@ -394,6 +421,7 @@ package Vellis {
              * attempt is recorded observationally. Evidence: initialization from
              * the snapshot reconstructs equivalent personal memory.
              */
+            }
         }
 
         include use case snapshotMemory[1] : 'Create canonical snapshot' {
@@ -406,6 +434,7 @@ package Vellis {
         subject system : 'Vellis System';
         actor owner : Owner;
         objective {
+            require constraint {
             doc /*
              * Input: one initial record or complete snapshot with an optional
              * later ledger tail. Success: completely verify equivalent personal
@@ -415,6 +444,7 @@ package Vellis {
              * restore the live system. Evidence: the result is equivalent to direct
              * state at the reconstructed revision.
              */
+            }
         }
 
         include use case reconstructMemory[1] : 'Reconstruct canonical state' {
@@ -427,6 +457,7 @@ package Vellis {
         subject system : 'Vellis System';
         actor owner : Owner;
         objective {
+            require constraint {
             doc /*
              * Input: an owner-selected historical revision. Success: with no
              * delta in flight, restore its graph and active definitions as one
@@ -434,6 +465,7 @@ package Vellis {
              * canonical history remains unchanged. Evidence: current memory
              * matches the selected revision and the earlier ledger prefix is intact.
              */
+            }
         }
 
         include use case restoreMemory[1] : 'Restore historical state' {
@@ -448,6 +480,7 @@ package Vellis {
         in ref item sourceSnapshot : 'V1 JSON System Snapshot';
         in ref item confirmedPreview [0..1] : 'V1 Import Preview';
         objective {
+            require constraint {
             doc /*
              * Input: one complete Vellis v1 JSON snapshot at first use. Analyze
              * live graph content and active definitions incrementally into a
@@ -466,6 +499,7 @@ package Vellis {
              * preserve the accepted candidate and the report accounts for every
              * definition simplification or omission.
              */
+            }
         }
 
         include use case initializeRecoveredMemory[1] : 'Initialize fresh RTG from recovery candidate' {
@@ -479,6 +513,7 @@ package Vellis {
         actor owner : Owner;
         actor agent : 'MCP Agent';
         objective {
+            require constraint {
             doc /*
              * Input: an owner interaction with an external AI agent. Success:
              * provide relevant personal context within the trusted agent's
@@ -493,6 +528,7 @@ package Vellis {
              * scope, while declined, unsubmitted, or rejected context causes no
              * memory mutation and is not available.
              */
+            }
         }
     }
 

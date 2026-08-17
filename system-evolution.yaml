@@ -3,13 +3,13 @@ evolution:
   id: vellis-2-prerelease-remediation
   objective: Formalize accepted obligations and restore semantic, observational, compatibility, and installable release integrity for Vellis 2.0.
   observable_distinction: Requirements and objectives constrain their prose, query bounds use semantic JSON equality, required observations cannot disappear behind completed results, and installed Vellis preserves snapshot recovery.
-  lifecycle: awaiting-approval
+  lifecycle: active
   approval:
-    status: pending
+    status: accepted
     reason: The approved plan must be bound to a durable awaiting-approval checkpoint before execution.
-    checkpoint: null
+    checkpoint: git:90daeb0effc79e9a9a8ab8bfa64d8f701b5c15c0
   blocker: null
-  checkpoint: git:5d33c6ef405aa8efa1a54de81d7e9427aa9e1850
+  checkpoint: git:90daeb0effc79e9a9a8ab8bfa64d8f701b5c15c0
 baselines:
   status: current
   source: &source
@@ -198,11 +198,11 @@ work_items:
       - refs: [VellisRequirements, VellisVerification, RTGSystem]
         coverage: full
         remaining_work_item_ids: []
-    approval: {status: pending, reason: "The owner accepted the formal constraint, subject, and completion meaning; durable binding is pending.", checkpoint: null}
+    approval: {status: accepted, reason: "The owner accepted the formal constraint, subject, and completion meaning; durable binding is pending.", checkpoint: git:90daeb0effc79e9a9a8ab8bfa64d8f701b5c15c0}
     nearest_wrong_system: Prose remains non-constraining, RTG verification binds to Vellis, or required observation is absent.
     compatibility_effect: Formal and failure semantics become explicit without changing normal payloads.
     non_effects: [MCP and persistence shapes remain unchanged., Accepted canonical mutations remain canonical-ledger authoritative.]
-    lifecycle: pending
+    lifecycle: active
     implementation_status: not evaluated
     evidence_refs: []
     blocker: null
@@ -261,7 +261,7 @@ work_items:
       - refs: [VellisRequirements::simpleIndividualOperation]
         coverage: partial
         remaining_work_item_ids: [W005]
-    approval: {status: pending, reason: The owner selected reviewed final 2.0.0 metadata before merge; durable binding is pending., checkpoint: null}
+    approval: {status: accepted, reason: The owner selected reviewed final 2.0.0 metadata before merge; durable binding is pending., checkpoint: git:90daeb0effc79e9a9a8ab8bfa64d8f701b5c15c0}
     nearest_wrong_system: Source modules work while installed commands do not.
     compatibility_effect: Both former executables dispatch v2 setup, preserve, restore, and serving.
     non_effects: [FastMCP pins and MCP contract remain unchanged., Packaging selects no remote deployment.]
@@ -282,7 +282,7 @@ work_items:
       - refs: [VellisRequirements::v1SnapshotCompatibility, VellisRequirements::simpleIndividualOperation]
         coverage: full
         remaining_work_item_ids: []
-    approval: {status: pending, reason: The owner reaffirmed snapshot translation to a new ledger and rejected in-place conversion; durable binding is pending., checkpoint: null}
+    approval: {status: accepted, reason: The owner reaffirmed snapshot translation to a new ledger and rejected in-place conversion; durable binding is pending., checkpoint: git:90daeb0effc79e9a9a8ab8bfa64d8f701b5c15c0}
     nearest_wrong_system: Import works but guidance implies pre-upgrade-only export or raw migration.
     compatibility_effect: A fixture and runbook evidence the accepted path.
     non_effects: [No raw v1 reader is added., Real owner data and clients remain untouched.]

@@ -6,6 +6,7 @@ package VellisVerification {
     verification def 'Graph Invariants Hold' {
         subject system : 'RTG System';
         objective {
+            require constraint {
             doc /*
              * Exercise anchors, associated data, direct associations, and links
              * across valid and invalid identity, kind, type, endpoint, property,
@@ -27,6 +28,7 @@ package VellisVerification {
              * Every accepted graph conforms and every invalid proposal changes
              * no canonical state or revision.
              */
+            }
             verify VellisRequirements::graphInvariants;
         }
     }
@@ -34,6 +36,7 @@ package VellisVerification {
     verification def 'Semantic Query Selects And Shapes' {
         subject system : 'RTG System';
         objective {
+            require constraint {
             doc /*
              * Query one anchor type broadly, narrow it by known anchor UUIDs,
              * select associated data once by type and direct association alone
@@ -93,6 +96,7 @@ package VellisVerification {
              * matching rows and show identity selection stops at maximum plus one
              * and hydrates no more than that bounded candidate result.
              */
+            }
             verify VellisRequirements::semanticQueryMeaning;
         }
     }
@@ -100,6 +104,7 @@ package VellisVerification {
     verification def 'Invalid Query Is Read Only' {
         subject system : 'RTG System';
         objective {
+            require constraint {
             doc /*
              * Exercise empty or duplicate query-local names, unknown and incompatible
              * type keys, out-of-query references, endpoint directions, anchor
@@ -117,6 +122,7 @@ package VellisVerification {
              * prospective without a delta, preserving no partial payload and
              * every canonical non-effect.
              */
+            }
             verify VellisRequirements::querySafety;
         }
     }
@@ -124,6 +130,7 @@ package VellisVerification {
     verification def 'Every Canonical Transition Is Atomic' {
         subject system : 'RTG System';
         objective {
+            require constraint {
             doc /*
              * Exercise accepted graph mutation, delta create or edit, delta
              * discard, definition activation, and historical restoration. Each
@@ -140,6 +147,7 @@ package VellisVerification {
              * overlay and definitions together. An effective no-op
              * creates neither revision nor record.
              */
+            }
             verify VellisRequirements::atomicCanonicalRevision;
             verify VellisRequirements::explicitGraphChangeSet;
         }
@@ -148,6 +156,7 @@ package VellisVerification {
     verification def 'Cold Agent Discovers Evaluated Definitions' {
         subject system : 'RTG System';
         objective {
+            require constraint {
             doc /*
              * Starting with no graph knowledge, retrieve every current anchor
              * type and description, evaluated revision, and delta presence.
@@ -176,6 +185,7 @@ package VellisVerification {
              * reads leave canonical state and revision unchanged while recording
              * their observational outcomes after result selection.
              */
+            }
             verify VellisRequirements::agentDefinitionDiscoverability;
         }
     }
@@ -183,6 +193,7 @@ package VellisVerification {
     verification def 'Definition Work Is Singular And Non Disruptive' {
         subject system : 'RTG System';
         objective {
+            require constraint {
             doc /*
              * Through create, repeated definition edit, graph upsert staging,
              * tombstone staging, explicit unstaging, prospective query,
@@ -216,6 +227,7 @@ package VellisVerification {
              * show the assessment becomes stale while both values remain, then
              * reassess the exact effective proposal before activation.
              */
+            }
             verify VellisRequirements::definitionCardinality;
             verify VellisRequirements::nonDisruptiveDefinitionWork;
         }
@@ -224,6 +236,7 @@ package VellisVerification {
     verification def 'Validation Covers Every Scope' {
         subject system : 'RTG System';
         objective {
+            require constraint {
             doc /*
              * Produce governing-outcome findings for a well-formed but invalid
              * graph query, graph change, replay, and v1 recovery candidate. Show
@@ -241,6 +254,7 @@ package VellisVerification {
              * create no canonical validation state. Show an unexpected check
              * failure publishes no partial or successful assessment.
              */
+            }
             verify VellisRequirements::validationCoverage;
         }
     }
@@ -248,6 +262,7 @@ package VellisVerification {
     verification def 'Canonical History Is Durable And Contiguous' {
         subject system : 'RTG System';
         objective {
+            require constraint {
             doc /*
              * Starting from the initial record, commit representative canonical
              * transitions, restart the ordinary process boundary, and show the
@@ -261,6 +276,7 @@ package VellisVerification {
              * show that no permitted current-state tuple can mix their components
              * or revision.
              */
+            }
             verify VellisRequirements::durableCanonicalHistory;
         }
     }
@@ -268,6 +284,7 @@ package VellisVerification {
     verification def 'Canonical Snapshot Is Complete And Read Only' {
         subject system : 'RTG System';
         objective {
+            require constraint {
             doc /*
              * Capture snapshots with and without an in-flight delta. Show each
              * contains equivalent graph, active definitions, optional delta,
@@ -277,6 +294,7 @@ package VellisVerification {
              * size buffers while instrumentation shows no Graph, Canonical State,
              * definition-set document, or snapshot document is constructed.
              */
+            }
             verify VellisRequirements::canonicalSnapshotCompleteness;
         }
     }
@@ -284,6 +302,7 @@ package VellisVerification {
     verification def 'Snapshot And Tail Replay Is Equivalent' {
         subject system : 'RTG System';
         objective {
+            require constraint {
             doc /*
              * Initialize a fresh RTG from a semantically complete streamed
              * snapshot, then apply every
@@ -296,6 +315,7 @@ package VellisVerification {
              * Compare rebuilt and active projections in both directions using
              * set differences and show peak materialization remains bounded.
              */
+            }
             verify VellisRequirements::replayEquivalence;
         }
     }
@@ -303,6 +323,7 @@ package VellisVerification {
     verification def 'Invalid Ledger Tail Fails Safely' {
         subject system : 'RTG System';
         objective {
+            require constraint {
             doc /*
              * Replay tails with a gap, duplicate, reorder, mismatched base,
              * invalid or kind-incompatible semantic change, and incompatible
@@ -311,6 +332,7 @@ package VellisVerification {
              * identity and ledger lineage do not match. Show observable findings
              * and no partially accepted state.
              */
+            }
             verify VellisRequirements::replayEquivalence;
         }
     }
@@ -318,6 +340,7 @@ package VellisVerification {
     verification def 'Historical Selection Is Correct' {
         subject system : 'RTG System';
         objective {
+            require constraint {
             doc /*
              * Select a revision directly and query before, at, and between
              * committed instants using the same bounded graph-query semantics as
@@ -327,6 +350,7 @@ package VellisVerification {
              * discover definitions later retired, then use a time summary's exact
              * resolved revision for inspection and graph query with consistent results.
              */
+            }
             verify VellisRequirements::historicalStateCorrectness;
         }
     }
@@ -334,6 +358,7 @@ package VellisVerification {
     verification def 'Restore Appends Without Rewriting' {
         subject system : 'RTG System';
         objective {
+            require constraint {
             doc /*
              * With no delta, restore prior graph and active definitions and show
              * one new revision and explicit-difference record with no delta while
@@ -341,6 +366,7 @@ package VellisVerification {
              * comparison and show set-based bounded-memory work without either
              * graph aggregate. With a delta, show refusal and no state change.
              */
+            }
             verify VellisRequirements::historicalRestoreSemantics;
         }
     }
@@ -348,6 +374,7 @@ package VellisVerification {
     verification def 'Activity History Cannot Affect Replay' {
         subject system : 'RTG System';
         objective {
+            require constraint {
             doc /*
              * Record reads, validation, rejections, failures, and snapshot
              * activity with capability, outcome category, provenance, evaluated
@@ -359,6 +386,12 @@ package VellisVerification {
              * show identical reconstructed state from the unchanged canonical source.
              * Show no activity summary copies result rows, canonical payloads, or
              * inferred intent and no activity append reconstructs canonical state.
+             * Make the activity append fail for an otherwise permitted read,
+             * safely reported failure, snapshot, and validation. Show each returns
+             * no completed domain result. For validation, show the prior current
+             * assessment and all of its findings remain exactly retrievable. Show
+             * an accepted canonical mutation still completes from its canonical
+             * record without requiring a duplicate activity record.
              * Reject one retention request and show every preexisting activity
              * record remains while only the failure observation may be appended.
              * Query canonical and activity records separately with chronological
@@ -374,6 +407,7 @@ package VellisVerification {
              * to decide whole-result rejection rather than processing the remaining
              * selected interval.
              */
+            }
             verify VellisRequirements::dualLedgerSeparation;
             verify VellisRequirements::boundedHistoryRead;
         }
@@ -382,6 +416,7 @@ package VellisVerification {
     verification def 'MCP Tool Surface Is Typed And Portable' {
         subject system : 'RTG System';
         objective {
+            require constraint {
             doc /*
              * Discover exactly rtg_definition_summary,
              * rtg_definition_inspect, rtg_definition_delta, rtg_query,
@@ -396,6 +431,7 @@ package VellisVerification {
              * Invoke every tool through core MCP discovery and invocation alone,
              * without any additional MCP capability.
              */
+            }
             verify VellisRequirements::mcpAgentToolContract;
         }
     }
@@ -403,6 +439,7 @@ package VellisVerification {
     verification def 'MCP Outcomes Preserve RTG Meaning' {
         subject system : 'RTG System';
         objective {
+            require constraint {
             doc /*
              * For representative reads and mutations within one trusted owner-
              * configured client scope, distinguish a semantic rejection from
@@ -417,6 +454,7 @@ package VellisVerification {
              * changing or removing advisory annotations cannot change authorization,
              * validation, atomicity, or any failure non-effect.
              */
+            }
             verify VellisRequirements::mcpOutcomeIntegrity;
         }
     }
@@ -424,6 +462,7 @@ package VellisVerification {
     verification def 'Owner Governs Personal Memory' {
         subject system : 'Vellis System';
         objective {
+            require constraint {
             doc /*
              * Within the pre-established trusted-agent context, show the owner
              * controls memory and activity disclosure and retention. Show an
@@ -434,6 +473,7 @@ package VellisVerification {
              * and restoration. Show activity-retention changes leave canonical
              * state and replay unchanged.
              */
+            }
             verify VellisRequirements::ownerControlledMemory;
         }
     }
@@ -441,12 +481,14 @@ package VellisVerification {
     verification def 'Failures Are Observable And Safe' {
         subject system : 'Vellis System';
         objective {
+            require constraint {
             doc /*
              * Exercise semantic rejection and execution failure. The affected
              * participant receives a distinct outcome,
              * and every promised graph, definition, canonical-history, activity-
              * history, and revision non-effect holds.
              */
+            }
             verify VellisRequirements::observableFailure;
         }
     }
@@ -454,6 +496,7 @@ package VellisVerification {
     verification def 'V1 Snapshot Initializes Compatible Memory' {
         subject system : 'Vellis System';
         objective {
+            require constraint {
             doc /*
              * Analyze representative complete v1 JSON snapshots. Treat absent
              * system.live as true; import live objects and closed live relationships
@@ -478,6 +521,7 @@ package VellisVerification {
              * preservation failure with no partial canonical or activity state.
              * Show v1 Everyday Life keys remain unchanged with no v2 starter overlay.
              */
+            }
             verify VellisRequirements::v1SnapshotCompatibility;
         }
     }
@@ -485,6 +529,7 @@ package VellisVerification {
     verification def 'One Owner Begins Using One Cohesive System' {
         subject system : 'Vellis System';
         objective {
+            require constraint {
             doc /*
              * From a clean supported local environment, follow the supplied setup
              * guidance, connect one trusted owner-configured MCP agent, and
@@ -513,6 +558,7 @@ package VellisVerification {
              * prompting, permissions, scheduling, inference, and decisions about
              * tool invocation remain external to Vellis.
              */
+            }
             verify VellisRequirements::simpleIndividualOperation;
         }
     }
@@ -520,6 +566,7 @@ package VellisVerification {
     verification def 'Canonical Equality Decides No Ops' {
         subject system : 'RTG System';
         objective {
+            require constraint {
             doc /*
              * Compare Boolean, number, string, array, object, and null JSON
              * values. Show JSON kinds remain distinct, 1 and 1.0 have equal exact
@@ -537,6 +584,7 @@ package VellisVerification {
              * proposed-definition content, and keyed graph-overlay content also
              * participate without requiring either state as a resident aggregate.
              */
+            }
             verify VellisRequirements::canonicalSemanticEquality;
         }
     }
@@ -544,6 +592,7 @@ package VellisVerification {
     verification def 'String Patterns Validate Stored Values' {
         subject system : 'RTG System';
         objective {
+            require constraint {
             doc /*
              * Activate a stringValue property with a valid RE2 expression and
              * show whole-string matching accepts a conforming present value and
@@ -561,6 +610,7 @@ package VellisVerification {
              * ordered string comparison result, so ordering follows the stored
              * values rather than the pattern describing them.
              */
+            }
             verify VellisRequirements::stringPatternValidation;
         }
     }
@@ -568,6 +618,7 @@ package VellisVerification {
     verification def 'Fresh RTG Begins At Revision Zero' {
         subject system : 'RTG System';
         objective {
+            require constraint {
             doc /*
              * Initialize one state-free RTG with an empty valid definition set
              * and another with a non-empty valid set. Show each has revision 0,
@@ -581,6 +632,7 @@ package VellisVerification {
              * separately from a confirmed v1 candidate and show its graph and
              * translated definitions form revision 0 with no transitions or activity.
              */
+            }
             verify VellisRequirements::freshInitialization;
         }
     }
@@ -588,6 +640,7 @@ package VellisVerification {
     verification def 'Everyday Life Is An Optional Confirmed Start' {
         subject system : 'Vellis System';
         objective {
+            require constraint {
             doc /*
              * With no prior state, show blank and Everyday Life are the complete
              * choice set, Everyday Life is recommended and preselected, and
@@ -608,15 +661,23 @@ package VellisVerification {
              * existing system has no separate starter-install operation and may
              * use only ordinary owner-controlled definition governance.
              */
+            }
             verify VellisRequirements::recommendedEverydayLifeStart;
-            verify VellisRequirements::freshInitialization;
-            verify VellisRequirements::graphInvariants;
+            verify VellisRequirements::freshInitialization {
+                subject redefines system =
+                    'Everyday Life Is An Optional Confirmed Start'::system.memory;
+            }
+            verify VellisRequirements::graphInvariants {
+                subject redefines system =
+                    'Everyday Life Is An Optional Confirmed Start'::system.memory;
+            }
         }
     }
 
     verification def 'Current Operations Ignore History Length' {
         subject system : 'RTG System';
         objective {
+            require constraint {
             doc /*
              * Construct equivalent current canonical-state tuples backed by short
              * and long logical histories. Instrument semantic record accesses
@@ -647,6 +708,7 @@ package VellisVerification {
              * Append activity and show it neither visits the canonical prefix nor
              * reconstructs canonical state.
              */
+            }
             verify VellisRequirements::historyIndependentCurrentWork;
             verify VellisRequirements::atomicCanonicalRevision;
         }
@@ -655,6 +717,7 @@ package VellisVerification {
     verification def 'Historical Selection Avoids Irrelevant Records' {
         subject system : 'RTG System';
         objective {
+            require constraint {
             doc /*
              * Select equally narrow canonical and activity intervals behind
              * differently sized excluded prefixes. Instrument semantic record
@@ -669,6 +732,7 @@ package VellisVerification {
              * record counter would hide excluded records visited underneath it; do
              * not use unstable wall-clock assertions.
              */
+            }
             verify VellisRequirements::boundedHistoricalSelectionWork;
             verify VellisRequirements::historicalStateCorrectness;
             verify VellisRequirements::boundedHistoryRead;
@@ -678,6 +742,7 @@ package VellisVerification {
     verification def 'Replay Work Is Characterized By Required Tail' {
         subject system : 'RTG System';
         objective {
+            require constraint {
             doc /*
              * Reconstruct and ordinarily restart equivalent states across
              * increasing required replay-tail lengths. Record semantic record
@@ -687,6 +752,7 @@ package VellisVerification {
              * without asserting a numerical performance target. Show no Graph or
              * Canonical State aggregate is constructed.
              */
+            }
             verify VellisRequirements::replayEquivalence;
             verify VellisRequirements::durableCanonicalHistory;
         }
@@ -695,6 +761,7 @@ package VellisVerification {
     verification def 'Cold Agent Prepares Incremental Improvement' {
         subject system : 'Vellis System';
         objective {
+            require constraint {
             doc /*
              * Starting cold, have an externally scheduled owner-configured agent
              * read explicit bounded intervals from both ledgers, discover the
@@ -707,6 +774,7 @@ package VellisVerification {
              * owner approval is required before mutation, and a declined proposal
              * creates no canonical mutation.
              */
+            }
             verify VellisRequirements::ownerVisibleImprovementAnalysis;
             verify VellisRequirements::ownerControlledMemory;
         }
@@ -715,6 +783,7 @@ package VellisVerification {
     analysis def 'History Growth Performance Characterization' {
         subject system : 'RTG System';
         objective {
+            require constraint {
             doc /*
              * Independently vary current graph size, canonical-ledger length,
              * definition-change density, activity-history length, selected
@@ -735,6 +804,7 @@ package VellisVerification {
              * and representative owner dataset exist. This analysis does not
              * claim satisfaction of any numerical performance target.
              */
+            }
         }
     }
 

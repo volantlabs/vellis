@@ -4,6 +4,7 @@ package VellisRequirements {
 
     requirement def 'Graph Invariants' {
         subject system : 'RTG System';
+        require constraint {
         doc /*
          * The graph shall preserve globally unique object identity; distinct
          * anchor, associated-data, and link kinds; same-graph direct
@@ -34,10 +35,12 @@ package VellisRequirements {
          * required property, and validate every present required or optional
          * property against its declared JSON kind, shape, range, and pattern.
          */
+        }
     }
 
     requirement def 'Semantic Query Meaning' {
         subject system : 'RTG System';
+        require constraint {
         doc /*
          * A graph query shall select named anchor groups of one or more active
          * types in the definitions governing the evaluated state,
@@ -81,10 +84,12 @@ package VellisRequirements {
          * and proposed definitions; exactly one revision or time selector shall
          * evaluate the resolved historical graph and definitions with the same semantics.
          */
+        }
     }
 
     requirement def 'Query Safety' {
         subject system : 'RTG System';
+        require constraint {
         doc /*
          * Graph queries shall change no canonical state or revision. Their
          * permitted, rejected, or failed attempts may append observational
@@ -115,10 +120,12 @@ package VellisRequirements {
          * the caller's bound and shall not materialize an unbounded candidate
          * population merely because its type participates in the query.
          */
+        }
     }
 
     requirement def 'Atomic Canonical Revision' {
         subject system : 'RTG System';
+        require constraint {
         doc /*
          * Every accepted canonical state change shall advance the one total
          * revision exactly once and commit its semantic change and contiguous
@@ -130,20 +137,24 @@ package VellisRequirements {
          * Definition activation shall apply its exact assessed graph overlay,
          * active-definition change, delta removal, and transition as that one effect.
          */
+        }
     }
 
     requirement def 'Definition Cardinality' {
         subject system : 'RTG System';
+        require constraint {
         doc /*
          * At every established revision, the current canonical-state projection
          * shall contain exactly one active definition set and zero or one
          * definition delta. A present delta owns exactly one proposed definition
          * set and one keyed graph overlay; neither is active state.
          */
+        }
     }
 
     requirement def 'Non Disruptive Definition Work' {
         subject system : 'RTG System';
+        require constraint {
         doc /*
          * Creating, editing, retrieving, querying, or assessing a definition
          * delta shall not change active definitions or graph. Its graph overlay
@@ -171,10 +182,12 @@ package VellisRequirements {
          * Active changes that alter a staged identity shall make the prior prospective
          * assessment stale without silently discarding the overlay.
          */
+        }
     }
 
     requirement def 'Validation Coverage' {
         subject system : 'RTG System';
+        require constraint {
         doc /*
          * The system shall produce typed findings within the governing outcome
          * for semantically invalid graph queries, proposed graph changes,
@@ -194,10 +207,12 @@ package VellisRequirements {
          * or immediate retrievability. Assessment state is observational evidence,
          * never canonical or replay authority.
          */
+        }
     }
 
     requirement def 'Durable Canonical History' {
         subject system : 'RTG System';
+        require constraint {
         doc /*
          * Canonical history shall be complete, ordered, locally durable across
          * ordinary process restarts, and append-only in ordinary operation from
@@ -216,10 +231,12 @@ package VellisRequirements {
          * historical restoration records shall carry their replay-sufficient
          * explicit graph changes rather than a complete replacement graph.
          */
+        }
     }
 
     requirement def 'Canonical Snapshot Completeness' {
         subject system : 'RTG System';
+        require constraint {
         doc /*
          * A canonical snapshot shall be a self-contained, lossless capture of
          * graph, active definitions, optional in-flight delta, and total
@@ -228,10 +245,12 @@ package VellisRequirements {
          * completeness shall not require constructing a resident canonical-state,
          * graph, definition-set, or snapshot-document aggregate.
          */
+        }
     }
 
     requirement def 'Replay Equivalence' {
         subject system : 'RTG System';
+        require constraint {
         doc /*
          * Replay from an initial record or complete snapshot plus an optional
          * contiguous later same-ledger tail shall reconstruct equivalent graph,
@@ -246,10 +265,12 @@ package VellisRequirements {
          * state. Replay and reconstruction shall use bounded incremental or
          * set-based work and shall not return or require a resident whole state.
          */
+        }
     }
 
     requirement def 'Historical State Correctness' {
         subject system : 'RTG System';
+        require constraint {
         doc /*
          * Historical graph queries shall accept exactly one revision or time
          * selector, change no canonical state, and evaluate the selected committed
@@ -262,10 +283,12 @@ package VellisRequirements {
          * for inspection and graph query. Definition-delta retrieval remains
          * current-only.
          */
+        }
     }
 
     requirement def 'Historical Restore Semantics' {
         subject system : 'RTG System';
+        require constraint {
         doc /*
          * Restore shall require no in-flight delta and shall commit historical
          * graph and active definitions with no delta as one new revision without
@@ -275,14 +298,23 @@ package VellisRequirements {
          * but shall use bounded incremental or set-based work and shall not
          * construct either graph as one resident aggregate.
          */
+        }
     }
 
     requirement def 'Dual Ledger Separation' {
         subject system : 'RTG System';
+        require constraint {
         doc /*
          * Activity history shall record permitted reads, validation, rejections,
          * failures, snapshots, provenance, and summaries after the associated
-         * outcome has been determined. An activity-history read shall select its
+         * outcome has been determined. An invocation requiring such an
+         * observation shall complete only after its activity record is durably
+         * appended. If that append cannot complete, the invocation shall produce
+         * an unexpected execution failure and no completed domain result; that
+         * observation failure is not itself a safely reported domain outcome
+         * requiring recursive observation. An accepted canonical mutation is
+         * already represented by canonical history and shall not be duplicated
+         * as activity. An activity-history read shall select its
          * result before its own record is appended and shall never include itself.
          * Activity history shall remain observational, never be replayed, and
          * never establish canonical state or trigger canonical reconstruction.
@@ -292,10 +324,12 @@ package VellisRequirements {
          * intent. Owner-directed retention may change
          * only activity history and shall not affect reconstruction.
          */
+        }
     }
 
     requirement def 'Agent Definition Discoverability' {
         subject system : 'RTG System';
+        require constraint {
         doc /*
          * Every active type and rule definition shall have a non-empty,
          * owner-readable description. Automatic assessment shall establish only
@@ -322,10 +356,12 @@ package VellisRequirements {
          * current completed assessment; its evaluated revision and proposal
          * identity shall equal those reported by proposal discovery.
          */
+        }
     }
 
     requirement def 'Explicit Graph Change Set' {
         subject system : 'RTG System';
+        require constraint {
         doc /*
          * A graph change shall identify either active state or the sole
          * definition delta and shall use complete-object upserts and explicit UUID
@@ -344,10 +380,12 @@ package VellisRequirements {
          * would remove the final semantic difference from active state is rejected
          * atomically; only explicit discard removes the delta.
          */
+        }
     }
 
     requirement def 'Bounded History Read' {
         subject system : 'RTG System';
+        require constraint {
         doc /*
          * A history read shall select exactly one of canonical or activity
          * records, accept an optional chronological interval and a positive
@@ -363,10 +401,12 @@ package VellisRequirements {
          * A result shall never mix entry families, paginate silently, mutate
          * canonical state, or treat activity as replay authority.
          */
+        }
     }
 
     requirement def 'History Independent Current Work' {
         subject system : 'RTG System';
+        require constraint {
         doc /*
          * Current definition summary and inspection, current graph query,
          * current conformance assessment, proposal discovery, and ordinary change
@@ -397,10 +437,12 @@ package VellisRequirements {
          * rewrite the existing logical ledger prefix. Activity recording shall
          * remain observational and shall not trigger canonical reconstruction.
          */
+        }
     }
 
     requirement def 'Bounded Historical Selection Work' {
         subject system : 'RTG System';
+        require constraint {
         doc /*
          * Resolving a revision or time selector shall not linearly scan the
          * complete ledger. Selecting a bounded canonical or activity interval
@@ -415,10 +457,12 @@ package VellisRequirements {
          * These constraints govern semantic record processing, not
          * physical database pages or a selected indexing technology.
          */
+        }
     }
 
     requirement def 'MCP Agent Tool Contract' {
         subject system : 'RTG System';
+        require constraint {
         doc /*
          * The system shall expose exactly the selected ten stable, discoverable
          * MCP tool names. Every completed invocation shall return typed object
@@ -431,10 +475,12 @@ package VellisRequirements {
          * through core tool discovery and invocation without requiring any
          * additional MCP capability.
          */
+        }
     }
 
     requirement def 'MCP Outcome Integrity' {
         subject system : 'RTG System';
+        require constraint {
         doc /*
          * Semantic rejection shall be represented as a typed result distinct
          * from malformed input and unexpected execution failure. Read operations
@@ -451,10 +497,12 @@ package VellisRequirements {
          * and shall never enforce authorization, validation, atomicity, or failure
          * non-effects.
          */
+        }
     }
 
     requirement def 'Owner Controlled Memory' {
         subject system : 'Vellis System';
+        require constraint {
         doc /*
          * Vellis shall preserve owner control of personal-memory and activity
          * disclosure and retention, memory correction and
@@ -462,19 +510,23 @@ package VellisRequirements {
          * shall submit a context proposal for mutation only after owner approval;
          * declined, rejected, or failed context shall not be retained.
          */
+        }
     }
 
     requirement def 'Observable Failure' {
         subject system : 'Vellis System';
+        require constraint {
         doc /*
          * Semantic refusals and execution failures shall be observable to the
          * affected owner or external agent while preserving promised canonical
          * and observational non-effects.
          */
+        }
     }
 
     requirement def 'V1 Snapshot Compatibility' {
         subject system : 'Vellis System';
+        require constraint {
         doc /*
          * Only before any v2 canonical state exists, Vellis shall incrementally
          * analyze one complete v1.0.0 JSON system snapshot into a staged target
@@ -517,10 +569,12 @@ package VellisRequirements {
          * failure, or an existing v2 state shall establish no canonical or activity
          * state; no merge or replacement behavior exists.
          */
+        }
     }
 
     requirement def 'Simple Individual Operation' {
         subject system : 'Vellis System';
+        require constraint {
         doc /*
          * From a clean supported local environment, one owner shall be able to
          * follow supplied setup guidance to prepare one local Vellis system and
@@ -539,10 +593,12 @@ package VellisRequirements {
          * server-fleet, database, concurrent definition-delta, or enterprise-
          * infrastructure administration.
          */
+        }
     }
 
     requirement def 'Canonical Semantic Equality' {
         subject system : 'RTG System';
+        require constraint {
         doc /*
          * Every no-op, definition-delta comparison, graph comparison, replay
          * comparison, and permitted-value uniqueness decision shall use one
@@ -561,10 +617,12 @@ package VellisRequirements {
          * overlay meaning. This semantic equality does not require either state
          * to exist as one physical aggregate.
          */
+        }
     }
 
     requirement def 'Fresh Initialization' {
         subject system : 'RTG System';
+        require constraint {
         doc /*
          * A fresh RTG initialized without prior state shall accept one internally
          * valid initial definition set and establish revision 0 with an empty
@@ -578,10 +636,12 @@ package VellisRequirements {
          * a new owned history base with no transitions or activity records, using
          * bounded streaming or set-based work rather than a resident whole state.
          */
+        }
     }
 
     requirement def 'String Pattern Validation' {
         subject system : 'RTG System';
+        require constraint {
         doc /*
          * An optional property pattern shall use Google RE2 syntax and Unicode
          * semantics with whole-string FullMatch behavior. The system shall reject
@@ -595,10 +655,12 @@ package VellisRequirements {
          * describes which stored values are valid, never how any two of them
          * compare.
          */
+        }
     }
 
     requirement def 'Recommended Everyday Life Start' {
         subject system : 'Vellis System';
+        require constraint {
         doc /*
          * When no prior state exists, Vellis shall offer blank and Everyday Life
          * fresh vocabulary choices, present Everyday Life as recommended and
@@ -609,10 +671,12 @@ package VellisRequirements {
          * and v1 initialization shall not offer or overlay the starter, and
          * existing systems shall gain no separate starter-install behavior.
          */
+        }
     }
 
     requirement def 'Owner Visible Improvement Analysis' {
         subject system : 'Vellis System';
+        require constraint {
         doc /*
          * Vellis shall support an external owner-configured agent in using
          * explicit bounded canonical and activity intervals, evaluated historical
@@ -626,6 +690,7 @@ package VellisRequirements {
          * inference authority. Automated analysis shall not bypass owner approval;
          * declined proposals shall create no canonical mutation.
          */
+        }
     }
 
     part vellis : 'Vellis System';
