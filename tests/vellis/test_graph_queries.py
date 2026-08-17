@@ -23,7 +23,10 @@ from tests.vellis.oracle import _TestGraphIndex, evaluate_query, materialize_sta
 from tests.vellis.semantic_state import semantic_state_equal
 from vellis.canonical import Provenance
 from vellis.changes import GraphChange
+from vellis.definitions import AnchorTypeDefinition
+from vellis.governance import DefinitionChange
 from vellis.graph import Anchor, AssociatedDataObject, Graph, Link
+from vellis.history import RevisionSelection
 from vellis.json_value import normalize
 from vellis.outcomes import OperationStatus
 from vellis.query import (
@@ -35,6 +38,7 @@ from vellis.query import (
     AssociatedDataProjection,
     DataPropertyCondition,
     DataPropertyProjection,
+    EvaluatedStateScope,
     GraphQuery,
     GraphQueryResult,
     LinkProjection,
@@ -1329,6 +1333,30 @@ def _one_property(property_name: str = "rating") -> GraphQuery:
     )
 
 
+def _nested_property_definitions(json_kind):
+    from vellis.definitions import PropertyConstraint
+
+    definitions = _endpoint_definitions()
+    note = definitions.associated_data_types[0]
+    return replace(
+        definitions,
+        associated_data_types=(
+            replace(
+                note,
+                property_constraints=(
+                    *note.property_constraints,
+                    PropertyConstraint(
+                        property_name="payload",
+                        required=False,
+                        json_kind=json_kind,
+                        description="A nested value used to exercise semantic JSON identity.",
+                    ),
+                ),
+            ),
+        ),
+    )
+
+
 def test_a_projected_property_participates_in_row_identity(rated: RTGSystem) -> None:
     """Excludes a dedup key that ignores the property it was asked for.
 
@@ -1343,6 +1371,149 @@ def test_a_projected_property_participates_in_row_identity(rated: RTGSystem) -> 
         (each.present, str(each.value)) for row in result.rows for each in row.properties
     )
     assert values == [(False, "None"), (True, "2"), (True, "3")]
+
+
+@pytest.mark.parametrize(
+    "values",
+    [
+        ({"n": Decimal("3")}, {"n": Decimal("3.00")}),
+        ([Decimal("3")], [Decimal("3.00")]),
+    ],
+    ids=["nested-object-number", "nested-array-number"],
+)
+@pytest.mark.parametrize(
+    "state_scope",
+    [
+        EvaluatedStateScope.CURRENT,
+        EvaluatedStateScope.PROSPECTIVE,
+        EvaluatedStateScope.HISTORICAL,
+    ],
+    ids=["current", "prospective", "historical"],
+)
+def test_nested_numeric_spellings_are_one_bounded_semantic_row(
+    tmp_path: Path, values: tuple[object, object], state_scope: EvaluatedStateScope
+) -> None:
+    """Storage spelling cannot turn one JSON value into an over-limit answer."""
+    from vellis.json_value import JsonKind
+
+    kind = JsonKind.ARRAY if isinstance(values[0], list) else JsonKind.OBJECT
+    system = _system_with(tmp_path, _nested_property_definitions(kind))
+    try:
+        outcome = system.apply_graph_change(
+            GraphChange(
+                anchor_upserts=(ADA,),
+                associated_data_upserts=tuple(
+                    AssociatedDataObject(
+                        uuid=f"n-{index}",
+                        type_key="note",
+                        anchor_uuids=("a-1",),
+                        properties={"payload": normalize(value)},
+                    )
+                    for index, value in enumerate(values, start=1)
+                ),
+            ),
+            provenance=_owner(),
+        )
+        assert outcome.accepted and outcome.resulting_revision is not None
+        if state_scope is EvaluatedStateScope.PROSPECTIVE:
+            assert system.set_definition_delta(
+                DefinitionChange(
+                    anchor_type_upserts=(
+                        AnchorTypeDefinition("query-fixture-only", "An unrelated proposed type."),
+                    )
+                ),
+                provenance=_owner(),
+            ).accepted
+        selection = (
+            RevisionSelection(outcome.resulting_revision)
+            if state_scope is EvaluatedStateScope.HISTORICAL
+            else None
+        )
+        query = replace(
+            _one_property("payload"),
+            maximum_rows=1,
+            state_scope=state_scope,
+            historical_selection=selection,
+        )
+
+        result = system.query_graph(query)
+
+        assert result.accepted, result.findings
+        assert len(result.rows) == 1
+    finally:
+        system.close()
+
+
+def test_maximum_rows_rejects_genuinely_unequal_nested_values(tmp_path: Path) -> None:
+    from vellis.json_value import JsonKind
+
+    system = _system_with(tmp_path, _nested_property_definitions(JsonKind.OBJECT))
+    try:
+        assert system.apply_graph_change(
+            GraphChange(
+                anchor_upserts=(ADA,),
+                associated_data_upserts=(
+                    AssociatedDataObject(
+                        "n-1", "note", ("a-1",), {"payload": normalize({"n": Decimal("3")})}
+                    ),
+                    AssociatedDataObject(
+                        "n-2",
+                        "note",
+                        ("a-1",),
+                        {"payload": normalize({"n": Decimal("3.01")})},
+                    ),
+                ),
+            ),
+            provenance=_owner(),
+        ).accepted
+
+        result = system.query_graph(replace(_one_property("payload"), maximum_rows=1))
+
+        assert result.status is OperationStatus.REJECTED
+        assert result.rows == ()
+        assert "exceeds the maximum of 1" in result.findings[0].summary
+    finally:
+        system.close()
+
+
+def test_semantic_projection_deduplication_does_not_change_object_aggregation(
+    tmp_path: Path,
+) -> None:
+    from vellis.json_value import JsonKind
+
+    system = _system_with(tmp_path, _nested_property_definitions(JsonKind.ARRAY))
+    try:
+        assert system.apply_graph_change(
+            GraphChange(
+                anchor_upserts=(ADA,),
+                associated_data_upserts=(
+                    AssociatedDataObject(
+                        "n-1", "note", ("a-1",), {"payload": normalize([Decimal("3")])}
+                    ),
+                    AssociatedDataObject(
+                        "n-2", "note", ("a-1",), {"payload": normalize([Decimal("3.00")])}
+                    ),
+                ),
+            ),
+            provenance=_owner(),
+        ).accepted
+        query = replace(
+            _one_property("payload"),
+            aggregations=(
+                QueryAggregation(
+                    name="note-count", operator=AggregationOperator.COUNT, data_condition="notes"
+                ),
+            ),
+            maximum_rows=2,
+        )
+
+        result = system.query_graph(query)
+
+        assert result.accepted, result.findings
+        assert len(result.rows) == 1
+        assert result.aggregates[0].value == Decimal(2)
+    finally:
+        system.close()
 
 
 def test_presence_alone_distinguishes_two_rows(tmp_path: Path) -> None:

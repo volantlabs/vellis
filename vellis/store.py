@@ -1345,6 +1345,8 @@ class CanonicalStore:
 
     def evaluate_prospective_query(self, query: GraphQuery) -> GraphQueryResult:
         """Evaluate over the sole definition-and-graph proposal without copying it."""
+        from vellis.query import GraphQueryResult
+
         try:
             with self._lock:
                 self._connection.execute("BEGIN")
@@ -1413,6 +1415,7 @@ class CanonicalStore:
             ReturnedProperty,
             ReturnProjection,
             indexed_query_findings,
+            semantic_row_identity,
         )
 
         response_query = query
@@ -1642,32 +1645,17 @@ class CanonicalStore:
             + ", ".join(tables)
             + " WHERE "
             + " AND ".join(predicates)
-            + " LIMIT ?"
+            + (" LIMIT 1" if existence_only else "")
         )
         parameters = [
             *prefix_parameters,
             *select_parameters,
             *where_parameters,
-            1 if existence_only else query.maximum_rows + 1,
         ]
         cursor = self._connection.execute(sql, tuple(parameters))
-        raw_rows = cursor.fetchmany(1 if existence_only else query.maximum_rows + 1)
-        if not existence_only and len(raw_rows) > query.maximum_rows:
-            return GraphQueryResult(
-                status=OperationStatus.REJECTED,
-                summary=(
-                    f"the result has more than {query.maximum_rows} rows; it is refused whole "
-                    "rather than truncated"
-                ),
-                findings=(
-                    ValidationFinding(
-                        summary=f"the complete result exceeds the maximum of {query.maximum_rows}"
-                    ),
-                ),
-                query=response_query,
-            )
 
         if existence_only:
+            raw_rows = cursor.fetchmany(1)
             return GraphQueryResult(
                 status=OperationStatus.ACCEPTED,
                 summary=f"{int(bool(raw_rows))} existence rows at revision {revision}",
@@ -1677,7 +1665,8 @@ class CanonicalStore:
             )
 
         rows: list[GraphQueryRow] = []
-        for raw in raw_rows:
+        row_identities: set[tuple[object, ...]] = set()
+        for raw in cursor:
             offset = 0
             anchors: list[AnchorBinding] = []
             links: list[LinkBinding] = []
@@ -1711,7 +1700,28 @@ class CanonicalStore:
                     assert isinstance(projection, AssociatedDataProjection)
                     assert isinstance(value, AssociatedDataObject)
                     data.append(AssociatedDataBinding(projection.name, value))
-            rows.append(GraphQueryRow(tuple(anchors), tuple(links), tuple(data), tuple(properties)))
+            row = GraphQueryRow(tuple(anchors), tuple(links), tuple(data), tuple(properties))
+            identity = semantic_row_identity(row)
+            if identity in row_identities:
+                continue
+            row_identities.add(identity)
+            rows.append(row)
+            if len(rows) > query.maximum_rows:
+                return GraphQueryResult(
+                    status=OperationStatus.REJECTED,
+                    summary=(
+                        f"the result has more than {query.maximum_rows} rows; it is refused whole "
+                        "rather than truncated"
+                    ),
+                    findings=(
+                        ValidationFinding(
+                            summary=(
+                                f"the complete result exceeds the maximum of {query.maximum_rows}"
+                            )
+                        ),
+                    ),
+                    query=response_query,
+                )
         return GraphQueryResult(
             status=OperationStatus.ACCEPTED,
             summary=(

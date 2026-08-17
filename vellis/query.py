@@ -1018,7 +1018,7 @@ def _walk(
     for assignment in _assignments(query, index):
         if wants_rows and len(rows) <= query.maximum_rows:
             row = _project(query, assignment)
-            key = _row_identity(row)
+            key = semantic_row_identity(row)
             if key not in seen:
                 seen.add(key)
                 rows.append(row)
@@ -1171,7 +1171,7 @@ def _distinct_rows(query: GraphQuery, index: QueryCandidateIndex) -> tuple[Graph
     rows: list[GraphQueryRow] = []
     for assignment in _assignments(query, index):
         row = _project(query, assignment)
-        key = _row_identity(row)
+        key = semantic_row_identity(row)
         if key in seen:
             continue
         seen.add(key)
@@ -1304,7 +1304,7 @@ def _distinct_component_assignments(
     seen: set[tuple[object, ...]] = set()
     for assignment in _component_assignments(query, index):
         key = (
-            _row_identity(_project(query, assignment)),
+            semantic_row_identity(_project(query, assignment)),
             tuple(
                 (
                     name,
@@ -1516,7 +1516,7 @@ def _project(query: GraphQuery, assignment: _Assignment) -> GraphQueryRow:
     )
 
 
-def _row_identity(row: GraphQueryRow) -> tuple[object, ...]:
+def semantic_row_identity(row: GraphQueryRow) -> tuple[object, ...]:
     """Identify a row by its projected bindings, including property presence.
 
     Two assignments that project the same objects and the same property presence and
