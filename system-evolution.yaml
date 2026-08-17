@@ -9,7 +9,7 @@ evolution:
     reason: The approved plan must be bound to a durable awaiting-approval checkpoint before execution.
     checkpoint: git:90daeb0effc79e9a9a8ab8bfa64d8f701b5c15c0
   blocker: null
-  checkpoint: git:0b92565c3c4152062567fd4061dbf54be8001fa0
+  checkpoint: git:e8e0d06dabffdf8b2abc5646e361002810bedc07
 baselines:
   status: current
   source: &source
@@ -20,16 +20,16 @@ baselines:
     checkpoint: git:5d33c6ef405aa8efa1a54de81d7e9427aa9e1850
   target: &target
     model: sha256:adf05b52f9839b75f76240ee116c0ffba7ee452602c2083268d683c4b534b2c7
-    implementation: git:0b92565c3c4152062567fd4061dbf54be8001fa0
+    implementation: git:e8e0d06dabffdf8b2abc5646e361002810bedc07
     language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
     execution_environment: sha256:d71473693aa50faef1a25a449aa5808490e21eaf2a987942d1fb134c773550d1
-    checkpoint: git:0b92565c3c4152062567fd4061dbf54be8001fa0
+    checkpoint: git:e8e0d06dabffdf8b2abc5646e361002810bedc07
   observed:
     model: sha256:adf05b52f9839b75f76240ee116c0ffba7ee452602c2083268d683c4b534b2c7
-    implementation: git:0b92565c3c4152062567fd4061dbf54be8001fa0
+    implementation: git:e8e0d06dabffdf8b2abc5646e361002810bedc07
     language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
     execution_environment: sha256:d71473693aa50faef1a25a449aa5808490e21eaf2a987942d1fb134c773550d1
-    checkpoint: git:0b92565c3c4152062567fd4061dbf54be8001fa0
+    checkpoint: git:e8e0d06dabffdf8b2abc5646e361002810bedc07
 scope:
   authority_scope:
     - RTG::'JSON Value'
@@ -337,7 +337,7 @@ work_items:
     label: Integrate evidence and close the Vellis 2.0 candidate
     kind: closure
     dependencies: [W002, W003, W004, W005]
-    planned_baseline: {dimension: implementation, identity: git:0b92565c3c4152062567fd4061dbf54be8001fa0}
+    planned_baseline: {dimension: implementation, identity: git:e8e0d06dabffdf8b2abc5646e361002810bedc07}
     finding_ids: [F009]
     decision_ids: []
     authority:
