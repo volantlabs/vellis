@@ -3,13 +3,13 @@ evolution:
   id: vellis-2-prerelease-remediation
   objective: Formalize accepted obligations and restore semantic, observational, compatibility, and installable release integrity for Vellis 2.0.
   observable_distinction: Requirements and objectives constrain their prose, query bounds use semantic JSON equality, required observations cannot disappear behind completed results, and installed Vellis preserves snapshot recovery.
-  lifecycle: active
+  lifecycle: ready
   approval:
     status: accepted
     reason: The approved plan must be bound to a durable awaiting-approval checkpoint before execution.
     checkpoint: git:90daeb0effc79e9a9a8ab8bfa64d8f701b5c15c0
   blocker: null
-  checkpoint: git:7961c5159f8b0a1748ca36105b42a258b23b0c2e
+  checkpoint: git:80718765c5185f586c586cf0d2d82bbb69d6ca9a
 baselines:
   status: current
   source: &source
@@ -20,16 +20,16 @@ baselines:
     checkpoint: git:5d33c6ef405aa8efa1a54de81d7e9427aa9e1850
   target: &target
     model: sha256:adf05b52f9839b75f76240ee116c0ffba7ee452602c2083268d683c4b534b2c7
-    implementation: git:7961c5159f8b0a1748ca36105b42a258b23b0c2e
+    implementation: git:80718765c5185f586c586cf0d2d82bbb69d6ca9a
     language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
     execution_environment: sha256:d71473693aa50faef1a25a449aa5808490e21eaf2a987942d1fb134c773550d1
-    checkpoint: git:7961c5159f8b0a1748ca36105b42a258b23b0c2e
+    checkpoint: git:80718765c5185f586c586cf0d2d82bbb69d6ca9a
   observed:
     model: sha256:adf05b52f9839b75f76240ee116c0ffba7ee452602c2083268d683c4b534b2c7
-    implementation: git:7961c5159f8b0a1748ca36105b42a258b23b0c2e
+    implementation: git:80718765c5185f586c586cf0d2d82bbb69d6ca9a
     language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
     execution_environment: sha256:d71473693aa50faef1a25a449aa5808490e21eaf2a987942d1fb134c773550d1
-    checkpoint: git:7961c5159f8b0a1748ca36105b42a258b23b0c2e
+    checkpoint: git:80718765c5185f586c586cf0d2d82bbb69d6ca9a
 scope:
   authority_scope:
     - RTG::'JSON Value'
@@ -142,9 +142,9 @@ findings:
     consequence: The supported importer exists, but an owner may conclude recovery required a pre-upgrade export.
     authority_refs: [VellisRequirements::v1SnapshotCompatibility, VellisRequirements::simpleIndividualOperation]
     evidence_refs: [path:README.md#implementation-status]
-    disposition: plan-change
+    disposition: resolved
     owner_work_item_id: W005
-    implementation_status: partial
+    implementation_status: conforming
     nearest_wrong_system: Correct import behavior is documented as though unsupported raw conversion or pre-upgrade export were required.
     compatibility_effect: A v1.0 fixture and post-upgrade runbook evidence the accepted snapshot-to-new-lineage path.
   - id: F009
@@ -188,7 +188,9 @@ decisions:
     owner_work_item_id: W005
     evidence_intent: [A v1.0 export preserves representable meaning and reports every simplification or omission.]
     implementation_status: conforming
-    evidence_refs: [path:tests/vellis/test_v1_streaming.py#test_setup_imports_v1_through_normalized_temporary_sqlite]
+    evidence_refs:
+      - path:tests/vellis/test_v1_streaming.py#test_representative_v1_export_reports_every_unrepresentable_refinement
+      - path:tests/vellis/test_v1_streaming.py#test_representative_v1_export_preserves_graph_and_starts_one_new_lineage
   - id: D004
     summary: Freeze the reviewed installable candidate at version 2.0.0 before merge.
     authority_refs: [VellisRequirements::simpleIndividualOperation]
@@ -312,17 +314,20 @@ work_items:
     nearest_wrong_system: Import works but guidance implies pre-upgrade-only export or raw migration.
     compatibility_effect: A fixture and runbook evidence the accepted path.
     non_effects: [No raw v1 reader is added., Real owner data and clients remain untouched.]
-    lifecycle: active
-    implementation_status: partial
-    evidence_refs: []
+    lifecycle: complete
+    implementation_status: conforming
+    evidence_refs:
+      - path:README.md#v1-upgrade-and-recovery
+      - path:tests/vellis/test_v1_streaming.py#test_representative_v1_export_reports_every_unrepresentable_refinement
+      - path:tests/vellis/test_v1_streaming.py#test_representative_v1_export_preserves_graph_and_starts_one_new_lineage
     blocker: null
-    checkpoint: null
+    checkpoint: git:80718765c5185f586c586cf0d2d82bbb69d6ca9a
   - id: W006
     order: 6
     label: Integrate evidence and close the Vellis 2.0 candidate
     kind: closure
     dependencies: [W002, W003, W004, W005]
-    planned_baseline: {dimension: implementation, identity: git:5d33c6ef405aa8efa1a54de81d7e9427aa9e1850}
+    planned_baseline: {dimension: implementation, identity: git:80718765c5185f586c586cf0d2d82bbb69d6ca9a}
     finding_ids: [F009]
     decision_ids: []
     authority:
@@ -333,7 +338,7 @@ work_items:
     nearest_wrong_system: Source checks pass while semantic or built-artifact behavior is broken.
     compatibility_effect: CI and release evidence become stricter.
     non_effects: [No release is merged or published., User data and clients remain untouched.]
-    lifecycle: pending
+    lifecycle: ready
     implementation_status: partial
     evidence_refs: []
     blocker: null
