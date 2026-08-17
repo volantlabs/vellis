@@ -3,13 +3,13 @@ evolution:
   id: vellis-2-prerelease-remediation
   objective: Formalize accepted obligations and restore semantic, observational, compatibility, and installable release integrity for Vellis 2.0.
   observable_distinction: Requirements and objectives constrain their prose, query bounds use semantic JSON equality, required observations cannot disappear behind completed results, and installed Vellis preserves snapshot recovery.
-  lifecycle: active
+  lifecycle: ready
   approval:
     status: accepted
     reason: The approved plan must be bound to a durable awaiting-approval checkpoint before execution.
     checkpoint: git:90daeb0effc79e9a9a8ab8bfa64d8f701b5c15c0
   blocker: null
-  checkpoint: git:e29c5d1c31472385843c940995e07b5a31e5752e
+  checkpoint: git:7961c5159f8b0a1748ca36105b42a258b23b0c2e
 baselines:
   status: current
   source: &source
@@ -20,11 +20,16 @@ baselines:
     checkpoint: git:5d33c6ef405aa8efa1a54de81d7e9427aa9e1850
   target: &target
     model: sha256:adf05b52f9839b75f76240ee116c0ffba7ee452602c2083268d683c4b534b2c7
-    implementation: git:e29c5d1c31472385843c940995e07b5a31e5752e
+    implementation: git:7961c5159f8b0a1748ca36105b42a258b23b0c2e
     language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
-    execution_environment: sha256:50d4f5cf86c91d1ab613cd7ea017a88fe5127ca1c25b118033c6548591d4349f
-    checkpoint: git:e29c5d1c31472385843c940995e07b5a31e5752e
-  observed: *target
+    execution_environment: sha256:d71473693aa50faef1a25a449aa5808490e21eaf2a987942d1fb134c773550d1
+    checkpoint: git:7961c5159f8b0a1748ca36105b42a258b23b0c2e
+  observed:
+    model: sha256:adf05b52f9839b75f76240ee116c0ffba7ee452602c2083268d683c4b534b2c7
+    implementation: git:7961c5159f8b0a1748ca36105b42a258b23b0c2e
+    language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
+    execution_environment: sha256:d71473693aa50faef1a25a449aa5808490e21eaf2a987942d1fb134c773550d1
+    checkpoint: git:7961c5159f8b0a1748ca36105b42a258b23b0c2e
 scope:
   authority_scope:
     - RTG::'JSON Value'
@@ -126,9 +131,9 @@ findings:
     consequence: Isolated locked invocation fails before setup, serving, recovery, or actionable guidance is reachable.
     authority_refs: [VellisRequirements::simpleIndividualOperation]
     evidence_refs: [command:uv run pytest tests/test_repository_policy.py -q]
-    disposition: implementation-work
+    disposition: resolved
     owner_work_item_id: W004
-    implementation_status: conflicting
+    implementation_status: conforming
     nearest_wrong_system: Source modules pass while the installed v1 command identities cannot import or dispatch v2.
     compatibility_effect: Both executable names dispatch an installable 2.0.0 owner command surface.
   - id: F008
@@ -191,8 +196,8 @@ decisions:
     reversible: true
     owner_work_item_id: W004
     evidence_intent: [Built metadata, imported version, lock, and commands agree on 2.0.0.]
-    implementation_status: not evaluated
-    evidence_refs: []
+    implementation_status: conforming
+    evidence_refs: [command:just package-check]
 work_items:
   - id: W001
     order: 1
@@ -284,17 +289,19 @@ work_items:
     nearest_wrong_system: Source modules work while installed commands do not.
     compatibility_effect: Both former executables dispatch v2 setup, preserve, restore, and serving.
     non_effects: [FastMCP pins and MCP contract remain unchanged., Packaging selects no remote deployment.]
-    lifecycle: active
-    implementation_status: conflicting
-    evidence_refs: []
+    lifecycle: complete
+    implementation_status: conforming
+    evidence_refs:
+      - command:just package-check
+      - path:tests/test_repository_policy.py#test_release_metadata_restores_installable_package_and_legacy_commands
     blocker: null
-    checkpoint: null
+    checkpoint: git:7961c5159f8b0a1748ca36105b42a258b23b0c2e
   - id: W005
     order: 5
     label: Make v1 snapshot recovery and guidance reproducible
     kind: integration
     dependencies: [W004]
-    planned_baseline: {dimension: implementation, identity: git:5d33c6ef405aa8efa1a54de81d7e9427aa9e1850}
+    planned_baseline: {dimension: implementation, identity: git:7961c5159f8b0a1748ca36105b42a258b23b0c2e}
     finding_ids: [F008]
     decision_ids: [D003]
     authority:
@@ -305,7 +312,7 @@ work_items:
     nearest_wrong_system: Import works but guidance implies pre-upgrade-only export or raw migration.
     compatibility_effect: A fixture and runbook evidence the accepted path.
     non_effects: [No raw v1 reader is added., Real owner data and clients remain untouched.]
-    lifecycle: pending
+    lifecycle: ready
     implementation_status: partial
     evidence_refs: []
     blocker: null
