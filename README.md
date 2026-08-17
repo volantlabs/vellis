@@ -191,8 +191,8 @@ Use these words precisely:
   definitions, delta, revision, and canonical history where they were. The owner-only operations —
   activity retention, snapshots, the recovery check, and restoration — are verified at the system
   boundary that realizes them. Preserving a snapshot has the owner-facing
-  `uv run python -m vellis.preserve --out FILE` command because that document is one of the inputs
-  setup takes; restoration has `uv run python -m vellis restore --revision REVISION` (or `--time`)
+  `vellis preserve --out FILE` command because that document is one of the inputs
+  setup takes; restoration has `vellis restore --revision REVISION` (or `--time`)
   and confirms before committing the selected historical state forward. Support for incremental
   owner-visible improvement analysis is verified the same way: an externally scheduled agent reads
   explicit bounded intervals of both ledgers, discovers the vocabulary those states had, asks
@@ -228,7 +228,7 @@ Use these words precisely:
   history and the observational ledger. Forgetting activity removes those records but does not
   promise file-page reclamation. No numerical latency, startup, throughput, or storage budget is
   claimed without representative hardware and owner data.
-- **Runnable.** `uv run python -m vellis.setup` prepares one local system. It previews the
+- **Runnable.** The installable `vellis setup` command prepares one local system. It previews the
   destination and, unless it can already see that the destination will not do, offers both starting
   vocabularies with the Everyday Life starter preselected. It asks for confirmation, and accepts
   `--data-dir`, `--vocabulary`, `--yes`, and a no-effect `--dry-run` that still reports a
@@ -238,7 +238,7 @@ Use these words precisely:
   begins from a Vellis v1 JSON system
   snapshot instead, and `--from-snapshot` from a Vellis canonical snapshot document — a complete
   capture with an optional later ledger tail, which
-  `uv run python -m vellis.preserve --out FILE` writes from an established system, leaving its
+  `vellis preserve --out FILE` writes from an established system, leaving its
   canonical memory and revision where they were and recording the capture in its activity history.
   Each carries its own vocabulary, so passing `--vocabulary` as well
   is refused rather than ignored, and only one starting input may be given; each is read again at
@@ -247,7 +247,7 @@ Use these words precisely:
   that is the revision the captured state reached rather than zero. Setup stores memory under
   `VELLIS_DATA_DIR` when that is set and otherwise under the platform's user-data location, and
   never writes to this repository's ignored `.data/`.
-  `uv run python -m vellis` then serves that memory over local standard input and output; pointed at
+  `vellis serve` then serves that memory over local standard input and output; pointed at
   a destination holding no established memory it refuses rather than creating one, and a client that
   cannot start it is told which stage failed, that established memory is unchanged, and what to do
   next, in the same shape setup uses. Both commands
@@ -258,7 +258,40 @@ Use these words precisely:
   user-scoped Codex and Claude Code
   entries only through their public CLIs. Matching entries are no-ops; differing entries require
   explicit replacement; and an unavailable client reports a platform-correct copyable fallback
-  without undoing initialized memory.
+  without undoing initialized memory. `vellis-rtg-knowledge-graph` remains an executable alias,
+  `serve-mcp` remains a command alias for `serve`, and the existing `python -m vellis`,
+  `python -m vellis.setup`, and `python -m vellis.preserve` forms remain operational.
+
+### V1 upgrade and recovery
+
+A complete v1 JSON snapshot can be exported after installing Vellis 2.0.0. The old directory stays
+where it is and is never opened by v2. Run the tagged v1.0 code in a separate checkout and environment,
+point that process at the old directory, and use its public `rtg_export_system_snapshot` MCP tool:
+
+```sh
+git clone --branch v1.0 --single-branch https://github.com/volantlabs/vellis.git /tmp/vellis-v1
+uv --directory /tmp/vellis-v1 sync --locked
+uv --directory /tmp/vellis-v1 run vellis serve-mcp --data-dir /absolute/path/to/old-v1-data
+```
+
+From an MCP client connected to that process, call `rtg_export_system_snapshot` with
+`{"summary": false}` and save the returned `result` object—the object containing `graph`, `schema`,
+`constraints`, and `migration`—as one JSON file. Stop the v1 process, then preview and establish a
+separate v2 destination:
+
+```sh
+vellis setup --data-dir /absolute/path/to/new-v2-data \
+  --from-v1 /absolute/path/to/v1-system-snapshot.json --dry-run
+vellis setup --data-dir /absolute/path/to/new-v2-data \
+  --from-v1 /absolute/path/to/v1-system-snapshot.json
+```
+
+Setup reports every preserved, simplified, omitted, or blocking translation before confirmation.
+Representable live graph content is preserved exactly; non-live content, v1 history, and rules v2
+cannot express are reported rather than silently approximated. The accepted snapshot creates one new
+v2 canonical lineage at revision 0. Raw v1 storage, same-directory replacement, v1 ledger-history
+import, and in-place conversion are intentionally unsupported. Keep the old directory and snapshot
+until the new system has been inspected and independently backed up.
 - **Runnable and live-closed.** Closure reran the exact authorized no-op dry run and reread both
   matching entries. Codex desktop exercised all ten public tools in one owner scenario and restored
   the starter vocabulary with an empty conforming graph and no staged proposal. Claude Code
@@ -269,9 +302,11 @@ Use these words precisely:
   fallback commands for unavailable clients. FastMCP and FastMCP Slim are pinned at 4.0.0b1 and
   installed.
 
-Deployment realization remains open. This unreleased build intentionally starts a fresh normalized
-schema-version-5 store and refuses unsupported prototype schema versions rather than migrating them;
-it never inspects or changes this repository's ignored `.data/` content during development. The
+Vellis 2.0.0 is packaged as a wheel and source distribution with both released executable names.
+Deployment, remote hosting, authentication, and plugin packaging remain open. This release starts a
+fresh normalized schema-version-5 store and refuses unsupported prototype schema versions rather
+than migrating them; it never inspects or changes this repository's ignored `.data/` content during
+development. The
 initial contract assumes one trusted
 owner-configured client; its tools do not implement per-call authorization or decide owner approval.
 See [CONTRIBUTING.md](CONTRIBUTING.md) for the contribution workflow.

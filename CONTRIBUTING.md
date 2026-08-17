@@ -10,6 +10,7 @@ Requires `uv`, `just`, and `git`.
 ```sh
 just setup
 just model-setup
+just package-check
 just check
 ```
 
@@ -105,8 +106,10 @@ sit between that checkpoint and closure.
    semantic identity joins before value filtering and stop at the modeled bound, explicit broad checks
    remain bounded-memory, and lifecycle work streams. Do not claim numerical performance satisfaction
    before representative budgets exist.
-   Treat Vellis v1 compatibility as confirmed first-use initialization from one complete JSON snapshot,
-   never as an existing-system merge or adoption of v1 ledger history.
+   Treat Vellis v1 compatibility as confirmed first-use initialization from one complete JSON snapshot
+   into a separate v2 destination, never as an existing-system merge, raw-store adoption, same-directory
+   replacement, in-place conversion, or adoption of v1 ledger history. A post-upgrade recovery may run
+   tagged v1.0 in a separate environment against the untouched old directory to produce that snapshot.
 6. After focused evidence passes, freeze one state token and use fresh read-only agents for separate
    authority/conformance and engineering/evidence reviews. Checkpoint after one pair in which both
    lenses are clean and no substantive tracked or evidence state changes afterward. Prepare all
@@ -171,7 +174,8 @@ finding-bearing review history; completion claims remain checkpoint-specific.
 After the bookkeeping commit changes that token, the manager consumes the result and independently
 runs checkpoint validation; it does not rerun the pre-bookkeeping result check.
 The completed campaign's plan directly pins FastMCP and FastMCP Slim 4.0.0b1, selects local STDIO,
-and selected clean macOS onboarding through a documented Python setup path. The
+and selected clean macOS onboarding through a documented Python setup path. Vellis 2.0.0 now packages
+that path behind both released executable names while retaining the Python module forms. The
 pins, the STDIO boundary, and the setup path's three starting inputs — a confirmed fresh vocabulary,
 a canonical snapshot document, and a confirmed v1 snapshot — are implemented, and a client launching
 the server as a subprocess is exercised end to end, including the exact command an owner would

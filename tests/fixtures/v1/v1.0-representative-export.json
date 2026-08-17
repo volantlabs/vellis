@@ -1,0 +1,319 @@
+{
+  "graph": {
+    "anchors": [
+      {
+        "uuid": "person-1",
+        "type": "Person",
+        "display_name": "Ada",
+        "system": {"live": true, "origin": {"source": "v1.0", "ordinal": 1}}
+      },
+      {
+        "uuid": "place-1",
+        "type": "Place",
+        "display_name": "Home",
+        "system": {"live": true}
+      },
+      {
+        "uuid": "retired-1",
+        "type": "Retired",
+        "display_name": "Old place",
+        "system": {"live": false, "retired_reason": "fixture"}
+      }
+    ],
+    "data_objects": [
+      {
+        "uuid": "profile-1",
+        "type": "Profile",
+        "properties": {
+          "name": "Ada",
+          "score": 3.00,
+          "active": true,
+          "marker": null,
+          "nested": {"numbers": [3, 3.00], "flags": [true, null]},
+          "sequence": ["first", {"n": 3.00}],
+          "whole": 3,
+          "identifier": "123e4567-e89b-12d3-a456-426614174000",
+          "flexible": "stored as text",
+          "weird": "kept"
+        },
+        "system": {"live": true, "origin": "representative-v1-export"}
+      },
+      {
+        "uuid": "note-1",
+        "type": "Note",
+        "properties": {"title": "Home note"},
+        "system": {"live": true}
+      },
+      {
+        "uuid": "retired-data-1",
+        "type": "Note",
+        "properties": {"title": "Retired note"},
+        "system": {"live": false}
+      }
+    ],
+    "links": [
+      {
+        "uuid": "link-1",
+        "type": "lives_in",
+        "source_uuid": "person-1",
+        "target_uuid": "place-1",
+        "system": {"live": true, "confidence": 1.0}
+      },
+      {
+        "uuid": "retired-link-1",
+        "type": "lives_in",
+        "source_uuid": "person-1",
+        "target_uuid": "retired-1",
+        "system": {"live": false}
+      }
+    ],
+    "anchor_data_index": {
+      "person-1": ["profile-1", "retired-data-1"],
+      "place-1": ["note-1"],
+      "retired-1": ["note-1"]
+    }
+  },
+  "schema": {
+    "definitions": [
+      {
+        "uuid": "definition-person",
+        "kind": "anchor",
+        "type_key": "Person",
+        "description": "A person.",
+        "payload": {
+          "required_data_types": ["Profile"],
+          "optional_data_types": ["Note"],
+          "ui_label": "People"
+        },
+        "system": {"live": true}
+      },
+      {
+        "uuid": "definition-place",
+        "kind": "anchor",
+        "type_key": "Place",
+        "description": "A place.",
+        "payload": {"optional_data_types": ["Note"]},
+        "system": {"live": true}
+      },
+      {
+        "uuid": "definition-retired",
+        "kind": "anchor",
+        "type_key": "Retired",
+        "description": "A retired type.",
+        "payload": {},
+        "system": {"live": false}
+      },
+      {
+        "uuid": "definition-profile",
+        "kind": "data_object",
+        "type_key": "Profile",
+        "description": "A person's profile.",
+        "payload": {
+          "properties": {
+            "active": {
+              "required": true,
+              "value_kinds": ["boolean"],
+              "description": "Whether the profile is active."
+            },
+            "flexible": {
+              "required": true,
+              "value_kinds": ["string", "number"],
+              "description": "A v1 union narrowed by stored content."
+            },
+            "identifier": {
+              "required": true,
+              "value_kinds": ["uuid"],
+              "description": "A v1 UUID refinement."
+            },
+            "marker": {
+              "required": true,
+              "value_kinds": ["null"],
+              "description": "A null marker."
+            },
+            "name": {
+              "required": true,
+              "value_kinds": ["string"],
+              "allowed_values": ["Ada", "Grace"],
+              "pattern": "^A",
+              "description": "The person's name."
+            },
+            "nested": {
+              "required": true,
+              "value_kinds": ["object"],
+              "description": "Nested JSON content."
+            },
+            "score": {
+              "required": true,
+              "value_kinds": ["number"],
+              "minimum": 0,
+              "maximum": 5,
+              "allowed_values": [3, 3.00, 4],
+              "description": "A bounded exact score."
+            },
+            "sequence": {
+              "required": true,
+              "value_kinds": ["list"],
+              "description": "Nested array content."
+            },
+            "unused": {
+              "required": false,
+              "value_kinds": ["string", "number"],
+              "description": "An unused union rule."
+            },
+            "weird": {
+              "required": true,
+              "value_kinds": ["string"],
+              "format": "email",
+              "description": "A field with an unsupported refinement."
+            },
+            "whole": {
+              "required": true,
+              "value_kinds": ["integer"],
+              "description": "A v1 integer refinement."
+            }
+          }
+        },
+        "system": {"live": true}
+      },
+      {
+        "uuid": "definition-note",
+        "kind": "data_object",
+        "type_key": "Note",
+        "description": "A note.",
+        "payload": {
+          "properties": {
+            "title": {
+              "required": true,
+              "value_kinds": ["string"],
+              "description": "The note title."
+            }
+          }
+        },
+        "system": {"live": true}
+      },
+      {
+        "uuid": "definition-link",
+        "kind": "link",
+        "type_key": "lives_in",
+        "description": "A person lives in a place.",
+        "payload": {
+          "allowed_source_types": ["Person"],
+          "allowed_target_types": ["Place", "Retired"],
+          "transitive": false
+        },
+        "system": {"live": true}
+      }
+    ]
+  },
+  "constraints": {
+    "constraints": [
+      {
+        "uuid": "constraint-profile-count",
+        "kind": "cardinality",
+        "display_name": "one profile per person",
+        "description": "Each person has exactly one profile.",
+        "payload": {
+          "query_spec": {
+            "anchor_buckets": [{"name": "person", "anchor_type_keys": ["Person"]}],
+            "data_requirements": [
+              {
+                "name": "profile",
+                "anchor_bucket": "person",
+                "data_type_key": "Profile",
+                "required": false
+              }
+            ]
+          },
+          "counted_binding": "profile",
+          "group_by_bindings": ["person"],
+          "minimum": 1,
+          "maximum": 1
+        },
+        "system": {"live": true}
+      },
+      {
+        "uuid": "constraint-outgoing-link-count",
+        "kind": "cardinality",
+        "display_name": "one home per person",
+        "description": "Each person has one outgoing lives-in link.",
+        "payload": {
+          "query_spec": {
+            "anchor_buckets": [
+              {"name": "person", "anchor_type_keys": ["Person"]},
+              {"name": "place", "anchor_type_keys": ["Place"]}
+            ],
+            "link_requirements": [
+              {
+                "name": "home",
+                "source_bucket": "person",
+                "target_bucket": "place",
+                "link_type_keys": ["lives_in"],
+                "required": false
+              }
+            ]
+          },
+          "counted_binding": "home",
+          "group_by_bindings": ["person"],
+          "minimum": 1,
+          "maximum": 1
+        },
+        "system": {"live": true}
+      },
+      {
+        "uuid": "constraint-incoming-link-count",
+        "kind": "cardinality",
+        "display_name": "homes have residents",
+        "description": "A place has at most two incoming lives-in links.",
+        "payload": {
+          "query_spec": {
+            "anchor_buckets": [
+              {"name": "person", "anchor_type_keys": ["Person"]},
+              {"name": "place", "anchor_type_keys": ["Place"]}
+            ],
+            "link_requirements": [
+              {
+                "name": "home",
+                "source_bucket": "person",
+                "target_bucket": "place",
+                "link_type_keys": ["lives_in"],
+                "required": false
+              }
+            ]
+          },
+          "counted_binding": "home",
+          "group_by_bindings": ["place"],
+          "minimum": 1,
+          "maximum": 2
+        },
+        "system": {"live": true}
+      },
+      {
+        "uuid": "constraint-query-pattern",
+        "kind": "query_pattern",
+        "display_name": "query-only rule",
+        "description": "A v1-only query result rule.",
+        "payload": {"minimum_matches": 1},
+        "system": {"live": true}
+      },
+      {
+        "uuid": "constraint-unknown",
+        "kind": "future_constraint",
+        "display_name": "future rule",
+        "payload": {"future": true},
+        "system": {"live": true}
+      },
+      {
+        "uuid": "constraint-retired",
+        "kind": "query_pattern",
+        "display_name": "retired rule",
+        "payload": {},
+        "system": {"live": false}
+      }
+    ]
+  },
+  "migration": {
+    "migrations": [
+      {"uuid": "migration-1", "description": "Prior v1 history is intentionally omitted."}
+    ]
+  }
+}

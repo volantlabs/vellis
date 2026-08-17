@@ -106,7 +106,8 @@ extension rather than a current capability gap.
 
 ## Local setup path
 
-The campaign selects a Python setup program as the primary local onboarding path, with the
+The campaign selects a Python setup program as the primary local onboarding path, packaged as
+`vellis setup` and still available as `python -m vellis.setup`, with the
 repository README pointing both agents and developers to it. It previews every effect and confirms
 before applying it, and complete non-interactive arguments plus `--yes` support agent-driven setup;
 `--dry-run` changes nothing.
@@ -124,6 +125,11 @@ anything in this repository. Whichever way that happens, it goes through the pub
 `claude mcp` commands and never edits a configuration file directly, a matching `vellis` entry is a
 no-op, a differing entry is replaced only deliberately, and client tool approval settings stay
 entirely client-owned.
+
+The installed `vellis serve` command and `vellis-rtg-knowledge-graph` executable alias reach the
+same STDIO boundary. `vellis serve-mcp` is retained as a command alias, and a bare `vellis` invocation
+continues to serve for existing registrations. Packaging does not select remote hosting,
+authentication, deployment, or plugin packaging; those remain outside the contract.
 
 The selected owner of this behavior is the setup program. Repeating `--client codex` or
 `--client claude` selects either or both clients; omitting `--client` selects neither. Setup previews
@@ -144,9 +150,10 @@ left revision 8 conforming with no staged proposal. Claude Code completed a boun
 the reproducible project boundary, setup, persistence, inventory, registration, and dry-run evidence
 to close A017, D006, and the runnable campaign boundary without changing client approval policy.
 
-The commands below are a fallback when a supported client CLI is unavailable, not the selected
-primary workflow. Establish a system first with
-`uv run python -m vellis.setup`, then, with `VELLIS` standing for the absolute path of this clone:
+The commands below are a source-checkout fallback when a supported client CLI is unavailable, not
+the selected primary workflow. An installed artifact can instead register `vellis serve`. For the
+checkout form, establish a system first with `vellis setup` (or `uv run python -m vellis.setup`),
+then, with `VELLIS` standing for the absolute path of this clone:
 
 ```sh
 VELLIS=/absolute/path/to/this/clone

@@ -5,15 +5,26 @@ from __future__ import annotations
 import io
 import json
 import tracemalloc
+from decimal import Decimal
 from pathlib import Path
 
 import pytest
 
 from tests.vellis.oracle import materialize_state
+from vellis.definitions import (
+    DirectAssociationMultiplicityConstraint,
+    LinkEnd,
+    LinkMultiplicityConstraint,
+)
+from vellis.json_value import JsonKind, normalize
 from vellis.setup import EXIT_FAILED, EXIT_SUCCESS, main
 from vellis.store import CanonicalStore
-from vellis.v1 import SnapshotError
+from vellis.v1 import RecoveryDisposition, SnapshotError
 from vellis.v1_streaming import preview_v1_stream
+
+REPRESENTATIVE_V1_EXPORT = (
+    Path(__file__).resolve().parents[1] / "fixtures" / "v1" / "v1.0-representative-export.json"
+)
 
 
 def _snapshot() -> dict[str, object]:
@@ -121,6 +132,145 @@ def test_setup_imports_v1_through_normalized_temporary_sqlite(tmp_path: Path) ->
         assert {value.uuid for value in state.graph.objects()} == {"a1", "a2", "d1", "l1"}
         assert store.canonical_record_count() == 1
         assert store.verify_projection_from_ledger() == ()
+    finally:
+        store.close()
+
+
+def test_representative_v1_export_reports_every_unrepresentable_refinement() -> None:
+    """The frozen v1.0 codec-shaped fixture spans every supported definition/count form."""
+    preview = preview_v1_stream(REPRESENTATIVE_V1_EXPORT)
+
+    assert preview.is_acceptable
+    assert (
+        preview.anchor_count,
+        preview.data_count,
+        preview.link_count,
+        preview.anchor_type_count,
+        preview.data_type_count,
+        preview.link_type_count,
+    ) == (2, 2, 1, 2, 2, 1)
+    dispositions = {finding.disposition for finding in preview.findings}
+    assert dispositions == {
+        RecoveryDisposition.PRESERVED,
+        RecoveryDisposition.SIMPLIFIED,
+        RecoveryDisposition.OMITTED,
+    }
+    report = "\n".join(finding.summary for finding in preview.findings)
+    for expected in (
+        "non-live anchor retired-1 is not imported",
+        "non-live associated-data object retired-data-1 is not imported",
+        "non-live link retired-link-1 is not imported",
+        "Profile.flexible allowed 2 value kinds",
+        "Profile.identifier was a v1 uuid",
+        "Profile.unused allowed several value kinds",
+        "Profile.weird had a v1 format rule",
+        "Profile.whole was a v1 integer",
+        "query-pattern constraint query-only rule",
+        "future_constraint",
+        "1 v1 migration records",
+        "v1 link type lives_in named types no live v1 definition describes",
+    ):
+        assert expected in report
+
+
+def test_representative_v1_export_preserves_graph_and_starts_one_new_lineage(
+    tmp_path: Path,
+) -> None:
+    destination = tmp_path / "vellis-2"
+    code, _out, error = _run(
+        ["--data-dir", str(destination), "--from-v1", str(REPRESENTATIVE_V1_EXPORT), "--yes"]
+    )
+
+    assert code == EXIT_SUCCESS, error
+    store = CanonicalStore(destination / "vellis.sqlite3")
+    try:
+        state = materialize_state(store)
+        assert state.revision == 0
+        assert store.canonical_record_count() == 1
+        assert store.verify_projection_from_ledger() == ()
+        assert {value.uuid for value in state.graph.objects()} == {
+            "person-1",
+            "place-1",
+            "profile-1",
+            "note-1",
+            "link-1",
+        }
+
+        person = state.graph.anchor("person-1")
+        profile = state.graph.associated_data_object("profile-1")
+        note = state.graph.associated_data_object("note-1")
+        link = state.graph.link("link-1")
+        assert person is not None and profile is not None and note is not None and link is not None
+        assert person.display_name == "Ada"
+        assert person.system_metadata.members == normalize(
+            {"live": True, "origin": {"source": "v1.0", "ordinal": 1}}
+        )
+        assert profile.anchor_uuids == ("person-1",)
+        assert note.anchor_uuids == ("place-1",)
+        assert profile.properties == normalize(
+            {
+                "name": "Ada",
+                "score": Decimal("3.00"),
+                "active": True,
+                "marker": None,
+                "nested": {"numbers": [3, Decimal("3.00")], "flags": [True, None]},
+                "sequence": ["first", {"n": Decimal("3.00")}],
+                "whole": 3,
+                "identifier": "123e4567-e89b-12d3-a456-426614174000",
+                "flexible": "stored as text",
+                "weird": "kept",
+            }
+        )
+        assert (link.source_uuid, link.target_uuid) == ("person-1", "place-1")
+
+        definitions = state.active_definitions
+        assert {value.type_key for value in definitions.anchor_types} == {"Person", "Place"}
+        assert {value.type_key for value in definitions.associated_data_types} == {
+            "Profile",
+            "Note",
+        }
+        profile_type = definitions.associated_data_type("Profile")
+        link_type = definitions.link_type("lives_in")
+        assert profile_type is not None and link_type is not None
+        rules = {rule.property_name: rule for rule in profile_type.property_constraints}
+        assert rules.keys() == {
+            "active",
+            "flexible",
+            "identifier",
+            "marker",
+            "name",
+            "nested",
+            "score",
+            "sequence",
+            "weird",
+            "whole",
+        }
+        assert rules["nested"].json_kind is JsonKind.OBJECT
+        assert rules["sequence"].json_kind is JsonKind.ARRAY
+        assert rules["whole"].json_kind is JsonKind.NUMBER
+        assert rules["identifier"].json_kind is JsonKind.STRING
+        assert rules["score"].value_range is not None
+        assert rules["score"].value_range.permitted_values == (
+            Decimal("3"),
+            Decimal("4"),
+        )
+        assert link_type.endpoint_constraint.permitted_source_type_keys == ("Person",)
+        assert link_type.endpoint_constraint.permitted_target_type_keys == ("Place",)
+
+        association_counts = [
+            value
+            for value in definitions.relationship_constraints
+            if isinstance(value, DirectAssociationMultiplicityConstraint)
+        ]
+        link_counts = [
+            value
+            for value in definitions.relationship_constraints
+            if isinstance(value, LinkMultiplicityConstraint)
+        ]
+        assert [(value.lower_bound, value.upper_bound) for value in association_counts] == [(1, 1)]
+        assert {
+            value.constrained_end: (value.lower_bound, value.upper_bound) for value in link_counts
+        } == {LinkEnd.SOURCE: (1, 1), LinkEnd.TARGET: (0, 2)}
     finally:
         store.close()
 
