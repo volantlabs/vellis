@@ -2,8 +2,8 @@ schema_version: "1.0"
 evolution:
   id: callable-tool-surface-and-value-fidelity
   objective: Close pre-release boundary, campaign-handoff, and public-guidance findings without changing accepted system meaning.
-  observable_distinction: Snapshot publication never replaces another name, every owner-facing failure reports its true operation and complete known state effect, every campaign result is bound to current work, and security, query, graph-preview, and definition-edit guidance match the runnable local surface.
-  lifecycle: complete
+  observable_distinction: Snapshot publication never replaces another name, every owner-facing failure reports its true operation and complete known state effect, every campaign result is bound to current work, CI can reconstruct durable checkpoint evidence, and security, query, graph-preview, and definition-edit guidance match the runnable local surface.
+  lifecycle: active
   approval:
     status: not-required
     reason: The new findings are implementation, workflow-validation, and documentation defects under unchanged accepted authority.
@@ -20,16 +20,16 @@ baselines:
     checkpoint: git:b519b400476d9bd364d1110a30c3d3120d8b457c
   target:
     model: sha256:30decc89ce67a19b2f9720028ffb3eb8161edf37affd11fa49b12179b3018d3e
-    implementation: git:b8a78cbbc996ef5ab2752c795e49d80c0a885804
+    implementation: git:c4bbf81c9e34c9b6b11fbd5763765c6e520e409b
     language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
     execution_environment: sha256:50d4f5cf86c91d1ab613cd7ea017a88fe5127ca1c25b118033c6548591d4349f
-    checkpoint: git:b8a78cbbc996ef5ab2752c795e49d80c0a885804
+    checkpoint: git:c4bbf81c9e34c9b6b11fbd5763765c6e520e409b
   observed:
     model: sha256:30decc89ce67a19b2f9720028ffb3eb8161edf37affd11fa49b12179b3018d3e
-    implementation: git:b8a78cbbc996ef5ab2752c795e49d80c0a885804
+    implementation: git:c4bbf81c9e34c9b6b11fbd5763765c6e520e409b
     language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
     execution_environment: sha256:50d4f5cf86c91d1ab613cd7ea017a88fe5127ca1c25b118033c6548591d4349f
-    checkpoint: git:b8a78cbbc996ef5ab2752c795e49d80c0a885804
+    checkpoint: git:c4bbf81c9e34c9b6b11fbd5763765c6e520e409b
 scope:
   authority_scope:
     - VellisRequirements::mcpAgentToolContract
@@ -76,6 +76,8 @@ scope:
     - CONTRIBUTING.md
     - .agents/skills/sysml-implementation-campaign/SKILL.md
     - .agents/skills/sysml-implementation-campaign/references/campaign-supervision.md
+    - .github/workflows/check.yml
+    - tests/test_repository_policy.py
   review_lenses:
     - authority and conformance
     - engineering and evidence
@@ -644,6 +646,20 @@ findings:
     implementation_status: conforming
     nearest_wrong_system: Keyed definition staging correctly replaces one complete type while public discovery leaves the caller to guess whether omitted members are retained or removed.
     compatibility_effect: Advisory description only; definition semantics, tool names, request schemas, active state, and prospective state are unchanged.
+  - id: F039
+    summary: CI fetched only the synthetic pull-request tip while campaign validation requires historical checkpoint commits.
+    classification: plan gap
+    consequence: The required repository check rejects a conforming pre-release candidate because durable campaign evidence cannot be reconstructed from a one-commit checkout, so review readiness depends on local history that CI was never given.
+    authority_refs:
+      - AGENTS.md
+      - CONTRIBUTING.md
+    evidence_refs:
+      - command:just implementation-campaign-check
+    disposition: implementation-work
+    owner_work_item_id: W010
+    implementation_status: conflicting
+    nearest_wrong_system: The same complete check passes in a full local clone while the required CI job fails before tests because checkout depth hides every historical evidence checkpoint.
+    compatibility_effect: CI checkout history only; product behavior, model authority, dependencies, runtime configuration, and published interfaces are unchanged.
 decisions:
   - id: D001
     summary: Replace only self-reaching definitions with the permissive JSON value they stand for, then inline the rest, at the boundary that already owns the wire form.
@@ -1128,29 +1144,57 @@ work_items:
       - command:just check
     blocker: null
     checkpoint: git:b8a78cbbc996ef5ab2752c795e49d80c0a885804
+  - id: W010
+    order: 10
+    label: Make CI checkpoint evidence reconstructible
+    kind: implementation
+    dependencies: [W009]
+    planned_baseline:
+      dimension: implementation
+      identity: git:c4bbf81c9e34c9b6b11fbd5763765c6e520e409b
+    finding_ids: [F039]
+    decision_ids: []
+    authority:
+      - refs:
+          - AGENTS.md
+          - CONTRIBUTING.md
+        coverage: full
+        remaining_work_item_ids: []
+    approval:
+      status: not-required
+      reason: Existing repository rules already require CI to validate reconstructible campaign checkpoints; the checkout must supply the history that validation consumes.
+      checkpoint: null
+    nearest_wrong_system: CI invokes the complete project gate but supplies a repository view incapable of resolving the durable checkpoints that gate is required to validate.
+    compatibility_effect: The GitHub Actions checkout fetches history needed for validation; product behavior, dependencies, runtime state, and external configuration remain unchanged.
+    non_effects:
+      - No model, product implementation, persistence, MCP contract, dependency, or lock-file changes.
+      - Local check semantics and campaign checkpoint identities remain unchanged.
+      - User-owned data, external clients, and protected ignored files remain untouched.
+    lifecycle: active
+    implementation_status: partial
+    evidence_refs:
+      - command:uv run pytest tests/test_repository_policy.py -q
+      - command:just implementation-campaign-check
+      - command:just check
+    blocker: null
+    checkpoint: null
 closure:
-  finding_disposition: complete
+  finding_disposition: open
   model_status: accepted
-  implementation_status: conforming
-  integration_status: conforming
+  implementation_status: partial
+  integration_status: not evaluated
   external_status: not applicable
-  compatibility: Model, persistence, tool names, request schemas, and query meaning remain unchanged; failure reporting, campaign validation, and public guidance are stricter, while pypdf, basedpyright, and Ruff changes remain in the development toolchain.
+  compatibility: Model, persistence, tool names, request schemas, query meaning, and runtime behavior remain unchanged; public guidance and campaign validation are stricter, developer-tool changes remain toolchain-only, and CI gains the repository history required to reconstruct durable checkpoint evidence.
   reviews:
     - lens: authority and conformance
-      status: clean
-      reviewer: /root/final_authority_review
-      checkpoint: git:b8a78cbbc996ef5ab2752c795e49d80c0a885804
-      evidence_refs:
-        - command:just check
+      status: pending
+      reviewer: null
+      checkpoint: null
+      evidence_refs: []
     - lens: engineering and evidence
-      status: clean
-      reviewer: /root/final_engineering_review
-      checkpoint: git:b8a78cbbc996ef5ab2752c795e49d80c0a885804
-      evidence_refs:
-        - command:just check
-  evidence_refs:
-    - command:just model-check
-    - command:just implementation-campaign-check
-    - command:just system-evolution-check
-    - command:just check
-  checkpoint: git:b8a78cbbc996ef5ab2752c795e49d80c0a885804
+      status: pending
+      reviewer: null
+      checkpoint: null
+      evidence_refs: []
+  evidence_refs: []
+  checkpoint: null
