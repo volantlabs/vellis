@@ -3,13 +3,13 @@ evolution:
   id: vellis-2-prerelease-remediation
   objective: Formalize accepted obligations and restore semantic, observational, compatibility, and installable release integrity for Vellis 2.0.
   observable_distinction: Requirements and objectives constrain their prose, query bounds use semantic JSON equality, required observations cannot disappear behind completed results, and installed Vellis preserves snapshot recovery.
-  lifecycle: active
+  lifecycle: ready
   approval:
     status: accepted
     reason: The approved plan must be bound to a durable awaiting-approval checkpoint before execution.
     checkpoint: git:90daeb0effc79e9a9a8ab8bfa64d8f701b5c15c0
   blocker: null
-  checkpoint: git:9a446f6683787ae2b032f62652d087743fdd5d41
+  checkpoint: git:e29c5d1c31472385843c940995e07b5a31e5752e
 baselines:
   status: current
   source: &source
@@ -20,10 +20,10 @@ baselines:
     checkpoint: git:5d33c6ef405aa8efa1a54de81d7e9427aa9e1850
   target: &target
     model: sha256:adf05b52f9839b75f76240ee116c0ffba7ee452602c2083268d683c4b534b2c7
-    implementation: git:9a446f6683787ae2b032f62652d087743fdd5d41
+    implementation: git:e29c5d1c31472385843c940995e07b5a31e5752e
     language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
     execution_environment: sha256:50d4f5cf86c91d1ab613cd7ea017a88fe5127ca1c25b118033c6548591d4349f
-    checkpoint: git:9a446f6683787ae2b032f62652d087743fdd5d41
+    checkpoint: git:e29c5d1c31472385843c940995e07b5a31e5752e
   observed: *target
 scope:
   authority_scope:
@@ -104,9 +104,9 @@ findings:
     consequence: Reads and safely reported non-success outcomes can appear complete without mandatory activity evidence.
     authority_refs: [VellisRequirements::dualLedgerSeparation, VellisRequirements::mcpOutcomeIntegrity]
     evidence_refs: [path:tests/vellis/test_activity_history.py#test_a_broken_activity_ledger_cannot_break_the_operation_it_observes]
-    disposition: implementation-work
+    disposition: resolved
     owner_work_item_id: W003
-    implementation_status: conflicting
+    implementation_status: conforming
     nearest_wrong_system: A broken activity table leaves successful reads indistinguishable from fully observed operations.
     compatibility_effect: Observation-store faults surface as unexpected failures; normal completed outcomes are unchanged.
   - id: F006
@@ -115,9 +115,9 @@ findings:
     consequence: Failing closed can still replace the prior assessment although no completed validation result reaches the caller.
     authority_refs: [VellisRequirements::validationCoverage, VellisRequirements::dualLedgerSeparation, RTGSystem::'Assess graph conformance']
     evidence_refs: [path:tests/vellis/test_activity_history.py#test_a_non_conforming_graph_is_recorded_as_a_completed_assessment]
-    disposition: implementation-work
+    disposition: resolved
     owner_work_item_id: W003
-    implementation_status: conflicting
+    implementation_status: conforming
     nearest_wrong_system: Unexpected validation failure silently replaces the prior retrievable assessment.
     compatibility_effect: Assessment and activity publication become one observational transaction; schema and successful reports remain unchanged.
   - id: F007
@@ -172,8 +172,9 @@ decisions:
     reversible: true
     owner_work_item_id: W003
     evidence_intent: [Fault injection preserves the exact prior current assessment.]
-    implementation_status: not evaluated
-    evidence_refs: []
+    implementation_status: conforming
+    evidence_refs:
+      - path:tests/vellis/test_activity_history.py#test_validation_observation_failure_preserves_the_prior_assessment_atomically
   - id: D003
     summary: Preserve confirmed complete-v1-snapshot import as a new v2 lineage; reject raw and in-place migration scope.
     authority_refs: [VellisRequirements::v1SnapshotCompatibility]
@@ -257,17 +258,22 @@ work_items:
     nearest_wrong_system: A result lacks observation or failed validation replaces the prior assessment.
     compatibility_effect: Observation faults become unexpected; successful behavior and schema remain unchanged.
     non_effects: [Accepted canonical mutations gain no duplicate activity record., Observation cannot roll back canonical history.]
-    lifecycle: active
-    implementation_status: conflicting
-    evidence_refs: []
+    lifecycle: complete
+    implementation_status: conforming
+    evidence_refs:
+      - path:tests/vellis/test_activity_history.py#test_activity_append_failure_prevents_an_accepted_read_from_completing
+      - path:tests/vellis/test_activity_history.py#test_activity_append_failure_supersedes_a_safely_reportable_execution_failure
+      - path:tests/vellis/test_activity_history.py#test_validation_observation_failure_preserves_the_prior_assessment_atomically
+      - path:tests/vellis/test_cleanup_boundaries.py#test_preserve_observation_failure_publishes_no_snapshot_file
+      - path:tests/vellis/test_activity_history.py#test_a_broken_activity_ledger_cannot_break_the_operation_it_observes
     blocker: null
-    checkpoint: null
+    checkpoint: git:e29c5d1c31472385843c940995e07b5a31e5752e
   - id: W004
     order: 4
     label: Restore the installable Vellis 2.0 command boundary
     kind: implementation
     dependencies: [W001]
-    planned_baseline: {dimension: implementation, identity: git:5d33c6ef405aa8efa1a54de81d7e9427aa9e1850}
+    planned_baseline: {dimension: implementation, identity: git:e29c5d1c31472385843c940995e07b5a31e5752e}
     finding_ids: [F007]
     decision_ids: [D004]
     authority:
@@ -278,7 +284,7 @@ work_items:
     nearest_wrong_system: Source modules work while installed commands do not.
     compatibility_effect: Both former executables dispatch v2 setup, preserve, restore, and serving.
     non_effects: [FastMCP pins and MCP contract remain unchanged., Packaging selects no remote deployment.]
-    lifecycle: pending
+    lifecycle: ready
     implementation_status: conflicting
     evidence_refs: []
     blocker: null
