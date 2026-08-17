@@ -67,7 +67,7 @@ dev = [
     "pypdf>=6.15.0",
     "pytest>=8.0",
     "pyyaml>=6.0.3",
-    "ruff>=0.16.1",
+    "ruff>=0.16.3",
 ]
 
 [tool.basedpyright]
