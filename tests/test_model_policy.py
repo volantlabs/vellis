@@ -27,11 +27,15 @@ def test_named_objectives_and_requirement_usages_own_required_constraints() -> N
 package Example {
     requirement namedUsage : SomeRequirement {
         subject system : Anything;
-        require constraint { doc /* The subject shall behave. */ }
+        require constraint governingRule {
+            doc policyText locale "en" /* The subject shall behave. */
+        }
     }
     verification def NamedCase {
         objective demonstrateBehavior {
-            require constraint { doc /* Demonstrate the required behavior. */ }
+            require constraint governingRule {
+                doc <'OBJ'> 'policy text' /* Demonstrate the required behavior. */
+            }
         }
     }
 }
@@ -78,6 +82,54 @@ package Example {
     assert len(findings) == 4
     assert sum("no directly owned required constraint" in finding for finding in findings) == 2
     assert sum("outside a required constraint" in finding for finding in findings) == 2
+
+
+def test_identified_bare_docs_are_rejected_even_beside_empty_required_constraints() -> None:
+    source = """
+package Example {
+    requirement def IdentifiedRequirement {
+        doc policyText locale "en" /* The subject shall behave. */
+        require constraint emptyRule { }
+    }
+    verification def IdentifiedCase {
+        objective namedObjective {
+            doc <'OBJ'> 'policy text' /* Demonstrate the required behavior. */
+            require constraint emptyRule { }
+        }
+    }
+}
+"""
+    findings = policy_findings(Path("example.sysml"), source)
+    assert len(findings) == 2
+    assert all("outside a required constraint" in finding for finding in findings)
+
+
+def test_inherited_requirement_usage_needs_no_redundant_local_constraint() -> None:
+    source = """
+package Example {
+    requirement inheritedRequirement : SomeRequirement {
+        subject system : Anything;
+    }
+}
+"""
+    assert policy_findings(Path("example.sysml"), source) == ()
+
+
+def test_notes_and_strings_cannot_inject_phantom_normative_syntax() -> None:
+    source = '''
+package Example {
+    //*
+      requirement def Phantom { doc phantom braces }
+    */
+    requirement def RealRequirement {
+        require constraint governingRule {
+            "doc /* not documentation */";
+            doc actualDocumentation /* The subject shall behave. */
+        }
+    }
+}
+'''
+    assert policy_findings(Path("example.sysml"), source) == ()
 
 
 def test_bare_normative_docs_are_rejected_even_when_verify_is_present() -> None:

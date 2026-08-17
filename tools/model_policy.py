@@ -1,35 +1,34 @@
 from __future__ import annotations
 
-import re
 import sys
+from dataclasses import dataclass
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 MODEL_ROOT = ROOT / "model"
 
-_DECLARATION = re.compile(
-    r"(?P<requirement>\brequirement\s+(?P<definition>def\b)?[^;{}]*\{)"
-    r"|(?P<objective>\bobjective(?:\s+[^;{}]+)?\s*\{)"
-)
-_REQUIRED = re.compile(r"\brequire\s+constraint\s*\{")
-_DOC = re.compile(r"\bdoc\s*/\*")
+@dataclass(frozen=True)
+class _Token:
+    text: str
+    start: int
 
 
-def _mask_literals_and_comments(source: str) -> str:
-    """Preserve structural offsets while hiding braces in strings and comments."""
-    masked = list(source)
+def _tokens(source: str) -> tuple[_Token, ...]:
+    """Lex the structural subset needed for ownership without parsing model meaning."""
+    tokens: list[_Token] = []
     index = 0
     while index < len(source):
-        if source.startswith("//", index):
+        if source[index].isspace():
+            index += 1
+        elif source.startswith("//*", index):
+            end = source.find("*/", index + 3)
+            index = len(source) if end < 0 else end + 2
+        elif source.startswith("//", index):
             end = source.find("\n", index + 2)
-            end = len(source) if end < 0 else end
-            masked[index:end] = " " * (end - index)
-            index = end
+            index = len(source) if end < 0 else end
         elif source.startswith("/*", index):
             end = source.find("*/", index + 2)
-            end = len(source) if end < 0 else end + 2
-            masked[index:end] = " " * (end - index)
-            index = end
+            index = len(source) if end < 0 else end + 2
         elif source[index] in {'"', "'"}:
             quote = source[index]
             end = index + 1
@@ -41,62 +40,93 @@ def _mask_literals_and_comments(source: str) -> str:
                     break
                 else:
                     end += 1
-            masked[index:end] = " " * (end - index)
             index = end
+        elif source[index].isalpha() or source[index] == "_":
+            end = index + 1
+            while end < len(source) and (source[end].isalnum() or source[end] == "_"):
+                end += 1
+            tokens.append(_Token(source[index:end], index))
+            index = end
+        elif source[index] in "{};":
+            tokens.append(_Token(source[index], index))
+            index += 1
         else:
             index += 1
-    return "".join(masked)
+    return tuple(tokens)
 
 
-def _close_brace(masked: str, opening: int) -> int | None:
-    depth = 0
-    for index in range(opening, len(masked)):
-        if masked[index] == "{":
-            depth += 1
-        elif masked[index] == "}":
-            depth -= 1
-            if depth == 0:
-                return index
+def _closing_braces(tokens: tuple[_Token, ...]) -> dict[int, int]:
+    openings: list[int] = []
+    closings: dict[int, int] = {}
+    for index, token in enumerate(tokens):
+        if token.text == "{":
+            openings.append(index)
+        elif token.text == "}" and openings:
+            closings[openings.pop()] = index
+    return closings
+
+
+def _body_opening(tokens: tuple[_Token, ...], declaration: int) -> int | None:
+    for index in range(declaration + 1, len(tokens)):
+        if tokens[index].text == "{":
+            return index
+        if tokens[index].text == ";":
+            return None
     return None
 
 
-def _depth_at(masked: str, opening: int, position: int) -> int:
-    depth = 0
-    for character in masked[opening:position]:
-        if character == "{":
+def _body_depths(tokens: tuple[_Token, ...], opening: int, closing: int) -> dict[int, int]:
+    depth = 1
+    depths: dict[int, int] = {}
+    for index in range(opening + 1, closing):
+        depths[index] = depth
+        if tokens[index].text == "{":
             depth += 1
-        elif character == "}":
+        elif tokens[index].text == "}":
             depth -= 1
-    return depth
+    return depths
 
 
 def policy_findings(path: Path, source: str) -> tuple[str, ...]:
-    masked = _mask_literals_and_comments(source)
+    tokens = _tokens(source)
+    closings = _closing_braces(tokens)
     findings: list[str] = []
-    for declaration in _DECLARATION.finditer(masked):
-        opening = masked.find("{", declaration.start(), declaration.end())
-        closing = _close_brace(masked, opening)
-        line = source.count("\n", 0, declaration.start()) + 1
-        if declaration.group("objective") is not None:
+    for declaration, token in enumerate(tokens):
+        if token.text not in {"requirement", "objective"}:
+            continue
+        is_satisfaction = (
+            token.text == "requirement"
+            and declaration > 0
+            and tokens[declaration - 1].text == "satisfy"
+        )
+        if is_satisfaction:
+            continue
+        opening = _body_opening(tokens, declaration)
+        if opening is None:
+            continue
+        closing = closings.get(opening)
+        line = source.count("\n", 0, token.start) + 1
+        if token.text == "objective":
             label = "objective"
-        elif declaration.group("definition") is not None:
+        elif declaration + 1 < len(tokens) and tokens[declaration + 1].text == "def":
             label = "requirement definition"
         else:
             label = "requirement usage"
         if closing is None:
             findings.append(f"{path}:{line}: {label} has no closing brace")
             continue
+        depths = _body_depths(tokens, opening, closing)
         required = [
-            match
-            for match in _REQUIRED.finditer(masked, opening + 1, closing)
-            if _depth_at(masked, opening, match.start()) == 1
+            index
+            for index in range(opening + 1, closing)
+            if depths[index] == 1 and tokens[index].text == "require"
         ]
         bare_docs = [
-            match
-            for match in _DOC.finditer(source, opening + 1, closing)
-            if _depth_at(masked, opening, match.start()) == 1
+            index
+            for index in range(opening + 1, closing)
+            if depths[index] == 1 and tokens[index].text == "doc"
         ]
-        if not required:
+        if bare_docs and not required:
             findings.append(f"{path}:{line}: {label} has no directly owned required constraint")
         if bare_docs:
             findings.append(
