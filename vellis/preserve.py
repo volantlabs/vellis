@@ -112,13 +112,14 @@ def main(
     *,
     stdout: TextIO | None = None,
     stderr: TextIO | None = None,
+    prog: str = "python -m vellis.preserve",
 ) -> int:
     """Write one snapshot document, or say why it could not be written."""
     out: TextIO = sys.stdout if stdout is None else stdout
     error: TextIO = sys.stderr if stderr is None else stderr
 
     parser = argparse.ArgumentParser(
-        prog="python -m vellis.preserve",
+        prog=prog,
         description=(
             "Write one established Vellis memory out as a canonical snapshot document, "
             "which setup can begin a new system from."

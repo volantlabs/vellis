@@ -1,8 +1,9 @@
-"""Run the selected MCP boundary over local standard input and output.
+"""Dispatch the installed owner command and local MCP boundary.
 
-``python -m vellis`` is what a client launches. Setup is its own entry point because
-establishing a memory is the owner's decision and starting a server is not; a boundary
-that quietly created one would be making it for them.
+``vellis`` and the legacy ``vellis-rtg-knowledge-graph`` executable both expose setup,
+preserve, restore, and serving. The existing ``python -m`` forms stay available. A bare
+command still serves over standard input/output so existing MCP client launch commands do
+not change.
 
 ``python -m vellis restore`` is the owner's, for the same reason inverted. Restoring a
 past state is a modeled capability the ten agent tools deliberately leave out, because
@@ -91,7 +92,12 @@ def _position_changed(before: tuple[int, int] | None, after: tuple[int, int] | N
 
 
 def _restore(
-    argv: list[str], *, error: TextIO, output: TextIO, confirm: Callable[[str], str]
+    argv: list[str],
+    *,
+    error: TextIO,
+    output: TextIO,
+    confirm: Callable[[str], str],
+    prog: str = "python -m vellis restore",
 ) -> int:
     """Make a past state current again, on the owner's own say-so.
 
@@ -100,7 +106,7 @@ def _restore(
     the point: the owner is the only party the model lets decide this.
     """
     parser = argparse.ArgumentParser(
-        prog="python -m vellis restore",
+        prog=prog,
         description="Make one past state of this memory current again, as a new revision.",
     )
     parser.add_argument("--data-dir", default=None, help="Where the memory lives.")
@@ -237,24 +243,9 @@ def _restore(
     return result
 
 
-def main(
-    argv: list[str] | None = None,
-    *,
-    stderr: TextIO | None = None,
-    stdout: TextIO | None = None,
-    confirm: Callable[[str], str] = input,
-) -> int:
-    error: TextIO = sys.stderr if stderr is None else stderr
-    arguments_given = sys.argv[1:] if argv is None else argv
-    if arguments_given and arguments_given[0] == "restore":
-        return _restore(
-            list(arguments_given[1:]),
-            error=error,
-            output=sys.stdout if stdout is None else stdout,
-            confirm=confirm,
-        )
+def _serve(argv: list[str], *, error: TextIO, prog: str) -> int:
     parser = argparse.ArgumentParser(
-        prog="python -m vellis",
+        prog=prog,
         description="Serve one established Vellis memory over local standard input and output.",
     )
     parser.add_argument(
@@ -289,6 +280,79 @@ def main(
         )
         return EXIT_FAILED
     return EXIT_SUCCESS
+
+
+def _print_root_help(prog: str, output: TextIO) -> None:
+    parser = argparse.ArgumentParser(
+        prog=prog,
+        description=(
+            "Set up, preserve, restore, or serve one local Vellis personal-memory system. "
+            "With no command, Vellis serves over local standard input and output."
+        ),
+    )
+    parser.add_argument(
+        "command",
+        nargs="?",
+        choices=("setup", "preserve", "restore", "serve", "serve-mcp"),
+        help="owner operation; serve-mcp is the legacy spelling of serve",
+    )
+    parser.add_argument(
+        "--data-dir",
+        help="serve the memory in this directory when no explicit command is given",
+    )
+    parser.print_help(file=output)
+
+
+def _invoked_program() -> str:
+    name = Path(sys.argv[0]).name
+    return "python -m vellis" if name == "__main__.py" else name
+
+
+def main(
+    argv: list[str] | None = None,
+    *,
+    stderr: TextIO | None = None,
+    stdout: TextIO | None = None,
+    confirm: Callable[[str], str] = input,
+    prog: str | None = None,
+) -> int:
+    error: TextIO = sys.stderr if stderr is None else stderr
+    output: TextIO = sys.stdout if stdout is None else stdout
+    arguments_given = list(sys.argv[1:] if argv is None else argv)
+    program = prog or (_invoked_program() if argv is None else "vellis")
+    if arguments_given and arguments_given[0] in {"-h", "--help"}:
+        _print_root_help(program, output)
+        return EXIT_SUCCESS
+    if arguments_given and arguments_given[0] == "setup":
+        from vellis.setup import main as setup
+
+        return setup(
+            arguments_given[1:],
+            stdout=output,
+            stderr=error,
+            prog=f"{program} setup",
+        )
+    if arguments_given and arguments_given[0] == "preserve":
+        from vellis.preserve import main as preserve
+
+        return preserve(
+            arguments_given[1:],
+            stdout=output,
+            stderr=error,
+            prog=f"{program} preserve",
+        )
+    if arguments_given and arguments_given[0] == "restore":
+        return _restore(
+            list(arguments_given[1:]),
+            error=error,
+            output=output,
+            confirm=confirm,
+            prog=f"{program} restore",
+        )
+    if arguments_given and arguments_given[0] in {"serve", "serve-mcp"}:
+        command = arguments_given.pop(0)
+        return _serve(arguments_given, error=error, prog=f"{program} {command}")
+    return _serve(arguments_given, error=error, prog=program)
 
 
 if __name__ == "__main__":

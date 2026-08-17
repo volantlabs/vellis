@@ -1,7 +1,23 @@
+[build-system]
+requires = ["setuptools>=83.0.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "vellis"
-version = "0.2.0.dev0"
+version = "2.0.0"
+description = "A local-first personal-memory system built on a Reified Type Graph."
+readme = "README.md"
 requires-python = ">=3.14"
+license = "Apache-2.0"
+license-files = ["LICENSE"]
+authors = [{ name = "Vellis contributors" }]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: End Users/Desktop",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.14",
+    "Topic :: Database",
+]
 dependencies = [
     # Pinned exactly, without a global prerelease allowance: the selected boundary is a
     # beta and the campaign records that choice, so a floating range would let it move
@@ -12,8 +28,19 @@ dependencies = [
     "ijson>=3.5.1",
 ]
 
-[tool.uv]
-package = false
+[project.scripts]
+vellis = "vellis.__main__:main"
+vellis-rtg-knowledge-graph = "vellis.__main__:main"
+
+[project.urls]
+Repository = "https://github.com/volantlabs/vellis"
+Issues = "https://github.com/volantlabs/vellis/issues"
+
+[tool.setuptools.packages.find]
+where = ["."]
+namespaces = false
+include = ["vellis*"]
+exclude = ["tests*"]
 
 [dependency-groups]
 dev = [

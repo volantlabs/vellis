@@ -708,6 +708,7 @@ def main(
     stdout: TextIO | None = None,
     stderr: TextIO | None = None,
     stdin: TextIO | None = None,
+    prog: str = "python -m vellis.setup",
 ) -> int:
     """Run the documented setup path."""
     import sys
@@ -717,7 +718,7 @@ def main(
     source: TextIO = sys.stdin if stdin is None else stdin
 
     parser = argparse.ArgumentParser(
-        prog="python -m vellis.setup",
+        prog=prog,
         description="Prepare one local Vellis personal-memory system.",
     )
     parser.add_argument(

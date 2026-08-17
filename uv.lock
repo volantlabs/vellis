@@ -1282,8 +1282,8 @@ wheels = [
 
 [[package]]
 name = "vellis"
-version = "0.2.0.dev0"
-source = { virtual = "." }
+version = "2.0.0"
+source = { editable = "." }
 dependencies = [
     { name = "fastmcp" },
     { name = "fastmcp-slim" },

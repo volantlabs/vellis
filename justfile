@@ -38,6 +38,10 @@ implementation-campaign-check:
 system-evolution-check:
     @uv run python tools/system_evolution.py check
 
+# Build and smoke-test the installable wheel and source distribution.
+package-check:
+    @uv run python tools/package_smoke.py
+
 # Show the active evolution lifecycle, approval, and next work.
 system-evolution-status:
     @uv run python tools/system_evolution.py status
@@ -93,7 +97,7 @@ model-reference-find query specification="" limit="8":
     @specification={{quote(specification)}}; if test -n "$specification"; then uv run python tools/sysml_reference.py find {{quote(query)}} --specification "$specification" --limit {{quote(limit)}}; else uv run python tools/sysml_reference.py find {{quote(query)}} --limit {{quote(limit)}}; fi
 
 # Run the complete repository gate.
-check: lint typecheck skills-check implementation-campaign-check system-evolution-check model-check model-reference-check test
+check: lint typecheck skills-check implementation-campaign-check system-evolution-check model-check model-reference-check test package-check
 
 # List every SysML v2 construct name, for turning a question into a searchable term.
 model-reference-concepts:
