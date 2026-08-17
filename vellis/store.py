@@ -119,6 +119,7 @@ if TYPE_CHECKING:
 
 __all__ = [
     "AlreadyInitializedError",
+    "ActivityAppendError",
     "CanonicalStore",
     "ConcurrentRevisionError",
     "ForeignDatabaseError",
@@ -683,6 +684,10 @@ def _projection_revision(row: tuple[object, ...]) -> int:
 
 class StoreError(RuntimeError):
     """Raised when durable state cannot be read or written safely."""
+
+
+class ActivityAppendError(StoreError):
+    """Raised when a required observational record cannot be durably appended."""
 
 
 _CHECKPOINT_LOCK = Lock()
@@ -3288,9 +3293,14 @@ class CanonicalStore:
                 raise StoreError(f"could not publish validation assessment: {error}") from error
 
     def assess_and_publish(
-        self, scope: ValidationScope, *, maximum_findings: int
+        self,
+        scope: ValidationScope,
+        *,
+        maximum_findings: int,
+        provenance: Provenance,
+        observation_scope: str,
     ) -> ValidationReport:
-        """Bind, scan, and publish one complete assessment in one SQLite transaction."""
+        """Atomically publish a complete assessment and its required observation."""
         with self._lock:
             try:
                 self._connection.execute("BEGIN IMMEDIATE")
@@ -3310,8 +3320,22 @@ class CanonicalStore:
                     ),
                     overlay_identity=overlay_identity,
                 )
+                self._append_activity_unlocked(
+                    ActivityRecord(
+                        capability="check",
+                        outcome_category=report.status,
+                        semantic_scope=observation_scope,
+                        summary=report.summary,
+                        provenance=provenance,
+                        recorded_at=now(),
+                        evaluated_revision=report.evaluated_revision,
+                    )
+                )
                 self._connection.execute("COMMIT")
                 return report
+            except ActivityAppendError:
+                self._rollback_quietly()
+                raise
             except Exception as error:
                 self._rollback_quietly()
                 raise StoreError(f"could not publish validation assessment: {error}") from error
@@ -6257,25 +6281,29 @@ class CanonicalStore:
 
     def append_activity(self, record: ActivityRecord) -> None:
         """Append one observation. Never part of a canonical transaction."""
+        with self._lock:
+            self._append_activity_unlocked(record)
+
+    def _append_activity_unlocked(self, record: ActivityRecord) -> None:
+        """Append an observation while the caller owns any required transaction."""
         try:
-            with self._lock:
-                self._connection.execute(
-                    "INSERT INTO activity_record"
-                    " (recorded_at, capability, outcome_category, semantic_scope, summary,"
-                    " initiator, source, evaluated_revision) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-                    (
-                        _stored_time(record.recorded_at),
-                        record.capability,
-                        record.outcome_category.value,
-                        record.semantic_scope,
-                        record.summary,
-                        record.provenance.initiator,
-                        record.provenance.source,
-                        record.evaluated_revision,
-                    ),
-                )
+            self._connection.execute(
+                "INSERT INTO activity_record"
+                " (recorded_at, capability, outcome_category, semantic_scope, summary,"
+                " initiator, source, evaluated_revision) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                (
+                    _stored_time(record.recorded_at),
+                    record.capability,
+                    record.outcome_category.value,
+                    record.semantic_scope,
+                    record.summary,
+                    record.provenance.initiator,
+                    record.provenance.source,
+                    record.evaluated_revision,
+                ),
+            )
         except sqlite3.Error as error:
-            raise StoreError(f"could not append the activity record: {error}") from error
+            raise ActivityAppendError(f"could not append the activity record: {error}") from error
 
     def activity_records(
         self,

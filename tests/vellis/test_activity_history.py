@@ -11,6 +11,7 @@ makes it safe to let the owner delete.
 
 from __future__ import annotations
 
+import io
 from datetime import timedelta
 from pathlib import Path
 
@@ -23,8 +24,14 @@ from vellis.activity import HistoryKind, HistoryQuery, RetentionDecision
 from vellis.canonical import Provenance, TransitionKind, now
 from vellis.changes import GraphChange
 from vellis.graph import Anchor
-from vellis.outcomes import OperationStatus
+from vellis.outcomes import (
+    OperationStatus,
+    ValidationRequest,
+    ValidationRequestKind,
+    ValidationScope,
+)
 from vellis.query import AnchorGroup, AnchorProjection, GraphQuery, ReturnShape
+from vellis.store import ActivityAppendError, StoreError
 from vellis.system import RTGSystem
 
 ADA = Anchor(uuid="a-1", type_key="person", display_name="Ada")
@@ -627,6 +634,103 @@ def test_a_broken_activity_ledger_cannot_break_the_operation_it_observes(
 
     assert outcome.accepted, outcome.findings
     assert materialize_state(system).graph.anchor("a-1") is not None
+
+
+def _fail_activity_append(monkeypatch: pytest.MonkeyPatch, system: RTGSystem) -> None:
+    def unavailable(_record) -> None:
+        raise ActivityAppendError("injected activity append failure")
+
+    monkeypatch.setattr(system.store, "_append_activity_unlocked", unavailable)
+
+
+def test_activity_append_failure_prevents_an_accepted_read_from_completing(
+    system: RTGSystem, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _fail_activity_append(monkeypatch, system)
+
+    with pytest.raises(ActivityAppendError, match="injected activity append failure"):
+        system.query_graph(_anyone(), provenance=_owner())
+
+
+def test_activity_append_failure_prevents_a_refusal_from_completing(
+    system: RTGSystem, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _fail_activity_append(monkeypatch, system)
+    invalid = GraphQuery(
+        anchor_groups=(AnchorGroup(name="people", anchor_types=("unknown",)),),
+        return_shape=ReturnShape(
+            projections=(AnchorProjection(name="who", anchor_group="people"),)
+        ),
+        maximum_rows=10,
+    )
+
+    with pytest.raises(ActivityAppendError, match="injected activity append failure"):
+        system.query_graph(invalid, provenance=_owner())
+
+
+def test_activity_append_failure_supersedes_a_safely_reportable_execution_failure(
+    system: RTGSystem, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def unavailable_query(_query):
+        raise StoreError("injected query failure")
+
+    monkeypatch.setattr(system.store, "evaluate_current_query", unavailable_query)
+    _fail_activity_append(monkeypatch, system)
+
+    with pytest.raises(ActivityAppendError, match="injected activity append failure"):
+        system.query_graph(_anyone(), provenance=_owner())
+
+
+def test_activity_append_failure_prevents_history_and_snapshot_completion(
+    system: RTGSystem, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _fail_activity_append(monkeypatch, system)
+
+    with pytest.raises(ActivityAppendError, match="injected activity append failure"):
+        system.history(HistoryQuery(HistoryKind.CANONICAL, 10), provenance=_owner())
+    with pytest.raises(ActivityAppendError, match="injected activity append failure"):
+        system.export_snapshot(io.StringIO(), provenance=_owner())
+
+
+def test_unencodable_activity_text_is_an_unexpected_append_failure(system: RTGSystem) -> None:
+    with pytest.raises(ActivityAppendError, match="activity record cannot be stored"):
+        system.query_graph(_anyone(), provenance=Provenance("owner\ud800"))
+
+
+def test_validation_observation_failure_preserves_the_prior_assessment_atomically(
+    system: RTGSystem, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    prior = system.check(provenance=_owner())
+    assert prior.accepted and prior.assessment_id is not None
+    activity_count = system.store.activity_record_count()
+    _fail_activity_append(monkeypatch, system)
+
+    with pytest.raises(ActivityAppendError, match="injected activity append failure"):
+        system.check(provenance=_owner())
+
+    preserved = system.store.assessment_page(prior.assessment_id, 1, 100)
+    assert preserved == prior
+    assert system.store.activity_record_count() == activity_count
+
+
+def test_validation_page_requires_its_activity_append(
+    system: RTGSystem, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    prior = system.check(provenance=_owner())
+    assert prior.assessment_id is not None
+    _fail_activity_append(monkeypatch, system)
+
+    with pytest.raises(ActivityAppendError, match="injected activity append failure"):
+        system.check(
+            ValidationRequest(
+                ValidationRequestKind.READ_FINDINGS,
+                ValidationScope.GRAPH_CONFORMANCE,
+                10,
+                assessment_id=prior.assessment_id,
+                start_ordinal=1,
+            ),
+            provenance=_owner(),
+        )
 
 
 def test_a_canonical_summary_carries_no_replay_payload(system: RTGSystem) -> None:

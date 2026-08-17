@@ -13,7 +13,7 @@ import vellis.__main__ as owner_command
 import vellis.mcp as mcp_boundary
 import vellis.preserve as preserve_command
 from vellis.outcomes import OperationStatus, RevisionedOutcome
-from vellis.store import StoreError
+from vellis.store import ActivityAppendError, StoreError
 from vellis.streaming import SnapshotMetadata
 
 
@@ -502,6 +502,33 @@ def test_preserve_failure_before_capture_does_not_claim_an_observation(
     assert code == preserve_command.EXIT_FAILED
     assert "Stage: capture" in error.getvalue()
     assert "attempt is recorded" not in error.getvalue()
+
+
+def test_preserve_observation_failure_publishes_no_snapshot_file(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    directory = tmp_path / "memory"
+    directory.mkdir()
+    preserve_command.store_path(directory).touch()
+
+    class _UnobservedSnapshotSystem(_CleanCloseSystem):
+        def export_snapshot(self, stream: TextIO, *, provenance: object) -> SnapshotMetadata:
+            stream.write("complete but not observed\n")
+            raise ActivityAppendError("injected activity append failure")
+
+    monkeypatch.setattr(
+        preserve_command.RTGSystem, "open", lambda path: _UnobservedSnapshotSystem()
+    )
+    document = tmp_path / "out.snapshot"
+    error = io.StringIO()
+
+    code = preserve_command.main(
+        ["--data-dir", str(directory), "--out", str(document)], stderr=error
+    )
+
+    assert code == preserve_command.EXIT_FAILED
+    assert "Stage: capture" in error.getvalue()
+    assert not document.exists()
 
 
 def test_preserve_reports_an_indeterminate_activity_effect_when_position_is_unreadable(

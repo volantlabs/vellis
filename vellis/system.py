@@ -89,6 +89,7 @@ from vellis.outcomes import (
 )
 from vellis.query import EvaluatedStateScope, GraphQuery, GraphQueryResult
 from vellis.store import (
+    ActivityAppendError,
     AlreadyInitializedError,
     CanonicalStore,
     ConcurrentRevisionError,
@@ -917,33 +918,33 @@ class RTGSystem:
         provenance: Provenance,
         evaluated_revision: int | None = None,
     ) -> None:
-        """Append one observation after an outcome has been determined.
+        """Durably append an observation before the invocation can complete.
 
-        Deliberately outside every canonical transaction. Observing is not part of what
-        an operation does to memory, and a ledger that could roll a commit back would
-        make it so. A store that cannot record the observation has still done the work,
-        so the outcome the caller already holds stands.
+        Observations stay outside canonical transactions, so they can never roll back an
+        accepted canonical mutation. Every other invocation is incomplete if this append
+        fails; the resulting store error deliberately crosses the system boundary.
         """
-        if _unstorable_record_text(provenance, summary) or _unstorable_record_text(
-            provenance, scope
-        ):
-            # An operation refused for text it could not store must not then try to store
-            # that same text in its own observation. The outcome the caller holds stands.
-            return
-        try:
-            self._store.append_activity(
-                ActivityRecord(
-                    capability=capability,
-                    outcome_category=outcome,
-                    semantic_scope=scope,
-                    summary=summary,
-                    provenance=provenance,
-                    recorded_at=now(),
-                    evaluated_revision=evaluated_revision,
-                )
+        invalid_text = {
+            finding.summary: finding
+            for finding in (
+                *_unstorable_record_text(provenance, summary),
+                *_unstorable_record_text(provenance, scope),
             )
-        except StoreError:
-            return
+        }.values()
+        if invalid_text:
+            detail = "; ".join(finding.summary for finding in invalid_text)
+            raise ActivityAppendError(f"the activity record cannot be stored: {detail}")
+        self._store.append_activity(
+            ActivityRecord(
+                capability=capability,
+                outcome_category=outcome,
+                semantic_scope=scope,
+                summary=summary,
+                provenance=provenance,
+                recorded_at=now(),
+                evaluated_revision=evaluated_revision,
+            )
+        )
 
     # --- Reading a state that has passed ------------------------------------------------
 
@@ -1382,8 +1383,13 @@ class RTGSystem:
             )
         try:
             report = self._store.assess_and_publish(
-                request.scope, maximum_findings=request.maximum_findings
+                request.scope,
+                maximum_findings=request.maximum_findings,
+                provenance=provenance,
+                observation_scope=scope_text,
             )
+        except ActivityAppendError:
+            raise
         except StoreError as error:
             return finish(
                 ValidationReport(
@@ -1399,7 +1405,7 @@ class RTGSystem:
             )
         # A report has no status of its own: it succeeded, and says whether the graph
         # conforms. The observation records that the assessment ran and what it found.
-        return finish(report)
+        return report
 
 
 def _transition_summary(kind: str | None, revision: int) -> str:
