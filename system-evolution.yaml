@@ -3,7 +3,7 @@ evolution:
   id: vellis-2-prerelease-remediation
   objective: Formalize accepted obligations and restore semantic, observational, compatibility, and installable release integrity for Vellis 2.0.
   observable_distinction: Requirements and objectives constrain their prose, query bounds use semantic JSON equality, required observations cannot disappear behind completed results, and installed Vellis preserves snapshot recovery.
-  lifecycle: ready
+  lifecycle: active
   approval:
     status: accepted
     reason: The approved plan must be bound to a durable awaiting-approval checkpoint before execution.
@@ -284,7 +284,7 @@ work_items:
     nearest_wrong_system: Source modules work while installed commands do not.
     compatibility_effect: Both former executables dispatch v2 setup, preserve, restore, and serving.
     non_effects: [FastMCP pins and MCP contract remain unchanged., Packaging selects no remote deployment.]
-    lifecycle: ready
+    lifecycle: active
     implementation_status: conflicting
     evidence_refs: []
     blocker: null
