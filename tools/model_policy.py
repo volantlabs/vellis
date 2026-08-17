@@ -7,6 +7,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 MODEL_ROOT = ROOT / "model"
 
+
 @dataclass(frozen=True)
 class _Token:
     text: str

@@ -116,7 +116,7 @@ package Example {
 
 
 def test_notes_and_strings_cannot_inject_phantom_normative_syntax() -> None:
-    source = '''
+    source = """
 package Example {
     //*
       requirement def Phantom { doc phantom braces }
@@ -128,7 +128,7 @@ package Example {
         }
     }
 }
-'''
+"""
     assert policy_findings(Path("example.sysml"), source) == ()
 
 
