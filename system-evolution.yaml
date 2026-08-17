@@ -3,7 +3,7 @@ evolution:
   id: vellis-2-prerelease-remediation
   objective: Formalize accepted obligations and restore semantic, observational, compatibility, and installable release integrity for Vellis 2.0.
   observable_distinction: Requirements and objectives constrain their prose, query bounds use semantic JSON equality, required observations cannot disappear behind completed results, and installed Vellis preserves snapshot recovery.
-  lifecycle: ready
+  lifecycle: active
   approval:
     status: accepted
     reason: The approved plan must be bound to a durable awaiting-approval checkpoint before execution.
@@ -338,7 +338,7 @@ work_items:
     nearest_wrong_system: Source checks pass while semantic or built-artifact behavior is broken.
     compatibility_effect: CI and release evidence become stricter.
     non_effects: [No release is merged or published., User data and clients remain untouched.]
-    lifecycle: ready
+    lifecycle: active
     implementation_status: partial
     evidence_refs: []
     blocker: null
