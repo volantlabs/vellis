@@ -153,9 +153,9 @@ findings:
     consequence: Syntax and source-tree tests can stay green while all underlying defects recur.
     authority_refs: [AGENTS.md, VellisVerification]
     evidence_refs: [command:just check]
-    disposition: plan-change
+    disposition: resolved
     owner_work_item_id: W006
-    implementation_status: partial
+    implementation_status: conforming
     nearest_wrong_system: The project gate passes with bare normative docs, serialized identity, best-effort audit, and no wheel.
     compatibility_effect: Evidence and CI become stricter without changing product payload or persistence compatibility.
 decisions:
@@ -340,18 +340,24 @@ work_items:
     non_effects: [No release is merged or published., User data and clients remain untouched.]
     lifecycle: active
     implementation_status: partial
-    evidence_refs: []
+    evidence_refs:
+      - command:just check
+      - command:just model-check
+      - command:just package-check
     blocker: null
     checkpoint: null
 closure:
   finding_disposition: open
   model_status: accepted
-  implementation_status: conflicting
+  implementation_status: conforming
   integration_status: partial
   external_status: not applicable
-  compatibility: V1 compatibility remains confirmed snapshot translation into a separate new v2 lineage; raw and in-place conversion remain outside scope. Installable command and 2.0.0 evidence are pending.
+  compatibility: Vellis 2.0.0 restores both installed commands while preserving MCP names and schemas, persistence formats, exact FastMCP 4.0.0b1 pins, and confirmed v1 snapshot translation into a separate new lineage. Raw or in-place v1 conversion, deployment, remote hosting, authentication, and plugin packaging remain outside scope.
   reviews:
     - {lens: authority and conformance, status: pending, reviewer: null, checkpoint: null, evidence_refs: []}
     - {lens: engineering and evidence, status: pending, reviewer: null, checkpoint: null, evidence_refs: []}
-  evidence_refs: []
+  evidence_refs:
+    - command:just check
+    - command:just model-check
+    - command:just package-check
   checkpoint: null
