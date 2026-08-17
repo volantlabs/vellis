@@ -1,1206 +1,326 @@
 schema_version: "1.0"
 evolution:
-  id: callable-tool-surface-and-value-fidelity
-  objective: Close pre-release boundary, campaign-handoff, and public-guidance findings without changing accepted system meaning.
-  observable_distinction: Snapshot publication never replaces another name, every owner-facing failure reports its true operation and complete known state effect, every campaign result is bound to current work, CI can reconstruct durable checkpoint evidence, and security, query, graph-preview, and definition-edit guidance match the runnable local surface.
-  lifecycle: complete
+  id: vellis-2-prerelease-remediation
+  objective: Formalize accepted obligations and restore semantic, observational, compatibility, and installable release integrity for Vellis 2.0.
+  observable_distinction: Requirements and objectives constrain their prose, query bounds use semantic JSON equality, required observations cannot disappear behind completed results, and installed Vellis preserves snapshot recovery.
+  lifecycle: awaiting-approval
   approval:
-    status: not-required
-    reason: The new findings are implementation, workflow-validation, and documentation defects under unchanged accepted authority.
+    status: pending
+    reason: The approved plan must be bound to a durable awaiting-approval checkpoint before execution.
     checkpoint: null
   blocker: null
-  checkpoint: git:fc92f3bef7e95ba1d9885d1d2dd316124307c444
+  checkpoint: git:5d33c6ef405aa8efa1a54de81d7e9427aa9e1850
 baselines:
   status: current
-  source:
+  source: &source
     model: sha256:30decc89ce67a19b2f9720028ffb3eb8161edf37affd11fa49b12179b3018d3e
-    implementation: git:b519b400476d9bd364d1110a30c3d3120d8b457c
-    language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
-    execution_environment: sha256:3315a10b5fcc8d62aa435d2f4e12165a147f334b01fad06ce367d11b6eb8191c
-    checkpoint: git:b519b400476d9bd364d1110a30c3d3120d8b457c
-  target:
-    model: sha256:30decc89ce67a19b2f9720028ffb3eb8161edf37affd11fa49b12179b3018d3e
-    implementation: git:fc92f3bef7e95ba1d9885d1d2dd316124307c444
+    implementation: git:5d33c6ef405aa8efa1a54de81d7e9427aa9e1850
     language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
     execution_environment: sha256:50d4f5cf86c91d1ab613cd7ea017a88fe5127ca1c25b118033c6548591d4349f
-    checkpoint: git:fc92f3bef7e95ba1d9885d1d2dd316124307c444
-  observed:
-    model: sha256:30decc89ce67a19b2f9720028ffb3eb8161edf37affd11fa49b12179b3018d3e
-    implementation: git:fc92f3bef7e95ba1d9885d1d2dd316124307c444
-    language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
-    execution_environment: sha256:50d4f5cf86c91d1ab613cd7ea017a88fe5127ca1c25b118033c6548591d4349f
-    checkpoint: git:fc92f3bef7e95ba1d9885d1d2dd316124307c444
+    checkpoint: git:5d33c6ef405aa8efa1a54de81d7e9427aa9e1850
+  target: null
+  observed: *source
 scope:
   authority_scope:
-    - VellisRequirements::mcpAgentToolContract
-    - VellisRequirements::mcpOutcomeIntegrity
-    - VellisRequirements::canonicalSemanticEquality
-    - VellisRequirements::semanticQueryMeaning
-    - VellisRequirements::querySafety
-    - VellisRequirements::durableCanonicalHistory
-    - VellisRequirements::simpleIndividualOperation
+    - RTG::'JSON Value'
+    - RTG::'Graph Query Result'
     - RTGSystem
-    - AGENTS.md
+    - VellisRequirements
+    - VellisVerification
+    - SysML 2.1 Beta 1 sections 7.21.1, 7.21.2, and 7.24.2
   implementation_scope:
-    - model/10-rtg-domain.sysml
-    - model/40-requirements.sysml
-    - model/50-verification.sysml
-    - implementation-campaign.yaml
-    - tools/implementation_campaign.py
-    - tests/test_implementation_campaign.py
-    - vellis/mcp.py
-    - vellis/json_value.py
-    - vellis/definitions.py
+    - model/*.sysml
     - vellis/query.py
     - vellis/store.py
     - vellis/system.py
-    - vellis/setup.py
-    - vellis/preserve.py
-    - tests/vellis/test_mcp_boundary.py
-    - tests/vellis/test_graph_queries.py
-    - tests/vellis/test_invalid_queries.py
-    - tests/vellis/test_definition_validity.py
-    - tests/vellis/test_definition_governance.py
-    - tests/vellis/test_activity_history.py
-    - tests/test_system_evolution.py
     - vellis/__main__.py
-    - tests/vellis/test_historical_restore.py
-    - tests/vellis/test_store_integrity.py
-    - tests/vellis/test_setup_path.py
-    - tests/vellis/test_cleanup_boundaries.py
-    - README.md
-    - SECURITY.md
-    - docs/mcp-realization.md
     - pyproject.toml
     - uv.lock
+    - tests/
+    - README.md
     - CONTRIBUTING.md
-    - .agents/skills/sysml-implementation-campaign/SKILL.md
-    - .agents/skills/sysml-implementation-campaign/references/campaign-supervision.md
+    - docs/mcp-realization.md
     - .github/workflows/check.yml
-    - tests/test_repository_policy.py
   review_lenses:
     - authority and conformance
     - engineering and evidence
   non_goals:
-    - Changing the ten selected tool names or their authorization boundary.
-    - Changing persistence formats or canonical stored meaning.
-    - Constraining a stored property value more tightly than the owner's own definitions do.
-    - Replacing definitions that are capable of being written out with a permissive value.
-    - Adding native aggregation over anchor groups or changing query result semantics.
+    - Adopting raw v1 storage, v1 ledger history, or same-directory in-place conversion.
+    - Changing MCP tool names, schemas, persistence format, authorization, or exact FastMCP 4.0.0b1 pins.
+    - Merging, tagging, publishing, or touching real ignored owner data.
 findings:
   - id: F001
-    summary: The three request types carrying a stored JSON value publish a definitions block and an unresolved reference instead of an inlined request schema.
-    classification: implementation defect
-    consequence: A client that does not resolve references sees an untyped parameter for rtg_query, rtg_change, and rtg_set_definition_delta, sends each request as text, and is refused as malformed, so both write tools and the query tool cannot be called at all.
-    authority_refs:
-      - VellisRequirements::mcpAgentToolContract
-    evidence_refs:
-      - path:tests/vellis/test_mcp_boundary.py#test_published_input_schemas_carry_their_whole_meaning
-    disposition: resolved
+    summary: Normative requirement and case-objective prose is not owned by required constraints.
+    classification: model gap
+    consequence: Satisfaction and verification can be present while constraining none of the documented obligations.
+    authority_refs: [VellisRequirements, VellisVerification, SysML 2.1 Beta 1 sections 7.21.1 and 7.21.2]
+    evidence_refs: [command:just model-check]
+    disposition: model-change
     owner_work_item_id: W001
-    implementation_status: conforming
-    nearest_wrong_system: Every tool body and every validation behaves correctly while three of the ten tools are unreachable through core discovery and invocation.
-    compatibility_effect: Published input schemas gain inlined meaning; accepted requests, refusals, and results are unchanged.
+    implementation_status: conflicting
+    nearest_wrong_system: Every relationship exists while a system violating every documented shall statement still satisfies empty formal constraints.
+    compatibility_effect: Existing obligation text becomes formally required without changing selected normal behavior or payloads.
   - id: F002
-    summary: Boundary evidence passed prepared dictionaries to every tool and never consulted a published input schema.
-    classification: plan gap
-    consequence: A schema that says nothing about its request passes the whole boundary suite, so the contract's usability obligation had no discriminating evidence.
-    authority_refs:
-      - VellisRequirements::mcpAgentToolContract
-    evidence_refs:
-      - path:tests/vellis/test_mcp_boundary.py#test_published_input_schemas_carry_their_whole_meaning
-    disposition: resolved
+    summary: The Everyday Life verification case implicitly binds RTG requirements to a Vellis System subject.
+    classification: model gap
+    consequence: The case does not verify fresh initialization and graph invariants against the contained RTG memory.
+    authority_refs: [VellisVerification::'Everyday Life Is An Optional Confirmed Start', SysML 2.1 Beta 1 section 7.24.2]
+    evidence_refs: [command:just model-check]
+    disposition: model-change
     owner_work_item_id: W001
-    implementation_status: conforming
-    nearest_wrong_system: The boundary suite is green because it exercises the server directly and never reads what a caller would be told.
-    compatibility_effect: Test evidence only; no product behavior changes.
+    implementation_status: conflicting
+    nearest_wrong_system: The product choice passes while contained memory violates RTG requirements because verify subjects default to Vellis.
+    compatibility_effect: Verification binding changes only; the owner scenario and product behavior remain unchanged.
   - id: F003
-    summary: Evolution workflow tests selected work items and findings from the live record by hardcoded identifier.
-    classification: implementation defect
-    consequence: Opening any evolution whose work items or findings are named differently fails six validator tests that assert nothing about names, so the durable record's inventory is frozen by its own tooling.
-    authority_refs:
-      - AGENTS.md
-    evidence_refs:
-      - command:uv run pytest tests/test_system_evolution.py -q
-    disposition: resolved
+    summary: Accepted authority does not define completion when a required activity append fails.
+    classification: model gap
+    consequence: Best-effort observation can return success without mandatory evidence, or failure handling can recurse without a completion boundary.
+    authority_refs: [VellisRequirements::dualLedgerSeparation, VellisRequirements::mcpOutcomeIntegrity, RTGSystem::'Assess graph conformance']
+    evidence_refs: [path:tests/vellis/test_activity_history.py#test_a_broken_activity_ledger_cannot_break_the_operation_it_observes]
+    disposition: model-change
     owner_work_item_id: W001
-    implementation_status: conforming
-    nearest_wrong_system: Validator rules are correct while the suite fails for the sole reason that the current evolution named its work differently.
-    compatibility_effect: Test realization only; the record schema and validator rules are unchanged.
+    implementation_status: conflicting
+    nearest_wrong_system: An observation-bearing operation completes even though its required activity record was never stored.
+    compatibility_effect: Observation failure becomes unexpected with no completed result; accepted canonical mutations remain canonical-ledger authoritative.
   - id: F004
-    summary: A stored JSON value arriving through a tool had its kind decided by union order, so the numbers one and zero were read as Booleans.
+    summary: Stored projected rows deduplicate nested JSON by serialized spelling before enforcing the row bound.
     classification: implementation defect
-    consequence: A declared number property refuses a legitimate 1, and inside an array or object no declaration reaches the member, so 1 and 0 are committed to canonical state as true and false with no finding and no way for the owner to notice.
-    authority_refs:
-      - VellisRequirements::canonicalSemanticEquality
-      - VellisRequirements::mcpOutcomeIntegrity
-    evidence_refs:
-      - path:tests/vellis/test_mcp_boundary.py#test_a_stored_value_keeps_the_json_kind_the_caller_sent
-    disposition: resolved
-    owner_work_item_id: W001
-    implementation_status: conforming
-    nearest_wrong_system: Every operation reports success while the owner's ones and zeros are silently rewritten into Booleans in canonical state.
-    compatibility_effect: A value now keeps the kind its caller sent; no stored form, comparison, or result shape changes.
+    consequence: Mathematically equal nested numbers can produce duplicate rows and an incorrect whole-query refusal.
+    authority_refs: [VellisRequirements::canonicalSemanticEquality, VellisRequirements::semanticQueryMeaning, VellisRequirements::querySafety]
+    evidence_refs: [path:tests/vellis/test_graph_queries.py#test_a_projected_property_participates_in_row_identity]
+    disposition: implementation-work
+    owner_work_item_id: W002
+    implementation_status: conflicting
+    nearest_wrong_system: Nested 3 and 3.00 are two SQL rows although public equality says they are one value.
+    compatibility_effect: Equal duplicates collapse correctly; stored values and genuinely distinct rows are unchanged.
   - id: F005
-    summary: A multiplicity finding named its constrained end by rendering the enumeration member, so owner-facing text read 'DirectAssociationEnd.ASSOCIATED_DATA'.
+    summary: Required activity append failures are swallowed after outcomes are computed.
     classification: implementation defect
-    consequence: A finding an owner reads carries a realization detail beside type keys that are already their modeled names, so the one part they cannot look up is the one the system invented.
-    authority_refs:
-      - VellisRequirements::mcpOutcomeIntegrity
-    evidence_refs:
-      - path:tests/vellis/test_definition_validity.py#test_a_multiplicity_label_names_its_end_in_the_model_s_own_words
-    disposition: resolved
-    owner_work_item_id: W001
-    implementation_status: conforming
-    nearest_wrong_system: Findings are correct and complete while naming their subject in a vocabulary the model never defined.
-    compatibility_effect: Label text changes; finding identity, ordering, and validation are unchanged.
+    consequence: Reads and safely reported non-success outcomes can appear complete without mandatory activity evidence.
+    authority_refs: [VellisRequirements::dualLedgerSeparation, VellisRequirements::mcpOutcomeIntegrity]
+    evidence_refs: [path:tests/vellis/test_activity_history.py#test_a_broken_activity_ledger_cannot_break_the_operation_it_observes]
+    disposition: implementation-work
+    owner_work_item_id: W003
+    implementation_status: conflicting
+    nearest_wrong_system: A broken activity table leaves successful reads indistinguishable from fully observed operations.
+    compatibility_effect: Observation-store faults surface as unexpected failures; normal completed outcomes are unchanged.
   - id: F006
-    summary: A refused activation reported only that the assessment was missing, stale, or nonconforming.
+    summary: Validation assessment publication commits before its required observation is attempted.
     classification: implementation defect
-    consequence: The caller's next move differs by reason, so one message covering all of them forces another assessment to learn what the refusal already knew.
-    authority_refs:
-      - VellisRequirements::mcpOutcomeIntegrity
-      - VellisRequirements::observableFailure
-    evidence_refs:
-      - path:tests/vellis/test_definition_governance.py#test_a_refused_activation_says_which_of_the_reasons_it_was
-    disposition: resolved
-    owner_work_item_id: W001
-    implementation_status: conforming
-    nearest_wrong_system: A correct refusal leaves the caller unable to tell repair-the-proposal from assess-it-again.
-    compatibility_effect: Refusal text becomes specific; the refusal itself and its non-effect are unchanged.
+    consequence: Failing closed can still replace the prior assessment although no completed validation result reaches the caller.
+    authority_refs: [VellisRequirements::validationCoverage, VellisRequirements::dualLedgerSeparation, RTGSystem::'Assess graph conformance']
+    evidence_refs: [path:tests/vellis/test_activity_history.py#test_a_non_conforming_graph_is_recorded_as_a_completed_assessment]
+    disposition: implementation-work
+    owner_work_item_id: W003
+    implementation_status: conflicting
+    nearest_wrong_system: Unexpected validation failure silently replaces the prior retrievable assessment.
+    compatibility_effect: Assessment and activity publication become one observational transaction; schema and successful reports remain unchanged.
   - id: F007
-    summary: A canonical history entry with no stored summary fell back to naming its stored transition key and revision.
+    summary: The replacement branch removed installable package metadata and both released console entry points.
     classification: implementation defect
-    consequence: An owner reviewing their own memory reads 'graphMutation to revision 3', which names a realization key rather than saying what happened.
-    authority_refs:
-      - VellisRequirements::boundedHistoryRead
-    evidence_refs:
-      - path:tests/vellis/test_activity_history.py#test_a_canonical_entry_says_what_happened_in_the_model_s_own_words
-    disposition: resolved
-    owner_work_item_id: W001
-    implementation_status: conforming
-    nearest_wrong_system: History is complete and durable while telling its owner nothing they can read.
-    compatibility_effect: Fallback summary text changes; no ledger row, ordering, or replay authority changes.
-  - id: F008
-    summary: The Everyday Life starter models every date as a patterned string while ordered comparison is valid only for number-valued properties, so no date-range question can be asked.
-    classification: model gap
-    consequence: An owner cannot ask what is due before a date, and the only workaround is to read every task and filter outside the system, which is the unbounded read the query bound exists to prevent.
-    authority_refs:
-      - VellisRequirements::semanticQueryMeaning
-      - VellisRequirements::querySafety
-      - VellisRequirements::stringPatternValidation
-      - EverydayLifeStarter
-    evidence_refs:
-      - path:tests/vellis/test_graph_queries.py#test_a_string_property_orders_by_code_point
-      - path:tests/vellis/test_graph_queries.py#test_string_ordering_agrees_between_the_stored_and_replayed_graph
-    disposition: resolved
-    owner_work_item_id: W003
-    implementation_status: conforming
-    nearest_wrong_system: Every bound is honoured while the most common question about a task list can only be answered by defeating them.
-    compatibility_effect: Ordered comparison now accepts string-valued properties by code point. No stored value, definition, or existing result changes; a query that was refused is now answered, and none that was answered changes its rows.
-  - id: F009
-    summary: Campaign evidence lookup located its commit by exact record match, including the observed baseline that is meant to track the repository.
-    classification: implementation defect
-    consequence: Updating the observed baseline after a model change, which is the only correct response to one, drops evidence lookup back to the closure commit where evidence renamed since then no longer resolves, so the record can be validated only after committing the change being validated.
-    authority_refs:
-      - AGENTS.md
-    evidence_refs:
-      - path:tests/test_implementation_campaign.py#test_evidence_lookup_survives_updating_the_baseline_that_tracks_the_repository
-    disposition: resolved
-    owner_work_item_id: W001
-    implementation_status: conforming
-    nearest_wrong_system: A completed campaign is reported as having unresolvable evidence purely because its repository-tracking baseline was brought up to date.
-    compatibility_effect: Evidence lookup ignores one drifting field when matching; which commit closed a campaign, and every evidence rule, are unchanged.
-  - id: F010
-    summary: After any definition activation, the delta assessment stops reporting dangling type references created by a later removal, and reports the proposal as conforming.
-    classification: implementation defect
-    consequence: An owner removing a type that other definitions still name is told the proposal conforms and may activate it, installing an active vocabulary that the system's own definition validation rejects. The safety net is present on a fresh system and absent on every system past its first vocabulary change.
-    authority_refs:
-      - VellisRequirements::validationCoverage
-      - VellisRequirements::nonDisruptiveDefinitionWork
-    evidence_refs:
-      - path:tests/vellis/test_definition_governance.py#test_a_removal_that_orphans_a_reference_is_refused_after_an_earlier_activation
-      - path:tests/vellis/test_definition_governance.py#test_a_removal_that_orphans_a_multiplicity_rule_is_refused_after_an_activation
-    disposition: resolved
-    owner_work_item_id: W001
-    implementation_status: conforming
-    nearest_wrong_system: Definition governance refuses an inconsistent removal exactly once, on a system that has never changed its vocabulary, and silently permits it forever after.
-    compatibility_effect: Proposals previously reported as conforming are now correctly refused. No stored definition, graph object, or ledger record changes, and assessment work stays bounded to the closure of what the edit touched.
-  - id: F011
-    summary: A projection deduplicates identical tuples, so an agent totalling projected values silently answers a smaller question.
-    classification: model gap
-    consequence: Summing a projected category and amount over 1,460 transactions read 752 rows and returned exactly zero for every category, a plausible answer that is wrong, with nothing in the result indicating the collapse.
-    authority_refs:
-      - VellisRequirements::semanticQueryMeaning
-    evidence_refs:
-      - path:tests/vellis/test_graph_queries.py#test_aggregation_counts_matching_objects_not_distinct_projected_tuples
-      - path:tests/vellis/test_graph_queries.py#test_aggregation_agrees_between_the_stored_and_in_memory_graph
-      - path:tests/vellis/test_graph_queries.py#test_in_memory_aggregation_stops_when_the_maximum_is_decided
-    disposition: resolved
-    owner_work_item_id: W001
-    implementation_status: conforming
-    nearest_wrong_system: Every row is correct and every total computed from them is wrong, in a way that reads as a real answer.
-    compatibility_effect: Deduplication is unchanged. Aggregation is added beside it and reads matches, so a caller has a way to ask the question they meant.
-  - id: F012
-    summary: An anchor group named exactly one type, so a question about work of several shapes needed one query per shape.
-    classification: model gap
-    consequence: As a vocabulary grows the cost of any cross-type question grows with it, and the caller must merge results the system could have joined.
-    authority_refs:
-      - VellisRequirements::semanticQueryMeaning
-    evidence_refs:
-      - path:tests/vellis/test_graph_queries.py#test_an_anchor_group_may_name_several_types
-      - path:tests/vellis/test_mcp_boundary.py#test_the_former_single_anchor_type_spelling_remains_callable
-    disposition: resolved
-    owner_work_item_id: W001
-    implementation_status: conforming
-    nearest_wrong_system: A caller merges per-type results by hand and silently omits a type the vocabulary gained since they wrote the query.
-    compatibility_effect: A group now names one or more types; the former scalar wire spelling remains accepted as the same singleton group while discovery and returned queries use the canonical collection.
-  - id: F013
-    summary: Historical restoration was modelled, implemented, and covered by twenty tests, with no path by which any owner or agent could invoke it.
-    classification: implementation defect
-    consequence: An owner whose memory is damaged can read the history that shows it and has no way to act on it, while a working, tested recovery capability sits unreachable.
-    authority_refs:
-      - RTGSystem
-      - VellisRequirements::historicalRestoreSemantics
-    evidence_refs:
-      - path:tests/vellis/test_historical_restore.py#test_the_owner_can_reach_restoration_from_the_command_line
-    disposition: resolved
-    owner_work_item_id: W001
-    implementation_status: conforming
-    nearest_wrong_system: The safety net exists, is tested, and cannot be reached by the person it protects.
-    compatibility_effect: The agent surface stays at exactly ten tools; restoration becomes an owner command that confirms before acting.
-  - id: F014
-    summary: Committed state remained in the write-ahead log, so copying the store file produced a coherent but silently older memory.
-    classification: implementation defect
-    consequence: A copy of the store file was two revisions behind the live memory and still held a proposal that had already been activated, with nothing to indicate it was not current.
-    authority_refs:
-      - VellisRequirements::durableCanonicalHistory
-    evidence_refs:
-      - path:tests/vellis/test_store_integrity.py#test_close_reports_a_reader_that_prevents_a_complete_checkpoint
-    disposition: resolved
-    owner_work_item_id: W001
-    implementation_status: conforming
-    nearest_wrong_system: An owner keeps a backup of their memory that is quietly a snapshot of a different day.
-    compatibility_effect: A clean close leaves the store wholly in its named file; a reader that prevents that guarantee now makes close fail with a corrective action instead of silently reporting success.
-  - id: F015
-    summary: An accepted approval must name a checkpoint whose own record already shows it accepted, so the first such record can never be written.
-    classification: implementation defect
-    consequence: The accepted approval state is unreachable. An owner's acceptance of a model change cannot be sealed durably, so a record that needs one stays pending however the work actually went, and no evolution in this repository's history has ever recorded one.
-    authority_refs:
-      - AGENTS.md
-    evidence_refs:
-      - path:tests/test_system_evolution.py#test_an_accepted_approval_binds_to_a_checkpoint_that_had_the_decision_open
-    disposition: resolved
-    owner_work_item_id: W003
-    implementation_status: conforming
-    nearest_wrong_system: The workflow enforces owner acceptance rigorously and provides no way to record that it happened, so the rule is satisfied only by never using it.
-    compatibility_effect: The accepted state becomes reachable. What a checkpoint must still show is that the decision was open and that its consequence has not changed since.
-  - id: F016
-    summary: Return Shape required at least one projection while Graph Query and the implementation permit a query containing only aggregations.
-    classification: model gap
-    consequence: Accepted authority described aggregation-only queries as both valid and impossible, so model conformance could not be assessed consistently and the in-memory evaluator pruned their result-bearing component.
-    authority_refs:
-      - RTG::'Return Shape'
-      - RTG::'Graph Query'
-      - VellisRequirements::querySafety
-    evidence_refs:
-      - path:tests/vellis/test_graph_queries.py#test_aggregation_agrees_between_the_stored_and_in_memory_graph
-      - path:tests/vellis/test_graph_queries.py#test_in_memory_aggregation_stops_when_the_maximum_is_decided
-      - command:just model-check
-    disposition: resolved
+    consequence: Isolated locked invocation fails before setup, serving, recovery, or actionable guidance is reachable.
+    authority_refs: [VellisRequirements::simpleIndividualOperation]
+    evidence_refs: [command:uv run pytest tests/test_repository_policy.py -q]
+    disposition: implementation-work
     owner_work_item_id: W004
-    implementation_status: conforming
-    nearest_wrong_system: The durable evaluator returns a correct total while replayed graph evaluation returns zero, and both claim to realize the same accepted query.
-    compatibility_effect: The corrected authority selects aggregation-only queries consistently with the Graph Query behavior already presented to the owner; no previously accepted query is refused or changes its result.
-  - id: F017
-    summary: SQL existence pruning returned no aggregate bindings when a disconnected non-result selector component had no satisfying assignment.
-    classification: implementation defect
-    consequence: A valid empty selection returned an accepted result missing every requested aggregate, while in-memory evaluation returned the required zero count and absent arithmetic values.
-    authority_refs:
-      - RTG::'Graph Query Result'
-      - VellisRequirements::semanticQueryMeaning
-      - VellisRequirements::querySafety
-    evidence_refs:
-      - path:tests/vellis/test_graph_queries.py#test_unsatisfied_disconnected_component_keeps_empty_aggregate_bindings
-    disposition: resolved
-    owner_work_item_id: W001
-    implementation_status: conforming
-    nearest_wrong_system: Current, prospective, or historical SQL evaluation accepts an empty selection but omits the requested arithmetic answers, while replayed graph evaluation returns them.
-    compatibility_effect: Accepted empty selections now include one canonical zero/absent binding for every requested aggregation; nonempty results and rejected queries are unchanged.
-  - id: F018
-    summary: SQL evaluation computed aggregate bindings for a nonempty mixed projection-plus-aggregation query and then omitted them from the accepted result.
-    classification: implementation defect
-    consequence: A caller received the requested rows but none of the requested arithmetic answers, while in-memory evaluation of the same accepted query returned both parts.
-    authority_refs:
-      - RTG::'Graph Query Result'
-      - VellisRequirements::semanticQueryMeaning
-    evidence_refs:
-      - path:tests/vellis/test_graph_queries.py#test_aggregation_agrees_between_the_stored_and_in_memory_graph
-    disposition: resolved
-    owner_work_item_id: W001
-    implementation_status: conforming
-    nearest_wrong_system: Durable evaluation accepts a mixed query and returns its projected objects while silently discarding every aggregate it already computed.
-    compatibility_effect: Nonempty mixed results now include exactly the aggregate bindings the query requested; projected rows and aggregation-only results are unchanged.
-  - id: F019
-    summary: A checkpoint failure raised from close in an owner-facing finally block could replace a structured setup, serve, restore, or preserve outcome.
-    classification: implementation defect
-    consequence: A refused second setup surfaced as a raw StoreError, and an operation that had already committed could look wholly failed without saying that established memory changed.
-    authority_refs:
-      - VellisRequirements::simpleIndividualOperation
-      - VellisRequirements::durableCanonicalHistory
-      - VellisRequirements::mcpOutcomeIntegrity
-    evidence_refs:
-      - path:tests/vellis/test_setup_path.py#test_a_checkpoint_blocker_cannot_replace_a_second_start_report
-      - path:tests/vellis/test_cleanup_boundaries.py#test_mcp_shutdown_reports_checkpoint_contention_without_recasting_commits
-      - path:tests/vellis/test_cleanup_boundaries.py#test_restore_close_failure_names_the_committed_state_effect
-      - path:tests/vellis/test_cleanup_boundaries.py#test_preserve_close_failure_keeps_the_published_snapshot_truthful
-    disposition: resolved
-    owner_work_item_id: W001
-    implementation_status: conforming
-    nearest_wrong_system: The operation produces an accurate typed outcome, then cleanup contention erases it with a bare exception after any committed effect is already durable in the WAL.
-    compatibility_effect: Cleanup contention is now staged and actionable at owner boundaries; successful and refused domain outcomes retain their true state effect, and clean shutdown behavior is unchanged.
-  - id: F020
-    summary: Aggregate sums used the process decimal context and rounded accepted exact numbers beyond 28 significant digits.
-    classification: implementation defect
-    consequence: A query returned a plausible but numerically different total for values the system had stored exactly, and both evaluators agreed on the same rounded error.
-    authority_refs:
-      - VellisRequirements::canonicalSemanticEquality
-      - VellisRequirements::semanticQueryMeaning
-    evidence_refs:
-      - path:tests/vellis/test_graph_queries.py#test_sum_preserves_exact_numbers_beyond_the_decimal_context
-    disposition: resolved
-    owner_work_item_id: W001
-    implementation_status: conforming
-    nearest_wrong_system: Durable and in-memory evaluation agree perfectly while both silently round a carry-sensitive total under the host process's default arithmetic context.
-    compatibility_effect: Sum now preserves the exact mathematical value of every accepted decimal input; counts, minimum, maximum, selection, and stored values are unchanged.
-  - id: F021
-    summary: The accepted string-ordering work item still described its compatibility effect as unresolved, and the closure roll-up omitted the selected behavior.
+    implementation_status: conflicting
+    nearest_wrong_system: Source modules pass while the installed v1 command identities cannot import or dispatch v2.
+    compatibility_effect: Both executable names dispatch an installable 2.0.0 owner command surface.
+  - id: F008
+    summary: Guidance does not explain how untouched v1 data can be exported after v2 replaces the CLI.
     classification: plan gap
-    consequence: The durable evolution record contradicted its accepted decision and conforming implementation, so a closure reader could not tell which compatibility effect had actually been selected.
-    authority_refs:
-      - AGENTS.md
-      - VellisRequirements::semanticQueryMeaning
-    evidence_refs:
-      - command:just system-evolution-check
-    disposition: resolved
-    owner_work_item_id: W003
-    implementation_status: conforming
-    nearest_wrong_system: Product behavior and accepted model authority agree while the execution ledger continues to say the owner has not selected an approach.
-    compatibility_effect: Record truth now names exact Unicode code-point ordering as the accepted additive behavior; product behavior is unchanged by this bookkeeping correction.
-  - id: F022
-    summary: Prospective multiplicity assessment enumerated active rules by the overlay set identity, dropping untouched rules inherited from its base after an activation.
-    classification: implementation defect
-    consequence: A prospective graph could violate an inherited upper bound, receive a conforming assessment, and become eligible for activation.
-    authority_refs:
-      - VellisRequirements::validationCoverage
-      - VellisRequirements::nonDisruptiveDefinitionWork
-    evidence_refs:
-      - path:tests/vellis/test_definition_governance.py#test_an_inherited_multiplicity_rule_assesses_prospective_objects_after_activation
-    disposition: resolved
-    owner_work_item_id: W001
-    implementation_status: conforming
-    nearest_wrong_system: Definition-reference validation reaches inherited rules correctly while final prospective graph conformance silently omits those same rules.
-    compatibility_effect: Prospective assessments now enforce untouched inherited multiplicity rules; conforming proposals and active-state validation are unchanged.
-  - id: F023
-    summary: Exact aggregation still used Decimal construction at the implementation exponent boundary, so a finite accepted input pair could raise Overflow or InvalidOperation while forming its sum.
-    classification: implementation defect
-    consequence: Both evaluators crashed on a valid aggregate request instead of returning either an exact result or a whole typed refusal when the exact result was outside the finite result representation.
-    authority_refs:
-      - VellisRequirements::canonicalSemanticEquality
-      - VellisRequirements::semanticQueryMeaning
-      - VellisRequirements::mcpOutcomeIntegrity
-    evidence_refs:
-      - path:tests/vellis/test_graph_queries.py#test_sum_preserves_exact_numbers_at_the_decimal_exponent_boundary
-    disposition: resolved
-    owner_work_item_id: W001
-    implementation_status: conforming
-    nearest_wrong_system: Exact coefficient arithmetic succeeds, then result construction raises at the representation boundary through both otherwise-agreeing evaluators.
-    compatibility_effect: Representable sums remain exact; an exact sum outside the finite decimal result range is now refused whole with a typed finding instead of raising.
-  - id: F024
-    summary: Exact summation aligned widely separated exponents by materializing a power-of-ten coefficient before deciding whether the result was returnable.
-    classification: implementation defect
-    consequence: Two compact accepted numeric inputs could trigger population-sized allocation or MemoryError instead of a bounded whole-query refusal.
-    authority_refs:
-      - VellisRequirements::querySafety
-      - VellisRequirements::mcpOutcomeIntegrity
-    evidence_refs:
-      - path:tests/vellis/test_graph_queries.py#test_sum_refuses_compact_inputs_that_require_population_sized_expansion
-    disposition: resolved
-    owner_work_item_id: W001
-    implementation_status: conforming
-    nearest_wrong_system: Match count stays within the caller's bound while two short exponent spellings cause unbounded transient coefficient materialization.
-    compatibility_effect: Exact sums whose coefficient span is proportional to accepted input size remain unchanged; superlinear compact-input expansion is refused whole with a typed finding before allocation.
-  - id: F025
-    summary: The stdio MCP parser converted a high-precision fractional JSON number to binary float before Vellis could preserve its exact mathematical value.
-    classification: implementation defect
-    consequence: A caller could submit one exact JSON number and receive an accepted canonical mutation containing a different rounded number with no finding.
-    authority_refs:
-      - VellisRequirements::canonicalSemanticEquality
-      - VellisRequirements::mcpOutcomeIntegrity
-    evidence_refs:
-      - path:tests/vellis/test_mcp_boundary.py#test_raw_stdio_preserves_a_high_precision_fraction_in_both_directions
-    disposition: resolved
+    consequence: The supported importer exists, but an owner may conclude recovery required a pre-upgrade export.
+    authority_refs: [VellisRequirements::v1SnapshotCompatibility, VellisRequirements::simpleIndividualOperation]
+    evidence_refs: [path:README.md#implementation-status]
+    disposition: plan-change
     owner_work_item_id: W005
-    implementation_status: conforming
-    nearest_wrong_system: Prepared-dictionary tests preserve every apparent value while the production stdio decoder silently rounds a fractional token before the same request reaches them.
-    compatibility_effect: Fractional JSON numbers retain their exact literal mathematical value through stdio input and output; integers, Booleans, schemas, tool names, and stored forms are unchanged.
-  - id: F026
-    summary: The public server command reported every ServeError as an open-memory failure with unchanged established memory, and its first correction overlooked activity-ledger changes from read-only sessions.
-    classification: implementation defect
-    consequence: An owner could be told the wrong failed stage or that memory was unchanged even though committed canonical or activity history had changed during the completed session.
-    authority_refs:
-      - VellisRequirements::simpleIndividualOperation
-      - VellisRequirements::observableFailure
-    evidence_refs:
-      - path:tests/vellis/test_cleanup_boundaries.py#test_public_server_command_keeps_the_close_stage_and_state_effect
-      - path:tests/vellis/test_cleanup_boundaries.py#test_mcp_shutdown_reports_whether_the_completed_session_changed_memory
-      - path:tests/vellis/test_cleanup_boundaries.py#test_mcp_shutdown_counts_read_activity_as_a_changed_memory
-      - path:tests/vellis/test_cleanup_boundaries.py#test_mcp_shutdown_reports_an_indeterminate_effect_when_final_position_is_unreadable
-    disposition: resolved
-    owner_work_item_id: W005
-    implementation_status: conforming
-    nearest_wrong_system: The server diagnoses close contention accurately while the owner-facing command rewrites it into a pre-service failure and a false non-effect.
-    compatibility_effect: Serve failures gain their accurate stage and complete established-memory effect across canonical and activity history; clean serving, open failures, tool behavior, and canonical meaning are unchanged.
-  - id: F027
-    summary: Preservation checks an output name before capture, then publishes with unconditional replacement.
-    classification: implementation defect
-    consequence: A concurrently created file or dangling symbolic link can be overwritten after the preflight check even though the command promises never to write over an existing name.
-    authority_refs:
-      - Vellis::'Preserve personal memory snapshot'
-      - VellisRequirements::ownerControlledMemory
-    evidence_refs:
-      - path:tests/vellis/test_cleanup_boundaries.py#test_preserve_never_replaces_a_concurrently_created_destination
-      - path:tests/vellis/test_cleanup_boundaries.py#test_preserve_refuses_a_dangling_symlink_before_observing_memory
-    disposition: resolved
-    owner_work_item_id: W006
-    implementation_status: conforming
-    nearest_wrong_system: Snapshot bytes are complete and valid while publication destroys another file that appeared during capture.
-    compatibility_effect: Successful output is unchanged; publication now refuses every already-established destination name atomically.
-  - id: F028
-    summary: A preservation capture or write failure can suppress a simultaneous close and checkpoint failure, and observation reporting is assumed rather than measured.
-    classification: implementation defect
-    consequence: The owner may miss WAL copy-safety guidance or be told an activity record exists when failure occurred before snapshot observation.
-    authority_refs:
-      - Vellis::'Preserve personal memory snapshot'
-      - VellisRequirements::observableFailure
-      - VellisRequirements::durableCanonicalHistory
-    evidence_refs:
-      - path:tests/vellis/test_cleanup_boundaries.py#test_preserve_reports_capture_and_close_failures_together
-      - path:tests/vellis/test_cleanup_boundaries.py#test_preserve_reports_write_and_close_failures_together
-      - path:tests/vellis/test_cleanup_boundaries.py#test_preserve_failure_before_capture_does_not_claim_an_observation
-      - path:tests/vellis/test_cleanup_boundaries.py#test_preserve_reports_an_indeterminate_activity_effect_when_position_is_unreadable
-    disposition: resolved
-    owner_work_item_id: W006
-    implementation_status: conforming
-    nearest_wrong_system: The primary failure is actionable while the secondary checkpoint failure and actual observational effect disappear.
-    compatibility_effect: Failure output gains complete primary, cleanup, and measured activity effects; successful snapshots retain their existing content.
-  - id: F029
-    summary: A rejected restore is reported as an unchanged serve failure even though restoration appends an activity record.
-    classification: implementation defect
-    consequence: The owner receives the wrong operation name and a false state-effect claim after a normal semantic refusal.
-    authority_refs:
-      - Vellis::'Restore prior personal memory'
-      - VellisRequirements::observableFailure
-      - VellisRequirements::dualLedgerSeparation
-    evidence_refs:
-      - path:tests/vellis/test_cleanup_boundaries.py#test_rejected_restore_reports_restore_and_its_activity_effect
-    disposition: resolved
-    owner_work_item_id: W006
-    implementation_status: conforming
-    nearest_wrong_system: Canonical state is correctly preserved and activity history correctly records the refusal while the command denies that either operation or effect occurred.
-    compatibility_effect: Restore failures use restore-specific language and report canonical-or-activity effects accurately; restore semantics are unchanged.
-  - id: F030
-    summary: An unexpected server construction or transport exception escapes the public command as a bare traceback.
-    classification: implementation defect
-    consequence: A connection failure lacks its failed stage, state effect, corrective action, and any simultaneous close/checkpoint warning.
-    authority_refs:
-      - VellisRequirements::simpleIndividualOperation
-      - VellisRequirements::observableFailure
-    evidence_refs:
-      - path:tests/vellis/test_cleanup_boundaries.py#test_unexpected_mcp_runtime_failure_reports_its_stage_and_observed_effect
-      - path:tests/vellis/test_cleanup_boundaries.py#test_unexpected_mcp_runtime_and_close_failures_are_both_reported
-      - path:tests/vellis/test_cleanup_boundaries.py#test_mcp_process_control_failure_keeps_its_meaning_after_cleanup
-    disposition: resolved
-    owner_work_item_id: W006
-    implementation_status: conforming
-    nearest_wrong_system: Domain tool outcomes are correct while the process boundary fails outside the actionable owner contract.
-    compatibility_effect: Ordinary runtime exceptions become structured serve failures; process-control exceptions retain their existing propagation.
-  - id: F031
-    summary: Failed and paused campaign worker results bypass current campaign, work-item, checkpoint, and state-token bindings.
-    classification: implementation defect
-    consequence: A stale or misrouted result can pass candidate validation and drive retry or failure handling for the wrong work.
-    authority_refs:
-      - AGENTS.md
-      - .agents/skills/sysml-implementation-campaign/SKILL.md
-    evidence_refs:
-      - path:tests/test_implementation_campaign.py#test_noncheckpointed_worker_result_is_bound_to_current_work_and_state
-      - path:tests/test_implementation_campaign.py#test_noncheckpointed_worker_result_cannot_claim_a_checkpoint
-      - path:tests/test_implementation_campaign.py#test_noncheckpointed_present_review_token_must_match_current_state
-    disposition: resolved
-    owner_work_item_id: W007
-    implementation_status: conforming
-    nearest_wrong_system: Checkpoint advancement is strongly bound while a non-successful result from unrelated or stale work is accepted as current.
-    compatibility_effect: Schema version 2 remains accepted; invalid paused and failed results are newly rejected.
-  - id: F032
-    summary: Security guidance still says the repository has no application implementation or runnable MCP server.
+    implementation_status: partial
+    nearest_wrong_system: Correct import behavior is documented as though unsupported raw conversion or pre-upgrade export were required.
+    compatibility_effect: A v1.0 fixture and post-upgrade runbook evidence the accepted snapshot-to-new-lineage path.
+  - id: F009
+    summary: Gates do not reject vacuous constraints, backend equality drift, silent observation loss, or unbuildable artifacts.
     classification: plan gap
-    consequence: Reporters are directed by an obsolete threat and runtime scope that omits the implemented CLI, local store, snapshot, and STDIO boundary.
-    authority_refs:
-      - README.md
-      - SECURITY.md
-    evidence_refs:
-      - path:SECURITY.md#current-scope
-    disposition: resolved
-    owner_work_item_id: W008
-    implementation_status: conforming
-    nearest_wrong_system: The application is runnable and locally stateful while its reporting policy describes only a model repository.
-    compatibility_effect: Documentation only; no runtime or security boundary changes.
-  - id: F033
-    summary: Query discovery guidance does not explicitly identify anchor projection as the exact object-count workaround or explain the shared-data condition for multi-type groups.
-    classification: plan gap
-    consequence: A caller may silently undercount property-only tuples or expect a union group to reach per-type associated data without learning the correct existing alternatives.
-    authority_refs:
-      - VellisRequirements::semanticQueryMeaning
-      - VellisRequirements::querySafety
-    evidence_refs:
-      - path:tests/vellis/test_mcp_boundary.py#test_query_discovery_explains_identity_counts_and_multi_type_grounding
-      - path:tests/vellis/test_graph_queries.py#test_projecting_anchors_preserves_identity_for_exact_object_counts
-    disposition: resolved
+    consequence: Syntax and source-tree tests can stay green while all underlying defects recur.
+    authority_refs: [AGENTS.md, VellisVerification]
+    evidence_refs: [command:just check]
+    disposition: plan-change
     owner_work_item_id: W006
-    implementation_status: conforming
-    nearest_wrong_system: Query semantics are correct but the tool surface encourages a plausible, silently smaller answer.
-    compatibility_effect: Advisory description only; query schemas, rows, aggregations, and bounds remain unchanged.
-  - id: F034
-    summary: The locked development dependency pypdf 6.14.2 has two known vulnerabilities fixed in 6.15.0.
-    classification: implementation defect
-    consequence: Pre-release dependency evidence claims a clean repository toolchain while reference tooling resolves a package version affected by PYSEC-2026-3655 and PYSEC-2026-3656.
-    authority_refs:
-      - SECURITY.md
-      - AGENTS.md
-    evidence_refs:
-      - path:SECURITY.md#current-scope
-      - command:just check
-    disposition: resolved
-    owner_work_item_id: W008
-    implementation_status: conforming
-    nearest_wrong_system: The shipped runtime is unaffected, but the repository's development and reference-tooling dependency set carries known fixable vulnerabilities while release evidence says otherwise.
-    compatibility_effect: Development dependency refresh only; product runtime, stored meaning, and public interfaces are unchanged.
-  - id: F035
-    summary: Query guidance overstates row counting as an exact anchor count when other projections can repeat an anchor across distinct tuples.
-    classification: plan gap
-    consequence: A caller can overcount anchors when one anchor has several matching associated-data or link assignments, despite following the published identity guidance.
-    authority_refs:
-      - VellisRequirements::semanticQueryMeaning
-      - VellisRequirements::querySafety
-    evidence_refs:
-      - path:tests/vellis/test_graph_queries.py#test_anchor_count_uses_distinct_identity_when_other_projections_repeat_it
-      - path:tests/vellis/test_mcp_boundary.py#test_query_discovery_explains_identity_counts_and_multi_type_grounding
-    disposition: resolved
-    owner_work_item_id: W008
-    implementation_status: conforming
-    nearest_wrong_system: Anchor-only counting is exact, but adding a one-to-many projection makes row count larger than the number of distinct projected anchor identities.
-    compatibility_effect: Advisory description only; query schemas, evaluated tuples, aggregation, and bounds remain unchanged.
-  - id: F036
-    summary: Process-control exceptions during restore or fresh initialization bypass database close and checkpoint cleanup.
-    classification: implementation defect
-    consequence: An owner interruption can propagate after a canonical commit without attempting the repository's close/checkpoint path, leaving the owner without the cleanup guarantee needed before copying the database.
-    authority_refs:
-      - VellisRequirements::observableFailure
-      - VellisRequirements::simpleIndividualOperation
-      - VellisRequirements::freshInitialization
-      - Vellis::'Restore prior personal memory'
-    evidence_refs:
-      - path:tests/vellis/test_cleanup_boundaries.py#test_restore_process_control_failure_keeps_its_meaning_after_cleanup
-      - path:tests/vellis/test_setup_path.py#test_setup_process_control_failure_keeps_its_meaning_after_cleanup
-    disposition: resolved
-    owner_work_item_id: W009
-    implementation_status: conforming
-    nearest_wrong_system: Ordinary failures and server interruption close safely, while the same interruption during restore or setup escapes one line before cleanup begins.
-    compatibility_effect: Process-control exceptions still propagate; cleanup is newly attempted first and a simultaneous checkpoint failure is attached without replacing the original exception.
-  - id: F037
-    summary: Paused and failed campaign results can claim passed checks and a clean state-bound review pair.
-    classification: implementation defect
-    consequence: Candidate validation accepts completion evidence that the non-checkpointed outcome is not permitted to claim, making a paused or failed handoff internally misleading even though it cannot advance a checkpoint.
-    authority_refs:
-      - AGENTS.md
-      - .agents/skills/sysml-implementation-campaign/SKILL.md
-    evidence_refs:
-      - path:tests/test_implementation_campaign.py#test_noncheckpointed_worker_result_cannot_claim_completion_evidence
-    disposition: resolved
-    owner_work_item_id: W009
-    implementation_status: conforming
-    nearest_wrong_system: Campaign, work-item, state-token, reason, and null-checkpoint bindings all pass while a failed result falsely presents every check and both final reviews as clean.
-    compatibility_effect: Worker-result schema version 2 remains unchanged; non-checkpointed results may still report failed or not-run checks and finding-bearing reviews, but not completion claims.
-  - id: F038
-    summary: Definition-edit discovery did not say that a type upsert replaces the complete definition at its natural key.
-    classification: plan gap
-    consequence: A caller can omit a property constraint believing the edit retains unspecified members, silently remove that constraint from prospective meaning, and approve a broader vocabulary than intended.
-    authority_refs:
-      - VellisRequirements::nonDisruptiveDefinitionWork
-      - VellisRequirements::mcpAgentToolContract
-    evidence_refs:
-      - path:tests/vellis/test_definition_governance.py#test_a_type_upsert_replaces_its_complete_definition_and_retains_other_keys
-      - path:tests/vellis/test_mcp_boundary.py#test_change_discovery_explains_definition_replacement_and_prospective_preview
-    disposition: resolved
-    owner_work_item_id: W009
-    implementation_status: conforming
-    nearest_wrong_system: Keyed definition staging correctly replaces one complete type while public discovery leaves the caller to guess whether omitted members are retained or removed.
-    compatibility_effect: Advisory description only; definition semantics, tool names, request schemas, active state, and prospective state are unchanged.
-  - id: F039
-    summary: CI fetched only the synthetic pull-request tip while campaign validation requires historical checkpoint commits.
-    classification: plan gap
-    consequence: The required repository check rejects a conforming pre-release candidate because durable campaign evidence cannot be reconstructed from a one-commit checkout, so review readiness depends on local history that CI was never given.
-    authority_refs:
-      - AGENTS.md
-      - CONTRIBUTING.md
-    evidence_refs:
-      - path:tests/test_repository_policy.py#test_ci_runs_locked_setup_before_full_check
-    disposition: resolved
-    owner_work_item_id: W010
-    implementation_status: conforming
-    nearest_wrong_system: The same complete check passes in a full local clone while the required CI job fails before tests because checkout depth hides every historical evidence checkpoint.
-    compatibility_effect: CI checkout history only; product behavior, model authority, dependencies, runtime configuration, and published interfaces are unchanged.
+    implementation_status: partial
+    nearest_wrong_system: The project gate passes with bare normative docs, serialized identity, best-effort audit, and no wheel.
+    compatibility_effect: Evidence and CI become stricter without changing product payload or persistence compatibility.
 decisions:
   - id: D001
-    summary: Replace only self-reaching definitions with the permissive JSON value they stand for, then inline the rest, at the boundary that already owns the wire form.
-    authority_refs:
-      - VellisRequirements::mcpAgentToolContract
-    alternatives:
-      - Annotate the recursive value type in the domain so its schema stops recursing, which would put a serialization concern inside domain meaning.
-      - Hand-author all ten input schemas, which would duplicate the request types and drift from them.
-      - Require clients to resolve references, which the contract forbids as an additional capability.
+    summary: Stream SQL projections and apply the shared semantic row identity before maximumRows.
+    authority_refs: [VellisRequirements::canonicalSemanticEquality, VellisRequirements::querySafety]
+    alternatives: [Canonicalize and migrate nested stored JSON numbers., Keep serialized SQL equality.]
     reversible: true
-    owner_work_item_id: W001
-    evidence_intent:
-      - Every published input schema carries no definitions block and no unresolved reference.
-      - Every parameter carrying semantic input declares an object with members.
-      - Definitions that do not reach themselves keep their typed meaning rather than being flattened.
-      - Accepted requests, semantic refusals, and malformed input stay distinct and unchanged.
-    implementation_status: conforming
-    evidence_refs:
-      - path:tests/vellis/test_mcp_boundary.py#test_published_input_schemas_carry_their_whole_meaning
-      - path:tests/vellis/test_mcp_boundary.py#test_typed_current_change_and_bounded_query_round_trip
-      - path:tests/vellis/test_mcp_boundary.py#test_semantic_rejection_is_typed_but_malformed_input_is_not_a_domain_result
+    owner_work_item_id: W002
+    evidence_intent: [Equal nested spellings collapse on all evaluators., Retain at most maximumRows plus one unique row.]
+    implementation_status: not evaluated
+    evidence_refs: []
   - id: D002
-    summary: Evolution workflow tests select work items and findings by position in the dependency graph rather than by identifier.
-    authority_refs:
-      - AGENTS.md
-    alternatives:
-      - Name every future evolution's work to match the identifiers the tests expect, which freezes the record's inventory permanently.
-      - Give the tests their own synthetic record, which would stop exercising the record the repository actually validates.
+    summary: Publish validation assessment and required activity in one SQLite transaction.
+    authority_refs: [VellisRequirements::validationCoverage, VellisRequirements::dualLedgerSeparation]
+    alternatives: [Roll back a separately committed assessment., Keep observation best-effort.]
     reversible: true
-    owner_work_item_id: W001
-    evidence_intent:
-      - The validator suite passes against a record whose work items and findings carry different identifiers.
-      - Each case still asserts the rule it names, with identifiers resolved from the record under test.
-    implementation_status: conforming
-    evidence_refs:
-      - command:uv run pytest tests/test_system_evolution.py -q
+    owner_work_item_id: W003
+    evidence_intent: [Fault injection preserves the exact prior current assessment.]
+    implementation_status: not evaluated
+    evidence_refs: []
   - id: D003
-    summary: Reading a JSON value is the value module's decision through its exact normalizer, not a union heuristic's.
-    authority_refs:
-      - VellisRequirements::canonicalSemanticEquality
-    alternatives:
-      - Mark the Boolean strict, which a caller validating leniently overrides, as the default tool path does.
-      - Reorder the union so the exact decimal precedes the Boolean, which only moves the collision onto Booleans.
-    reversible: true
-    owner_work_item_id: W001
-    evidence_intent:
-      - One and zero remain numbers whether declared, nested in an array, or nested in an object.
-      - True and false remain Booleans in the same positions.
-      - Kind fidelity holds through the tool path a caller actually uses, not only through direct validation.
+    summary: Preserve confirmed complete-v1-snapshot import as a new v2 lineage; reject raw and in-place migration scope.
+    authority_refs: [VellisRequirements::v1SnapshotCompatibility]
+    alternatives: [Adopt raw predecessor storage and history., Replace a v1 directory in place.]
+    reversible: false
+    owner_work_item_id: W005
+    evidence_intent: [A v1.0 export preserves representable meaning and reports every simplification or omission.]
     implementation_status: conforming
-    evidence_refs:
-      - path:tests/vellis/test_mcp_boundary.py#test_a_stored_value_keeps_the_json_kind_the_caller_sent
+    evidence_refs: [path:tests/vellis/test_v1_streaming.py#test_setup_imports_v1_through_normalized_temporary_sqlite]
   - id: D004
-    summary: Ordered comparison extends to string-valued properties by exact Unicode code point, rather than making starter dates numeric or adding numeric companions.
-    authority_refs:
-      - VellisRequirements::semanticQueryMeaning
-      - VellisRequirements::stringPatternValidation
-      - EverydayLifeStarter
-    alternatives:
-      - Model starter dates as numbers, which keeps query meaning untouched but makes every stored date unreadable, discards the lexical shape rule, migrates every existing starter graph, and leaves every other string unorderable.
-      - Add a numeric companion beside each patterned date, which creates two sources of truth for one fact and silently desynchronises when only one is written.
-    reversible: false
-    owner_work_item_id: W003
-    evidence_intent:
-      - A patterned date range is answerable without reading every candidate row.
-      - Ordering follows exact code points, not case folding or locale collation, and matches for values outside ASCII.
-      - The stored realization and the in-memory realization order identically.
-      - Kinds that carry no order of their own stay rejected, as does a mismatched expected kind.
-      - A pattern still describes which values are valid and never how two of them compare.
-    implementation_status: conforming
-    evidence_refs:
-      - path:tests/vellis/test_graph_queries.py#test_a_string_property_orders_by_code_point
-      - path:tests/vellis/test_graph_queries.py#test_string_ordering_agrees_between_the_stored_and_replayed_graph
-      - command:uv run pytest tests/vellis/test_invalid_queries.py -q
-  - id: D005
-    summary: Assessment scope selection reaches definitions through the resolved current source tables rather than by definition-set identity.
-    authority_refs:
-      - VellisRequirements::validationCoverage
-    alternatives:
-      - Widen assessment to scan the whole active definition set, which trades a correctness defect for the unbounded work the model forbids.
-      - Flatten the overlay into one set on activation, which discards the sharing that keeps an activation bounded.
+    summary: Freeze the reviewed installable candidate at version 2.0.0 before merge.
+    authority_refs: [VellisRequirements::simpleIndividualOperation]
+    alternatives: [Retain 0.2.0.dev0 through merge., Make an unreviewed post-merge version change.]
     reversible: true
-    owner_work_item_id: W001
-    evidence_intent:
-      - A removal orphaning a permission is refused after an unrelated activation, not only on a fresh system.
-      - A removal orphaning only a multiplicity rule is refused on the same terms.
-      - Assessment work stays bounded to the closure of what the edit touched.
-    implementation_status: conforming
-    evidence_refs:
-      - path:tests/vellis/test_definition_governance.py#test_a_removal_that_orphans_a_reference_is_refused_after_an_earlier_activation
-      - path:tests/vellis/test_definition_governance.py#test_a_removal_that_orphans_a_multiplicity_rule_is_refused_after_an_activation
-      - command:uv run pytest tests/vellis/test_population_local_work.py -q
-  - id: D006
-    summary: Aggregation answers over the objects a data condition matched, and the caller's maximum bounds those matches exactly as it bounds a projected result.
-    authority_refs:
-      - VellisRequirements::semanticQueryMeaning
-      - VellisRequirements::querySafety
-    alternatives:
-      - Document the deduplication hazard and leave the arithmetic to callers, which leaves every caller one forgotten projection away from a confidently wrong total.
-      - Bound only the returned aggregate, which would let one number license reading an unbounded population and quietly turn the maximum into a display limit.
-    reversible: false
-    owner_work_item_id: W001
-    evidence_intent:
-      - An aggregate counts and sums matching objects, not distinct projected tuples.
-      - A count of nothing is zero and a sum of nothing is absent.
-      - A selection larger than the maximum is refused whole rather than aggregated in part.
-      - Sum applies only to numbers; minimum and maximum order numbers and strings as an ordered comparison does.
-    implementation_status: conforming
-    evidence_refs:
-      - path:tests/vellis/test_graph_queries.py#test_aggregation_counts_matching_objects_not_distinct_projected_tuples
-      - path:tests/vellis/test_graph_queries.py#test_an_aggregate_is_absent_when_nothing_carries_the_property
-      - path:tests/vellis/test_graph_queries.py#test_an_aggregated_selection_larger_than_the_maximum_is_refused_whole
-      - command:uv run pytest tests/vellis/test_invalid_queries.py -q
-  - id: D007
-    summary: Restoration reaches the owner through the command line rather than through an eleventh agent tool.
-    authority_refs:
-      - VellisRequirements::mcpAgentToolContract
-      - RTGSystem
-    alternatives:
-      - Expose restoration as an eleventh MCP tool, which breaks the selected ten-name contract and hands a recovery action to the surface that decides no authorization.
-      - Leave it unreachable and document the gap, which leaves an owner with damaged memory no recourse at all.
-    reversible: true
-    owner_work_item_id: W001
-    evidence_intent:
-      - The owner can restore a selected revision and is asked before anything happens.
-      - Declining leaves established memory exactly as it was.
-      - Restoration commits forward as a new revision rather than erasing what followed.
-    implementation_status: conforming
-    evidence_refs:
-      - path:tests/vellis/test_historical_restore.py#test_the_owner_can_reach_restoration_from_the_command_line
-  - id: D008
-    summary: An accepted approval binds to a checkpoint where the decision was open or already sealed, and whose gated consequence matches, rather than to one that already recorded the acceptance.
-    authority_refs:
-      - AGENTS.md
-    alternatives:
-      - Drop the checkpoint requirement and record approvals in prose, which loses the only durable evidence of what was put up for decision.
-      - Allow an accepted approval with no checkpoint until a follow-up commit seals it, which leaves a window in which an unsealed acceptance validates.
-    reversible: true
-    owner_work_item_id: W003
-    evidence_intent:
-      - An acceptance can be recorded at all, against a checkpoint that shows the decision pending.
-      - A checkpoint where the subject needed no decision is refused.
-      - A consequence that changed since the checkpoint is refused.
-    implementation_status: conforming
-    evidence_refs:
-      - path:tests/test_system_evolution.py#test_an_accepted_approval_binds_to_a_checkpoint_that_had_the_decision_open
+    owner_work_item_id: W004
+    evidence_intent: [Built metadata, imported version, lock, and commands agree on 2.0.0.]
+    implementation_status: not evaluated
+    evidence_refs: []
 work_items:
   - id: W001
     order: 1
-    label: Close callable-tool and scale-simulation defects across the selected boundary
-    kind: implementation
+    label: Formalize accepted obligations and observation completion
+    kind: modeling
     dependencies: []
-    planned_baseline:
-      dimension: implementation
-      identity: git:f52adf1ce01cbe1450acabab731d6def6aabbccb
-    finding_ids: [F001, F002, F003, F004, F005, F006, F007, F009, F010, F011, F012, F013, F014, F017, F018, F019, F020, F022, F023, F024]
-    decision_ids: [D001, D002, D003, D005, D006, D007]
+    planned_baseline: {dimension: model, identity: sha256:30decc89ce67a19b2f9720028ffb3eb8161edf37affd11fa49b12179b3018d3e}
+    finding_ids: [F001, F002, F003]
+    decision_ids: []
     authority:
-      - refs:
-          - VellisRequirements::mcpAgentToolContract
-        coverage: partial
-        remaining_work_item_ids: [W002]
-      - refs:
-          - RTG::'Return Shape'
-          - RTG::'Graph Query'
-          - VellisRequirements::semanticQueryMeaning
-          - VellisRequirements::querySafety
-        coverage: partial
-        remaining_work_item_ids: [W002]
-      - refs:
-          - VellisRequirements::durableCanonicalHistory
-          - VellisRequirements::simpleIndividualOperation
-          - VellisRequirements::mcpOutcomeIntegrity
-        coverage: partial
-        remaining_work_item_ids: [W002]
-    approval:
-      status: not-required
-      reason: An implementation defect already decided by accepted MCP contract meaning is ordinary implementation work.
-      checkpoint: null
-    nearest_wrong_system: The surface is callable while one evaluator returns wrong or population-sized aggregate work, a legacy request is malformed, or close silently leaves the named file incomplete or replaces the operation outcome.
-    compatibility_effect: Callers gain typed schemas and multi-type groups while the former scalar singleton spelling remains accepted; canonical results use the collection shape.
-    non_effects:
-      - Validation still runs against the real request types, not the published schema.
-      - Stored property values remain constrained only by the owner's definitions.
-      - Canonical state, persistence format, and user-owned data are untouched.
-      - A rejected over-bound query returns no partial rows or aggregates.
-    lifecycle: complete
-    implementation_status: conforming
-    evidence_refs:
-      - command:uv run pytest tests/vellis/test_mcp_boundary.py -q
-      - command:uv run pytest tests/vellis/test_graph_queries.py tests/vellis/test_store_integrity.py -q
-      - command:uv run pytest tests/vellis/test_setup_path.py tests/vellis/test_cleanup_boundaries.py -q
+      - refs: [VellisRequirements, VellisVerification, RTGSystem]
+        coverage: full
+        remaining_work_item_ids: []
+    approval: {status: pending, reason: "The owner accepted the formal constraint, subject, and completion meaning; durable binding is pending.", checkpoint: null}
+    nearest_wrong_system: Prose remains non-constraining, RTG verification binds to Vellis, or required observation is absent.
+    compatibility_effect: Formal and failure semantics become explicit without changing normal payloads.
+    non_effects: [MCP and persistence shapes remain unchanged., Accepted canonical mutations remain canonical-ledger authoritative.]
+    lifecycle: pending
+    implementation_status: not evaluated
+    evidence_refs: []
     blocker: null
-    checkpoint: git:f52adf1ce01cbe1450acabab731d6def6aabbccb
+    checkpoint: git:5d33c6ef405aa8efa1a54de81d7e9427aa9e1850
   - id: W002
     order: 2
-    label: Review and close the boundary schema correction
-    kind: closure
+    label: Enforce semantic projected-row equality before query bounds
+    kind: implementation
     dependencies: [W001]
-    planned_baseline:
-      dimension: implementation
-      identity: git:f52adf1ce01cbe1450acabab731d6def6aabbccb
-    finding_ids: []
-    decision_ids: []
+    planned_baseline: {dimension: implementation, identity: git:5d33c6ef405aa8efa1a54de81d7e9427aa9e1850}
+    finding_ids: [F004]
+    decision_ids: [D001]
     authority:
-      - refs:
-          - VellisRequirements::mcpAgentToolContract
-          - RTG::'Return Shape'
-          - RTG::'Graph Query'
-          - VellisRequirements::semanticQueryMeaning
-          - VellisRequirements::querySafety
-          - VellisRequirements::durableCanonicalHistory
-          - VellisRequirements::simpleIndividualOperation
+      - refs: [VellisRequirements::canonicalSemanticEquality, VellisRequirements::semanticQueryMeaning, VellisRequirements::querySafety]
         coverage: full
         remaining_work_item_ids: []
-    approval:
-      status: not-required
-      reason: Closure reconciles a bounded boundary correction under unchanged authority.
-      checkpoint: null
-    nearest_wrong_system: Checks pass while a published schema still defers its meaning to a reference.
-    compatibility_effect: No public or persisted compatibility changes.
-    non_effects:
-      - The ten selected tool names and their order remain exactly as the model declares them.
-      - User-owned data remains untouched.
-    lifecycle: complete
-    implementation_status: conforming
-    evidence_refs:
-      - command:just check
-      - command:just system-evolution-check
+    approval: {status: not-required, reason: Accepted equality and bound authority already decide the defect., checkpoint: null}
+    nearest_wrong_system: Numeric spelling decides duplicate cardinality and refusal.
+    compatibility_effect: Equal duplicates collapse; storage and distinct results are unchanged.
+    non_effects: [Aggregation remains object-identity based., No persistence or schema change occurs.]
+    lifecycle: pending
+    implementation_status: conflicting
+    evidence_refs: []
     blocker: null
-    checkpoint: git:f52adf1ce01cbe1450acabab731d6def6aabbccb
+    checkpoint: null
   - id: W003
     order: 3
-    label: Decide how a date-range question is asked, then change the accepted meaning it needs
-    kind: modeling
-    dependencies: []
-    planned_baseline:
-      dimension: model
-      identity: sha256:30decc89ce67a19b2f9720028ffb3eb8161edf37affd11fa49b12179b3018d3e
-    finding_ids: [F008, F015, F021]
-    decision_ids: [D004, D008]
+    label: Make required observation and assessment publication fail closed
+    kind: implementation
+    dependencies: [W001]
+    planned_baseline: {dimension: implementation, identity: git:5d33c6ef405aa8efa1a54de81d7e9427aa9e1850}
+    finding_ids: [F005, F006]
+    decision_ids: [D002]
     authority:
-      - refs:
-          - VellisRequirements::semanticQueryMeaning
-          - VellisRequirements::stringPatternValidation
-          - EverydayLifeStarter
+      - refs: [VellisRequirements::dualLedgerSeparation, VellisRequirements::validationCoverage, VellisRequirements::mcpOutcomeIntegrity]
         coverage: full
         remaining_work_item_ids: []
-    approval:
-      status: accepted
-      reason: The corrected compatibility statement must be sealed against a checkpoint that already carries the accepted Unicode code-point ordering consequence.
-      checkpoint: git:65f138443e1ecbe8d9b067bd26d2ad2af1ef57c6
-    nearest_wrong_system: An agent quietly relaxes ordered string comparison, and pattern validation silently acquires the ordering the model says it must not add.
-    compatibility_effect: Ordered comparison now accepts string-valued properties by exact Unicode code point; stored values and existing query results are unchanged, while formerly refused ordered string queries are answered.
-    non_effects:
-      - No accepted model meaning changes before the owner accepts it.
-      - Existing starter graphs keep their stored date values whichever approach is chosen.
-    lifecycle: complete
-    implementation_status: conforming
-    evidence_refs:
-      - path:tests/vellis/test_graph_queries.py#test_a_string_property_orders_by_code_point
-      - path:tests/vellis/test_graph_queries.py#test_string_ordering_agrees_between_the_stored_and_replayed_graph
+    approval: {status: not-required, reason: Accepted target authority makes the correction determinate., checkpoint: null}
+    nearest_wrong_system: A result lacks observation or failed validation replaces the prior assessment.
+    compatibility_effect: Observation faults become unexpected; successful behavior and schema remain unchanged.
+    non_effects: [Accepted canonical mutations gain no duplicate activity record., Observation cannot roll back canonical history.]
+    lifecycle: pending
+    implementation_status: conflicting
+    evidence_refs: []
     blocker: null
-    checkpoint: git:f52adf1ce01cbe1450acabab731d6def6aabbccb
+    checkpoint: null
   - id: W004
     order: 4
-    label: Accept the coherent aggregation-only query authority
-    kind: modeling
-    dependencies: []
-    planned_baseline:
-      dimension: model
-      identity: sha256:30decc89ce67a19b2f9720028ffb3eb8161edf37affd11fa49b12179b3018d3e
-    finding_ids: [F016]
-    decision_ids: []
+    label: Restore the installable Vellis 2.0 command boundary
+    kind: implementation
+    dependencies: [W001]
+    planned_baseline: {dimension: implementation, identity: git:5d33c6ef405aa8efa1a54de81d7e9427aa9e1850}
+    finding_ids: [F007]
+    decision_ids: [D004]
     authority:
-      - refs:
-          - RTG::'Return Shape'
-          - RTG::'Graph Query'
-          - VellisRequirements::semanticQueryMeaning
-          - VellisRequirements::querySafety
-        coverage: full
-        remaining_work_item_ids: []
-    approval:
-      status: accepted
-      reason: Resolving contradictory projection cardinality selects one coherent accepted meaning for aggregation-only queries, and the owner explicitly requested that reviewed correction.
-      checkpoint: git:428faa3753365862626aa108ae55ad79535f97e8
-    nearest_wrong_system: One accepted declaration permits aggregation-only queries while another makes every such query an impossible model instance.
-    compatibility_effect: Aggregation-only queries become consistently modeled; existing projected and aggregated requests retain their accepted results.
-    non_effects:
-      - No query gains sorting, pagination, traversal, or computed expressions.
-      - Persistence and canonical graph meaning remain unchanged.
-    lifecycle: complete
-    implementation_status: conforming
-    evidence_refs:
-      - command:just model-check
-      - path:tests/vellis/test_graph_queries.py#test_aggregation_agrees_between_the_stored_and_in_memory_graph
+      - refs: [VellisRequirements::simpleIndividualOperation]
+        coverage: partial
+        remaining_work_item_ids: [W005]
+    approval: {status: pending, reason: The owner selected reviewed final 2.0.0 metadata before merge; durable binding is pending., checkpoint: null}
+    nearest_wrong_system: Source modules work while installed commands do not.
+    compatibility_effect: Both former executables dispatch v2 setup, preserve, restore, and serving.
+    non_effects: [FastMCP pins and MCP contract remain unchanged., Packaging selects no remote deployment.]
+    lifecycle: pending
+    implementation_status: conflicting
+    evidence_refs: []
     blocker: null
-    checkpoint: git:f52adf1ce01cbe1450acabab731d6def6aabbccb
+    checkpoint: null
   - id: W005
     order: 5
-    label: Preserve exact fractional wire values and truthful server cleanup outcomes
-    kind: implementation
-    dependencies: [W001, W002, W003, W004]
-    planned_baseline:
-      dimension: implementation
-      identity: git:dfe65eea36cc95302deecaeee6ae8e0df7f93800
-    finding_ids: [F025, F026]
-    decision_ids: []
+    label: Make v1 snapshot recovery and guidance reproducible
+    kind: integration
+    dependencies: [W004]
+    planned_baseline: {dimension: implementation, identity: git:5d33c6ef405aa8efa1a54de81d7e9427aa9e1850}
+    finding_ids: [F008]
+    decision_ids: [D003]
     authority:
-      - refs:
-          - VellisRequirements::canonicalSemanticEquality
-          - VellisRequirements::mcpOutcomeIntegrity
-        coverage: partial
-        remaining_work_item_ids: [W001, W002]
-      - refs:
-          - VellisRequirements::simpleIndividualOperation
-          - VellisRequirements::observableFailure
-        coverage: partial
-        remaining_work_item_ids: [W002]
-    approval:
-      status: not-required
-      reason: Both findings are implementation defects already decided by accepted exact-value and actionable-failure authority.
-      checkpoint: null
-    nearest_wrong_system: Unit-level tool calls and direct serve tests pass while raw stdio rounds a fraction or the public command contradicts a completed mutating session's close failure.
-    compatibility_effect: Exact fractional JSON values survive stdio round trips, and close failures report their true stage and complete canonical-or-activity state effect; existing tool names, schemas, stored meaning, and clean outcomes remain unchanged.
-    non_effects:
-      - No model authority, persistence format, tool inventory, request schema, or owner data changes.
-      - Malformed input remains distinct from a completed domain result.
-      - Open-memory failures continue to report unchanged memory.
-    lifecycle: complete
-    implementation_status: conforming
-    evidence_refs:
-      - path:tests/vellis/test_mcp_boundary.py#test_raw_stdio_preserves_a_high_precision_fraction_in_both_directions
-      - path:tests/vellis/test_cleanup_boundaries.py#test_public_server_command_keeps_the_close_stage_and_state_effect
-      - path:tests/vellis/test_cleanup_boundaries.py#test_mcp_shutdown_counts_read_activity_as_a_changed_memory
-      - path:tests/vellis/test_cleanup_boundaries.py#test_mcp_shutdown_reports_an_indeterminate_effect_when_final_position_is_unreadable
-      - command:uv run pytest tests/vellis/test_mcp_boundary.py tests/vellis/test_cleanup_boundaries.py tests/vellis/test_setup_path.py -q
-      - command:just check
+      - refs: [VellisRequirements::v1SnapshotCompatibility, VellisRequirements::simpleIndividualOperation]
+        coverage: full
+        remaining_work_item_ids: []
+    approval: {status: pending, reason: The owner reaffirmed snapshot translation to a new ledger and rejected in-place conversion; durable binding is pending., checkpoint: null}
+    nearest_wrong_system: Import works but guidance implies pre-upgrade-only export or raw migration.
+    compatibility_effect: A fixture and runbook evidence the accepted path.
+    non_effects: [No raw v1 reader is added., Real owner data and clients remain untouched.]
+    lifecycle: pending
+    implementation_status: partial
+    evidence_refs: []
     blocker: null
-    checkpoint: git:cdd309bbf946214622b33925b4272496a94004b2
+    checkpoint: null
   - id: W006
     order: 6
-    label: Make owner-facing snapshot, restore, serve, and query guidance truthful
-    kind: implementation
-    dependencies: [W001, W002, W003, W004, W005]
-    planned_baseline:
-      dimension: implementation
-      identity: git:2d4c8406e971dd57febb2f045d31b162d42b0544
-    finding_ids: [F027, F028, F029, F030, F033]
-    decision_ids: []
-    authority:
-      - refs:
-          - Vellis::'Preserve personal memory snapshot'
-          - Vellis::'Restore prior personal memory'
-          - VellisRequirements::observableFailure
-          - VellisRequirements::simpleIndividualOperation
-          - VellisRequirements::semanticQueryMeaning
-          - VellisRequirements::querySafety
-        coverage: partial
-        remaining_work_item_ids: [W008]
-    approval:
-      status: not-required
-      reason: Accepted authority already decides publication non-destruction, observable failures, and query meaning.
-      checkpoint: null
-    nearest_wrong_system: Each nominal operation works while concurrent publication, rejected restoration, or runtime cleanup makes the owner-facing result false or incomplete.
-    compatibility_effect: Successful operations and query meaning are unchanged; failure diagnostics and advisory query guidance become more precise.
-    non_effects:
-      - No tool name, request schema, query result, canonical meaning, or persistence format changes.
-      - Process-control exceptions remain process-control exceptions.
-      - User-owned data and protected ignored files remain untouched.
-    lifecycle: complete
-    implementation_status: conforming
-    evidence_refs:
-      - command:uv run pytest tests/vellis/test_cleanup_boundaries.py tests/vellis/test_mcp_boundary.py tests/vellis/test_historical_restore.py -q
-      - command:uv run pytest tests/vellis/test_graph_queries.py tests/vellis/test_invalid_queries.py -q
-    blocker: null
-    checkpoint: git:b519b400476d9bd364d1110a30c3d3120d8b457c
-  - id: W007
-    order: 7
-    label: Bind every campaign worker result to current work and durable state
-    kind: implementation
-    dependencies: [W006]
-    planned_baseline:
-      dimension: implementation
-      identity: git:2d4c8406e971dd57febb2f045d31b162d42b0544
-    finding_ids: [F031]
-    decision_ids: []
-    authority:
-      - refs:
-          - AGENTS.md
-          - .agents/skills/sysml-implementation-campaign/SKILL.md
-        coverage: full
-        remaining_work_item_ids: []
-    approval:
-      status: not-required
-      reason: The correction makes candidate validation enforce the already-selected supervision boundary.
-      checkpoint: null
-    nearest_wrong_system: A compact result is schema-valid but belongs to another campaign, work item, checkpoint outcome, or durable state.
-    compatibility_effect: Worker-result schema version 2 is unchanged; invalid non-success results fail closed.
-    non_effects:
-      - Checkpointed clean-pair validation remains unchanged.
-      - No implementation campaign record or product runtime behavior changes.
-    lifecycle: complete
-    implementation_status: conforming
-    evidence_refs:
-      - command:uv run pytest tests/test_implementation_campaign.py -q
-      - command:just implementation-campaign-check
-    blocker: null
-    checkpoint: git:b519b400476d9bd364d1110a30c3d3120d8b457c
-  - id: W008
-    order: 8
-    label: Synchronize public truth and close pre-release remediation
+    label: Integrate evidence and close the Vellis 2.0 candidate
     kind: closure
-    dependencies: [W006, W007]
-    planned_baseline:
-      dimension: implementation
-      identity: git:a57c30aa20c3db3968b7e00bad8ad46497fdca5d
-    finding_ids: [F032, F034, F035]
+    dependencies: [W002, W003, W004, W005]
+    planned_baseline: {dimension: implementation, identity: git:5d33c6ef405aa8efa1a54de81d7e9427aa9e1850}
+    finding_ids: [F009]
     decision_ids: []
     authority:
-      - refs:
-          - README.md
-          - SECURITY.md
-          - VellisRequirements::simpleIndividualOperation
+      - refs: [VellisRequirements, VellisVerification, AGENTS.md]
         coverage: full
         remaining_work_item_ids: []
-    approval:
-      status: not-required
-      reason: Closure aligns public reporting scope with the already implemented local boundary.
-      checkpoint: null
-    nearest_wrong_system: All product code and checks conform while public security scope, dependency evidence, or closure evidence describes a retired or vulnerable repository state.
-    compatibility_effect: Documentation, development dependency, lock, and evolution bookkeeping only.
-    non_effects:
-      - Accepted model authority and the trusted local STDIO boundary remain unchanged.
-      - Native anchor-group aggregation remains deferred.
-    lifecycle: complete
-    implementation_status: conforming
-    evidence_refs:
-      - command:just model-check
-      - command:just system-evolution-check
-      - command:just check
+    approval: {status: not-required, reason: Closure adds evidence and reconciles the approved target., checkpoint: null}
+    nearest_wrong_system: Source checks pass while semantic or built-artifact behavior is broken.
+    compatibility_effect: CI and release evidence become stricter.
+    non_effects: [No release is merged or published., User data and clients remain untouched.]
+    lifecycle: pending
+    implementation_status: partial
+    evidence_refs: []
     blocker: null
-    checkpoint: git:f35f2a1f7405915ecac6e82b715f1eb1de22c661
-  - id: W009
-    order: 9
-    label: Preserve cleanup, handoff, and public discovery meaning
-    kind: implementation
-    dependencies: [W008]
-    planned_baseline:
-      dimension: implementation
-      identity: git:f3ed8d10689483cc183511b36300c82881d74cd7
-    finding_ids: [F036, F037, F038]
-    decision_ids: []
-    authority:
-      - refs:
-          - VellisRequirements::observableFailure
-          - VellisRequirements::simpleIndividualOperation
-          - VellisRequirements::freshInitialization
-          - VellisRequirements::nonDisruptiveDefinitionWork
-          - VellisRequirements::mcpAgentToolContract
-          - AGENTS.md
-          - .agents/skills/sysml-implementation-campaign/SKILL.md
-        coverage: full
-        remaining_work_item_ids: []
-    approval:
-      status: not-required
-      reason: Accepted product authority and campaign supervision already require cleanup before propagation, outcome-specific candidate claims, and truthful discovery of existing edit semantics.
-      checkpoint: null
-    nearest_wrong_system: Nominal and ordinary failures are safe while process-control or non-checkpointed handoff paths bypass cleanup and evidence boundaries, or correct edit behavior remains unsafe to infer from discovery.
-    compatibility_effect: Product semantics and worker-result schema version remain unchanged; cleanup and semantic validation become stricter, and existing query, preview, and definition-edit behavior becomes explicit in discovery.
-    non_effects:
-      - Process-control exceptions retain their original Python meaning.
-      - No persistence format, product interface, campaign checkpoint format, or schema version changes.
-      - User-owned data and protected ignored files remain untouched.
-    lifecycle: complete
-    implementation_status: conforming
-    evidence_refs:
-      - command:uv run pytest tests/vellis/test_cleanup_boundaries.py tests/vellis/test_setup_path.py tests/test_implementation_campaign.py -q
-      - command:uv run pytest tests/vellis/test_mcp_boundary.py tests/vellis/test_definition_governance.py -q
-      - command:just skills-check
-      - command:just implementation-campaign-check
-      - command:just check
-    blocker: null
-    checkpoint: git:b8a78cbbc996ef5ab2752c795e49d80c0a885804
-  - id: W010
-    order: 10
-    label: Make CI checkpoint evidence reconstructible
-    kind: implementation
-    dependencies: [W009]
-    planned_baseline:
-      dimension: implementation
-      identity: git:5e5e727a0600f9129e3d38d7555782dc2bacc466
-    finding_ids: [F039]
-    decision_ids: []
-    authority:
-      - refs:
-          - AGENTS.md
-          - CONTRIBUTING.md
-        coverage: full
-        remaining_work_item_ids: []
-    approval:
-      status: not-required
-      reason: Existing repository rules already require CI to validate reconstructible campaign checkpoints; the checkout must supply the history that validation consumes.
-      checkpoint: null
-    nearest_wrong_system: CI invokes the complete project gate but supplies a repository view incapable of resolving the durable checkpoints that gate is required to validate.
-    compatibility_effect: The GitHub Actions checkout fetches history needed for validation; product behavior, dependencies, runtime state, and external configuration remain unchanged.
-    non_effects:
-      - No model, product implementation, persistence, MCP contract, dependency, or lock-file changes.
-      - Local check semantics and campaign checkpoint identities remain unchanged.
-      - User-owned data, external clients, and protected ignored files remain untouched.
-    lifecycle: complete
-    implementation_status: conforming
-    evidence_refs:
-      - command:uv run pytest tests/test_repository_policy.py -q
-      - command:just implementation-campaign-check
-      - command:just check
-    blocker: null
-    checkpoint: git:fc92f3bef7e95ba1d9885d1d2dd316124307c444
+    checkpoint: null
 closure:
-  finding_disposition: complete
-  model_status: accepted
-  implementation_status: conforming
-  integration_status: conforming
+  finding_disposition: open
+  model_status: not evaluated
+  implementation_status: conflicting
+  integration_status: partial
   external_status: not applicable
-  compatibility: Model, persistence, tool names, request schemas, query meaning, and runtime behavior remain unchanged; public guidance and campaign validation are stricter, developer-tool changes remain toolchain-only, and CI gains the repository history required to reconstruct durable checkpoint evidence.
+  compatibility: V1 compatibility remains confirmed snapshot translation into a separate new v2 lineage; raw and in-place conversion remain outside scope. Installable command and 2.0.0 evidence are pending.
   reviews:
-    - lens: authority and conformance
-      status: clean
-      reviewer: /root/ci_authority_review
-      checkpoint: git:fc92f3bef7e95ba1d9885d1d2dd316124307c444
-      evidence_refs:
-        - command:just check
-    - lens: engineering and evidence
-      status: clean
-      reviewer: /root/ci_engineering_review
-      checkpoint: git:fc92f3bef7e95ba1d9885d1d2dd316124307c444
-      evidence_refs:
-        - command:just check
-  evidence_refs:
-    - command:just model-check
-    - command:just implementation-campaign-check
-    - command:just system-evolution-check
-    - command:just check
-  checkpoint: git:fc92f3bef7e95ba1d9885d1d2dd316124307c444
+    - {lens: authority and conformance, status: pending, reviewer: null, checkpoint: null, evidence_refs: []}
+    - {lens: engineering and evidence, status: pending, reviewer: null, checkpoint: null, evidence_refs: []}
+  evidence_refs: []
+  checkpoint: null
