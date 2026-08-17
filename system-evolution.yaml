@@ -3,13 +3,13 @@ evolution:
   id: vellis-2-prerelease-remediation
   objective: Formalize accepted obligations and restore semantic, observational, compatibility, and installable release integrity for Vellis 2.0.
   observable_distinction: Requirements and objectives constrain their prose, query bounds use semantic JSON equality, required observations cannot disappear behind completed results, and installed Vellis preserves snapshot recovery.
-  lifecycle: active
+  lifecycle: ready
   approval:
     status: accepted
     reason: The approved plan must be bound to a durable awaiting-approval checkpoint before execution.
     checkpoint: git:90daeb0effc79e9a9a8ab8bfa64d8f701b5c15c0
   blocker: null
-  checkpoint: git:0de8c94b8afd71260ffece09fc73fb6a970fc7e9
+  checkpoint: git:9a446f6683787ae2b032f62652d087743fdd5d41
 baselines:
   status: current
   source: &source
@@ -20,10 +20,10 @@ baselines:
     checkpoint: git:5d33c6ef405aa8efa1a54de81d7e9427aa9e1850
   target: &target
     model: sha256:adf05b52f9839b75f76240ee116c0ffba7ee452602c2083268d683c4b534b2c7
-    implementation: git:0de8c94b8afd71260ffece09fc73fb6a970fc7e9
+    implementation: git:9a446f6683787ae2b032f62652d087743fdd5d41
     language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
     execution_environment: sha256:50d4f5cf86c91d1ab613cd7ea017a88fe5127ca1c25b118033c6548591d4349f
-    checkpoint: git:0de8c94b8afd71260ffece09fc73fb6a970fc7e9
+    checkpoint: git:9a446f6683787ae2b032f62652d087743fdd5d41
   observed: *target
 scope:
   authority_scope:
@@ -93,9 +93,9 @@ findings:
     consequence: Mathematically equal nested numbers can produce duplicate rows and an incorrect whole-query refusal.
     authority_refs: [VellisRequirements::canonicalSemanticEquality, VellisRequirements::semanticQueryMeaning, VellisRequirements::querySafety]
     evidence_refs: [path:tests/vellis/test_graph_queries.py#test_a_projected_property_participates_in_row_identity]
-    disposition: implementation-work
+    disposition: resolved
     owner_work_item_id: W002
-    implementation_status: conflicting
+    implementation_status: conforming
     nearest_wrong_system: Nested 3 and 3.00 are two SQL rows although public equality says they are one value.
     compatibility_effect: Equal duplicates collapse correctly; stored values and genuinely distinct rows are unchanged.
   - id: F005
@@ -161,8 +161,10 @@ decisions:
     reversible: true
     owner_work_item_id: W002
     evidence_intent: [Equal nested spellings collapse on all evaluators., Retain at most maximumRows plus one unique row.]
-    implementation_status: not evaluated
-    evidence_refs: []
+    implementation_status: conforming
+    evidence_refs:
+      - path:tests/vellis/test_graph_queries.py#test_nested_numeric_spellings_are_one_bounded_semantic_row
+      - path:tests/vellis/test_graph_queries.py#test_maximum_rows_rejects_genuinely_unequal_nested_values
   - id: D002
     summary: Publish validation assessment and required activity in one SQLite transaction.
     authority_refs: [VellisRequirements::validationCoverage, VellisRequirements::dualLedgerSeparation]
@@ -231,17 +233,20 @@ work_items:
     nearest_wrong_system: Numeric spelling decides duplicate cardinality and refusal.
     compatibility_effect: Equal duplicates collapse; storage and distinct results are unchanged.
     non_effects: [Aggregation remains object-identity based., No persistence or schema change occurs.]
-    lifecycle: active
-    implementation_status: conflicting
-    evidence_refs: []
+    lifecycle: complete
+    implementation_status: conforming
+    evidence_refs:
+      - path:tests/vellis/test_graph_queries.py#test_nested_numeric_spellings_are_one_bounded_semantic_row
+      - path:tests/vellis/test_graph_queries.py#test_maximum_rows_rejects_genuinely_unequal_nested_values
+      - path:tests/vellis/test_graph_queries.py#test_semantic_projection_deduplication_does_not_change_object_aggregation
     blocker: null
-    checkpoint: null
+    checkpoint: git:9a446f6683787ae2b032f62652d087743fdd5d41
   - id: W003
     order: 3
     label: Make required observation and assessment publication fail closed
     kind: implementation
     dependencies: [W001]
-    planned_baseline: {dimension: implementation, identity: git:5d33c6ef405aa8efa1a54de81d7e9427aa9e1850}
+    planned_baseline: {dimension: implementation, identity: git:9a446f6683787ae2b032f62652d087743fdd5d41}
     finding_ids: [F005, F006]
     decision_ids: [D002]
     authority:
@@ -252,7 +257,7 @@ work_items:
     nearest_wrong_system: A result lacks observation or failed validation replaces the prior assessment.
     compatibility_effect: Observation faults become unexpected; successful behavior and schema remain unchanged.
     non_effects: [Accepted canonical mutations gain no duplicate activity record., Observation cannot roll back canonical history.]
-    lifecycle: pending
+    lifecycle: ready
     implementation_status: conflicting
     evidence_refs: []
     blocker: null
