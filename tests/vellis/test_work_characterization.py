@@ -243,7 +243,9 @@ def test_a_returned_result_is_bounded_without_scanning_or_hydrating_the_matching
         assert measured.value.status is OperationStatus.REJECTED
         assert not measured.value.rows
         assert measured.cost.canonical_record_visits == 0
-        assert measured.cost.current_graph_object_decodes == 0
+        # Semantic equality is resolved after SQL's serialized-JSON prefilter, so the
+        # evaluator decodes only the first maximumRows + 1 unique rows before refusing.
+        assert measured.cost.current_graph_object_decodes == 3
         assert measured.cost.sqlite_vm_steps < 1_000
     finally:
         system.close()

@@ -73,7 +73,11 @@ def policy_findings(path: Path, source: str) -> tuple[str, ...]:
         opening = masked.find("{", declaration.start(), declaration.end())
         closing = _close_brace(masked, opening)
         line = source.count("\n", 0, declaration.start()) + 1
-        label = "requirement definition" if declaration.group().startswith("requirement") else "objective"
+        label = (
+            "requirement definition"
+            if declaration.group().startswith("requirement")
+            else "objective"
+        )
         if closing is None:
             findings.append(f"{path}:{line}: {label} has no closing brace")
             continue
@@ -90,7 +94,9 @@ def policy_findings(path: Path, source: str) -> tuple[str, ...]:
         if not required:
             findings.append(f"{path}:{line}: {label} has no directly owned required constraint")
         if bare_docs:
-            findings.append(f"{path}:{line}: {label} owns normative documentation outside a required constraint")
+            findings.append(
+                f"{path}:{line}: {label} owns normative documentation outside a required constraint"
+            )
     return tuple(findings)
 
 

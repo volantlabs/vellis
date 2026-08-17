@@ -24,6 +24,7 @@ from vellis.changes import GraphChange
 from vellis.graph import Anchor, AssociatedDataObject, Link
 from vellis.json_value import normalize
 from vellis.outcomes import OperationStatus
+from vellis.store import ActivityAppendError
 from vellis.system import RTGSystem
 
 ADA = Anchor(uuid="a-1", type_key="person", display_name="Ada")
@@ -670,19 +671,18 @@ def test_committing_costs_the_same_whatever_the_history_length(tmp_path: Path) -
     ],
     ids=["initiator", "source"],
 )
-def test_unstorable_provenance_is_refused_like_it_is_at_initialization(
+def test_unstorable_rejection_observation_surfaces_as_an_unexpected_failure(
     tmp_path: Path, provenance: Provenance
 ) -> None:
-    """Excludes screening the first record's text and not every later record's."""
+    """A refusal cannot complete when its required observation is itself unstorable."""
     system = _populated(tmp_path)
     try:
         before = materialize_state(system)
-        outcome = system.apply_graph_change(
-            GraphChange(anchor_upserts=(Anchor("a-7", "person", "Later"),)),
-            provenance=provenance,
-        )
-        assert outcome.status is OperationStatus.REJECTED
-        assert any("unpaired surrogate" in each.summary for each in outcome.findings)
+        with pytest.raises(ActivityAppendError, match="unpaired surrogate"):
+            system.apply_graph_change(
+                GraphChange(anchor_upserts=(Anchor("a-7", "person", "Later"),)),
+                provenance=provenance,
+            )
         assert semantic_state_equal(materialize_state(system), before)
     finally:
         system.close()
