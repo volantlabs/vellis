@@ -83,8 +83,10 @@ or equivalent traces; wall-clock targets wait for representative runtime, hardwa
 The selected Vellis realization stores normalized object values, definition entries, presence
 intervals, proposal entries, assessments, canonical events, and activity records in shared SQLite
 tables. The state head carries transactionally maintained current-graph and proposal summaries, so
-ordinary transition identity is derived without a population scan. Queries compile to parameterized joins and `EXISTS` expressions with `DISTINCT` and
-`maximumRows + 1`. Ordinary mutation validation derives the affected invariant closure; explicit
+ordinary transition identity is derived without a population scan. Queries compile to parameterized
+joins and `EXISTS` expressions with `DISTINCT`, then stream projected rows through semantic identity
+until `maximumRows + 1` unique rows are found or the cursor is exhausted. Ordinary mutation
+validation derives the affected invariant closure; explicit
 full checks and broad cutovers use set-based scans and SQLite-backed findings. Snapshot, tail, restore,
 and compatibility import are streaming or SQL set operations. These are Vellis realization choices,
 not portable RTG architecture.

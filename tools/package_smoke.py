@@ -14,11 +14,15 @@ ROOT = Path(__file__).resolve().parent.parent
 VERSION = "2.0.0"
 
 
-def _run(*arguments: str) -> subprocess.CompletedProcess[str]:
+def _run(*arguments: str, cwd: Path = ROOT) -> subprocess.CompletedProcess[str]:
+    environment = os.environ.copy()
+    environment.pop("PYTHONPATH", None)
+    environment["PYTHONNOUSERSITE"] = "1"
     return subprocess.run(
         arguments,
-        cwd=ROOT,
+        cwd=cwd,
         check=True,
+        env=environment,
         text=True,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
@@ -72,6 +76,8 @@ def _assert_sdist(sdist: Path) -> None:
 def _installed_smoke(wheel: Path, directory: Path) -> None:
     requirements = directory / "runtime-requirements.txt"
     environment = directory / "installed"
+    invocation_directory = directory / "invocation"
+    invocation_directory.mkdir()
     _run(
         "uv",
         "export",
@@ -92,23 +98,39 @@ def _installed_smoke(wheel: Path, directory: Path) -> None:
     _run("uv", "pip", "install", "--python", str(python), "-r", str(requirements))
     _run("uv", "pip", "install", "--python", str(python), "--no-deps", str(wheel))
 
-    for command in (
-        (str(binary), "--help"),
-        (str(binary), "setup", "--help"),
-        (str(binary), "preserve", "--help"),
-        (str(binary), "restore", "--help"),
-        (str(binary), "serve", "--help"),
-        (str(binary), "serve-mcp", "--help"),
-        (str(legacy), "--help"),
-        (str(python), "-m", "vellis", "--help"),
-        (str(python), "-m", "vellis.setup", "--help"),
-        (str(python), "-m", "vellis.preserve", "--help"),
-        (str(python), "-m", "vellis", "restore", "--help"),
+    for command, expected in (
+        ((str(binary), "--help"), "usage: vellis "),
+        ((str(binary), "setup", "--help"), "usage: vellis setup "),
+        ((str(binary), "preserve", "--help"), "usage: vellis preserve "),
+        ((str(binary), "restore", "--help"), "usage: vellis restore "),
+        ((str(binary), "serve", "--help"), "usage: vellis serve "),
+        ((str(binary), "serve-mcp", "--help"), "usage: vellis serve-mcp "),
+        ((str(legacy), "--help"), "usage: vellis-rtg-knowledge-graph "),
+        ((str(python), "-m", "vellis", "--help"), "usage: python -m vellis "),
+        ((str(python), "-m", "vellis.setup", "--help"), "usage: python -m vellis.setup "),
+        (
+            (str(python), "-m", "vellis.preserve", "--help"),
+            "usage: python -m vellis.preserve ",
+        ),
+        (
+            (str(python), "-m", "vellis", "restore", "--help"),
+            "usage: python -m vellis restore ",
+        ),
     ):
-        _run(*command)
-    version = _run(str(python), "-c", "import vellis; print(vellis.__version__)")
-    if version.stdout.strip() != VERSION:
-        raise AssertionError(f"installed package reports {version.stdout.strip()!r}, not {VERSION}")
+        result = _run(*command, cwd=invocation_directory)
+        if expected not in result.stdout:
+            raise AssertionError(f"installed command {command!r} did not emit {expected!r}")
+    imported = _run(
+        str(python),
+        "-c",
+        "import vellis; print(vellis.__version__); print(vellis.__file__)",
+        cwd=invocation_directory,
+    )
+    version, source = imported.stdout.splitlines()
+    if version != VERSION:
+        raise AssertionError(f"installed package reports {version!r}, not {VERSION}")
+    if not Path(source).resolve().is_relative_to(environment.resolve()):
+        raise AssertionError(f"smoke imported Vellis outside the isolated environment: {source}")
 
 
 def main() -> int:

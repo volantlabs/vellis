@@ -219,8 +219,9 @@ Use these words precisely:
   Summary and focused inspection decode no graph and no unrelated definitions. A one-object mutation
   scales with its change, incident relationships, affected associations, and applicable rules; a
   high-degree mutation scales with that degree, not unrelated population or obsolete object
-  versions. Current, prospective, and historical queries constrain candidates in SQL and stop after
-  `maximumRows + 1`; only projected rows are hydrated. An ordinary mutation never invokes a full
+  versions. Current, prospective, and historical queries constrain candidates in SQL, hydrate only
+  projected rows, and stop after `maximumRows + 1` semantically unique rows; serialized duplicates
+  may be streamed and decoded on the way to that bound. An ordinary mutation never invokes a full
   conformance check. A broad definition cutover or explicit full check may scan all applicable rows,
   but does so set-wise with bounded working memory and stores every finding once for paged retrieval.
   Snapshot, tail replay, import, verification, v1 translation, and restore stream or use temporary

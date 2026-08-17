@@ -7,7 +7,10 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 MODEL_ROOT = ROOT / "model"
 
-_DECLARATION = re.compile(r"\brequirement\s+def\b[^;{]*\{|\bobjective\s*\{")
+_DECLARATION = re.compile(
+    r"(?P<requirement>\brequirement\s+(?P<definition>def\b)?[^;{}]*\{)"
+    r"|(?P<objective>\bobjective(?:\s+[^;{}]+)?\s*\{)"
+)
 _REQUIRED = re.compile(r"\brequire\s+constraint\s*\{")
 _DOC = re.compile(r"\bdoc\s*/\*")
 
@@ -73,11 +76,12 @@ def policy_findings(path: Path, source: str) -> tuple[str, ...]:
         opening = masked.find("{", declaration.start(), declaration.end())
         closing = _close_brace(masked, opening)
         line = source.count("\n", 0, declaration.start()) + 1
-        label = (
-            "requirement definition"
-            if declaration.group().startswith("requirement")
-            else "objective"
-        )
+        if declaration.group("objective") is not None:
+            label = "objective"
+        elif declaration.group("definition") is not None:
+            label = "requirement definition"
+        else:
+            label = "requirement usage"
         if closing is None:
             findings.append(f"{path}:{line}: {label} has no closing brace")
             continue
