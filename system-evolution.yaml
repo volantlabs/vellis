@@ -3,13 +3,13 @@ evolution:
   id: vellis-2-prerelease-remediation
   objective: Formalize accepted obligations and restore semantic, observational, compatibility, and installable release integrity for Vellis 2.0.
   observable_distinction: Requirements and objectives constrain their prose, query bounds use semantic JSON equality, required observations cannot disappear behind completed results, and installed Vellis preserves snapshot recovery.
-  lifecycle: active
+  lifecycle: ready
   approval:
     status: accepted
     reason: The approved plan must be bound to a durable awaiting-approval checkpoint before execution.
     checkpoint: git:90daeb0effc79e9a9a8ab8bfa64d8f701b5c15c0
   blocker: null
-  checkpoint: git:90daeb0effc79e9a9a8ab8bfa64d8f701b5c15c0
+  checkpoint: git:0de8c94b8afd71260ffece09fc73fb6a970fc7e9
 baselines:
   status: current
   source: &source
@@ -18,8 +18,13 @@ baselines:
     language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
     execution_environment: sha256:50d4f5cf86c91d1ab613cd7ea017a88fe5127ca1c25b118033c6548591d4349f
     checkpoint: git:5d33c6ef405aa8efa1a54de81d7e9427aa9e1850
-  target: null
-  observed: *source
+  target: &target
+    model: sha256:adf05b52f9839b75f76240ee116c0ffba7ee452602c2083268d683c4b534b2c7
+    implementation: git:0de8c94b8afd71260ffece09fc73fb6a970fc7e9
+    language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
+    execution_environment: sha256:50d4f5cf86c91d1ab613cd7ea017a88fe5127ca1c25b118033c6548591d4349f
+    checkpoint: git:0de8c94b8afd71260ffece09fc73fb6a970fc7e9
+  observed: *target
 scope:
   authority_scope:
     - RTG::'JSON Value'
@@ -55,9 +60,9 @@ findings:
     consequence: Satisfaction and verification can be present while constraining none of the documented obligations.
     authority_refs: [VellisRequirements, VellisVerification, SysML 2.1 Beta 1 sections 7.21.1 and 7.21.2]
     evidence_refs: [command:just model-check]
-    disposition: model-change
+    disposition: resolved
     owner_work_item_id: W001
-    implementation_status: conflicting
+    implementation_status: conforming
     nearest_wrong_system: Every relationship exists while a system violating every documented shall statement still satisfies empty formal constraints.
     compatibility_effect: Existing obligation text becomes formally required without changing selected normal behavior or payloads.
   - id: F002
@@ -66,9 +71,9 @@ findings:
     consequence: The case does not verify fresh initialization and graph invariants against the contained RTG memory.
     authority_refs: [VellisVerification::'Everyday Life Is An Optional Confirmed Start', SysML 2.1 Beta 1 section 7.24.2]
     evidence_refs: [command:just model-check]
-    disposition: model-change
+    disposition: resolved
     owner_work_item_id: W001
-    implementation_status: conflicting
+    implementation_status: conforming
     nearest_wrong_system: The product choice passes while contained memory violates RTG requirements because verify subjects default to Vellis.
     compatibility_effect: Verification binding changes only; the owner scenario and product behavior remain unchanged.
   - id: F003
@@ -77,9 +82,9 @@ findings:
     consequence: Best-effort observation can return success without mandatory evidence, or failure handling can recurse without a completion boundary.
     authority_refs: [VellisRequirements::dualLedgerSeparation, VellisRequirements::mcpOutcomeIntegrity, RTGSystem::'Assess graph conformance']
     evidence_refs: [path:tests/vellis/test_activity_history.py#test_a_broken_activity_ledger_cannot_break_the_operation_it_observes]
-    disposition: model-change
+    disposition: resolved
     owner_work_item_id: W001
-    implementation_status: conflicting
+    implementation_status: conforming
     nearest_wrong_system: An observation-bearing operation completes even though its required activity record was never stored.
     compatibility_effect: Observation failure becomes unexpected with no completed result; accepted canonical mutations remain canonical-ledger authoritative.
   - id: F004
@@ -202,17 +207,20 @@ work_items:
     nearest_wrong_system: Prose remains non-constraining, RTG verification binds to Vellis, or required observation is absent.
     compatibility_effect: Formal and failure semantics become explicit without changing normal payloads.
     non_effects: [MCP and persistence shapes remain unchanged., Accepted canonical mutations remain canonical-ledger authoritative.]
-    lifecycle: active
-    implementation_status: not evaluated
-    evidence_refs: []
+    lifecycle: complete
+    implementation_status: conforming
+    evidence_refs:
+      - command:just model-check
+      - path:tests/test_model_policy.py#test_current_normative_model_blocks_own_required_constraints
+      - path:tests/test_model_policy.py#test_bare_normative_docs_are_rejected_even_when_verify_is_present
     blocker: null
-    checkpoint: git:5d33c6ef405aa8efa1a54de81d7e9427aa9e1850
+    checkpoint: git:0de8c94b8afd71260ffece09fc73fb6a970fc7e9
   - id: W002
     order: 2
     label: Enforce semantic projected-row equality before query bounds
     kind: implementation
     dependencies: [W001]
-    planned_baseline: {dimension: implementation, identity: git:5d33c6ef405aa8efa1a54de81d7e9427aa9e1850}
+    planned_baseline: {dimension: implementation, identity: git:0de8c94b8afd71260ffece09fc73fb6a970fc7e9}
     finding_ids: [F004]
     decision_ids: [D001]
     authority:
@@ -223,7 +231,7 @@ work_items:
     nearest_wrong_system: Numeric spelling decides duplicate cardinality and refusal.
     compatibility_effect: Equal duplicates collapse; storage and distinct results are unchanged.
     non_effects: [Aggregation remains object-identity based., No persistence or schema change occurs.]
-    lifecycle: pending
+    lifecycle: ready
     implementation_status: conflicting
     evidence_refs: []
     blocker: null
@@ -314,7 +322,7 @@ work_items:
     checkpoint: null
 closure:
   finding_disposition: open
-  model_status: not evaluated
+  model_status: accepted
   implementation_status: conflicting
   integration_status: partial
   external_status: not applicable
