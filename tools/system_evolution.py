@@ -124,6 +124,7 @@ def _is_vellis_check_command(command: str, *, root: Path) -> bool:
         "just check",
         "just implementation-campaign-check",
         "just model-check",
+        "just package-check",
         "just system-evolution-check",
         "just skills-check",
     }:

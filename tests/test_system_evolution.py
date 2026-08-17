@@ -436,6 +436,12 @@ def test_vellis_evidence_rejects_false_commands_and_unresolved_fragments() -> No
     assert any("evidence fragment does not resolve" in each for each in findings)
 
 
+def test_package_check_is_recognized_as_durable_vellis_evidence() -> None:
+    assert system_evolution._is_vellis_check_command(  # noqa: SLF001
+        "just package-check", root=system_evolution.ROOT
+    )
+
+
 def test_accepted_approval_checkpoint_must_exist_and_contain_the_gate() -> None:
     record = copy.deepcopy(_record())
     root = _root_work(record)
