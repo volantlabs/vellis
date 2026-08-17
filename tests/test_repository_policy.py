@@ -82,11 +82,16 @@ def test_ci_runs_locked_setup_before_full_check() -> None:
     workflow = yaml.safe_load(
         (ROOT / ".github" / "workflows" / "check.yml").read_text(encoding="utf-8")
     )
+    steps = workflow["jobs"]["check"]["steps"]
     commands = [
         " ".join(str(step["run"]).split())
-        for step in workflow["jobs"]["check"]["steps"]
+        for step in steps
         if "run" in step
     ]
+    checkout = next(
+        step for step in steps if str(step.get("uses", "")).startswith("actions/checkout@")
+    )
 
+    assert checkout["with"]["fetch-depth"] == 0
     assert "uv sync --locked" in commands
     assert commands.index("just model-setup") < commands.index("just check")

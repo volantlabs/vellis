@@ -654,10 +654,10 @@ findings:
       - AGENTS.md
       - CONTRIBUTING.md
     evidence_refs:
-      - command:just implementation-campaign-check
-    disposition: implementation-work
+      - path:tests/test_repository_policy.py#test_ci_runs_locked_setup_before_full_check
+    disposition: resolved
     owner_work_item_id: W010
-    implementation_status: conflicting
+    implementation_status: conforming
     nearest_wrong_system: The same complete check passes in a full local clone while the required CI job fails before tests because checkout depth hides every historical evidence checkpoint.
     compatibility_effect: CI checkout history only; product behavior, model authority, dependencies, runtime configuration, and published interfaces are unchanged.
 decisions:
