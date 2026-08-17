@@ -3,13 +3,13 @@ evolution:
   id: callable-tool-surface-and-value-fidelity
   objective: Close pre-release boundary, campaign-handoff, and public-guidance findings without changing accepted system meaning.
   observable_distinction: Snapshot publication never replaces another name, every owner-facing failure reports its true operation and complete known state effect, every campaign result is bound to current work, and security, query, graph-preview, and definition-edit guidance match the runnable local surface.
-  lifecycle: active
+  lifecycle: complete
   approval:
     status: not-required
     reason: The new findings are implementation, workflow-validation, and documentation defects under unchanged accepted authority.
     checkpoint: null
   blocker: null
-  checkpoint: git:f35f2a1f7405915ecac6e82b715f1eb1de22c661
+  checkpoint: git:b8a78cbbc996ef5ab2752c795e49d80c0a885804
 baselines:
   status: current
   source:
@@ -20,16 +20,16 @@ baselines:
     checkpoint: git:b519b400476d9bd364d1110a30c3d3120d8b457c
   target:
     model: sha256:30decc89ce67a19b2f9720028ffb3eb8161edf37affd11fa49b12179b3018d3e
-    implementation: git:f3ed8d10689483cc183511b36300c82881d74cd7
+    implementation: git:b8a78cbbc996ef5ab2752c795e49d80c0a885804
     language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
     execution_environment: sha256:50d4f5cf86c91d1ab613cd7ea017a88fe5127ca1c25b118033c6548591d4349f
-    checkpoint: git:f3ed8d10689483cc183511b36300c82881d74cd7
+    checkpoint: git:b8a78cbbc996ef5ab2752c795e49d80c0a885804
   observed:
     model: sha256:30decc89ce67a19b2f9720028ffb3eb8161edf37affd11fa49b12179b3018d3e
-    implementation: git:f3ed8d10689483cc183511b36300c82881d74cd7
+    implementation: git:b8a78cbbc996ef5ab2752c795e49d80c0a885804
     language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
     execution_environment: sha256:50d4f5cf86c91d1ab613cd7ea017a88fe5127ca1c25b118033c6548591d4349f
-    checkpoint: git:f3ed8d10689483cc183511b36300c82881d74cd7
+    checkpoint: git:b8a78cbbc996ef5ab2752c795e49d80c0a885804
 scope:
   authority_scope:
     - VellisRequirements::mcpAgentToolContract
@@ -1118,8 +1118,8 @@ work_items:
       - Process-control exceptions retain their original Python meaning.
       - No persistence format, product interface, campaign checkpoint format, or schema version changes.
       - User-owned data and protected ignored files remain untouched.
-    lifecycle: active
-    implementation_status: partial
+    lifecycle: complete
+    implementation_status: conforming
     evidence_refs:
       - command:uv run pytest tests/vellis/test_cleanup_boundaries.py tests/vellis/test_setup_path.py tests/test_implementation_campaign.py -q
       - command:uv run pytest tests/vellis/test_mcp_boundary.py tests/vellis/test_definition_governance.py -q
@@ -1127,24 +1127,30 @@ work_items:
       - command:just implementation-campaign-check
       - command:just check
     blocker: null
-    checkpoint: null
+    checkpoint: git:b8a78cbbc996ef5ab2752c795e49d80c0a885804
 closure:
-  finding_disposition: open
+  finding_disposition: complete
   model_status: accepted
-  implementation_status: partial
-  integration_status: not evaluated
+  implementation_status: conforming
+  integration_status: conforming
   external_status: not applicable
-  compatibility: Model, persistence, tool names, request schemas, and query meaning remain unchanged; failure reporting, campaign validation, and public guidance are stricter, while pypdf changes only in the development toolchain.
+  compatibility: Model, persistence, tool names, request schemas, and query meaning remain unchanged; failure reporting, campaign validation, and public guidance are stricter, while pypdf, basedpyright, and Ruff changes remain in the development toolchain.
   reviews:
     - lens: authority and conformance
-      status: pending
-      reviewer: null
-      checkpoint: null
-      evidence_refs: []
+      status: clean
+      reviewer: /root/final_authority_review
+      checkpoint: git:b8a78cbbc996ef5ab2752c795e49d80c0a885804
+      evidence_refs:
+        - command:just check
     - lens: engineering and evidence
-      status: pending
-      reviewer: null
-      checkpoint: null
-      evidence_refs: []
-  evidence_refs: []
-  checkpoint: null
+      status: clean
+      reviewer: /root/final_engineering_review
+      checkpoint: git:b8a78cbbc996ef5ab2752c795e49d80c0a885804
+      evidence_refs:
+        - command:just check
+  evidence_refs:
+    - command:just model-check
+    - command:just implementation-campaign-check
+    - command:just system-evolution-check
+    - command:just check
+  checkpoint: git:b8a78cbbc996ef5ab2752c795e49d80c0a885804
