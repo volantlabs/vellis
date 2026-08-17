@@ -30,12 +30,13 @@ def _mask_literals_and_comments(source: str) -> str:
             end = len(source) if end < 0 else end + 2
             masked[index:end] = " " * (end - index)
             index = end
-        elif source[index] == '"':
+        elif source[index] in {'"', "'"}:
+            quote = source[index]
             end = index + 1
             while end < len(source):
                 if source[end] == "\\":
                     end += 2
-                elif source[end] == '"':
+                elif source[end] == quote:
                     end += 1
                     break
                 else:

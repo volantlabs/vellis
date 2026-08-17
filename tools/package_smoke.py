@@ -14,7 +14,11 @@ ROOT = Path(__file__).resolve().parent.parent
 VERSION = "2.0.0"
 
 
-def _run(*arguments: str, cwd: Path = ROOT) -> subprocess.CompletedProcess[str]:
+def _run(
+    *arguments: str,
+    cwd: Path = ROOT,
+    input_text: str | None = None,
+) -> subprocess.CompletedProcess[str]:
     environment = os.environ.copy()
     environment.pop("PYTHONPATH", None)
     environment["PYTHONNOUSERSITE"] = "1"
@@ -23,6 +27,7 @@ def _run(*arguments: str, cwd: Path = ROOT) -> subprocess.CompletedProcess[str]:
         cwd=cwd,
         check=True,
         env=environment,
+        input=input_text,
         text=True,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
@@ -131,6 +136,54 @@ def _installed_smoke(wheel: Path, directory: Path) -> None:
         raise AssertionError(f"installed package reports {version!r}, not {VERSION}")
     if not Path(source).resolve().is_relative_to(environment.resolve()):
         raise AssertionError(f"smoke imported Vellis outside the isolated environment: {source}")
+
+    memory = directory / "memory"
+    snapshot = directory / "snapshot.json"
+    setup = _run(
+        str(binary),
+        "setup",
+        "--data-dir",
+        str(memory),
+        "--vocabulary",
+        "blank",
+        "--yes",
+        cwd=invocation_directory,
+    )
+    if "established revision 0" not in setup.stdout:
+        raise AssertionError("installed setup did not establish a fresh revision-zero system")
+    preserve = _run(
+        str(legacy),
+        "preserve",
+        "--data-dir",
+        str(memory),
+        "--out",
+        str(snapshot),
+        cwd=invocation_directory,
+    )
+    if "Preserved revision 0" not in preserve.stdout or not snapshot.is_file():
+        raise AssertionError("installed legacy command did not publish a revision-zero snapshot")
+    restore = _run(
+        str(binary),
+        "restore",
+        "--data-dir",
+        str(memory),
+        "--revision",
+        "0",
+        "--yes",
+        cwd=invocation_directory,
+    )
+    if "revision 0 is already current" not in restore.stdout:
+        raise AssertionError("installed restore did not inspect the established revision")
+    server = _run(
+        str(binary),
+        "serve",
+        "--data-dir",
+        str(memory),
+        cwd=invocation_directory,
+        input_text="",
+    )
+    if "Starting MCP server 'vellis'" not in server.stdout:
+        raise AssertionError("installed serve did not start the pinned STDIO MCP boundary")
 
 
 def main() -> int:

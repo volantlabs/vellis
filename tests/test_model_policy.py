@@ -60,6 +60,26 @@ package Example {
     assert any("objective" in finding for finding in findings)
 
 
+def test_unrestricted_names_cannot_hide_normative_declarations() -> None:
+    source = """
+package Example {
+    requirement def 'Bare; Requirement' {
+        subject system : Anything;
+        doc /* The subject shall behave. */
+    }
+    verification def NamedCase {
+        objective 'Bare; Objective' {
+            doc /* Demonstrate the required behavior. */
+        }
+    }
+}
+"""
+    findings = policy_findings(Path("example.sysml"), source)
+    assert len(findings) == 4
+    assert sum("no directly owned required constraint" in finding for finding in findings) == 2
+    assert sum("outside a required constraint" in finding for finding in findings) == 2
+
+
 def test_bare_normative_docs_are_rejected_even_when_verify_is_present() -> None:
     source = """
 package Example {
