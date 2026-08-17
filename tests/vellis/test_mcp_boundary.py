@@ -89,13 +89,33 @@ async def test_query_discovery_explains_identity_counts_and_multi_type_grounding
     async with client:
         tools = await client.list_tools()
     query = next(tool for tool in tools if tool.name == "rtg_query")
-    description = " ".join((query.description or "").split())
+    query_description = " ".join((query.description or "").split())
 
-    assert "identity-bearing anchor" in description
-    assert "anchor-only return shape" in description
-    assert "count distinct projected anchor UUIDs" in description
-    assert "permits every anchor type" in description
-    assert "query each type separately" in description
+    assert "identity-bearing anchor" in query_description
+    assert "anchor-only return shape" in query_description
+    assert "count distinct projected anchor UUIDs" in query_description
+    assert "permits every anchor type" in query_description
+    assert "query each type separately" in query_description
+    assert "accepted per-type result is complete" in query_description
+    assert "apply any desired bound to the combined presentation" in query_description
+
+
+@pytest.mark.anyio
+async def test_change_discovery_explains_definition_replacement_and_prospective_preview(
+    client: Client,
+) -> None:
+    async with client:
+        tools = await client.list_tools()
+    change = next(tool for tool in tools if tool.name == "rtg_change")
+    change_description = " ".join((change.description or "").split())
+    definition_change = next(tool for tool in tools if tool.name == "rtg_set_definition_delta")
+    definition_description = " ".join((definition_change.description or "").split())
+
+    assert "definitionDelta target" in change_description
+    assert "queried and checked before activation or explicit discard" in change_description
+    assert "replaces the complete definition at that type key" in definition_description
+    assert "omission removes it" in definition_description
+    assert "untouched type keys remain unchanged" in definition_description
 
 
 @pytest.fixture

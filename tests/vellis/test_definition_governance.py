@@ -326,6 +326,33 @@ def test_correcting_a_duplicated_member_of_a_referenced_set_is_a_real_change(
         system.close()
 
 
+def test_a_type_upsert_replaces_its_complete_definition_and_retains_other_keys(
+    tmp_path: Path,
+) -> None:
+    system = _system(tmp_path)
+    try:
+        replacement = AssociatedDataTypeDefinition(
+            "note",
+            ("person",),
+            (),
+            "A note without constrained properties.",
+        )
+        staged = system.set_definition_delta(
+            DefinitionChange(associated_data_type_upserts=(replacement,)),
+            provenance=OWNER,
+        )
+
+        proposed = materialize_definitions(system, prospective=True)
+        proposed_note = next(
+            value for value in proposed.associated_data_types if value.type_key == "note"
+        )
+        assert staged.accepted
+        assert proposed_note == replacement
+        assert proposed.anchor_types == (PERSON,)
+    finally:
+        system.close()
+
+
 def test_a_refused_activation_says_which_of_the_reasons_it_was(tmp_path: Path) -> None:
     """The caller's next move differs by reason, so the refusal has to name one.
 

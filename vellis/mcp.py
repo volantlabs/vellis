@@ -404,7 +404,9 @@ def build_server(system: RTGSystem, *, name: str = "vellis") -> FastMCP:
         match. When other projections can produce several tuples per anchor, count distinct
         projected anchor UUIDs instead of rows. A data condition grounded on a multi-type
         anchor group is valid only when its associated-data type permits every anchor type
-        in that group; otherwise query each type separately and merge the bounded results.
+        in that group; otherwise query each type separately. Each accepted per-type result
+        is complete because exceeding its maximum is refused whole, so merge only accepted
+        results and apply any desired bound to the combined presentation.
         """
         return _result(
             system.query_graph(query, provenance=_agent()),
@@ -417,14 +419,24 @@ def build_server(system: RTGSystem, *, name: str = "vellis") -> FastMCP:
         )
 
     def rtg_change(request: GraphChangeRequest) -> RevisionedOutcome:
-        """Validate explicit upserts and removals, then atomically commit an effective change."""
+        """Validate explicit graph edits against active state or a prospective preview.
+
+        The active target commits an effective conforming change atomically. The
+        definitionDelta target stages complete-object edits in prospective state, where they
+        can be queried and checked before activation or explicit discard.
+        """
         return _result(
             system.apply_graph_change(request, provenance=_agent()),
             _unreturnable_outcome,
         )
 
     def rtg_set_definition_delta(request: SetDefinitionDeltaRequest) -> DefinitionDeltaResult:
-        """Apply bounded keyed definition edits to the sole proposal."""
+        """Apply bounded keyed definition edits to the sole proposal.
+
+        A type upsert replaces the complete definition at that type key: resend every
+        permitted type, property constraint, and description intended to remain because
+        omission removes it. Definitions at untouched type keys remain unchanged.
+        """
         return _result(
             system.set_definition_delta(request.change, provenance=_agent()),
             lambda reason: DefinitionDeltaResult(

@@ -2,7 +2,7 @@ schema_version: "1.0"
 evolution:
   id: callable-tool-surface-and-value-fidelity
   objective: Close pre-release boundary, campaign-handoff, and public-guidance findings without changing accepted system meaning.
-  observable_distinction: Snapshot publication never replaces another name, every owner-facing failure reports its true operation and complete known state effect, every campaign result is bound to current work, and security and query guidance match the runnable local surface.
+  observable_distinction: Snapshot publication never replaces another name, every owner-facing failure reports its true operation and complete known state effect, every campaign result is bound to current work, and security, query, graph-preview, and definition-edit guidance match the runnable local surface.
   lifecycle: active
   approval:
     status: not-required
@@ -629,6 +629,21 @@ findings:
     implementation_status: conforming
     nearest_wrong_system: Campaign, work-item, state-token, reason, and null-checkpoint bindings all pass while a failed result falsely presents every check and both final reviews as clean.
     compatibility_effect: Worker-result schema version 2 remains unchanged; non-checkpointed results may still report failed or not-run checks and finding-bearing reviews, but not completion claims.
+  - id: F038
+    summary: Definition-edit discovery did not say that a type upsert replaces the complete definition at its natural key.
+    classification: plan gap
+    consequence: A caller can omit a property constraint believing the edit retains unspecified members, silently remove that constraint from prospective meaning, and approve a broader vocabulary than intended.
+    authority_refs:
+      - VellisRequirements::nonDisruptiveDefinitionWork
+      - VellisRequirements::mcpAgentToolContract
+    evidence_refs:
+      - path:tests/vellis/test_definition_governance.py#test_a_type_upsert_replaces_its_complete_definition_and_retains_other_keys
+      - path:tests/vellis/test_mcp_boundary.py#test_change_discovery_explains_definition_replacement_and_prospective_preview
+    disposition: resolved
+    owner_work_item_id: W009
+    implementation_status: conforming
+    nearest_wrong_system: Keyed definition staging correctly replaces one complete type while public discovery leaves the caller to guess whether omitted members are retained or removed.
+    compatibility_effect: Advisory description only; definition semantics, tool names, request schemas, active state, and prospective state are unchanged.
 decisions:
   - id: D001
     summary: Replace only self-reaching definitions with the permissive JSON value they stand for, then inline the rest, at the boundary that already owns the wire form.
@@ -1074,29 +1089,31 @@ work_items:
     checkpoint: git:f35f2a1f7405915ecac6e82b715f1eb1de22c661
   - id: W009
     order: 9
-    label: Preserve cleanup and evidence meaning across non-success control flow
+    label: Preserve cleanup, handoff, and public discovery meaning
     kind: implementation
     dependencies: [W008]
     planned_baseline:
       dimension: implementation
       identity: git:ffe898fa5e34cf57e2c49589dd2fac7690b8714e
-    finding_ids: [F036, F037]
+    finding_ids: [F036, F037, F038]
     decision_ids: []
     authority:
       - refs:
           - VellisRequirements::observableFailure
           - VellisRequirements::simpleIndividualOperation
           - VellisRequirements::freshInitialization
+          - VellisRequirements::nonDisruptiveDefinitionWork
+          - VellisRequirements::mcpAgentToolContract
           - AGENTS.md
           - .agents/skills/sysml-implementation-campaign/SKILL.md
         coverage: full
         remaining_work_item_ids: []
     approval:
       status: not-required
-      reason: Accepted product authority and campaign supervision already require cleanup before propagation and outcome-specific candidate claims.
+      reason: Accepted product authority and campaign supervision already require cleanup before propagation, outcome-specific candidate claims, and truthful discovery of existing edit semantics.
       checkpoint: null
-    nearest_wrong_system: Nominal and ordinary failures are safe while process-control or non-checkpointed handoff paths bypass the same cleanup and evidence boundaries.
-    compatibility_effect: Product semantics and worker-result schema version remain unchanged; cleanup and semantic validation become stricter.
+    nearest_wrong_system: Nominal and ordinary failures are safe while process-control or non-checkpointed handoff paths bypass cleanup and evidence boundaries, or correct edit behavior remains unsafe to infer from discovery.
+    compatibility_effect: Product semantics and worker-result schema version remain unchanged; cleanup and semantic validation become stricter, and existing query, preview, and definition-edit behavior becomes explicit in discovery.
     non_effects:
       - Process-control exceptions retain their original Python meaning.
       - No persistence format, product interface, campaign checkpoint format, or schema version changes.
@@ -1105,6 +1122,7 @@ work_items:
     implementation_status: partial
     evidence_refs:
       - command:uv run pytest tests/vellis/test_cleanup_boundaries.py tests/vellis/test_setup_path.py tests/test_implementation_campaign.py -q
+      - command:uv run pytest tests/vellis/test_mcp_boundary.py tests/vellis/test_definition_governance.py -q
       - command:just skills-check
       - command:just implementation-campaign-check
       - command:just check

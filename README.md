@@ -148,9 +148,10 @@ Use these words precisely:
   shallow anchor vocabulary and the complete focused neighborhood of each selected anchor, each
   carrying the revision it was evaluated at so a caller can tell that the ground moved;
   governance of the one prospective definition set and graph overlay — stage bounded keyed
-  definition edits, stage complete-object upserts or tombstones, unstage, assess, activate, and
-  discard — where a working proposal may temporarily carry findings and an exact non-stale clean
-  assessment gates atomic activation; and the optional
+  complete-definition replacements, stage complete-object graph upserts or tombstones, query the
+  prospective preview, unstage, assess, activate, and discard — where an edited type key replaces
+  its complete definition while untouched keys remain, a working proposal may temporarily carry
+  findings, and an exact non-stale clean assessment gates atomic activation; and the optional
   Everyday Life starter vocabulary as an ordinary, owner-governable definition set; and bounded
   semantic query over current state — named anchor and associated-data groups, required directed
   links, structured property comparisons, and a shaped result refused whole rather than truncated
