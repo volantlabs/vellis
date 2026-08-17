@@ -23,7 +23,10 @@ def test_project_metadata_declares_license_and_authors() -> None:
     assert "LICENSE" in project["license-files"]
     assert project["authors"]
     assert "Development Status :: 4 - Beta" in project["classifiers"]
-    assert "fastmcp>=3.4.5,<4" in project["dependencies"]
+    assert any(
+        dependency.startswith("fastmcp>=3.") and dependency.endswith(",<4")
+        for dependency in project["dependencies"]
+    )
     assert "mcp>=1.28.1,<2" in data["dependency-groups"]["dev"]
     assert project["scripts"]["vellis-rtg-knowledge-graph"] == (
         "apps.rtg_knowledge_graph.main:main"

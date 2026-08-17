@@ -26,7 +26,7 @@ classifiers = [
     "Topic :: Software Development :: Libraries",
 ]
 dependencies = [
-    "fastmcp>=3.4.5,<4",
+    "fastmcp>=3.4.7,<4",
     "google-re2==1.1.20251105",
 ]
 
