@@ -83,11 +83,7 @@ def test_ci_runs_locked_setup_before_full_check() -> None:
         (ROOT / ".github" / "workflows" / "check.yml").read_text(encoding="utf-8")
     )
     steps = workflow["jobs"]["check"]["steps"]
-    commands = [
-        " ".join(str(step["run"]).split())
-        for step in steps
-        if "run" in step
-    ]
+    commands = [" ".join(str(step["run"]).split()) for step in steps if "run" in step]
     checkout = next(
         step for step in steps if str(step.get("uses", "")).startswith("actions/checkout@")
     )
