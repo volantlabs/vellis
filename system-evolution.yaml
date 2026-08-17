@@ -3,13 +3,13 @@ evolution:
   id: callable-tool-surface-and-value-fidelity
   objective: Close pre-release boundary, campaign-handoff, and public-guidance findings without changing accepted system meaning.
   observable_distinction: Snapshot publication never replaces another name, every owner-facing failure reports its true operation and complete known state effect, every campaign result is bound to current work, CI can reconstruct durable checkpoint evidence, and security, query, graph-preview, and definition-edit guidance match the runnable local surface.
-  lifecycle: active
+  lifecycle: complete
   approval:
     status: not-required
     reason: The new findings are implementation, workflow-validation, and documentation defects under unchanged accepted authority.
     checkpoint: null
   blocker: null
-  checkpoint: git:b8a78cbbc996ef5ab2752c795e49d80c0a885804
+  checkpoint: git:fc92f3bef7e95ba1d9885d1d2dd316124307c444
 baselines:
   status: current
   source:
@@ -20,16 +20,16 @@ baselines:
     checkpoint: git:b519b400476d9bd364d1110a30c3d3120d8b457c
   target:
     model: sha256:30decc89ce67a19b2f9720028ffb3eb8161edf37affd11fa49b12179b3018d3e
-    implementation: git:5e5e727a0600f9129e3d38d7555782dc2bacc466
+    implementation: git:fc92f3bef7e95ba1d9885d1d2dd316124307c444
     language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
     execution_environment: sha256:50d4f5cf86c91d1ab613cd7ea017a88fe5127ca1c25b118033c6548591d4349f
-    checkpoint: git:5e5e727a0600f9129e3d38d7555782dc2bacc466
+    checkpoint: git:fc92f3bef7e95ba1d9885d1d2dd316124307c444
   observed:
     model: sha256:30decc89ce67a19b2f9720028ffb3eb8161edf37affd11fa49b12179b3018d3e
-    implementation: git:5e5e727a0600f9129e3d38d7555782dc2bacc466
+    implementation: git:fc92f3bef7e95ba1d9885d1d2dd316124307c444
     language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
     execution_environment: sha256:50d4f5cf86c91d1ab613cd7ea017a88fe5127ca1c25b118033c6548591d4349f
-    checkpoint: git:5e5e727a0600f9129e3d38d7555782dc2bacc466
+    checkpoint: git:fc92f3bef7e95ba1d9885d1d2dd316124307c444
 scope:
   authority_scope:
     - VellisRequirements::mcpAgentToolContract
@@ -1170,31 +1170,37 @@ work_items:
       - No model, product implementation, persistence, MCP contract, dependency, or lock-file changes.
       - Local check semantics and campaign checkpoint identities remain unchanged.
       - User-owned data, external clients, and protected ignored files remain untouched.
-    lifecycle: active
-    implementation_status: partial
+    lifecycle: complete
+    implementation_status: conforming
     evidence_refs:
       - command:uv run pytest tests/test_repository_policy.py -q
       - command:just implementation-campaign-check
       - command:just check
     blocker: null
-    checkpoint: null
+    checkpoint: git:fc92f3bef7e95ba1d9885d1d2dd316124307c444
 closure:
-  finding_disposition: open
+  finding_disposition: complete
   model_status: accepted
-  implementation_status: partial
-  integration_status: not evaluated
+  implementation_status: conforming
+  integration_status: conforming
   external_status: not applicable
   compatibility: Model, persistence, tool names, request schemas, query meaning, and runtime behavior remain unchanged; public guidance and campaign validation are stricter, developer-tool changes remain toolchain-only, and CI gains the repository history required to reconstruct durable checkpoint evidence.
   reviews:
     - lens: authority and conformance
-      status: pending
-      reviewer: null
-      checkpoint: null
-      evidence_refs: []
+      status: clean
+      reviewer: /root/ci_authority_review
+      checkpoint: git:fc92f3bef7e95ba1d9885d1d2dd316124307c444
+      evidence_refs:
+        - command:just check
     - lens: engineering and evidence
-      status: pending
-      reviewer: null
-      checkpoint: null
-      evidence_refs: []
-  evidence_refs: []
-  checkpoint: null
+      status: clean
+      reviewer: /root/ci_engineering_review
+      checkpoint: git:fc92f3bef7e95ba1d9885d1d2dd316124307c444
+      evidence_refs:
+        - command:just check
+  evidence_refs:
+    - command:just model-check
+    - command:just implementation-campaign-check
+    - command:just system-evolution-check
+    - command:just check
+  checkpoint: git:fc92f3bef7e95ba1d9885d1d2dd316124307c444
