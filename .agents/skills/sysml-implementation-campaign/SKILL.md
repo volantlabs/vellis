@@ -63,7 +63,8 @@ The slice worker follows [Execution and resume](references/execution-and-resume.
    token. Validate every candidate result against the recomputed current durable state and current
    campaign/work item. Every outcome carries the current durable state token; for a paused or failed
    result it binds the handoff even when no review ran, while the result names its reason and claims
-   no checkpoint. Validate a
+   no checkpoint, passed check, or clean final review pair. It may retain failed or not-run checks
+   and finding-bearing review history needed to explain the pause or failure. Validate a
    checkpointed result additionally against the frozen token, intended checkpoint, and reported passed
    checks before bookkeeping. The manager
    still enforces fresh-agent independence, runs required project gates, and independently validates

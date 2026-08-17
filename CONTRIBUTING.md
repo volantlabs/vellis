@@ -165,8 +165,9 @@ optional JSONL timing, review-count, check-count, and harness-usage telemetry un
 failure when no child is live, and stop after three identical failures against one state token.
 Candidate validation binds checkpointed, paused, and failed results to the current campaign, work
 item, and independently recomputed durable state. Paused and failed results carry a reason and no
-checkpoint, and use `review_state_token` to bind the handoff to current durable state even when no
-review ran. Checkpoint format, passed-check, and clean-review-pair rules apply only to checkpointed results.
+checkpoint, passed check, or clean final review pair, and use `review_state_token` to bind the handoff
+to current durable state even when no review ran. They may retain failed or not-run checks and
+finding-bearing review history; completion claims remain checkpoint-specific.
 After the bookkeeping commit changes that token, the manager consumes the result and independently
 runs checkpoint validation; it does not rerun the pre-bookkeeping result check.
 The completed campaign's plan directly pins FastMCP and FastMCP Slim 4.0.0b1, selects local STDIO,

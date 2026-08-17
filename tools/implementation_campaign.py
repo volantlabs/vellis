@@ -1846,8 +1846,24 @@ def worker_result_findings(
                 findings.append("checkpointed result requires every reported check passed")
             if expected_state_token is None:
                 findings.append("checkpointed result requires the expected frozen state token")
-        elif outcome in {"paused", "failed"} and result.get("checkpoint") is not None:
-            findings.append("paused or failed result must not claim a checkpoint")
+        elif outcome in {"paused", "failed"}:
+            if result.get("checkpoint") is not None:
+                findings.append("paused or failed result must not claim a checkpoint")
+            if any(
+                isinstance(check, dict) and check.get("outcome") == "passed"
+                for check in result.get("checks", [])
+            ):
+                findings.append("paused or failed result must not claim passed checks")
+            if isinstance(reviews, list):
+                clean_lenses = {
+                    item.get("lens")
+                    for item in reviews
+                    if isinstance(item, dict) and item.get("status") == "clean"
+                }
+                if set(REVIEW_LENSES).issubset(clean_lenses):
+                    findings.append(
+                        "paused or failed result must not claim a clean final review pair"
+                    )
         if outcome == "checkpointed" and isinstance(reviews, list):
             valid_reviews = [item for item in reviews if isinstance(item, dict)]
             lenses = [item.get("lens") for item in valid_reviews]

@@ -3,7 +3,7 @@ evolution:
   id: callable-tool-surface-and-value-fidelity
   objective: Close pre-release boundary, campaign-handoff, and public-guidance findings without changing accepted system meaning.
   observable_distinction: Snapshot publication never replaces another name, every owner-facing failure reports its true operation and complete known state effect, every campaign result is bound to current work, and security and query guidance match the runnable local surface.
-  lifecycle: complete
+  lifecycle: active
   approval:
     status: not-required
     reason: The new findings are implementation, workflow-validation, and documentation defects under unchanged accepted authority.
@@ -598,6 +598,37 @@ findings:
     implementation_status: conforming
     nearest_wrong_system: Anchor-only counting is exact, but adding a one-to-many projection makes row count larger than the number of distinct projected anchor identities.
     compatibility_effect: Advisory description only; query schemas, evaluated tuples, aggregation, and bounds remain unchanged.
+  - id: F036
+    summary: Process-control exceptions during restore or fresh initialization bypass database close and checkpoint cleanup.
+    classification: implementation defect
+    consequence: An owner interruption can propagate after a canonical commit without attempting the repository's close/checkpoint path, leaving the owner without the cleanup guarantee needed before copying the database.
+    authority_refs:
+      - VellisRequirements::observableFailure
+      - VellisRequirements::simpleIndividualOperation
+      - VellisRequirements::freshInitialization
+      - Vellis::'Restore prior personal memory'
+    evidence_refs:
+      - path:tests/vellis/test_cleanup_boundaries.py#test_restore_process_control_failure_keeps_its_meaning_after_cleanup
+      - path:tests/vellis/test_setup_path.py#test_setup_process_control_failure_keeps_its_meaning_after_cleanup
+    disposition: resolved
+    owner_work_item_id: W009
+    implementation_status: conforming
+    nearest_wrong_system: Ordinary failures and server interruption close safely, while the same interruption during restore or setup escapes one line before cleanup begins.
+    compatibility_effect: Process-control exceptions still propagate; cleanup is newly attempted first and a simultaneous checkpoint failure is attached without replacing the original exception.
+  - id: F037
+    summary: Paused and failed campaign results can claim passed checks and a clean state-bound review pair.
+    classification: implementation defect
+    consequence: Candidate validation accepts completion evidence that the non-checkpointed outcome is not permitted to claim, making a paused or failed handoff internally misleading even though it cannot advance a checkpoint.
+    authority_refs:
+      - AGENTS.md
+      - .agents/skills/sysml-implementation-campaign/SKILL.md
+    evidence_refs:
+      - path:tests/test_implementation_campaign.py#test_noncheckpointed_worker_result_cannot_claim_completion_evidence
+    disposition: resolved
+    owner_work_item_id: W009
+    implementation_status: conforming
+    nearest_wrong_system: Campaign, work-item, state-token, reason, and null-checkpoint bindings all pass while a failed result falsely presents every check and both final reviews as clean.
+    compatibility_effect: Worker-result schema version 2 remains unchanged; non-checkpointed results may still report failed or not-run checks and finding-bearing reviews, but not completion claims.
 decisions:
   - id: D001
     summary: Replace only self-reaching definitions with the permissive JSON value they stand for, then inline the rest, at the boundary that already owns the wire form.
@@ -1041,29 +1072,61 @@ work_items:
       - command:just check
     blocker: null
     checkpoint: git:f35f2a1f7405915ecac6e82b715f1eb1de22c661
+  - id: W009
+    order: 9
+    label: Preserve cleanup and evidence meaning across non-success control flow
+    kind: implementation
+    dependencies: [W008]
+    planned_baseline:
+      dimension: implementation
+      identity: git:f35f2a1f7405915ecac6e82b715f1eb1de22c661
+    finding_ids: [F036, F037]
+    decision_ids: []
+    authority:
+      - refs:
+          - VellisRequirements::observableFailure
+          - VellisRequirements::simpleIndividualOperation
+          - VellisRequirements::freshInitialization
+          - AGENTS.md
+          - .agents/skills/sysml-implementation-campaign/SKILL.md
+        coverage: full
+        remaining_work_item_ids: []
+    approval:
+      status: not-required
+      reason: Accepted product authority and campaign supervision already require cleanup before propagation and outcome-specific candidate claims.
+      checkpoint: null
+    nearest_wrong_system: Nominal and ordinary failures are safe while process-control or non-checkpointed handoff paths bypass the same cleanup and evidence boundaries.
+    compatibility_effect: Product semantics and worker-result schema version remain unchanged; cleanup and semantic validation become stricter.
+    non_effects:
+      - Process-control exceptions retain their original Python meaning.
+      - No persistence format, product interface, campaign checkpoint format, or schema version changes.
+      - User-owned data and protected ignored files remain untouched.
+    lifecycle: active
+    implementation_status: partial
+    evidence_refs:
+      - command:uv run pytest tests/vellis/test_cleanup_boundaries.py tests/vellis/test_setup_path.py tests/test_implementation_campaign.py -q
+      - command:just skills-check
+      - command:just implementation-campaign-check
+      - command:just check
+    blocker: null
+    checkpoint: null
 closure:
-  finding_disposition: complete
+  finding_disposition: open
   model_status: accepted
-  implementation_status: conforming
-  integration_status: conforming
+  implementation_status: partial
+  integration_status: not evaluated
   external_status: not applicable
   compatibility: Model, persistence, tool names, request schemas, and query meaning remain unchanged; failure reporting, campaign validation, and public guidance are stricter, while pypdf changes only in the development toolchain.
   reviews:
     - lens: authority and conformance
-      status: clean
-      reviewer: /root/pre_release_authority_rerun
-      checkpoint: git:f35f2a1f7405915ecac6e82b715f1eb1de22c661
-      evidence_refs:
-        - command:just check
+      status: pending
+      reviewer: null
+      checkpoint: null
+      evidence_refs: []
     - lens: engineering and evidence
-      status: clean
-      reviewer: /root/pre_release_engineering_rerun
-      checkpoint: git:f35f2a1f7405915ecac6e82b715f1eb1de22c661
-      evidence_refs:
-        - command:just check
-  evidence_refs:
-    - command:just model-check
-    - command:just implementation-campaign-check
-    - command:just system-evolution-check
-    - command:just check
-  checkpoint: git:f35f2a1f7405915ecac6e82b715f1eb1de22c661
+      status: pending
+      reviewer: null
+      checkpoint: null
+      evidence_refs: []
+  evidence_refs: []
+  checkpoint: null

@@ -166,6 +166,7 @@ def _restore(
         return EXIT_FAILED
     starting_position = _memory_position(system)
     ending_position = starting_position
+    control_failure: BaseException | None = None
     try:
         print(f"Vellis will restore {named} in {path}.", file=output)
         print(
@@ -206,9 +207,21 @@ def _restore(
             memory_changed=_position_changed(starting_position, ending_position),
             operation="restore",
         )
+    except BaseException as interrupted:
+        # KeyboardInterrupt, SystemExit, and cancellation retain their process-control
+        # meaning, but not at the cost of bypassing the same checkpoint cleanup every
+        # ordinary restore path receives.
+        control_failure = interrupted
     try:
         system.close()
     except StoreError as close_error:
+        if control_failure is not None:
+            control_failure.add_note(
+                "Vellis cleanup also failed: "
+                f"{close_error}. Close the other database reader, then open and close "
+                "Vellis again before copying the memory file."
+            )
+            raise control_failure from close_error
         _report(
             ConnectionStage.CLOSE_MEMORY,
             f"the restore operation finished, but cleanup could not: {close_error}",
@@ -219,6 +232,8 @@ def _restore(
             operation="restore",
         )
         return EXIT_FAILED
+    if control_failure is not None:
+        raise control_failure
     return result
 
 

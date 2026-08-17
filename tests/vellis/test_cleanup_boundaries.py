@@ -311,6 +311,28 @@ def test_rejected_restore_reports_restore_and_its_activity_effect(
     assert "established memory: changed" in error.getvalue()
 
 
+def test_restore_process_control_failure_keeps_its_meaning_after_cleanup(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    directory = tmp_path / "memory"
+    directory.mkdir()
+    owner_command.store_path(directory).touch()
+    system = _BlockedCloseSystem()
+    monkeypatch.setattr(owner_command.RTGSystem, "open", lambda path: system)
+
+    with pytest.raises(KeyboardInterrupt) as raised:
+        owner_command._restore(
+            ["--data-dir", str(directory), "--revision", "0"],
+            output=io.StringIO(),
+            error=io.StringIO(),
+            confirm=lambda prompt: (_ for _ in ()).throw(KeyboardInterrupt()),
+        )
+
+    assert system.close_calls == 1
+    assert any("cleanup also failed" in note for note in raised.value.__notes__)
+    assert any("before copying the memory file" in note for note in raised.value.__notes__)
+
+
 def test_preserve_close_failure_keeps_the_published_snapshot_truthful(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

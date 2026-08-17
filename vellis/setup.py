@@ -386,6 +386,8 @@ def _initialize(
             choice=choice,
         )
     system = RTGSystem(store)
+    control_failure: BaseException | None = None
+    report: SetupReport | None = None
     try:
         if recovery is None:
             outcome = system.initialize_fresh(
@@ -433,9 +435,22 @@ def _initialize(
             store=store_file,
             choice=choice,
         )
+    except BaseException as interrupted:
+        # Initialization may already have committed before a process-control exception
+        # is delivered. Preserve that exception, but attempt the same close/checkpoint
+        # path first so an interruption cannot silently weaken copy safety.
+        control_failure = interrupted
     try:
         system.close()
     except StoreError as error:
+        if control_failure is not None:
+            control_failure.add_note(
+                "Vellis cleanup also failed: "
+                f"{error}. Close the other database reader, then open and close Vellis "
+                "again before copying the memory file."
+            )
+            raise control_failure from error
+        assert report is not None
         prior_action = report.corrective_action
         retry = (
             "close the other database reader, then open and close Vellis again before "
@@ -447,6 +462,9 @@ def _initialize(
             summary=f"{report.summary}; cleanup could not finish: {error}",
             corrective_action=f"{prior_action}; {retry}" if prior_action else retry,
         )
+    if control_failure is not None:
+        raise control_failure
+    assert report is not None
     return report
 
 

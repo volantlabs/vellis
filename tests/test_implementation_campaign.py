@@ -1940,6 +1940,60 @@ def test_noncheckpointed_worker_result_cannot_claim_a_checkpoint(outcome: str) -
 
 
 @pytest.mark.parametrize("outcome", ("paused", "failed"))
+def test_noncheckpointed_worker_result_cannot_claim_completion_evidence(outcome: str) -> None:
+    result = _noncheckpointed_worker_result(outcome)
+    result["checks"] = [{"name": "just check", "outcome": "passed"}]
+    result["review_pairs"] = 1
+    result["reviews"] = [
+        {
+            "lens": "authority",
+            "reviewer": "authority-agent",
+            "status": "clean",
+            "state_token": "a" * 64,
+        },
+        {
+            "lens": "engineering",
+            "reviewer": "engineering-agent",
+            "status": "clean",
+            "state_token": "a" * 64,
+        },
+    ]
+    result["material_findings"] = [{"pair": 1, "authority": 0, "engineering": 0}]
+
+    findings = _worker_result_findings(result, current_state_token="a" * 64)
+
+    assert "paused or failed result must not claim passed checks" in findings
+    assert "paused or failed result must not claim a clean final review pair" in findings
+
+
+@pytest.mark.parametrize("outcome", ("paused", "failed"))
+def test_noncheckpointed_worker_result_retains_noncompletion_evidence(outcome: str) -> None:
+    result = _noncheckpointed_worker_result(outcome)
+    result["checks"] = [
+        {"name": "focused", "outcome": "failed"},
+        {"name": "just check", "outcome": "not-run"},
+    ]
+    result["review_pairs"] = 1
+    result["reviews"] = [
+        {
+            "lens": "authority",
+            "reviewer": "authority-agent",
+            "status": "clean",
+            "state_token": "a" * 64,
+        },
+        {
+            "lens": "engineering",
+            "reviewer": "engineering-agent",
+            "status": "findings",
+            "state_token": "a" * 64,
+        },
+    ]
+    result["material_findings"] = [{"pair": 1, "authority": 0, "engineering": 1}]
+
+    assert _worker_result_findings(result, current_state_token="a" * 64) == []
+
+
+@pytest.mark.parametrize("outcome", ("paused", "failed"))
 def test_noncheckpointed_present_review_token_must_match_current_state(outcome: str) -> None:
     result = _noncheckpointed_worker_result(outcome)
     result["review_state_token"] = "b" * 64

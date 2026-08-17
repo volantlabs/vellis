@@ -74,8 +74,9 @@ finding counts, both final lens dispositions and reviewer identifiers, their sha
 token, elapsed time, optional usage measurements, and a pause or failure reason. Bind every candidate
 result to the current campaign, current work item, and independently recomputed durable state before
 using it for advancement, pause, retry, or failure-limit handling. A paused or failed result has a
-reason, no checkpoint, and a review-state token that names the current durable state even when no
-review ran. Validate a
+reason, no checkpoint, passed check, or clean final review pair, and a review-state token that names
+the current durable state even when no review ran. It may retain failed or not-run checks and
+finding-bearing review history that explains the non-success outcome. Validate a
 checkpointed result additionally against the frozen token, intended checkpoint, and reported passed
 checks before bookkeeping; internal agreement among result fields is not enough. A checkpointed
 result has at least one pair: the clean state-bound pair that

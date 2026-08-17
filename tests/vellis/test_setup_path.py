@@ -16,6 +16,7 @@ from pathlib import Path
 
 import pytest
 
+import vellis.setup as setup_command
 from tests.vellis.oracle import materialize_replay, materialize_state
 from tests.vellis.semantic_state import semantic_state_equal
 from vellis.activity import HistoryKind, HistoryQuery
@@ -94,6 +95,43 @@ def test_a_filesystem_root_is_refused() -> None:
 def test_the_three_outcomes_an_agent_reads_stay_distinct() -> None:
     """The exit status is the whole of what a non-interactive caller can see."""
     assert (EXIT_SUCCESS, EXIT_FAILED, EXIT_DECLINED) == (0, 1, 3)
+
+
+def test_setup_process_control_failure_keeps_its_meaning_after_cleanup(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    class _InterruptedSystem:
+        def __init__(self, store: object) -> None:
+            self.close_calls = 0
+
+        def initialize_fresh(self, *args: object, **kwargs: object) -> object:
+            raise KeyboardInterrupt
+
+        def close(self) -> None:
+            self.close_calls += 1
+            raise setup_command.StoreError("reader blocked checkpoint")
+
+    system: _InterruptedSystem | None = None
+
+    def build_system(store: object) -> _InterruptedSystem:
+        nonlocal system
+        system = _InterruptedSystem(store)
+        return system
+
+    monkeypatch.setattr(setup_command, "CanonicalStore", lambda path: object())
+    monkeypatch.setattr(setup_command, "RTGSystem", build_system)
+
+    with pytest.raises(KeyboardInterrupt) as raised:
+        setup_command._initialize(
+            tmp_path,
+            tmp_path / "vellis.sqlite3",
+            "owner",
+            FreshVocabularyChoice.BLANK,
+        )
+
+    assert system is not None and system.close_calls == 1
+    assert any("cleanup also failed" in note for note in raised.value.__notes__)
+    assert any("before copying the memory file" in note for note in raised.value.__notes__)
 
 
 @pytest.mark.parametrize("missing", ["nothing", "the stage", "what happened", "what to do next"])
