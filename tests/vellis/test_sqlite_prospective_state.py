@@ -160,6 +160,61 @@ def test_complete_invalid_assessment_is_stored_once_and_paged(tmp_path: Path) ->
         system.close()
 
 
+def test_assessment_and_finding_pages_accept_oversized_positive_maxima(tmp_path: Path) -> None:
+    system = _system(tmp_path)
+    try:
+        revision = system.store.current_revision()
+        current = system.check(
+            ValidationRequest(
+                ValidationRequestKind.ASSESS,
+                ValidationScope.GRAPH_CONFORMANCE,
+                2**100,
+            ),
+            provenance=OWNER,
+        )
+        assert current.accepted and current.conforms and current.returned_findings == ()
+        assert system.set_definition_delta(
+            DefinitionChange(anchor_type_upserts=(TEAM,), type_removals=("person",)),
+            provenance=OWNER,
+        ).accepted
+        assert system.apply_graph_change(
+            GraphChangeRequest(
+                GraphChangeTarget.DEFINITION_DELTA,
+                GraphChange(
+                    anchor_upserts=(
+                        Anchor("a", "person", "Ada"),
+                        Anchor("b", "person", "Babbage"),
+                    )
+                ),
+            ),
+            provenance=OWNER,
+        ).accepted
+        prospective_revision = system.store.current_revision()
+
+        prospective = _assess_delta(system, maximum=2**100)
+
+        assert prospective.accepted and not prospective.conforms
+        assert prospective.finding_count == len(prospective.returned_findings)
+        assert prospective.assessment_id is not None
+        page = system.check(
+            ValidationRequest(
+                ValidationRequestKind.READ_FINDINGS,
+                ValidationScope.DEFINITION_DELTA,
+                2**100,
+                assessment_id=prospective.assessment_id,
+                start_ordinal=1,
+            ),
+            provenance=OWNER,
+        )
+        assert page.accepted
+        assert page.returned_findings == prospective.returned_findings
+        assert system.store.current_revision() == prospective_revision
+        assert prospective_revision > revision
+        assert system.store.activity_records()[-1].outcome_category.value == "accepted"
+    finally:
+        system.close()
+
+
 def test_activation_rejects_assessment_made_stale_by_proposal_edit(tmp_path: Path) -> None:
     system = _system(tmp_path)
     try:

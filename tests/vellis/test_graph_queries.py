@@ -1922,6 +1922,53 @@ def test_aggregation_counts_matching_objects_not_distinct_projected_tuples(
         system.close()
 
 
+@pytest.mark.parametrize("maximum", [2**63 - 1, 2**100])
+@pytest.mark.parametrize(
+    "state_scope",
+    [
+        EvaluatedStateScope.CURRENT,
+        EvaluatedStateScope.PROSPECTIVE,
+        EvaluatedStateScope.HISTORICAL,
+    ],
+)
+def test_aggregation_accepts_large_positive_bounds_without_canonical_effects(
+    system: RTGSystem,
+    maximum: int,
+    state_scope: EvaluatedStateScope,
+) -> None:
+    if state_scope is EvaluatedStateScope.PROSPECTIVE:
+        assert system.set_definition_delta(
+            DefinitionChange(
+                anchor_type_upserts=(
+                    AnchorTypeDefinition("query-fixture-only", "An unrelated proposed type."),
+                )
+            ),
+            provenance=_owner(),
+        ).accepted
+    revision = system.store.current_revision()
+    query = replace(
+        _rating_query(
+            QueryAggregation(
+                name="howMany",
+                operator=AggregationOperator.COUNT,
+                data_condition="notes",
+            )
+        ),
+        maximum_rows=maximum,
+        state_scope=state_scope,
+        historical_selection=(
+            RevisionSelection(revision) if state_scope is EvaluatedStateScope.HISTORICAL else None
+        ),
+    )
+
+    result = system.query_graph(query, provenance=_owner())
+
+    assert result.accepted, result.findings
+    assert result.aggregates[0].value == Decimal(3)
+    assert system.store.current_revision() == revision
+    assert system.store.activity_records()[-1].outcome_category is OperationStatus.ACCEPTED
+
+
 def test_sum_preserves_exact_numbers_beyond_the_decimal_context(tmp_path: Path) -> None:
     """A carry beyond 28 digits must not be rounded by the process-wide context."""
     system = RTGSystem.open(tmp_path / "vellis.sqlite3")

@@ -91,7 +91,7 @@ from vellis.governance import (
     DefinitionDeltaResult,
     SetDefinitionDeltaRequest,
 )
-from vellis.json_value import MAXIMUM_STORED_INTEGER_EXPONENT, JsonValueError
+from vellis.json_value import JsonValueError
 from vellis.outcomes import (
     OperationStatus,
     RevisionedOutcome,
@@ -106,6 +106,8 @@ from vellis.system import RTGSystem
 __all__ = ["TOOL_NAMES", "ServeError", "ServeStage", "build_server", "serve"]
 
 logger = get_logger(__name__)
+
+_MAXIMUM_COMPACT_INTEGER_EXPONENT = 30
 
 
 class ServeStage:
@@ -659,9 +661,10 @@ def _wire(value: object) -> object:
     """
     if isinstance(value, Decimal):
         if value == value.to_integral_value():
-            if abs(value.adjusted()) > MAXIMUM_STORED_INTEGER_EXPONENT:
-                raise JsonValueError(f"the number {value} is larger than a stored integer may be")
-            return int(value)
+            if abs(value.adjusted()) <= _MAXIMUM_COMPACT_INTEGER_EXPONENT:
+                return int(value)
+            rendered = float(value)
+            return rendered if Decimal(repr(rendered)) == value else value
         rendered = float(value)
         return rendered if Decimal(repr(rendered)) == value else value
     if isinstance(value, Enum):
@@ -698,6 +701,8 @@ def _result[T](value: T, unreturnable: Callable[[str], T]) -> T:
         wired = _wire(value)
     except JsonValueError as error:
         wired = _wire(unreturnable(str(error)))
+    if not isinstance(wired, dict):  # Every public tool result is one typed outcome object.
+        raise JsonValueError("a tool result must have one object wire form")
     # ToolResult's convenience constructor turns Decimal into a JSON string before the
     # transport can encode it. Give it an already-formed protocol result, whose raw form
     # it preserves, so both representations keep the same exact JSON-number token.
@@ -708,6 +713,11 @@ def _result[T](value: T, unreturnable: Callable[[str], T]) -> T:
             is_error=False,
         )
     )
+    # FastMCP's ToolResult initializer normalizes Decimal members to strings even
+    # though the underlying protocol result retains them. Restore the already-wired
+    # value for in-process transports; the exact STDIO writer independently repairs
+    # the serialized protocol copy from the adjacent text representation.
+    result.structured_content = wired
     return cast("T", result)  # pyright: ignore[reportInvalidCast]
 
 

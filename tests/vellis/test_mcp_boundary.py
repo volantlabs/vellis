@@ -9,7 +9,9 @@ from pathlib import Path
 
 import pytest
 from fastmcp import Client
+from mcp.types import TextContent
 
+from vellis.activity import HistoryKind, HistoryQuery
 from vellis.canonical import Provenance
 from vellis.definitions import (
     AnchorTypeDefinition,
@@ -19,6 +21,7 @@ from vellis.definitions import (
 )
 from vellis.json_value import JsonKind
 from vellis.mcp import TOOL_NAMES, build_server
+from vellis.outcomes import OperationStatus
 from vellis.system import RTGSystem
 
 
@@ -216,6 +219,96 @@ async def test_a_stored_value_keeps_the_json_kind_the_caller_sent(valued_client:
     assert json.dumps(returned, sort_keys=True) == json.dumps(sent, sort_keys=True)
 
 
+@pytest.mark.anyio
+async def test_large_integral_number_remains_exact_and_query_activity_is_accepted(
+    tmp_path: Path,
+) -> None:
+    memory = RTGSystem.open(tmp_path / "large-integral.sqlite3")
+    try:
+        assert memory.initialize_fresh(
+            GraphDefinitionSet(
+                anchor_types=(AnchorTypeDefinition("person", "A person."),),
+                associated_data_types=(
+                    AssociatedDataTypeDefinition(
+                        "person.stats",
+                        ("person",),
+                        (PropertyConstraint("count", False, JsonKind.NUMBER, "A count."),),
+                        "Stats.",
+                    ),
+                ),
+            ),
+            provenance=Provenance("owner"),
+            initialization_summary="fresh",
+        ).accepted
+        exact_integer = 10**31
+        async with Client(build_server(memory)) as mcp_client:
+            changed = await mcp_client.call_tool(
+                "rtg_change",
+                {
+                    "request": {
+                        "target": "active",
+                        "change": {
+                            "anchor_upserts": [
+                                {"uuid": "p-1", "type_key": "person", "display_name": "Ada"}
+                            ],
+                            "associated_data_upserts": [
+                                {
+                                    "uuid": "d-1",
+                                    "type_key": "person.stats",
+                                    "anchor_uuids": ["p-1"],
+                                    "properties": {"count": exact_integer},
+                                }
+                            ],
+                        },
+                    }
+                },
+            )
+            queried = await mcp_client.call_tool(
+                "rtg_query",
+                {
+                    "query": {
+                        "anchor_groups": [{"name": "people", "anchor_types": ["person"]}],
+                        "data_conditions": [
+                            {
+                                "name": "stats",
+                                "anchor_group": "people",
+                                "associated_data_type": "person.stats",
+                            }
+                        ],
+                        "return_shape": {
+                            "projections": [
+                                {
+                                    "name": "count",
+                                    "data_condition": "stats",
+                                    "property_name": "count",
+                                }
+                            ]
+                        },
+                        "maximum_rows": 2,
+                    }
+                },
+            )
+
+        assert changed.structured_content is not None
+        assert changed.structured_content["status"] == "accepted"
+        assert queried.structured_content is not None
+        assert queried.structured_content["status"] == "accepted"
+        structured_value = queried.structured_content["rows"][0]["properties"][0]["value"]
+        assert Decimal(str(structured_value)) == Decimal(exact_integer)
+        textual = queried.content[0]
+        assert isinstance(textual, TextContent)
+        exact_text = json.loads(textual.text, parse_int=Decimal, parse_float=Decimal)
+        assert exact_text["rows"][0]["properties"][0]["value"] == Decimal(exact_integer)
+        assert json.loads(textual.text) == queried.structured_content
+        activity = memory.history(HistoryQuery(HistoryKind.ACTIVITY, 100))
+        query_entry = next(
+            entry for entry in activity.activity_entries if entry.capability == "query"
+        )
+        assert query_entry.outcome_category is OperationStatus.ACCEPTED
+    finally:
+        memory.close()
+
+
 def _raw_mcp_response(
     process: subprocess.Popen[str], request_id: int
 ) -> tuple[dict[str, object], str]:
@@ -227,7 +320,9 @@ def _raw_mcp_response(
     raise AssertionError(f"the MCP server ended before answering request {request_id}")
 
 
-def test_raw_stdio_preserves_a_high_precision_fraction_in_both_directions(tmp_path: Path) -> None:
+def test_raw_stdio_preserves_exact_fraction_and_large_integer_in_both_directions(
+    tmp_path: Path,
+) -> None:
     """The transport must not round a JSON number before Vellis can read its meaning."""
     directory = tmp_path / "memory"
     directory.mkdir()
@@ -241,7 +336,10 @@ def test_raw_stdio_preserves_a_high_precision_fraction_in_both_directions(tmp_pa
                     AssociatedDataTypeDefinition(
                         "person.stats",
                         ("person",),
-                        (PropertyConstraint("ratio", False, JsonKind.NUMBER, "A ratio."),),
+                        (
+                            PropertyConstraint("ratio", False, JsonKind.NUMBER, "A ratio."),
+                            PropertyConstraint("count", False, JsonKind.NUMBER, "A count."),
+                        ),
                         "Stats.",
                     ),
                 ),
@@ -261,6 +359,7 @@ def test_raw_stdio_preserves_a_high_precision_fraction_in_both_directions(tmp_pa
         encoding="utf-8",
     )
     exact = Decimal("0.12345678901234567890123456789")
+    exact_integer = 10**31
     try:
         assert process.stdin is not None
 
@@ -292,7 +391,11 @@ def test_raw_stdio_preserves_a_high_precision_fraction_in_both_directions(tmp_pa
             '"arguments":{"request":{"target":"active","change":{"anchor_upserts":['
             '{"uuid":"p-1","type_key":"person","display_name":"Ada"}],'
             '"associated_data_upserts":[{"uuid":"d-1","type_key":"person.stats",'
-            '"anchor_uuids":["p-1"],"properties":{"ratio":' + str(exact) + "}}]}}}}}\n"
+            '"anchor_uuids":["p-1"],"properties":{"ratio":'
+            + str(exact)
+            + ',"count":'
+            + str(exact_integer)
+            + "}}]}}}}}\n"
         )
         process.stdin.flush()
         changed, _ = _raw_mcp_response(process, 2)
@@ -325,7 +428,12 @@ def test_raw_stdio_preserves_a_high_precision_fraction_in_both_directions(tmp_pa
                                         "name": "ratio",
                                         "data_condition": "stats",
                                         "property_name": "ratio",
-                                    }
+                                    },
+                                    {
+                                        "name": "count",
+                                        "data_condition": "stats",
+                                        "property_name": "count",
+                                    },
                                 ]
                             },
                             "maximum_rows": 2,
@@ -343,7 +451,9 @@ def test_raw_stdio_preserves_a_high_precision_fraction_in_both_directions(tmp_pa
         assert isinstance(rows, list)
         assert structured["status"] == "accepted"
         assert rows[0]["properties"][0]["value"] == exact, raw_query
+        assert rows[0]["properties"][1]["value"] == exact_integer, raw_query
         assert f'"value":{exact}' in raw_query
+        assert '"value":1E+31' in raw_query
         content = query_result["content"]
         assert isinstance(content, list)
         text = content[0]["text"]

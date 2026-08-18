@@ -114,6 +114,8 @@ from vellis.outcomes import (
 )
 from vellis.validation import assess_object_neighborhood, validate_property_value
 
+_MAXIMUM_SQLITE_INTEGER = 2**63 - 1
+
 if TYPE_CHECKING:
     from vellis.query import AggregateBinding, GraphQuery, GraphQueryResult
 
@@ -3219,10 +3221,12 @@ class CanonicalStore:
         count = int(row[5])
         if start_ordinal > max(1, count):
             return None
+        remaining_findings = max(0, count - start_ordinal + 1)
+        sql_limit = min(maximum_findings, remaining_findings)
         finding_rows = self._connection.execute(
             "SELECT ordinal, summary FROM validation_finding"
             " WHERE assessment_id = ? AND ordinal >= ? ORDER BY ordinal LIMIT ?",
-            (assessment_id, start_ordinal, maximum_findings),
+            (assessment_id, start_ordinal, sql_limit),
         ).fetchall()
         findings: list[ValidationFinding] = []
         for ordinal, summary in finding_rows:
@@ -3691,15 +3695,14 @@ class CanonicalStore:
                 + " AND ".join(predicates)
                 + " LIMIT ?"
             )
+            sql_limit = min(query.maximum_rows + 1, _MAXIMUM_SQLITE_INTEGER)
             parameters = [
                 *prefix_parameters,
                 *select_parameters,
                 *where_parameters,
-                query.maximum_rows + 1,
+                sql_limit,
             ]
-            matched = self._connection.execute(sql, tuple(parameters)).fetchmany(
-                query.maximum_rows + 1
-            )
+            matched = self._connection.execute(sql, tuple(parameters)).fetchall()
             if len(matched) > query.maximum_rows:
                 return ValidationFinding(
                     summary=(
