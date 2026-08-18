@@ -668,7 +668,7 @@ def _write_client_preview(plans: Sequence[ClientPlan], stream: TextIO) -> None:
         print(f"      inspect: {render_command(plan.inspection_argv)}", file=stream)
         if plan.remove_argv is not None:
             print(f"      remove:  {render_command(plan.remove_argv)}", file=stream)
-        if plan.action in {ClientAction.ADD, ClientAction.REPLACE, ClientAction.MANUAL}:
+        if plan.action in {ClientAction.ADD, ClientAction.REPLACE}:
             print(f"      add:     {plan.manual_command}", file=stream)
         print(f"      {plan.detail}", file=stream)
 
@@ -713,7 +713,17 @@ def _write_client_outcomes(
             )
             if outcome.plan.state is ClientState.DIFFERING:
                 retry.extend(("--replace-client", outcome.plan.client.value))
-            print(f"  what to do next: {render_command(retry)}", file=stream)
+            rendered_retry = render_command(retry)
+            if outcome.plan.state is ClientState.UNAVAILABLE:
+                inspection = render_command(outcome.plan.inspection_argv)
+                print(
+                    f"  what to do next: install or repair the "
+                    f"{outcome.plan.client.value} CLI until `{inspection}` runs, then run: "
+                    f"{rendered_retry}",
+                    file=stream,
+                )
+            else:
+                print(f"  what to do next: {rendered_retry}", file=stream)
 
 
 def _launcher_context() -> tuple[Path, Path | None]:

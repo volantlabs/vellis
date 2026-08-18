@@ -152,8 +152,10 @@ left revision 8 conforming with no staged proposal. Claude Code completed a boun
 the reproducible project boundary, setup, persistence, inventory, registration, and dry-run evidence
 to close A017, D006, and the runnable campaign boundary without changing client approval policy.
 
-The commands below are a source-checkout fallback when a supported client CLI is unavailable, not
-the selected primary workflow. An installed artifact instead registers the absolute interpreter
+The commands below are a manual source-checkout fallback when automated registration was not
+selected or completed, not the selected primary workflow. They still require the named client CLI;
+if it is unavailable, install or repair it until its public inspection command succeeds before
+retrying registration. An installed artifact instead registers the absolute interpreter
 that owns the package with `-m vellis`, so later client launches do not depend on an activated shell
 or a source checkout. For the checkout form, establish a system first with `vellis setup` (or
 `uv run python -m vellis.setup`),

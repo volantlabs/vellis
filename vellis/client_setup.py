@@ -222,7 +222,11 @@ def _apply_one(plan: ClientPlan, runner: Runner) -> ClientOutcome:
             plan,
             False,
             False,
-            f"client CLI is unavailable; run: {plan.manual_command}",
+            (
+                f"client CLI is unavailable; install or repair the {plan.client.value} CLI "
+                f"until `{render_command(plan.inspection_argv)}` runs, then use setup's "
+                "reported client-only retry command"
+            ),
         )
     if plan.action is ClientAction.REFUSE:
         corrective = (

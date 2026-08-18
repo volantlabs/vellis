@@ -451,8 +451,11 @@ def test_missing_client_reports_a_copyable_command_without_undoing_memory(
         stderr=error,
     )
     assert code == EXIT_FAILED
-    assert "client CLI is unavailable; run:" in error.getvalue()
-    assert "--data-dir" in error.getvalue()
+    assert "install or repair the codex CLI" in error.getvalue()
+    assert "`codex mcp get vellis --json` runs" in error.getvalue()
+    assert "then run: uv --directory" in error.getvalue()
+    assert "-m vellis.setup" in error.getvalue()
+    assert render_command(("--data-dir", str(destination.resolve()))) in error.getvalue()
     system = RTGSystem.open(store_path(destination.resolve()))
     try:
         assert system.is_initialized
