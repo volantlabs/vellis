@@ -769,6 +769,118 @@ def test_endpoint_type_change_cannot_activate_an_incomplete_multiplicity_closure
         system.close()
 
 
+def test_endpoint_type_change_revalidates_incident_link_without_a_multiplicity_rule(
+    tmp_path: Path,
+) -> None:
+    project = AnchorTypeDefinition("project", "A project.")
+    definitions = GraphDefinitionSet(
+        anchor_types=(PERSON, TEAM, project),
+        link_types=(
+            LinkTypeDefinition(
+                "assigned",
+                EndpointConstraint(("person",), ("project",), "Assignment endpoints."),
+                "Assignment.",
+            ),
+        ),
+    )
+    system = RTGSystem.open(tmp_path / "endpoint-type-local.sqlite3")
+    try:
+        assert system.initialize_fresh(
+            definitions, provenance=OWNER, initialization_summary="fresh"
+        ).accepted
+        assert system.apply_graph_change(
+            GraphChange(
+                anchor_upserts=(
+                    Anchor("p", "person", "Person"),
+                    Anchor("j", "project", "Project"),
+                ),
+                link_upserts=(Link("assignment", "assigned", "p", "j"),),
+            ),
+            provenance=OWNER,
+        ).accepted
+        assert system.apply_graph_change(
+            GraphChangeRequest(
+                GraphChangeTarget.DEFINITION_DELTA,
+                GraphChange(anchor_upserts=(Anchor("p", "team", "Team"),)),
+            ),
+            provenance=OWNER,
+        ).accepted
+
+        report = _assess_delta(system)
+
+        assert not report.conforms
+        assert any(
+            "endpoint constraint does not permit" in item.summary
+            for item in report.returned_findings
+        )
+    finally:
+        system.close()
+
+
+def test_anchor_tombstone_revalidates_links_and_far_multiplicity_subjects(tmp_path: Path) -> None:
+    project = AnchorTypeDefinition("project", "A project.")
+    system = RTGSystem.open(tmp_path / "anchor-tombstone.sqlite3")
+    try:
+        assert system.initialize_fresh(
+            GraphDefinitionSet(
+                anchor_types=(PERSON, project),
+                link_types=(
+                    LinkTypeDefinition(
+                        "assigned",
+                        EndpointConstraint(("person",), ("project",), "Assignment endpoints."),
+                        "Assignment.",
+                    ),
+                ),
+                relationship_constraints=(
+                    LinkMultiplicityConstraint(
+                        "assigned",
+                        LinkEnd.TARGET,
+                        ("project",),
+                        ("person",),
+                        1,
+                        1,
+                        "Each project has one person.",
+                    ),
+                ),
+            ),
+            provenance=OWNER,
+            initialization_summary="fresh",
+        ).accepted
+        assert system.apply_graph_change(
+            GraphChange(
+                anchor_upserts=(
+                    Anchor("p", "person", "Person"),
+                    Anchor("j", "project", "Project"),
+                ),
+                link_upserts=(Link("assignment", "assigned", "p", "j"),),
+            ),
+            provenance=OWNER,
+        ).accepted
+        assert system.apply_graph_change(
+            GraphChangeRequest(
+                GraphChangeTarget.DEFINITION_DELTA,
+                GraphChange(anchor_removals=("p",)),
+            ),
+            provenance=OWNER,
+        ).accepted
+        before = materialize_state(system)
+
+        report = _assess_delta(system)
+
+        assert not report.conforms
+        summaries = {item.summary for item in report.returned_findings}
+        assert any("no anchor or associated data" in summary for summary in summaries)
+        assert any("outside 1..1" in summary for summary in summaries)
+        assert report.assessment_id is not None
+        activation = system.activate_definition_delta(
+            ActivateDefinitionDeltaRequest(report.assessment_id), provenance=OWNER
+        )
+        assert not activation.accepted
+        assert semantic_state_equal(materialize_state(system), before)
+    finally:
+        system.close()
+
+
 def test_repeated_anchor_references_have_set_multiplicity_in_prospective_sql(
     tmp_path: Path,
 ) -> None:
@@ -1489,6 +1601,84 @@ def test_link_shape_assessment_scales_with_hub_degree_not_second_hop_degree(
     assert large_steps < medium_steps * 3
 
 
+def test_participant_type_change_scales_with_its_applicable_incident_degree(
+    tmp_path: Path,
+) -> None:
+    def measured(degree: int) -> int:
+        central = AnchorTypeDefinition("central", "A central node.")
+        other = AnchorTypeDefinition("other", "Another node.")
+        spoke = AnchorTypeDefinition("spoke", "A spoke node.")
+        leaf = AnchorTypeDefinition("leaf", "A leaf node.")
+        edge = LinkTypeDefinition(
+            "edge",
+            EndpointConstraint(
+                ("central", "other", "spoke"), ("spoke", "leaf"), "Edge endpoints."
+            ),
+            "An edge.",
+        )
+        rule = LinkMultiplicityConstraint(
+            "edge", LinkEnd.SOURCE, ("central",), ("spoke",), 0, None, "Central edges."
+        )
+        system = RTGSystem.open(tmp_path / f"type-hub-comb-{degree}.sqlite3")
+        try:
+            assert system.initialize_fresh(
+                GraphDefinitionSet(
+                    anchor_types=(central, other, spoke, leaf),
+                    link_types=(edge,),
+                    relationship_constraints=(rule,),
+                ),
+                provenance=OWNER,
+                initialization_summary="type hub comb",
+            ).accepted
+            anchors = [Anchor("hub", "central", "Hub")]
+            links: list[Link] = []
+            for spoke_index in range(degree):
+                spoke_uuid = f"spoke-{spoke_index}"
+                anchors.append(Anchor(spoke_uuid, "spoke", spoke_uuid))
+                links.append(Link(f"hub-{spoke_index}", "edge", "hub", spoke_uuid))
+                for leaf_index in range(degree):
+                    leaf_uuid = f"leaf-{spoke_index}-{leaf_index}"
+                    anchors.append(Anchor(leaf_uuid, "leaf", leaf_uuid))
+                    links.append(
+                        Link(
+                            f"leaf-edge-{spoke_index}-{leaf_index}",
+                            "edge",
+                            spoke_uuid,
+                            leaf_uuid,
+                        )
+                    )
+            assert system.apply_graph_change(
+                GraphChange(anchor_upserts=tuple(anchors), link_upserts=tuple(links)),
+                provenance=OWNER,
+            ).accepted
+            assert system.apply_graph_change(
+                GraphChangeRequest(
+                    GraphChangeTarget.DEFINITION_DELTA,
+                    GraphChange(anchor_upserts=(Anchor("hub", "other", "Hub"),)),
+                ),
+                provenance=OWNER,
+            ).accepted
+            steps = 0
+
+            def progress() -> int:
+                nonlocal steps
+                steps += 100
+                return 0
+
+            system.store._connection.set_progress_handler(progress, 100)  # noqa: SLF001
+            report = _assess_delta(system)
+            system.store._connection.set_progress_handler(None, 0)  # noqa: SLF001
+            assert report.conforms, report.returned_findings
+            return steps
+        finally:
+            system.close()
+
+    medium_steps = measured(20)
+    large_steps = measured(40)
+
+    assert large_steps < medium_steps * 3
+
+
 def test_state_wide_rule_cutover_has_linear_sql_step_growth(tmp_path: Path) -> None:
     def measured(population: int) -> int:
         node = AnchorTypeDefinition("node", "A node.")
@@ -1738,6 +1928,58 @@ def test_staged_data_assessment_includes_direct_association_multiplicity(tmp_pat
 
         assert report.finding_count == 2
         assert any("outside 1..1" in finding.summary for finding in report.returned_findings)
+    finally:
+        system.close()
+
+
+def test_anchor_tombstone_revalidates_direct_association_and_data_multiplicity(
+    tmp_path: Path,
+) -> None:
+    system = RTGSystem.open(tmp_path / "direct-association-tombstone.sqlite3")
+    try:
+        assert system.initialize_fresh(
+            GraphDefinitionSet(
+                anchor_types=(PERSON,),
+                associated_data_types=(
+                    AssociatedDataTypeDefinition(
+                        "note", permitted_anchor_type_keys=("person",), description="A note."
+                    ),
+                ),
+                relationship_constraints=(
+                    DirectAssociationMultiplicityConstraint(
+                        DirectAssociationEnd.ASSOCIATED_DATA,
+                        ("person",),
+                        ("note",),
+                        1,
+                        1,
+                        "One grounding anchor.",
+                    ),
+                ),
+            ),
+            provenance=OWNER,
+            initialization_summary="fresh",
+        ).accepted
+        assert system.apply_graph_change(
+            GraphChange(
+                anchor_upserts=(Anchor("p", "person", "Person"),),
+                associated_data_upserts=(AssociatedDataObject("d", "note", ("p",), {}),),
+            ),
+            provenance=OWNER,
+        ).accepted
+        assert system.apply_graph_change(
+            GraphChangeRequest(
+                GraphChangeTarget.DEFINITION_DELTA,
+                GraphChange(anchor_removals=("p",)),
+            ),
+            provenance=OWNER,
+        ).accepted
+
+        report = _assess_delta(system)
+
+        assert not report.conforms
+        summaries = {finding.summary for finding in report.returned_findings}
+        assert any("no anchor owned by this graph" in summary for summary in summaries)
+        assert any("outside 1..1" in summary for summary in summaries)
     finally:
         system.close()
 

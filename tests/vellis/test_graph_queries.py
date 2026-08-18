@@ -336,6 +336,82 @@ def test_query_beyond_sqlite_join_capacity_is_refused_whole(tmp_path: Path) -> N
         system.close()
 
 
+def test_disconnected_unprojected_capacity_refusal_is_propagated_whole(tmp_path: Path) -> None:
+    from vellis.definitions import EndpointConstraint, GraphDefinitionSet, LinkTypeDefinition
+
+    definitions = GraphDefinitionSet(
+        anchor_types=(AnchorTypeDefinition("focus", "A projected focus."),)
+        + tuple(
+            AnchorTypeDefinition(f"node-{index}", f"Graph node {index}.")
+            for index in range(34)
+        ),
+        link_types=tuple(
+            LinkTypeDefinition(
+                f"edge-{index}",
+                EndpointConstraint(
+                    (f"node-{index}",),
+                    (f"node-{index + 1}",),
+                    "Connects adjacent nodes.",
+                ),
+                f"Graph edge {index}.",
+            )
+            for index in range(33)
+        ),
+    )
+    system = _system_with(tmp_path, definitions)
+    anchors = (Anchor("focus", "focus", "Focus"),) + tuple(
+        Anchor(f"chain-{index}", f"node-{index}", f"Chain {index}") for index in range(34)
+    )
+    links = tuple(
+        Link(
+            f"chain-edge-{index}",
+            f"edge-{index}",
+            f"chain-{index}",
+            f"chain-{index + 1}",
+        )
+        for index in range(33)
+    )
+    assert system.apply_graph_change(
+        GraphChange(anchor_upserts=anchors, link_upserts=links), provenance=_owner()
+    ).accepted
+    groups = (AnchorGroup("focus", ("focus",), AnchorUuidFilter(("focus",))),) + tuple(
+        AnchorGroup(
+            f"chain-node-{index}",
+            (f"node-{index}",),
+            AnchorUuidFilter((f"chain-{index}",)),
+        )
+        for index in range(34)
+    )
+    required = tuple(
+        RequiredLink(
+            f"chain-query-edge-{index}",
+            f"chain-node-{index}",
+            f"chain-node-{index + 1}",
+            f"edge-{index}",
+            LinkUuidFilter((f"chain-edge-{index}",)),
+        )
+        for index in range(33)
+    )
+    query = GraphQuery(
+        anchor_groups=groups,
+        required_links=required,
+        return_shape=ReturnShape((AnchorProjection("projected", "focus"),)),
+        maximum_rows=1,
+    )
+    revision = system.store.current_revision()
+    try:
+        result = system.query_graph(query, provenance=_owner())
+
+        assert result.status is OperationStatus.REJECTED
+        assert result.rows == () and result.aggregates == ()
+        assert result.evaluated_revision is None
+        assert "structural capacity" in result.summary
+        assert system.store.current_revision() == revision
+        assert system.store.activity_records()[-1].outcome_category is OperationStatus.REJECTED
+    finally:
+        system.close()
+
+
 # --- Selection ------------------------------------------------------------------------
 
 

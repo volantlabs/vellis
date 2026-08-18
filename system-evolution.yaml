@@ -41,7 +41,7 @@ findings:
     classification: implementation defect
     consequence: A local display or property change can perform superlinear work with connected graph size even though no distant invariant can change.
     authority_refs: [VellisRequirements::historyIndependentCurrentWork, VellisRequirements::validationCoverage]
-    evidence_refs: [path:tests/vellis/test_sqlite_prospective_state.py#test_display_only_assessment_work_ignores_connected_component_length, path:tests/vellis/test_sqlite_prospective_state.py#test_link_shape_assessment_scales_with_hub_degree_not_second_hop_degree, path:tests/vellis/test_sqlite_prospective_state.py#test_state_wide_rule_cutover_has_linear_sql_step_growth, path:tests/vellis/test_sqlite_prospective_state.py#test_endpoint_type_change_cannot_activate_an_incomplete_multiplicity_closure]
+    evidence_refs: [path:tests/vellis/test_sqlite_prospective_state.py#test_display_only_assessment_work_ignores_connected_component_length, path:tests/vellis/test_sqlite_prospective_state.py#test_link_shape_assessment_scales_with_hub_degree_not_second_hop_degree, path:tests/vellis/test_sqlite_prospective_state.py#test_participant_type_change_scales_with_its_applicable_incident_degree, path:tests/vellis/test_sqlite_prospective_state.py#test_state_wide_rule_cutover_has_linear_sql_step_growth, path:tests/vellis/test_sqlite_prospective_state.py#test_endpoint_type_change_cannot_activate_an_incomplete_multiplicity_closure, path:tests/vellis/test_sqlite_prospective_state.py#test_endpoint_type_change_revalidates_incident_link_without_a_multiplicity_rule, path:tests/vellis/test_sqlite_prospective_state.py#test_anchor_tombstone_revalidates_links_and_far_multiplicity_subjects, path:tests/vellis/test_sqlite_prospective_state.py#test_anchor_tombstone_revalidates_direct_association_and_data_multiplicity]
     disposition: resolved
     owner_work_item_id: W001
     implementation_status: conforming
@@ -63,7 +63,7 @@ findings:
     classification: implementation defect
     consequence: A valid collection can cross SQLite's host-parameter capacity and return a realization failure instead of its semantic result or whole-result rejection.
     authority_refs: [VellisRequirements::querySafety, VellisRequirements::historyIndependentCurrentWork]
-    evidence_refs: [path:tests/vellis/test_graph_queries.py#test_large_uuid_filters_do_not_depend_on_sqlite_host_parameter_capacity, path:tests/vellis/test_graph_queries.py#test_large_type_filters_do_not_depend_on_sqlite_host_parameter_capacity, path:tests/vellis/test_definition_discovery.py#test_large_definition_selection_does_not_depend_on_sqlite_host_parameters, path:tests/vellis/test_graph_changes.py#test_large_graph_change_does_not_depend_on_sqlite_host_parameters, path:tests/vellis/test_sqlite_prospective_state.py#test_large_prospective_change_does_not_depend_on_sqlite_host_parameters, path:tests/vellis/test_sqlite_prospective_state.py#test_large_multiplicity_participant_sets_are_bound_relationally, path:tests/vellis/test_graph_queries.py#test_query_beyond_sqlite_join_capacity_is_refused_whole]
+    evidence_refs: [path:tests/vellis/test_graph_queries.py#test_large_uuid_filters_do_not_depend_on_sqlite_host_parameter_capacity, path:tests/vellis/test_graph_queries.py#test_large_type_filters_do_not_depend_on_sqlite_host_parameter_capacity, path:tests/vellis/test_definition_discovery.py#test_large_definition_selection_does_not_depend_on_sqlite_host_parameters, path:tests/vellis/test_graph_changes.py#test_large_graph_change_does_not_depend_on_sqlite_host_parameters, path:tests/vellis/test_sqlite_prospective_state.py#test_large_prospective_change_does_not_depend_on_sqlite_host_parameters, path:tests/vellis/test_sqlite_prospective_state.py#test_large_multiplicity_participant_sets_are_bound_relationally, path:tests/vellis/test_graph_queries.py#test_query_beyond_sqlite_join_capacity_is_refused_whole, path:tests/vellis/test_graph_queries.py#test_disconnected_unprojected_capacity_refusal_is_propagated_whole]
     disposition: resolved
     owner_work_item_id: W003
     implementation_status: conforming
@@ -78,7 +78,7 @@ decisions:
     owner_work_item_id: W001
     evidence_intent: [Keep display-only work independent of connected-component length., Keep endpoint-type and high-degree multiplicity findings complete.]
     implementation_status: conforming
-    evidence_refs: [path:tests/vellis/test_sqlite_prospective_state.py#test_display_only_assessment_work_ignores_connected_component_length, path:tests/vellis/test_sqlite_prospective_state.py#test_link_shape_assessment_scales_with_hub_degree_not_second_hop_degree, path:tests/vellis/test_sqlite_prospective_state.py#test_state_wide_rule_cutover_has_linear_sql_step_growth, path:tests/vellis/test_sqlite_prospective_state.py#test_endpoint_type_change_cannot_activate_an_incomplete_multiplicity_closure]
+    evidence_refs: [path:tests/vellis/test_sqlite_prospective_state.py#test_display_only_assessment_work_ignores_connected_component_length, path:tests/vellis/test_sqlite_prospective_state.py#test_link_shape_assessment_scales_with_hub_degree_not_second_hop_degree, path:tests/vellis/test_sqlite_prospective_state.py#test_participant_type_change_scales_with_its_applicable_incident_degree, path:tests/vellis/test_sqlite_prospective_state.py#test_state_wide_rule_cutover_has_linear_sql_step_growth, path:tests/vellis/test_sqlite_prospective_state.py#test_endpoint_type_change_cannot_activate_an_incomplete_multiplicity_closure, path:tests/vellis/test_sqlite_prospective_state.py#test_endpoint_type_change_revalidates_incident_link_without_a_multiplicity_rule, path:tests/vellis/test_sqlite_prospective_state.py#test_anchor_tombstone_revalidates_links_and_far_multiplicity_subjects, path:tests/vellis/test_sqlite_prospective_state.py#test_anchor_tombstone_revalidates_direct_association_and_data_multiplicity]
   - id: D002
     summary: Materialize only bounded match identities in SQLite and stream property rows through exact incremental reducers.
     authority_refs: [RTG::'Graph Query', VellisRequirements::querySafety]
@@ -96,7 +96,7 @@ decisions:
     owner_work_item_id: W003
     evidence_intent: [Operate above a deliberately lowered SQLite variable limit., Preserve semantic invalid-input findings and canonical non-effects.]
     implementation_status: conforming
-    evidence_refs: [path:tests/vellis/test_graph_queries.py#test_large_uuid_filters_do_not_depend_on_sqlite_host_parameter_capacity, path:tests/vellis/test_graph_queries.py#test_large_type_filters_do_not_depend_on_sqlite_host_parameter_capacity, path:tests/vellis/test_definition_discovery.py#test_large_definition_selection_does_not_depend_on_sqlite_host_parameters, path:tests/vellis/test_graph_changes.py#test_large_graph_change_does_not_depend_on_sqlite_host_parameters, path:tests/vellis/test_sqlite_prospective_state.py#test_large_prospective_change_does_not_depend_on_sqlite_host_parameters, path:tests/vellis/test_sqlite_prospective_state.py#test_large_multiplicity_participant_sets_are_bound_relationally, path:tests/vellis/test_graph_queries.py#test_query_beyond_sqlite_join_capacity_is_refused_whole]
+    evidence_refs: [path:tests/vellis/test_graph_queries.py#test_large_uuid_filters_do_not_depend_on_sqlite_host_parameter_capacity, path:tests/vellis/test_graph_queries.py#test_large_type_filters_do_not_depend_on_sqlite_host_parameter_capacity, path:tests/vellis/test_definition_discovery.py#test_large_definition_selection_does_not_depend_on_sqlite_host_parameters, path:tests/vellis/test_graph_changes.py#test_large_graph_change_does_not_depend_on_sqlite_host_parameters, path:tests/vellis/test_sqlite_prospective_state.py#test_large_prospective_change_does_not_depend_on_sqlite_host_parameters, path:tests/vellis/test_sqlite_prospective_state.py#test_large_multiplicity_participant_sets_are_bound_relationally, path:tests/vellis/test_graph_queries.py#test_query_beyond_sqlite_join_capacity_is_refused_whole, path:tests/vellis/test_graph_queries.py#test_disconnected_unprojected_capacity_refusal_is_propagated_whole]
 work_items:
   - id: W001
     order: 1
@@ -178,8 +178,8 @@ work_items:
     compatibility_effect: Prerelease completion claims become evidence-backed without changing public identities or formats.
     non_effects: [No release, tag, merge, external client mutation, or owner-data access.]
     lifecycle: active
-    implementation_status: not evaluated
-    evidence_refs: []
+    implementation_status: conforming
+    evidence_refs: [path:tests/vellis/test_sqlite_prospective_state.py#test_participant_type_change_scales_with_its_applicable_incident_degree, path:tests/vellis/test_sqlite_prospective_state.py#test_anchor_tombstone_revalidates_links_and_far_multiplicity_subjects, path:tests/vellis/test_sqlite_prospective_state.py#test_anchor_tombstone_revalidates_direct_association_and_data_multiplicity, path:tests/vellis/test_graph_queries.py#test_disconnected_unprojected_capacity_refusal_is_propagated_whole]
     blocker: null
     checkpoint: null
 closure:

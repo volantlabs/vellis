@@ -1719,6 +1719,13 @@ class CanonicalStore:
                     validate=False,
                     existence_only=True,
                 )
+                if existence.status is not OperationStatus.ACCEPTED:
+                    return GraphQueryResult(
+                        status=existence.status,
+                        summary=existence.summary,
+                        findings=existence.findings,
+                        query=response_query,
+                    )
                 if not existence.rows:
                     empty_aggregates = tuple(
                         AggregateBinding(
@@ -4238,6 +4245,10 @@ class CanonicalStore:
             " (natural_key TEXT PRIMARY KEY) WITHOUT ROWID"
         )
         self._connection.execute(
+            "CREATE TEMP TABLE IF NOT EXISTS assessment_changed_multiplicity_rule"
+            " (natural_key TEXT PRIMARY KEY) WITHOUT ROWID"
+        )
+        self._connection.execute(
             "CREATE TEMP TABLE IF NOT EXISTS assessment_impacted_relation"
             " (uuid TEXT PRIMARY KEY) WITHOUT ROWID"
         )
@@ -4245,6 +4256,7 @@ class CanonicalStore:
         self._connection.execute("DELETE FROM assessment_definition_type")
         self._connection.execute("DELETE FROM assessment_impacted_uuid")
         self._connection.execute("DELETE FROM assessment_definition_relationship")
+        self._connection.execute("DELETE FROM assessment_changed_multiplicity_rule")
         self._connection.execute("DELETE FROM assessment_impacted_relation")
         self._connection.execute(
             "INSERT OR IGNORE INTO assessment_definition_type"
@@ -4365,6 +4377,10 @@ class CanonicalStore:
                 active_rule
             ) == self._multiplicity_validation_signature(proposed_rule):
                 continue
+            self._connection.execute(
+                "INSERT OR IGNORE INTO assessment_changed_multiplicity_rule VALUES (?)",
+                (str(natural_key),),
+            )
             impacted_types: set[str] = set()
             for rule in (
                 *active_rule.relationship_constraints,
@@ -4410,7 +4426,6 @@ class CanonicalStore:
             "assessment_validation_uuid",
             "assessment_changed_participant",
             "assessment_type_changed_participant",
-            "assessment_multiplicity_subject",
         ):
             self._connection.execute(
                 f"CREATE TEMP TABLE IF NOT EXISTS {table}"  # noqa: S608
@@ -4420,33 +4435,6 @@ class CanonicalStore:
         self._connection.execute(
             "INSERT INTO assessment_validation_uuid SELECT uuid FROM assessment_impacted_uuid"
         )
-
-        # Definition edits seed the population whose relationship membership may have
-        # changed. This is intentionally state-wide when the edited definition is.
-        if self._connection.execute("SELECT 1 FROM assessment_impacted_type LIMIT 1").fetchone():
-            self._connection.execute(
-                "INSERT OR IGNORE INTO assessment_changed_participant"
-                " SELECT g.uuid FROM assessment_impacted_type AS t"
-                " CROSS JOIN graph_presence_interval AS g"
-                " INDEXED BY graph_presence_current_type"
-                " ON g.object_kind IN ('anchor', 'associatedData', 'link')"
-                " AND g.type_key = t.type_key AND g.valid_to_revision IS NULL"
-                " UNION SELECT v.uuid FROM proposal_entry AS p JOIN object_value AS v"
-                " ON v.id = p.object_value_id WHERE p.operation = 'upsert'"
-                " AND v.type_key IN (SELECT type_key FROM assessment_impacted_type)"
-            )
-            self._connection.execute(
-                "INSERT OR IGNORE INTO assessment_type_changed_participant"
-                " SELECT g.uuid FROM assessment_impacted_type AS t"
-                " CROSS JOIN graph_presence_interval AS g"
-                " INDEXED BY graph_presence_current_type"
-                " ON g.object_kind IN ('anchor', 'associatedData')"
-                " AND g.type_key = t.type_key AND g.valid_to_revision IS NULL"
-                " UNION SELECT v.uuid FROM proposal_entry AS p JOIN object_value AS v"
-                " ON v.id = p.object_value_id WHERE p.operation = 'upsert'"
-                " AND v.object_kind IN ('anchor', 'associatedData')"
-                " AND v.type_key IN (SELECT type_key FROM assessment_impacted_type)"
-            )
 
         # Graph edits seed relationship work only when relationship membership can
         # change. Display names, properties, and metadata remain local validation work.
@@ -4492,11 +4480,11 @@ class CanonicalStore:
         self._connection.execute(
             "INSERT OR IGNORE INTO assessment_type_changed_participant"
             " SELECT p.uuid FROM proposal_entry AS p"
-            " JOIN object_value AS n ON n.id = p.object_value_id"
-            " JOIN object_value AS b ON b.id = p.base_object_value_id"
-            " WHERE p.operation = 'upsert'"
-            " AND p.object_kind IN ('anchor', 'associatedData')"
-            " AND n.type_key IS NOT b.type_key"
+            " LEFT JOIN object_value AS n ON n.id = p.object_value_id"
+            " LEFT JOIN object_value AS b ON b.id = p.base_object_value_id"
+            " WHERE p.object_kind IN ('anchor', 'associatedData')"
+            " AND (p.operation = 'delete' OR b.id IS NULL"
+            " OR n.type_key IS NOT b.type_key)"
         )
 
         self._connection.execute(
@@ -4549,52 +4537,19 @@ class CanonicalStore:
                 " AND p.object_kind IN ('link', 'associatedData')"
             )
 
-        # A relationship-shape edit changes counts only for its direct subjects. A
-        # participant type change additionally changes whether its incident relations
-        # count for each far subject, so only that reason promotes the far subjects.
+        # A participant type/membership change can change the validity of its incident
+        # relationship objects. Promote those relationships into local validation;
+        # rule-specific multiplicity subjects are derived later without a second hop.
         include_incident_relations(
             "assessment_type_changed_participant", "assessment_type_incident_relation"
-        )
-        self._connection.execute(
-            "INSERT OR IGNORE INTO assessment_multiplicity_subject"
-            " SELECT uuid FROM assessment_changed_participant"
-            " UNION SELECT uuid FROM assessment_type_incident_relation"
-            " UNION SELECT g.source_uuid FROM assessment_type_incident_relation AS r"
-            " CROSS JOIN graph_presence_interval AS g INDEXED BY graph_presence_current_uuid"
-            " ON g.uuid = r.uuid"
-            " AND g.valid_to_revision IS NULL WHERE g.object_kind = 'link'"
-            " UNION SELECT g.target_uuid FROM assessment_type_incident_relation AS r"
-            " CROSS JOIN graph_presence_interval AS g INDEXED BY graph_presence_current_uuid"
-            " ON g.uuid = r.uuid"
-            " AND g.valid_to_revision IS NULL WHERE g.object_kind = 'link'"
-            " UNION SELECT v.source_uuid FROM proposal_entry AS p JOIN object_value AS v"
-            " ON v.id = p.object_value_id WHERE p.operation = 'upsert'"
-            " AND v.object_kind = 'link'"
-            " AND v.uuid IN (SELECT uuid FROM assessment_type_incident_relation)"
-            " UNION SELECT v.target_uuid FROM proposal_entry AS p JOIN object_value AS v"
-            " ON v.id = p.object_value_id WHERE p.operation = 'upsert'"
-            " AND v.object_kind = 'link'"
-            " AND v.uuid IN (SELECT uuid FROM assessment_type_incident_relation)"
-            " UNION SELECT a.anchor_uuid FROM assessment_type_incident_relation AS r"
-            " CROSS JOIN graph_presence_interval AS g INDEXED BY graph_presence_current_uuid"
-            " ON g.uuid = r.uuid"
-            " AND g.valid_to_revision IS NULL JOIN object_anchor AS a"
-            " ON a.object_value_id = g.object_value_id"
-            " UNION SELECT a.anchor_uuid FROM assessment_type_incident_relation AS r"
-            " JOIN proposal_entry AS p ON p.uuid = r.uuid JOIN object_anchor AS a"
-            " ON a.object_value_id = p.object_value_id WHERE p.operation = 'upsert'"
         )
         self._connection.execute(
             "INSERT OR IGNORE INTO assessment_impacted_relation"
             " SELECT uuid FROM assessment_type_incident_relation"
         )
-        include_incident_relations(
-            "assessment_multiplicity_subject", "assessment_impacted_relation"
-        )
         self._connection.execute(
             "INSERT OR IGNORE INTO assessment_impacted_uuid"
             " SELECT uuid FROM assessment_impacted_relation"
-            " UNION SELECT uuid FROM assessment_multiplicity_subject"
             " UNION SELECT g.source_uuid FROM assessment_impacted_relation AS r"
             " CROSS JOIN graph_presence_interval AS g INDEXED BY graph_presence_current_uuid"
             " ON g.uuid = r.uuid"
@@ -4622,20 +4577,54 @@ class CanonicalStore:
         )
         self._connection.execute(
             "INSERT OR IGNORE INTO assessment_impacted_type"
-            " SELECT v.type_key FROM graph_presence_interval AS g JOIN object_value AS v"
-            " ON v.id = g.object_value_id WHERE g.valid_to_revision IS NULL"
-            " AND g.uuid IN (SELECT uuid FROM assessment_impacted_uuid)"
+            " SELECT v.type_key FROM assessment_impacted_uuid AS i"
+            " CROSS JOIN graph_presence_interval AS g INDEXED BY graph_presence_current_uuid"
+            " ON g.uuid = i.uuid AND g.valid_to_revision IS NULL"
+            " JOIN object_value AS v ON v.id = g.object_value_id"
             " UNION SELECT v.type_key FROM proposal_entry AS p JOIN object_value AS v"
             " ON v.id = p.object_value_id WHERE p.operation = 'upsert'"
             " AND p.uuid IN (SELECT uuid FROM assessment_impacted_uuid)"
         )
+        self._connection.execute(
+            "INSERT OR IGNORE INTO assessment_validation_uuid"
+            " SELECT uuid FROM assessment_type_incident_relation"
+        )
+        # Local relationship validation needs its unchanged endpoints for lookup, but
+        # lookup-only participants do not themselves become validation work.
+        self._connection.execute(
+            "INSERT OR IGNORE INTO assessment_impacted_uuid"
+            " SELECT v.source_uuid FROM assessment_validation_uuid AS i"
+            " CROSS JOIN graph_presence_interval AS g INDEXED BY graph_presence_current_uuid"
+            " ON g.uuid = i.uuid AND g.valid_to_revision IS NULL"
+            " JOIN object_value AS v ON v.id = g.object_value_id"
+            " WHERE v.object_kind = 'link'"
+            " UNION SELECT v.target_uuid FROM assessment_validation_uuid AS i"
+            " CROSS JOIN graph_presence_interval AS g INDEXED BY graph_presence_current_uuid"
+            " ON g.uuid = i.uuid AND g.valid_to_revision IS NULL"
+            " JOIN object_value AS v ON v.id = g.object_value_id"
+            " WHERE v.object_kind = 'link'"
+            " UNION SELECT v.source_uuid FROM assessment_validation_uuid AS i"
+            " JOIN proposal_entry AS p ON p.uuid = i.uuid"
+            " JOIN object_value AS v ON v.id = p.object_value_id"
+            " WHERE p.operation = 'upsert' AND v.object_kind = 'link'"
+            " UNION SELECT v.target_uuid FROM assessment_validation_uuid AS i"
+            " JOIN proposal_entry AS p ON p.uuid = i.uuid"
+            " JOIN object_value AS v ON v.id = p.object_value_id"
+            " WHERE p.operation = 'upsert' AND v.object_kind = 'link'"
+            " UNION SELECT a.anchor_uuid FROM assessment_validation_uuid AS i"
+            " JOIN graph_presence_interval AS g INDEXED BY graph_presence_current_uuid"
+            " ON g.uuid = i.uuid AND g.valid_to_revision IS NULL"
+            " JOIN object_anchor AS a ON a.object_value_id = g.object_value_id"
+            " UNION SELECT a.anchor_uuid FROM assessment_validation_uuid AS i"
+            " JOIN proposal_entry AS p ON p.uuid = i.uuid"
+            " JOIN object_anchor AS a ON a.object_value_id = p.object_value_id"
+            " WHERE p.operation = 'upsert'"
+        )
         self._prepare_effective_assessment_relations_unlocked()
 
     def _prepare_effective_assessment_relations_unlocked(self) -> None:
-        """Materialize only the affected effective objects and their incident relations."""
+        """Materialize affected validation objects and lookup-only participants."""
         self._connection.execute("DROP TABLE IF EXISTS temp.assessment_effective_object")
-        self._connection.execute("DROP TABLE IF EXISTS temp.assessment_incident_link")
-        self._connection.execute("DROP TABLE IF EXISTS temp.assessment_effective_data_anchor")
         self._connection.execute(
             "CREATE TEMP TABLE assessment_effective_object AS"
             " SELECT g.uuid, v.object_kind, v.type_key, v.source_uuid, v.target_uuid,"
@@ -4657,50 +4646,6 @@ class CanonicalStore:
         self._connection.execute(
             "CREATE INDEX assessment_effective_object_type"
             " ON assessment_effective_object(object_kind, type_key, uuid)"
-        )
-        self._connection.execute(
-            "CREATE TEMP TABLE assessment_incident_link AS"
-            " SELECT v.uuid, v.type_key, v.source_uuid, v.target_uuid"
-            " FROM assessment_impacted_relation AS r"
-            " CROSS JOIN graph_presence_interval AS g INDEXED BY graph_presence_current_uuid"
-            " ON g.uuid = r.uuid AND g.valid_to_revision IS NULL"
-            " JOIN object_value AS v ON v.id = g.object_value_id"
-            " WHERE v.object_kind = 'link'"
-            " AND NOT EXISTS (SELECT 1 FROM proposal_entry AS p WHERE p.uuid = v.uuid)"
-            " UNION ALL SELECT v.uuid, v.type_key, v.source_uuid, v.target_uuid"
-            " FROM assessment_impacted_relation AS r CROSS JOIN proposal_entry AS p"
-            " ON p.uuid = r.uuid JOIN object_value AS v ON v.id = p.object_value_id"
-            " WHERE p.operation = 'upsert' AND v.object_kind = 'link'"
-        )
-        self._connection.execute(
-            "CREATE UNIQUE INDEX assessment_incident_link_uuid ON assessment_incident_link(uuid)"
-        )
-        self._connection.execute(
-            "CREATE INDEX assessment_incident_link_source"
-            " ON assessment_incident_link(source_uuid, type_key, target_uuid)"
-        )
-        self._connection.execute(
-            "CREATE INDEX assessment_incident_link_target"
-            " ON assessment_incident_link(target_uuid, type_key, source_uuid)"
-        )
-        self._connection.execute(
-            "CREATE TEMP TABLE assessment_effective_data_anchor AS"
-            " SELECT a.data_uuid, a.anchor_uuid FROM current_data_anchor AS a"
-            " WHERE NOT EXISTS (SELECT 1 FROM proposal_entry AS p WHERE p.uuid = a.data_uuid)"
-            " AND a.data_uuid IN (SELECT uuid FROM assessment_impacted_relation)"
-            " UNION ALL SELECT v.uuid, a.anchor_uuid FROM proposal_entry AS p"
-            " JOIN object_value AS v ON v.id = p.object_value_id"
-            " JOIN object_anchor AS a ON a.object_value_id = v.id"
-            " WHERE p.operation = 'upsert' AND v.object_kind = 'associatedData'"
-            " AND v.uuid IN (SELECT uuid FROM assessment_impacted_relation)"
-        )
-        self._connection.execute(
-            "CREATE INDEX assessment_data_anchor_anchor"
-            " ON assessment_effective_data_anchor(anchor_uuid, data_uuid)"
-        )
-        self._connection.execute(
-            "CREATE INDEX assessment_data_anchor_data"
-            " ON assessment_effective_data_anchor(data_uuid, anchor_uuid)"
         )
 
     @staticmethod
@@ -4979,16 +4924,301 @@ class CanonicalStore:
                 type_keys=set(),
                 relationship_keys={str(natural_key)},
             )
-            yield from self._multiplicity_findings_unlocked(relation, definitions)
+            yield from self._multiplicity_findings_unlocked(
+                relation, definitions, natural_key=str(natural_key)
+            )
+
+    def _prepare_multiplicity_work_unlocked(
+        self,
+        natural_key: str,
+        constraint: LinkMultiplicityConstraint | DirectAssociationMultiplicityConstraint,
+    ) -> None:
+        """Materialize only subjects whose count under one rule can have changed."""
+        self._connection.execute(
+            "CREATE TEMP TABLE IF NOT EXISTS assessment_multiplicity_work"
+            " (natural_key TEXT, uuid TEXT, PRIMARY KEY (natural_key, uuid)) WITHOUT ROWID"
+        )
+        self._connection.execute(
+            "DELETE FROM assessment_multiplicity_work WHERE natural_key = ?", (natural_key,)
+        )
+        if isinstance(constraint, LinkMultiplicityConstraint):
+            near = (
+                "source_uuid" if constraint.constrained_end is LinkEnd.SOURCE else "target_uuid"
+            )
+            far = (
+                "target_uuid" if constraint.constrained_end is LinkEnd.SOURCE else "source_uuid"
+            )
+            # A staged relationship-shape change can alter the count of its old and new
+            # direct subjects. Property/display-only edits are absent from the reason set.
+            self._connection.execute(
+                "INSERT OR IGNORE INTO assessment_multiplicity_work"
+                f" SELECT ?, v.{near} FROM proposal_entry AS p"  # noqa: S608
+                " JOIN object_value AS v ON v.id IN"
+                " (p.object_value_id, p.base_object_value_id)"
+                " WHERE p.uuid IN (SELECT uuid FROM assessment_changed_participant)"
+                " AND v.object_kind = 'link' AND v.type_key = ?",
+                (natural_key, constraint.link_type_key),
+            )
+            # A participant's own type/membership change can change whether it is a
+            # constrained subject. If it is at the opposite end, only the near subject
+            # of that rule is promoted; sibling far-end neighborhoods are never walked.
+            self._connection.execute(
+                "INSERT OR IGNORE INTO assessment_multiplicity_work"
+                " SELECT ?, uuid FROM assessment_type_changed_participant",
+                (natural_key,),
+            )
+            self._connection.execute(
+                "INSERT OR IGNORE INTO assessment_multiplicity_work"
+                f" SELECT ?, g.{near} FROM assessment_type_changed_participant AS t"  # noqa: S608
+                " CROSS JOIN graph_presence_interval AS g"
+                f" INDEXED BY graph_presence_current_link_{far.removesuffix('_uuid')}"  # noqa: S608
+                f" ON g.{far} = t.uuid AND g.valid_to_revision IS NULL"  # noqa: S608
+                " WHERE g.object_kind = 'link' AND g.type_key = ?"
+                " AND NOT EXISTS (SELECT 1 FROM proposal_entry AS p WHERE p.uuid = g.uuid)"
+                f" UNION SELECT ?, v.{near} FROM assessment_type_changed_participant AS t"  # noqa: S608
+                " JOIN proposal_entry AS p JOIN object_value AS v ON v.id = p.object_value_id"
+                f" AND v.{far} = t.uuid WHERE p.operation = 'upsert'"  # noqa: S608
+                " AND v.object_kind = 'link' AND v.type_key = ?",
+                (
+                    natural_key,
+                    constraint.link_type_key,
+                    natural_key,
+                    constraint.link_type_key,
+                ),
+            )
+            if self._connection.execute(
+                "SELECT 1 FROM assessment_changed_multiplicity_rule WHERE natural_key = ?",
+                (natural_key,),
+            ).fetchone():
+                self._connection.execute(
+                    "INSERT OR IGNORE INTO assessment_multiplicity_work"
+                    " SELECT ?, uuid FROM prospective_graph_object AS e"
+                    " WHERE e.object_kind IN ('anchor', 'associatedData')"
+                    " AND EXISTS (SELECT 1 FROM multiplicity_type_filter AS mtf"
+                    " WHERE mtf.role = 'constrained' AND mtf.type_key = e.type_key)",
+                    (natural_key,),
+                )
+            self._prepare_multiplicity_relations_unlocked(natural_key, constraint)
+            return
+
+        assert isinstance(constraint, DirectAssociationMultiplicityConstraint)
+        anchor_end = constraint.constrained_end is DirectAssociationEnd.ANCHOR
+        # An association-set edit changes counts only for the edited data identity and
+        # its old/new anchors.
+        if anchor_end:
+            self._connection.execute(
+                "INSERT OR IGNORE INTO assessment_multiplicity_work"
+                " SELECT ?, a.anchor_uuid FROM proposal_entry AS p"
+                " JOIN object_anchor AS a ON a.object_value_id IN"
+                " (p.object_value_id, p.base_object_value_id)"
+                " WHERE p.object_kind = 'associatedData'"
+                " AND p.uuid IN (SELECT uuid FROM assessment_changed_participant)",
+                (natural_key,),
+            )
+        else:
+            self._connection.execute(
+                "INSERT OR IGNORE INTO assessment_multiplicity_work"
+                " SELECT ?, p.uuid FROM proposal_entry AS p"
+                " WHERE p.object_kind = 'associatedData'"
+                " AND p.uuid IN (SELECT uuid FROM assessment_changed_participant)",
+                (natural_key,),
+            )
+        # A subject type change affects that subject only. An opposite participant type
+        # change affects exactly the directly associated subjects for this rule.
+        self._connection.execute(
+            "INSERT OR IGNORE INTO assessment_multiplicity_work"
+            " SELECT ?, uuid FROM assessment_type_changed_participant",
+            (natural_key,),
+        )
+        if anchor_end:
+            self._connection.execute(
+                "INSERT OR IGNORE INTO assessment_multiplicity_work"
+                " SELECT ?, a.anchor_uuid FROM assessment_type_changed_participant AS t"
+                " JOIN current_data_anchor AS a ON a.data_uuid = t.uuid"
+                " WHERE NOT EXISTS (SELECT 1 FROM proposal_entry AS p"
+                " WHERE p.uuid = a.data_uuid)"
+                " UNION SELECT ?, a.anchor_uuid"
+                " FROM assessment_type_changed_participant AS t"
+                " JOIN proposal_entry AS p ON p.uuid = t.uuid"
+                " JOIN object_anchor AS a ON a.object_value_id = p.object_value_id"
+                " WHERE p.operation = 'upsert' AND p.object_kind = 'associatedData'",
+                (natural_key, natural_key),
+            )
+        else:
+            self._connection.execute(
+                "INSERT OR IGNORE INTO assessment_multiplicity_work"
+                " SELECT ?, a.data_uuid FROM assessment_type_changed_participant AS t"
+                " JOIN current_data_anchor AS a ON a.anchor_uuid = t.uuid"
+                " WHERE NOT EXISTS (SELECT 1 FROM proposal_entry AS p"
+                " WHERE p.uuid = a.data_uuid)"
+                " UNION SELECT ?, v.uuid FROM assessment_type_changed_participant AS t"
+                " JOIN proposal_entry AS p JOIN object_value AS v ON v.id = p.object_value_id"
+                " JOIN object_anchor AS a ON a.object_value_id = v.id AND a.anchor_uuid = t.uuid"
+                " WHERE p.operation = 'upsert' AND v.object_kind = 'associatedData'",
+                (natural_key, natural_key),
+            )
+        if self._connection.execute(
+            "SELECT 1 FROM assessment_changed_multiplicity_rule WHERE natural_key = ?",
+            (natural_key,),
+        ).fetchone():
+            kind = "anchor" if anchor_end else "associatedData"
+            role = "anchor" if anchor_end else "data"
+            self._connection.execute(
+                "INSERT OR IGNORE INTO assessment_multiplicity_work"
+                " SELECT ?, uuid FROM prospective_graph_object AS e"
+                " WHERE e.object_kind = ?"
+                " AND EXISTS (SELECT 1 FROM multiplicity_type_filter AS mtf"
+                " WHERE mtf.role = ? AND mtf.type_key = e.type_key)",
+                (natural_key, kind, role),
+            )
+        self._prepare_multiplicity_relations_unlocked(natural_key, constraint)
+
+    def _prepare_multiplicity_relations_unlocked(
+        self,
+        natural_key: str,
+        constraint: LinkMultiplicityConstraint | DirectAssociationMultiplicityConstraint,
+    ) -> None:
+        """Materialize one rule's incident degree and lookup-only participants."""
+        self._connection.execute(
+            "CREATE TEMP TABLE IF NOT EXISTS multiplicity_lookup_uuid"
+            " (uuid TEXT PRIMARY KEY) WITHOUT ROWID"
+        )
+        self._connection.execute(
+            "CREATE TEMP TABLE IF NOT EXISTS multiplicity_effective_object"
+            " (uuid TEXT PRIMARY KEY, object_kind TEXT, type_key TEXT) WITHOUT ROWID"
+        )
+        self._connection.execute(
+            "CREATE INDEX IF NOT EXISTS multiplicity_effective_object_type"
+            " ON multiplicity_effective_object(object_kind, type_key, uuid)"
+        )
+        self._connection.execute(
+            "CREATE TEMP TABLE IF NOT EXISTS multiplicity_incident_link"
+            " (uuid TEXT PRIMARY KEY, type_key TEXT, source_uuid TEXT, target_uuid TEXT)"
+            " WITHOUT ROWID"
+        )
+        self._connection.execute(
+            "CREATE INDEX IF NOT EXISTS multiplicity_incident_link_source"
+            " ON multiplicity_incident_link(source_uuid, type_key, target_uuid)"
+        )
+        self._connection.execute(
+            "CREATE INDEX IF NOT EXISTS multiplicity_incident_link_target"
+            " ON multiplicity_incident_link(target_uuid, type_key, source_uuid)"
+        )
+        self._connection.execute(
+            "CREATE TEMP TABLE IF NOT EXISTS multiplicity_effective_data_anchor"
+            " (data_uuid TEXT, anchor_uuid TEXT, PRIMARY KEY (data_uuid, anchor_uuid))"
+            " WITHOUT ROWID"
+        )
+        self._connection.execute(
+            "CREATE INDEX IF NOT EXISTS multiplicity_effective_data_anchor_anchor"
+            " ON multiplicity_effective_data_anchor(anchor_uuid, data_uuid)"
+        )
+        self._connection.execute("DELETE FROM multiplicity_lookup_uuid")
+        self._connection.execute("DELETE FROM multiplicity_effective_object")
+        self._connection.execute("DELETE FROM multiplicity_incident_link")
+        self._connection.execute("DELETE FROM multiplicity_effective_data_anchor")
+        self._connection.execute(
+            "INSERT INTO multiplicity_lookup_uuid SELECT uuid"
+            " FROM assessment_multiplicity_work WHERE natural_key = ?",
+            (natural_key,),
+        )
+        if not self._connection.execute(
+            "SELECT 1 FROM multiplicity_lookup_uuid LIMIT 1"
+        ).fetchone():
+            return
+        if isinstance(constraint, LinkMultiplicityConstraint):
+            near = (
+                "source_uuid" if constraint.constrained_end is LinkEnd.SOURCE else "target_uuid"
+            )
+            far = (
+                "target_uuid" if constraint.constrained_end is LinkEnd.SOURCE else "source_uuid"
+            )
+            self._connection.execute(
+                "INSERT OR IGNORE INTO multiplicity_incident_link"
+                f" SELECT g.uuid, g.type_key, g.source_uuid, g.target_uuid"  # noqa: S608
+                " FROM assessment_multiplicity_work AS w"
+                " CROSS JOIN graph_presence_interval AS g"
+                f" INDEXED BY graph_presence_current_link_{near.removesuffix('_uuid')}"  # noqa: S608
+                f" ON g.{near} = w.uuid AND g.valid_to_revision IS NULL"  # noqa: S608
+                " WHERE w.natural_key = ? AND g.object_kind = 'link' AND g.type_key = ?"
+                " AND NOT EXISTS (SELECT 1 FROM proposal_entry AS p WHERE p.uuid = g.uuid)"
+                " UNION SELECT v.uuid, v.type_key, v.source_uuid, v.target_uuid"
+                " FROM assessment_multiplicity_work AS w"
+                " JOIN proposal_entry AS p JOIN object_value AS v ON v.id = p.object_value_id"
+                f" AND v.{near} = w.uuid WHERE w.natural_key = ?"  # noqa: S608
+                " AND p.operation = 'upsert' AND v.object_kind = 'link' AND v.type_key = ?",
+                (
+                    natural_key,
+                    constraint.link_type_key,
+                    natural_key,
+                    constraint.link_type_key,
+                ),
+            )
+            self._connection.execute(
+                "INSERT OR IGNORE INTO multiplicity_lookup_uuid"
+                f" SELECT {far} FROM multiplicity_incident_link"  # noqa: S608
+            )
+        else:
+            if constraint.constrained_end is DirectAssociationEnd.ANCHOR:
+                self._connection.execute(
+                    "INSERT OR IGNORE INTO multiplicity_effective_data_anchor"
+                    " SELECT a.data_uuid, a.anchor_uuid"
+                    " FROM assessment_multiplicity_work AS w"
+                    " JOIN current_data_anchor AS a ON a.anchor_uuid = w.uuid"
+                    " WHERE w.natural_key = ? AND NOT EXISTS"
+                    " (SELECT 1 FROM proposal_entry AS p WHERE p.uuid = a.data_uuid)"
+                    " UNION SELECT v.uuid, a.anchor_uuid"
+                    " FROM assessment_multiplicity_work AS w"
+                    " JOIN proposal_entry AS p JOIN object_value AS v ON v.id = p.object_value_id"
+                    " JOIN object_anchor AS a ON a.object_value_id = v.id"
+                    " AND a.anchor_uuid = w.uuid WHERE w.natural_key = ?"
+                    " AND p.operation = 'upsert' AND v.object_kind = 'associatedData'",
+                    (natural_key, natural_key),
+                )
+                self._connection.execute(
+                    "INSERT OR IGNORE INTO multiplicity_lookup_uuid"
+                    " SELECT data_uuid FROM multiplicity_effective_data_anchor"
+                )
+            else:
+                self._connection.execute(
+                    "INSERT OR IGNORE INTO multiplicity_effective_data_anchor"
+                    " SELECT a.data_uuid, a.anchor_uuid"
+                    " FROM assessment_multiplicity_work AS w"
+                    " JOIN current_data_anchor AS a ON a.data_uuid = w.uuid"
+                    " WHERE w.natural_key = ? AND NOT EXISTS"
+                    " (SELECT 1 FROM proposal_entry AS p WHERE p.uuid = a.data_uuid)"
+                    " UNION SELECT v.uuid, a.anchor_uuid"
+                    " FROM assessment_multiplicity_work AS w"
+                    " JOIN proposal_entry AS p ON p.uuid = w.uuid"
+                    " JOIN object_value AS v ON v.id = p.object_value_id"
+                    " JOIN object_anchor AS a ON a.object_value_id = v.id"
+                    " WHERE w.natural_key = ? AND p.operation = 'upsert'"
+                    " AND v.object_kind = 'associatedData'",
+                    (natural_key, natural_key),
+                )
+                self._connection.execute(
+                    "INSERT OR IGNORE INTO multiplicity_lookup_uuid"
+                    " SELECT anchor_uuid FROM multiplicity_effective_data_anchor"
+                )
+        self._connection.execute(
+            "INSERT OR IGNORE INTO multiplicity_effective_object"
+            " SELECT g.uuid, g.object_kind, g.type_key FROM multiplicity_lookup_uuid AS i"
+            " CROSS JOIN graph_presence_interval AS g INDEXED BY graph_presence_current_uuid"
+            " ON g.uuid = i.uuid AND g.valid_to_revision IS NULL"
+            " WHERE NOT EXISTS (SELECT 1 FROM proposal_entry AS p WHERE p.uuid = g.uuid)"
+            " UNION SELECT v.uuid, v.object_kind, v.type_key"
+            " FROM multiplicity_lookup_uuid AS i JOIN proposal_entry AS p ON p.uuid = i.uuid"
+            " JOIN object_value AS v ON v.id = p.object_value_id WHERE p.operation = 'upsert'"
+        )
 
     def _multiplicity_findings_unlocked(
-        self, relation: str, definitions: GraphDefinitionSet
+        self, relation: str, definitions: GraphDefinitionSet, *, natural_key: str = ""
     ) -> Iterator[ValidationFinding]:
         prospective = relation == "prospective_graph_object"
-        object_relation = "assessment_effective_object" if prospective else relation
-        link_relation = "assessment_incident_link" if prospective else relation
+        object_relation = "multiplicity_effective_object" if prospective else relation
+        link_relation = "multiplicity_incident_link" if prospective else relation
         association_relation = (
-            "assessment_effective_data_anchor" if prospective else "current_data_anchor"
+            "multiplicity_effective_data_anchor" if prospective else "current_data_anchor"
         )
         self._connection.execute(
             "CREATE TEMP TABLE IF NOT EXISTS multiplicity_type_filter"
@@ -5017,6 +5247,8 @@ class CanonicalStore:
                     "INSERT INTO multiplicity_type_filter VALUES ('opposite', ?)",
                     ((value,) for value in opposite),
                 )
+                if prospective:
+                    self._prepare_multiplicity_work_unlocked(natural_key, constraint)
                 sql = (
                     f"SELECT e.uuid, e.type_key, count(f.uuid) FROM {object_relation} AS e"
                     f" LEFT JOIN {link_relation} AS l ON "
@@ -5029,13 +5261,19 @@ class CanonicalStore:
                     + " AND EXISTS (SELECT 1 FROM multiplicity_type_filter AS mtf"
                     + " WHERE mtf.role = 'constrained' AND mtf.type_key = e.type_key)"
                     + (
-                        " AND e.uuid IN (SELECT uuid FROM assessment_multiplicity_subject)"
+                        " AND e.uuid IN (SELECT uuid FROM assessment_multiplicity_work"
+                        " WHERE natural_key = ?)"
                         if prospective
                         else ""
                     )
                     + " GROUP BY e.uuid, e.type_key ORDER BY e.uuid"
                 )
-                rows = self._connection.execute(sql, (constraint.link_type_key,))
+                parameters = (
+                    (constraint.link_type_key, natural_key)
+                    if prospective
+                    else (constraint.link_type_key,)
+                )
+                rows = self._connection.execute(sql, parameters)
                 for uuid, type_key, count_value in rows:
                     count = int(count_value)
                     if count < lower or (upper is not None and count > upper):
@@ -5063,6 +5301,8 @@ class CanonicalStore:
                 "INSERT INTO multiplicity_type_filter VALUES ('data', ?)",
                 ((value,) for value in data_types),
             )
+            if prospective:
+                self._prepare_multiplicity_work_unlocked(natural_key, constraint)
             if constraint.constrained_end is DirectAssociationEnd.ANCHOR:
                 sql = (
                     f"SELECT a.uuid, count(DISTINCT d.uuid) FROM {object_relation} AS a"
@@ -5078,10 +5318,11 @@ class CanonicalStore:
                 if prospective:
                     sql = sql.replace(
                         " GROUP BY",
-                        " AND a.uuid IN (SELECT uuid FROM assessment_multiplicity_subject)"
+                        " AND a.uuid IN (SELECT uuid FROM assessment_multiplicity_work"
+                        " WHERE natural_key = ?)"
                         " GROUP BY",
                     )
-                rows = self._connection.execute(sql)
+                rows = self._connection.execute(sql, (natural_key,) if prospective else ())
             else:
                 sql = (
                     f"SELECT d.uuid, count(DISTINCT a.uuid) FROM {object_relation} AS d"
@@ -5097,10 +5338,11 @@ class CanonicalStore:
                 if prospective:
                     sql = sql.replace(
                         " GROUP BY",
-                        " AND d.uuid IN (SELECT uuid FROM assessment_multiplicity_subject)"
+                        " AND d.uuid IN (SELECT uuid FROM assessment_multiplicity_work"
+                        " WHERE natural_key = ?)"
                         " GROUP BY",
                     )
-                rows = self._connection.execute(sql)
+                rows = self._connection.execute(sql, (natural_key,) if prospective else ())
             for uuid, count_value in rows:
                 count = int(count_value)
                 if count < lower or (upper is not None and count > upper):

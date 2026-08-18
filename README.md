@@ -119,9 +119,10 @@ Useful commands:
 
 ## Implementation status
 
-The v2 prerelease is undergoing a bounded scaling remediation. Functional coverage remains as
-described below, but the affected-invariant locality and scalar-aggregation memory claims are not
-release-candidate claims until the active evolution record closes with fresh evidence.
+The v2 prerelease is implementation-conforming and is the release candidate described below. Its
+scaling remediation is implemented and verified: ordinary prospective work is reason-aware and
+degree-sized, exact scalar aggregation uses bounded Python memory, and public collections cross
+SQLite host-parameter boundaries without changing their meaning.
 
 All seventeen original campaign slices and corrective slice S018 are complete. S018 implements the
 selected setup-program/public-CLI behavior with fake-client evidence. Closure confirmed both
