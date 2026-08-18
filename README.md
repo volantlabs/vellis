@@ -119,11 +119,6 @@ Useful commands:
 
 ## Implementation status
 
-The Vellis 2 prerelease candidate is undergoing a bounded remediation review. The completed
-campaign remains the implementation baseline, but the conformance and release-candidate claims
-below are temporarily qualified until the five tracked review findings in
-`system-evolution.yaml` have decisive evidence and a clean two-lens review.
-
 All seventeen original campaign slices and corrective slice S018 are complete. S018 implements the
 selected setup-program/public-CLI behavior with fake-client evidence. Closure confirmed both
 matching user-scoped STDIO registrations, the exact no-op dry run, a full ten-tool Codex desktop
