@@ -119,10 +119,12 @@ Useful commands:
 
 ## Implementation status
 
-The v2 prerelease is implementation-conforming and is the release candidate described below. Its
-scaling remediation is implemented and verified: ordinary prospective work is reason-aware and
-degree-sized, exact scalar aggregation uses bounded Python memory, and public collections cross
-SQLite host-parameter boundaries without changing their meaning.
+The existing v2 prerelease implementation remains runnable, but this branch now contains a proposed
+query-semantics and work-locality authority change awaiting owner acceptance. That target limits one
+query to a connected selector tree, makes row and aggregate output exclusive, preserves the source
+identity of projected properties, and requires exact rule-subject-end mutation work. The current
+runtime does not yet conform to that proposed target; implementation begins only after its exact
+model checkpoint is accepted.
 
 All seventeen original campaign slices and corrective slice S018 are complete. S018 implements the
 selected setup-program/public-CLI behavior with fake-client evidence. Closure confirmed both
@@ -228,16 +230,17 @@ Use these words precisely:
   delta, revision, and canonical ledger identical either side; a client failure after successful
   initialization leaves that newly established memory intact, and its client-only retry does not
   change it.
-- **Characterized, not budgeted.** What this realization's work responds to is measured in semantic
+- **Characterized, not budgeted.** Existing evidence measures work in semantic
   row visits, decoded values, affected neighborhoods, streamed buffer sizes, and query candidates.
   Returned projections, definition-discovery details, and history entries legitimately require
   output-sized memory; summary and focused inspection decode no graph and no unrelated definitions.
-  Ordinary mutation and prospective validation scale with changed objects, applicable rules, and
-  incident degree, not connected-component diameter, disconnected population, history length, or
-  obsolete object versions. Explicit full assessment and broad definition cutover remain state-wide
+  The proposed target requires ordinary mutation and prospective validation to scale with exact
+  changed invariant subjects rather than unrelated rules or far endpoints. Explicit full assessment
+  and broad definition cutover remain state-wide
   work, but execute set-wise with bounded process memory and store each finding once for paged
-  retrieval. Current, prospective, and historical queries constrain candidates in SQL, hydrate only
-  projected rows, and refuse after `maximumRows + 1` semantically unique matches. Scalar aggregation
+  retrieval. The target query implementation will bound source-preserving row identities or one
+  aggregate target population before hydration or arithmetic. The current query implementation has
+  known hidden-witness and late-deduplication scaling defects. Scalar aggregation currently
   retains bounded match identities in an indexed SQLite temporary table and streams fixed-size
   property batches through exact reducers, so resident Python memory follows batch size, reducer
   count, and final scalar size rather than matched population; varied exponents and their

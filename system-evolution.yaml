@@ -1,206 +1,164 @@
 schema_version: "1.0"
 evolution:
-  id: vellis-2-prerelease-scaling-remediation
-  objective: Remove population-sized resident aggregation, superlinear prospective assessment, and SQLite collection-limit failures without changing accepted Vellis 2.0 meaning or compatibility.
-  observable_distinction: Ordinary prospective work follows only the affected invariant neighborhood, scalar aggregation keeps bounded process memory, and large valid collections do not fail at SQLite host-parameter boundaries.
-  lifecycle: complete
-  approval: {status: not-required, reason: "Accepted query-safety and affected-invariant authority decides all three implementation defects.", checkpoint: null}
+  id: vellis-2-semantic-work-locality
+  objective: Replace locally optimized query and validation paths with one connected-tree query meaning and one exact reason-aware invariant-impact meaning.
+  observable_distinction: Hidden query witnesses cannot multiply answer work, and ordinary mutation contains only exact applicable rule-subject-end work rather than broad neighborhoods.
+  lifecycle: awaiting-approval
+  approval: {status: pending, reason: "The query language, output and row identity, state selection, compatibility, and mutation locality change accepted meaning.", checkpoint: null}
   blocker: null
-  checkpoint: git:7e9d5dfc9727abface7d84f3f58684cce4ba6239
+  checkpoint: null
 baselines:
   status: current
-  source: &source
+  source:
     model: sha256:adf05b52f9839b75f76240ee116c0ffba7ee452602c2083268d683c4b534b2c7
-    implementation: git:17d2b2676400f530ff9eccf8ab653d54644f1beb
+    implementation: git:ca6539e10393a5a52e2cd2f67d0af662e92cc010
     language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
     execution_environment: sha256:d71473693aa50faef1a25a449aa5808490e21eaf2a987942d1fb134c773550d1
-    checkpoint: git:17d2b2676400f530ff9eccf8ab653d54644f1beb
-  target: &target
-    model: sha256:adf05b52f9839b75f76240ee116c0ffba7ee452602c2083268d683c4b534b2c7
-    implementation: git:7e9d5dfc9727abface7d84f3f58684cce4ba6239
+    checkpoint: git:ca6539e10393a5a52e2cd2f67d0af662e92cc010
+  target:
+    model: sha256:11501ab66e8e477fc9b5d8eab723902c813129401591aaef2c79f71ad211b2a0
+    implementation: git:ca6539e10393a5a52e2cd2f67d0af662e92cc010
     language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
     execution_environment: sha256:d71473693aa50faef1a25a449aa5808490e21eaf2a987942d1fb134c773550d1
-    checkpoint: git:7e9d5dfc9727abface7d84f3f58684cce4ba6239
+    checkpoint: git:ca6539e10393a5a52e2cd2f67d0af662e92cc010
   observed:
-    model: sha256:adf05b52f9839b75f76240ee116c0ffba7ee452602c2083268d683c4b534b2c7
-    implementation: git:7e9d5dfc9727abface7d84f3f58684cce4ba6239
+    model: sha256:11501ab66e8e477fc9b5d8eab723902c813129401591aaef2c79f71ad211b2a0
+    implementation: git:ca6539e10393a5a52e2cd2f67d0af662e92cc010
     language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
     execution_environment: sha256:d71473693aa50faef1a25a449aa5808490e21eaf2a987942d1fb134c773550d1
-    checkpoint: git:7e9d5dfc9727abface7d84f3f58684cce4ba6239
+    checkpoint: git:ca6539e10393a5a52e2cd2f67d0af662e92cc010
 scope:
-  authority_scope: [RTG::'Graph Query', RTGSystem::'Query graph', RTGSystem::'Assess graph conformance', VellisRequirements::querySafety, VellisRequirements::validationCoverage, VellisRequirements::historyIndependentCurrentWork, VellisVerification::semanticQuery, VellisVerification::currentWorkScaling]
-  implementation_scope: [vellis/query.py, vellis/store.py, vellis/normalized.py, tests/vellis/, README.md, system-evolution.yaml]
+  authority_scope: [RTG::'Graph Query', RTG::'Evaluated State Selection', RTG::'Definition Summary Request', RTG::'Definition Inspection Request', RTGSystem::'Query graph', RTGSystem::'Discover evaluated graph definitions', VellisRequirements::semanticQueryMeaning, VellisRequirements::querySafety, VellisRequirements::explicitGraphChangeSet, VellisRequirements::validationCoverage, VellisRequirements::historyIndependentCurrentWork, VellisRequirements::canonicalSemanticEquality, VellisRequirements::historicalStateCorrectness, VellisRequirements::agentDefinitionDiscoverability, VellisRequirements::mcpAgentToolContract, VellisVerification::semanticQuery, VellisVerification::invalidQuery, VellisVerification::validationCoverage, VellisVerification::currentWorkScaling, VellisVerification::historyGrowth]
+  implementation_scope: [vellis/query.py, vellis/sqlite_query.py, vellis/store.py, vellis/system.py, vellis/mcp.py, vellis/json_value.py, vellis/definitions.py, tests/vellis/, model/, README.md, docs/mcp-realization.md, system-evolution.yaml]
   review_lenses: [authority and conformance, engineering and evidence]
   non_goals:
-    - Changing the SysML model, public APIs, MCP schemas, persistence schema, snapshot formats, version, or v1 compatibility.
-    - Introducing numerical latency targets or materializing a resident complete graph.
-    - Touching ignored owner data, external clients, releases, tags, or pull-request state.
+    - Add disconnected or cyclic patterns, traversal, OR, negation, sorting, paging, grouping, mixed output, multiple aggregate targets, a parser, optimizer, fallback evaluator, or rule engine.
+    - Change persistent schema, snapshots, replay, restore, v1 initialization, tool names, approval, or canonical transactions.
+    - Add numerical budgets or touch ignored owner data, external clients, releases, tags, merges, or pull-request state.
 findings:
-  - id: F001
-    summary: Prospective assessment repeatedly expands accumulated participants and relations across the whole connected component.
-    classification: implementation defect
-    consequence: A local display or property change can perform superlinear work with connected graph size even though no distant invariant can change.
-    authority_refs: [VellisRequirements::historyIndependentCurrentWork, VellisRequirements::validationCoverage]
-    evidence_refs: [path:tests/vellis/test_sqlite_prospective_state.py#test_display_only_assessment_work_ignores_connected_component_length, path:tests/vellis/test_sqlite_prospective_state.py#test_link_shape_assessment_scales_with_hub_degree_not_second_hop_degree, path:tests/vellis/test_sqlite_prospective_state.py#test_participant_type_change_scales_with_its_applicable_incident_degree, path:tests/vellis/test_sqlite_prospective_state.py#test_state_wide_rule_cutover_has_linear_sql_step_growth, path:tests/vellis/test_sqlite_prospective_state.py#test_endpoint_type_change_cannot_activate_an_incomplete_multiplicity_closure, path:tests/vellis/test_sqlite_prospective_state.py#test_endpoint_type_change_revalidates_incident_link_without_a_multiplicity_rule, path:tests/vellis/test_sqlite_prospective_state.py#test_anchor_tombstone_revalidates_links_and_far_multiplicity_subjects, path:tests/vellis/test_sqlite_prospective_state.py#test_anchor_tombstone_revalidates_direct_association_and_data_multiplicity]
-    disposition: resolved
-    owner_work_item_id: W001
-    implementation_status: conforming
-    nearest_wrong_system: Correct fixed-point findings are obtained by repeatedly rescanning every already reached participant and relation, including unaffected distant objects.
-    compatibility_effect: Findings and activation behavior remain unchanged; only forbidden unrelated work is removed.
-  - id: F002
-    summary: SQLite aggregation fetches and retains every bounded match and then retains a second value population for scalar reduction.
-    classification: implementation defect
-    consequence: A valid high maximum can exhaust process memory even though the caller receives only one scalar per aggregation.
-    authority_refs: [RTG::'Graph Query', VellisRequirements::querySafety, VellisRequirements::historyIndependentCurrentWork]
-    evidence_refs: [path:tests/vellis/test_graph_queries.py#test_scalar_aggregation_streams_one_bounded_selection, path:tests/vellis/test_graph_queries.py#test_cancelling_exponents_keep_python_sum_memory_bounded, path:tests/vellis/test_graph_queries.py#test_aggregation_accepts_large_positive_bounds_without_canonical_effects]
-    disposition: resolved
-    owner_work_item_id: W002
-    implementation_status: conforming
-    nearest_wrong_system: The selection is bounded semantically but every matching row and value remains resident until reduction completes.
-    compatibility_effect: Exact aggregate values, maximum-plus-one refusal, and public result shapes remain unchanged.
-  - id: F003
-    summary: Public UUID and type collections are interpolated into single SQL placeholder lists.
-    classification: implementation defect
-    consequence: A valid collection can cross SQLite's host-parameter capacity and return a realization failure instead of its semantic result or whole-result rejection.
-    authority_refs: [VellisRequirements::querySafety, VellisRequirements::historyIndependentCurrentWork]
-    evidence_refs: [path:tests/vellis/test_graph_queries.py#test_large_uuid_filters_do_not_depend_on_sqlite_host_parameter_capacity, path:tests/vellis/test_graph_queries.py#test_large_type_filters_do_not_depend_on_sqlite_host_parameter_capacity, path:tests/vellis/test_definition_discovery.py#test_large_definition_selection_does_not_depend_on_sqlite_host_parameters, path:tests/vellis/test_graph_changes.py#test_large_graph_change_does_not_depend_on_sqlite_host_parameters, path:tests/vellis/test_sqlite_prospective_state.py#test_large_prospective_change_does_not_depend_on_sqlite_host_parameters, path:tests/vellis/test_sqlite_prospective_state.py#test_large_multiplicity_participant_sets_are_bound_relationally, path:tests/vellis/test_graph_queries.py#test_query_beyond_sqlite_join_capacity_is_refused_whole, path:tests/vellis/test_graph_queries.py#test_disconnected_unprojected_capacity_refusal_is_propagated_whole]
-    disposition: resolved
-    owner_work_item_id: W003
-    implementation_status: conforming
-    nearest_wrong_system: Small collections work, while an otherwise identical larger collection fails solely at the database driver's parameter threshold.
-    compatibility_effect: Existing requests retain meaning; large collections use relational or chunked binding and structurally excessive queries are rejected whole.
+  - {id: F001, summary: "The query model permits disconnected components, cycles, and mixed output without an owner use case.", classification: model gap, consequence: "Unneeded generality legitimizes component products and ambiguous outputs.", authority_refs: [RTG::'Graph Query', VellisRequirements::querySafety], evidence_refs: [path:docs/mcp-realization.md#semantic-work-locality-trigger-evidence], disposition: model-change, owner_work_item_id: W001, implementation_status: conflicting, nearest_wrong_system: "One join is patched while the language retains forms requiring the same accidental machinery.", compatibility_effect: "Disconnected, cyclic, and mixed requests are removed."}
+  - {id: F002, summary: "Property-only projection collapses distinct source objects carrying equal values.", classification: model gap, consequence: "Rows cannot preserve object cardinality safely.", authority_refs: [RTG::'Returned Property', VellisRequirements::semanticQueryMeaning], evidence_refs: [path:docs/mcp-realization.md#semantic-work-locality-trigger-evidence], disposition: model-change, owner_work_item_id: W001, implementation_status: conflicting, nearest_wrong_system: "Equal values remain indistinguishable when their source objects differ.", compatibility_effect: "Property row identity includes its source data UUID."}
+  - {id: F003, summary: "Flat SQLite joins multiply hidden witnesses before late deduplication.", classification: implementation defect, consequence: "Work grows with combinations that cannot distinguish an answer.", authority_refs: [VellisRequirements::querySafety], evidence_refs: [path:docs/mcp-realization.md#semantic-work-locality-trigger-evidence], disposition: implementation-work, owner_work_item_id: W003, implementation_status: conflicting, nearest_wrong_system: "SELECT DISTINCT acts only after hidden witness products.", compatibility_effect: "Connected-tree answers remain while hidden branches become existential."}
+  - {id: F004, summary: "The test oracle imports a second production assignment evaluator.", classification: plan gap, consequence: "Differential tests cannot expose shared semantic defects.", authority_refs: [VellisVerification::semanticQuery], evidence_refs: [path:docs/mcp-realization.md#semantic-work-locality-trigger-evidence], disposition: implementation-work, owner_work_item_id: W003, implementation_status: conflicting, nearest_wrong_system: "Named realizations agree because they share production semantics.", compatibility_effect: "No capability is lost; fallback evaluation is deleted."}
+  - {id: F005, summary: "State selection uses parallel fields and arguments plus legacy middleware.", classification: model gap, consequence: "Equivalent meaning has invalid combinations and compatibility branches.", authority_refs: [RTG::'Graph Query', VellisRequirements::historicalStateCorrectness], evidence_refs: [path:docs/mcp-realization.md#semantic-work-locality-trigger-evidence], disposition: model-change, owner_work_item_id: W001, implementation_status: conflicting, nearest_wrong_system: "A tagged selector is added while old selector channels remain.", compatibility_effect: "One tagged state replaces prerelease overloads without translation."}
+  - {id: F006, summary: "Authority does not exclude far-end promotion and participant-by-rule work precisely enough.", classification: model gap, consequence: "Correct findings can still use forbidden quadratic neighborhoods.", authority_refs: [VellisRequirements::explicitGraphChangeSet], evidence_refs: [path:docs/mcp-realization.md#semantic-work-locality-trigger-evidence], disposition: model-change, owner_work_item_id: W001, implementation_status: conflicting, nearest_wrong_system: "Every incident endpoint is affected even when its count cannot change.", compatibility_effect: "Findings remain complete; lookup-only identities stay unpromoted."}
+  - {id: F007, summary: "Active endpoint-type changes expand a quadratic incident neighborhood.", classification: implementation defect, consequence: "Hub-of-hubs work grows quadratically.", authority_refs: [VellisRequirements::explicitGraphChangeSet], evidence_refs: [path:docs/mcp-realization.md#semantic-work-locality-trigger-evidence], disposition: implementation-work, owner_work_item_id: W004, implementation_status: conflicting, nearest_wrong_system: "Active validation promotes both endpoints of every incident relationship.", compatibility_effect: "Active validity and atomic rejection remain unchanged."}
+  - {id: F008, summary: "Prospective multiplicity selection is reason-insensitive.", classification: implementation defect, consequence: "Display edits scale with irrelevant rules and independent changes form cross-products.", authority_refs: [VellisRequirements::validationCoverage], evidence_refs: [path:docs/mcp-realization.md#semantic-work-locality-trigger-evidence], disposition: implementation-work, owner_work_item_id: W004, implementation_status: conflicting, nearest_wrong_system: "Mentioned types select all rules and all changed participants enter each rule.", compatibility_effect: "Prospective findings and activation remain complete."}
+  - {id: F009, summary: "Historical aggregation preflight omits a compiled LIMIT binding.", classification: implementation defect, consequence: "A boundary query passes preflight then fails with too many variables.", authority_refs: [VellisRequirements::querySafety], evidence_refs: [path:docs/mcp-realization.md#semantic-work-locality-trigger-evidence], disposition: implementation-work, owner_work_item_id: W003, implementation_status: conflicting, nearest_wrong_system: "Capacity is estimated from fields rather than executable statements.", compatibility_effect: "Excess receives typed whole-result refusal."}
+  - {id: F010, summary: "Permitted-value uniqueness compares each value with every earlier value.", classification: implementation defect, consequence: "Valid definition work grows quadratically.", authority_refs: [VellisRequirements::canonicalSemanticEquality], evidence_refs: [path:docs/mcp-realization.md#semantic-work-locality-trigger-evidence], disposition: implementation-work, owner_work_item_id: W002, implementation_status: conflicting, nearest_wrong_system: "Equality is correct but uniqueness remains pairwise.", compatibility_effect: "JSON meaning and persisted identities remain unchanged."}
+  - {id: F011, summary: "Documentation claims scaling properties disproved by current evidence.", classification: stale baseline, consequence: "Public guidance overstates conformance.", authority_refs: [path:README.md#implementation-status], evidence_refs: [path:docs/mcp-realization.md#semantic-work-locality-trigger-evidence], disposition: implementation-work, owner_work_item_id: W005, implementation_status: conflicting, nearest_wrong_system: "Prior remediation remains documented as complete.", compatibility_effect: "Guidance distinguishes proposed, implemented, and verified states."}
 decisions:
-  - id: D001
-    summary: Track local validation objects, rule-subject work, incident relations, and lookup-only participants separately in indexed temporary relations.
-    authority_refs: [VellisRequirements::historyIndependentCurrentWork, VellisRequirements::validationCoverage]
-    alternatives: [Retain whole-component closure with a linear frontier., Construct a resident graph.]
-    reversible: true
-    owner_work_item_id: W001
-    evidence_intent: [Keep display-only work independent of connected-component length., Keep endpoint-type and high-degree multiplicity findings complete.]
-    implementation_status: conforming
-    evidence_refs: [path:tests/vellis/test_sqlite_prospective_state.py#test_display_only_assessment_work_ignores_connected_component_length, path:tests/vellis/test_sqlite_prospective_state.py#test_link_shape_assessment_scales_with_hub_degree_not_second_hop_degree, path:tests/vellis/test_sqlite_prospective_state.py#test_participant_type_change_scales_with_its_applicable_incident_degree, path:tests/vellis/test_sqlite_prospective_state.py#test_state_wide_rule_cutover_has_linear_sql_step_growth, path:tests/vellis/test_sqlite_prospective_state.py#test_endpoint_type_change_cannot_activate_an_incomplete_multiplicity_closure, path:tests/vellis/test_sqlite_prospective_state.py#test_endpoint_type_change_revalidates_incident_link_without_a_multiplicity_rule, path:tests/vellis/test_sqlite_prospective_state.py#test_anchor_tombstone_revalidates_links_and_far_multiplicity_subjects, path:tests/vellis/test_sqlite_prospective_state.py#test_anchor_tombstone_revalidates_direct_association_and_data_multiplicity]
-  - id: D002
-    summary: Materialize only bounded match identities in SQLite and stream property rows through exact incremental reducers.
-    authority_refs: [RTG::'Graph Query', VellisRequirements::querySafety]
-    alternatives: [Retain Python match populations., Narrow the public positive maximum.]
-    reversible: true
-    owner_work_item_id: W002
-    evidence_intent: [Bound fetched batches independently of match count., Preserve exact count, sum, minimum, maximum, and refusal semantics in every state scope.]
-    implementation_status: conforming
-    evidence_refs: [path:tests/vellis/test_graph_queries.py#test_scalar_aggregation_streams_one_bounded_selection, path:tests/vellis/test_graph_queries.py#test_cancelling_exponents_keep_python_sum_memory_bounded, path:tests/vellis/test_graph_queries.py#test_aggregation_accepts_large_positive_bounds_without_canonical_effects]
-  - id: D003
-    summary: Bind public collections through indexed temporary relations or connection-aware chunks and reject structurally unexecutable queries whole.
-    authority_refs: [VellisRequirements::querySafety, VellisRequirements::historyIndependentCurrentWork]
-    alternatives: [Publish a new collection maximum., Allow driver-capacity failures.]
-    reversible: true
-    owner_work_item_id: W003
-    evidence_intent: [Operate above a deliberately lowered SQLite variable limit., Preserve semantic invalid-input findings and canonical non-effects.]
-    implementation_status: conforming
-    evidence_refs: [path:tests/vellis/test_graph_queries.py#test_large_uuid_filters_do_not_depend_on_sqlite_host_parameter_capacity, path:tests/vellis/test_graph_queries.py#test_large_type_filters_do_not_depend_on_sqlite_host_parameter_capacity, path:tests/vellis/test_definition_discovery.py#test_large_definition_selection_does_not_depend_on_sqlite_host_parameters, path:tests/vellis/test_graph_changes.py#test_large_graph_change_does_not_depend_on_sqlite_host_parameters, path:tests/vellis/test_sqlite_prospective_state.py#test_large_prospective_change_does_not_depend_on_sqlite_host_parameters, path:tests/vellis/test_sqlite_prospective_state.py#test_large_multiplicity_participant_sets_are_bound_relationally, path:tests/vellis/test_graph_queries.py#test_query_beyond_sqlite_join_capacity_is_refused_whole, path:tests/vellis/test_graph_queries.py#test_disconnected_unprojected_capacity_refusal_is_propagated_whole]
+  - {id: D001, summary: "Public graph queries are connected acyclic selector trees.", authority_refs: [RTG::'Graph Query'], alternatives: [Retain disconnected or cyclic forms.], reversible: false, owner_work_item_id: W001, evidence_intent: [Reject disconnected and cyclic graphs., Accept paths, stars, and trees.], implementation_status: not evaluated, evidence_refs: []}
+  - {id: D002, summary: "Row and aggregate output are exclusive with no grouping.", authority_refs: [RTG::'Query Output'], alternatives: [Retain mixed output.], reversible: false, owner_work_item_id: W001, evidence_intent: [Reject mixed output., Preserve one-target arithmetic.], implementation_status: not evaluated, evidence_refs: []}
+  - {id: D003, summary: "Make a clean prerelease break without query translation.", authority_refs: [VellisRequirements::mcpAgentToolContract], alternatives: [Translate legacy payloads.], reversible: true, owner_work_item_id: W003, evidence_intent: [Old shapes fail., Ten tool names remain.], implementation_status: not evaluated, evidence_refs: []}
+  - {id: D004, summary: "Hidden selector branches affect answers only through existence.", authority_refs: [VellisRequirements::querySafety], alternatives: [Flat joins and late distinct.], reversible: true, owner_work_item_id: W003, evidence_intent: [Hidden fanout does not multiply answers or decodes.], implementation_status: not evaluated, evidence_refs: []}
+  - {id: D005, summary: "Collection query restrictions use one relational member mechanism.", authority_refs: [VellisRequirements::querySafety], alternatives: [Threshold-specific filter paths.], reversible: true, owner_work_item_id: W003, evidence_intent: [Large filters ignore host-variable thresholds.], implementation_status: not evaluated, evidence_refs: []}
+  - {id: D006, summary: "Query and discovery carry one tagged evaluated-state selection.", authority_refs: [RTG::'Evaluated State Selection'], alternatives: [Scope plus optional history.], reversible: false, owner_work_item_id: W001, evidence_intent: [Exercise four selection kinds.], implementation_status: not evaluated, evidence_refs: []}
+  - {id: D007, summary: "JSON equality uses one immutable kind-tagged key for sets and counters.", authority_refs: [VellisRequirements::canonicalSemanticEquality], alternatives: [Pairwise scans., Serialization identity.], reversible: true, owner_work_item_id: W002, evidence_intent: [Preserve numeric equivalence and Boolean distinction with one key construction per value and no pairwise uniqueness scan.], implementation_status: not evaluated, evidence_refs: []}
+  - {id: D008, summary: "Active and prospective multiplicity share one old/proposed reason kernel.", authority_refs: [VellisRequirements::explicitGraphChangeSet], alternatives: [Separate broad algorithms.], reversible: true, owner_work_item_id: W004, evidence_intent: [Exact rule-subject-end parity., Lookup-only far endpoints.], implementation_status: not evaluated, evidence_refs: []}
+  - {id: D009, summary: "The query oracle is test-only and shares no production evaluation or reduction.", authority_refs: [VellisVerification::semanticQuery], alternatives: [Import production evaluation.], reversible: true, owner_work_item_id: W003, evidence_intent: [Detect deliberately mutated compiler results.], implementation_status: not evaluated, evidence_refs: []}
 work_items:
   - id: W001
     order: 1
-    label: Make prospective assessment follow the affected invariant neighborhood
-    kind: implementation
+    label: Model the simpler query and exact work-locality boundary
+    kind: modeling
     dependencies: []
-    planned_baseline: {dimension: implementation, identity: git:17d2b2676400f530ff9eccf8ab653d54644f1beb}
-    finding_ids: [F001]
-    decision_ids: [D001]
+    planned_baseline: {dimension: model, identity: sha256:adf05b52f9839b75f76240ee116c0ffba7ee452602c2083268d683c4b534b2c7}
+    finding_ids: [F001, F002, F005, F006]
+    decision_ids: [D001, D002, D006]
     authority:
-      - refs: [VellisRequirements::historyIndependentCurrentWork, VellisRequirements::validationCoverage, RTGSystem::'Assess graph conformance']
-        coverage: partial
-        remaining_work_item_ids: [W002, W003]
-    approval: {status: not-required, reason: "Accepted affected-invariant and complete-assessment meaning decides this correction.", checkpoint: null}
-    nearest_wrong_system: Prospective findings are correct but a local edit still walks a long connected chain or repeatedly rescans accumulated rows.
-    compatibility_effect: Prospective reports and activation remain semantically identical with less unrelated work.
-    non_effects: [No model, public payload, persistence, or canonical-history change., No disconnected population or history traversal.]
-    lifecycle: complete
-    implementation_status: conforming
-    evidence_refs: [path:tests/vellis/test_sqlite_prospective_state.py#test_display_only_assessment_work_ignores_connected_component_length, path:tests/vellis/test_sqlite_prospective_state.py#test_link_shape_assessment_scales_with_hub_degree_not_second_hop_degree, path:tests/vellis/test_sqlite_prospective_state.py#test_state_wide_rule_cutover_has_linear_sql_step_growth, path:tests/vellis/test_sqlite_prospective_state.py#test_endpoint_type_change_cannot_activate_an_incomplete_multiplicity_closure]
+      - {refs: [RTG::'Graph Query', RTG::'Evaluated State Selection', RTG::'Definition Summary Request', RTG::'Definition Inspection Request', RTGSystem::'Query graph', RTGSystem::'Discover evaluated graph definitions', VellisRequirements::semanticQueryMeaning, VellisRequirements::querySafety, VellisRequirements::agentDefinitionDiscoverability], coverage: full, remaining_work_item_ids: []}
+      - {refs: [VellisRequirements::explicitGraphChangeSet, VellisRequirements::validationCoverage, VellisRequirements::historyIndependentCurrentWork], coverage: partial, remaining_work_item_ids: [W003, W004]}
+    approval: {status: pending, reason: "This changes public query language, row identity, state selection, compatibility, and mutation locality.", checkpoint: null}
+    nearest_wrong_system: "Disconnected queries are rejected but mixed output, value-only property identity, physical ordering, or generic affected participants remain."
+    compatibility_effect: "The prerelease query schema breaks and disconnected, cyclic, mixed, and multi-target questions are removed."
+    non_effects: [No persistence or snapshot change., No new subsystem or public operation., No implementation relies on the target before acceptance.]
+    lifecycle: pending
+    implementation_status: not evaluated
+    evidence_refs: [command:just model-check, command:just system-evolution-check]
     blocker: null
-    checkpoint: git:06802d8014669cbb0f7c76b2e143db9b24cc0f46
+    checkpoint: null
   - id: W002
     order: 2
-    label: Stream exact scalar aggregation with bounded process memory
+    label: Replace quadratic JSON collection equality
     kind: implementation
     dependencies: [W001]
-    planned_baseline: {dimension: implementation, identity: git:06802d8014669cbb0f7c76b2e143db9b24cc0f46}
-    finding_ids: [F002]
-    decision_ids: [D002]
-    authority:
-      - refs: [RTG::'Graph Query', VellisRequirements::querySafety, VellisVerification::semanticQuery]
-        coverage: full
-        remaining_work_item_ids: []
-    approval: {status: not-required, reason: "Accepted exact aggregation and bounded-query meaning decides this correction.", checkpoint: null}
-    nearest_wrong_system: A scalar result is exact but its entire matching population remains resident in Python.
-    compatibility_effect: All aggregate results and rejection boundaries remain unchanged.
-    non_effects: [No public maximum, numeric semantics, query schema, or canonical effect changes.]
-    lifecycle: complete
-    implementation_status: conforming
-    evidence_refs: [path:tests/vellis/test_graph_queries.py#test_scalar_aggregation_streams_one_bounded_selection, path:tests/vellis/test_graph_queries.py#test_cancelling_exponents_keep_python_sum_memory_bounded, path:tests/vellis/test_graph_queries.py#test_aggregation_accepts_large_positive_bounds_without_canonical_effects]
+    planned_baseline: {dimension: model, identity: sha256:11501ab66e8e477fc9b5d8eab723902c813129401591aaef2c79f71ad211b2a0}
+    finding_ids: [F010]
+    decision_ids: [D007]
+    authority: [{refs: [VellisRequirements::canonicalSemanticEquality], coverage: partial, remaining_work_item_ids: [W005]}]
+    approval: {status: not-required, reason: "Canonical equality decides this correction after W001 acceptance.", checkpoint: null}
+    nearest_wrong_system: Correct equality remains but uniqueness still compares pairs.
+    compatibility_effect: No semantic or persisted identity changes.
+    non_effects: [No ledger hash or snapshot change.]
+    lifecycle: pending
+    implementation_status: conflicting
+    evidence_refs: []
     blocker: null
-    checkpoint: git:6d600908e25bc6a1d675ae0a134a060cdee02b0d
+    checkpoint: null
   - id: W003
     order: 3
-    label: Remove SQLite host-parameter thresholds from public collections
+    label: Replace the query contract and execution path end to end
     kind: implementation
     dependencies: [W002]
-    planned_baseline: {dimension: implementation, identity: git:6d600908e25bc6a1d675ae0a134a060cdee02b0d}
-    finding_ids: [F003]
-    decision_ids: [D003]
-    authority:
-      - refs: [VellisRequirements::querySafety, VellisRequirements::historyIndependentCurrentWork]
-        coverage: partial
-        remaining_work_item_ids: [W004]
-    approval: {status: not-required, reason: "This removes a private realization threshold without changing public meaning.", checkpoint: null}
-    nearest_wrong_system: Valid large filters or definition selections fail with too many SQL variables, or structural capacity returns a partial result.
-    compatibility_effect: Large collections complete or receive the modeled whole-result rejection.
-    non_effects: [No truncation or new public collection maximum., Unexpected database faults remain failed outcomes.]
-    lifecycle: complete
-    implementation_status: conforming
-    evidence_refs: [path:tests/vellis/test_graph_queries.py#test_large_uuid_filters_do_not_depend_on_sqlite_host_parameter_capacity, path:tests/vellis/test_graph_queries.py#test_large_type_filters_do_not_depend_on_sqlite_host_parameter_capacity, path:tests/vellis/test_definition_discovery.py#test_large_definition_selection_does_not_depend_on_sqlite_host_parameters, path:tests/vellis/test_graph_changes.py#test_large_graph_change_does_not_depend_on_sqlite_host_parameters, path:tests/vellis/test_sqlite_prospective_state.py#test_large_prospective_change_does_not_depend_on_sqlite_host_parameters, path:tests/vellis/test_sqlite_prospective_state.py#test_large_multiplicity_participant_sets_are_bound_relationally, path:tests/vellis/test_graph_queries.py#test_query_beyond_sqlite_join_capacity_is_refused_whole]
+    planned_baseline: {dimension: model, identity: sha256:11501ab66e8e477fc9b5d8eab723902c813129401591aaef2c79f71ad211b2a0}
+    finding_ids: [F003, F004, F009]
+    decision_ids: [D003, D004, D005, D009]
+    authority: [{refs: [RTG::'Graph Query', RTG::'Evaluated State Selection', RTG::'Definition Summary Request', RTG::'Definition Inspection Request', RTGSystem::'Query graph', RTGSystem::'Discover evaluated graph definitions', VellisRequirements::semanticQueryMeaning, VellisRequirements::querySafety, VellisRequirements::historicalStateCorrectness, VellisRequirements::agentDefinitionDiscoverability, VellisRequirements::mcpAgentToolContract], coverage: full, remaining_work_item_ids: []}]
+    approval: {status: not-required, reason: "W001 acceptance governs changed public meaning; this realizes it.", checkpoint: null}
+    nearest_wrong_system: A new compiler exists while a legacy evaluator, component path, late distinct, or manual capacity formula remains reachable.
+    compatibility_effect: Only new prerelease schemas remain under unchanged tool names.
+    non_effects: [No persistent migration., No fallback evaluator., Queries do not mutate canonical state.]
+    lifecycle: pending
+    implementation_status: conflicting
+    evidence_refs: []
     blocker: null
-    checkpoint: git:1f79890fbcfede5746f48be0df4c8f90928e0f87
+    checkpoint: null
   - id: W004
     order: 4
-    label: Integrate scaling evidence and close the prerelease candidate
-    kind: closure
-    dependencies: [W001, W002, W003]
-    planned_baseline: {dimension: implementation, identity: git:df2291f5a78dac497578aceee1aa4e90e6e146cc}
-    finding_ids: []
-    decision_ids: []
-    authority:
-      - refs: [VellisRequirements, VellisVerification, AGENTS.md]
-        coverage: full
-        remaining_work_item_ids: []
-    approval: {status: not-required, reason: "Closure reconciles unchanged authority, implementation, evidence, and public truth.", checkpoint: null}
-    nearest_wrong_system: Focused evidence passes while cross-scope behavior, documentation, or the frozen candidate remains unreviewed.
-    compatibility_effect: Prerelease completion claims become evidence-backed without changing public identities or formats.
-    non_effects: [No release, tag, merge, external client mutation, or owner-data access.]
-    lifecycle: complete
-    implementation_status: conforming
-    evidence_refs: [command:just model-check, command:just system-evolution-check, command:just package-check, command:just check, path:tests/vellis/test_sqlite_prospective_state.py#test_participant_type_change_scales_with_its_applicable_incident_degree, path:tests/vellis/test_sqlite_prospective_state.py#test_anchor_tombstone_revalidates_links_and_far_multiplicity_subjects, path:tests/vellis/test_sqlite_prospective_state.py#test_anchor_tombstone_revalidates_direct_association_and_data_multiplicity, path:tests/vellis/test_graph_queries.py#test_disconnected_unprojected_capacity_refusal_is_propagated_whole, path:README.md#implementation-status]
+    label: Unify active and prospective invariant impact
+    kind: implementation
+    dependencies: [W003]
+    planned_baseline: {dimension: model, identity: sha256:11501ab66e8e477fc9b5d8eab723902c813129401591aaef2c79f71ad211b2a0}
+    finding_ids: [F007, F008]
+    decision_ids: [D008]
+    authority: [{refs: [VellisRequirements::explicitGraphChangeSet, VellisRequirements::validationCoverage, VellisRequirements::historyIndependentCurrentWork], coverage: partial, remaining_work_item_ids: [W005]}]
+    approval: {status: not-required, reason: "Accepted affected-invariant authority decides this realization.", checkpoint: null}
+    nearest_wrong_system: Findings are correct while paths still promote far endpoints or cross participants with rules.
+    compatibility_effect: Validation findings, activation, atomicity, and proposals remain unchanged.
+    non_effects: [No cascade., Active validation does not alter the proposal., Complete assessment stays state-wide.]
+    lifecycle: pending
+    implementation_status: conflicting
+    evidence_refs: []
     blocker: null
-    checkpoint: git:7e9d5dfc9727abface7d84f3f58684cce4ba6239
+    checkpoint: null
+  - id: W005
+    order: 5
+    label: Integrate evidence, synchronize documentation, and close the evolution
+    kind: closure
+    dependencies: [W001, W002, W003, W004]
+    planned_baseline: {dimension: model, identity: sha256:11501ab66e8e477fc9b5d8eab723902c813129401591aaef2c79f71ad211b2a0}
+    finding_ids: [F011]
+    decision_ids: []
+    authority: [{refs: [VellisRequirements, VellisVerification, AGENTS.md], coverage: full, remaining_work_item_ids: []}]
+    approval: {status: not-required, reason: "Closure reconciles authority, implementation, evidence, compatibility, and public truth.", checkpoint: null}
+    nearest_wrong_system: Focused fixes pass while obsolete code or claims retain the prior accidental model.
+    compatibility_effect: The prerelease break is documented while persistence and tool names remain stable.
+    non_effects: [No release, tag, merge, external client mutation, or owner-data access.]
+    lifecycle: pending
+    implementation_status: not evaluated
+    evidence_refs: []
+    blocker: null
+    checkpoint: null
 closure:
-  finding_disposition: complete
-  model_status: unchanged
-  implementation_status: conforming
-  integration_status: conforming
+  finding_disposition: open
+  model_status: not evaluated
+  implementation_status: conflicting
+  integration_status: not evaluated
   external_status: not applicable
-  compatibility: Accepted Vellis 2.0 meaning, public APIs, MCP schemas, persistence and snapshot formats, version, and v1 translation remain unchanged.
+  compatibility: Proposed prerelease break for query payloads and property row identity; persistence, snapshots, restore, v1 initialization, and ten MCP names remain unchanged.
   reviews:
-    - {lens: authority and conformance, status: clean, reviewer: agent:/root/scaling_final_authority_review, checkpoint: git:7e9d5dfc9727abface7d84f3f58684cce4ba6239, evidence_refs: [command:just check]}
-    - {lens: engineering and evidence, status: clean, reviewer: agent:/root/scaling_final_engineering_review, checkpoint: git:7e9d5dfc9727abface7d84f3f58684cce4ba6239, evidence_refs: [command:just check]}
-  evidence_refs:
-    - command:just model-check
-    - command:just system-evolution-check
-    - command:just package-check
-    - command:just check
-    - path:tests/vellis/test_sqlite_prospective_state.py#test_participant_type_change_scales_with_its_applicable_incident_degree
-    - path:tests/vellis/test_sqlite_prospective_state.py#test_anchor_tombstone_revalidates_links_and_far_multiplicity_subjects
-    - path:tests/vellis/test_sqlite_prospective_state.py#test_anchor_tombstone_revalidates_direct_association_and_data_multiplicity
-    - path:tests/vellis/test_graph_queries.py#test_disconnected_unprojected_capacity_refusal_is_propagated_whole
-    - path:tests/vellis/test_graph_queries.py#test_cancelling_exponents_keep_python_sum_memory_bounded
-    - path:README.md#implementation-status
-  checkpoint: git:7e9d5dfc9727abface7d84f3f58684cce4ba6239
+    - {lens: authority and conformance, status: pending, reviewer: null, checkpoint: null, evidence_refs: []}
+    - {lens: engineering and evidence, status: pending, reviewer: null, checkpoint: null, evidence_refs: []}
+  evidence_refs: []
+  checkpoint: null

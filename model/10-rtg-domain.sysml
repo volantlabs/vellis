@@ -14,7 +14,7 @@ package RTG {
     }
 
     attribute def 'Query Name' :> ScalarValues::String {
-        doc /* A non-empty query-local name for one group, link condition, data condition, or projection. */
+        doc /* A non-empty query-local name for one group, link condition, data condition, projection, or aggregation. */
     }
 
     attribute def 'Revision Number' :> ScalarValues::Natural {
@@ -120,13 +120,6 @@ package RTG {
     enum def 'Validation Scope' {
         enum graphConformance;
         enum definitionDelta;
-    }
-
-    enum def 'Evaluated State Scope' {
-        enum current;
-        enum prospective;
-        enum historical;
-        doc /* Selects active, sole prospective, or committed historical state. */
     }
 
     enum def 'Graph Change Target' {
@@ -397,13 +390,12 @@ package RTG {
     }
 
     item def 'Definition Summary Request' {
-        attribute stateScope : 'Evaluated State Scope' default = 'Evaluated State Scope'::current;
-        item historicalSelection [0..1] : 'Historical State Selection';
+        item 'state' : 'Evaluated State Selection';
         doc /*
-         * Current and prospective scopes forbid a historical selection;
-         * historical scope requires exactly one revision or time selection and
-         * evaluates active definitions at its resolved revision. Prospective
-         * scope requires a current definition delta.
+         * Selects current, prospective, revision, or time meaning. An omitted
+         * external state value means current. Prospective selection requires a
+         * current definition delta; revision and time selections evaluate active
+         * definitions at their resolved committed revision.
          */
     }
 
@@ -411,7 +403,7 @@ package RTG {
         attribute anchorTypeKeys [1..*] : 'Type Key';
         doc /*
          * Selects a non-empty unique set of anchor keys from the definitions
-         * selected by stateScope or at exactly one selected revision or time.
+         * selected by the request state.
          */
     }
 
@@ -481,14 +473,14 @@ package RTG {
 
     /* Simple semantic query vocabulary. */
 
-    item def 'Anchor UUID Filter' {
+    item def 'UUID Filter' {
         attribute uuids [1..*] : 'Graph UUID';
-        doc /* Narrows one anchor group to a non-empty set of unique known anchor identities. */
-    }
-
-    item def 'Link UUID Filter' {
-        attribute uuids [1..*] : 'Graph UUID';
-        doc /* Narrows one required link to a non-empty set of unique known link identities. */
+        doc /*
+         * Narrows one selector to a non-empty set of unique known identities of
+         * its required object kind and type. Any unknown, wrong-kind, or
+         * wrong-type member rejects the whole query. A valid data identity that
+         * does not satisfy association or property conditions simply does not match.
+         */
     }
 
     abstract item def 'Endpoint Group' {
@@ -498,7 +490,7 @@ package RTG {
 
     item def 'Anchor Group' :> 'Endpoint Group' {
         attribute anchorTypes [1..*] : 'Type Key';
-        item uuidFilter [0..1] : 'Anchor UUID Filter';
+        item uuidFilter [0..1] : 'UUID Filter';
         doc /*
          * A named anchor candidate set of one or more types in the definitions
          * governing the evaluated state. An anchor belongs to the set when its
@@ -518,7 +510,7 @@ package RTG {
         ref item sourceGroup : 'Endpoint Group';
         ref item targetGroup : 'Endpoint Group';
         attribute linkType : 'Type Key';
-        item uuidFilter [0..1] : 'Link UUID Filter';
+        item uuidFilter [0..1] : 'UUID Filter';
         doc /*
          * Requires a directed link of one type in the definitions governing the
          * evaluated state from a source-group
@@ -551,6 +543,7 @@ package RTG {
     item def 'Associated Data Condition' :> 'Endpoint Group' {
         ref item anchorGroup : 'Anchor Group';
         attribute associatedDataType : 'Type Key';
+        item uuidFilter [0..1] : 'UUID Filter';
         item propertyConditions [*] : 'Data Property Condition';
         doc /*
          * Selects directly associated data of the evaluated type that satisfies
@@ -581,15 +574,16 @@ package RTG {
         attribute propertyName : ScalarValues::String;
     }
 
-    item def 'Return Shape' {
-        item projections [*] : 'Return Projection';
+    abstract item def 'Query Output';
+
+    item def 'Row Query Output' :> 'Query Output' {
+        item projections [1..*] : 'Return Projection';
+        attribute maximumRows : ScalarValues::Positive;
         doc /*
-         * Selects named anchor, link, associated-data, and property bindings.
+         * Selects a non-empty set of named anchor, link, associated-data, and
+         * property bindings and one positive complete-result bound.
          * Every projection references a selector owned by its graph query, and
-         * every projection name is unique within that query. A return shape may
-         * be empty only when its graph query asks for at least one aggregation.
-         * Sorting, pagination, traversal, and computed expressions are outside
-         * this query model.
+         * every projection name is unique within that query.
          */
     }
 
@@ -603,11 +597,10 @@ package RTG {
     item def 'Query Aggregation' {
         attribute name : 'Query Name';
         attribute operator : 'Aggregation Operator';
-        ref item dataCondition : 'Associated Data Condition';
         attribute propertyName [0..1] : ScalarValues::String;
         doc /*
-         * One arithmetic answer about the matching objects of a named data
-         * condition, returned instead of the objects themselves.
+         * One arithmetic answer about the aggregate output's matching target
+         * objects, returned instead of those objects.
          *
          * Count takes no property and counts matches. Sum, minimum, and maximum
          * name a present property of the condition's type and read only the
@@ -617,11 +610,18 @@ package RTG {
          * is required, a property the condition's type does not define, or a
          * property whose kind the operator cannot order, is rejected.
          *
-         * Aggregation reads every match rather than the distinct projected
-         * tuples a return shape would produce, because the question is about the
-         * objects rather than about their distinct values. An aggregate and a
-         * naive projection of the same property may therefore legitimately
-         * disagree, and the aggregate is the one that answers "how much".
+         * Every operation uses the one aggregate output target population.
+         */
+    }
+
+    item def 'Aggregate Query Output' :> 'Query Output' {
+        ref item dataCondition : 'Associated Data Condition';
+        item aggregations [1..*] : 'Query Aggregation';
+        attribute maximumMatches : ScalarValues::Positive;
+        doc /*
+         * Selects one associated-data condition as the sole visible aggregate
+         * population, one or more arithmetic answers over its distinct matching
+         * object identities, and one positive complete-selection bound.
          */
     }
 
@@ -629,33 +629,32 @@ package RTG {
         item anchorGroups [1..*] : 'Anchor Group';
         item requiredLinks [*] : 'Required Link';
         item dataConditions [*] : 'Associated Data Condition';
-        item returnShape : 'Return Shape';
-        item aggregations [*] : 'Query Aggregation';
-        item historicalSelection [0..1] : 'Historical State Selection';
-        attribute stateScope : 'Evaluated State Scope' default = 'Evaluated State Scope'::current;
-        attribute maximumRows : ScalarValues::Positive;
+        item output : 'Query Output';
+        item 'state' : 'Evaluated State Selection';
         doc /*
          * Named anchor selection, required-link restriction, associated-data
          * filtering, and projection define meaning, not evaluation order. All
-         * group, link-condition, data-condition, and projection names are
+         * group, link-condition, data-condition, projection, and aggregation names are
          * unique within the query. Every reference resolves to an element owned
-         * by the same query. Current scope with no historical selection evaluates
-         * active state; prospective scope evaluates active state with the sole
-         * definition delta's graph overlay and proposed definitions. Prospective
-         * scope requires a delta and forbids historical selection. Historical
-         * scope requires exactly one revision or time selection and evaluates the resolved historical active
-         * state with identical query meaning. The caller may discover
+         * by the same query. Anchor groups and associated-data conditions are
+         * selector vertices; each direct association and required link is an
+         * edge. The selector graph is connected and acyclic, has exactly one
+         * fewer edge than vertex, and contains no self-edge or parallel edge.
+         * Distinct selector aliases may bind the same graph object when their
+         * constraints allow it; aliases do not imply inequality. A self-link is
+         * therefore discoverable through two compatible endpoint aliases even
+         * when both aliases bind the same endpoint identity.
+         * Current selection evaluates active state; prospective selection
+         * evaluates active state with the sole definition delta's graph overlay
+         * and proposed definitions. Revision or time selection evaluates the
+         * resolved historical active state with identical query meaning. The
+         * caller may discover
          * the definitions active at that selected state and reuse its exact
-         * evaluated revision for this query. The positive maximum bounds a
-         * complete result rather than requesting a page.
-         *
-         * A query states projections, aggregations, or both, and at least one of
-         * them. The positive maximum bounds the matching objects an aggregation
-         * reads exactly as it bounds a projected result: a selection larger than
-         * the maximum is refused whole whether the caller asked for the objects
-         * or only for arithmetic over them. Returning one number therefore never
-         * licenses reading an unbounded population, and the maximum keeps meaning
-         * the same work it means for any other query.
+         * evaluated revision for this query. An omitted external state value
+         * means current. Exactly one row or aggregate output is present. Its
+         * positive maximum bounds one complete result rather than requesting a
+         * page. Sorting, pagination, traversal, computed expressions, grouping,
+         * disconnected patterns, and cyclic patterns are outside this query model.
          */
     }
 
@@ -676,8 +675,12 @@ package RTG {
 
     item def 'Returned Property' {
         ref item projection : 'Data Property Projection';
+        ref item associatedData : 'Associated Data Object';
         attribute value [0..1] : 'JSON Value';
-        doc /* Absence means the projected optional property is missing; present null remains JSON null. */
+        doc /*
+         * Identifies the source associated-data object. Absence means its
+         * projected optional property is missing; present null remains JSON null.
+         */
     }
 
     item def 'Graph Query Row' {
@@ -686,11 +689,14 @@ package RTG {
         item associatedData [*] : 'Associated Data Binding';
         item properties [*] : 'Returned Property';
         doc /*
-         * One jointly satisfying assignment of every selector needed by the
-         * return shape. The row contains exactly one binding for each projection
+         * One jointly satisfying assignment of every selector needed by row
+         * output. The row contains exactly one binding for each projection
          * and no unrequested binding. Matching objects that are not projected do
-         * not appear. Rows with identical projected bindings and property
-         * presence or values are one result row, not duplicates.
+         * not appear. Row identity includes every projection name and projected
+         * object identity; a property binding also includes its source object,
+         * presence, and canonical value. Equal property values from different
+         * source objects therefore remain different rows. Hidden satisfying
+         * witnesses do not distinguish rows.
          */
     }
 
@@ -794,14 +800,13 @@ package RTG {
         item rows [*] : 'Graph Query Row';
         item aggregates [*] : 'Aggregate Binding';
         doc /*
-         * Accepted results contain exactly the bindings requested by the
-         * referenced query's return shape, one aggregate for each of its
-         * aggregations, and the evaluated revision. Rejected
+         * Accepted results contain either exactly the rows requested by row
+         * output and no aggregates, or one aggregate for each operation in
+         * aggregate output and no rows, together with the evaluated revision. Rejected
          * or failed queries contain no rows, aggregates, or evaluated revision. Invalid
          * queries contain findings and change no canonical state. A
-         * result that would exceed maximumRows, or cannot be returned completely,
-         * is rejected whole and never truncated; a selection exceeding it is
-         * refused for an aggregating query on the same terms. The operation
+         * result that would exceed its output maximum, or cannot be returned
+         * completely, is rejected whole and never truncated. The operation
          * attempt may still produce observational activity.
          */
     }
@@ -1125,7 +1130,13 @@ package RTG {
          */
     }
 
-    abstract item def 'Historical State Selection';
+    abstract item def 'Evaluated State Selection';
+
+    item def 'Current Selection' :> 'Evaluated State Selection';
+
+    item def 'Prospective Selection' :> 'Evaluated State Selection';
+
+    abstract item def 'Historical State Selection' :> 'Evaluated State Selection';
 
     item def 'Revision Selection' :> 'Historical State Selection' {
         attribute revision : 'Revision Number';

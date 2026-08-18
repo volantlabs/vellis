@@ -98,6 +98,34 @@ domain model: text and structured content communicate the same typed outcome, an
 changing advisory annotations cannot change authorization, validation, atomicity, or any promised
 failure non-effect.
 
+## Semantic work-locality trigger evidence
+
+The `vellis-2-semantic-work-locality` evolution began from a clean
+`ca6539e10393a5a52e2cd2f67d0af662e92cc010` checkout with all 1,192 existing tests passing. That
+pass is evidence of missing discrimination, not evidence that the following shapes conform:
+
+- Aggregation's late `SELECT DISTINCT` in `vellis/store.py` first enumerates hidden flat-join
+  witnesses. Distinct output therefore does not prevent a hidden cross-product.
+- Active endpoint-type validation obtains generic affected participants, loads every incident
+  relationship, and promotes both endpoints. Hub-of-hubs degree 10, 20, and 40 produced respectively
+  14,200, 52,000, and 199,300 SQLite steps and 231, 861, and 3,321 decoded objects.
+- Prospective multiplicity selection considers every rule mentioning a locally impacted type. An
+  isolated display rename with 10, 100, 500, and 1,000 irrelevant rules produced 8,434, 45,154,
+  208,354, and 412,354 SQLite steps. Independent K changes and K rules at K 5, 10, 20, and 40
+  produced 12,800, 35,200, 108,300, and 359,800 steps.
+- Historical aggregation capacity accounting omitted the additional bound parameter compiled into
+  its `LIMIT`; at a SQLite variable limit of 32 the historical form failed after equivalent current
+  and prospective forms passed preflight.
+- Permitted-value validation scans every earlier accepted value. Valid collections of 500, 1,000,
+  2,000, and 4,000 values took 0.047, 0.174, 0.672, and 2.640 seconds; 8,000 took 10.455 seconds.
+- `vellis/query.py` contains an assignment evaluator used by `tests/vellis/oracle.py`; component
+  splitting is duplicated in query and store code; query execution also retains specialized
+  collection paths, recursive component evaluation, manual capacity formulas, legacy state and
+  payload channels, and post-hydration row deduplication.
+
+These measurements characterize forbidden dependency shapes; they are not public latency budgets.
+The successor evolution record owns their model, implementation, evidence, and deletion closure.
+
 Query rows are distinct projected tuples. To count anchors exactly, use an anchor-only return shape
 and count its rows, or count distinct projected anchor UUIDs when other projections can produce
 several tuples per anchor. Projecting only repeated property values may intentionally collapse

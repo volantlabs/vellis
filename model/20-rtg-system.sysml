@@ -84,14 +84,17 @@ package RTGSystem {
         objective {
             require constraint {
             doc /*
-             * Input: named anchor and directly associated-data endpoint groups,
-             * optional known anchor UUIDs, required typed directed links with
-             * optional known link UUIDs, associated-data value conditions, a
-             * return shape, a positive maximum row count, and current,
-             * prospective, or exactly one revision or time selection. Success:
-             * return the complete shaped named bindings and evaluated revision.
+             * Input: one connected acyclic tree of named anchor and directly
+             * associated-data selectors, optional known UUIDs for each selector,
+             * required typed directed links, associated-data value conditions,
+             * exactly one row or aggregate output with its positive complete
+             * bound, and current, prospective, revision, or time selection.
+             * Success: return either the complete shaped named rows or the
+             * requested arithmetic over one distinct associated-data target
+             * population, together with the evaluated revision.
              * Refusal or failure: return findings for unknown or incompatible
-             * names, types, identities, properties, projections, history
+             * names, types, identities, properties, projections, disconnected
+             * or cyclic selector shapes, output mode, history
              * targets, a result that exceeds the caller's bound, or a result the
              * system cannot return completely; return no partial
              * rows. Canonical state and revision never change. One observational

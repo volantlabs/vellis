@@ -39,6 +39,7 @@ package VellisVerification {
             require constraint {
             doc /*
              * Query one anchor type broadly, narrow it by known anchor UUIDs,
+             * and narrow associated data by known associated-data UUIDs,
              * select associated data once by type and direct association alone
              * and once with structured value comparisons, constrain anchor and
              * associated-data endpoint groups by directed link type and optional
@@ -51,19 +52,17 @@ package VellisVerification {
              * it returns the anchors of each, identically to the union of the
              * per-type queries it replaces, and reject a group naming a type that
              * is not active.
-             * Count, sum, minimise, and maximise a data condition's matches and
-             * show each answers over every match rather than over distinct
-             * projected tuples, including a population whose distinct values
-             * differ from its matches. Show a count of zero where nothing matches
+             * Count, sum, minimise, and maximise one aggregate output target and
+             * show each answers over its distinct matching object identities.
+             * Show a count of zero where nothing matches
              * and an absent sum, minimum, and maximum where no match carries the
              * property. Hold an aggregating query's maximum below its matching
              * population and show it is refused whole exactly as a projected
              * result is. Reject an aggregation whose property its condition does
              * not define, whose operator cannot sum or order that property's
              * kind, or which omits a property its operator requires.
-             * Issue an aggregation-only query and repeat it through the durable
-             * and in-memory indexed realizations; show both return the same count,
-             * sum, minimum, and maximum over the same object identities.
+             * Compare aggregation with an independent semantic oracle and show
+             * the same count, sum, minimum, and maximum over the same identities.
              * Order a number-valued property by exact mathematical value and a
              * string-valued property by exact Unicode code-point sequence,
              * including a value whose code-point order differs from its order
@@ -75,7 +74,8 @@ package VellisVerification {
              * binding per requested projection, including an absent-valued binding
              * only for a projected missing optional property, present-valued
              * bindings for both non-null and JSON-null properties, and that identical
-             * projected tuples occur once. Every binding identifies its projection
+             * projected tuples occur once. Show equal values from distinct source
+             * data objects remain distinct rows. Every binding identifies its projection
              * and the result identifies its query. Repeat against current state,
              * the sole prospective overlay, a selected revision, and a selected
              * time; all use the same meaning. Alternative evaluation
@@ -86,12 +86,12 @@ package VellisVerification {
              * Add a proposal-only type and changed proposed property rule and show
              * prospective selection accepts and applies them while current rejects
              * the proposal-only type and retains the active rule.
-             * Independently increase satisfying assignments in a selector
-             * component disconnected from every requested projection and show
-             * that it changes rows only when the component moves between absent
-             * and present, without multiplying projected assignment work. Repeat
-             * with an unprojected selector connected by a condition and show its
-             * distinguishable constraint outcomes still govern the rows.
+             * Exercise paths, stars, and branching selector trees. Independently
+             * increase satisfying hidden witnesses on a connected branch and
+             * show they govern existence without multiplying returned rows or
+             * aggregate targets. Bind two compatible aliases to the same object
+             * and use two endpoint aliases to discover a self-link, showing no
+             * implicit alias-inequality constraint.
              * Hold a broad query's maximum fixed while increasing unrelated
              * matching rows and show identity selection stops at maximum plus one
              * and hydrates no more than that bounded candidate result.
@@ -107,20 +107,22 @@ package VellisVerification {
             require constraint {
             doc /*
              * Exercise empty or duplicate query-local names, unknown and incompatible
-             * type keys, out-of-query references, endpoint directions, anchor
-             * and link UUIDs, duplicate UUID restrictions, property names, incompatible comparisons,
-             * malformed projections, and an
+             * type keys, out-of-query references, endpoint directions, anchor,
+             * associated-data, and link UUIDs, duplicate UUID restrictions,
+             * disconnected selectors, self-edges, parallel edges, longer cycles,
+             * property names, incompatible comparisons, missing, empty, or mixed
+             * output, malformed projections, and an
              * unrequested result binding, zero maximum, and a result exceeding
              * its positive maximum, plus a result the system cannot return
              * completely. Show findings, no partial result rows, and unchanged
              * graph, definitions, delta, revision, and canonical history, while
              * one rejection observation may be appended to activity history.
-             * For query and definition discovery alike, accept current and
-             * prospective scopes without historical selection and historical
-             * scope with exactly one revision or time. Reject current or
-             * prospective with either selector, historical without one, and
-             * prospective without a delta, preserving no partial payload and
-             * every canonical non-effect.
+             * For query and definition discovery alike, accept current,
+             * prospective, revision, and time selections. Reject prospective
+             * without a delta, an unresolved revision or time, and a naive time,
+             * preserving no partial payload and every canonical non-effect.
+             * Reject count with a supplied property as well as sum, minimum, or
+             * maximum without a required property.
              */
             }
             verify VellisRequirements::querySafety;
@@ -253,6 +255,14 @@ package VellisVerification {
              * implicated modeled definitions and graph objects when available and
              * create no canonical validation state. Show an unexpected check
              * failure publishes no partial or successful assessment.
+             * For the same small old and proposed states, compare active and
+             * prospective validation with complete assessment and show identical
+             * exact applicable rule, subject, and constrained-end work. Change
+             * only display or property content and show no multiplicity work;
+             * change an opposite endpoint's membership and show unchanged far
+             * endpoints remain lookup-only unless their own count can change.
+             * Change only a multiplicity-rule description and show zero
+             * multiplicity work.
              */
             }
             verify VellisRequirements::validationCoverage;
@@ -583,6 +593,11 @@ package VellisVerification {
              * Compare canonical states and show revision, delta presence,
              * proposed-definition content, and keyed graph-overlay content also
              * participate without requiring either state as a resident aggregate.
+             * Validate permitted-value collections at successively doubled sizes
+             * through at least eight thousand members. Show one canonical-key
+             * construction per supplied value, set or counter membership rather
+             * than pairwise equality scans, and unchanged duplicate decisions for
+             * equivalent numbers, object-member order, and nested values.
              */
             }
             verify VellisRequirements::canonicalSemanticEquality;
@@ -690,13 +705,13 @@ package VellisVerification {
              * process restart and show they decode only requested definitions and
              * no graph objects. Hold one small query answer fixed while increasing unrelated
              * graph populations; instrument candidate retrieval and object decoding
-             * and show identities, types, direct associations, and directed
-             * relationships constrain candidates before property comparisons without
-             * complete-graph materialization. Hold one-object mutation meaning fixed
-             * while increasing unrelated populations and show decoded values remain
-             * limited to the touched object, its incident relationships and direct
-             * associations, and applicable rules. Separately increase only that
-             * object's degree and show work scales with the affected neighborhood.
+             * and show answer identities are bounded before hydration, hidden
+             * witnesses do not multiply work, and no complete graph is materialized.
+             * Hold one-object mutation meaning fixed while increasing unrelated
+             * rules and populations and show exact applicable rule, subject, and
+             * constrained-end work is unchanged. Separately increase only an
+             * applicable degree and show work scales with that degree while far
+             * endpoints remain lookup-only.
              * For state-wide conformance and cutover, show semantic-entry visits and
              * finding counts may grow while peak materialization remains bounded.
              * Instrument every production operation and show none constructs a
@@ -792,7 +807,7 @@ package VellisVerification {
              * semantic and physically filtered record visits, per-object encoding
              * and decoding, retained and transient memory, streaming buffer bounds,
              * allocation or copy work, identity/type/association/relationship
-             * candidate joins, value comparisons, joint-assignment work, replay and
+             * candidate joins, value comparisons, returned-identity and hidden-witness work, replay and
              * startup duration with explicit units, and storage growth. Include a
              * representative scale fixture with about one thousand definitions and
              * at least one hundred thousand graph objects, plus fixed one-object,

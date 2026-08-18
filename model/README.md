@@ -59,9 +59,12 @@ The model constrains every production operation to avoid a resident complete gra
 definition-set document, or canonical-change document. Ordinary mutations validate their complete
 affected invariant closure; explicit conformance and broad definition cutovers may scan all relevant
 semantic entries while retaining bounded working memory; lifecycle operations use incremental, streaming, or
-set-based work. Current query work narrows candidates
-through identity, type, direct association, and directed relationship meaning before value filtering,
-and projected-query work avoids multiplication by semantically irrelevant assignments. Bounded
+set-based work. Current connected-tree query work may restrict identities, types, direct
+associations, directed relationships, and property values in any useful order. It bounds distinct
+answer identities before hydration or arithmetic, and selector branches that cannot distinguish an
+answer act only through existence rather than multiplying work by hidden witnesses. Ordinary
+mutation distinguishes changed objects, structural validation subjects, unchanged lookup identities,
+and exact applicable multiplicity rule-subject-end work. Bounded
 historical selection avoids scanning excluded ledger prefixes. The portable model does not select materialized
 projections, revision/time or relationship indexes, definition checkpoints, caches, snapshot cadence,
 databases, or storage layouts. Those are possible non-normative realizations whose conformance is

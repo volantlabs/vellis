@@ -44,20 +44,22 @@ package VellisRequirements {
         doc /*
          * A graph query shall select named anchor groups of one or more active
          * types in the definitions governing the evaluated state,
-         * optionally narrow anchors and links by known UUIDs, select directly
+         * optionally narrow anchors, associated data, and links by known UUIDs, select directly
          * associated-data groups by type and optional structured value
          * comparisons, require typed directed links between anchor or
          * associated-data groups, and return only bindings that reference the
-         * named projections in its return shape at an identified revision.
+         * named projections in its row output at an identified revision.
          * An anchor group shall select anchors of any of one or more named
          * active anchor types, so one group can span several shapes of thing.
-         * A query shall state projections, aggregations, or both, and at least
-         * one of them. Each aggregation shall count the matches of a named data
-         * condition, or sum, minimise, or maximise one present property of them,
+         * Its selector vertices and direct-association or required-link edges
+         * shall form one connected acyclic tree without self-edges or parallel
+         * edges. A query shall state exactly one non-empty row or aggregate
+         * output. Aggregate output shall select one named data condition as its
+         * distinct object population. Each aggregation shall count that
+         * population, or sum, minimise, or maximise one present property of it,
          * summing only number-valued properties and ordering number-valued and
          * string-valued properties exactly as an ordered comparison does.
-         * Aggregation shall read every match rather than distinct projected
-         * tuples. A count shall be present and zero when nothing matches; a sum,
+         * A count shall be present and zero when nothing matches; a sum,
          * minimum, or maximum shall be absent when no match carries the property. An
          * associated-data group with no property comparisons shall select by
          * direct association and type alone. Definitions governing the evaluated
@@ -75,14 +77,19 @@ package VellisRequirements {
          * contain exactly one binding for each requested projection. Identical
          * projected tuples shall occur once. A selected optional property shall
          * retain its binding when absent so absence remains distinct from JSON null.
-         * A returned property value shall be present exactly when the projected
-         * property is present, including when that value is JSON null.
+         * A returned property value shall identify its source associated-data
+         * object and be present exactly when the projected property is present,
+         * including when that value is JSON null. Equal property values from
+         * distinct source objects shall remain distinct rows; hidden satisfying
+         * witnesses shall not distinguish rows.
+         * Distinct aliases may bind the same graph object when their constraints
+         * permit it, including two endpoint aliases that discover a self-link.
          * Query-local names shall be unique and every selector and projection
          * reference shall resolve within that query. Evaluation strategy shall
          * not change this meaning. Current selection shall evaluate active state;
          * prospective selection shall evaluate the sole delta's effective graph
-         * and proposed definitions; exactly one revision or time selector shall
-         * evaluate the resolved historical graph and definitions with the same semantics.
+         * and proposed definitions; revision or time selection shall evaluate
+         * the resolved historical graph and definitions with the same semantics.
          */
         }
     }
@@ -94,31 +101,32 @@ package VellisRequirements {
          * Graph queries shall change no canonical state or revision. Their
          * permitted, rejected, or failed attempts may append observational
          * activity. Unknown or
-         * incompatible type keys, empty or duplicate names, out-of-query references,
+         * incompatible type keys, empty or duplicate names, disconnected or
+         * cyclic selector graphs, self-edges, parallel edges, out-of-query references,
          * endpoint roles, unknown or duplicate UUID restrictions, properties,
          * comparisons, projections, or unresolved
          * historical selections shall produce observable findings and no result
-         * rows. An aggregation naming no data condition of the query, omitting a
+         * rows. A missing, empty, or mixed output, or an aggregation naming no data condition of the query, omitting a
          * property its operator requires, naming a property its condition's type
          * does not define, or naming a property whose kind its operator cannot
          * sum or order, shall produce observable findings and no result.
-         * Every query shall provide a
-         * positive row maximum; a result exceeding it, or one the system cannot
+         * Every output shall provide a positive complete-result maximum; a row
+         * result or distinct aggregate target selection exceeding it, or one the system cannot
          * return completely, shall be rejected whole, never truncated or paged.
-         * The same maximum shall bound the matching objects an aggregation
+         * The aggregate maximum shall bound the distinct objects its arithmetic
          * reads, and a selection exceeding it shall be rejected whole, so
          * returning one number never licenses reading an unbounded population.
-         * Evaluation shall not multiply work across selector components
-         * disconnected from every projected or aggregated selector. Such a
-         * component shall affect the result only through whether it has at least
-         * one satisfying assignment. Query work may scale with candidates and
-         * conditions inside a component that can change a projected tuple or an
-         * aggregated population, with combinations of result-bearing components,
-         * and with distinct rows or matched objects needed to decide the caller's
-         * maximum.
-         * Evaluation shall stop after enough distinct projected rows to decide
-         * the caller's bound and shall not materialize an unbounded candidate
-         * population merely because its type participates in the query.
+         * Query work may scale with named candidates, stated property values,
+         * matching associations and links, paths joining returned selectors,
+         * genuine combinations of returned identities, and distinct rows or
+         * target objects needed to decide the caller's maximum. A selector branch
+         * that cannot distinguish a returned row or aggregate target shall affect
+         * it only through existence and shall not multiply work by its satisfying
+         * witnesses. Evaluation shall bound distinct answer identities before
+         * object-value hydration or arithmetic. It shall not scale with
+         * disconnected populations, duplicate hidden witnesses, declaration
+         * order, or graph-object decoding before that bound, and shall not fail
+         * merely because a collection crosses a private execution threshold.
          */
         }
     }
@@ -205,7 +213,9 @@ package VellisRequirements {
          * preserves the prior one. Current or proposal changes may make the
          * retained assessment stale for activation without changing its findings
          * or immediate retrievability. Assessment state is observational evidence,
-         * never canonical or replay authority.
+         * never canonical or replay authority. Active changes and prospective
+         * assessments shall derive the same affected structural subjects and
+         * exact multiplicity work from their respective old and proposed meaning.
          */
         }
     }
@@ -272,11 +282,12 @@ package VellisRequirements {
         subject system : 'RTG System';
         require constraint {
         doc /*
-         * Historical graph queries shall accept exactly one revision or time
-         * selector, change no canonical state, and evaluate the selected committed
+         * Graph queries, definition summary, and focused inspection shall use one
+         * current, prospective, revision, or time state selection. Revision and
+         * time selections change no canonical state and evaluate the selected committed
          * revision with current-query semantics. A time resolves to the greatest
          * committed revision at or before it. Definition summary and focused
-         * inspection shall accept the same optional selector, return definitions
+         * inspection shall return definitions
          * active at the exact evaluated revision and delta presence at that state,
          * and reject unresolved selections without partial content or evaluated
          * revision. A caller may reuse a time-based summary's resolved revision
@@ -371,10 +382,17 @@ package VellisRequirements {
          * upsert/removal conflicts, unknown removals, kind changes, invalid final
          * references, and any assumed implicit cascade shall be rejected without
          * canonical effect. An ordinary active change shall validate every
-         * invariant that can be affected by its touched values, final references,
-         * reverse references, incident relationships, associations, and
-         * multiplicity participants, relying on the previously valid unaffected
-         * state. It shall not perform a complete-graph conformance assessment.
+         * invariant whose truth can change between old and proposed meaning,
+         * relying on the previously valid unaffected state. Structural validation
+         * subjects shall remain distinct from unchanged lookup identities.
+         * Multiplicity work shall be the distinct applicable rule, subject, and
+         * constrained-end combinations justified by changed relationship
+         * membership, subject membership, opposite membership, or rule meaning.
+         * Unchanged far endpoints shall remain lookup-only unless one of their
+         * own exact counts can change. Display-only graph edits, property-only
+         * graph edits, and rule-description-only edits shall create no
+         * multiplicity work. Ordinary change shall not perform a
+         * complete-graph conformance assessment.
          * Delta staging may remain temporarily nonconforming until an explicit
          * prospective assessment and shall change no active state. An edit that
          * would remove the final semantic difference from active state is rejected
@@ -418,13 +436,14 @@ package VellisRequirements {
          * shall not require retaining the complete canonical-state tuple or complete
          * graph in process memory between invocations. Definition-only summary and
          * inspection shall not materialize graph objects. Current graph query shall
-         * narrow candidates by the requested identities, types, direct associations,
-         * and directed relationships before applying property comparisons and shall
-         * not materialize unrelated graph objects merely because they are current.
+         * obey Query Safety's candidate, hidden-witness, answer-identity, and
+         * hydration locality and shall not materialize unrelated graph objects
+         * merely because they are current.
          * No production operation shall construct or retain a complete Graph,
          * Canonical State, definition-set document, canonical-change document, or
-         * equivalent whole-state aggregate. Ordinary mutation shall inspect only
-         * its complete affected invariant closure. A definition cutover or
+         * equivalent whole-state aggregate. Ordinary mutation shall obey Explicit
+         * Graph Change Set's exact structural-subject, lookup, and multiplicity-
+         * work locality. A definition cutover or
          * explicit conformance assessment may scan every applicable semantic
          * state entry when its meaning is state-wide, while keeping working memory bounded.
          * Snapshot, replay, import, initialization, and restoration shall use
@@ -467,8 +486,8 @@ package VellisRequirements {
          * The system shall expose exactly the selected ten stable, discoverable
          * MCP tool names. Every completed invocation shall return typed object
          * meaning; tools with semantic input shall accept typed object meaning.
-         * Definition summary, graph change, activation, and conformance shall
-         * carry their state selection, target, exact assessment identity, or
+         * Definition summary, inspection, graph query, graph change, activation,
+         * and conformance shall carry their state selection, target, exact assessment identity, or
          * assessment-page request through typed input. A genuinely parameterless
          * tool shall introduce no empty domain request.
          * Every tool shall preserve canonical RTG semantics and remain usable
