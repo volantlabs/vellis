@@ -6,7 +6,7 @@ evolution:
   lifecycle: active
   approval: {status: not-required, reason: "Accepted authority decides all five defects; the owner selected the bounded fail-closed POSIX realization.", checkpoint: null}
   blocker: null
-  checkpoint: git:1f674497ca02a2a5ce8fb93a0bf1ffc444fd2d69
+  checkpoint: git:8387151cd4c02810b8945102a36156520f671873
 baselines:
   status: current
   source: &source
@@ -17,19 +17,19 @@ baselines:
     checkpoint: git:784a81bc30e7f8fdb857f4e8c1df3fb41d76f6bc
   target: &target
     model: sha256:adf05b52f9839b75f76240ee116c0ffba7ee452602c2083268d683c4b534b2c7
-    implementation: git:1f674497ca02a2a5ce8fb93a0bf1ffc444fd2d69
+    implementation: git:8387151cd4c02810b8945102a36156520f671873
     language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
     execution_environment: sha256:d71473693aa50faef1a25a449aa5808490e21eaf2a987942d1fb134c773550d1
-    checkpoint: git:1f674497ca02a2a5ce8fb93a0bf1ffc444fd2d69
+    checkpoint: git:8387151cd4c02810b8945102a36156520f671873
   observed:
     model: sha256:adf05b52f9839b75f76240ee116c0ffba7ee452602c2083268d683c4b534b2c7
-    implementation: git:1f674497ca02a2a5ce8fb93a0bf1ffc444fd2d69
+    implementation: git:8387151cd4c02810b8945102a36156520f671873
     language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
     execution_environment: sha256:d71473693aa50faef1a25a449aa5808490e21eaf2a987942d1fb134c773550d1
-    checkpoint: git:1f674497ca02a2a5ce8fb93a0bf1ffc444fd2d69
+    checkpoint: git:8387151cd4c02810b8945102a36156520f671873
 scope:
   authority_scope: [RTGSystem::'Query graph', RTGSystem::'Assess graph conformance', RTGSystem::'Activate definition delta', VellisRequirements::canonicalSemanticEquality, VellisRequirements::querySafety, VellisRequirements::validationCoverage, VellisRequirements::nonDisruptiveDefinitionWork, VellisRequirements::ownerControlledMemory, VellisRequirements::mcpOutcomeIntegrity, VellisVerification]
-  implementation_scope: [vellis/mcp.py, vellis/setup.py, vellis/store.py, vellis/streaming.py, vellis/v1_streaming.py, tests/vellis/, README.md, SECURITY.md, system-evolution.yaml]
+  implementation_scope: [vellis/mcp.py, vellis/setup.py, vellis/store.py, vellis/streaming.py, vellis/v1_streaming.py, tools/system_evolution.py, tests/test_system_evolution.py, tests/vellis/, README.md, SECURITY.md, system-evolution.yaml]
   review_lenses: [authority and conformance, engineering and evidence]
   non_goals:
     - Changing the accepted SysML model, MCP schemas, persistence schema, snapshot formats, version, or v1 compatibility.
@@ -219,7 +219,7 @@ work_items:
     label: Integrate evidence and close the prerelease candidate
     kind: closure
     dependencies: [W001, W002, W003]
-    planned_baseline: {dimension: implementation, identity: git:1f674497ca02a2a5ce8fb93a0bf1ffc444fd2d69}
+    planned_baseline: {dimension: implementation, identity: git:8387151cd4c02810b8945102a36156520f671873}
     finding_ids: []
     decision_ids: []
     authority:
@@ -237,10 +237,11 @@ work_items:
       - command:just system-evolution-check
       - command:just package-check
       - command:just check
+      - path:tests/test_system_evolution.py#test_qualified_authority_references_must_resolve_in_the_current_model
       - path:README.md#implementation-status
       - path:SECURITY.md#current-scope
     blocker: null
-    checkpoint: git:1f674497ca02a2a5ce8fb93a0bf1ffc444fd2d69
+    checkpoint: git:8387151cd4c02810b8945102a36156520f671873
 closure:
   finding_disposition: open
   model_status: unchanged
@@ -256,8 +257,9 @@ closure:
     - command:just system-evolution-check
     - command:just package-check
     - command:just check
+    - path:tests/test_system_evolution.py#test_qualified_authority_references_must_resolve_in_the_current_model
     - path:tests/vellis/test_sqlite_prospective_state.py#test_endpoint_type_change_cannot_activate_an_incomplete_multiplicity_closure
     - path:tests/vellis/test_mcp_boundary.py#test_raw_stdio_preserves_exact_fraction_and_large_integer_in_both_directions
     - path:tests/vellis/test_graph_queries.py#test_aggregation_accepts_large_positive_bounds_without_canonical_effects
     - path:tests/vellis/test_storage_permissions.py#test_setup_and_sqlite_companions_are_private_under_umask_022
-  checkpoint: git:1f674497ca02a2a5ce8fb93a0bf1ffc444fd2d69
+  checkpoint: git:8387151cd4c02810b8945102a36156520f671873
