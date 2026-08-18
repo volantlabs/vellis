@@ -41,6 +41,13 @@ class ClientAction(Enum):
     REFUSE = "refuse"
 
 
+class ClientFailureStage(Enum):
+    INSPECTION = "client inspection"
+    REPLACEMENT_DECISION = "client replacement authorization"
+    REMOVAL = "client entry removal"
+    REGISTRATION = "client registration"
+
+
 @dataclass(frozen=True, slots=True)
 class CommandResult:
     returncode: int
@@ -69,6 +76,11 @@ class ClientOutcome:
     succeeded: bool
     changed: bool
     detail: str
+    failed_stage: ClientFailureStage | None = None
+
+    def __post_init__(self) -> None:
+        if self.succeeded == (self.failed_stage is not None):
+            raise ValueError("a client outcome must identify the stage of every failure")
 
 
 def subprocess_runner(argv: Sequence[str]) -> CommandResult:
@@ -173,6 +185,7 @@ def apply_plans(
                         "client state changed after preview; inspect it with the public CLI "
                         "and use setup's reported client-only retry command"
                     ),
+                    failed_stage=ClientFailureStage.INSPECTION,
                 )
             )
             continue
@@ -227,6 +240,7 @@ def _apply_one(plan: ClientPlan, runner: Runner) -> ClientOutcome:
                 f"until `{render_command(plan.inspection_argv)}` runs, then use setup's "
                 "reported client-only retry command"
             ),
+            ClientFailureStage.INSPECTION,
         )
     if plan.action is ClientAction.REFUSE:
         corrective = (
@@ -237,7 +251,17 @@ def _apply_one(plan: ClientPlan, runner: Runner) -> ClientOutcome:
                 "client-only retry command"
             )
         )
-        return ClientOutcome(plan, False, False, f"{plan.detail}; {corrective}")
+        return ClientOutcome(
+            plan,
+            False,
+            False,
+            f"{plan.detail}; {corrective}",
+            (
+                ClientFailureStage.REPLACEMENT_DECISION
+                if plan.state is ClientState.DIFFERING
+                else ClientFailureStage.INSPECTION
+            ),
+        )
     if plan.remove_argv is not None:
         removed = runner(plan.remove_argv)
         if removed.returncode != 0:
@@ -246,6 +270,7 @@ def _apply_one(plan: ClientPlan, runner: Runner) -> ClientOutcome:
                 False,
                 False,
                 f"public CLI removal failed: {_command_failure(removed)}",
+                ClientFailureStage.REMOVAL,
             )
     added = runner(plan.add_argv)
     if added.returncode != 0:
@@ -255,6 +280,7 @@ def _apply_one(plan: ClientPlan, runner: Runner) -> ClientOutcome:
             plan.remove_argv is not None,
             "public CLI registration failed: "
             f"{_command_failure(added)}; run: {plan.manual_command}",
+            ClientFailureStage.REGISTRATION,
         )
     return ClientOutcome(plan, True, True, "user-scoped STDIO entry configured")
 

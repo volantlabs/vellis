@@ -15,6 +15,7 @@ from tests.vellis.oracle import materialize_state
 from vellis import setup as setup_implementation
 from vellis.client_setup import (
     ClientAction,
+    ClientFailureStage,
     ClientKind,
     ClientState,
     apply_plans,
@@ -253,7 +254,8 @@ def test_installed_client_failure_reports_an_installed_retry_command(
             "--yes",
         )
     )
-    assert f"what to do next: {retry}" in error.getvalue()
+    assert "failed stage: client inspection" in error.getvalue()
+    assert f"Once inspection is readable, run: {retry}" in error.getvalue()
     assert "uv --directory" not in error.getvalue()
 
 
@@ -414,6 +416,8 @@ def test_an_ambiguous_inspection_error_is_not_mistaken_for_absence(
     )[0]
     assert plan.state is ClientState.UNPARSEABLE
     assert plan.action is ClientAction.REFUSE
+    outcome = apply_plans((plan,))[0]
+    assert outcome.failed_stage is ClientFailureStage.INSPECTION
 
 
 def test_claude_output_without_scope_is_reported_as_unparseable(
@@ -456,6 +460,8 @@ def test_missing_client_reports_a_copyable_command_without_undoing_memory(
     assert "then run: uv --directory" in error.getvalue()
     assert "-m vellis.setup" in error.getvalue()
     assert render_command(("--data-dir", str(destination.resolve()))) in error.getvalue()
+    assert "failed stage: client inspection" in error.getvalue()
+    assert "established memory: changed" in error.getvalue()
     system = RTGSystem.open(store_path(destination.resolve()))
     try:
         assert system.is_initialized
@@ -478,8 +484,11 @@ def test_unparseable_inspection_is_separate_from_successful_initialization(
     )
     assert code == EXIT_FAILED
     assert "inspection output could not be classified" in error.getvalue()
-    assert "established memory: unchanged" in error.getvalue()
-    assert "what to do next: uv --directory" in error.getvalue()
+    assert "failed stage: client inspection" in error.getvalue()
+    assert "established memory: changed" in error.getvalue()
+    assert "do not rerun setup before then" in error.getvalue()
+    assert "stop and seek owner direction" in error.getvalue()
+    assert "Once inspection is readable, run: uv --directory" in error.getvalue()
     assert "run python -m vellis.setup --data-dir" in error.getvalue()
     assert "--vocabulary" not in error.getvalue()
     system = RTGSystem.open(store_path(destination.resolve()))
@@ -487,6 +496,16 @@ def test_unparseable_inspection_is_separate_from_successful_initialization(
         before = materialize_state(system)
     finally:
         system.close()
+
+    retry_error = io.StringIO()
+    failed_retry = main(
+        ["--data-dir", str(destination), "--client", "codex", "--yes"],
+        stdout=io.StringIO(),
+        stderr=retry_error,
+    )
+    assert failed_retry == EXIT_FAILED
+    assert "failed stage: client inspection" in retry_error.getvalue()
+    assert "established memory: unchanged" in retry_error.getvalue()
 
     _set_state(tmp_path, "codex", {"status": "absent"})
     retry_out, retry_error = io.StringIO(), io.StringIO()

@@ -1444,6 +1444,51 @@ def test_nested_numeric_spellings_are_one_bounded_semantic_row(
         system.close()
 
 
+def test_many_serialized_spellings_stream_without_a_global_sql_distinct_set(
+    tmp_path: Path,
+) -> None:
+    """Semantic duplicates cannot create an unbounded SQLite DISTINCT materialization."""
+    from vellis.json_value import JsonKind
+
+    system = _system_with(tmp_path, _nested_property_definitions(JsonKind.OBJECT))
+    statements: list[str] = []
+    try:
+        spellings = tuple(Decimal("3." + ("0" * places)) for places in range(1, 257))
+        outcome = system.apply_graph_change(
+            GraphChange(
+                anchor_upserts=(ADA,),
+                associated_data_upserts=tuple(
+                    AssociatedDataObject(
+                        uuid=f"n-{index}",
+                        type_key="note",
+                        anchor_uuids=("a-1",),
+                        properties={"payload": normalize({"n": spelling})},
+                    )
+                    for index, spelling in enumerate(spellings, start=1)
+                ),
+            ),
+            provenance=_owner(),
+        )
+        assert outcome.accepted
+        query = replace(_one_property("payload"), maximum_rows=1)
+        system.store._connection.set_trace_callback(statements.append)  # noqa: SLF001
+
+        result = system.query_graph(query)
+
+        assert result.accepted, result.findings
+        assert len(result.rows) == 1
+        projection_statements = [
+            statement for statement in statements if "object_property AS pp0" in statement
+        ]
+        assert len(projection_statements) == 1, [
+            statement for statement in statements if "object_property" in statement
+        ]
+        assert "SELECT DISTINCT" not in projection_statements[0].upper()
+    finally:
+        system.store._connection.set_trace_callback(None)  # noqa: SLF001
+        system.close()
+
+
 def test_maximum_rows_rejects_genuinely_unequal_nested_values(tmp_path: Path) -> None:
     from vellis.json_value import JsonKind
 

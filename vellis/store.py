@@ -1644,7 +1644,7 @@ class CanonicalStore:
 
         sql = (
             prefix
-            + "SELECT DISTINCT "
+            + "SELECT "
             + ", ".join(selected)
             + " FROM "
             + ", ".join(tables)

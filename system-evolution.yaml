@@ -171,7 +171,7 @@ findings:
     compatibility_effect: Evidence and CI become stricter without changing product payload or persistence compatibility.
 decisions:
   - id: D001
-    summary: Stream SQL projections and apply the shared semantic row identity before maximumRows.
+    summary: Stream raw SQL projections without a global DISTINCT materialization and apply the shared semantic row identity before maximumRows.
     authority_refs: [VellisRequirements::canonicalSemanticEquality, VellisRequirements::querySafety]
     alternatives: [Canonicalize and migrate nested stored JSON numbers., Keep serialized SQL equality.]
     reversible: true
@@ -181,6 +181,7 @@ decisions:
     evidence_refs:
       - path:tests/vellis/test_graph_queries.py#test_nested_numeric_spellings_are_one_bounded_semantic_row
       - path:tests/vellis/test_graph_queries.py#test_maximum_rows_rejects_genuinely_unequal_nested_values
+      - path:tests/vellis/test_graph_queries.py#test_many_serialized_spellings_stream_without_a_global_sql_distinct_set
   - id: D002
     summary: Publish validation assessment and required activity in one SQLite transaction.
     authority_refs: [VellisRequirements::validationCoverage, VellisRequirements::dualLedgerSeparation]

@@ -139,9 +139,11 @@ the public inspection and mutation commands before confirmation, treats a matchi
 and requires `--replace-client CLIENT` before replacing a differing entry. Matching includes the
 enabled user scope, STDIO command and arguments, and an empty launch environment; another transport,
 destination-bearing environment, scope, or enabled state is a difference. Client inspection and
-connection outcomes are reported separately from memory initialization, with an exact client-only
-retry command. An unavailable client gets a platform-correct copyable command without undoing
-established memory. Linux and Windows command rendering, paths containing spaces, and non-default
+connection outcomes are reported separately from memory initialization, name their failed stage,
+state the memory effect of the complete setup operation, and provide an exact client-only retry
+command. An unavailable client is told to repair its public inspection command before retrying; an
+unparseable inspection must first become a readable absent, matching, or differing state, or stop
+for owner direction. Linux and Windows command rendering, paths containing spaces, and non-default
 destinations have fake-client evidence.
 
 Corrective slice S018 implements decisions D004 and D005. Closure decision D006 reran the matching

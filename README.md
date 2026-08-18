@@ -210,10 +210,13 @@ Use these words precisely:
   snapshot with its later records, and a confirmed v1 snapshot — establishes its own system; a
   client launching the server as an ordinary subprocess discovers exactly the ten tools, learns the
   vocabulary cold, asks a bounded question and retains one approved change; and a later session in
-  a new process finds that memory at the state replay reconstructs. A failed start, a second start
-  over an established system, and a client that cannot connect each name the stage that failed,
-  say that established memory is unchanged, and give an available next step, with graph,
-  definitions, delta, revision, and canonical ledger identical either side of the failure.
+  a new process finds that memory at the state replay reconstructs. A failed start before
+  initialization, a second start over an established system, and a client that cannot connect each
+  name the stage that failed, truthfully report whether established memory changed, and give an
+  available next step. Pre-initialization and established-memory failures leave graph, definitions,
+  delta, revision, and canonical ledger identical either side; a client failure after successful
+  initialization leaves that newly established memory intact, and its client-only retry does not
+  change it.
 - **Characterized, not budgeted.** What this realization's work responds to is measured in semantic
   row visits, decoded values, affected neighborhoods, streamed buffer sizes, and query candidates.
   Summary and focused inspection decode no graph and no unrelated definitions. A one-object mutation
@@ -250,7 +253,7 @@ Use these words precisely:
   never writes to this repository's ignored `.data/`.
   `vellis serve` then serves that memory over local standard input and output; pointed at
   a destination holding no established memory it refuses rather than creating one, and a client that
-  cannot start it is told which stage failed, that established memory is unchanged, and what to do
+  cannot start it is told which stage failed, whether established memory changed, and what to do
   next, in the same shape setup uses. Both commands
   resolve the same destination, so a system established at a configured location is the one the
   server serves. An MCP client launching that command as a subprocess discovers exactly the
@@ -258,8 +261,9 @@ Use these words precisely:
   processes — a real client library over the real transport. Setup inspects and configures selected
   user-scoped Codex and Claude Code
   entries only through their public CLIs. Matching entries are no-ops; differing entries require
-  explicit replacement; and an unavailable client reports a platform-correct copyable fallback
-  without undoing initialized memory. `vellis-rtg-knowledge-graph` remains an executable alias,
+  explicit replacement; and an unavailable client identifies the inspection failure and tells the
+  owner how to repair the client before using the exact client-only retry, without undoing
+  initialized memory. `vellis-rtg-knowledge-graph` remains an executable alias,
   `serve-mcp` remains a command alias for `serve`, and the existing `python -m vellis`,
   `python -m vellis.setup`, and `python -m vellis.preserve` forms remain operational.
 
@@ -299,8 +303,8 @@ until the new system has been inspected and independently backed up.
   completed the bounded `rtg_definition_summary` invocation at revision 8. These observations,
   together with reproducible project boundary, setup, persistence, and inventory evidence, close
   D006 and the campaign without changing client approval policy.
-  [MCP realization](docs/mcp-realization.md#client-configuration) carries manual
-  fallback commands for unavailable clients. FastMCP and FastMCP Slim are pinned at 4.0.0b1 and
+  [MCP realization](docs/mcp-realization.md#client-configuration) carries public-CLI inspection,
+  repair, and registration guidance. FastMCP and FastMCP Slim are pinned at 4.0.0b1 and
   installed.
 
 Vellis 2.0.0 is packaged as a wheel and source distribution with both released executable names.

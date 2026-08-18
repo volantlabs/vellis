@@ -680,15 +680,19 @@ def _write_client_outcomes(
     destination: Path,
     project_directory: Path,
     python_executable: Path | None,
+    memory_changed: bool,
 ) -> None:
     for outcome in outcomes:
         status = "configured" if outcome.succeeded else "not configured"
         effect = "changed" if outcome.changed else "unchanged"
         print(f"MCP client {outcome.plan.client.value}: {status}", file=stream)
         print(f"  client configuration: {effect}", file=stream)
-        print("  established memory: unchanged", file=stream)
+        memory_effect = "changed" if memory_changed else "unchanged"
+        print(f"  established memory: {memory_effect}", file=stream)
         print(f"  result: {outcome.detail}", file=stream)
         if not outcome.succeeded:
+            assert outcome.failed_stage is not None
+            print(f"  failed stage: {outcome.failed_stage.value}", file=stream)
             retry = (
                 [str(python_executable), "-m", "vellis.setup"]
                 if python_executable is not None
@@ -719,6 +723,17 @@ def _write_client_outcomes(
                 print(
                     f"  what to do next: install or repair the "
                     f"{outcome.plan.client.value} CLI until `{inspection}` runs, then run: "
+                    f"{rendered_retry}",
+                    file=stream,
+                )
+            elif outcome.plan.state is ClientState.UNPARSEABLE:
+                inspection = render_command(outcome.plan.inspection_argv)
+                print(
+                    f"  what to do next: run `{inspection}` and resolve its reported error, "
+                    f"or install or repair the {outcome.plan.client.value} CLI, until it "
+                    "returns a readable absent, matching, or differing vellis state; do not "
+                    "rerun setup before then. If the entry cannot be identified safely, stop "
+                    "and seek owner direction. Once inspection is readable, run: "
                     f"{rendered_retry}",
                     file=stream,
                 )
@@ -970,6 +985,7 @@ def main(
             destination=preview.destination,
             project_directory=project_directory,
             python_executable=python_executable,
+            memory_changed=False,
         )
         return (
             EXIT_SUCCESS if all(outcome.succeeded for outcome in client_outcomes) else EXIT_FAILED
@@ -1046,6 +1062,7 @@ def main(
         destination=preview.destination,
         project_directory=project_directory,
         python_executable=python_executable,
+        memory_changed=report.memory_changed,
     )
     return EXIT_SUCCESS if all(outcome.succeeded for outcome in client_outcomes) else EXIT_FAILED
 
