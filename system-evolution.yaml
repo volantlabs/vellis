@@ -3,10 +3,10 @@ evolution:
   id: vellis-2-prerelease-review-remediation
   objective: Resolve five prerelease implementation defects without changing accepted Vellis 2.0 meaning or compatibility.
   observable_distinction: Prospective activation cannot admit invalid state, exact numbers and positive bounds remain usable, and local POSIX memory is private or refused before use.
-  lifecycle: active
+  lifecycle: ready
   approval: {status: not-required, reason: "Accepted authority decides all five defects; the owner selected the bounded fail-closed POSIX realization.", checkpoint: null}
   blocker: null
-  checkpoint: git:784a81bc30e7f8fdb857f4e8c1df3fb41d76f6bc
+  checkpoint: git:131515384d8fdb62dddc4ab3598e74605ca352be
 baselines:
   status: current
   source: &source
@@ -15,8 +15,13 @@ baselines:
     language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
     execution_environment: sha256:d71473693aa50faef1a25a449aa5808490e21eaf2a987942d1fb134c773550d1
     checkpoint: git:784a81bc30e7f8fdb857f4e8c1df3fb41d76f6bc
-  target: null
-  observed: *source
+  target: &target
+    model: sha256:adf05b52f9839b75f76240ee116c0ffba7ee452602c2083268d683c4b534b2c7
+    implementation: git:131515384d8fdb62dddc4ab3598e74605ca352be
+    language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
+    execution_environment: sha256:d71473693aa50faef1a25a449aa5808490e21eaf2a987942d1fb134c773550d1
+    checkpoint: git:131515384d8fdb62dddc4ab3598e74605ca352be
+  observed: *target
 scope:
   authority_scope: [RTGSystem::'Query graph', RTGSystem::'Assess graph conformance', RTGSystem::'Activate proposed change', VellisRequirements::canonicalSemanticEquality, VellisRequirements::querySafety, VellisRequirements::validationCoverage, VellisRequirements::proposalIsolation, VellisRequirements::simpleIndividualOperation, VellisRequirements::mcpOutcomeIntegrity, VellisVerification]
   implementation_scope: [vellis/mcp.py, vellis/setup.py, vellis/store.py, vellis/streaming.py, vellis/v1_streaming.py, tests/vellis/, README.md, SECURITY.md, system-evolution.yaml]
@@ -31,10 +36,10 @@ findings:
     classification: implementation defect
     consequence: A staged endpoint-type change can hide unchanged incident links, yield a clean assessment, and commit invalid active state.
     authority_refs: [VellisRequirements::proposalIsolation, VellisRequirements::validationCoverage, RTGSystem::'Activate proposed change']
-    evidence_refs: []
-    disposition: implementation-work
+    evidence_refs: [path:tests/vellis/test_sqlite_prospective_state.py#test_endpoint_type_change_cannot_activate_an_incomplete_multiplicity_closure]
+    disposition: resolved
     owner_work_item_id: W001
-    implementation_status: conflicting
+    implementation_status: conforming
     nearest_wrong_system: Prospective validation visits each affected relation and participant only once, so a newly discovered participant's other incident links remain invisible.
     compatibility_effect: Invalid proposals become rejected with findings; valid proposal payloads, state, and history remain unchanged.
   - id: F002
@@ -64,10 +69,10 @@ findings:
     classification: implementation defect
     consequence: Stored prospective validation can disagree with modeled set semantics and the in-memory semantic validator.
     authority_refs: [VellisRequirements::definitionSemantics, VellisRequirements::validationCoverage]
-    evidence_refs: []
-    disposition: implementation-work
+    evidence_refs: [path:tests/vellis/test_sqlite_prospective_state.py#test_repeated_anchor_references_have_set_multiplicity_in_prospective_sql]
+    disposition: resolved
     owner_work_item_id: W001
-    implementation_status: conflicting
+    implementation_status: conforming
     nearest_wrong_system: One associated-data object referring to the same anchor twice counts as two association members.
     compatibility_effect: Duplicate references count once; distinct associated-data objects and all public formats remain unchanged.
   - id: F005
@@ -89,8 +94,10 @@ decisions:
     reversible: true
     owner_work_item_id: W001
     evidence_intent: [Reject the endpoint-type invalid-activation reproducer., Terminate on cyclic affected closures without scanning disconnected populations.]
-    implementation_status: not evaluated
-    evidence_refs: []
+    implementation_status: conforming
+    evidence_refs:
+      - path:tests/vellis/test_sqlite_prospective_state.py#test_endpoint_type_change_cannot_activate_an_incomplete_multiplicity_closure
+      - path:tests/vellis/test_sqlite_prospective_state.py#test_repeated_anchor_references_have_set_multiplicity_in_prospective_sql
   - id: D002
     summary: Preserve large integral Decimal values as exact JSON-number tokens and clamp only private SQLite limits and probes.
     authority_refs: [VellisRequirements::canonicalSemanticEquality, VellisRequirements::querySafety, VellisRequirements::mcpOutcomeIntegrity]
@@ -126,17 +133,19 @@ work_items:
     nearest_wrong_system: Prospective SQL either under-expands incident relations or counts duplicate references as distinct set members.
     compatibility_effect: Prospective findings match semantic validation and invalid activation has no canonical effects.
     non_effects: [No model, schema, snapshot, or public payload changes., Work remains independent of canonical-history length and disconnected populations.]
-    lifecycle: active
-    implementation_status: not evaluated
-    evidence_refs: []
+    lifecycle: complete
+    implementation_status: conforming
+    evidence_refs:
+      - path:tests/vellis/test_sqlite_prospective_state.py#test_endpoint_type_change_cannot_activate_an_incomplete_multiplicity_closure
+      - path:tests/vellis/test_sqlite_prospective_state.py#test_repeated_anchor_references_have_set_multiplicity_in_prospective_sql
     blocker: null
-    checkpoint: null
+    checkpoint: git:131515384d8fdb62dddc4ab3598e74605ca352be
   - id: W002
     order: 2
     label: Preserve exact numbers and arbitrary positive public bounds
     kind: implementation
     dependencies: [W001]
-    planned_baseline: {dimension: implementation, identity: git:784a81bc30e7f8fdb857f4e8c1df3fb41d76f6bc}
+    planned_baseline: {dimension: implementation, identity: git:131515384d8fdb62dddc4ab3598e74605ca352be}
     finding_ids: [F002, F005]
     decision_ids: [D002]
     authority:
@@ -147,7 +156,7 @@ work_items:
     nearest_wrong_system: Transport or SQLite representation narrows accepted mathematical values.
     compatibility_effect: Existing values and bounds retain behavior while larger valid values become usable.
     non_effects: [No MCP schema or persistence format changes., Rejections and reads retain their canonical non-effects.]
-    lifecycle: pending
+    lifecycle: ready
     implementation_status: not evaluated
     evidence_refs: []
     blocker: null
