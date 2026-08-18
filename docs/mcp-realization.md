@@ -110,11 +110,11 @@ pass is evidence of missing discrimination, not evidence that the following shap
   witnesses. Distinct output therefore does not prevent a hidden cross-product.
 - Active endpoint-type validation obtains generic affected participants, loads every incident
   relationship, and promotes both endpoints. Hub-of-hubs degree 10, 20, and 40 produced respectively
-  14,200, 52,000, and 199,300 SQLite steps and 231, 861, and 3,321 decoded objects.
+  15,187, 52,857, and 200,389 SQLite steps and 231, 861, and 3,321 decoded objects.
 - Prospective multiplicity selection considers every rule mentioning a locally impacted type. An
   isolated display rename with 10, 100, 500, and 1,000 irrelevant rules produced 8,434, 45,154,
   208,354, and 412,354 SQLite steps. Independent K changes and K rules at K 5, 10, 20, and 40
-  produced 12,800, 35,200, 108,300, and 359,800 steps.
+  produced 13,498, 31,543, 93,133, and 318,313 steps.
 - Historical aggregation capacity accounting omitted the additional bound parameter compiled into
   its `LIMIT`; at a SQLite variable limit of 32 the historical form failed after equivalent current
   and prospective forms passed preflight.
@@ -140,11 +140,12 @@ The temporary executable characterization is
 resets the shared instrumentation boundary, and reproduces the active 10/20/40 hub series, the
 10/100/500/1,000 irrelevant-rule series, and the 5/10/20/40 independent-change-by-rule series. It
 also counts the exact pairwise equality calls for 500/1,000/2,000/4,000/8,000 permitted values.
-Its final source-mechanism case pins the late aggregate `SELECT DISTINCT` plus bound, the manual
-capacity preflight's lack of historical selection, the impacted-type and participant-by-rule
-prospective expansion, and the production evaluator imported by the nominal oracle. Thus every
-recorded trigger is either rebuilt and measured or bound to the exact conflicting mechanism; no
-fixture or instrumentation must be invented from this prose.
+Its historical-capacity case exercises the exact variable-limit boundary where current and
+prospective aggregation pass but revision-selected aggregation reaches SQLite with one unaccounted
+binding. The final source-mechanism case additionally pins the late aggregate `SELECT DISTINCT`,
+the impacted-type and participant-by-rule expansion, and the production evaluator imported by the
+nominal oracle. Thus every recorded trigger is either rebuilt and measured or bound to the exact
+conflicting mechanism; no fixture or instrumentation must be invented from this prose.
 
 W002 through W004 replace these trigger recipes with permanent discriminating regression fixtures;
 the final subtraction review removes any evidence that asserts the superseded implementation shape.

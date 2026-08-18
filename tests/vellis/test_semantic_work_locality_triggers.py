@@ -7,12 +7,15 @@ depend on a superseded implementation shape.
 
 from __future__ import annotations
 
+import sqlite3
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
 
 import vellis.definitions as definitions_module
 from tests.vellis.characterization import OWNER, measure
+from tests.vellis.conftest import build_rich_definitions, build_rich_graph
 from tests.vellis.test_sqlite_prospective_state import _assess_delta
 from vellis.changes import GraphChange, GraphChangeRequest, GraphChangeTarget
 from vellis.definitions import (
@@ -27,8 +30,22 @@ from vellis.definitions import (
     ValueRange,
     validate_definition_set,
 )
+from vellis.governance import DefinitionChange
 from vellis.graph import Anchor, Link
+from vellis.history import RevisionSelection
 from vellis.json_value import normalize
+from vellis.outcomes import OperationStatus
+from vellis.query import (
+    AggregationOperator,
+    AnchorGroup,
+    AnchorUuidFilter,
+    AssociatedDataCondition,
+    EvaluatedStateScope,
+    GraphQuery,
+    QueryAggregation,
+    RequiredLink,
+    ReturnShape,
+)
 from vellis.system import RTGSystem
 
 
@@ -264,6 +281,84 @@ def test_permitted_value_trigger_reproduces_pairwise_equality(monkeypatch, count
     assert not findings
     assert calls == count * (count - 1) // 2
     assert not validate_definition_set(graph_definitions)
+
+
+def test_historical_aggregate_reproduces_missing_limit_binding_preflight(tmp_path: Path) -> None:
+    system = RTGSystem.open(tmp_path / "historical-capacity.sqlite3")
+    try:
+        assert system.initialize_fresh(
+            build_rich_definitions(),
+            provenance=OWNER,
+            initialization_summary="historical capacity trigger",
+        ).accepted
+        rich_graph = build_rich_graph()
+        people = (
+            rich_graph.anchors[0],
+            *(Anchor(f"person-{index}", "person", f"Person {index}") for index in range(2, 7)),
+        )
+        project = rich_graph.anchors[1]
+        links = tuple(
+            Link(f"works-{index}", "worksOn", person.uuid, project.uuid)
+            for index, person in enumerate(people)
+        )
+        applied = system.apply_graph_change(
+            GraphChange(
+                anchor_upserts=(*people, project),
+                associated_data_upserts=rich_graph.associated_data,
+                link_upserts=links,
+            ),
+            provenance=OWNER,
+        )
+        assert applied.accepted and applied.resulting_revision is not None
+        assert system.set_definition_delta(
+            DefinitionChange(
+                anchor_type_upserts=(AnchorTypeDefinition("unrelated", "An unrelated type."),)
+            ),
+            provenance=OWNER,
+        ).accepted
+        groups = tuple(
+            AnchorGroup(
+                f"person{index}",
+                ("person",),
+                AnchorUuidFilter((person.uuid,)) if index < 2 else None,
+            )
+            for index, person in enumerate(people)
+        ) + (AnchorGroup("project", ("project",)),)
+        query = GraphQuery(
+            anchor_groups=groups,
+            data_conditions=(AssociatedDataCondition("notes", "person0", "note"),),
+            required_links=tuple(
+                RequiredLink(f"link{index}", f"person{index}", "project", "worksOn")
+                for index in range(len(people))
+            ),
+            return_shape=ReturnShape(()),
+            aggregations=(
+                QueryAggregation("count", AggregationOperator.COUNT, "notes"),
+            ),
+            maximum_rows=20,
+        )
+        system.store._connection.setlimit(  # noqa: SLF001
+            sqlite3.SQLITE_LIMIT_VARIABLE_NUMBER, 32
+        )
+
+        current = system.query_graph(query, provenance=OWNER)
+        prospective = system.query_graph(
+            replace(query, state_scope=EvaluatedStateScope.PROSPECTIVE), provenance=OWNER
+        )
+        historical = system.query_graph(
+            replace(query, state_scope=EvaluatedStateScope.HISTORICAL),
+            selection=RevisionSelection(applied.resulting_revision),
+            provenance=OWNER,
+        )
+
+        assert current.status is OperationStatus.ACCEPTED
+        assert prospective.status is OperationStatus.ACCEPTED
+        assert historical.status is OperationStatus.FAILED
+        assert "too many SQL variables" in historical.findings[0].summary
+        assert not historical.rows and not historical.aggregates
+        assert historical.evaluated_revision is None
+    finally:
+        system.close()
 
 
 def test_trigger_source_contains_late_distinct_false_oracle_and_manual_capacity() -> None:
