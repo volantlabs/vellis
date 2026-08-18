@@ -9,7 +9,7 @@ evolution:
     reason: The approved plan must be bound to a durable awaiting-approval checkpoint before execution.
     checkpoint: git:90daeb0effc79e9a9a8ab8bfa64d8f701b5c15c0
   blocker: null
-  checkpoint: git:b46dec53c2912b6f55925414486ac50b0dca32b6
+  checkpoint: git:128465b8ef77d7b90885a86cfd960ba775f00a96
 baselines:
   status: current
   source: &source
@@ -20,16 +20,16 @@ baselines:
     checkpoint: git:5d33c6ef405aa8efa1a54de81d7e9427aa9e1850
   target: &target
     model: sha256:adf05b52f9839b75f76240ee116c0ffba7ee452602c2083268d683c4b534b2c7
-    implementation: git:b46dec53c2912b6f55925414486ac50b0dca32b6
+    implementation: git:128465b8ef77d7b90885a86cfd960ba775f00a96
     language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
     execution_environment: sha256:d71473693aa50faef1a25a449aa5808490e21eaf2a987942d1fb134c773550d1
-    checkpoint: git:b46dec53c2912b6f55925414486ac50b0dca32b6
+    checkpoint: git:128465b8ef77d7b90885a86cfd960ba775f00a96
   observed:
     model: sha256:adf05b52f9839b75f76240ee116c0ffba7ee452602c2083268d683c4b534b2c7
-    implementation: git:b46dec53c2912b6f55925414486ac50b0dca32b6
+    implementation: git:128465b8ef77d7b90885a86cfd960ba775f00a96
     language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
     execution_environment: sha256:d71473693aa50faef1a25a449aa5808490e21eaf2a987942d1fb134c773550d1
-    checkpoint: git:b46dec53c2912b6f55925414486ac50b0dca32b6
+    checkpoint: git:128465b8ef77d7b90885a86cfd960ba775f00a96
 scope:
   authority_scope:
     - RTG::'JSON Value'
@@ -42,6 +42,7 @@ scope:
     - model/*.sysml
     - vellis/__init__.py
     - vellis/__main__.py
+    - vellis/client_setup.py
     - vellis/preserve.py
     - vellis/query.py
     - vellis/setup.py
@@ -337,7 +338,7 @@ work_items:
     label: Integrate evidence and close the Vellis 2.0 candidate
     kind: closure
     dependencies: [W002, W003, W004, W005]
-    planned_baseline: {dimension: implementation, identity: git:b46dec53c2912b6f55925414486ac50b0dca32b6}
+    planned_baseline: {dimension: implementation, identity: git:128465b8ef77d7b90885a86cfd960ba775f00a96}
     finding_ids: [F009]
     decision_ids: []
     authority:
