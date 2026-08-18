@@ -127,13 +127,11 @@ def _authority_reference_findings(record: dict[str, Any], *, root: Path) -> list
     ]
     for finding in record["findings"]:
         references.extend(
-            (f"finding {finding['id']}", reference)
-            for reference in finding["authority_refs"]
+            (f"finding {finding['id']}", reference) for reference in finding["authority_refs"]
         )
     for decision in record["decisions"]:
         references.extend(
-            (f"decision {decision['id']}", reference)
-            for reference in decision["authority_refs"]
+            (f"decision {decision['id']}", reference) for reference in decision["authority_refs"]
         )
     for item in record["work_items"]:
         for contribution in item["authority"]:
