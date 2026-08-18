@@ -162,7 +162,8 @@ Use these words precisely:
   when it would exceed the caller's row bound, with indexed identity, type, direct-association, and
   directed-link joins constraining candidates before property filtering; exact count, sum, minimum,
   and maximum aggregation over current, prospective, and historical selections, with bounded match
-  identities retained in SQLite and property values streamed through fixed-size reducer batches;
+  identities and sparse exact-sum terms retained in SQLite while property values stream through
+  fixed-size reducer batches;
   public UUID and type collections are bound relationally or in connection-aware chunks, while a
   query beyond SQLite's structural plan capacity is rejected whole with no partial result; and a
   separated
@@ -238,9 +239,11 @@ Use these words precisely:
   projected rows, and refuse after `maximumRows + 1` semantically unique matches. Scalar aggregation
   retains bounded match identities in an indexed SQLite temporary table and streams fixed-size
   property batches through exact reducers, so resident Python memory follows batch size, reducer
-  count, and final scalar size rather than matched population. Result-bearing multi-group joins may
-  be combinatorial; the caller's maximum bounds the returned answer, and SQLite structural capacity
-  is a typed whole-result refusal rather than truncation or a driver failure. Snapshot, import, tail
+  count, and final scalar size rather than matched population; varied exponents and their
+  cancellation remain external SQLite terms until final scalar construction. Result-bearing
+  multi-group joins may be combinatorial; the caller's maximum bounds the returned answer, and
+  SQLite structural capacity is a typed whole-result refusal rather than truncation or a driver
+  failure. Snapshot, import, tail
   replay, verification, v1 translation, and restoration are linear streaming or temporary-set work
   without constructing whole-state values. Storage grows with normalized history and the
   observational ledger. Forgetting activity removes those records but does not promise file-page

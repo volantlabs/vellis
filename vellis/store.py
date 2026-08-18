@@ -4023,7 +4023,10 @@ class CanonicalStore:
         from vellis.query import (
             AggregateBinding,
             AggregationOperator,
-            _ExactDecimalAccumulator,
+            _decimal_term,
+            _exact_decimal_streamed_result,
+            _integer_from_text,
+            _integer_text,
         )
 
         conditions = {condition.name: condition for condition in query.data_conditions}
@@ -4038,6 +4041,11 @@ class CanonicalStore:
             "CREATE TEMP TABLE IF NOT EXISTS query_aggregate_property"
             " (name TEXT PRIMARY KEY) WITHOUT ROWID"
         )
+        self._connection.execute(
+            "CREATE TEMP TABLE IF NOT EXISTS query_aggregate_sum_term"
+            " (name TEXT, exponent INTEGER, coefficient TEXT NOT NULL,"
+            " PRIMARY KEY (name, exponent)) WITHOUT ROWID"
+        )
         bindings: dict[str, AggregateBinding] = {}
         try:
             for condition_name in condition_names:
@@ -4048,6 +4056,7 @@ class CanonicalStore:
                 ]
                 self._connection.execute("DELETE FROM query_aggregate_match")
                 self._connection.execute("DELETE FROM query_aggregate_property")
+                self._connection.execute("DELETE FROM query_aggregate_sum_term")
                 alias = selector_alias[condition_name]
                 sql = (
                     prefix
@@ -4109,11 +4118,12 @@ class CanonicalStore:
                 self._maximum_aggregation_reducer_count = max(
                     self._maximum_aggregation_reducer_count, reducer_count
                 )
-                sums = {
-                    name: _ExactDecimalAccumulator()
+                sum_counts = {
+                    name: 0
                     for name, operators in operations.items()
                     if AggregationOperator.SUM in operators
                 }
+                sum_input_digits = dict.fromkeys(sum_counts, 0)
                 extrema: dict[tuple[str, AggregationOperator], JsonValue] = {}
                 cursor = self._connection.execute(
                     "SELECT p.name, p.json_kind, p.boolean_value, p.number_value,"
@@ -4133,7 +4143,31 @@ class CanonicalStore:
                         for operator in operations[name]:
                             if operator is AggregationOperator.SUM:
                                 assert isinstance(value, Decimal)
-                                sums[name].add(value)
+                                exponent, coefficient, digits = _decimal_term(value)
+                                sum_counts[name] += 1
+                                sum_input_digits[name] += digits
+                                while coefficient:
+                                    while coefficient % 10 == 0:
+                                        coefficient //= 10
+                                        exponent += 1
+                                    row = self._connection.execute(
+                                        "SELECT coefficient FROM query_aggregate_sum_term"
+                                        " WHERE name = ? AND exponent = ?",
+                                        (name, exponent),
+                                    ).fetchone()
+                                    if row is None:
+                                        break
+                                    self._connection.execute(
+                                        "DELETE FROM query_aggregate_sum_term"
+                                        " WHERE name = ? AND exponent = ?",
+                                        (name, exponent),
+                                    )
+                                    coefficient += _integer_from_text(str(row[0]))
+                                if coefficient:
+                                    self._connection.execute(
+                                        "INSERT INTO query_aggregate_sum_term VALUES (?, ?, ?)",
+                                        (name, exponent, _integer_text(coefficient)),
+                                    )
                                 continue
                             key = (name, operator)
                             if key not in extrema:
@@ -4147,14 +4181,25 @@ class CanonicalStore:
                 for aggregation in property_aggregations:
                     name = str(aggregation.property_name)
                     if aggregation.operator is AggregationOperator.SUM:
-                        accumulator = sums[name]
-                        if not accumulator.count:
+                        if not sum_counts[name]:
                             bindings[aggregation.name] = AggregateBinding(
                                 aggregation=aggregation.name, present=False
                             )
                             continue
                         try:
-                            reduced: JsonValue = accumulator.result()
+                            reduced: JsonValue = _exact_decimal_streamed_result(
+                                lambda name=name: (
+                                    (int(exponent), _integer_from_text(str(coefficient)))
+                                    for exponent, coefficient in self._connection.execute(
+                                        "SELECT exponent, coefficient"
+                                        " FROM query_aggregate_sum_term WHERE name = ?"
+                                        " ORDER BY exponent",
+                                        (name,),
+                                    )
+                                ),
+                                sum_input_digits[name],
+                                sum_counts[name],
+                            )
                         except ArithmeticError as error:
                             return ValidationFinding(summary=str(error))
                     else:
@@ -4171,6 +4216,7 @@ class CanonicalStore:
         finally:
             self._connection.execute("DELETE FROM query_aggregate_match")
             self._connection.execute("DELETE FROM query_aggregate_property")
+            self._connection.execute("DELETE FROM query_aggregate_sum_term")
         return tuple(bindings[aggregation.name] for aggregation in query.aggregations)
 
     def _prepare_prospective_assessment_scope_unlocked(self, active_identity: str) -> None:
@@ -4363,6 +4409,7 @@ class CanonicalStore:
         for table in (
             "assessment_validation_uuid",
             "assessment_changed_participant",
+            "assessment_type_changed_participant",
             "assessment_multiplicity_subject",
         ):
             self._connection.execute(
@@ -4386,6 +4433,18 @@ class CanonicalStore:
                 " AND g.type_key = t.type_key AND g.valid_to_revision IS NULL"
                 " UNION SELECT v.uuid FROM proposal_entry AS p JOIN object_value AS v"
                 " ON v.id = p.object_value_id WHERE p.operation = 'upsert'"
+                " AND v.type_key IN (SELECT type_key FROM assessment_impacted_type)"
+            )
+            self._connection.execute(
+                "INSERT OR IGNORE INTO assessment_type_changed_participant"
+                " SELECT g.uuid FROM assessment_impacted_type AS t"
+                " CROSS JOIN graph_presence_interval AS g"
+                " INDEXED BY graph_presence_current_type"
+                " ON g.object_kind IN ('anchor', 'associatedData')"
+                " AND g.type_key = t.type_key AND g.valid_to_revision IS NULL"
+                " UNION SELECT v.uuid FROM proposal_entry AS p JOIN object_value AS v"
+                " ON v.id = p.object_value_id WHERE p.operation = 'upsert'"
+                " AND v.object_kind IN ('anchor', 'associatedData')"
                 " AND v.type_key IN (SELECT type_key FROM assessment_impacted_type)"
             )
 
@@ -4430,10 +4489,25 @@ class CanonicalStore:
             " WHERE p.uuid IN (SELECT uuid FROM assessment_changed_participant)"
             " AND v.object_kind = 'associatedData'"
         )
+        self._connection.execute(
+            "INSERT OR IGNORE INTO assessment_type_changed_participant"
+            " SELECT p.uuid FROM proposal_entry AS p"
+            " JOIN object_value AS n ON n.id = p.object_value_id"
+            " JOIN object_value AS b ON b.id = p.base_object_value_id"
+            " WHERE p.operation = 'upsert'"
+            " AND p.object_kind IN ('anchor', 'associatedData')"
+            " AND n.type_key IS NOT b.type_key"
+        )
 
-        def include_incident_relations(subject_table: str) -> None:
+        self._connection.execute(
+            "CREATE TEMP TABLE IF NOT EXISTS assessment_type_incident_relation"
+            " (uuid TEXT PRIMARY KEY) WITHOUT ROWID"
+        )
+        self._connection.execute("DELETE FROM assessment_type_incident_relation")
+
+        def include_incident_relations(subject_table: str, relation_table: str) -> None:
             self._connection.execute(
-                "INSERT OR IGNORE INTO assessment_impacted_relation"
+                f"INSERT OR IGNORE INTO {relation_table}"  # noqa: S608
                 f" SELECT g.uuid FROM {subject_table} AS s"  # noqa: S608
                 " CROSS JOIN graph_presence_interval AS g"
                 " INDEXED BY graph_presence_current_link_source"
@@ -4475,40 +4549,48 @@ class CanonicalStore:
                 " AND p.object_kind IN ('link', 'associatedData')"
             )
 
-        # The first hop finds relationships whose membership changed. Their participants
-        # are the subjects whose complete multiplicity counts may now differ. The second
-        # hop collects every sibling relation needed for those counts; far participants
-        # are lookup-only and do not recursively expand the connected component.
-        include_incident_relations("assessment_changed_participant")
+        # A relationship-shape edit changes counts only for its direct subjects. A
+        # participant type change additionally changes whether its incident relations
+        # count for each far subject, so only that reason promotes the far subjects.
+        include_incident_relations(
+            "assessment_type_changed_participant", "assessment_type_incident_relation"
+        )
         self._connection.execute(
             "INSERT OR IGNORE INTO assessment_multiplicity_subject"
             " SELECT uuid FROM assessment_changed_participant"
-            " UNION SELECT g.source_uuid FROM assessment_impacted_relation AS r"
+            " UNION SELECT uuid FROM assessment_type_incident_relation"
+            " UNION SELECT g.source_uuid FROM assessment_type_incident_relation AS r"
             " CROSS JOIN graph_presence_interval AS g INDEXED BY graph_presence_current_uuid"
             " ON g.uuid = r.uuid"
             " AND g.valid_to_revision IS NULL WHERE g.object_kind = 'link'"
-            " UNION SELECT g.target_uuid FROM assessment_impacted_relation AS r"
+            " UNION SELECT g.target_uuid FROM assessment_type_incident_relation AS r"
             " CROSS JOIN graph_presence_interval AS g INDEXED BY graph_presence_current_uuid"
             " ON g.uuid = r.uuid"
             " AND g.valid_to_revision IS NULL WHERE g.object_kind = 'link'"
             " UNION SELECT v.source_uuid FROM proposal_entry AS p JOIN object_value AS v"
             " ON v.id = p.object_value_id WHERE p.operation = 'upsert'"
             " AND v.object_kind = 'link'"
-            " AND v.uuid IN (SELECT uuid FROM assessment_impacted_relation)"
+            " AND v.uuid IN (SELECT uuid FROM assessment_type_incident_relation)"
             " UNION SELECT v.target_uuid FROM proposal_entry AS p JOIN object_value AS v"
             " ON v.id = p.object_value_id WHERE p.operation = 'upsert'"
             " AND v.object_kind = 'link'"
-            " AND v.uuid IN (SELECT uuid FROM assessment_impacted_relation)"
-            " UNION SELECT a.anchor_uuid FROM assessment_impacted_relation AS r"
+            " AND v.uuid IN (SELECT uuid FROM assessment_type_incident_relation)"
+            " UNION SELECT a.anchor_uuid FROM assessment_type_incident_relation AS r"
             " CROSS JOIN graph_presence_interval AS g INDEXED BY graph_presence_current_uuid"
             " ON g.uuid = r.uuid"
             " AND g.valid_to_revision IS NULL JOIN object_anchor AS a"
             " ON a.object_value_id = g.object_value_id"
-            " UNION SELECT a.anchor_uuid FROM assessment_impacted_relation AS r"
+            " UNION SELECT a.anchor_uuid FROM assessment_type_incident_relation AS r"
             " JOIN proposal_entry AS p ON p.uuid = r.uuid JOIN object_anchor AS a"
             " ON a.object_value_id = p.object_value_id WHERE p.operation = 'upsert'"
         )
-        include_incident_relations("assessment_multiplicity_subject")
+        self._connection.execute(
+            "INSERT OR IGNORE INTO assessment_impacted_relation"
+            " SELECT uuid FROM assessment_type_incident_relation"
+        )
+        include_incident_relations(
+            "assessment_multiplicity_subject", "assessment_impacted_relation"
+        )
         self._connection.execute(
             "INSERT OR IGNORE INTO assessment_impacted_uuid"
             " SELECT uuid FROM assessment_impacted_relation"

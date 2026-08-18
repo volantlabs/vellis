@@ -29,7 +29,7 @@ baselines:
     checkpoint: git:d4439115b258c5ab69b581f86121bdb6e909a08e
 scope:
   authority_scope: [RTG::'Graph Query', RTGSystem::'Query graph', RTGSystem::'Assess graph conformance', VellisRequirements::querySafety, VellisRequirements::validationCoverage, VellisRequirements::historyIndependentCurrentWork, VellisVerification::semanticQuery, VellisVerification::currentWorkScaling]
-  implementation_scope: [vellis/query.py, vellis/store.py, tests/vellis/, README.md, system-evolution.yaml]
+  implementation_scope: [vellis/query.py, vellis/store.py, vellis/normalized.py, tests/vellis/, README.md, system-evolution.yaml]
   review_lenses: [authority and conformance, engineering and evidence]
   non_goals:
     - Changing the SysML model, public APIs, MCP schemas, persistence schema, snapshot formats, version, or v1 compatibility.
@@ -41,7 +41,7 @@ findings:
     classification: implementation defect
     consequence: A local display or property change can perform superlinear work with connected graph size even though no distant invariant can change.
     authority_refs: [VellisRequirements::historyIndependentCurrentWork, VellisRequirements::validationCoverage]
-    evidence_refs: [path:tests/vellis/test_sqlite_prospective_state.py#test_narrow_assessment_sql_steps_ignore_unrelated_link_population]
+    evidence_refs: [path:tests/vellis/test_sqlite_prospective_state.py#test_display_only_assessment_work_ignores_connected_component_length, path:tests/vellis/test_sqlite_prospective_state.py#test_link_shape_assessment_scales_with_hub_degree_not_second_hop_degree, path:tests/vellis/test_sqlite_prospective_state.py#test_state_wide_rule_cutover_has_linear_sql_step_growth, path:tests/vellis/test_sqlite_prospective_state.py#test_endpoint_type_change_cannot_activate_an_incomplete_multiplicity_closure]
     disposition: resolved
     owner_work_item_id: W001
     implementation_status: conforming
@@ -52,7 +52,7 @@ findings:
     classification: implementation defect
     consequence: A valid high maximum can exhaust process memory even though the caller receives only one scalar per aggregation.
     authority_refs: [RTG::'Graph Query', VellisRequirements::querySafety, VellisRequirements::historyIndependentCurrentWork]
-    evidence_refs: [path:tests/vellis/test_graph_queries.py#test_scalar_aggregation_streams_one_bounded_selection, path:tests/vellis/test_graph_queries.py#test_aggregation_accepts_large_positive_bounds_without_canonical_effects]
+    evidence_refs: [path:tests/vellis/test_graph_queries.py#test_scalar_aggregation_streams_one_bounded_selection, path:tests/vellis/test_graph_queries.py#test_cancelling_exponents_keep_python_sum_memory_bounded, path:tests/vellis/test_graph_queries.py#test_aggregation_accepts_large_positive_bounds_without_canonical_effects]
     disposition: resolved
     owner_work_item_id: W002
     implementation_status: conforming
@@ -78,7 +78,7 @@ decisions:
     owner_work_item_id: W001
     evidence_intent: [Keep display-only work independent of connected-component length., Keep endpoint-type and high-degree multiplicity findings complete.]
     implementation_status: conforming
-    evidence_refs: [path:tests/vellis/test_sqlite_prospective_state.py#test_display_only_assessment_work_ignores_connected_component_length, path:tests/vellis/test_sqlite_prospective_state.py#test_endpoint_type_change_cannot_activate_an_incomplete_multiplicity_closure]
+    evidence_refs: [path:tests/vellis/test_sqlite_prospective_state.py#test_display_only_assessment_work_ignores_connected_component_length, path:tests/vellis/test_sqlite_prospective_state.py#test_link_shape_assessment_scales_with_hub_degree_not_second_hop_degree, path:tests/vellis/test_sqlite_prospective_state.py#test_state_wide_rule_cutover_has_linear_sql_step_growth, path:tests/vellis/test_sqlite_prospective_state.py#test_endpoint_type_change_cannot_activate_an_incomplete_multiplicity_closure]
   - id: D002
     summary: Materialize only bounded match identities in SQLite and stream property rows through exact incremental reducers.
     authority_refs: [RTG::'Graph Query', VellisRequirements::querySafety]
@@ -87,7 +87,7 @@ decisions:
     owner_work_item_id: W002
     evidence_intent: [Bound fetched batches independently of match count., Preserve exact count, sum, minimum, maximum, and refusal semantics in every state scope.]
     implementation_status: conforming
-    evidence_refs: [path:tests/vellis/test_graph_queries.py#test_scalar_aggregation_streams_one_bounded_selection, path:tests/vellis/test_graph_queries.py#test_aggregation_accepts_large_positive_bounds_without_canonical_effects]
+    evidence_refs: [path:tests/vellis/test_graph_queries.py#test_scalar_aggregation_streams_one_bounded_selection, path:tests/vellis/test_graph_queries.py#test_cancelling_exponents_keep_python_sum_memory_bounded, path:tests/vellis/test_graph_queries.py#test_aggregation_accepts_large_positive_bounds_without_canonical_effects]
   - id: D003
     summary: Bind public collections through indexed temporary relations or connection-aware chunks and reject structurally unexecutable queries whole.
     authority_refs: [VellisRequirements::querySafety, VellisRequirements::historyIndependentCurrentWork]
@@ -116,7 +116,7 @@ work_items:
     non_effects: [No model, public payload, persistence, or canonical-history change., No disconnected population or history traversal.]
     lifecycle: complete
     implementation_status: conforming
-    evidence_refs: [path:tests/vellis/test_sqlite_prospective_state.py#test_display_only_assessment_work_ignores_connected_component_length, path:tests/vellis/test_sqlite_prospective_state.py#test_endpoint_type_change_cannot_activate_an_incomplete_multiplicity_closure]
+    evidence_refs: [path:tests/vellis/test_sqlite_prospective_state.py#test_display_only_assessment_work_ignores_connected_component_length, path:tests/vellis/test_sqlite_prospective_state.py#test_link_shape_assessment_scales_with_hub_degree_not_second_hop_degree, path:tests/vellis/test_sqlite_prospective_state.py#test_state_wide_rule_cutover_has_linear_sql_step_growth, path:tests/vellis/test_sqlite_prospective_state.py#test_endpoint_type_change_cannot_activate_an_incomplete_multiplicity_closure]
     blocker: null
     checkpoint: git:06802d8014669cbb0f7c76b2e143db9b24cc0f46
   - id: W002
@@ -137,7 +137,7 @@ work_items:
     non_effects: [No public maximum, numeric semantics, query schema, or canonical effect changes.]
     lifecycle: complete
     implementation_status: conforming
-    evidence_refs: [path:tests/vellis/test_graph_queries.py#test_scalar_aggregation_streams_one_bounded_selection, path:tests/vellis/test_graph_queries.py#test_aggregation_accepts_large_positive_bounds_without_canonical_effects]
+    evidence_refs: [path:tests/vellis/test_graph_queries.py#test_scalar_aggregation_streams_one_bounded_selection, path:tests/vellis/test_graph_queries.py#test_cancelling_exponents_keep_python_sum_memory_bounded, path:tests/vellis/test_graph_queries.py#test_aggregation_accepts_large_positive_bounds_without_canonical_effects]
     blocker: null
     checkpoint: git:6d600908e25bc6a1d675ae0a134a060cdee02b0d
   - id: W003

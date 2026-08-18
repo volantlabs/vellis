@@ -1407,6 +1407,149 @@ def test_display_only_assessment_work_ignores_connected_component_length(
     assert long <= short + 300
 
 
+def test_link_shape_assessment_scales_with_hub_degree_not_second_hop_degree(
+    tmp_path: Path,
+) -> None:
+    def measured(degree: int) -> int:
+        node = AnchorTypeDefinition("node", "A node.")
+        edge = LinkTypeDefinition(
+            "edge",
+            EndpointConstraint(("node",), ("node",), "Edge endpoints."),
+            "An edge.",
+        )
+        rule = LinkMultiplicityConstraint(
+            "edge",
+            LinkEnd.SOURCE,
+            ("node",),
+            ("node",),
+            0,
+            None,
+            "Any number of outgoing edges.",
+        )
+        system = RTGSystem.open(tmp_path / f"hub-comb-{degree}.sqlite3")
+        try:
+            assert system.initialize_fresh(
+                GraphDefinitionSet(
+                    anchor_types=(node,),
+                    link_types=(edge,),
+                    relationship_constraints=(rule,),
+                ),
+                provenance=OWNER,
+                initialization_summary="hub comb",
+            ).accepted
+            anchors = [Anchor("hub", "node", "Hub"), Anchor("extra", "node", "Extra")]
+            links: list[Link] = []
+            for spoke in range(degree):
+                anchors.append(Anchor(f"spoke-{spoke}", "node", f"Spoke {spoke}"))
+                links.append(Link(f"hub-{spoke}", "edge", "hub", f"spoke-{spoke}"))
+                for leaf in range(degree):
+                    anchors.append(Anchor(f"leaf-{spoke}-{leaf}", "node", f"Leaf {spoke}-{leaf}"))
+                    links.append(
+                        Link(
+                            f"to-leaf-{spoke}-{leaf}",
+                            "edge",
+                            f"spoke-{spoke}",
+                            f"leaf-{spoke}-{leaf}",
+                        )
+                    )
+            assert system.apply_graph_change(
+                GraphChange(anchor_upserts=tuple(anchors), link_upserts=tuple(links)),
+                provenance=OWNER,
+            ).accepted
+            assert system.set_definition_delta(
+                DefinitionChange(anchor_type_upserts=(TEAM,)), provenance=OWNER
+            ).accepted
+            assert system.apply_graph_change(
+                GraphChangeRequest(
+                    GraphChangeTarget.DEFINITION_DELTA,
+                    GraphChange(link_upserts=(Link("new-edge", "edge", "hub", "extra"),)),
+                ),
+                provenance=OWNER,
+            ).accepted
+            steps = 0
+
+            def progress() -> int:
+                nonlocal steps
+                steps += 100
+                return 0
+
+            system.store._connection.set_progress_handler(progress, 100)  # noqa: SLF001
+            report = _assess_delta(system)
+            system.store._connection.set_progress_handler(None, 0)  # noqa: SLF001
+
+            assert report.conforms, report.returned_findings
+            return steps
+        finally:
+            system.close()
+
+    medium_steps = measured(20)
+    large_steps = measured(40)
+
+    # Doubling the changed hub degree must not visit every edge of every sibling hub.
+    assert large_steps < medium_steps * 3
+
+
+def test_state_wide_rule_cutover_has_linear_sql_step_growth(tmp_path: Path) -> None:
+    def measured(population: int) -> int:
+        node = AnchorTypeDefinition("node", "A node.")
+        edge = LinkTypeDefinition(
+            "edge",
+            EndpointConstraint(("node",), ("node",), "Edge endpoints."),
+            "An edge.",
+        )
+        current_rule = LinkMultiplicityConstraint(
+            "edge", LinkEnd.SOURCE, ("node",), ("node",), 0, 2, "At most two."
+        )
+        proposed_rule = LinkMultiplicityConstraint(
+            "edge", LinkEnd.SOURCE, ("node",), ("node",), 0, 1, "At most one."
+        )
+        system = RTGSystem.open(tmp_path / f"rule-cutover-{population}.sqlite3")
+        try:
+            assert system.initialize_fresh(
+                GraphDefinitionSet(
+                    anchor_types=(node,),
+                    link_types=(edge,),
+                    relationship_constraints=(current_rule,),
+                ),
+                provenance=OWNER,
+                initialization_summary="rule cutover",
+            ).accepted
+            anchors = tuple(
+                Anchor(f"node-{index}", "node", f"Node {index}") for index in range(population * 2)
+            )
+            links = tuple(
+                Link(f"edge-{index}", "edge", f"node-{index}", f"node-{population + index}")
+                for index in range(population)
+            )
+            assert system.apply_graph_change(
+                GraphChange(anchor_upserts=anchors, link_upserts=links), provenance=OWNER
+            ).accepted
+            assert system.set_definition_delta(
+                DefinitionChange(relationship_constraint_upserts=(proposed_rule,)),
+                provenance=OWNER,
+            ).accepted
+            steps = 0
+
+            def progress() -> int:
+                nonlocal steps
+                steps += 100
+                return 0
+
+            system.store._connection.set_progress_handler(progress, 100)  # noqa: SLF001
+            report = _assess_delta(system, maximum=population * 2)
+            system.store._connection.set_progress_handler(None, 0)  # noqa: SLF001
+
+            assert report.conforms, report.returned_findings
+            return steps
+        finally:
+            system.close()
+
+    small_steps = measured(100)
+    large_steps = measured(500)
+
+    assert large_steps < small_steps * 7
+
+
 def test_changed_relation_type_includes_unchanged_referenced_objects(tmp_path: Path) -> None:
     other = AnchorTypeDefinition("other", "Another anchor.")
     original_data = AssociatedDataTypeDefinition(

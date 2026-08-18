@@ -13,6 +13,7 @@ meaning they will have to agree with.
 from __future__ import annotations
 
 import sqlite3
+import tracemalloc
 from dataclasses import replace
 from decimal import Decimal
 from pathlib import Path
@@ -2157,6 +2158,73 @@ def test_scalar_aggregation_streams_one_bounded_selection(tmp_path: Path, popula
         )
     finally:
         system.close()
+
+
+def test_cancelling_exponents_keep_python_sum_memory_bounded(tmp_path: Path) -> None:
+    def measured(pair_count: int) -> int:
+        system = RTGSystem.open(tmp_path / f"cancelled-{pair_count}.sqlite3")
+        try:
+            assert system.initialize_fresh(
+                _discriminating_definitions(),
+                provenance=_owner(),
+                initialization_summary="a fresh start",
+            ).accepted
+            positives = tuple(
+                AssociatedDataObject(
+                    f"positive-{index:05d}",
+                    "note",
+                    ("a-1",),
+                    {"rating": Decimal((0, (1,), -index))},
+                )
+                for index in range(pair_count)
+            )
+            negatives = tuple(
+                AssociatedDataObject(
+                    f"negative-{index:05d}",
+                    "note",
+                    ("a-1",),
+                    {"rating": Decimal((1, (1,), -index))},
+                )
+                for index in range(pair_count)
+            )
+            assert system.apply_graph_change(
+                GraphChange(
+                    anchor_upserts=(ADA,),
+                    associated_data_upserts=(*positives, *negatives),
+                ),
+                provenance=_owner(),
+            ).accepted
+            system.store.reset_instrumentation()
+            tracemalloc.start()
+            try:
+                result = system.query_graph(
+                    _rating_query(
+                        QueryAggregation(
+                            name="total",
+                            operator=AggregationOperator.SUM,
+                            data_condition="notes",
+                            property_name="rating",
+                        ),
+                        maximum=pair_count * 2,
+                    )
+                )
+                _, peak = tracemalloc.get_traced_memory()
+            finally:
+                tracemalloc.stop()
+            assert result.accepted, result.findings
+            assert result.aggregates[0].value == Decimal(0)
+            assert system.store.maximum_aggregation_batch_rows <= 256
+            assert system.store.maximum_aggregation_reducer_count == 1
+            return peak
+        finally:
+            system.close()
+
+    small_peak = measured(100)
+    large_peak = measured(2_000)
+
+    # The population is twenty times larger. Some allocator variation is expected, but
+    # Python must retain batches and reducer metadata rather than one exponent per row.
+    assert large_peak < small_peak * 4
 
 
 @pytest.mark.parametrize("maximum", [2**63 - 1, 2**100])

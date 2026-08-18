@@ -28,7 +28,7 @@ current state until then, and this module does not pretend to offer the choice.
 
 from __future__ import annotations
 
-from collections.abc import Iterator, Sequence
+from collections.abc import Callable, Iterable, Iterator, Sequence
 from dataclasses import dataclass, field
 from decimal import Decimal, InvalidOperation
 from enum import Enum
@@ -1092,31 +1092,40 @@ def _aggregate_value(operator: AggregationOperator, values: list[JsonValue]) -> 
 
 @dataclass(slots=True)
 class _ExactDecimalAccumulator:
-    """Retain only coefficient places needed by one exact scalar sum."""
+    """Retain sparse exact coefficients for the in-memory reference evaluator."""
 
     coefficients: dict[int, int] = field(default_factory=dict)
     input_digits: int = 0
     count: int = 0
 
     def add(self, value: Decimal) -> None:
-        shape = value.as_tuple()
-        assert isinstance(shape.exponent, int)
-        coefficient = 0
-        for digit in shape.digits:
-            coefficient = coefficient * 10 + digit
-        self.input_digits += len(shape.digits)
-        exponent = shape.exponent
-        while coefficient and coefficient % 10 == 0:
-            coefficient //= 10
-            exponent += 1
-        signed = -coefficient if shape.sign else coefficient
-        self.coefficients[exponent] = self.coefficients.get(exponent, 0) + signed
+        exponent, coefficient, digits = _decimal_term(value)
+        self.input_digits += digits
         self.count += 1
+        updated = self.coefficients.get(exponent, 0) + coefficient
+        if updated:
+            self.coefficients[exponent] = updated
+        else:
+            self.coefficients.pop(exponent, None)
 
     def result(self) -> Decimal:
         if not self.count:
             return Decimal(0)
         return _exact_decimal_result(self.coefficients, self.input_digits, self.count)
+
+
+def _decimal_term(value: Decimal) -> tuple[int, int, int]:
+    """Return one finite decimal's normalized exponent, signed coefficient, and digits."""
+    shape = value.as_tuple()
+    assert isinstance(shape.exponent, int)
+    coefficient = 0
+    for digit in shape.digits:
+        coefficient = coefficient * 10 + digit
+    exponent = shape.exponent
+    while coefficient and coefficient % 10 == 0:
+        coefficient //= 10
+        exponent += 1
+    return exponent, (-coefficient if shape.sign else coefficient), len(shape.digits)
 
 
 def _exact_decimal_sum(values: Sequence[JsonValue]) -> Decimal:
@@ -1129,26 +1138,36 @@ def _exact_decimal_sum(values: Sequence[JsonValue]) -> Decimal:
 
 
 def _exact_decimal_result(coefficients: dict[int, int], input_digits: int, count: int) -> Decimal:
-    terms: list[tuple[int, int]] = []
-    for exponent, coefficient in coefficients.items():
+    return _exact_decimal_streamed_result(lambda: coefficients.items(), input_digits, count)
+
+
+def _exact_decimal_streamed_result(
+    terms: Callable[[], Iterable[tuple[int, int]]], input_digits: int, count: int
+) -> Decimal:
+    """Materialize an exact scalar from a re-readable, externally retained term stream."""
+    lowest_place: int | None = None
+    highest_place: int | None = None
+    for raw_exponent, raw_coefficient in terms():
+        exponent, coefficient = raw_exponent, raw_coefficient
         while coefficient and coefficient % 10 == 0:
             coefficient //= 10
             exponent += 1
-        if coefficient:
-            terms.append((exponent, coefficient))
-    if not terms:
+        if not coefficient:
+            continue
+        lowest_place = exponent if lowest_place is None else min(lowest_place, exponent)
+        highest = exponent + _integer_digit_count(coefficient) - 1
+        highest_place = highest if highest_place is None else max(highest_place, highest)
+    if lowest_place is None or highest_place is None:
         return Decimal(0)
-    lowest_place = min(exponent for exponent, _ in terms)
-    highest_place = max(
-        exponent + _integer_digit_count(coefficient) - 1 for exponent, coefficient in terms
-    )
     permitted_span = max(MAXIMUM_STORED_INTEGER_EXPONENT, input_digits + len(str(count)))
     if highest_place - lowest_place + 1 > permitted_span:
         raise ArithmeticError(
             "the exact aggregate sum would require expanding compact numeric inputs "
             "beyond the finite result materialization bound"
         )
-    total = sum(coefficient * 10 ** (exponent - lowest_place) for exponent, coefficient in terms)
+    total = 0
+    for exponent, coefficient in terms():
+        total += coefficient * 10 ** (exponent - lowest_place)
     if total == 0:
         return Decimal(0)
     while total % 10 == 0:
@@ -1177,6 +1196,28 @@ def _integer_digit_count(value: int) -> int:
         remaining //= 10
         digits += 1
     return digits
+
+
+def _integer_text(value: int) -> str:
+    """Encode an integer without the interpreter's integer-to-text digit limit."""
+    if not value:
+        return "0"
+    sign = "-" if value < 0 else ""
+    remaining = abs(value)
+    digits: list[str] = []
+    while remaining:
+        remaining, digit = divmod(remaining, 10)
+        digits.append(str(digit))
+    return sign + "".join(reversed(digits))
+
+
+def _integer_from_text(value: str) -> int:
+    """Decode an integer without the interpreter's text-to-integer digit limit."""
+    sign = -1 if value.startswith("-") else 1
+    result = 0
+    for digit in value.removeprefix("-"):
+        result = result * 10 + (ord(digit) - ord("0"))
+    return sign * result
 
 
 def _distinct_rows(query: GraphQuery, index: QueryCandidateIndex) -> tuple[GraphQueryRow, ...]:
