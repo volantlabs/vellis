@@ -1261,6 +1261,83 @@ def test_narrow_assessment_sql_steps_ignore_unrelated_link_population(tmp_path: 
         system.close()
 
 
+def test_display_only_assessment_work_ignores_connected_component_length(
+    tmp_path: Path,
+) -> None:
+    def measured(length: int) -> int:
+        system = RTGSystem.open(tmp_path / f"connected-{length}.sqlite3")
+        try:
+            assert system.initialize_fresh(
+                GraphDefinitionSet(
+                    anchor_types=(PERSON,),
+                    link_types=(
+                        LinkTypeDefinition(
+                            "next",
+                            EndpointConstraint(("person",), ("person",), "Chain endpoints."),
+                            "A chain edge.",
+                        ),
+                    ),
+                    relationship_constraints=(
+                        LinkMultiplicityConstraint(
+                            "next",
+                            LinkEnd.SOURCE,
+                            ("person",),
+                            ("person",),
+                            0,
+                            1,
+                            "At most one next edge.",
+                        ),
+                    ),
+                ),
+                provenance=OWNER,
+                initialization_summary="connected",
+            ).accepted
+            assert system.apply_graph_change(
+                GraphChange(
+                    anchor_upserts=tuple(
+                        Anchor(f"person-{index}", "person", f"Person {index}")
+                        for index in range(length + 1)
+                    ),
+                    link_upserts=tuple(
+                        Link(
+                            f"next-{index}",
+                            "next",
+                            f"person-{index}",
+                            f"person-{index + 1}",
+                        )
+                        for index in range(length)
+                    ),
+                ),
+                provenance=OWNER,
+            ).accepted
+            assert system.apply_graph_change(
+                GraphChangeRequest(
+                    GraphChangeTarget.DEFINITION_DELTA,
+                    GraphChange(anchor_upserts=(Anchor("person-0", "person", "Renamed person"),)),
+                ),
+                provenance=OWNER,
+            ).accepted
+            steps = 0
+
+            def progress() -> int:
+                nonlocal steps
+                steps += 100
+                return 0
+
+            system.store._connection.set_progress_handler(progress, 100)  # noqa: SLF001
+            report = _assess_delta(system)
+            system.store._connection.set_progress_handler(None, 0)  # noqa: SLF001
+            assert report.conforms
+            return steps
+        finally:
+            system.close()
+
+    short = measured(10)
+    long = measured(1_000)
+
+    assert long <= short + 300
+
+
 def test_changed_relation_type_includes_unchanged_referenced_objects(tmp_path: Path) -> None:
     other = AnchorTypeDefinition("other", "Another anchor.")
     original_data = AssociatedDataTypeDefinition(

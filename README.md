@@ -119,6 +119,10 @@ Useful commands:
 
 ## Implementation status
 
+The v2 prerelease is undergoing a bounded scaling remediation. Functional coverage remains as
+described below, but the affected-invariant locality and scalar-aggregation memory claims are not
+release-candidate claims until the active evolution record closes with fresh evidence.
+
 All seventeen original campaign slices and corrective slice S018 are complete. S018 implements the
 selected setup-program/public-CLI behavior with fake-client evidence. Closure confirmed both
 matching user-scoped STDIO registrations, the exact no-op dry run, a full ten-tool Codex desktop

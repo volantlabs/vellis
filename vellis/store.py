@@ -3568,7 +3568,13 @@ class CanonicalStore:
         """Validate each object from normalized rows without assembling its neighborhood."""
         rows = self._connection.execute(
             f"SELECT uuid, object_value_id, object_kind, type_key, source_uuid, target_uuid"
-            f" FROM {object_relation} ORDER BY type_key, uuid"  # noqa: S608
+            f" FROM {object_relation}"  # noqa: S608
+            + (
+                " WHERE uuid IN (SELECT uuid FROM assessment_validation_uuid)"
+                if relation == "prospective_graph_object"
+                else ""
+            )
+            + " ORDER BY type_key, uuid"
         )
         cached_type_key: str | None = None
         cached_definitions = GraphDefinitionSet()
@@ -4036,22 +4042,87 @@ class CanonicalStore:
             " UNION SELECT a.anchor_uuid FROM object_anchor AS a JOIN proposal_entry AS p"
             " ON a.object_value_id IN (p.object_value_id, p.base_object_value_id)"
         )
-        # Expand seeds monotonically to relationships and then their participants until
-        # neither indexed set grows. A newly reached endpoint can expose another current
-        # or proposed relationship whose invariant must be checked. Current and proposed
-        # edges are included symmetrically so removals and upserts receive identical
-        # treatment without constructing a resident graph.
-        while True:
-            changes_before_expansion = self._connection.total_changes
+        for table in (
+            "assessment_validation_uuid",
+            "assessment_changed_participant",
+            "assessment_multiplicity_subject",
+        ):
+            self._connection.execute(
+                f"CREATE TEMP TABLE IF NOT EXISTS {table}"  # noqa: S608
+                " (uuid TEXT PRIMARY KEY) WITHOUT ROWID"
+            )
+            self._connection.execute(f"DELETE FROM {table}")  # noqa: S608
+        self._connection.execute(
+            "INSERT INTO assessment_validation_uuid SELECT uuid FROM assessment_impacted_uuid"
+        )
+
+        # Definition edits seed the population whose relationship membership may have
+        # changed. This is intentionally state-wide when the edited definition is.
+        if self._connection.execute("SELECT 1 FROM assessment_impacted_type LIMIT 1").fetchone():
+            self._connection.execute(
+                "INSERT OR IGNORE INTO assessment_changed_participant"
+                " SELECT g.uuid FROM assessment_impacted_type AS t"
+                " CROSS JOIN graph_presence_interval AS g"
+                " INDEXED BY graph_presence_current_type"
+                " ON g.object_kind IN ('anchor', 'associatedData', 'link')"
+                " AND g.type_key = t.type_key AND g.valid_to_revision IS NULL"
+                " UNION SELECT v.uuid FROM proposal_entry AS p JOIN object_value AS v"
+                " ON v.id = p.object_value_id WHERE p.operation = 'upsert'"
+                " AND v.type_key IN (SELECT type_key FROM assessment_impacted_type)"
+            )
+
+        # Graph edits seed relationship work only when relationship membership can
+        # change. Display names, properties, and metadata remain local validation work.
+        self._connection.execute(
+            "INSERT OR IGNORE INTO assessment_changed_participant"
+            " SELECT p.uuid FROM proposal_entry AS p"
+            " LEFT JOIN object_value AS n ON n.id = p.object_value_id"
+            " LEFT JOIN object_value AS b ON b.id = p.base_object_value_id"
+            " WHERE p.object_kind = 'anchor' AND (p.operation = 'delete'"
+            " OR b.id IS NULL OR n.type_key IS NOT b.type_key)"
+            " UNION SELECT p.uuid FROM proposal_entry AS p"
+            " LEFT JOIN object_value AS n ON n.id = p.object_value_id"
+            " LEFT JOIN object_value AS b ON b.id = p.base_object_value_id"
+            " WHERE p.object_kind = 'link' AND (p.operation = 'delete' OR b.id IS NULL"
+            " OR n.type_key IS NOT b.type_key OR n.source_uuid IS NOT b.source_uuid"
+            " OR n.target_uuid IS NOT b.target_uuid)"
+            " UNION SELECT p.uuid FROM proposal_entry AS p"
+            " LEFT JOIN object_value AS n ON n.id = p.object_value_id"
+            " LEFT JOIN object_value AS b ON b.id = p.base_object_value_id"
+            " WHERE p.object_kind = 'associatedData' AND (p.operation = 'delete'"
+            " OR b.id IS NULL OR n.type_key IS NOT b.type_key"
+            " OR EXISTS (SELECT anchor_uuid FROM object_anchor WHERE object_value_id = n.id"
+            " EXCEPT SELECT anchor_uuid FROM object_anchor WHERE object_value_id = b.id)"
+            " OR EXISTS (SELECT anchor_uuid FROM object_anchor WHERE object_value_id = b.id"
+            " EXCEPT SELECT anchor_uuid FROM object_anchor WHERE object_value_id = n.id))"
+        )
+        self._connection.execute(
+            "INSERT OR IGNORE INTO assessment_changed_participant"
+            " SELECT v.source_uuid FROM proposal_entry AS p JOIN object_value AS v"
+            " ON v.id IN (p.object_value_id, p.base_object_value_id)"
+            " WHERE p.uuid IN (SELECT uuid FROM assessment_changed_participant)"
+            " AND v.object_kind = 'link'"
+            " UNION SELECT v.target_uuid FROM proposal_entry AS p JOIN object_value AS v"
+            " ON v.id IN (p.object_value_id, p.base_object_value_id)"
+            " WHERE p.uuid IN (SELECT uuid FROM assessment_changed_participant)"
+            " AND v.object_kind = 'link'"
+            " UNION SELECT a.anchor_uuid FROM proposal_entry AS p JOIN object_value AS v"
+            " ON v.id IN (p.object_value_id, p.base_object_value_id)"
+            " JOIN object_anchor AS a ON a.object_value_id = v.id"
+            " WHERE p.uuid IN (SELECT uuid FROM assessment_changed_participant)"
+            " AND v.object_kind = 'associatedData'"
+        )
+
+        def include_incident_relations(subject_table: str) -> None:
             self._connection.execute(
                 "INSERT OR IGNORE INTO assessment_impacted_relation"
-                " SELECT g.uuid FROM assessment_impacted_uuid AS s"
+                f" SELECT g.uuid FROM {subject_table} AS s"  # noqa: S608
                 " CROSS JOIN graph_presence_interval AS g"
                 " INDEXED BY graph_presence_current_link_source"
                 " ON g.source_uuid = s.uuid AND g.valid_to_revision IS NULL"
                 " WHERE g.object_kind = 'link'"
                 " AND NOT EXISTS (SELECT 1 FROM proposal_entry AS p WHERE p.uuid = g.uuid)"
-                " UNION SELECT g.uuid FROM assessment_impacted_uuid AS s"
+                f" UNION SELECT g.uuid FROM {subject_table} AS s"  # noqa: S608
                 " CROSS JOIN graph_presence_interval AS g"
                 " INDEXED BY graph_presence_current_link_target"
                 " ON g.target_uuid = s.uuid AND g.valid_to_revision IS NULL"
@@ -4059,13 +4130,13 @@ class CanonicalStore:
                 " AND NOT EXISTS (SELECT 1 FROM proposal_entry AS p WHERE p.uuid = g.uuid)"
                 " UNION SELECT v.uuid FROM proposal_entry AS p JOIN object_value AS v"
                 " ON v.id = p.object_value_id WHERE p.operation = 'upsert'"
-                " AND v.object_kind = 'link' AND v.source_uuid IN"
-                " (SELECT uuid FROM assessment_impacted_uuid)"
+                f" AND v.object_kind = 'link' AND v.source_uuid IN"  # noqa: S608
+                f" (SELECT uuid FROM {subject_table})"  # noqa: S608
                 " UNION SELECT v.uuid FROM proposal_entry AS p JOIN object_value AS v"
                 " ON v.id = p.object_value_id WHERE p.operation = 'upsert'"
-                " AND v.object_kind = 'link' AND v.target_uuid IN"
-                " (SELECT uuid FROM assessment_impacted_uuid)"
-                " UNION SELECT v.uuid FROM assessment_impacted_uuid AS s"
+                f" AND v.object_kind = 'link' AND v.target_uuid IN"  # noqa: S608
+                f" (SELECT uuid FROM {subject_table})"  # noqa: S608
+                f" UNION SELECT v.uuid FROM {subject_table} AS s"  # noqa: S608
                 " CROSS JOIN object_anchor AS a INDEXED BY object_anchor_reverse"
                 " ON a.anchor_uuid = s.uuid JOIN object_value AS v ON v.id = a.object_value_id"
                 " JOIN graph_presence_interval AS g"
@@ -4075,46 +4146,80 @@ class CanonicalStore:
                 " UNION SELECT v.uuid FROM proposal_entry AS p JOIN object_value AS v"
                 " ON v.id = p.object_value_id JOIN object_anchor AS a ON a.object_value_id = v.id"
                 " WHERE p.operation = 'upsert' AND v.object_kind = 'associatedData'"
-                " AND a.anchor_uuid IN (SELECT uuid FROM assessment_impacted_uuid)"
-                " UNION SELECT v.uuid FROM assessment_impacted_uuid AS i"
+                f" AND a.anchor_uuid IN (SELECT uuid FROM {subject_table})"  # noqa: S608
+                f" UNION SELECT v.uuid FROM {subject_table} AS i"  # noqa: S608
                 " CROSS JOIN graph_presence_interval AS g INDEXED BY graph_presence_current_uuid"
                 " ON g.uuid = i.uuid AND g.valid_to_revision IS NULL"
                 " JOIN object_value AS v ON v.id = g.object_value_id"
                 " WHERE v.object_kind IN ('link', 'associatedData')"
-                " UNION SELECT uuid FROM proposal_entry"
-                " WHERE object_kind IN ('link', 'associatedData')"
+                " UNION SELECT p.uuid FROM proposal_entry AS p"
+                f" WHERE p.uuid IN (SELECT uuid FROM {subject_table})"  # noqa: S608
+                " AND p.object_kind IN ('link', 'associatedData')"
             )
-            self._connection.execute(
-                "INSERT OR IGNORE INTO assessment_impacted_uuid"
-                " SELECT uuid FROM assessment_impacted_relation"
-                " UNION SELECT g.source_uuid FROM assessment_impacted_relation AS r"
-                " CROSS JOIN graph_presence_interval AS g"
-                " INDEXED BY graph_presence_current_uuid ON g.uuid = r.uuid"
-                " AND g.valid_to_revision IS NULL WHERE g.object_kind = 'link'"
-                " UNION SELECT g.target_uuid FROM assessment_impacted_relation AS r"
-                " CROSS JOIN graph_presence_interval AS g"
-                " INDEXED BY graph_presence_current_uuid ON g.uuid = r.uuid"
-                " AND g.valid_to_revision IS NULL WHERE g.object_kind = 'link'"
-                " UNION SELECT v.source_uuid FROM proposal_entry AS p JOIN object_value AS v"
-                " ON v.id = p.object_value_id WHERE p.operation = 'upsert'"
-                " AND v.object_kind = 'link' AND v.uuid IN"
-                " (SELECT uuid FROM assessment_impacted_relation)"
-                " UNION SELECT v.target_uuid FROM proposal_entry AS p JOIN object_value AS v"
-                " ON v.id = p.object_value_id WHERE p.operation = 'upsert'"
-                " AND v.object_kind = 'link' AND v.uuid IN"
-                " (SELECT uuid FROM assessment_impacted_relation)"
-                " UNION SELECT a.anchor_uuid FROM assessment_impacted_relation AS r"
-                " CROSS JOIN graph_presence_interval AS g"
-                " INDEXED BY graph_presence_current_uuid ON g.uuid = r.uuid"
-                " AND g.valid_to_revision IS NULL JOIN object_anchor AS a"
-                " ON a.object_value_id = g.object_value_id"
-                " UNION SELECT a.anchor_uuid FROM assessment_impacted_relation AS r"
-                " CROSS JOIN proposal_entry AS p ON p.uuid = r.uuid"
-                " JOIN object_anchor AS a ON a.object_value_id = p.object_value_id"
-                " WHERE p.operation = 'upsert'"
-            )
-            if self._connection.total_changes == changes_before_expansion:
-                break
+
+        # The first hop finds relationships whose membership changed. Their participants
+        # are the subjects whose complete multiplicity counts may now differ. The second
+        # hop collects every sibling relation needed for those counts; far participants
+        # are lookup-only and do not recursively expand the connected component.
+        include_incident_relations("assessment_changed_participant")
+        self._connection.execute(
+            "INSERT OR IGNORE INTO assessment_multiplicity_subject"
+            " SELECT uuid FROM assessment_changed_participant"
+            " UNION SELECT g.source_uuid FROM assessment_impacted_relation AS r"
+            " CROSS JOIN graph_presence_interval AS g INDEXED BY graph_presence_current_uuid"
+            " ON g.uuid = r.uuid"
+            " AND g.valid_to_revision IS NULL WHERE g.object_kind = 'link'"
+            " UNION SELECT g.target_uuid FROM assessment_impacted_relation AS r"
+            " CROSS JOIN graph_presence_interval AS g INDEXED BY graph_presence_current_uuid"
+            " ON g.uuid = r.uuid"
+            " AND g.valid_to_revision IS NULL WHERE g.object_kind = 'link'"
+            " UNION SELECT v.source_uuid FROM proposal_entry AS p JOIN object_value AS v"
+            " ON v.id = p.object_value_id WHERE p.operation = 'upsert'"
+            " AND v.object_kind = 'link'"
+            " AND v.uuid IN (SELECT uuid FROM assessment_impacted_relation)"
+            " UNION SELECT v.target_uuid FROM proposal_entry AS p JOIN object_value AS v"
+            " ON v.id = p.object_value_id WHERE p.operation = 'upsert'"
+            " AND v.object_kind = 'link'"
+            " AND v.uuid IN (SELECT uuid FROM assessment_impacted_relation)"
+            " UNION SELECT a.anchor_uuid FROM assessment_impacted_relation AS r"
+            " CROSS JOIN graph_presence_interval AS g INDEXED BY graph_presence_current_uuid"
+            " ON g.uuid = r.uuid"
+            " AND g.valid_to_revision IS NULL JOIN object_anchor AS a"
+            " ON a.object_value_id = g.object_value_id"
+            " UNION SELECT a.anchor_uuid FROM assessment_impacted_relation AS r"
+            " JOIN proposal_entry AS p ON p.uuid = r.uuid JOIN object_anchor AS a"
+            " ON a.object_value_id = p.object_value_id WHERE p.operation = 'upsert'"
+        )
+        include_incident_relations("assessment_multiplicity_subject")
+        self._connection.execute(
+            "INSERT OR IGNORE INTO assessment_impacted_uuid"
+            " SELECT uuid FROM assessment_impacted_relation"
+            " UNION SELECT uuid FROM assessment_multiplicity_subject"
+            " UNION SELECT g.source_uuid FROM assessment_impacted_relation AS r"
+            " CROSS JOIN graph_presence_interval AS g INDEXED BY graph_presence_current_uuid"
+            " ON g.uuid = r.uuid"
+            " AND g.valid_to_revision IS NULL WHERE g.object_kind = 'link'"
+            " UNION SELECT g.target_uuid FROM assessment_impacted_relation AS r"
+            " CROSS JOIN graph_presence_interval AS g INDEXED BY graph_presence_current_uuid"
+            " ON g.uuid = r.uuid"
+            " AND g.valid_to_revision IS NULL WHERE g.object_kind = 'link'"
+            " UNION SELECT v.source_uuid FROM proposal_entry AS p JOIN object_value AS v"
+            " ON v.id = p.object_value_id WHERE p.operation = 'upsert'"
+            " AND v.object_kind = 'link'"
+            " AND v.uuid IN (SELECT uuid FROM assessment_impacted_relation)"
+            " UNION SELECT v.target_uuid FROM proposal_entry AS p JOIN object_value AS v"
+            " ON v.id = p.object_value_id WHERE p.operation = 'upsert'"
+            " AND v.object_kind = 'link'"
+            " AND v.uuid IN (SELECT uuid FROM assessment_impacted_relation)"
+            " UNION SELECT a.anchor_uuid FROM assessment_impacted_relation AS r"
+            " CROSS JOIN graph_presence_interval AS g INDEXED BY graph_presence_current_uuid"
+            " ON g.uuid = r.uuid"
+            " AND g.valid_to_revision IS NULL JOIN object_anchor AS a"
+            " ON a.object_value_id = g.object_value_id"
+            " UNION SELECT a.anchor_uuid FROM assessment_impacted_relation AS r"
+            " JOIN proposal_entry AS p ON p.uuid = r.uuid JOIN object_anchor AS a"
+            " ON a.object_value_id = p.object_value_id WHERE p.operation = 'upsert'"
+        )
         self._connection.execute(
             "INSERT OR IGNORE INTO assessment_impacted_type"
             " SELECT v.type_key FROM graph_presence_interval AS g JOIN object_value AS v"
@@ -4511,7 +4616,7 @@ class CanonicalStore:
                     + " WHERE e.object_kind IN ('anchor', 'associatedData')"
                     + f" AND e.type_key IN ({constrained_marks})"
                     + (
-                        " AND e.uuid IN (SELECT uuid FROM assessment_impacted_uuid)"
+                        " AND e.uuid IN (SELECT uuid FROM assessment_multiplicity_subject)"
                         if prospective
                         else ""
                     )
@@ -4552,7 +4657,8 @@ class CanonicalStore:
                 if prospective:
                     sql = sql.replace(
                         " GROUP BY",
-                        " AND a.uuid IN (SELECT uuid FROM assessment_impacted_uuid) GROUP BY",
+                        " AND a.uuid IN (SELECT uuid FROM assessment_multiplicity_subject)"
+                        " GROUP BY",
                     )
                 rows = self._connection.execute(sql, (*data_types, *anchors))
             else:
@@ -4567,7 +4673,8 @@ class CanonicalStore:
                 if prospective:
                     sql = sql.replace(
                         " GROUP BY",
-                        " AND d.uuid IN (SELECT uuid FROM assessment_impacted_uuid) GROUP BY",
+                        " AND d.uuid IN (SELECT uuid FROM assessment_multiplicity_subject)"
+                        " GROUP BY",
                     )
                 rows = self._connection.execute(sql, (*anchors, *data_types))
             for uuid, count_value in rows:

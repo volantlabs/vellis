@@ -1,265 +1,186 @@
 schema_version: "1.0"
 evolution:
-  id: vellis-2-prerelease-review-remediation
-  objective: Resolve five prerelease implementation defects without changing accepted Vellis 2.0 meaning or compatibility.
-  observable_distinction: Prospective activation cannot admit invalid state, exact numbers and positive bounds remain usable, and local POSIX memory is private or refused before use.
-  lifecycle: complete
-  approval: {status: not-required, reason: "Accepted authority decides all five defects; the owner selected the bounded fail-closed POSIX realization.", checkpoint: null}
+  id: vellis-2-prerelease-scaling-remediation
+  objective: Remove population-sized resident aggregation, superlinear prospective assessment, and SQLite collection-limit failures without changing accepted Vellis 2.0 meaning or compatibility.
+  observable_distinction: Ordinary prospective work follows only the affected invariant neighborhood, scalar aggregation keeps bounded process memory, and large valid collections do not fail at SQLite host-parameter boundaries.
+  lifecycle: active
+  approval: {status: not-required, reason: "Accepted query-safety and affected-invariant authority decides all three implementation defects.", checkpoint: null}
   blocker: null
-  checkpoint: git:16cb7dea56b0610369a241219625a95231ca5c1d
+  checkpoint: null
 baselines:
   status: current
   source: &source
     model: sha256:adf05b52f9839b75f76240ee116c0ffba7ee452602c2083268d683c4b534b2c7
-    implementation: git:784a81bc30e7f8fdb857f4e8c1df3fb41d76f6bc
+    implementation: git:17d2b2676400f530ff9eccf8ab653d54644f1beb
     language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
     execution_environment: sha256:d71473693aa50faef1a25a449aa5808490e21eaf2a987942d1fb134c773550d1
-    checkpoint: git:784a81bc30e7f8fdb857f4e8c1df3fb41d76f6bc
-  target: &target
-    model: sha256:adf05b52f9839b75f76240ee116c0ffba7ee452602c2083268d683c4b534b2c7
-    implementation: git:16cb7dea56b0610369a241219625a95231ca5c1d
-    language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
-    execution_environment: sha256:d71473693aa50faef1a25a449aa5808490e21eaf2a987942d1fb134c773550d1
-    checkpoint: git:16cb7dea56b0610369a241219625a95231ca5c1d
-  observed:
-    model: sha256:adf05b52f9839b75f76240ee116c0ffba7ee452602c2083268d683c4b534b2c7
-    implementation: git:16cb7dea56b0610369a241219625a95231ca5c1d
-    language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
-    execution_environment: sha256:d71473693aa50faef1a25a449aa5808490e21eaf2a987942d1fb134c773550d1
-    checkpoint: git:16cb7dea56b0610369a241219625a95231ca5c1d
+    checkpoint: git:17d2b2676400f530ff9eccf8ab653d54644f1beb
+  target: null
+  observed: *source
 scope:
-  authority_scope: [RTGSystem::'Query graph', RTGSystem::'Assess graph conformance', RTGSystem::'Activate definition delta', VellisRequirements::canonicalSemanticEquality, VellisRequirements::querySafety, VellisRequirements::validationCoverage, VellisRequirements::nonDisruptiveDefinitionWork, VellisRequirements::ownerControlledMemory, VellisRequirements::mcpOutcomeIntegrity, VellisVerification]
-  implementation_scope: [vellis/mcp.py, vellis/setup.py, vellis/store.py, vellis/streaming.py, vellis/v1_streaming.py, tools/system_evolution.py, tests/test_system_evolution.py, tests/vellis/, README.md, SECURITY.md, system-evolution.yaml]
+  authority_scope: [RTG::'Graph Query', RTGSystem::'Query graph', RTGSystem::'Assess graph conformance', VellisRequirements::querySafety, VellisRequirements::validationCoverage, VellisRequirements::historyIndependentCurrentWork, VellisVerification::semanticQuery, VellisVerification::currentWorkScaling]
+  implementation_scope: [vellis/query.py, vellis/store.py, tests/vellis/, README.md, system-evolution.yaml]
   review_lenses: [authority and conformance, engineering and evidence]
   non_goals:
-    - Changing the accepted SysML model, MCP schemas, persistence schema, snapshot formats, version, or v1 compatibility.
-    - Migrating permissions automatically or claiming verified Windows native ACL enforcement.
-    - Touching ignored owner data, client configuration, releases, tags, or external pull-request state.
+    - Changing the SysML model, public APIs, MCP schemas, persistence schema, snapshot formats, version, or v1 compatibility.
+    - Introducing numerical latency targets or materializing a resident complete graph.
+    - Touching ignored owner data, external clients, releases, tags, or pull-request state.
 findings:
   - id: F001
-    summary: One-pass prospective closure can approve and activate a graph that violates link multiplicity.
+    summary: Prospective assessment repeatedly expands accumulated participants and relations across the whole connected component.
     classification: implementation defect
-    consequence: A staged endpoint-type change can hide unchanged incident links, yield a clean assessment, and commit invalid active state.
-    authority_refs: [VellisRequirements::nonDisruptiveDefinitionWork, VellisRequirements::validationCoverage, RTGSystem::'Activate definition delta']
-    evidence_refs: [path:tests/vellis/test_sqlite_prospective_state.py#test_endpoint_type_change_cannot_activate_an_incomplete_multiplicity_closure]
-    disposition: resolved
+    consequence: A local display or property change can perform superlinear work with connected graph size even though no distant invariant can change.
+    authority_refs: [VellisRequirements::historyIndependentCurrentWork, VellisRequirements::validationCoverage]
+    evidence_refs: [path:tests/vellis/test_sqlite_prospective_state.py#test_narrow_assessment_sql_steps_ignore_unrelated_link_population]
+    disposition: implementation-work
     owner_work_item_id: W001
-    implementation_status: conforming
-    nearest_wrong_system: Prospective validation visits each affected relation and participant only once, so a newly discovered participant's other incident links remain invisible.
-    compatibility_effect: Invalid proposals become rejected with findings; valid proposal payloads, state, and history remain unchanged.
+    implementation_status: conflicting
+    nearest_wrong_system: Correct fixed-point findings are obtained by repeatedly rescanning every already reached participant and relation, including unaffected distant objects.
+    compatibility_effect: Findings and activation behavior remain unchanged; only forbidden unrelated work is removed.
   - id: F002
-    summary: MCP serialization rejects a large integral Decimal after the same value was accepted and stored.
+    summary: SQLite aggregation fetches and retains every bounded match and then retains a second value population for scalar reduction.
     classification: implementation defect
-    consequence: Querying a large exact integer such as 10**31 + 1 can return a lossy or typed-failed result and make the activity ledger disagree with the caller's final status.
-    authority_refs: [VellisRequirements::canonicalSemanticEquality, VellisRequirements::mcpOutcomeIntegrity]
-    evidence_refs:
-      - path:tests/vellis/test_mcp_boundary.py#test_large_integral_number_remains_exact_and_query_activity_is_accepted
-      - path:tests/vellis/test_mcp_boundary.py#test_raw_stdio_preserves_exact_fraction_and_large_integer_in_both_directions
-    disposition: resolved
+    consequence: A valid high maximum can exhaust process memory even though the caller receives only one scalar per aggregation.
+    authority_refs: [RTG::'Graph Query', VellisRequirements::querySafety, VellisRequirements::historyIndependentCurrentWork]
+    evidence_refs: [path:tests/vellis/test_graph_queries.py#test_aggregation_accepts_large_positive_bounds_without_canonical_effects]
+    disposition: implementation-work
     owner_work_item_id: W002
-    implementation_status: conforming
-    nearest_wrong_system: Storage is lossless but the MCP adapter eagerly expands or rejects integral Decimal values according to exponent size.
-    compatibility_effect: Large accepted integers remain exact JSON-number tokens; ordinary compact integers retain their existing representation.
+    implementation_status: conflicting
+    nearest_wrong_system: The selection is bounded semantically but every matching row and value remains resident until reduction completes.
+    compatibility_effect: Exact aggregate values, maximum-plus-one refusal, and public result shapes remain unchanged.
   - id: F003
-    summary: New POSIX stores and imports can expose plaintext owner memory through permissive filesystem modes.
+    summary: Public UUID and type collections are interpolated into single SQL placeholder lists.
     classification: implementation defect
-    consequence: Under an ordinary umask, database directories and files can grant group or other access, while insecure existing stores are opened without warning.
-    authority_refs: [VellisRequirements::ownerControlledMemory]
-    evidence_refs:
-      - path:tests/vellis/test_storage_permissions.py#test_setup_and_sqlite_companions_are_private_under_umask_022
-      - path:tests/vellis/test_storage_permissions.py#test_normalized_and_v1_import_publications_remain_private
-      - path:tests/vellis/test_storage_permissions.py#test_preserved_snapshot_publication_remains_private
-      - path:tests/vellis/test_storage_permissions.py#test_insecure_existing_database_is_refused_without_mutation
-      - path:tests/vellis/test_storage_permissions.py#test_insecure_existing_directory_and_symlinked_database_are_refused
-    disposition: resolved
+    consequence: A valid collection can cross SQLite's host-parameter capacity and return a realization failure instead of its semantic result or whole-result rejection.
+    authority_refs: [VellisRequirements::querySafety, VellisRequirements::historyIndependentCurrentWork]
+    evidence_refs: [path:tests/vellis/test_graph_queries.py#test_known_uuids_narrow_an_anchor_group]
+    disposition: implementation-work
     owner_work_item_id: W003
-    implementation_status: conforming
-    nearest_wrong_system: SQLite creates plaintext memory using ambient permissions and accepts symlinked, non-owner, or broadly accessible paths.
-    compatibility_effect: POSIX stores require owner-only modes and ownership; insecure prerelease stores receive repair guidance and no automatic migration.
-  - id: F004
-    summary: Prospective direct-association multiplicity counts repeated anchor references instead of distinct associated-data identities.
-    classification: implementation defect
-    consequence: Stored prospective validation can disagree with modeled set semantics and the in-memory semantic validator.
-    authority_refs: [VellisRequirements::graphInvariants, VellisRequirements::validationCoverage]
-    evidence_refs: [path:tests/vellis/test_sqlite_prospective_state.py#test_repeated_anchor_references_have_set_multiplicity_in_prospective_sql]
-    disposition: resolved
-    owner_work_item_id: W001
-    implementation_status: conforming
-    nearest_wrong_system: One associated-data object referring to the same anchor twice counts as two association members.
-    compatibility_effect: Duplicate references count once; distinct associated-data objects and all public formats remain unchanged.
-  - id: F005
-    summary: Oversized positive public row and finding maxima overflow SQLite integer bindings.
-    classification: implementation defect
-    consequence: Valid positive bounds such as 2**100 raise untyped OverflowError instead of returning the correct accepted result.
-    authority_refs: [VellisRequirements::querySafety, VellisRequirements::validationCoverage, VellisRequirements::mcpOutcomeIntegrity]
-    evidence_refs:
-      - path:tests/vellis/test_graph_queries.py#test_aggregation_accepts_large_positive_bounds_without_canonical_effects
-      - path:tests/vellis/test_sqlite_prospective_state.py#test_assessment_and_finding_pages_accept_oversized_positive_maxima
-    disposition: resolved
-    owner_work_item_id: W002
-    implementation_status: conforming
-    nearest_wrong_system: Public arbitrary positive integers are passed directly into fixed-width SQLite LIMIT and fetchmany parameters.
-    compatibility_effect: Large maxima behave like non-restrictive valid bounds; zero, negative, and ordinary over-bound behavior remains unchanged.
+    implementation_status: conflicting
+    nearest_wrong_system: Small collections work, while an otherwise identical larger collection fails solely at the database driver's parameter threshold.
+    compatibility_effect: Existing requests retain meaning; large collections use relational or chunked binding and structurally excessive queries are rejected whole.
 decisions:
   - id: D001
-    summary: Compute prospective invariant closure monotonically in indexed SQLite temporary tables until neither relation nor participant membership grows.
-    authority_refs: [VellisRequirements::nonDisruptiveDefinitionWork, VellisRequirements::validationCoverage]
-    alternatives: [Construct a complete resident graph., Retain one-pass expansion.]
+    summary: Track local validation objects, rule-subject work, incident relations, and lookup-only participants separately in indexed temporary relations.
+    authority_refs: [VellisRequirements::historyIndependentCurrentWork, VellisRequirements::validationCoverage]
+    alternatives: [Retain whole-component closure with a linear frontier., Construct a resident graph.]
     reversible: true
     owner_work_item_id: W001
-    evidence_intent: [Reject the endpoint-type invalid-activation reproducer., Terminate on cyclic affected closures without scanning disconnected populations.]
-    implementation_status: conforming
-    evidence_refs:
-      - path:tests/vellis/test_sqlite_prospective_state.py#test_endpoint_type_change_cannot_activate_an_incomplete_multiplicity_closure
-      - path:tests/vellis/test_sqlite_prospective_state.py#test_repeated_anchor_references_have_set_multiplicity_in_prospective_sql
+    evidence_intent: [Keep display-only work independent of connected-component length., Keep endpoint-type and high-degree multiplicity findings complete.]
+    implementation_status: not evaluated
+    evidence_refs: []
   - id: D002
-    summary: Preserve large integral Decimal values as exact JSON-number tokens and clamp only private SQLite limits and probes.
-    authority_refs: [VellisRequirements::canonicalSemanticEquality, VellisRequirements::querySafety, VellisRequirements::mcpOutcomeIntegrity]
-    alternatives: [Reject integers above a transport exponent threshold., Narrow the public positive-integer contract.]
+    summary: Materialize only bounded match identities in SQLite and stream property rows through exact incremental reducers.
+    authority_refs: [RTG::'Graph Query', VellisRequirements::querySafety]
+    alternatives: [Retain Python match populations., Narrow the public positive maximum.]
     reversible: true
     owner_work_item_id: W002
-    evidence_intent: [Round-trip 10**31 + 1 through both MCP result forms., Accept 2**63-1 and 2**100 bounds without canonical effects.]
-    implementation_status: conforming
-    evidence_refs:
-      - path:tests/vellis/test_mcp_boundary.py#test_large_integral_number_remains_exact_and_query_activity_is_accepted
-      - path:tests/vellis/test_mcp_boundary.py#test_raw_stdio_preserves_exact_fraction_and_large_integer_in_both_directions
-      - path:tests/vellis/test_graph_queries.py#test_aggregation_accepts_large_positive_bounds_without_canonical_effects
-      - path:tests/vellis/test_sqlite_prospective_state.py#test_assessment_and_finding_pages_accept_oversized_positive_maxima
+    evidence_intent: [Bound fetched batches independently of match count., Preserve exact count, sum, minimum, maximum, and refusal semantics in every state scope.]
+    implementation_status: not evaluated
+    evidence_refs: []
   - id: D003
-    summary: Enforce owner-only POSIX storage modes and fail closed with chmod guidance instead of mutating insecure existing paths.
-    authority_refs: [VellisRequirements::ownerControlledMemory]
-    alternatives: [Silently chmod prerelease stores., Rely on the ambient umask.]
+    summary: Bind public collections through indexed temporary relations or connection-aware chunks and reject structurally unexecutable queries whole.
+    authority_refs: [VellisRequirements::querySafety, VellisRequirements::historyIndependentCurrentWork]
+    alternatives: [Publish a new collection maximum., Allow driver-capacity failures.]
     reversible: true
     owner_work_item_id: W003
-    evidence_intent: [Create directories as 0700 and database artifacts as 0600 under umask 022., Refuse insecure existing paths without canonical effects.]
-    implementation_status: conforming
-    evidence_refs:
-      - path:tests/vellis/test_storage_permissions.py#test_setup_and_sqlite_companions_are_private_under_umask_022
-      - path:tests/vellis/test_storage_permissions.py#test_normalized_and_v1_import_publications_remain_private
-      - path:tests/vellis/test_storage_permissions.py#test_insecure_existing_database_is_refused_without_mutation
+    evidence_intent: [Operate above a deliberately lowered SQLite variable limit., Preserve semantic invalid-input findings and canonical non-effects.]
+    implementation_status: not evaluated
+    evidence_refs: []
 work_items:
   - id: W001
     order: 1
-    label: Restore prospective validation integrity
+    label: Make prospective assessment follow the affected invariant neighborhood
     kind: implementation
     dependencies: []
-    planned_baseline: {dimension: implementation, identity: git:784a81bc30e7f8fdb857f4e8c1df3fb41d76f6bc}
-    finding_ids: [F001, F004]
+    planned_baseline: {dimension: implementation, identity: git:17d2b2676400f530ff9eccf8ab653d54644f1beb}
+    finding_ids: [F001]
     decision_ids: [D001]
     authority:
-      - refs: [VellisRequirements::nonDisruptiveDefinitionWork, VellisRequirements::validationCoverage, RTGSystem::'Activate definition delta']
-        coverage: full
-        remaining_work_item_ids: []
-    approval: {status: not-required, reason: "Accepted prospective and set semantics decide both defects.", checkpoint: null}
-    nearest_wrong_system: Prospective SQL either under-expands incident relations or counts duplicate references as distinct set members.
-    compatibility_effect: Prospective findings match semantic validation and invalid activation has no canonical effects.
-    non_effects: [No model, schema, snapshot, or public payload changes., Work remains independent of canonical-history length and disconnected populations.]
-    lifecycle: complete
-    implementation_status: conforming
-    evidence_refs:
-      - path:tests/vellis/test_sqlite_prospective_state.py#test_endpoint_type_change_cannot_activate_an_incomplete_multiplicity_closure
-      - path:tests/vellis/test_sqlite_prospective_state.py#test_repeated_anchor_references_have_set_multiplicity_in_prospective_sql
+      - refs: [VellisRequirements::historyIndependentCurrentWork, VellisRequirements::validationCoverage, RTGSystem::'Assess graph conformance']
+        coverage: partial
+        remaining_work_item_ids: [W002, W003]
+    approval: {status: not-required, reason: "Accepted affected-invariant and complete-assessment meaning decides this correction.", checkpoint: null}
+    nearest_wrong_system: Prospective findings are correct but a local edit still walks a long connected chain or repeatedly rescans accumulated rows.
+    compatibility_effect: Prospective reports and activation remain semantically identical with less unrelated work.
+    non_effects: [No model, public payload, persistence, or canonical-history change., No disconnected population or history traversal.]
+    lifecycle: active
+    implementation_status: conflicting
+    evidence_refs: []
     blocker: null
-    checkpoint: git:131515384d8fdb62dddc4ab3598e74605ca352be
+    checkpoint: null
   - id: W002
     order: 2
-    label: Preserve exact numbers and arbitrary positive public bounds
+    label: Stream exact scalar aggregation with bounded process memory
     kind: implementation
     dependencies: [W001]
-    planned_baseline: {dimension: implementation, identity: git:131515384d8fdb62dddc4ab3598e74605ca352be}
-    finding_ids: [F002, F005]
+    planned_baseline: {dimension: implementation, identity: git:17d2b2676400f530ff9eccf8ab653d54644f1beb}
+    finding_ids: [F002]
     decision_ids: [D002]
     authority:
-      - refs: [VellisRequirements::canonicalSemanticEquality, VellisRequirements::querySafety, VellisRequirements::validationCoverage, VellisRequirements::mcpOutcomeIntegrity]
+      - refs: [RTG::'Graph Query', VellisRequirements::querySafety, VellisVerification::semanticQuery]
         coverage: full
         remaining_work_item_ids: []
-    approval: {status: not-required, reason: "Accepted exact-number and positive-bound contracts decide both defects.", checkpoint: null}
-    nearest_wrong_system: Transport or SQLite representation narrows accepted mathematical values.
-    compatibility_effect: Existing values and bounds retain behavior while larger valid values become usable.
-    non_effects: [No MCP schema or persistence format changes., Rejections and reads retain their canonical non-effects.]
-    lifecycle: complete
-    implementation_status: conforming
-    evidence_refs:
-      - path:tests/vellis/test_mcp_boundary.py#test_large_integral_number_remains_exact_and_query_activity_is_accepted
-      - path:tests/vellis/test_mcp_boundary.py#test_raw_stdio_preserves_exact_fraction_and_large_integer_in_both_directions
-      - path:tests/vellis/test_graph_queries.py#test_aggregation_accepts_large_positive_bounds_without_canonical_effects
-      - path:tests/vellis/test_sqlite_prospective_state.py#test_assessment_and_finding_pages_accept_oversized_positive_maxima
+    approval: {status: not-required, reason: "Accepted exact aggregation and bounded-query meaning decides this correction.", checkpoint: null}
+    nearest_wrong_system: A scalar result is exact but its entire matching population remains resident in Python.
+    compatibility_effect: All aggregate results and rejection boundaries remain unchanged.
+    non_effects: [No public maximum, numeric semantics, query schema, or canonical effect changes.]
+    lifecycle: pending
+    implementation_status: conflicting
+    evidence_refs: []
     blocker: null
-    checkpoint: git:8b1c0b2a1bf83a9904d106a70c8755bf3e180cd0
+    checkpoint: null
   - id: W003
     order: 3
-    label: Make POSIX plaintext storage private or fail closed
+    label: Remove SQLite host-parameter thresholds from public collections
     kind: implementation
     dependencies: [W002]
-    planned_baseline: {dimension: implementation, identity: git:8b1c0b2a1bf83a9904d106a70c8755bf3e180cd0}
+    planned_baseline: {dimension: implementation, identity: git:17d2b2676400f530ff9eccf8ab653d54644f1beb}
     finding_ids: [F003]
     decision_ids: [D003]
     authority:
-      - refs: [VellisRequirements::ownerControlledMemory]
-        coverage: full
-        remaining_work_item_ids: []
-    approval: {status: not-required, reason: "The owner selected fail-closed POSIX enforcement without automatic chmod.", checkpoint: null}
-    nearest_wrong_system: Plaintext local memory inherits permissive modes or follows an unsafe existing path.
-    compatibility_effect: Insecure prerelease POSIX stores require explicit owner repair; Windows keeps profile/default ACL behavior.
-    non_effects: [No automatic permission mutation., Snapshot format and v1 translation meaning remain unchanged.]
-    lifecycle: complete
-    implementation_status: conforming
-    evidence_refs:
-      - path:tests/vellis/test_storage_permissions.py#test_setup_and_sqlite_companions_are_private_under_umask_022
-      - path:tests/vellis/test_storage_permissions.py#test_normalized_and_v1_import_publications_remain_private
-      - path:tests/vellis/test_storage_permissions.py#test_preserved_snapshot_publication_remains_private
-      - path:tests/vellis/test_storage_permissions.py#test_insecure_existing_database_is_refused_without_mutation
-      - path:tests/vellis/test_storage_permissions.py#test_insecure_existing_directory_and_symlinked_database_are_refused
-      - path:README.md#implementation-status
-      - path:SECURITY.md#current-scope
+      - refs: [VellisRequirements::querySafety, VellisRequirements::historyIndependentCurrentWork]
+        coverage: partial
+        remaining_work_item_ids: [W004]
+    approval: {status: not-required, reason: "This removes a private realization threshold without changing public meaning.", checkpoint: null}
+    nearest_wrong_system: Valid large filters or definition selections fail with too many SQL variables, or structural capacity returns a partial result.
+    compatibility_effect: Large collections complete or receive the modeled whole-result rejection.
+    non_effects: [No truncation or new public collection maximum., Unexpected database faults remain failed outcomes.]
+    lifecycle: pending
+    implementation_status: conflicting
+    evidence_refs: []
     blocker: null
-    checkpoint: git:85e027299758880234b4955e5bb86d8c7e27654e
+    checkpoint: null
   - id: W004
     order: 4
-    label: Integrate evidence and close the prerelease candidate
+    label: Integrate scaling evidence and close the prerelease candidate
     kind: closure
     dependencies: [W001, W002, W003]
-    planned_baseline: {dimension: implementation, identity: git:6275c26cec13c08ec22ed6ece6702e09de2261a8}
+    planned_baseline: {dimension: implementation, identity: git:17d2b2676400f530ff9eccf8ab653d54644f1beb}
     finding_ids: []
     decision_ids: []
     authority:
       - refs: [VellisRequirements, VellisVerification, AGENTS.md]
         coverage: full
         remaining_work_item_ids: []
-    approval: {status: not-required, reason: "Closure reconciles unchanged authority, implementation, documentation, and evidence.", checkpoint: null}
-    nearest_wrong_system: Focused fixes pass while cross-cutting gates, documentation truth, or exact candidate review remains incomplete.
-    compatibility_effect: Release claims become evidence-backed without changing version or public identities.
-    non_effects: [No release, tag, merge, or external client mutation., No owner data is inspected or changed.]
-    lifecycle: complete
-    implementation_status: conforming
-    evidence_refs:
-      - command:just model-check
-      - command:just system-evolution-check
-      - command:just package-check
-      - command:just check
-      - path:tests/test_system_evolution.py#test_qualified_authority_references_must_resolve_in_the_current_model
-      - path:README.md#implementation-status
-      - path:SECURITY.md#current-scope
+    approval: {status: not-required, reason: "Closure reconciles unchanged authority, implementation, evidence, and public truth.", checkpoint: null}
+    nearest_wrong_system: Focused evidence passes while cross-scope behavior, documentation, or the frozen candidate remains unreviewed.
+    compatibility_effect: Prerelease completion claims become evidence-backed without changing public identities or formats.
+    non_effects: [No release, tag, merge, external client mutation, or owner-data access.]
+    lifecycle: pending
+    implementation_status: not evaluated
+    evidence_refs: []
     blocker: null
-    checkpoint: git:16cb7dea56b0610369a241219625a95231ca5c1d
+    checkpoint: null
 closure:
-  finding_disposition: complete
+  finding_disposition: open
   model_status: unchanged
-  implementation_status: conforming
-  integration_status: conforming
+  implementation_status: conflicting
+  integration_status: not evaluated
   external_status: not applicable
-  compatibility: Accepted Vellis 2.0 meaning, version, MCP schemas, persistence schema, snapshots, and v1 translation remain unchanged. Invalid prospective activation is rejected; exact large numbers and positive bounds now work. POSIX plaintext stores require private owner-only paths with repair guidance; Windows retains profile/default ACL behavior without a native ACL claim.
+  compatibility: Accepted Vellis 2.0 meaning, public APIs, MCP schemas, persistence and snapshot formats, version, and v1 translation remain unchanged.
   reviews:
-    - {lens: authority and conformance, status: clean, reviewer: agent:/root/prerelease_remediation_authority_review2, checkpoint: git:16cb7dea56b0610369a241219625a95231ca5c1d, evidence_refs: [command:just check]}
-    - {lens: engineering and evidence, status: clean, reviewer: agent:/root/prerelease_remediation_engineering_review2, checkpoint: git:16cb7dea56b0610369a241219625a95231ca5c1d, evidence_refs: [command:just check]}
-  evidence_refs:
-    - command:just model-check
-    - command:just system-evolution-check
-    - command:just package-check
-    - command:just check
-    - path:tests/test_system_evolution.py#test_qualified_authority_references_must_resolve_in_the_current_model
-    - path:tests/vellis/test_sqlite_prospective_state.py#test_endpoint_type_change_cannot_activate_an_incomplete_multiplicity_closure
-    - path:tests/vellis/test_mcp_boundary.py#test_raw_stdio_preserves_exact_fraction_and_large_integer_in_both_directions
-    - path:tests/vellis/test_graph_queries.py#test_aggregation_accepts_large_positive_bounds_without_canonical_effects
-    - path:tests/vellis/test_storage_permissions.py#test_setup_and_sqlite_companions_are_private_under_umask_022
-  checkpoint: git:16cb7dea56b0610369a241219625a95231ca5c1d
+    - {lens: authority and conformance, status: pending, reviewer: null, checkpoint: null, evidence_refs: []}
+    - {lens: engineering and evidence, status: pending, reviewer: null, checkpoint: null, evidence_refs: []}
+  evidence_refs: []
+  checkpoint: null
