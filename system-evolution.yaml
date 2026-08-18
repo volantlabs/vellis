@@ -17,16 +17,16 @@ baselines:
     checkpoint: git:17d2b2676400f530ff9eccf8ab653d54644f1beb
   target: &target
     model: sha256:adf05b52f9839b75f76240ee116c0ffba7ee452602c2083268d683c4b534b2c7
-    implementation: git:b00a19b9e3e386c47bc4bac076e496db1a7457db
+    implementation: git:df2291f5a78dac497578aceee1aa4e90e6e146cc
     language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
     execution_environment: sha256:d71473693aa50faef1a25a449aa5808490e21eaf2a987942d1fb134c773550d1
-    checkpoint: git:b00a19b9e3e386c47bc4bac076e496db1a7457db
+    checkpoint: git:df2291f5a78dac497578aceee1aa4e90e6e146cc
   observed:
     model: sha256:adf05b52f9839b75f76240ee116c0ffba7ee452602c2083268d683c4b534b2c7
-    implementation: git:b00a19b9e3e386c47bc4bac076e496db1a7457db
+    implementation: git:df2291f5a78dac497578aceee1aa4e90e6e146cc
     language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
     execution_environment: sha256:d71473693aa50faef1a25a449aa5808490e21eaf2a987942d1fb134c773550d1
-    checkpoint: git:b00a19b9e3e386c47bc4bac076e496db1a7457db
+    checkpoint: git:df2291f5a78dac497578aceee1aa4e90e6e146cc
 scope:
   authority_scope: [RTG::'Graph Query', RTGSystem::'Query graph', RTGSystem::'Assess graph conformance', VellisRequirements::querySafety, VellisRequirements::validationCoverage, VellisRequirements::historyIndependentCurrentWork, VellisVerification::semanticQuery, VellisVerification::currentWorkScaling]
   implementation_scope: [vellis/query.py, vellis/store.py, vellis/normalized.py, tests/vellis/, README.md, system-evolution.yaml]
@@ -166,7 +166,7 @@ work_items:
     label: Integrate scaling evidence and close the prerelease candidate
     kind: closure
     dependencies: [W001, W002, W003]
-    planned_baseline: {dimension: implementation, identity: git:b00a19b9e3e386c47bc4bac076e496db1a7457db}
+    planned_baseline: {dimension: implementation, identity: git:df2291f5a78dac497578aceee1aa4e90e6e146cc}
     finding_ids: []
     decision_ids: []
     authority:
