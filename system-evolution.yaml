@@ -1,394 +1,208 @@
 schema_version: "1.0"
 evolution:
-  id: vellis-2-prerelease-remediation
-  objective: Formalize accepted obligations and restore semantic, observational, compatibility, and installable release integrity for Vellis 2.0.
-  observable_distinction: Requirements and objectives constrain their prose, query bounds use semantic JSON equality, required observations cannot disappear behind completed results, and installed Vellis preserves snapshot recovery.
-  lifecycle: complete
-  approval:
-    status: accepted
-    reason: The approved plan must be bound to a durable awaiting-approval checkpoint before execution.
-    checkpoint: git:90daeb0effc79e9a9a8ab8bfa64d8f701b5c15c0
+  id: vellis-2-prerelease-review-remediation
+  objective: Resolve five prerelease implementation defects without changing accepted Vellis 2.0 meaning or compatibility.
+  observable_distinction: Prospective activation cannot admit invalid state, exact numbers and positive bounds remain usable, and local POSIX memory is private or refused before use.
+  lifecycle: ready
+  approval: {status: not-required, reason: "Accepted authority decides all five defects; the owner selected the bounded fail-closed POSIX realization.", checkpoint: null}
   blocker: null
-  checkpoint: git:e4a2aec30ff050f522ca8bbc343e66ae13d7bb5b
+  checkpoint: git:784a81bc30e7f8fdb857f4e8c1df3fb41d76f6bc
 baselines:
   status: current
   source: &source
-    model: sha256:30decc89ce67a19b2f9720028ffb3eb8161edf37affd11fa49b12179b3018d3e
-    implementation: git:5d33c6ef405aa8efa1a54de81d7e9427aa9e1850
-    language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
-    execution_environment: sha256:50d4f5cf86c91d1ab613cd7ea017a88fe5127ca1c25b118033c6548591d4349f
-    checkpoint: git:5d33c6ef405aa8efa1a54de81d7e9427aa9e1850
-  target: &target
     model: sha256:adf05b52f9839b75f76240ee116c0ffba7ee452602c2083268d683c4b534b2c7
-    implementation: git:e4a2aec30ff050f522ca8bbc343e66ae13d7bb5b
+    implementation: git:784a81bc30e7f8fdb857f4e8c1df3fb41d76f6bc
     language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
     execution_environment: sha256:d71473693aa50faef1a25a449aa5808490e21eaf2a987942d1fb134c773550d1
-    checkpoint: git:e4a2aec30ff050f522ca8bbc343e66ae13d7bb5b
-  observed:
-    model: sha256:adf05b52f9839b75f76240ee116c0ffba7ee452602c2083268d683c4b534b2c7
-    implementation: git:e4a2aec30ff050f522ca8bbc343e66ae13d7bb5b
-    language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
-    execution_environment: sha256:d71473693aa50faef1a25a449aa5808490e21eaf2a987942d1fb134c773550d1
-    checkpoint: git:e4a2aec30ff050f522ca8bbc343e66ae13d7bb5b
+    checkpoint: git:784a81bc30e7f8fdb857f4e8c1df3fb41d76f6bc
+  target: null
+  observed: *source
 scope:
-  authority_scope:
-    - RTG::'JSON Value'
-    - RTG::'Graph Query Result'
-    - RTGSystem
-    - VellisRequirements
-    - VellisVerification
-    - SysML 2.1 Beta 1 sections 7.21.1, 7.21.2, and 7.24.2
-  implementation_scope:
-    - model/*.sysml
-    - vellis/__init__.py
-    - vellis/__main__.py
-    - vellis/client_setup.py
-    - vellis/preserve.py
-    - vellis/query.py
-    - vellis/setup.py
-    - vellis/store.py
-    - vellis/system.py
-    - tools/model_policy.py
-    - tools/package_smoke.py
-    - tools/system_evolution.py
-    - pyproject.toml
-    - uv.lock
-    - justfile
-    - implementation-campaign.yaml
-    - system-evolution.yaml
-    - tests/
-    - README.md
-    - CONTRIBUTING.md
-    - docs/mcp-realization.md
-    - docs/vision.md
-    - .github/workflows/check.yml
-  review_lenses:
-    - authority and conformance
-    - engineering and evidence
+  authority_scope: [RTGSystem::'Query graph', RTGSystem::'Assess graph conformance', RTGSystem::'Activate proposed change', VellisRequirements::canonicalSemanticEquality, VellisRequirements::querySafety, VellisRequirements::validationCoverage, VellisRequirements::proposalIsolation, VellisRequirements::simpleIndividualOperation, VellisRequirements::mcpOutcomeIntegrity, VellisVerification]
+  implementation_scope: [vellis/mcp.py, vellis/setup.py, vellis/store.py, vellis/streaming.py, vellis/v1_streaming.py, tests/vellis/, README.md, SECURITY.md, system-evolution.yaml]
+  review_lenses: [authority and conformance, engineering and evidence]
   non_goals:
-    - Adopting raw v1 storage, v1 ledger history, or same-directory in-place conversion.
-    - Changing MCP tool names, schemas, persistence format, authorization, or exact FastMCP 4.0.0b1 pins.
-    - Merging, tagging, publishing, or touching real ignored owner data.
+    - Changing the accepted SysML model, MCP schemas, persistence schema, snapshot formats, version, or v1 compatibility.
+    - Migrating permissions automatically or claiming verified Windows native ACL enforcement.
+    - Touching ignored owner data, client configuration, releases, tags, or external pull-request state.
 findings:
   - id: F001
-    summary: Normative requirement and case-objective prose is not owned by required constraints.
-    classification: model gap
-    consequence: Satisfaction and verification can be present while constraining none of the documented obligations.
-    authority_refs: [VellisRequirements, VellisVerification, SysML 2.1 Beta 1 sections 7.21.1 and 7.21.2]
-    evidence_refs: [command:just model-check]
-    disposition: resolved
+    summary: One-pass prospective closure can approve and activate a graph that violates link multiplicity.
+    classification: implementation defect
+    consequence: A staged endpoint-type change can hide unchanged incident links, yield a clean assessment, and commit invalid active state.
+    authority_refs: [VellisRequirements::proposalIsolation, VellisRequirements::validationCoverage, RTGSystem::'Activate proposed change']
+    evidence_refs: []
+    disposition: implementation-work
     owner_work_item_id: W001
-    implementation_status: conforming
-    nearest_wrong_system: Every relationship exists while a system violating every documented shall statement still satisfies empty formal constraints.
-    compatibility_effect: Existing obligation text becomes formally required without changing selected normal behavior or payloads.
+    implementation_status: conflicting
+    nearest_wrong_system: Prospective validation visits each affected relation and participant only once, so a newly discovered participant's other incident links remain invisible.
+    compatibility_effect: Invalid proposals become rejected with findings; valid proposal payloads, state, and history remain unchanged.
   - id: F002
-    summary: The Everyday Life verification case implicitly binds RTG requirements to a Vellis System subject.
-    classification: model gap
-    consequence: The case does not verify fresh initialization and graph invariants against the contained RTG memory.
-    authority_refs: [VellisVerification::'Everyday Life Is An Optional Confirmed Start', SysML 2.1 Beta 1 section 7.24.2]
-    evidence_refs: [command:just model-check]
-    disposition: resolved
-    owner_work_item_id: W001
-    implementation_status: conforming
-    nearest_wrong_system: The product choice passes while contained memory violates RTG requirements because verify subjects default to Vellis.
-    compatibility_effect: Verification binding changes only; the owner scenario and product behavior remain unchanged.
-  - id: F003
-    summary: Accepted authority does not define completion when a required activity append fails.
-    classification: model gap
-    consequence: Best-effort observation can return success without mandatory evidence, or failure handling can recurse without a completion boundary.
-    authority_refs: [VellisRequirements::dualLedgerSeparation, VellisRequirements::mcpOutcomeIntegrity, RTGSystem::'Assess graph conformance']
-    evidence_refs: [path:tests/vellis/test_activity_history.py#test_a_broken_activity_ledger_cannot_break_the_operation_it_observes]
-    disposition: resolved
-    owner_work_item_id: W001
-    implementation_status: conforming
-    nearest_wrong_system: An observation-bearing operation completes even though its required activity record was never stored.
-    compatibility_effect: Observation failure becomes unexpected with no completed result; accepted canonical mutations remain canonical-ledger authoritative.
-  - id: F004
-    summary: Stored projected rows deduplicate nested JSON by serialized spelling before enforcing the row bound.
+    summary: MCP serialization rejects a large integral Decimal after the same value was accepted and stored.
     classification: implementation defect
-    consequence: Mathematically equal nested numbers can produce duplicate rows and an incorrect whole-query refusal.
-    authority_refs: [VellisRequirements::canonicalSemanticEquality, VellisRequirements::semanticQueryMeaning, VellisRequirements::querySafety]
-    evidence_refs: [path:tests/vellis/test_graph_queries.py#test_a_projected_property_participates_in_row_identity]
-    disposition: resolved
+    consequence: Querying 10**31 returns a typed failure and the activity ledger can disagree with the caller's final status.
+    authority_refs: [VellisRequirements::canonicalSemanticEquality, VellisRequirements::mcpOutcomeIntegrity]
+    evidence_refs: []
+    disposition: implementation-work
     owner_work_item_id: W002
-    implementation_status: conforming
-    nearest_wrong_system: Nested 3 and 3.00 are two SQL rows although public equality says they are one value.
-    compatibility_effect: Equal duplicates collapse correctly; stored values and genuinely distinct rows are unchanged.
-  - id: F005
-    summary: Required activity append failures are swallowed after outcomes are computed.
+    implementation_status: conflicting
+    nearest_wrong_system: Storage is lossless but the MCP adapter eagerly expands or rejects integral Decimal values according to exponent size.
+    compatibility_effect: Large accepted integers remain exact JSON-number tokens; ordinary compact integers retain their existing representation.
+  - id: F003
+    summary: New POSIX stores and imports can expose plaintext owner memory through permissive filesystem modes.
     classification: implementation defect
-    consequence: Reads and safely reported non-success outcomes can appear complete without mandatory activity evidence.
-    authority_refs: [VellisRequirements::dualLedgerSeparation, VellisRequirements::mcpOutcomeIntegrity]
-    evidence_refs: [path:tests/vellis/test_activity_history.py#test_a_broken_activity_ledger_cannot_break_the_operation_it_observes]
-    disposition: resolved
-    owner_work_item_id: W003
-    implementation_status: conforming
-    nearest_wrong_system: A broken activity table leaves successful reads indistinguishable from fully observed operations.
-    compatibility_effect: Observation-store faults surface as unexpected failures; normal completed outcomes are unchanged.
-  - id: F006
-    summary: Validation assessment publication commits before its required observation is attempted.
-    classification: implementation defect
-    consequence: Failing closed can still replace the prior assessment although no completed validation result reaches the caller.
-    authority_refs: [VellisRequirements::validationCoverage, VellisRequirements::dualLedgerSeparation, RTGSystem::'Assess graph conformance']
-    evidence_refs: [path:tests/vellis/test_activity_history.py#test_a_non_conforming_graph_is_recorded_as_a_completed_assessment]
-    disposition: resolved
-    owner_work_item_id: W003
-    implementation_status: conforming
-    nearest_wrong_system: Unexpected validation failure silently replaces the prior retrievable assessment.
-    compatibility_effect: Assessment and activity publication become one observational transaction; schema and successful reports remain unchanged.
-  - id: F007
-    summary: The replacement branch removed installable package metadata and both released console entry points.
-    classification: implementation defect
-    consequence: Isolated locked invocation fails before setup, serving, recovery, or actionable guidance is reachable.
+    consequence: Under an ordinary umask, database directories and files can grant group or other access, while insecure existing stores are opened without warning.
     authority_refs: [VellisRequirements::simpleIndividualOperation]
-    evidence_refs: [command:uv run pytest tests/test_repository_policy.py -q]
-    disposition: resolved
-    owner_work_item_id: W004
-    implementation_status: conforming
-    nearest_wrong_system: Source modules pass while the installed v1 command identities cannot import or dispatch v2.
-    compatibility_effect: Both executable names dispatch an installable 2.0.0 owner command surface.
-  - id: F008
-    summary: Guidance does not explain how untouched v1 data can be exported after v2 replaces the CLI.
-    classification: plan gap
-    consequence: The supported importer exists, but an owner may conclude recovery required a pre-upgrade export.
-    authority_refs: [VellisRequirements::v1SnapshotCompatibility, VellisRequirements::simpleIndividualOperation]
-    evidence_refs: [path:README.md#implementation-status]
-    disposition: resolved
-    owner_work_item_id: W005
-    implementation_status: conforming
-    nearest_wrong_system: Correct import behavior is documented as though unsupported raw conversion or pre-upgrade export were required.
-    compatibility_effect: A v1.0 fixture and post-upgrade runbook evidence the accepted snapshot-to-new-lineage path.
-  - id: F009
-    summary: Gates do not reject vacuous constraints, backend equality drift, silent observation loss, or unbuildable artifacts.
-    classification: plan gap
-    consequence: Syntax and source-tree tests can stay green while all underlying defects recur.
-    authority_refs: [AGENTS.md, VellisVerification]
-    evidence_refs: [command:just check]
-    disposition: resolved
-    owner_work_item_id: W006
-    implementation_status: conforming
-    nearest_wrong_system: The project gate passes with bare normative docs, serialized identity, best-effort audit, and no wheel.
-    compatibility_effect: Evidence and CI become stricter without changing product payload or persistence compatibility.
+    evidence_refs: []
+    disposition: implementation-work
+    owner_work_item_id: W003
+    implementation_status: conflicting
+    nearest_wrong_system: SQLite creates plaintext memory using ambient permissions and accepts symlinked, non-owner, or broadly accessible paths.
+    compatibility_effect: POSIX stores require owner-only modes and ownership; insecure prerelease stores receive repair guidance and no automatic migration.
+  - id: F004
+    summary: Prospective direct-association multiplicity counts repeated anchor references instead of distinct associated-data identities.
+    classification: implementation defect
+    consequence: Stored prospective validation can disagree with modeled set semantics and the in-memory semantic validator.
+    authority_refs: [VellisRequirements::definitionSemantics, VellisRequirements::validationCoverage]
+    evidence_refs: []
+    disposition: implementation-work
+    owner_work_item_id: W001
+    implementation_status: conflicting
+    nearest_wrong_system: One associated-data object referring to the same anchor twice counts as two association members.
+    compatibility_effect: Duplicate references count once; distinct associated-data objects and all public formats remain unchanged.
+  - id: F005
+    summary: Oversized positive public row and finding maxima overflow SQLite integer bindings.
+    classification: implementation defect
+    consequence: Valid positive bounds such as 2**100 raise untyped OverflowError instead of returning the correct accepted result.
+    authority_refs: [VellisRequirements::querySafety, VellisRequirements::validationCoverage, VellisRequirements::mcpOutcomeIntegrity]
+    evidence_refs: []
+    disposition: implementation-work
+    owner_work_item_id: W002
+    implementation_status: conflicting
+    nearest_wrong_system: Public arbitrary positive integers are passed directly into fixed-width SQLite LIMIT and fetchmany parameters.
+    compatibility_effect: Large maxima behave like non-restrictive valid bounds; zero, negative, and ordinary over-bound behavior remains unchanged.
 decisions:
   - id: D001
-    summary: Stream raw SQL projections without a global DISTINCT materialization and apply the shared semantic row identity before maximumRows.
-    authority_refs: [VellisRequirements::canonicalSemanticEquality, VellisRequirements::querySafety]
-    alternatives: [Canonicalize and migrate nested stored JSON numbers., Keep serialized SQL equality.]
+    summary: Compute prospective invariant closure monotonically in indexed SQLite temporary tables until neither relation nor participant membership grows.
+    authority_refs: [VellisRequirements::proposalIsolation, VellisRequirements::validationCoverage]
+    alternatives: [Construct a complete resident graph., Retain one-pass expansion.]
+    reversible: true
+    owner_work_item_id: W001
+    evidence_intent: [Reject the endpoint-type invalid-activation reproducer., Terminate on cyclic affected closures without scanning disconnected populations.]
+    implementation_status: not evaluated
+    evidence_refs: []
+  - id: D002
+    summary: Preserve large integral Decimal values as exact JSON-number tokens and clamp only private SQLite limits and probes.
+    authority_refs: [VellisRequirements::canonicalSemanticEquality, VellisRequirements::querySafety, VellisRequirements::mcpOutcomeIntegrity]
+    alternatives: [Reject integers above a transport exponent threshold., Narrow the public positive-integer contract.]
     reversible: true
     owner_work_item_id: W002
-    evidence_intent: [Equal nested spellings collapse on all evaluators., Retain at most maximumRows plus one unique row.]
-    implementation_status: conforming
-    evidence_refs:
-      - path:tests/vellis/test_graph_queries.py#test_nested_numeric_spellings_are_one_bounded_semantic_row
-      - path:tests/vellis/test_graph_queries.py#test_maximum_rows_rejects_genuinely_unequal_nested_values
-      - path:tests/vellis/test_graph_queries.py#test_many_serialized_spellings_stream_without_a_global_sql_distinct_set
-  - id: D002
-    summary: Publish validation assessment and required activity in one SQLite transaction.
-    authority_refs: [VellisRequirements::validationCoverage, VellisRequirements::dualLedgerSeparation]
-    alternatives: [Roll back a separately committed assessment., Keep observation best-effort.]
+    evidence_intent: [Round-trip 10**31 through both MCP result forms., Accept 2**63-1 and 2**100 bounds without canonical effects.]
+    implementation_status: not evaluated
+    evidence_refs: []
+  - id: D003
+    summary: Enforce owner-only POSIX storage modes and fail closed with chmod guidance instead of mutating insecure existing paths.
+    authority_refs: [VellisRequirements::simpleIndividualOperation]
+    alternatives: [Silently chmod prerelease stores., Rely on the ambient umask.]
     reversible: true
     owner_work_item_id: W003
-    evidence_intent: [Fault injection preserves the exact prior current assessment.]
-    implementation_status: conforming
-    evidence_refs:
-      - path:tests/vellis/test_activity_history.py#test_validation_observation_failure_preserves_the_prior_assessment_atomically
-  - id: D003
-    summary: Preserve confirmed complete-v1-snapshot import as a new v2 lineage; reject raw and in-place migration scope.
-    authority_refs: [VellisRequirements::v1SnapshotCompatibility]
-    alternatives: [Adopt raw predecessor storage and history., Replace a v1 directory in place.]
-    reversible: false
-    owner_work_item_id: W005
-    evidence_intent: [A v1.0 export preserves representable meaning and reports every simplification or omission.]
-    implementation_status: conforming
-    evidence_refs:
-      - path:tests/vellis/test_v1_streaming.py#test_representative_v1_export_reports_every_unrepresentable_refinement
-      - path:tests/vellis/test_v1_streaming.py#test_representative_v1_export_preserves_graph_and_starts_one_new_lineage
-  - id: D004
-    summary: Freeze the reviewed installable candidate at version 2.0.0 before merge.
-    authority_refs: [VellisRequirements::simpleIndividualOperation]
-    alternatives: [Retain 0.2.0.dev0 through merge., Make an unreviewed post-merge version change.]
-    reversible: true
-    owner_work_item_id: W004
-    evidence_intent: [Built metadata, imported version, lock, and commands agree on 2.0.0.]
-    implementation_status: conforming
-    evidence_refs: [command:just package-check]
+    evidence_intent: [Create directories as 0700 and database artifacts as 0600 under umask 022., Refuse insecure existing paths without canonical effects.]
+    implementation_status: not evaluated
+    evidence_refs: []
 work_items:
   - id: W001
     order: 1
-    label: Formalize accepted obligations and observation completion
-    kind: modeling
-    dependencies: []
-    planned_baseline: {dimension: model, identity: sha256:30decc89ce67a19b2f9720028ffb3eb8161edf37affd11fa49b12179b3018d3e}
-    finding_ids: [F001, F002, F003]
-    decision_ids: []
-    authority:
-      - refs: [VellisRequirements, VellisVerification, RTGSystem]
-        coverage: full
-        remaining_work_item_ids: []
-    approval: {status: accepted, reason: "The owner accepted the formal constraint, subject, and completion meaning; durable binding is pending.", checkpoint: git:90daeb0effc79e9a9a8ab8bfa64d8f701b5c15c0}
-    nearest_wrong_system: Prose remains non-constraining, RTG verification binds to Vellis, or required observation is absent.
-    compatibility_effect: Formal and failure semantics become explicit without changing normal payloads.
-    non_effects: [MCP and persistence shapes remain unchanged., Accepted canonical mutations remain canonical-ledger authoritative.]
-    lifecycle: complete
-    implementation_status: conforming
-    evidence_refs:
-      - command:just model-check
-      - path:tests/test_model_policy.py#test_current_normative_model_blocks_own_required_constraints
-      - path:tests/test_model_policy.py#test_bare_normative_docs_are_rejected_even_when_verify_is_present
-    blocker: null
-    checkpoint: git:0de8c94b8afd71260ffece09fc73fb6a970fc7e9
-  - id: W002
-    order: 2
-    label: Enforce semantic projected-row equality before query bounds
+    label: Restore prospective validation integrity
     kind: implementation
-    dependencies: [W001]
-    planned_baseline: {dimension: implementation, identity: git:0de8c94b8afd71260ffece09fc73fb6a970fc7e9}
-    finding_ids: [F004]
+    dependencies: []
+    planned_baseline: {dimension: implementation, identity: git:784a81bc30e7f8fdb857f4e8c1df3fb41d76f6bc}
+    finding_ids: [F001, F004]
     decision_ids: [D001]
     authority:
-      - refs: [VellisRequirements::canonicalSemanticEquality, VellisRequirements::semanticQueryMeaning, VellisRequirements::querySafety]
+      - refs: [VellisRequirements::proposalIsolation, VellisRequirements::validationCoverage, RTGSystem::'Activate proposed change']
         coverage: full
         remaining_work_item_ids: []
-    approval: {status: not-required, reason: Accepted equality and bound authority already decide the defect., checkpoint: null}
-    nearest_wrong_system: Numeric spelling decides duplicate cardinality and refusal.
-    compatibility_effect: Equal duplicates collapse; storage and distinct results are unchanged.
-    non_effects: [Aggregation remains object-identity based., No persistence or schema change occurs.]
-    lifecycle: complete
-    implementation_status: conforming
-    evidence_refs:
-      - path:tests/vellis/test_graph_queries.py#test_nested_numeric_spellings_are_one_bounded_semantic_row
-      - path:tests/vellis/test_graph_queries.py#test_maximum_rows_rejects_genuinely_unequal_nested_values
-      - path:tests/vellis/test_graph_queries.py#test_semantic_projection_deduplication_does_not_change_object_aggregation
+    approval: {status: not-required, reason: "Accepted prospective and set semantics decide both defects.", checkpoint: null}
+    nearest_wrong_system: Prospective SQL either under-expands incident relations or counts duplicate references as distinct set members.
+    compatibility_effect: Prospective findings match semantic validation and invalid activation has no canonical effects.
+    non_effects: [No model, schema, snapshot, or public payload changes., Work remains independent of canonical-history length and disconnected populations.]
+    lifecycle: ready
+    implementation_status: not evaluated
+    evidence_refs: []
     blocker: null
-    checkpoint: git:9a446f6683787ae2b032f62652d087743fdd5d41
-  - id: W003
-    order: 3
-    label: Make required observation and assessment publication fail closed
+    checkpoint: null
+  - id: W002
+    order: 2
+    label: Preserve exact numbers and arbitrary positive public bounds
     kind: implementation
     dependencies: [W001]
-    planned_baseline: {dimension: implementation, identity: git:9a446f6683787ae2b032f62652d087743fdd5d41}
-    finding_ids: [F005, F006]
+    planned_baseline: {dimension: implementation, identity: git:784a81bc30e7f8fdb857f4e8c1df3fb41d76f6bc}
+    finding_ids: [F002, F005]
     decision_ids: [D002]
     authority:
-      - refs: [VellisRequirements::dualLedgerSeparation, VellisRequirements::validationCoverage, VellisRequirements::mcpOutcomeIntegrity]
+      - refs: [VellisRequirements::canonicalSemanticEquality, VellisRequirements::querySafety, VellisRequirements::validationCoverage, VellisRequirements::mcpOutcomeIntegrity]
         coverage: full
         remaining_work_item_ids: []
-    approval: {status: not-required, reason: Accepted target authority makes the correction determinate., checkpoint: null}
-    nearest_wrong_system: A result lacks observation or failed validation replaces the prior assessment.
-    compatibility_effect: Observation faults become unexpected; successful behavior and schema remain unchanged.
-    non_effects: [Accepted canonical mutations gain no duplicate activity record., Observation cannot roll back canonical history.]
-    lifecycle: complete
-    implementation_status: conforming
-    evidence_refs:
-      - path:tests/vellis/test_activity_history.py#test_activity_append_failure_prevents_an_accepted_read_from_completing
-      - path:tests/vellis/test_activity_history.py#test_activity_append_failure_supersedes_a_safely_reportable_execution_failure
-      - path:tests/vellis/test_activity_history.py#test_validation_observation_failure_preserves_the_prior_assessment_atomically
-      - path:tests/vellis/test_cleanup_boundaries.py#test_preserve_observation_failure_publishes_no_snapshot_file
-      - path:tests/vellis/test_activity_history.py#test_a_broken_activity_ledger_cannot_break_the_operation_it_observes
+    approval: {status: not-required, reason: "Accepted exact-number and positive-bound contracts decide both defects.", checkpoint: null}
+    nearest_wrong_system: Transport or SQLite representation narrows accepted mathematical values.
+    compatibility_effect: Existing values and bounds retain behavior while larger valid values become usable.
+    non_effects: [No MCP schema or persistence format changes., Rejections and reads retain their canonical non-effects.]
+    lifecycle: pending
+    implementation_status: not evaluated
+    evidence_refs: []
     blocker: null
-    checkpoint: git:e29c5d1c31472385843c940995e07b5a31e5752e
-  - id: W004
-    order: 4
-    label: Restore the installable Vellis 2.0 command boundary
+    checkpoint: null
+  - id: W003
+    order: 3
+    label: Make POSIX plaintext storage private or fail closed
     kind: implementation
-    dependencies: [W001]
-    planned_baseline: {dimension: implementation, identity: git:e29c5d1c31472385843c940995e07b5a31e5752e}
-    finding_ids: [F007]
-    decision_ids: [D004]
-    authority:
-      - refs: [VellisRequirements::simpleIndividualOperation]
-        coverage: partial
-        remaining_work_item_ids: [W005]
-    approval: {status: accepted, reason: The owner selected reviewed final 2.0.0 metadata before merge; durable binding is pending., checkpoint: git:90daeb0effc79e9a9a8ab8bfa64d8f701b5c15c0}
-    nearest_wrong_system: Source modules work while installed commands do not.
-    compatibility_effect: Both former executables dispatch v2 setup, preserve, restore, and serving.
-    non_effects: [FastMCP pins and MCP contract remain unchanged., Packaging selects no remote deployment.]
-    lifecycle: complete
-    implementation_status: conforming
-    evidence_refs:
-      - command:just package-check
-      - path:tests/test_repository_policy.py#test_release_metadata_restores_installable_package_and_legacy_commands
-    blocker: null
-    checkpoint: git:7961c5159f8b0a1748ca36105b42a258b23b0c2e
-  - id: W005
-    order: 5
-    label: Make v1 snapshot recovery and guidance reproducible
-    kind: integration
-    dependencies: [W004]
-    planned_baseline: {dimension: implementation, identity: git:7961c5159f8b0a1748ca36105b42a258b23b0c2e}
-    finding_ids: [F008]
+    dependencies: [W002]
+    planned_baseline: {dimension: implementation, identity: git:784a81bc30e7f8fdb857f4e8c1df3fb41d76f6bc}
+    finding_ids: [F003]
     decision_ids: [D003]
     authority:
-      - refs: [VellisRequirements::v1SnapshotCompatibility, VellisRequirements::simpleIndividualOperation]
+      - refs: [VellisRequirements::simpleIndividualOperation]
         coverage: full
         remaining_work_item_ids: []
-    approval: {status: accepted, reason: The owner reaffirmed snapshot translation to a new ledger and rejected in-place conversion; durable binding is pending., checkpoint: git:90daeb0effc79e9a9a8ab8bfa64d8f701b5c15c0}
-    nearest_wrong_system: Import works but guidance implies pre-upgrade-only export or raw migration.
-    compatibility_effect: A fixture and runbook evidence the accepted path.
-    non_effects: [No raw v1 reader is added., Real owner data and clients remain untouched.]
-    lifecycle: complete
-    implementation_status: conforming
-    evidence_refs:
-      - path:README.md#v1-upgrade-and-recovery
-      - path:tests/vellis/test_v1_streaming.py#test_representative_v1_export_reports_every_unrepresentable_refinement
-      - path:tests/vellis/test_v1_streaming.py#test_representative_v1_export_preserves_graph_and_starts_one_new_lineage
+    approval: {status: not-required, reason: "The owner selected fail-closed POSIX enforcement without automatic chmod.", checkpoint: null}
+    nearest_wrong_system: Plaintext local memory inherits permissive modes or follows an unsafe existing path.
+    compatibility_effect: Insecure prerelease POSIX stores require explicit owner repair; Windows keeps profile/default ACL behavior.
+    non_effects: [No automatic permission mutation., Snapshot format and v1 translation meaning remain unchanged.]
+    lifecycle: pending
+    implementation_status: not evaluated
+    evidence_refs: []
     blocker: null
-    checkpoint: git:80718765c5185f586c586cf0d2d82bbb69d6ca9a
-  - id: W006
-    order: 6
-    label: Integrate evidence and close the Vellis 2.0 candidate
+    checkpoint: null
+  - id: W004
+    order: 4
+    label: Integrate evidence and close the prerelease candidate
     kind: closure
-    dependencies: [W002, W003, W004, W005]
-    planned_baseline: {dimension: implementation, identity: git:e4a2aec30ff050f522ca8bbc343e66ae13d7bb5b}
-    finding_ids: [F009]
+    dependencies: [W001, W002, W003]
+    planned_baseline: {dimension: implementation, identity: git:784a81bc30e7f8fdb857f4e8c1df3fb41d76f6bc}
+    finding_ids: []
     decision_ids: []
     authority:
       - refs: [VellisRequirements, VellisVerification, AGENTS.md]
         coverage: full
         remaining_work_item_ids: []
-    approval: {status: not-required, reason: Closure adds evidence and reconciles the approved target., checkpoint: null}
-    nearest_wrong_system: Source checks pass while semantic or built-artifact behavior is broken.
-    compatibility_effect: CI and release evidence become stricter.
-    non_effects: [No release is merged or published., User data and clients remain untouched.]
-    lifecycle: complete
-    implementation_status: conforming
-    evidence_refs:
-      - command:just check
-      - command:just model-check
-      - command:just package-check
-      - path:tests/test_model_policy.py#test_empty_required_constraints_cannot_make_definitions_or_objectives_nonvacuous
-      - path:tests/vellis/test_graph_queries.py#test_many_serialized_spellings_stream_without_a_global_sql_distinct_set
+    approval: {status: not-required, reason: "Closure reconciles unchanged authority, implementation, documentation, and evidence.", checkpoint: null}
+    nearest_wrong_system: Focused fixes pass while cross-cutting gates, documentation truth, or exact candidate review remains incomplete.
+    compatibility_effect: Release claims become evidence-backed without changing version or public identities.
+    non_effects: [No release, tag, merge, or external client mutation., No owner data is inspected or changed.]
+    lifecycle: pending
+    implementation_status: not evaluated
+    evidence_refs: []
     blocker: null
-    checkpoint: git:e4a2aec30ff050f522ca8bbc343e66ae13d7bb5b
+    checkpoint: null
 closure:
-  finding_disposition: complete
-  model_status: accepted
-  implementation_status: conforming
-  integration_status: conforming
+  finding_disposition: open
+  model_status: unchanged
+  implementation_status: not evaluated
+  integration_status: not evaluated
   external_status: not applicable
-  compatibility: Vellis 2.0.0 formalizes existing obligations and clarifies complete-definition, prospective-preview, and setup-failure wording without changing MCP names or schemas, query meaning, or persistence formats. Semantic row equality now precedes limits without global SQL DISTINCT, and required observations fail closed. Both installed commands, exact FastMCP 4.0.0b1 pins, and confirmed v1 snapshot translation into a separate lineage remain supported. Basedpyright and Ruff changes are developer-tool-only. Raw or in-place v1 conversion, deployment, remote hosting, authentication, and plugin packaging remain outside scope.
+  compatibility: Accepted Vellis 2.0 meaning and public identities remain unchanged; compatibility effects are limited to rejecting unsafe POSIX stores and correcting previously invalid or failed behavior.
   reviews:
-    - lens: authority and conformance
-      status: clean
-      reviewer: /root/remediation_authority_review_9
-      checkpoint: git:e4a2aec30ff050f522ca8bbc343e66ae13d7bb5b
-      evidence_refs:
-        - command:just model-check
-        - command:just system-evolution-check
-        - path:tests/test_model_policy.py#test_empty_required_constraints_cannot_make_definitions_or_objectives_nonvacuous
-    - lens: engineering and evidence
-      status: clean
-      reviewer: /root/remediation_engineering_review_9
-      checkpoint: git:e4a2aec30ff050f522ca8bbc343e66ae13d7bb5b
-      evidence_refs:
-        - command:just check
-        - command:just package-check
-        - path:tests/vellis/test_graph_queries.py#test_many_serialized_spellings_stream_without_a_global_sql_distinct_set
-  evidence_refs:
-    - command:just check
-    - command:just model-check
-    - command:just package-check
-    - path:tests/vellis/test_activity_history.py#test_validation_observation_failure_preserves_the_prior_assessment_atomically
-    - path:tests/vellis/test_client_setup.py#test_unparseable_inspection_is_separate_from_successful_initialization
-    - path:tests/vellis/test_v1_streaming.py#test_representative_v1_export_preserves_graph_and_starts_one_new_lineage
-  checkpoint: git:e4a2aec30ff050f522ca8bbc343e66ae13d7bb5b
+    - {lens: authority and conformance, status: pending, reviewer: null, checkpoint: null, evidence_refs: []}
+    - {lens: engineering and evidence, status: pending, reviewer: null, checkpoint: null, evidence_refs: []}
+  evidence_refs: []
+  checkpoint: null
