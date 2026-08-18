@@ -240,7 +240,7 @@ async def test_large_integral_number_remains_exact_and_query_activity_is_accepte
             provenance=Provenance("owner"),
             initialization_summary="fresh",
         ).accepted
-        exact_integer = 10**31
+        exact_integer = 10**31 + 1
         async with Client(build_server(memory)) as mcp_client:
             changed = await mcp_client.call_tool(
                 "rtg_change",
@@ -359,7 +359,7 @@ def test_raw_stdio_preserves_exact_fraction_and_large_integer_in_both_directions
         encoding="utf-8",
     )
     exact = Decimal("0.12345678901234567890123456789")
-    exact_integer = 10**31
+    exact_integer = 10**31 + 1
     try:
         assert process.stdin is not None
 
@@ -453,7 +453,7 @@ def test_raw_stdio_preserves_exact_fraction_and_large_integer_in_both_directions
         assert rows[0]["properties"][0]["value"] == exact, raw_query
         assert rows[0]["properties"][1]["value"] == exact_integer, raw_query
         assert f'"value":{exact}' in raw_query
-        assert '"value":1E+31' in raw_query
+        assert f'"value":{exact_integer}' in raw_query
         content = query_result["content"]
         assert isinstance(content, list)
         text = content[0]["text"]

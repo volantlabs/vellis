@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import shlex
 import subprocess
 from collections import Counter
@@ -116,6 +117,51 @@ def _reference_findings(record: dict[str, Any], *, root: Path) -> list[str]:
             reference.removeprefix("command:"), root=root
         ):
             findings.append(f"{label} command evidence is not a Vellis check: {reference}")
+    return findings
+
+
+def _authority_reference_findings(record: dict[str, Any], *, root: Path) -> list[str]:
+    """Reject qualified authority names that do not resolve in the current model."""
+    references: list[tuple[str, str]] = [
+        ("scope", reference) for reference in record["scope"]["authority_scope"]
+    ]
+    for finding in record["findings"]:
+        references.extend(
+            (f"finding {finding['id']}", reference)
+            for reference in finding["authority_refs"]
+        )
+    for decision in record["decisions"]:
+        references.extend(
+            (f"decision {decision['id']}", reference)
+            for reference in decision["authority_refs"]
+        )
+    for item in record["work_items"]:
+        for contribution in item["authority"]:
+            references.extend(
+                (f"work item {item['id']}", reference) for reference in contribution["refs"]
+            )
+
+    package_text: dict[str, str] = {}
+    for path in sorted((root / "model").glob("*.sysml")):
+        text = path.read_text(encoding="utf-8")
+        for package in re.findall(r"^\s*package\s+(?:'([^']+)'|([A-Za-z_]\w*))\s*\{", text, re.M):
+            package_text[package[0] or package[1]] = text
+
+    findings: list[str] = []
+    for label, reference in references:
+        if "::" not in reference:
+            continue
+        package, member = reference.split("::", 1)
+        text = package_text.get(package)
+        if text is None:
+            findings.append(f"{label} authority reference does not resolve: {reference}")
+            continue
+        if member.startswith("'") and member.endswith("'"):
+            resolves = member in text
+        else:
+            resolves = re.search(rf"(?<![\w]){re.escape(member)}(?![\w])", text) is not None
+        if not resolves:
+            findings.append(f"{label} authority reference does not resolve: {reference}")
     return findings
 
 
@@ -692,6 +738,7 @@ def validate_record(record: dict[str, Any], *, root: Path = ROOT) -> list[str]:
             findings.append(f"pending review {review['lens']!r} retains completed-review state")
 
     findings.extend(_reference_findings(record, root=root))
+    findings.extend(_authority_reference_findings(record, root=root))
     findings.extend(_git_checkpoint_findings(record, root=root))
     findings.extend(_repository_baseline_findings(record, root=root))
     findings.extend(_approval_checkpoint_findings(record, root=root))

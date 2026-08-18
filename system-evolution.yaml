@@ -28,7 +28,7 @@ baselines:
     execution_environment: sha256:d71473693aa50faef1a25a449aa5808490e21eaf2a987942d1fb134c773550d1
     checkpoint: git:1f674497ca02a2a5ce8fb93a0bf1ffc444fd2d69
 scope:
-  authority_scope: [RTGSystem::'Query graph', RTGSystem::'Assess graph conformance', RTGSystem::'Activate proposed change', VellisRequirements::canonicalSemanticEquality, VellisRequirements::querySafety, VellisRequirements::validationCoverage, VellisRequirements::proposalIsolation, VellisRequirements::simpleIndividualOperation, VellisRequirements::mcpOutcomeIntegrity, VellisVerification]
+  authority_scope: [RTGSystem::'Query graph', RTGSystem::'Assess graph conformance', RTGSystem::'Activate definition delta', VellisRequirements::canonicalSemanticEquality, VellisRequirements::querySafety, VellisRequirements::validationCoverage, VellisRequirements::nonDisruptiveDefinitionWork, VellisRequirements::ownerControlledMemory, VellisRequirements::mcpOutcomeIntegrity, VellisVerification]
   implementation_scope: [vellis/mcp.py, vellis/setup.py, vellis/store.py, vellis/streaming.py, vellis/v1_streaming.py, tests/vellis/, README.md, SECURITY.md, system-evolution.yaml]
   review_lenses: [authority and conformance, engineering and evidence]
   non_goals:
@@ -40,7 +40,7 @@ findings:
     summary: One-pass prospective closure can approve and activate a graph that violates link multiplicity.
     classification: implementation defect
     consequence: A staged endpoint-type change can hide unchanged incident links, yield a clean assessment, and commit invalid active state.
-    authority_refs: [VellisRequirements::proposalIsolation, VellisRequirements::validationCoverage, RTGSystem::'Activate proposed change']
+    authority_refs: [VellisRequirements::nonDisruptiveDefinitionWork, VellisRequirements::validationCoverage, RTGSystem::'Activate definition delta']
     evidence_refs: [path:tests/vellis/test_sqlite_prospective_state.py#test_endpoint_type_change_cannot_activate_an_incomplete_multiplicity_closure]
     disposition: resolved
     owner_work_item_id: W001
@@ -50,7 +50,7 @@ findings:
   - id: F002
     summary: MCP serialization rejects a large integral Decimal after the same value was accepted and stored.
     classification: implementation defect
-    consequence: Querying 10**31 returns a typed failure and the activity ledger can disagree with the caller's final status.
+    consequence: Querying a large exact integer such as 10**31 + 1 can return a lossy or typed-failed result and make the activity ledger disagree with the caller's final status.
     authority_refs: [VellisRequirements::canonicalSemanticEquality, VellisRequirements::mcpOutcomeIntegrity]
     evidence_refs:
       - path:tests/vellis/test_mcp_boundary.py#test_large_integral_number_remains_exact_and_query_activity_is_accepted
@@ -64,7 +64,7 @@ findings:
     summary: New POSIX stores and imports can expose plaintext owner memory through permissive filesystem modes.
     classification: implementation defect
     consequence: Under an ordinary umask, database directories and files can grant group or other access, while insecure existing stores are opened without warning.
-    authority_refs: [VellisRequirements::simpleIndividualOperation]
+    authority_refs: [VellisRequirements::ownerControlledMemory]
     evidence_refs:
       - path:tests/vellis/test_storage_permissions.py#test_setup_and_sqlite_companions_are_private_under_umask_022
       - path:tests/vellis/test_storage_permissions.py#test_normalized_and_v1_import_publications_remain_private
@@ -80,7 +80,7 @@ findings:
     summary: Prospective direct-association multiplicity counts repeated anchor references instead of distinct associated-data identities.
     classification: implementation defect
     consequence: Stored prospective validation can disagree with modeled set semantics and the in-memory semantic validator.
-    authority_refs: [VellisRequirements::definitionSemantics, VellisRequirements::validationCoverage]
+    authority_refs: [VellisRequirements::graphInvariants, VellisRequirements::validationCoverage]
     evidence_refs: [path:tests/vellis/test_sqlite_prospective_state.py#test_repeated_anchor_references_have_set_multiplicity_in_prospective_sql]
     disposition: resolved
     owner_work_item_id: W001
@@ -103,7 +103,7 @@ findings:
 decisions:
   - id: D001
     summary: Compute prospective invariant closure monotonically in indexed SQLite temporary tables until neither relation nor participant membership grows.
-    authority_refs: [VellisRequirements::proposalIsolation, VellisRequirements::validationCoverage]
+    authority_refs: [VellisRequirements::nonDisruptiveDefinitionWork, VellisRequirements::validationCoverage]
     alternatives: [Construct a complete resident graph., Retain one-pass expansion.]
     reversible: true
     owner_work_item_id: W001
@@ -118,7 +118,7 @@ decisions:
     alternatives: [Reject integers above a transport exponent threshold., Narrow the public positive-integer contract.]
     reversible: true
     owner_work_item_id: W002
-    evidence_intent: [Round-trip 10**31 through both MCP result forms., Accept 2**63-1 and 2**100 bounds without canonical effects.]
+    evidence_intent: [Round-trip 10**31 + 1 through both MCP result forms., Accept 2**63-1 and 2**100 bounds without canonical effects.]
     implementation_status: conforming
     evidence_refs:
       - path:tests/vellis/test_mcp_boundary.py#test_large_integral_number_remains_exact_and_query_activity_is_accepted
@@ -127,7 +127,7 @@ decisions:
       - path:tests/vellis/test_sqlite_prospective_state.py#test_assessment_and_finding_pages_accept_oversized_positive_maxima
   - id: D003
     summary: Enforce owner-only POSIX storage modes and fail closed with chmod guidance instead of mutating insecure existing paths.
-    authority_refs: [VellisRequirements::simpleIndividualOperation]
+    authority_refs: [VellisRequirements::ownerControlledMemory]
     alternatives: [Silently chmod prerelease stores., Rely on the ambient umask.]
     reversible: true
     owner_work_item_id: W003
@@ -147,7 +147,7 @@ work_items:
     finding_ids: [F001, F004]
     decision_ids: [D001]
     authority:
-      - refs: [VellisRequirements::proposalIsolation, VellisRequirements::validationCoverage, RTGSystem::'Activate proposed change']
+      - refs: [VellisRequirements::nonDisruptiveDefinitionWork, VellisRequirements::validationCoverage, RTGSystem::'Activate definition delta']
         coverage: full
         remaining_work_item_ids: []
     approval: {status: not-required, reason: "Accepted prospective and set semantics decide both defects.", checkpoint: null}
@@ -195,7 +195,7 @@ work_items:
     finding_ids: [F003]
     decision_ids: [D003]
     authority:
-      - refs: [VellisRequirements::simpleIndividualOperation]
+      - refs: [VellisRequirements::ownerControlledMemory]
         coverage: full
         remaining_work_item_ids: []
     approval: {status: not-required, reason: "The owner selected fail-closed POSIX enforcement without automatic chmod.", checkpoint: null}

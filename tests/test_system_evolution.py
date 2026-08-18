@@ -112,6 +112,21 @@ def test_committed_evolution_record_is_valid() -> None:
     assert system_evolution.validate_record(_record()) == []
 
 
+def test_qualified_authority_references_must_resolve_in_the_current_model() -> None:
+    record = copy.deepcopy(_record())
+    record["findings"][0]["authority_refs"] = [  # type: ignore[index]
+        "VellisRequirements::doesNotExist"
+    ]
+
+    findings = system_evolution.validate_record(record)  # type: ignore[arg-type]
+
+    assert any(
+        "finding F001 authority reference does not resolve: "
+        "VellisRequirements::doesNotExist" in finding
+        for finding in findings
+    )
+
+
 def test_unknown_owned_finding_is_rejected() -> None:
     record = copy.deepcopy(_record())
     record["work_items"][0]["finding_ids"].append("F999")  # type: ignore[index,union-attr]

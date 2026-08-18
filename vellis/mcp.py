@@ -55,7 +55,8 @@ from datetime import datetime
 from decimal import Decimal
 from enum import Enum
 from pathlib import Path
-from typing import cast
+from types import TracebackType
+from typing import Any, Self, cast
 
 import anyio
 import anyio.lowlevel
@@ -74,6 +75,7 @@ from mcp.shared._context_streams import (
     ContextSendStream,
     create_context_streams,
 )
+from mcp.shared._stream_protocols import WriteStream
 from mcp.shared.message import SessionMessage
 from mcp.types import CallToolRequestParams, CallToolResult, TextContent
 
@@ -214,6 +216,34 @@ def _restore_exact_structured_content(message: object) -> object:
     return {**message, "result": {**result, "structuredContent": exact}}
 
 
+class _ExactStructuredWriteStream:
+    """Repair FastMCP's lossy structured copy before any transport receives it."""
+
+    def __init__(self, target: WriteStream[SessionMessage]) -> None:
+        self._target = target
+
+    async def send(self, item: SessionMessage, /) -> None:
+        raw = item.message.model_dump(by_alias=True, exclude_unset=True, mode="python")
+        repaired = _restore_exact_structured_content(raw)
+        message = mcp_types.jsonrpc_message_adapter.validate_python(repaired, by_name=False)
+        await self._target.send(SessionMessage(message, item.metadata))
+
+    async def aclose(self) -> None:
+        await self._target.aclose()
+
+    async def __aenter__(self) -> Self:
+        await self._target.__aenter__()
+        return self
+
+    async def __aexit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: TracebackType | None,
+    ) -> bool | None:
+        return await self._target.__aexit__(exc_type, exc_val, exc_tb)
+
+
 @asynccontextmanager
 async def _exact_stdio_server(
     stdin: anyio.AsyncFile[str] | None = None,
@@ -301,6 +331,25 @@ async def _exact_stdio_server(
 
 class _VellisMCP(FastMCP):
     """FastMCP with the exact-number stdio realization Vellis requires."""
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        original_run = self._mcp_server.run  # pyright: ignore[reportPrivateUsage]
+
+        async def run_with_exact_results(
+            read_stream: Any,
+            write_stream: WriteStream[SessionMessage],
+            initialization_options: Any,
+            raise_exceptions: bool = False,
+        ) -> None:
+            await original_run(
+                read_stream,
+                _ExactStructuredWriteStream(write_stream),
+                initialization_options,
+                raise_exceptions,
+            )
+
+        self._mcp_server.run = run_with_exact_results  # type: ignore[method-assign]  # pyright: ignore[reportPrivateUsage]
 
     async def run_stdio_async(
         self,
