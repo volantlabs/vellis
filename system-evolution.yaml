@@ -3,13 +3,13 @@ evolution:
   id: vellis-2-prerelease-remediation
   objective: Formalize accepted obligations and restore semantic, observational, compatibility, and installable release integrity for Vellis 2.0.
   observable_distinction: Requirements and objectives constrain their prose, query bounds use semantic JSON equality, required observations cannot disappear behind completed results, and installed Vellis preserves snapshot recovery.
-  lifecycle: active
+  lifecycle: complete
   approval:
     status: accepted
     reason: The approved plan must be bound to a durable awaiting-approval checkpoint before execution.
     checkpoint: git:90daeb0effc79e9a9a8ab8bfa64d8f701b5c15c0
   blocker: null
-  checkpoint: git:a2f64e5985edeb74bbbde815c56221c2ed491575
+  checkpoint: git:e4a2aec30ff050f522ca8bbc343e66ae13d7bb5b
 baselines:
   status: current
   source: &source
@@ -20,16 +20,16 @@ baselines:
     checkpoint: git:5d33c6ef405aa8efa1a54de81d7e9427aa9e1850
   target: &target
     model: sha256:adf05b52f9839b75f76240ee116c0ffba7ee452602c2083268d683c4b534b2c7
-    implementation: git:a2f64e5985edeb74bbbde815c56221c2ed491575
+    implementation: git:e4a2aec30ff050f522ca8bbc343e66ae13d7bb5b
     language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
     execution_environment: sha256:d71473693aa50faef1a25a449aa5808490e21eaf2a987942d1fb134c773550d1
-    checkpoint: git:a2f64e5985edeb74bbbde815c56221c2ed491575
+    checkpoint: git:e4a2aec30ff050f522ca8bbc343e66ae13d7bb5b
   observed:
     model: sha256:adf05b52f9839b75f76240ee116c0ffba7ee452602c2083268d683c4b534b2c7
-    implementation: git:a2f64e5985edeb74bbbde815c56221c2ed491575
+    implementation: git:e4a2aec30ff050f522ca8bbc343e66ae13d7bb5b
     language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
     execution_environment: sha256:d71473693aa50faef1a25a449aa5808490e21eaf2a987942d1fb134c773550d1
-    checkpoint: git:a2f64e5985edeb74bbbde815c56221c2ed491575
+    checkpoint: git:e4a2aec30ff050f522ca8bbc343e66ae13d7bb5b
 scope:
   authority_scope:
     - RTG::'JSON Value'
@@ -339,7 +339,7 @@ work_items:
     label: Integrate evidence and close the Vellis 2.0 candidate
     kind: closure
     dependencies: [W002, W003, W004, W005]
-    planned_baseline: {dimension: implementation, identity: git:a2f64e5985edeb74bbbde815c56221c2ed491575}
+    planned_baseline: {dimension: implementation, identity: git:e4a2aec30ff050f522ca8bbc343e66ae13d7bb5b}
     finding_ids: [F009]
     decision_ids: []
     authority:
@@ -350,26 +350,45 @@ work_items:
     nearest_wrong_system: Source checks pass while semantic or built-artifact behavior is broken.
     compatibility_effect: CI and release evidence become stricter.
     non_effects: [No release is merged or published., User data and clients remain untouched.]
-    lifecycle: active
-    implementation_status: partial
+    lifecycle: complete
+    implementation_status: conforming
     evidence_refs:
       - command:just check
       - command:just model-check
       - command:just package-check
+      - path:tests/test_model_policy.py#test_empty_required_constraints_cannot_make_definitions_or_objectives_nonvacuous
+      - path:tests/vellis/test_graph_queries.py#test_many_serialized_spellings_stream_without_a_global_sql_distinct_set
     blocker: null
-    checkpoint: null
+    checkpoint: git:e4a2aec30ff050f522ca8bbc343e66ae13d7bb5b
 closure:
-  finding_disposition: open
+  finding_disposition: complete
   model_status: accepted
   implementation_status: conforming
-  integration_status: partial
+  integration_status: conforming
   external_status: not applicable
-  compatibility: Vellis 2.0.0 restores both installed commands while preserving MCP names and schemas, persistence formats, exact FastMCP 4.0.0b1 pins, and confirmed v1 snapshot translation into a separate new lineage. Raw or in-place v1 conversion, deployment, remote hosting, authentication, and plugin packaging remain outside scope.
+  compatibility: Vellis 2.0.0 formalizes existing obligations and clarifies complete-definition, prospective-preview, and setup-failure wording without changing MCP names or schemas, query meaning, or persistence formats. Semantic row equality now precedes limits without global SQL DISTINCT, and required observations fail closed. Both installed commands, exact FastMCP 4.0.0b1 pins, and confirmed v1 snapshot translation into a separate lineage remain supported. Basedpyright and Ruff changes are developer-tool-only. Raw or in-place v1 conversion, deployment, remote hosting, authentication, and plugin packaging remain outside scope.
   reviews:
-    - {lens: authority and conformance, status: pending, reviewer: null, checkpoint: null, evidence_refs: []}
-    - {lens: engineering and evidence, status: pending, reviewer: null, checkpoint: null, evidence_refs: []}
+    - lens: authority and conformance
+      status: clean
+      reviewer: /root/remediation_authority_review_9
+      checkpoint: git:e4a2aec30ff050f522ca8bbc343e66ae13d7bb5b
+      evidence_refs:
+        - command:just model-check
+        - command:just system-evolution-check
+        - path:tests/test_model_policy.py#test_empty_required_constraints_cannot_make_definitions_or_objectives_nonvacuous
+    - lens: engineering and evidence
+      status: clean
+      reviewer: /root/remediation_engineering_review_9
+      checkpoint: git:e4a2aec30ff050f522ca8bbc343e66ae13d7bb5b
+      evidence_refs:
+        - command:just check
+        - command:just package-check
+        - path:tests/vellis/test_graph_queries.py#test_many_serialized_spellings_stream_without_a_global_sql_distinct_set
   evidence_refs:
     - command:just check
     - command:just model-check
     - command:just package-check
-  checkpoint: null
+    - path:tests/vellis/test_activity_history.py#test_validation_observation_failure_preserves_the_prior_assessment_atomically
+    - path:tests/vellis/test_client_setup.py#test_unparseable_inspection_is_separate_from_successful_initialization
+    - path:tests/vellis/test_v1_streaming.py#test_representative_v1_export_preserves_graph_and_starts_one_new_lineage
+  checkpoint: git:e4a2aec30ff050f522ca8bbc343e66ae13d7bb5b
