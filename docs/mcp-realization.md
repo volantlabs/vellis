@@ -80,13 +80,15 @@ projections, revision/time indexes, definition checkpoints, caches, and snapshot
 realization choices, not selected architecture. Conformance should use semantic record-access counts
 or equivalent traces; wall-clock targets wait for representative runtime, hardware, and owner data.
 
-The selected Vellis realization stores normalized object values, definition entries, presence
+The currently implemented, target-conflicting query realization stores normalized object values,
+definition entries, presence
 intervals, proposal entries, assessments, canonical events, and activity records in shared SQLite
 tables. The state head carries transactionally maintained current-graph and proposal summaries, so
-ordinary transition identity is derived without a population scan. Projected queries compile to
+ordinary transition identity is derived without a population scan. Before this evolution is
+implemented, projected queries compile to
 parameterized joins and `EXISTS` expressions, then stream raw candidate rows through semantic
 identity until `maximumRows + 1` unique rows are found or the cursor is exhausted; they do not ask
-SQLite to materialize a global serialized `DISTINCT` set. Aggregations use a limited SQL `DISTINCT`
+SQLite to materialize a global serialized `DISTINCT` set. The old aggregate shape uses a limited SQL `DISTINCT`
 over matched object identities and refuse the whole result after `maximumRows + 1`. Ordinary mutation
 validation derives the affected invariant closure; explicit
 full checks and broad cutovers use set-based scans and SQLite-backed findings. Snapshot, tail, restore,
@@ -126,15 +128,45 @@ pass is evidence of missing discrimination, not evidence that the following shap
 These measurements characterize forbidden dependency shapes; they are not public latency budgets.
 The successor evolution record owns their model, implementation, evidence, and deletion closure.
 
-Query rows are distinct projected tuples. To count anchors exactly, use an anchor-only return shape
-and count its rows, or count distinct projected anchor UUIDs when other projections can produce
-several tuples per anchor. Projecting only repeated property values may intentionally collapse
-several objects into one tuple. Aggregations count or total matches of a named associated-data
-condition without that projection collapse. A multi-type anchor group can project all of its anchors,
-but one associated-data condition over that group requires a data type permitted for every member
-anchor type. When the vocabulary instead uses separate per-type data, issue one bounded query per
-type and merge the results. Native aggregation over anchor groups remains a possible efficiency
-extension rather than a current capability gap.
+The raw measurements used CPython 3.14.5, SQLite 3.53.1, macOS 15.7.8 arm64, and the repository's
+`uv.lock` identity `sha256:d71473693aa50faef1a25a449aa5808490e21eaf2a987942d1fb134c773550d1`.
+SQLite work was counted with `Connection.set_progress_handler(..., 1)` and decoded objects with
+`SQLiteStore.current_graph_object_decodes`, using the reusable measurement boundary in
+`tests/vellis/characterization.py`. Each series rebuilt a fresh temporary database for each size and
+measured only the named operation after fixture construction.
+
+The fixture families are reconstructible as follows:
+
+- For active hub-of-hubs work, create one changed hub with degree D, give each neighbor D other
+  incident links, reset instrumentation, and apply only the hub's endpoint-type upsert for D = 10,
+  20, and 40. The existing endpoint-change setup and prospective degree controls are exercised by
+  `uv run pytest tests/vellis/test_graph_changes.py::test_endpoint_type_change_revalidates_incident_links tests/vellis/test_sqlite_prospective_state.py::test_participant_type_change_scales_with_its_applicable_incident_degree`.
+- For irrelevant rules, create one isolated anchor, add N multiplicity rules whose participating
+  type sets mention its type but whose counts cannot change, then rename only that anchor for N =
+  10, 100, 500, and 1,000. For the K-by-K case, create K independent type changes and K rules with
+  exactly one applicable subject each. The related measurement boundary is exercised by
+  `uv run pytest tests/vellis/test_sqlite_prospective_state.py::test_display_only_assessment_work_ignores_connected_component_length tests/vellis/test_sqlite_prospective_state.py::test_link_shape_assessment_scales_with_hub_degree_not_second_hop_degree`.
+- For aggregation, use one projected identity with N independently satisfying hidden witnesses,
+  reset the progress handler, and execute the aggregate-only query. Inspect the compiled statement
+  with `EXPLAIN QUERY PLAN`; the baseline reaches its late distinct after the flat witness joins.
+  The current hidden-component and aggregation controls are exercised by
+  `uv run pytest tests/vellis/test_graph_queries.py::test_unprojected_disconnected_population_does_not_multiply_projection_work tests/vellis/test_graph_queries.py::test_scalar_aggregation_streams_one_bounded_selection`.
+- For the historical binding boundary, lower `SQLITE_LIMIT_VARIABLE_NUMBER` to 32 and submit the
+  same aggregate query as current, prospective, and revision-selected state. The historical form's
+  compiled revision and bound parameters expose the missing preflight binding.
+- For permitted values, construct valid unique strings of the form `value-{index}` at each stated
+  size and time only `validate_definition_set`. The semantic baseline is exercised by
+  `uv run pytest tests/vellis/test_definition_validity.py::test_permitted_values_are_unique_by_json_equality_not_by_text`.
+
+W002 through W004 replace these trigger recipes with permanent discriminating regression fixtures;
+the final subtraction review removes any evidence that asserts the superseded implementation shape.
+
+The accepted target instead has exclusive row and aggregate outputs. Row identity preserves every
+projected source object, including the associated-data UUID behind a property value, while aggregate
+output operates on one distinct associated-data target population. Equal property values from
+different source objects therefore remain different rows. Implementation work deletes the old
+return-shape advice and translation paths; callers needing distinct values may deduplicate a complete
+bounded row result.
 
 ## Local setup path
 

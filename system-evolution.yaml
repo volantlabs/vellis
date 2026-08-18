@@ -16,13 +16,13 @@ baselines:
     execution_environment: sha256:d71473693aa50faef1a25a449aa5808490e21eaf2a987942d1fb134c773550d1
     checkpoint: git:ca6539e10393a5a52e2cd2f67d0af662e92cc010
   target:
-    model: sha256:11501ab66e8e477fc9b5d8eab723902c813129401591aaef2c79f71ad211b2a0
+    model: sha256:166e6f06ea2835127b96d3ef0133bb0b03c7c7c1aedb5442930742501bc4d4b3
     implementation: git:6060a99dc159fe49304db99ebb7573055e7925cf
     language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
     execution_environment: sha256:d71473693aa50faef1a25a449aa5808490e21eaf2a987942d1fb134c773550d1
     checkpoint: git:6060a99dc159fe49304db99ebb7573055e7925cf
   observed:
-    model: sha256:11501ab66e8e477fc9b5d8eab723902c813129401591aaef2c79f71ad211b2a0
+    model: sha256:166e6f06ea2835127b96d3ef0133bb0b03c7c7c1aedb5442930742501bc4d4b3
     implementation: git:6060a99dc159fe49304db99ebb7573055e7925cf
     language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
     execution_environment: sha256:d71473693aa50faef1a25a449aa5808490e21eaf2a987942d1fb134c773550d1
@@ -83,7 +83,7 @@ work_items:
     label: Replace quadratic JSON collection equality
     kind: implementation
     dependencies: [W001]
-    planned_baseline: {dimension: model, identity: sha256:11501ab66e8e477fc9b5d8eab723902c813129401591aaef2c79f71ad211b2a0}
+    planned_baseline: {dimension: model, identity: sha256:166e6f06ea2835127b96d3ef0133bb0b03c7c7c1aedb5442930742501bc4d4b3}
     finding_ids: [F010]
     decision_ids: [D007]
     authority: [{refs: [VellisRequirements::canonicalSemanticEquality], coverage: partial, remaining_work_item_ids: [W005]}]
@@ -101,7 +101,7 @@ work_items:
     label: Replace the query contract and execution path end to end
     kind: implementation
     dependencies: [W002]
-    planned_baseline: {dimension: model, identity: sha256:11501ab66e8e477fc9b5d8eab723902c813129401591aaef2c79f71ad211b2a0}
+    planned_baseline: {dimension: model, identity: sha256:166e6f06ea2835127b96d3ef0133bb0b03c7c7c1aedb5442930742501bc4d4b3}
     finding_ids: [F003, F004, F009]
     decision_ids: [D003, D004, D005, D009]
     authority: [{refs: [RTG::'Graph Query', RTG::'Evaluated State Selection', RTG::'Definition Summary Request', RTG::'Definition Inspection Request', RTGSystem::'Query graph', RTGSystem::'Discover evaluated graph definitions', VellisRequirements::semanticQueryMeaning, VellisRequirements::querySafety, VellisRequirements::historicalStateCorrectness, VellisRequirements::agentDefinitionDiscoverability, VellisRequirements::mcpAgentToolContract], coverage: full, remaining_work_item_ids: []}]
@@ -119,7 +119,7 @@ work_items:
     label: Unify active and prospective invariant impact
     kind: implementation
     dependencies: [W003]
-    planned_baseline: {dimension: model, identity: sha256:11501ab66e8e477fc9b5d8eab723902c813129401591aaef2c79f71ad211b2a0}
+    planned_baseline: {dimension: model, identity: sha256:166e6f06ea2835127b96d3ef0133bb0b03c7c7c1aedb5442930742501bc4d4b3}
     finding_ids: [F007, F008]
     decision_ids: [D008]
     authority: [{refs: [VellisRequirements::explicitGraphChangeSet, VellisRequirements::validationCoverage, VellisRequirements::historyIndependentCurrentWork], coverage: partial, remaining_work_item_ids: [W005]}]
@@ -137,7 +137,7 @@ work_items:
     label: Integrate evidence, synchronize documentation, and close the evolution
     kind: closure
     dependencies: [W001, W002, W003, W004]
-    planned_baseline: {dimension: model, identity: sha256:11501ab66e8e477fc9b5d8eab723902c813129401591aaef2c79f71ad211b2a0}
+    planned_baseline: {dimension: model, identity: sha256:166e6f06ea2835127b96d3ef0133bb0b03c7c7c1aedb5442930742501bc4d4b3}
     finding_ids: [F011]
     decision_ids: []
     authority: [{refs: [VellisRequirements, VellisVerification, AGENTS.md], coverage: full, remaining_work_item_ids: []}]

@@ -594,10 +594,11 @@ package VellisVerification {
              * proposed-definition content, and keyed graph-overlay content also
              * participate without requiring either state as a resident aggregate.
              * Validate permitted-value collections at successively doubled sizes
-             * through at least eight thousand members. Show one canonical-key
-             * construction per supplied value, set or counter membership rather
-             * than pairwise equality scans, and unchanged duplicate decisions for
-             * equivalent numbers, object-member order, and nested values.
+             * through at least eight thousand members. Instrument semantic
+             * equality work and show each supplied value contributes once to the
+             * uniqueness decision rather than being compared with every earlier
+             * value, while preserving duplicate decisions for equivalent numbers,
+             * object-member order, and nested values.
              */
             }
             verify VellisRequirements::canonicalSemanticEquality;
