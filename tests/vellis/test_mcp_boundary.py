@@ -325,7 +325,7 @@ def test_raw_stdio_preserves_exact_fraction_and_large_integer_in_both_directions
 ) -> None:
     """The transport must not round a JSON number before Vellis can read its meaning."""
     directory = tmp_path / "memory"
-    directory.mkdir()
+    directory.mkdir(mode=0o700)
     memory = directory / "vellis.sqlite3"
     system = RTGSystem.open(memory)
     try:

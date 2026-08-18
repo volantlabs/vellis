@@ -115,6 +115,7 @@ def test_close_reports_a_reader_that_prevents_a_complete_checkpoint(tmp_path: Pa
     reopened.close()
     copied = tmp_path / "copied.sqlite3"
     copyfile(path, copied)
+    copied.chmod(0o600)
     copy = RTGSystem.open(copied)
     try:
         copied_state = materialize_state(copy)
@@ -297,6 +298,7 @@ def test_an_unrelated_database_is_refused_not_adopted(tmp_path: Path) -> None:
         connection.commit()
     finally:
         connection.close()
+    path.chmod(0o600)
 
     with pytest.raises(StoreError, match="not a Vellis canonical store"):
         CanonicalStore(path)
@@ -305,6 +307,7 @@ def test_an_unrelated_database_is_refused_not_adopted(tmp_path: Path) -> None:
 def test_a_file_that_is_not_a_database_reports_a_store_error(tmp_path: Path) -> None:
     path = tmp_path / "vellis.sqlite3"
     path.write_text("this is not a database\n", encoding="utf-8")
+    path.chmod(0o600)
 
     with pytest.raises(NotADatabaseError, match="is not a database"):
         CanonicalStore(path)
@@ -365,6 +368,7 @@ def test_a_database_holding_other_objects_is_refused(tmp_path: Path) -> None:
         connection.commit()
     finally:
         connection.close()
+    path.chmod(0o600)
 
     with pytest.raises(StoreError, match="already holds other objects"):
         CanonicalStore(path)
@@ -390,6 +394,7 @@ def test_a_database_marked_by_another_application_is_refused(tmp_path: Path) -> 
         connection.commit()
     finally:
         connection.close()
+    path.chmod(0o600)
 
     with pytest.raises(StoreError, match="belongs to another application"):
         CanonicalStore(path)
@@ -405,6 +410,7 @@ def test_refusing_a_foreign_database_leaves_it_byte_identical(tmp_path: Path) ->
         connection.commit()
     finally:
         connection.close()
+    path.chmod(0o600)
 
     before = path.read_bytes()
     siblings_before = sorted(each.name for each in tmp_path.iterdir())
@@ -425,6 +431,7 @@ def test_a_database_holding_only_a_view_is_also_refused(tmp_path: Path) -> None:
         connection.commit()
     finally:
         connection.close()
+    path.chmod(0o600)
 
     with pytest.raises(StoreError, match="already holds other objects"):
         CanonicalStore(path)
@@ -565,6 +572,7 @@ def test_refusing_a_non_vellis_database_named_like_ours_leaves_it_untouched(
         connection.commit()
     finally:
         connection.close()
+    path.chmod(0o600)
 
     before = path.read_bytes()
     siblings = sorted(each.name for each in tmp_path.iterdir())

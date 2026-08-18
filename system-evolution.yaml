@@ -3,7 +3,7 @@ evolution:
   id: vellis-2-prerelease-review-remediation
   objective: Resolve five prerelease implementation defects without changing accepted Vellis 2.0 meaning or compatibility.
   observable_distinction: Prospective activation cannot admit invalid state, exact numbers and positive bounds remain usable, and local POSIX memory is private or refused before use.
-  lifecycle: ready
+  lifecycle: active
   approval: {status: not-required, reason: "Accepted authority decides all five defects; the owner selected the bounded fail-closed POSIX realization.", checkpoint: null}
   blocker: null
   checkpoint: git:8b1c0b2a1bf83a9904d106a70c8755bf3e180cd0
@@ -189,7 +189,7 @@ work_items:
     nearest_wrong_system: Plaintext local memory inherits permissive modes or follows an unsafe existing path.
     compatibility_effect: Insecure prerelease POSIX stores require explicit owner repair; Windows keeps profile/default ACL behavior.
     non_effects: [No automatic permission mutation., Snapshot format and v1 translation meaning remain unchanged.]
-    lifecycle: ready
+    lifecycle: active
     implementation_status: not evaluated
     evidence_refs: []
     blocker: null

@@ -30,8 +30,10 @@ than through wall-clock timing.
 
 from __future__ import annotations
 
+import os
 import secrets
 import sqlite3
+import stat
 from collections.abc import Iterable, Iterator
 from contextlib import closing, contextmanager
 from dataclasses import dataclass
@@ -746,6 +748,82 @@ class ConcurrentRevisionError(StoreError):
     """Raised when the revision a change was prepared against is no longer current."""
 
 
+def _private_path_error(path: Path, required_mode: int, reason: str) -> StoreError:
+    mode = format(required_mode, "04o")
+    return StoreError(
+        f"refusing insecure plaintext Vellis storage at {path}: {reason}; "
+        f"ensure it is owned by the current user and run `chmod {mode} -- {path}`"
+    )
+
+
+def _validate_private_posix_path(path: Path, *, directory: bool) -> None:
+    """Fail closed on an existing POSIX path without changing its permissions."""
+    if os.name != "posix":
+        return
+    required_mode = 0o700 if directory else 0o600
+    try:
+        metadata = path.lstat()
+    except OSError as error:
+        raise _private_path_error(path, required_mode, f"could not inspect it ({error})") from error
+    expected_kind = stat.S_ISDIR(metadata.st_mode) if directory else stat.S_ISREG(metadata.st_mode)
+    if not expected_kind:
+        kind = "directory" if directory else "regular database file"
+        raise _private_path_error(path, required_mode, f"it is not a {kind}")
+    if metadata.st_uid != os.geteuid():
+        raise _private_path_error(path, required_mode, "it is not owned by the current user")
+    actual_mode = stat.S_IMODE(metadata.st_mode)
+    if actual_mode != required_mode:
+        raise _private_path_error(
+            path,
+            required_mode,
+            f"its mode is {actual_mode:04o}, not the required {required_mode:04o}",
+        )
+
+
+def prepare_private_directory(path: Path) -> None:
+    """Create one private Vellis directory, or validate an existing one on POSIX."""
+    if os.name != "posix":
+        path.mkdir(parents=True, exist_ok=True)
+        return
+    try:
+        path.mkdir(parents=True, mode=0o700)
+    except FileExistsError:
+        _validate_private_posix_path(path, directory=True)
+        return
+    os.chmod(path, 0o700)
+    _validate_private_posix_path(path, directory=True)
+
+
+def _prepare_private_store_path(path: Path) -> None:
+    """Validate the enclosing directory and atomically establish a private file."""
+    if os.name != "posix":
+        return
+    _validate_private_posix_path(path.parent, directory=True)
+    try:
+        path.lstat()
+    except FileNotFoundError:
+        flags = os.O_CREAT | os.O_EXCL | os.O_RDWR
+        if hasattr(os, "O_NOFOLLOW"):
+            flags |= os.O_NOFOLLOW
+        try:
+            descriptor = os.open(path, flags, 0o600)
+        except FileExistsError:
+            _validate_private_posix_path(path, directory=False)
+        else:
+            try:
+                os.fchmod(descriptor, 0o600)
+            finally:
+                os.close(descriptor)
+    except OSError as error:
+        raise _private_path_error(path, 0o600, f"could not inspect it ({error})") from error
+    else:
+        _validate_private_posix_path(path, directory=False)
+    for suffix in ("-wal", "-shm"):
+        companion = Path(f"{path}{suffix}")
+        if companion.exists() or companion.is_symlink():
+            _validate_private_posix_path(companion, directory=False)
+
+
 @dataclass(frozen=True, slots=True)
 class ProposalState:
     revision: int
@@ -879,8 +957,15 @@ def holds_established_memory(path: Path) -> bool:
     so the cost is left where it is cheapest — the operation that follows opens the file
     properly, refuses, and says so, and nothing is established either way.
     """
-    if not path.exists():
+    if not path.exists() and not path.is_symlink():
         return False
+    if os.name == "posix":
+        _validate_private_posix_path(path.parent, directory=True)
+        _validate_private_posix_path(path, directory=False)
+        for suffix in ("-wal", "-shm"):
+            companion = Path(f"{path}{suffix}")
+            if companion.exists() or companion.is_symlink():
+                _validate_private_posix_path(companion, directory=False)
     if _is_not_a_database(path):
         raise NotADatabaseError(f"the file at {path} is not a database")
     try:
@@ -1075,6 +1160,7 @@ class CanonicalStore:
 
     def __init__(self, path: Path) -> None:
         self._path = path
+        _prepare_private_store_path(path)
         if _is_not_a_database(path):
             # Told apart here rather than from a failed open, so this refusal reads the
             # same whether a caller asked what was at the path or went to use it.
@@ -1108,6 +1194,12 @@ class CanonicalStore:
             self._connection.execute("PRAGMA synchronous = FULL")
             self._connection.execute("PRAGMA foreign_keys = ON")
             self._ensure_schema()
+            if os.name == "posix":
+                _validate_private_posix_path(path, directory=False)
+                for suffix in ("-wal", "-shm"):
+                    companion = Path(f"{path}{suffix}")
+                    if companion.exists():
+                        _validate_private_posix_path(companion, directory=False)
         except sqlite3.Error as error:
             self._connection.close()
             raise StoreError(f"could not open a canonical store at {path}: {error}") from error

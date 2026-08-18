@@ -61,6 +61,7 @@ from vellis.store import (
     StoreError,
     UnreadableStoreError,
     holds_established_memory,
+    prepare_private_directory,
 )
 from vellis.streaming import SnapshotMetadata, import_ndjson
 from vellis.system import RTGSystem
@@ -266,8 +267,8 @@ def prepare_local_system(
             choice=choice,
         )
     try:
-        destination.mkdir(parents=True, exist_ok=True)
-    except OSError as error:
+        prepare_private_directory(destination)
+    except (OSError, StoreError) as error:
         return SetupReport(
             stage=SetupStage.PREPARE_DESTINATION,
             succeeded=False,
@@ -275,7 +276,9 @@ def prepare_local_system(
             summary=f"could not prepare {destination}: {error}",
             choice=choice,
             corrective_action=(
-                "check that the parent directory exists and is writable, then run setup again"
+                str(error)
+                if isinstance(error, StoreError)
+                else "check that the parent directory exists and is writable, then run setup again"
             ),
             destination=destination,
             store=store_file,

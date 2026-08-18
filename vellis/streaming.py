@@ -34,7 +34,13 @@ from vellis.normalized import (
     verify_state_summaries,
 )
 from vellis.outcomes import ValidationScope
-from vellis.store import APPLICATION_ID, SCHEMA_VERSION, CanonicalStore, StoreError
+from vellis.store import (
+    APPLICATION_ID,
+    SCHEMA_VERSION,
+    CanonicalStore,
+    StoreError,
+    prepare_private_directory,
+)
 
 __all__ = [
     "SnapshotMetadata",
@@ -1412,13 +1418,12 @@ def import_ndjson(
     """Verify into temporary SQLite and atomically establish an empty destination."""
     if destination.exists():
         raise StoreError("snapshot import requires an empty destination")
-    destination.parent.mkdir(parents=True, exist_ok=True)
+    prepare_private_directory(destination.parent)
     descriptor, temporary_name = tempfile.mkstemp(
         prefix=f".{destination.name}.", suffix=".import", dir=destination.parent
     )
     os.close(descriptor)
     temporary = Path(temporary_name)
-    temporary.unlink()
     store: CanonicalStore | None = None
     try:
         store = CanonicalStore(temporary)

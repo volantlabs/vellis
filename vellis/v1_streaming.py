@@ -34,7 +34,7 @@ from vellis.normalized import (
     semantic_identity,
 )
 from vellis.outcomes import ValidationScope
-from vellis.store import CanonicalStore, StoreError
+from vellis.store import CanonicalStore, StoreError, prepare_private_directory
 from vellis.v1 import (
     RecoveryDisposition,
     RecoveryFacts,
@@ -895,13 +895,12 @@ def import_v1_stream(
     """Verify in sibling temporary SQLite and publish only one accepted import."""
     if destination.exists():
         raise StoreError("v1 import requires an empty destination")
-    destination.parent.mkdir(parents=True, exist_ok=True)
+    prepare_private_directory(destination.parent)
     descriptor, name = tempfile.mkstemp(
         prefix=f".{destination.name}.", suffix=".v1-import", dir=destination.parent
     )
     os.close(descriptor)
     temporary = Path(name)
-    temporary.unlink()
     try:
         preview = _build(path, temporary, expected_source_identity=expected_source_identity)
         if not preview.is_acceptable:

@@ -959,7 +959,7 @@ def test_current_graph_scan_guard_rejects_a_literal_only_f_string() -> None:
 
 def test_current_graph_scan_guard_discovers_nested_production_modules(tmp_path: Path) -> None:
     nested = tmp_path / "feature" / "ordinary.py"
-    nested.parent.mkdir()
+    nested.parent.mkdir(mode=0o700)
     nested.write_text(
         "def ordinary_read():\n    return 'SELECT uuid FROM current_graph_object'\n",
         encoding="utf-8",

@@ -323,9 +323,9 @@ def test_an_interrupted_first_attempt_is_still_a_beginning(
     the schema, so an interruption can leave either form behind.
     """
     destination = tmp_path / "v"
-    destination.mkdir()
+    destination.mkdir(mode=0o700)
     if interruption == "before the schema was written":
-        store_path(destination).touch()
+        store_path(destination).touch(mode=0o600)
     else:
         CanonicalStore(store_path(destination)).close()
 
@@ -357,13 +357,14 @@ def test_a_destination_whose_path_reads_as_uri_punctuation_is_answered_for(
 def test_a_destination_that_belongs_to_something_else_is_neither(tmp_path: Path) -> None:
     """Saying which it was is more use than either answer it is not."""
     destination = tmp_path / "v"
-    destination.mkdir()
+    destination.mkdir(mode=0o700)
     connection = sqlite3.connect(store_path(destination))
     try:
         connection.execute("CREATE TABLE somebody_elses (id INTEGER PRIMARY KEY)")
         connection.commit()
     finally:
         connection.close()
+    store_path(destination).chmod(0o600)
 
     code, out, err = _confirmed_run(["--data-dir", str(destination)], answer="n\n")
 
@@ -407,8 +408,9 @@ def test_a_failed_report_names_the_destination_it_tried(tmp_path: Path, kind: st
     """A caller telling its own user what went wrong needs to know which file that was."""
     if kind == "a file that is not a database":
         destination = tmp_path / "v"
-        destination.mkdir()
+        destination.mkdir(mode=0o700)
         store_path(destination).write_text("not a database\n", encoding="utf-8")
+        store_path(destination).chmod(0o600)
     else:
         blocker = tmp_path / "file"
         blocker.write_text("not a directory\n", encoding="utf-8")
@@ -427,8 +429,9 @@ def test_a_failed_report_names_the_destination_it_tried(tmp_path: Path, kind: st
 def test_a_file_that_is_not_a_database_is_an_actionable_failure(tmp_path: Path) -> None:
     """Told apart from a store this attempt could not open, which is a different answer."""
     destination = tmp_path / "v"
-    destination.mkdir()
+    destination.mkdir(mode=0o700)
     store_path(destination).write_bytes(b"SQLite format 3 but not really" + b"\x00" * 64)
+    store_path(destination).chmod(0o600)
 
     code, out, err = _confirmed_run(["--data-dir", str(destination), "--dry-run"])
 
@@ -448,7 +451,7 @@ def test_a_destination_this_cannot_read_is_left_to_the_operation(tmp_path: Path)
     properly — refuses with the advice that fits what it found.
     """
     destination = tmp_path / "v"
-    destination.mkdir()
+    destination.mkdir(mode=0o700)
     store_path(destination).mkdir()
 
     code, out, err = _confirmed_run(["--data-dir", str(destination)], answer="n\n")
@@ -491,7 +494,7 @@ def test_previewing_a_destination_that_holds_a_store_changes_nothing(tmp_path: P
 
 def test_previewing_an_existing_but_empty_destination_creates_no_store(tmp_path: Path) -> None:
     destination = tmp_path / "v"
-    destination.mkdir()
+    destination.mkdir(mode=0o700)
 
     code, _, _ = _confirmed_run(["--data-dir", str(destination), "--dry-run"])
 
@@ -521,7 +524,7 @@ def test_a_start_left_in_the_log_is_refused_by_the_operation(tmp_path: Path) -> 
     opens the file properly, finds the memory, and says so.
     """
     destination = tmp_path / "v"
-    destination.mkdir()
+    destination.mkdir(mode=0o700)
     store = store_path(destination)
     # Held open, so the log is never checkpointed and the memory lives only in it.
     keeper = CanonicalStore(store)
@@ -678,10 +681,10 @@ def test_a_store_missing_one_of_its_tables_still_belongs_to_its_owner(
     assert "leave this system where it is" in (again.corrective_action or "")
 
 
-def test_a_store_in_a_directory_this_account_cannot_write_still_says_what_it_holds(
+def test_a_store_in_an_insecure_directory_is_refused_without_permission_changes(
     tmp_path: Path,
 ) -> None:
-    """Reading a system may not depend on being allowed to add to the directory it is in."""
+    """Plaintext memory is not opened through a directory missing required owner access."""
     import os
 
     if os.geteuid() == 0:  # pragma: no cover - the root account may write it anyway
@@ -691,15 +694,16 @@ def test_a_store_in_a_directory_this_account_cannot_write_still_says_what_it_hol
     directory = report.store.parent
     directory.chmod(0o500)
     try:
-        assert holds_established_memory(report.store)
+        with pytest.raises(StoreError, match=r"chmod 0700"):
+            holds_established_memory(report.store)
 
-        code, out, err = _confirmed_run(["--data-dir", str(directory), "--dry-run"])
+        code, out, err = _confirmed_run(["--data-dir", str(directory), "--yes"])
     finally:
         directory.chmod(0o700)
 
     assert code == EXIT_FAILED
-    assert "already holds memory" in out
-    assert "use this system as it is" in err
+    assert "established memory: unchanged" in err
+    assert "chmod 0700" in err
 
 
 def test_a_store_another_process_is_writing_does_not_block_a_beginning(tmp_path: Path) -> None:
@@ -709,7 +713,7 @@ def test_a_store_another_process_is_writing_does_not_block_a_beginning(tmp_path:
     leave an owner whose first attempt was interrupted with no way forward at all.
     """
     destination = tmp_path / "v"
-    destination.mkdir()
+    destination.mkdir(mode=0o700)
     store = store_path(destination)
     CanonicalStore(store).close()
     writer = sqlite3.connect(store)
@@ -734,13 +738,14 @@ def test_a_store_another_process_is_writing_does_not_block_a_beginning(tmp_path:
 def test_a_file_carrying_our_own_marker_and_nothing_else_is_a_beginning(tmp_path: Path) -> None:
     """A first attempt can set the marker and stop before the schema; that is still ours."""
     destination = tmp_path / "v"
-    destination.mkdir()
+    destination.mkdir(mode=0o700)
     connection = sqlite3.connect(store_path(destination))
     try:
         connection.execute(f"PRAGMA application_id = {APPLICATION_ID}")
         connection.commit()
     finally:
         connection.close()
+    store_path(destination).chmod(0o600)
 
     assert not holds_established_memory(store_path(destination))
 
@@ -759,7 +764,7 @@ def test_a_database_belonging_to_another_application_is_refused_before_the_offer
     advice that assumes a Vellis build somewhere could read it.
     """
     destination = tmp_path / "v"
-    destination.mkdir()
+    destination.mkdir(mode=0o700)
     connection = sqlite3.connect(store_path(destination))
     try:
         connection.execute("PRAGMA application_id = 196078063")
@@ -767,6 +772,7 @@ def test_a_database_belonging_to_another_application_is_refused_before_the_offer
         connection.commit()
     finally:
         connection.close()
+    store_path(destination).chmod(0o600)
 
     with pytest.raises(ForeignDatabaseError, match="belongs to another application"):
         holds_established_memory(store_path(destination))
@@ -784,8 +790,9 @@ def test_a_file_that_stops_partway_through_the_header_is_not_a_database(
 ) -> None:
     """A truncated copy begins like a database and is not one."""
     destination = tmp_path / "v"
-    destination.mkdir()
+    destination.mkdir(mode=0o700)
     store_path(destination).write_bytes(b"SQLite format 3")
+    store_path(destination).chmod(0o600)
 
     code, out, err = _confirmed_run(["--data-dir", str(destination), "--dry-run"])
 
@@ -802,13 +809,14 @@ def test_a_database_that_only_looks_like_ours_is_still_not_ours(tmp_path: Path) 
     would read it, which is no way out at all.
     """
     destination = tmp_path / "v"
-    destination.mkdir()
+    destination.mkdir(mode=0o700)
     connection = sqlite3.connect(store_path(destination))
     try:
         connection.execute("CREATE TABLE schema_meta (key TEXT PRIMARY KEY, value TEXT)")
         connection.commit()
     finally:
         connection.close()
+    store_path(destination).chmod(0o600)
 
     with pytest.raises(ForeignDatabaseError):
         holds_established_memory(store_path(destination))

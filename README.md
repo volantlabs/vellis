@@ -255,7 +255,13 @@ Use these words precisely:
   snapshot start says before it is confirmed which revision the new lineage will begin at, because
   that is the revision the captured state reached rather than zero. Setup stores memory under
   `VELLIS_DATA_DIR` when that is set and otherwise under the platform's user-data location, and
-  never writes to this repository's ignored `.data/`.
+  never writes to this repository's ignored `.data/`. Stores and exported snapshots are plaintext
+  at rest. On macOS and Linux, Vellis creates its data directory with mode `0700`, creates database,
+  WAL, SHM, import, and snapshot files with mode `0600`, and refuses an existing store that is not
+  owner-owned, regular, and private. It never changes an existing store's permissions; follow the
+  reported `chmod 0700` or `chmod 0600` guidance after verifying the path. On Windows, Vellis relies
+  on the user-profile location and the host's default ACLs; native ACL enforcement is not verified
+  for this prerelease.
   `vellis serve` then serves that memory over local standard input and output; pointed at
   a destination holding no established memory it refuses rather than creating one, and a client that
   cannot start it is told which stage failed, whether established memory changed, and what to do
