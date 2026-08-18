@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+import json
 import os
 import subprocess
 import sys
 import tarfile
 import tempfile
 import zipfile
+from collections.abc import Mapping
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -17,11 +19,14 @@ VERSION = "2.0.0"
 def _run(
     *arguments: str,
     cwd: Path = ROOT,
+    env_updates: Mapping[str, str] | None = None,
     input_text: str | None = None,
 ) -> subprocess.CompletedProcess[str]:
     environment = os.environ.copy()
     environment.pop("PYTHONPATH", None)
     environment["PYTHONNOUSERSITE"] = "1"
+    if env_updates is not None:
+        environment.update(env_updates)
     return subprocess.run(
         arguments,
         cwd=cwd,
@@ -137,6 +142,43 @@ def _installed_smoke(wheel: Path, directory: Path) -> None:
     if not Path(source).resolve().is_relative_to(environment.resolve()):
         raise AssertionError(f"smoke imported Vellis outside the isolated environment: {source}")
 
+    fake_bin = directory / "fake-bin"
+    fake_bin.mkdir()
+    registration = directory / "codex-registration.json"
+    fake_codex = fake_bin / "codex"
+    fake_codex.write_text(
+        f"""#!{python}
+import json
+import os
+import sys
+from pathlib import Path
+
+registration = Path(os.environ["VELLIS_SMOKE_REGISTRATION"])
+arguments = sys.argv[1:]
+if arguments == ["mcp", "get", "vellis", "--json"]:
+    if not registration.exists():
+        print("Error: No MCP server named 'vellis' found.", file=sys.stderr)
+        raise SystemExit(1)
+    target = json.loads(registration.read_text(encoding="utf-8"))
+    print(json.dumps({{
+        "name": "vellis",
+        "enabled": True,
+        "transport": {{"type": "stdio", "command": target[0], "args": target[1:]}},
+    }}))
+    raise SystemExit(0)
+if arguments[:4] == ["mcp", "add", "vellis", "--"]:
+    registration.write_text(json.dumps(arguments[4:]), encoding="utf-8")
+    raise SystemExit(0)
+raise SystemExit(2)
+""",
+        encoding="utf-8",
+    )
+    fake_codex.chmod(0o755)
+    client_environment = {
+        "PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}",
+        "VELLIS_SMOKE_REGISTRATION": str(registration),
+    }
+
     memory = directory / "memory"
     snapshot = directory / "snapshot.json"
     setup = _run(
@@ -146,11 +188,29 @@ def _installed_smoke(wheel: Path, directory: Path) -> None:
         str(memory),
         "--vocabulary",
         "blank",
+        "--client",
+        "codex",
         "--yes",
         cwd=invocation_directory,
+        env_updates=client_environment,
     )
-    if "established revision 0" not in setup.stdout:
-        raise AssertionError("installed setup did not establish a fresh revision-zero system")
+    if (
+        "established revision 0" not in setup.stdout
+        or "MCP client codex: configured" not in setup.stdout
+    ):
+        raise AssertionError(
+            "installed setup did not establish memory and configure the fake client"
+        )
+    target = tuple(json.loads(registration.read_text(encoding="utf-8")))
+    expected_target = (
+        str(python.absolute()),
+        "-m",
+        "vellis",
+        "--data-dir",
+        str(memory.resolve()),
+    )
+    if target != expected_target:
+        raise AssertionError(f"installed setup registered {target!r}, not {expected_target!r}")
     preserve = _run(
         str(legacy),
         "preserve",
@@ -184,6 +244,13 @@ def _installed_smoke(wheel: Path, directory: Path) -> None:
     )
     if "Starting MCP server 'vellis'" not in server.stdout:
         raise AssertionError("installed serve did not start the pinned STDIO MCP boundary")
+    registered_server = _run(
+        *target,
+        cwd=invocation_directory,
+        input_text="",
+    )
+    if "Starting MCP server 'vellis'" not in registered_server.stdout:
+        raise AssertionError("the installed client's exact persisted argv did not start Vellis")
 
 
 def main() -> int:

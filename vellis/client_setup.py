@@ -85,17 +85,26 @@ def subprocess_runner(argv: Sequence[str]) -> CommandResult:
     return CommandResult(completed.returncode, completed.stdout, completed.stderr)
 
 
-def server_argv(project_directory: Path, data_directory: Path | None = None) -> tuple[str, ...]:
+def server_argv(
+    project_directory: Path,
+    data_directory: Path | None = None,
+    *,
+    python_executable: Path | None = None,
+) -> tuple[str, ...]:
     """Return the exact STDIO server command a client stores."""
-    command = [
-        "uv",
-        "--directory",
-        str(project_directory.resolve()),
-        "run",
-        "python",
-        "-m",
-        "vellis",
-    ]
+    command = (
+        [str(python_executable.absolute()), "-m", "vellis"]
+        if python_executable is not None
+        else [
+            "uv",
+            "--directory",
+            str(project_directory.resolve()),
+            "run",
+            "python",
+            "-m",
+            "vellis",
+        ]
+    )
     if data_directory is not None:
         command.extend(("--data-dir", str(data_directory.resolve())))
     return tuple(command)
@@ -115,6 +124,7 @@ def plan_clients(
     replace_clients: Iterable[ClientKind],
     project_directory: Path,
     data_directory: Path | None,
+    python_executable: Path | None = None,
     runner: Runner = subprocess_runner,
     platform: str | None = None,
 ) -> tuple[ClientPlan, ...]:
@@ -123,7 +133,11 @@ def plan_clients(
     replacements = frozenset(replace_clients)
     if not replacements.issubset(selected):
         raise ValueError("a client can be replaced only when it is also selected")
-    target = server_argv(project_directory, data_directory)
+    target = server_argv(
+        project_directory,
+        data_directory,
+        python_executable=python_executable,
+    )
     return tuple(
         _plan_one(client, target, client in replacements, runner, platform) for client in selected
     )

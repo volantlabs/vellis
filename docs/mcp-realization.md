@@ -153,8 +153,10 @@ the reproducible project boundary, setup, persistence, inventory, registration, 
 to close A017, D006, and the runnable campaign boundary without changing client approval policy.
 
 The commands below are a source-checkout fallback when a supported client CLI is unavailable, not
-the selected primary workflow. An installed artifact can instead register `vellis serve`. For the
-checkout form, establish a system first with `vellis setup` (or `uv run python -m vellis.setup`),
+the selected primary workflow. An installed artifact instead registers the absolute interpreter
+that owns the package with `-m vellis`, so later client launches do not depend on an activated shell
+or a source checkout. For the checkout form, establish a system first with `vellis setup` (or
+`uv run python -m vellis.setup`),
 then, with `VELLIS` standing for the absolute path of this clone:
 
 ```sh

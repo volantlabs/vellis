@@ -12,6 +12,7 @@ from pathlib import Path
 import pytest
 
 from tests.vellis.oracle import materialize_state
+from vellis import setup as setup_implementation
 from vellis.client_setup import (
     ClientAction,
     ClientKind,
@@ -176,6 +177,84 @@ def test_each_or_both_clients_use_only_the_public_cli_argument_arrays(
             ["mcp", "get", "vellis"],
             ["mcp", "add", "--scope", "user", "vellis", "--", *target],
         ]
+
+
+def test_installed_setup_registers_the_interpreter_that_owns_vellis(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _install_fake_clients(tmp_path, monkeypatch)
+    installed_module = tmp_path / "environment" / "site-packages" / "vellis" / "setup.py"
+    monkeypatch.setattr(setup_implementation, "__file__", str(installed_module))
+    destination = tmp_path / "memory"
+
+    assert (
+        setup_implementation.main(
+            [
+                "--data-dir",
+                str(destination),
+                "--vocabulary",
+                "blank",
+                "--client",
+                "codex",
+                "--yes",
+            ],
+            stdout=io.StringIO(),
+            stderr=io.StringIO(),
+        )
+        == EXIT_SUCCESS
+    )
+
+    state = json.loads((tmp_path / "codex-state.json").read_text(encoding="utf-8"))
+    assert state["target"] == [
+        str(Path(sys.executable).absolute()),
+        "-m",
+        "vellis",
+        "--data-dir",
+        str(destination.resolve()),
+    ]
+
+
+def test_installed_client_failure_reports_an_installed_retry_command(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _install_fake_clients(tmp_path, monkeypatch)
+    _set_state(tmp_path, "codex", {"status": "unparseable"})
+    installed_module = tmp_path / "environment" / "site-packages" / "vellis" / "setup.py"
+    monkeypatch.setattr(setup_implementation, "__file__", str(installed_module))
+    destination = tmp_path / "memory"
+    error = io.StringIO()
+
+    assert (
+        setup_implementation.main(
+            [
+                "--data-dir",
+                str(destination),
+                "--vocabulary",
+                "blank",
+                "--client",
+                "codex",
+                "--yes",
+            ],
+            stdout=io.StringIO(),
+            stderr=error,
+        )
+        == EXIT_FAILED
+    )
+
+    retry = render_command(
+        (
+            str(Path(sys.executable).absolute()),
+            "-m",
+            "vellis.setup",
+            "--data-dir",
+            str(destination.resolve()),
+            "--client",
+            "codex",
+            "--yes",
+        )
+    )
+    assert f"what to do next: {retry}" in error.getvalue()
+    assert "uv --directory" not in error.getvalue()
 
 
 def test_a_matching_entry_is_an_idempotent_no_op(

@@ -31,6 +31,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import sys
 import tempfile
 from collections.abc import Iterator, Sequence
 from dataclasses import dataclass, replace
@@ -673,7 +674,12 @@ def _write_client_preview(plans: Sequence[ClientPlan], stream: TextIO) -> None:
 
 
 def _write_client_outcomes(
-    outcomes: Sequence[ClientOutcome], stream: TextIO, *, destination: Path
+    outcomes: Sequence[ClientOutcome],
+    stream: TextIO,
+    *,
+    destination: Path,
+    project_directory: Path,
+    python_executable: Path | None,
 ) -> None:
     for outcome in outcomes:
         status = "configured" if outcome.succeeded else "not configured"
@@ -683,23 +689,40 @@ def _write_client_outcomes(
         print("  established memory: unchanged", file=stream)
         print(f"  result: {outcome.detail}", file=stream)
         if not outcome.succeeded:
-            retry = [
-                "uv",
-                "--directory",
-                str(Path(__file__).resolve().parent.parent),
-                "run",
-                "python",
-                "-m",
-                "vellis.setup",
-                "--data-dir",
-                str(destination),
-                "--client",
-                outcome.plan.client.value,
-                "--yes",
-            ]
+            retry = (
+                [str(python_executable), "-m", "vellis.setup"]
+                if python_executable is not None
+                else [
+                    "uv",
+                    "--directory",
+                    str(project_directory),
+                    "run",
+                    "python",
+                    "-m",
+                    "vellis.setup",
+                ]
+            )
+            retry.extend(
+                (
+                    "--data-dir",
+                    str(destination),
+                    "--client",
+                    outcome.plan.client.value,
+                    "--yes",
+                )
+            )
             if outcome.plan.state is ClientState.DIFFERING:
                 retry.extend(("--replace-client", outcome.plan.client.value))
             print(f"  what to do next: {render_command(retry)}", file=stream)
+
+
+def _launcher_context() -> tuple[Path, Path | None]:
+    """Select a checkout launcher or the interpreter that owns an installed package."""
+    project_directory = Path(__file__).resolve().parent.parent
+    is_checkout = (project_directory / "pyproject.toml").is_file() and (
+        project_directory / "uv.lock"
+    ).is_file()
+    return project_directory, None if is_checkout else Path(sys.executable).absolute()
 
 
 def main(
@@ -711,8 +734,6 @@ def main(
     prog: str = "python -m vellis.setup",
 ) -> int:
     """Run the documented setup path."""
-    import sys
-
     out: TextIO = sys.stdout if stdout is None else stdout
     error: TextIO = sys.stderr if stderr is None else stderr
     source: TextIO = sys.stdin if stdin is None else stdin
@@ -909,11 +930,13 @@ def main(
         return EXIT_FAILED
     assert preview.destination is not None
     explicit_destination = arguments.data_dir is not None or "VELLIS_DATA_DIR" in os.environ
+    project_directory, python_executable = _launcher_context()
     client_plans = plan_clients(
         clients=selected_clients,
         replace_clients=replaced_clients,
-        project_directory=Path(__file__).resolve().parent.parent,
+        project_directory=project_directory,
         data_directory=preview.destination if explicit_destination else None,
+        python_executable=python_executable,
     )
     _write_client_preview(client_plans, out)
     if arguments.dry_run:
@@ -935,6 +958,8 @@ def main(
             client_outcomes,
             out if all(outcome.succeeded for outcome in client_outcomes) else error,
             destination=preview.destination,
+            project_directory=project_directory,
+            python_executable=python_executable,
         )
         return (
             EXIT_SUCCESS if all(outcome.succeeded for outcome in client_outcomes) else EXIT_FAILED
@@ -1009,6 +1034,8 @@ def main(
         client_outcomes,
         out if all(outcome.succeeded for outcome in client_outcomes) else error,
         destination=preview.destination,
+        project_directory=project_directory,
+        python_executable=python_executable,
     )
     return EXIT_SUCCESS if all(outcome.succeeded for outcome in client_outcomes) else EXIT_FAILED
 
