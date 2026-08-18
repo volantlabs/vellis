@@ -480,6 +480,9 @@ package RTG {
          * its required object kind and type. Any unknown, wrong-kind, or
          * wrong-type member rejects the whole query. A valid data identity that
          * does not satisfy association or property conditions simply does not match.
+         * A present empty member collection is a semantic invalidity that rejects
+         * the whole query; an external representation that cannot form this typed
+         * value remains an input-boundary error.
          */
     }
 

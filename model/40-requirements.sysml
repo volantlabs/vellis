@@ -103,7 +103,7 @@ package VellisRequirements {
          * activity. Unknown or
          * incompatible type keys, empty or duplicate names, disconnected or
          * cyclic selector graphs, self-edges, parallel edges, out-of-query references,
-         * endpoint roles, unknown or duplicate UUID restrictions, properties,
+         * endpoint roles, empty, unknown, or duplicate UUID restrictions, properties,
          * comparisons, projections, or unresolved
          * historical selections shall produce observable findings and no result
          * rows. A missing, empty, or mixed output, or an aggregation naming no data condition of the query, omitting a

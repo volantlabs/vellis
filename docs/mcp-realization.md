@@ -135,33 +135,21 @@ SQLite work was counted with `Connection.set_progress_handler(..., 1)` and decod
 `tests/vellis/characterization.py`. Each series rebuilt a fresh temporary database for each size and
 measured only the named operation after fixture construction.
 
-The fixture families are reconstructible as follows:
-
-- For active hub-of-hubs work, create one changed hub with degree D, give each neighbor D other
-  incident links, reset instrumentation, and apply only the hub's endpoint-type upsert for D = 10,
-  20, and 40. The existing endpoint-change setup and prospective degree controls are exercised by
-  `uv run pytest tests/vellis/test_graph_changes.py::test_endpoint_type_change_revalidates_incident_links tests/vellis/test_sqlite_prospective_state.py::test_participant_type_change_scales_with_its_applicable_incident_degree`.
-- For irrelevant rules, create one isolated anchor, add N multiplicity rules whose participating
-  type sets mention its type but whose counts cannot change, then rename only that anchor for N =
-  10, 100, 500, and 1,000. For the K-by-K case, create K independent type changes and K rules with
-  exactly one applicable subject each. The related measurement boundary is exercised by
-  `uv run pytest tests/vellis/test_sqlite_prospective_state.py::test_display_only_assessment_work_ignores_connected_component_length tests/vellis/test_sqlite_prospective_state.py::test_link_shape_assessment_scales_with_hub_degree_not_second_hop_degree`.
-- For aggregation, use one projected identity with N independently satisfying hidden witnesses,
-  reset the progress handler, and execute the aggregate-only query. Inspect the compiled statement
-  with `EXPLAIN QUERY PLAN`; the baseline reaches its late distinct after the flat witness joins.
-  The current hidden-component and aggregation controls are exercised by
-  `uv run pytest tests/vellis/test_graph_queries.py::test_unprojected_disconnected_population_does_not_multiply_projection_work tests/vellis/test_graph_queries.py::test_scalar_aggregation_streams_one_bounded_selection`.
-- For the historical binding boundary, lower `SQLITE_LIMIT_VARIABLE_NUMBER` to 32 and submit the
-  same aggregate query as current, prospective, and revision-selected state. The historical form's
-  compiled revision and bound parameters expose the missing preflight binding.
-- For permitted values, construct valid unique strings of the form `value-{index}` at each stated
-  size and time only `validate_definition_set`. The semantic baseline is exercised by
-  `uv run pytest tests/vellis/test_definition_validity.py::test_permitted_values_are_unique_by_json_equality_not_by_text`.
+The temporary executable characterization is
+`uv run pytest tests/vellis/test_semantic_work_locality_triggers.py`. It rebuilds fresh databases,
+resets the shared instrumentation boundary, and reproduces the active 10/20/40 hub series, the
+10/100/500/1,000 irrelevant-rule series, and the 5/10/20/40 independent-change-by-rule series. It
+also counts the exact pairwise equality calls for 500/1,000/2,000/4,000/8,000 permitted values.
+Its final source-mechanism case pins the late aggregate `SELECT DISTINCT` plus bound, the manual
+capacity preflight's lack of historical selection, the impacted-type and participant-by-rule
+prospective expansion, and the production evaluator imported by the nominal oracle. Thus every
+recorded trigger is either rebuilt and measured or bound to the exact conflicting mechanism; no
+fixture or instrumentation must be invented from this prose.
 
 W002 through W004 replace these trigger recipes with permanent discriminating regression fixtures;
 the final subtraction review removes any evidence that asserts the superseded implementation shape.
 
-The accepted target instead has exclusive row and aggregate outputs. Row identity preserves every
+The proposed target instead has exclusive row and aggregate outputs. Row identity preserves every
 projected source object, including the associated-data UUID behind a property value, while aggregate
 output operates on one distinct associated-data target population. Equal property values from
 different source objects therefore remain different rows. Implementation work deletes the old

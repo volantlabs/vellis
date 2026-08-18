@@ -108,7 +108,7 @@ package VellisVerification {
             doc /*
              * Exercise empty or duplicate query-local names, unknown and incompatible
              * type keys, out-of-query references, endpoint directions, anchor,
-             * associated-data, and link UUIDs, duplicate UUID restrictions,
+             * associated-data, and link UUIDs, empty and duplicate UUID restrictions,
              * disconnected selectors, self-edges, parallel edges, longer cycles,
              * property names, incompatible comparisons, missing, empty, or mixed
              * output, malformed projections, and an
