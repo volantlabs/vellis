@@ -17,11 +17,16 @@ baselines:
     checkpoint: git:17d2b2676400f530ff9eccf8ab653d54644f1beb
   target: &target
     model: sha256:adf05b52f9839b75f76240ee116c0ffba7ee452602c2083268d683c4b534b2c7
-    implementation: git:6d600908e25bc6a1d675ae0a134a060cdee02b0d
+    implementation: git:1f79890fbcfede5746f48be0df4c8f90928e0f87
     language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
     execution_environment: sha256:d71473693aa50faef1a25a449aa5808490e21eaf2a987942d1fb134c773550d1
-    checkpoint: git:6d600908e25bc6a1d675ae0a134a060cdee02b0d
-  observed: *target
+    checkpoint: git:1f79890fbcfede5746f48be0df4c8f90928e0f87
+  observed:
+    model: sha256:adf05b52f9839b75f76240ee116c0ffba7ee452602c2083268d683c4b534b2c7
+    implementation: git:1f79890fbcfede5746f48be0df4c8f90928e0f87
+    language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
+    execution_environment: sha256:d71473693aa50faef1a25a449aa5808490e21eaf2a987942d1fb134c773550d1
+    checkpoint: git:1f79890fbcfede5746f48be0df4c8f90928e0f87
 scope:
   authority_scope: [RTG::'Graph Query', RTGSystem::'Query graph', RTGSystem::'Assess graph conformance', VellisRequirements::querySafety, VellisRequirements::validationCoverage, VellisRequirements::historyIndependentCurrentWork, VellisVerification::semanticQuery, VellisVerification::currentWorkScaling]
   implementation_scope: [vellis/query.py, vellis/store.py, tests/vellis/, README.md, system-evolution.yaml]
@@ -58,10 +63,10 @@ findings:
     classification: implementation defect
     consequence: A valid collection can cross SQLite's host-parameter capacity and return a realization failure instead of its semantic result or whole-result rejection.
     authority_refs: [VellisRequirements::querySafety, VellisRequirements::historyIndependentCurrentWork]
-    evidence_refs: [path:tests/vellis/test_graph_queries.py#test_known_uuids_narrow_an_anchor_group]
-    disposition: implementation-work
+    evidence_refs: [path:tests/vellis/test_graph_queries.py#test_large_uuid_filters_do_not_depend_on_sqlite_host_parameter_capacity, path:tests/vellis/test_graph_queries.py#test_large_type_filters_do_not_depend_on_sqlite_host_parameter_capacity, path:tests/vellis/test_definition_discovery.py#test_large_definition_selection_does_not_depend_on_sqlite_host_parameters, path:tests/vellis/test_graph_changes.py#test_large_graph_change_does_not_depend_on_sqlite_host_parameters, path:tests/vellis/test_sqlite_prospective_state.py#test_large_prospective_change_does_not_depend_on_sqlite_host_parameters, path:tests/vellis/test_sqlite_prospective_state.py#test_large_multiplicity_participant_sets_are_bound_relationally, path:tests/vellis/test_graph_queries.py#test_query_beyond_sqlite_join_capacity_is_refused_whole]
+    disposition: resolved
     owner_work_item_id: W003
-    implementation_status: conflicting
+    implementation_status: conforming
     nearest_wrong_system: Small collections work, while an otherwise identical larger collection fails solely at the database driver's parameter threshold.
     compatibility_effect: Existing requests retain meaning; large collections use relational or chunked binding and structurally excessive queries are rejected whole.
 decisions:
@@ -90,8 +95,8 @@ decisions:
     reversible: true
     owner_work_item_id: W003
     evidence_intent: [Operate above a deliberately lowered SQLite variable limit., Preserve semantic invalid-input findings and canonical non-effects.]
-    implementation_status: not evaluated
-    evidence_refs: []
+    implementation_status: conforming
+    evidence_refs: [path:tests/vellis/test_graph_queries.py#test_large_uuid_filters_do_not_depend_on_sqlite_host_parameter_capacity, path:tests/vellis/test_graph_queries.py#test_large_type_filters_do_not_depend_on_sqlite_host_parameter_capacity, path:tests/vellis/test_definition_discovery.py#test_large_definition_selection_does_not_depend_on_sqlite_host_parameters, path:tests/vellis/test_graph_changes.py#test_large_graph_change_does_not_depend_on_sqlite_host_parameters, path:tests/vellis/test_sqlite_prospective_state.py#test_large_prospective_change_does_not_depend_on_sqlite_host_parameters, path:tests/vellis/test_sqlite_prospective_state.py#test_large_multiplicity_participant_sets_are_bound_relationally, path:tests/vellis/test_graph_queries.py#test_query_beyond_sqlite_join_capacity_is_refused_whole]
 work_items:
   - id: W001
     order: 1
@@ -151,17 +156,17 @@ work_items:
     nearest_wrong_system: Valid large filters or definition selections fail with too many SQL variables, or structural capacity returns a partial result.
     compatibility_effect: Large collections complete or receive the modeled whole-result rejection.
     non_effects: [No truncation or new public collection maximum., Unexpected database faults remain failed outcomes.]
-    lifecycle: active
-    implementation_status: conflicting
-    evidence_refs: []
+    lifecycle: complete
+    implementation_status: conforming
+    evidence_refs: [path:tests/vellis/test_graph_queries.py#test_large_uuid_filters_do_not_depend_on_sqlite_host_parameter_capacity, path:tests/vellis/test_graph_queries.py#test_large_type_filters_do_not_depend_on_sqlite_host_parameter_capacity, path:tests/vellis/test_definition_discovery.py#test_large_definition_selection_does_not_depend_on_sqlite_host_parameters, path:tests/vellis/test_graph_changes.py#test_large_graph_change_does_not_depend_on_sqlite_host_parameters, path:tests/vellis/test_sqlite_prospective_state.py#test_large_prospective_change_does_not_depend_on_sqlite_host_parameters, path:tests/vellis/test_sqlite_prospective_state.py#test_large_multiplicity_participant_sets_are_bound_relationally, path:tests/vellis/test_graph_queries.py#test_query_beyond_sqlite_join_capacity_is_refused_whole]
     blocker: null
-    checkpoint: null
+    checkpoint: git:1f79890fbcfede5746f48be0df4c8f90928e0f87
   - id: W004
     order: 4
     label: Integrate scaling evidence and close the prerelease candidate
     kind: closure
     dependencies: [W001, W002, W003]
-    planned_baseline: {dimension: implementation, identity: git:17d2b2676400f530ff9eccf8ab653d54644f1beb}
+    planned_baseline: {dimension: implementation, identity: git:1f79890fbcfede5746f48be0df4c8f90928e0f87}
     finding_ids: []
     decision_ids: []
     authority:
@@ -172,7 +177,7 @@ work_items:
     nearest_wrong_system: Focused evidence passes while cross-scope behavior, documentation, or the frozen candidate remains unreviewed.
     compatibility_effect: Prerelease completion claims become evidence-backed without changing public identities or formats.
     non_effects: [No release, tag, merge, external client mutation, or owner-data access.]
-    lifecycle: pending
+    lifecycle: active
     implementation_status: not evaluated
     evidence_refs: []
     blocker: null

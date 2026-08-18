@@ -160,7 +160,12 @@ Use these words precisely:
   semantic query over current state — named anchor and associated-data groups, required directed
   links, structured property comparisons, and a shaped result refused whole rather than truncated
   when it would exceed the caller's row bound, with indexed identity, type, direct-association, and
-  directed-link joins constraining candidates before property filtering; and a separated
+  directed-link joins constraining candidates before property filtering; exact count, sum, minimum,
+  and maximum aggregation over current, prospective, and historical selections, with bounded match
+  identities retained in SQLite and property values streamed through fixed-size reducer batches;
+  public UUID and type collections are bound relationally or in connection-aware chunks, while a
+  query beyond SQLite's structural plan capacity is rejected whole with no partial result; and a
+  separated
   observational ledger — reads,
   validation, and refused operations leave a bounded record carrying capability, outcome,
   provenance, evaluated revision and scope but no result rows, over which the owner may read a
@@ -223,19 +228,24 @@ Use these words precisely:
   change it.
 - **Characterized, not budgeted.** What this realization's work responds to is measured in semantic
   row visits, decoded values, affected neighborhoods, streamed buffer sizes, and query candidates.
-  Summary and focused inspection decode no graph and no unrelated definitions. A one-object mutation
-  scales with its change, incident relationships, affected associations, and applicable rules; a
-  high-degree mutation scales with that degree, not unrelated population or obsolete object
-  versions. Current, prospective, and historical queries constrain candidates in SQL, hydrate only
-  projected rows, and stop after `maximumRows + 1` semantically unique rows; serialized duplicates
-  may be streamed and decoded on the way to that bound. An ordinary mutation never invokes a full
-  conformance check. A broad definition cutover or explicit full check may scan all applicable rows,
-  but does so set-wise with bounded working memory and stores every finding once for paged retrieval.
-  Snapshot, tail replay, import, verification, v1 translation, and restore stream or use temporary
-  SQLite/set operations without constructing whole-state values. Storage grows with normalized
-  history and the observational ledger. Forgetting activity removes those records but does not
-  promise file-page reclamation. No numerical latency, startup, throughput, or storage budget is
-  claimed without representative hardware and owner data.
+  Returned projections, definition-discovery details, and history entries legitimately require
+  output-sized memory; summary and focused inspection decode no graph and no unrelated definitions.
+  Ordinary mutation and prospective validation scale with changed objects, applicable rules, and
+  incident degree, not connected-component diameter, disconnected population, history length, or
+  obsolete object versions. Explicit full assessment and broad definition cutover remain state-wide
+  work, but execute set-wise with bounded process memory and store each finding once for paged
+  retrieval. Current, prospective, and historical queries constrain candidates in SQL, hydrate only
+  projected rows, and refuse after `maximumRows + 1` semantically unique matches. Scalar aggregation
+  retains bounded match identities in an indexed SQLite temporary table and streams fixed-size
+  property batches through exact reducers, so resident Python memory follows batch size, reducer
+  count, and final scalar size rather than matched population. Result-bearing multi-group joins may
+  be combinatorial; the caller's maximum bounds the returned answer, and SQLite structural capacity
+  is a typed whole-result refusal rather than truncation or a driver failure. Snapshot, import, tail
+  replay, verification, v1 translation, and restoration are linear streaming or temporary-set work
+  without constructing whole-state values. Storage grows with normalized history and the
+  observational ledger. Forgetting activity removes those records but does not promise file-page
+  reclamation. No numerical latency, startup, throughput, or storage budget is claimed without
+  representative hardware and owner data.
 - **Runnable.** The installable `vellis setup` command prepares one local system. It previews the
   destination and, unless it can already see that the destination will not do, offers both starting
   vocabularies with the Everyday Life starter preselected. It asks for confirmation, and accepts
