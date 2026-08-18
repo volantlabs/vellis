@@ -15,8 +15,13 @@ baselines:
     language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
     execution_environment: sha256:d71473693aa50faef1a25a449aa5808490e21eaf2a987942d1fb134c773550d1
     checkpoint: git:17d2b2676400f530ff9eccf8ab653d54644f1beb
-  target: null
-  observed: *source
+  target: &target
+    model: sha256:adf05b52f9839b75f76240ee116c0ffba7ee452602c2083268d683c4b534b2c7
+    implementation: git:06802d8014669cbb0f7c76b2e143db9b24cc0f46
+    language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
+    execution_environment: sha256:d71473693aa50faef1a25a449aa5808490e21eaf2a987942d1fb134c773550d1
+    checkpoint: git:06802d8014669cbb0f7c76b2e143db9b24cc0f46
+  observed: *target
 scope:
   authority_scope: [RTG::'Graph Query', RTGSystem::'Query graph', RTGSystem::'Assess graph conformance', VellisRequirements::querySafety, VellisRequirements::validationCoverage, VellisRequirements::historyIndependentCurrentWork, VellisVerification::semanticQuery, VellisVerification::currentWorkScaling]
   implementation_scope: [vellis/query.py, vellis/store.py, tests/vellis/, README.md, system-evolution.yaml]
@@ -32,9 +37,9 @@ findings:
     consequence: A local display or property change can perform superlinear work with connected graph size even though no distant invariant can change.
     authority_refs: [VellisRequirements::historyIndependentCurrentWork, VellisRequirements::validationCoverage]
     evidence_refs: [path:tests/vellis/test_sqlite_prospective_state.py#test_narrow_assessment_sql_steps_ignore_unrelated_link_population]
-    disposition: implementation-work
+    disposition: resolved
     owner_work_item_id: W001
-    implementation_status: conflicting
+    implementation_status: conforming
     nearest_wrong_system: Correct fixed-point findings are obtained by repeatedly rescanning every already reached participant and relation, including unaffected distant objects.
     compatibility_effect: Findings and activation behavior remain unchanged; only forbidden unrelated work is removed.
   - id: F002
@@ -67,8 +72,8 @@ decisions:
     reversible: true
     owner_work_item_id: W001
     evidence_intent: [Keep display-only work independent of connected-component length., Keep endpoint-type and high-degree multiplicity findings complete.]
-    implementation_status: not evaluated
-    evidence_refs: []
+    implementation_status: conforming
+    evidence_refs: [path:tests/vellis/test_sqlite_prospective_state.py#test_display_only_assessment_work_ignores_connected_component_length, path:tests/vellis/test_sqlite_prospective_state.py#test_endpoint_type_change_cannot_activate_an_incomplete_multiplicity_closure]
   - id: D002
     summary: Materialize only bounded match identities in SQLite and stream property rows through exact incremental reducers.
     authority_refs: [RTG::'Graph Query', VellisRequirements::querySafety]
@@ -104,17 +109,17 @@ work_items:
     nearest_wrong_system: Prospective findings are correct but a local edit still walks a long connected chain or repeatedly rescans accumulated rows.
     compatibility_effect: Prospective reports and activation remain semantically identical with less unrelated work.
     non_effects: [No model, public payload, persistence, or canonical-history change., No disconnected population or history traversal.]
-    lifecycle: active
-    implementation_status: conflicting
-    evidence_refs: []
+    lifecycle: complete
+    implementation_status: conforming
+    evidence_refs: [path:tests/vellis/test_sqlite_prospective_state.py#test_display_only_assessment_work_ignores_connected_component_length, path:tests/vellis/test_sqlite_prospective_state.py#test_endpoint_type_change_cannot_activate_an_incomplete_multiplicity_closure]
     blocker: null
-    checkpoint: null
+    checkpoint: git:06802d8014669cbb0f7c76b2e143db9b24cc0f46
   - id: W002
     order: 2
     label: Stream exact scalar aggregation with bounded process memory
     kind: implementation
     dependencies: [W001]
-    planned_baseline: {dimension: implementation, identity: git:17d2b2676400f530ff9eccf8ab653d54644f1beb}
+    planned_baseline: {dimension: implementation, identity: git:06802d8014669cbb0f7c76b2e143db9b24cc0f46}
     finding_ids: [F002]
     decision_ids: [D002]
     authority:
@@ -125,7 +130,7 @@ work_items:
     nearest_wrong_system: A scalar result is exact but its entire matching population remains resident in Python.
     compatibility_effect: All aggregate results and rejection boundaries remain unchanged.
     non_effects: [No public maximum, numeric semantics, query schema, or canonical effect changes.]
-    lifecycle: pending
+    lifecycle: active
     implementation_status: conflicting
     evidence_refs: []
     blocker: null

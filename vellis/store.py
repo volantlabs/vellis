@@ -117,6 +117,7 @@ from vellis.outcomes import (
 from vellis.validation import assess_object_neighborhood, validate_property_value
 
 _MAXIMUM_SQLITE_INTEGER = 2**63 - 1
+_AGGREGATION_BATCH_SIZE = 256
 
 if TYPE_CHECKING:
     from vellis.query import AggregateBinding, GraphQuery, GraphQueryResult
@@ -1171,6 +1172,8 @@ class CanonicalStore:
         self._current_graph_decodes = 0
         self._current_graph_object_decodes = 0
         self._current_definition_decodes = 0
+        self._maximum_aggregation_batch_rows = 0
+        self._maximum_aggregation_reducer_count = 0
         try:
             # One owner, one process, one connection — but not necessarily one thread:
             # a tool boundary answers on whichever worker it is called from. The
@@ -1220,6 +1223,8 @@ class CanonicalStore:
         store._current_graph_decodes = 0
         store._current_graph_object_decodes = 0
         store._current_definition_decodes = 0
+        store._maximum_aggregation_batch_rows = 0
+        store._maximum_aggregation_reducer_count = 0
         return store
 
     # --- Lifecycle ------------------------------------------------------------------
@@ -1322,6 +1327,16 @@ class CanonicalStore:
         """Addressable graph-object decodes since the last instrumentation reset."""
         return self._current_graph_object_decodes
 
+    @property
+    def maximum_aggregation_batch_rows(self) -> int:
+        """Largest aggregate property batch retained since the last reset."""
+        return self._maximum_aggregation_batch_rows
+
+    @property
+    def maximum_aggregation_reducer_count(self) -> int:
+        """Largest aggregate scalar-reducer set retained since the last reset."""
+        return self._maximum_aggregation_reducer_count
+
     def reset_instrumentation(self) -> None:
         self._record_reads = 0
         self._activity_reads = 0
@@ -1329,6 +1344,8 @@ class CanonicalStore:
         self._current_graph_decodes = 0
         self._current_graph_object_decodes = 0
         self._current_definition_decodes = 0
+        self._maximum_aggregation_batch_rows = 0
+        self._maximum_aggregation_reducer_count = 0
 
     # --- Current projection ---------------------------------------------------------
 
@@ -3755,105 +3772,160 @@ class CanonicalStore:
         predicates: list[str],
         where_parameters: list[object],
     ) -> tuple[AggregateBinding, ...] | ValidationFinding:
-        """Answer each aggregation from its own bounded selection.
-
-        One statement per aggregated condition, over the same joins the projected query
-        would use, selecting the matching objects by UUID. UUID rather than value identity
-        because two objects may legitimately carry identical content, and counting them
-        once would answer a question nobody asked.
-
-        The caller's maximum bounds these selections exactly as it bounds a projected
-        result: the statement stops one past it, and a larger selection is refused rather
-        than aggregated in part.
-        """
+        """Reduce bounded match identities without retaining their values as a population."""
         from vellis.json_value import JsonValue, json_kind
-        from vellis.query import AggregateBinding, AggregationOperator, _exact_decimal_sum
+        from vellis.query import (
+            AggregateBinding,
+            AggregationOperator,
+            _ExactDecimalAccumulator,
+        )
 
         conditions = {condition.name: condition for condition in query.data_conditions}
-        bindings: list[AggregateBinding] = []
-        for aggregation in query.aggregations:
-            alias = selector_alias[aggregation.data_condition]
-            columns = [f"{alias}.uuid"]
-            select_parameters: list[object] = []
-            if aggregation.operator is not AggregationOperator.COUNT:
-                for column in ("json_kind", "boolean_value", "number_value", "text_value"):
-                    columns.append(
-                        f"(SELECT ap.{column} FROM object_property AS ap"
-                        f" WHERE ap.object_value_id = {alias}.object_value_id"
-                        " AND ap.name = ? LIMIT 1)"
-                    )
-                    select_parameters.append(aggregation.property_name)
-            sql = (
-                prefix
-                + "SELECT DISTINCT "
-                + ", ".join(columns)
-                + " FROM "
-                + ", ".join(tables)
-                + " WHERE "
-                + " AND ".join(predicates)
-                + " LIMIT ?"
-            )
-            sql_limit = min(query.maximum_rows + 1, _MAXIMUM_SQLITE_INTEGER)
-            parameters = [
-                *prefix_parameters,
-                *select_parameters,
-                *where_parameters,
-                sql_limit,
-            ]
-            matched = self._connection.execute(sql, tuple(parameters)).fetchall()
-            if len(matched) > query.maximum_rows:
-                return ValidationFinding(
-                    summary=(
-                        f"the matches of '{aggregation.data_condition}' exceed the maximum "
-                        f"of {query.maximum_rows}"
-                    )
+        condition_names = tuple(
+            dict.fromkeys(aggregation.data_condition for aggregation in query.aggregations)
+        )
+        self._connection.execute(
+            "CREATE TEMP TABLE IF NOT EXISTS query_aggregate_match"
+            " (uuid TEXT PRIMARY KEY, object_value_id INTEGER NOT NULL) WITHOUT ROWID"
+        )
+        self._connection.execute(
+            "CREATE TEMP TABLE IF NOT EXISTS query_aggregate_property"
+            " (name TEXT PRIMARY KEY) WITHOUT ROWID"
+        )
+        bindings: dict[str, AggregateBinding] = {}
+        try:
+            for condition_name in condition_names:
+                aggregations = [
+                    aggregation
+                    for aggregation in query.aggregations
+                    if aggregation.data_condition == condition_name
+                ]
+                self._connection.execute("DELETE FROM query_aggregate_match")
+                self._connection.execute("DELETE FROM query_aggregate_property")
+                alias = selector_alias[condition_name]
+                sql = (
+                    prefix
+                    + "INSERT OR IGNORE INTO query_aggregate_match"
+                    + f" SELECT DISTINCT {alias}.uuid, {alias}.object_value_id FROM "
+                    + ", ".join(tables)
+                    + " WHERE "
+                    + " AND ".join(predicates)
+                    + " LIMIT ?"
                 )
-            if aggregation.operator is AggregationOperator.COUNT:
-                bindings.append(
-                    AggregateBinding(
-                        aggregation=aggregation.name, present=True, value=Decimal(len(matched))
-                    )
+                sql_limit = min(query.maximum_rows + 1, _MAXIMUM_SQLITE_INTEGER)
+                self._connection.execute(sql, (*prefix_parameters, *where_parameters, sql_limit))
+                matched_count = int(
+                    self._connection.execute(
+                        "SELECT count(*) FROM query_aggregate_match"
+                    ).fetchone()[0]
                 )
-                continue
-            condition = conditions[aggregation.data_condition]
-            data_type = definitions.associated_data_type(condition.associated_data_type)
-            declared = next(
-                (
-                    rule.json_kind
-                    for rule in (data_type.property_constraints if data_type else ())
-                    if rule.property_name == aggregation.property_name
-                ),
-                None,
-            )
-            values: list[JsonValue] = []
-            for row in matched:
-                stored = row[1:5]
-                if stored[0] is None:
+                if matched_count > query.maximum_rows:
+                    return ValidationFinding(
+                        summary=(
+                            f"the matches of '{condition_name}' exceed the maximum "
+                            f"of {query.maximum_rows}"
+                        )
+                    )
+                for aggregation in aggregations:
+                    if aggregation.operator is AggregationOperator.COUNT:
+                        bindings[aggregation.name] = AggregateBinding(
+                            aggregation=aggregation.name,
+                            present=True,
+                            value=Decimal(matched_count),
+                        )
+
+                property_aggregations = [
+                    aggregation
+                    for aggregation in aggregations
+                    if aggregation.operator is not AggregationOperator.COUNT
+                ]
+                if not property_aggregations:
                     continue
-                value = json_storage_value(*stored)
-                # Only the declared kind takes part, so a graph that does not conform
-                # cannot make this invent an order between kinds.
-                if json_kind(value) is declared:
-                    values.append(value)
-            if not values:
-                bindings.append(AggregateBinding(aggregation=aggregation.name, present=False))
-                continue
-            if aggregation.operator is AggregationOperator.SUM:
-                try:
-                    reduced: JsonValue = _exact_decimal_sum(values)
-                except ArithmeticError as error:
-                    return ValidationFinding(summary=str(error))
-            else:
-                ordered = sorted(values)  # pyright: ignore[reportArgumentType]
-                reduced = (
-                    ordered[0]
-                    if aggregation.operator is AggregationOperator.MINIMUM
-                    else ordered[-1]
+                property_names = {
+                    str(aggregation.property_name) for aggregation in property_aggregations
+                }
+                self._connection.executemany(
+                    "INSERT INTO query_aggregate_property VALUES (?)",
+                    ((name,) for name in sorted(property_names)),
                 )
-            bindings.append(
-                AggregateBinding(aggregation=aggregation.name, present=True, value=reduced)
-            )
-        return tuple(bindings)
+                condition = conditions[condition_name]
+                data_type = definitions.associated_data_type(condition.associated_data_type)
+                declared = {
+                    rule.property_name: rule.json_kind
+                    for rule in (data_type.property_constraints if data_type else ())
+                }
+                operations: dict[str, set[AggregationOperator]] = {}
+                for aggregation in property_aggregations:
+                    operations.setdefault(str(aggregation.property_name), set()).add(
+                        aggregation.operator
+                    )
+                reducer_count = sum(len(each) for each in operations.values())
+                self._maximum_aggregation_reducer_count = max(
+                    self._maximum_aggregation_reducer_count, reducer_count
+                )
+                sums = {
+                    name: _ExactDecimalAccumulator()
+                    for name, operators in operations.items()
+                    if AggregationOperator.SUM in operators
+                }
+                extrema: dict[tuple[str, AggregationOperator], JsonValue] = {}
+                cursor = self._connection.execute(
+                    "SELECT p.name, p.json_kind, p.boolean_value, p.number_value,"
+                    " p.text_value FROM query_aggregate_match AS m"
+                    " JOIN object_property AS p ON p.object_value_id = m.object_value_id"
+                    " JOIN query_aggregate_property AS r ON r.name = p.name"
+                )
+                while batch := cursor.fetchmany(_AGGREGATION_BATCH_SIZE):
+                    self._maximum_aggregation_batch_rows = max(
+                        self._maximum_aggregation_batch_rows, len(batch)
+                    )
+                    for name_value, kind, boolean, number, text_value in batch:
+                        name = str(name_value)
+                        value = json_storage_value(kind, boolean, number, text_value)
+                        if json_kind(value) is not declared.get(name):
+                            continue
+                        for operator in operations[name]:
+                            if operator is AggregationOperator.SUM:
+                                assert isinstance(value, Decimal)
+                                sums[name].add(value)
+                                continue
+                            key = (name, operator)
+                            if key not in extrema:
+                                extrema[key] = value
+                            elif operator is AggregationOperator.MINIMUM:
+                                if value < extrema[key]:  # pyright: ignore[reportOperatorIssue]
+                                    extrema[key] = value
+                            elif value > extrema[key]:  # pyright: ignore[reportOperatorIssue]
+                                extrema[key] = value
+
+                for aggregation in property_aggregations:
+                    name = str(aggregation.property_name)
+                    if aggregation.operator is AggregationOperator.SUM:
+                        accumulator = sums[name]
+                        if not accumulator.count:
+                            bindings[aggregation.name] = AggregateBinding(
+                                aggregation=aggregation.name, present=False
+                            )
+                            continue
+                        try:
+                            reduced: JsonValue = accumulator.result()
+                        except ArithmeticError as error:
+                            return ValidationFinding(summary=str(error))
+                    else:
+                        key = (name, aggregation.operator)
+                        if key not in extrema:
+                            bindings[aggregation.name] = AggregateBinding(
+                                aggregation=aggregation.name, present=False
+                            )
+                            continue
+                        reduced = extrema[key]
+                    bindings[aggregation.name] = AggregateBinding(
+                        aggregation=aggregation.name, present=True, value=reduced
+                    )
+        finally:
+            self._connection.execute("DELETE FROM query_aggregate_match")
+            self._connection.execute("DELETE FROM query_aggregate_property")
+        return tuple(bindings[aggregation.name] for aggregation in query.aggregations)
 
     def _prepare_prospective_assessment_scope_unlocked(self, active_identity: str) -> None:
         """Derive the changed-definition and staged-graph invariant closure in SQL."""

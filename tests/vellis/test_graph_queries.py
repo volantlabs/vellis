@@ -1922,6 +1922,80 @@ def test_aggregation_counts_matching_objects_not_distinct_projected_tuples(
         system.close()
 
 
+@pytest.mark.parametrize("population", [100, 5_000])
+def test_scalar_aggregation_streams_one_bounded_selection(tmp_path: Path, population: int) -> None:
+    system = RTGSystem.open(tmp_path / f"streamed-{population}.sqlite3")
+    try:
+        assert system.initialize_fresh(
+            build_rich_definitions(), provenance=_owner(), initialization_summary="a fresh start"
+        ).accepted
+        assert system.apply_graph_change(
+            GraphChange(
+                anchor_upserts=(ADA,),
+                associated_data_upserts=tuple(
+                    _note(f"n-{index}", ("a-1",), rating=index % 5 + 1)
+                    for index in range(population)
+                ),
+            ),
+            provenance=_owner(),
+        ).accepted
+        statements: list[str] = []
+        system.store.reset_instrumentation()
+        system.store._connection.set_trace_callback(statements.append)  # noqa: SLF001
+        try:
+            result = system.query_graph(
+                _rating_query(
+                    QueryAggregation(
+                        name="howMany",
+                        operator=AggregationOperator.COUNT,
+                        data_condition="notes",
+                    ),
+                    QueryAggregation(
+                        name="total",
+                        operator=AggregationOperator.SUM,
+                        data_condition="notes",
+                        property_name="rating",
+                    ),
+                    QueryAggregation(
+                        name="lowest",
+                        operator=AggregationOperator.MINIMUM,
+                        data_condition="notes",
+                        property_name="rating",
+                    ),
+                    QueryAggregation(
+                        name="highest",
+                        operator=AggregationOperator.MAXIMUM,
+                        data_condition="notes",
+                        property_name="rating",
+                    ),
+                    maximum=population,
+                ),
+                provenance=_owner(),
+            )
+        finally:
+            system.store._connection.set_trace_callback(None)  # noqa: SLF001
+
+        assert result.accepted, result.findings
+        answers = {binding.aggregation: binding.value for binding in result.aggregates}
+        assert answers == {
+            "howMany": Decimal(population),
+            "total": Decimal(sum(index % 5 + 1 for index in range(population))),
+            "lowest": Decimal(1),
+            "highest": Decimal(5),
+        }
+        assert system.store.maximum_aggregation_batch_rows <= 256
+        assert system.store.maximum_aggregation_reducer_count == 3
+        assert (
+            sum(
+                "INSERT OR IGNORE INTO query_aggregate_match" in statement
+                for statement in statements
+            )
+            == 1
+        )
+    finally:
+        system.close()
+
+
 @pytest.mark.parametrize("maximum", [2**63 - 1, 2**100])
 @pytest.mark.parametrize(
     "state_scope",

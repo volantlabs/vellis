@@ -1090,26 +1090,45 @@ def _aggregate_value(operator: AggregationOperator, values: list[JsonValue]) -> 
     return ordered[0] if operator is AggregationOperator.MINIMUM else ordered[-1]
 
 
-def _exact_decimal_sum(values: Sequence[JsonValue]) -> Decimal:
-    """Add finite decimals with context-free integer coefficient arithmetic."""
-    if not values:
-        return Decimal(0)
-    coefficients: dict[int, int] = {}
-    input_digits = 0
-    for value in values:
-        assert isinstance(value, Decimal)
+@dataclass(slots=True)
+class _ExactDecimalAccumulator:
+    """Retain only coefficient places needed by one exact scalar sum."""
+
+    coefficients: dict[int, int] = field(default_factory=dict)
+    input_digits: int = 0
+    count: int = 0
+
+    def add(self, value: Decimal) -> None:
         shape = value.as_tuple()
         assert isinstance(shape.exponent, int)
         coefficient = 0
         for digit in shape.digits:
             coefficient = coefficient * 10 + digit
-        input_digits += len(shape.digits)
+        self.input_digits += len(shape.digits)
         exponent = shape.exponent
         while coefficient and coefficient % 10 == 0:
             coefficient //= 10
             exponent += 1
         signed = -coefficient if shape.sign else coefficient
-        coefficients[exponent] = coefficients.get(exponent, 0) + signed
+        self.coefficients[exponent] = self.coefficients.get(exponent, 0) + signed
+        self.count += 1
+
+    def result(self) -> Decimal:
+        if not self.count:
+            return Decimal(0)
+        return _exact_decimal_result(self.coefficients, self.input_digits, self.count)
+
+
+def _exact_decimal_sum(values: Sequence[JsonValue]) -> Decimal:
+    """Add finite decimals with context-free integer coefficient arithmetic."""
+    accumulator = _ExactDecimalAccumulator()
+    for value in values:
+        assert isinstance(value, Decimal)
+        accumulator.add(value)
+    return accumulator.result()
+
+
+def _exact_decimal_result(coefficients: dict[int, int], input_digits: int, count: int) -> Decimal:
     terms: list[tuple[int, int]] = []
     for exponent, coefficient in coefficients.items():
         while coefficient and coefficient % 10 == 0:
@@ -1123,7 +1142,7 @@ def _exact_decimal_sum(values: Sequence[JsonValue]) -> Decimal:
     highest_place = max(
         exponent + _integer_digit_count(coefficient) - 1 for exponent, coefficient in terms
     )
-    permitted_span = max(MAXIMUM_STORED_INTEGER_EXPONENT, input_digits + len(str(len(values))))
+    permitted_span = max(MAXIMUM_STORED_INTEGER_EXPONENT, input_digits + len(str(count)))
     if highest_place - lowest_place + 1 > permitted_span:
         raise ArithmeticError(
             "the exact aggregate sum would require expanding compact numeric inputs "
