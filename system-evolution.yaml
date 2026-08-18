@@ -6,7 +6,7 @@ evolution:
   lifecycle: awaiting-approval
   approval: {status: pending, reason: "The query language, output and row identity, state selection, compatibility, and mutation locality change accepted meaning.", checkpoint: null}
   blocker: null
-  checkpoint: git:6060a99dc159fe49304db99ebb7573055e7925cf
+  checkpoint: git:c02d969e887baaa6c92479a32440638bac88bfbb
 baselines:
   status: current
   source:
@@ -17,16 +17,16 @@ baselines:
     checkpoint: git:ca6539e10393a5a52e2cd2f67d0af662e92cc010
   target:
     model: sha256:166e6f06ea2835127b96d3ef0133bb0b03c7c7c1aedb5442930742501bc4d4b3
-    implementation: git:6060a99dc159fe49304db99ebb7573055e7925cf
+    implementation: git:c02d969e887baaa6c92479a32440638bac88bfbb
     language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
     execution_environment: sha256:d71473693aa50faef1a25a449aa5808490e21eaf2a987942d1fb134c773550d1
-    checkpoint: git:6060a99dc159fe49304db99ebb7573055e7925cf
+    checkpoint: git:c02d969e887baaa6c92479a32440638bac88bfbb
   observed:
     model: sha256:166e6f06ea2835127b96d3ef0133bb0b03c7c7c1aedb5442930742501bc4d4b3
-    implementation: git:6060a99dc159fe49304db99ebb7573055e7925cf
+    implementation: git:c02d969e887baaa6c92479a32440638bac88bfbb
     language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
     execution_environment: sha256:d71473693aa50faef1a25a449aa5808490e21eaf2a987942d1fb134c773550d1
-    checkpoint: git:6060a99dc159fe49304db99ebb7573055e7925cf
+    checkpoint: git:c02d969e887baaa6c92479a32440638bac88bfbb
 scope:
   authority_scope: [RTG::'Graph Query', RTG::'Evaluated State Selection', RTG::'Definition Summary Request', RTG::'Definition Inspection Request', RTGSystem::'Query graph', RTGSystem::'Discover evaluated graph definitions', VellisRequirements::semanticQueryMeaning, VellisRequirements::querySafety, VellisRequirements::explicitGraphChangeSet, VellisRequirements::validationCoverage, VellisRequirements::historyIndependentCurrentWork, VellisRequirements::canonicalSemanticEquality, VellisRequirements::historicalStateCorrectness, VellisRequirements::agentDefinitionDiscoverability, VellisRequirements::mcpAgentToolContract, VellisVerification::semanticQuery, VellisVerification::invalidQuery, VellisVerification::validationCoverage, VellisVerification::currentWorkScaling, VellisVerification::historyGrowth]
   implementation_scope: [vellis/query.py, vellis/sqlite_query.py, vellis/store.py, vellis/system.py, vellis/mcp.py, vellis/json_value.py, vellis/definitions.py, tests/vellis/, model/, README.md, docs/mcp-realization.md, system-evolution.yaml]
@@ -77,7 +77,7 @@ work_items:
     implementation_status: not evaluated
     evidence_refs: [command:just model-check, command:just system-evolution-check]
     blocker: null
-    checkpoint: git:6060a99dc159fe49304db99ebb7573055e7925cf
+    checkpoint: git:c02d969e887baaa6c92479a32440638bac88bfbb
   - id: W002
     order: 2
     label: Replace quadratic JSON collection equality
