@@ -3,7 +3,7 @@ evolution:
   id: vellis-2-prerelease-review-remediation
   objective: Resolve five prerelease implementation defects without changing accepted Vellis 2.0 meaning or compatibility.
   observable_distinction: Prospective activation cannot admit invalid state, exact numbers and positive bounds remain usable, and local POSIX memory is private or refused before use.
-  lifecycle: ready
+  lifecycle: active
   approval: {status: not-required, reason: "Accepted authority decides all five defects; the owner selected the bounded fail-closed POSIX realization.", checkpoint: null}
   blocker: null
   checkpoint: git:784a81bc30e7f8fdb857f4e8c1df3fb41d76f6bc
@@ -126,7 +126,7 @@ work_items:
     nearest_wrong_system: Prospective SQL either under-expands incident relations or counts duplicate references as distinct set members.
     compatibility_effect: Prospective findings match semantic validation and invalid activation has no canonical effects.
     non_effects: [No model, schema, snapshot, or public payload changes., Work remains independent of canonical-history length and disconnected populations.]
-    lifecycle: ready
+    lifecycle: active
     implementation_status: not evaluated
     evidence_refs: []
     blocker: null

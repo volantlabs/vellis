@@ -9,6 +9,7 @@ from tests.vellis.semantic_state import (
     definition_delta_equal,
     semantic_state_equal,
 )
+from vellis.activity import HistoryKind, HistoryQuery
 from vellis.canonical import Provenance
 from vellis.changes import GraphChange, GraphChangeRequest, GraphChangeTarget
 from vellis.definitions import (
@@ -40,6 +41,7 @@ from vellis.query import (
     ReturnShape,
 )
 from vellis.system import RTGSystem
+from vellis.validation import assess_object_neighborhood
 
 OWNER = Provenance("owner")
 PERSON = AnchorTypeDefinition("person", "A person.")
@@ -562,6 +564,163 @@ def test_assessment_closure_catches_staged_link_endpoint_multiplicity(tmp_path: 
         assert any("outside 0..1" in finding.summary for finding in report.returned_findings)
     finally:
         system.close()
+
+
+def test_endpoint_type_change_cannot_activate_an_incomplete_multiplicity_closure(
+    tmp_path: Path,
+) -> None:
+    counted = AnchorTypeDefinition("counted", "A counted target.")
+    uncounted = AnchorTypeDefinition("uncounted", "An uncounted target.")
+    definitions = GraphDefinitionSet(
+        anchor_types=(PERSON, counted, uncounted),
+        link_types=(
+            LinkTypeDefinition(
+                "related",
+                EndpointConstraint(("person",), ("counted", "uncounted"), "Related endpoints."),
+                "A relation.",
+            ),
+        ),
+        relationship_constraints=(
+            LinkMultiplicityConstraint(
+                "related",
+                LinkEnd.SOURCE,
+                ("person",),
+                ("counted",),
+                0,
+                1,
+                "At most one counted target.",
+            ),
+        ),
+    )
+    system = RTGSystem.open(tmp_path / "fixed-point-closure.sqlite3")
+    try:
+        assert system.initialize_fresh(
+            definitions, provenance=OWNER, initialization_summary="fresh"
+        ).accepted
+        assert system.apply_graph_change(
+            GraphChange(
+                anchor_upserts=(
+                    Anchor("s", "person", "Source"),
+                    Anchor("x", "uncounted", "Uncounted"),
+                    Anchor("z", "counted", "Counted"),
+                ),
+                link_upserts=(
+                    Link("rel-x", "related", "s", "x"),
+                    Link("rel-z", "related", "s", "z"),
+                ),
+            ),
+            provenance=OWNER,
+        ).accepted
+        assert system.set_definition_delta(
+            DefinitionChange(anchor_type_upserts=(TEAM,)), provenance=OWNER
+        ).accepted
+        assert system.apply_graph_change(
+            GraphChangeRequest(
+                GraphChangeTarget.DEFINITION_DELTA,
+                GraphChange(anchor_upserts=(Anchor("x", "counted", "Counted now"),)),
+            ),
+            provenance=OWNER,
+        ).accepted
+        before = materialize_state(system)
+        before_history = system.history(
+            HistoryQuery(kind=HistoryKind.CANONICAL, maximum_records=100)
+        ).canonical_entries
+
+        report = _assess_delta(system)
+
+        assert report.accepted and not report.conforms
+        assert report.assessment_id is not None
+        assert any("outside 0..1" in finding.summary for finding in report.returned_findings)
+        activation = system.activate_definition_delta(
+            ActivateDefinitionDeltaRequest(report.assessment_id), provenance=OWNER
+        )
+        assert not activation.accepted
+        assert semantic_state_equal(materialize_state(system), before)
+        assert system.store.current_revision() == before.revision
+        after_history = system.history(
+            HistoryQuery(kind=HistoryKind.CANONICAL, maximum_records=100)
+        ).canonical_entries
+        assert after_history == before_history
+    finally:
+        system.close()
+
+
+def test_repeated_anchor_references_have_set_multiplicity_in_prospective_sql(
+    tmp_path: Path,
+) -> None:
+    note = AssociatedDataTypeDefinition(
+        "note", permitted_anchor_type_keys=("person",), description="A note."
+    )
+    for lower, upper, expected_multiplicity_finding in ((0, 1, False), (2, 2, True)):
+        base_constraint = DirectAssociationMultiplicityConstraint(
+            DirectAssociationEnd.ANCHOR,
+            ("person",),
+            ("note",),
+            0,
+            1,
+            "Initial set cardinality.",
+        )
+        proposed_constraint = DirectAssociationMultiplicityConstraint(
+            DirectAssociationEnd.ANCHOR,
+            ("person",),
+            ("note",),
+            lower,
+            upper,
+            "Proposed set cardinality.",
+        )
+        definitions = GraphDefinitionSet(
+            anchor_types=(PERSON,),
+            associated_data_types=(note,),
+            relationship_constraints=(base_constraint,),
+        )
+        system = RTGSystem.open(tmp_path / f"association-set-{lower}.sqlite3")
+        try:
+            assert system.initialize_fresh(
+                definitions, provenance=OWNER, initialization_summary="fresh"
+            ).accepted
+            assert system.apply_graph_change(
+                GraphChange(anchor_upserts=(Anchor("a", "person", "Anchor"),)),
+                provenance=OWNER,
+            ).accepted
+            assert system.set_definition_delta(
+                DefinitionChange(
+                    anchor_type_upserts=(TEAM,),
+                    relationship_constraint_upserts=(proposed_constraint,),
+                ),
+                provenance=OWNER,
+            ).accepted
+            repeated = AssociatedDataObject("d", "note", ("a", "a"), {})
+            assert system.apply_graph_change(
+                GraphChangeRequest(
+                    GraphChangeTarget.DEFINITION_DELTA,
+                    GraphChange(associated_data_upserts=(repeated,)),
+                ),
+                provenance=OWNER,
+            ).accepted
+
+            semantic_findings = assess_object_neighborhood(
+                (Anchor("a", "person", "Anchor"), repeated),
+                GraphDefinitionSet(
+                    anchor_types=(PERSON, TEAM),
+                    associated_data_types=(note,),
+                    relationship_constraints=(proposed_constraint,),
+                ),
+            )
+            report = _assess_delta(system)
+
+            assert not report.conforms
+            assert len(report.returned_findings) == len(semantic_findings)
+            multiplicity_findings = [
+                finding
+                for finding in report.returned_findings
+                if "matching direct associations" in finding.summary
+            ]
+            assert bool(multiplicity_findings) is expected_multiplicity_finding
+            assert any("outside" in finding.summary for finding in semantic_findings) is (
+                expected_multiplicity_finding
+            )
+        finally:
+            system.close()
 
 
 def test_assessment_closure_validates_reverse_definition_dependencies(tmp_path: Path) -> None:
