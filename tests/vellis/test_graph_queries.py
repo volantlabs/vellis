@@ -342,8 +342,7 @@ def test_disconnected_unprojected_capacity_refusal_is_propagated_whole(tmp_path:
     definitions = GraphDefinitionSet(
         anchor_types=(AnchorTypeDefinition("focus", "A projected focus."),)
         + tuple(
-            AnchorTypeDefinition(f"node-{index}", f"Graph node {index}.")
-            for index in range(34)
+            AnchorTypeDefinition(f"node-{index}", f"Graph node {index}.") for index in range(34)
         ),
         link_types=tuple(
             LinkTypeDefinition(

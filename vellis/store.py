@@ -4942,12 +4942,8 @@ class CanonicalStore:
             "DELETE FROM assessment_multiplicity_work WHERE natural_key = ?", (natural_key,)
         )
         if isinstance(constraint, LinkMultiplicityConstraint):
-            near = (
-                "source_uuid" if constraint.constrained_end is LinkEnd.SOURCE else "target_uuid"
-            )
-            far = (
-                "target_uuid" if constraint.constrained_end is LinkEnd.SOURCE else "source_uuid"
-            )
+            near = "source_uuid" if constraint.constrained_end is LinkEnd.SOURCE else "target_uuid"
+            far = "target_uuid" if constraint.constrained_end is LinkEnd.SOURCE else "source_uuid"
             # A staged relationship-shape change can alter the count of its old and new
             # direct subjects. Property/display-only edits are absent from the reason set.
             self._connection.execute(
@@ -5127,12 +5123,8 @@ class CanonicalStore:
         ).fetchone():
             return
         if isinstance(constraint, LinkMultiplicityConstraint):
-            near = (
-                "source_uuid" if constraint.constrained_end is LinkEnd.SOURCE else "target_uuid"
-            )
-            far = (
-                "target_uuid" if constraint.constrained_end is LinkEnd.SOURCE else "source_uuid"
-            )
+            near = "source_uuid" if constraint.constrained_end is LinkEnd.SOURCE else "target_uuid"
+            far = "target_uuid" if constraint.constrained_end is LinkEnd.SOURCE else "source_uuid"
             self._connection.execute(
                 "INSERT OR IGNORE INTO multiplicity_incident_link"
                 f" SELECT g.uuid, g.type_key, g.source_uuid, g.target_uuid"  # noqa: S608

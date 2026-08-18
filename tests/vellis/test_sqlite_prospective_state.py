@@ -1611,9 +1611,7 @@ def test_participant_type_change_scales_with_its_applicable_incident_degree(
         leaf = AnchorTypeDefinition("leaf", "A leaf node.")
         edge = LinkTypeDefinition(
             "edge",
-            EndpointConstraint(
-                ("central", "other", "spoke"), ("spoke", "leaf"), "Edge endpoints."
-            ),
+            EndpointConstraint(("central", "other", "spoke"), ("spoke", "leaf"), "Edge endpoints."),
             "An edge.",
         )
         rule = LinkMultiplicityConstraint(
