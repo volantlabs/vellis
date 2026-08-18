@@ -8,6 +8,7 @@ removals, never a complete replacement graph.
 
 from __future__ import annotations
 
+import sqlite3
 from pathlib import Path
 
 import pytest
@@ -93,6 +94,32 @@ def test_a_mixed_change_commits_one_revision(tmp_path: Path) -> None:
         assert anchor is not None and anchor.display_name == "Ada L."
         assert state.graph.associated_data_object("d-1") is not None
         assert state.graph.link("l-1") is not None
+    finally:
+        system.close()
+
+
+def test_large_graph_change_does_not_depend_on_sqlite_host_parameters(tmp_path: Path) -> None:
+    system = _system(tmp_path)
+    initial = tuple(Anchor(f"person-{index}", "person", f"Person {index}") for index in range(50))
+    try:
+        assert _apply(system, GraphChange(anchor_upserts=initial)).accepted
+        system.store._connection.setlimit(  # noqa: SLF001
+            sqlite3.SQLITE_LIMIT_VARIABLE_NUMBER, 32
+        )
+        updated = tuple(
+            Anchor(value.uuid, value.type_key, f"Updated {index}")
+            for index, value in enumerate(initial)
+        )
+
+        outcome = _apply(system, GraphChange(anchor_upserts=updated))
+
+        assert outcome.accepted, outcome.findings
+        state = materialize_state(system)
+        assert all(
+            state.graph.anchor(value.uuid).display_name == value.display_name  # type: ignore[union-attr]
+            for value in updated
+        )
+        assert semantic_state_equal(state, materialize_replay(system))
     finally:
         system.close()
 

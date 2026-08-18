@@ -1,5 +1,6 @@
 """Evidence for SQLite-native prospective state, stored assessments, and cutover."""
 
+import sqlite3
 from decimal import Decimal
 from pathlib import Path
 
@@ -66,6 +67,74 @@ def _assess_delta(system: RTGSystem, maximum: int = 10):
             maximum,
         )
     )
+
+
+def test_large_multiplicity_participant_sets_are_bound_relationally(tmp_path: Path) -> None:
+    anchors = tuple(
+        AnchorTypeDefinition(f"anchor-{index}", f"Anchor {index}.") for index in range(40)
+    )
+    data = AssociatedDataTypeDefinition(
+        "datum",
+        tuple(value.type_key for value in anchors),
+        description="Associated data.",
+    )
+    constraint = DirectAssociationMultiplicityConstraint(
+        constrained_end=DirectAssociationEnd.ANCHOR,
+        anchor_type_keys=tuple(value.type_key for value in anchors),
+        associated_data_type_keys=("datum",),
+        lower_bound=0,
+        upper_bound=1,
+        description="At most one datum.",
+    )
+    system = RTGSystem.open(tmp_path / "vellis.sqlite3")
+    assert system.initialize_fresh(
+        GraphDefinitionSet(
+            anchor_types=anchors,
+            associated_data_types=(data,),
+            relationship_constraints=(constraint,),
+        ),
+        provenance=OWNER,
+        initialization_summary="many multiplicity participants",
+    ).accepted
+    system.store._connection.setlimit(  # noqa: SLF001
+        sqlite3.SQLITE_LIMIT_VARIABLE_NUMBER, 32
+    )
+    try:
+        report = system.check(provenance=OWNER)
+
+        assert report.accepted, report.findings
+        assert report.conforms is True
+    finally:
+        system.close()
+
+
+def test_large_prospective_change_does_not_depend_on_sqlite_host_parameters(
+    tmp_path: Path,
+) -> None:
+    system = _system(tmp_path)
+    try:
+        assert system.set_definition_delta(
+            DefinitionChange(anchor_type_upserts=(TEAM,)), provenance=OWNER
+        ).accepted
+        system.store._connection.setlimit(  # noqa: SLF001
+            sqlite3.SQLITE_LIMIT_VARIABLE_NUMBER, 32
+        )
+        change = GraphChange(
+            anchor_upserts=tuple(
+                Anchor(f"person-{index}", "person", f"Person {index}") for index in range(50)
+            )
+        )
+
+        outcome = system.apply_graph_change(
+            GraphChangeRequest(GraphChangeTarget.DEFINITION_DELTA, change),
+            provenance=OWNER,
+        )
+
+        assert outcome.accepted, outcome.findings
+        assert system.store.proposal_state().staged_anchor_count == 50
+        assert materialize_state(system).graph.objects() == ()
+    finally:
+        system.close()
 
 
 def test_prospective_overlay_isolated_queryable_and_activates_atomically(tmp_path: Path) -> None:

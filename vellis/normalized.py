@@ -12,7 +12,7 @@ import hashlib
 from collections.abc import Callable, Iterable
 from decimal import Decimal
 from enum import Enum
-from sqlite3 import Connection
+from sqlite3 import SQLITE_LIMIT_VARIABLE_NUMBER, Connection
 
 from vellis.definitions import (
     AnchorTypeDefinition,
@@ -1148,6 +1148,14 @@ def _delete_staged_definition_entries(connection: Connection, retained_identity:
         connection.execute("DELETE FROM definition_set WHERE identity = ?", (source_identity,))
 
 
+def _parameter_chunks(
+    connection: Connection, values: set[str], *, reserved: int = 0
+) -> Iterable[tuple[str, ...]]:
+    size = max(1, min(400, connection.getlimit(SQLITE_LIMIT_VARIABLE_NUMBER) - reserved))
+    ordered = sorted(values)
+    return (tuple(ordered[start : start + size]) for start in range(0, len(ordered), size))
+
+
 def load_definition_set(
     connection: Connection,
     identity: str,
@@ -1214,10 +1222,13 @@ def load_definition_set(
             if not type_keys:
                 type_rows = ()
             else:
-                marks = ", ".join("?" for _ in type_keys)
-                type_rows = connection.execute(
-                    type_sql + f" AND type_key IN ({marks})",
-                    (identity, *sorted(type_keys)),
+                type_rows = (
+                    row
+                    for chunk in _parameter_chunks(connection, type_keys, reserved=1)
+                    for row in connection.execute(
+                        type_sql + " AND type_key IN (" + ", ".join("?" for _ in chunk) + ")",
+                        (identity, *chunk),
+                    )
                 )
         else:
             type_rows = connection.execute(type_sql, overlay_type_parameters)
@@ -1247,10 +1258,16 @@ def load_definition_set(
             if not relationship_keys:
                 relationship_rows = ()
             else:
-                marks = ", ".join("?" for _ in relationship_keys)
-                relationship_rows = connection.execute(
-                    relationship_sql + f" AND natural_key IN ({marks})",
-                    (identity, *sorted(relationship_keys)),
+                relationship_rows = (
+                    row
+                    for chunk in _parameter_chunks(connection, relationship_keys, reserved=1)
+                    for row in connection.execute(
+                        relationship_sql
+                        + " AND natural_key IN ("
+                        + ", ".join("?" for _ in chunk)
+                        + ")",
+                        (identity, *chunk),
+                    )
                 )
         else:
             relationship_rows = connection.execute(
@@ -1314,11 +1331,16 @@ def load_definition_set(
         if not type_keys:
             type_rows = ()
         else:
-            placeholders = ", ".join("?" for _ in type_keys)
-            type_sql += f" AND type_key IN ({placeholders})"
-            type_parameters.extend(sorted(type_keys))
-            type_rows = connection.execute(
-                type_sql + " ORDER BY occurrence", tuple(type_parameters)
+            type_rows = sorted(
+                (
+                    row
+                    for chunk in _parameter_chunks(connection, type_keys, reserved=1)
+                    for row in connection.execute(
+                        type_sql + " AND type_key IN (" + ", ".join("?" for _ in chunk) + ")",
+                        (identity, *chunk),
+                    )
+                ),
+                key=lambda row: int(row[0]),
             )
     else:
         type_rows = connection.execute(type_sql + " ORDER BY occurrence", tuple(type_parameters))
@@ -1438,31 +1460,39 @@ def load_definition_set(
         if not relationship_keys:
             relationship_rows = ()
         else:
-            placeholders = ", ".join("?" for _ in relationship_keys)
-            relationship_sql += (
-                f" WHERE r.definition_set_id = ? AND r.natural_key IN ({placeholders})"
-            )
-            relationship_parameters.extend(sorted(relationship_keys))
-            relationship_rows = connection.execute(
-                relationship_sql + " ORDER BY r.occurrence", tuple(relationship_parameters)
+            relationship_rows = sorted(
+                (
+                    row
+                    for chunk in _parameter_chunks(connection, relationship_keys, reserved=1)
+                    for row in connection.execute(
+                        relationship_sql
+                        + " WHERE r.definition_set_id = ? AND r.natural_key IN ("
+                        + ", ".join("?" for _ in chunk)
+                        + ")",
+                        (identity, *chunk),
+                    )
+                ),
+                key=lambda row: int(row[0]),
             )
     elif constrained_type_keys is not None:
         if not constrained_type_keys:
             relationship_rows = ()
         else:
-            placeholders = ", ".join("?" for _ in constrained_type_keys)
-            relationship_sql += (
-                " JOIN definition_multiplicity_participant AS p"
-                " ON p.definition_set_id = r.definition_set_id"
-                " AND p.rule_occurrence = r.occurrence AND p.role = 'first'"
-                " WHERE r.definition_set_id = ?"
-                f" AND p.type_key IN ({placeholders})"
-                " GROUP BY r.definition_set_id, r.occurrence"
-            )
-            relationship_parameters.extend(sorted(constrained_type_keys))
-            relationship_rows = connection.execute(
-                relationship_sql + " ORDER BY r.occurrence",
-                tuple(relationship_parameters),
+            relationship_rows = sorted(
+                {
+                    int(row[0]): row
+                    for chunk in _parameter_chunks(connection, constrained_type_keys, reserved=1)
+                    for row in connection.execute(
+                        relationship_sql + " JOIN definition_multiplicity_participant AS p"
+                        " ON p.definition_set_id = r.definition_set_id"
+                        " AND p.rule_occurrence = r.occurrence AND p.role = 'first'"
+                        " WHERE r.definition_set_id = ? AND p.type_key IN ("
+                        + ", ".join("?" for _ in chunk)
+                        + ") GROUP BY r.definition_set_id, r.occurrence",
+                        (identity, *chunk),
+                    )
+                }.values(),
+                key=lambda row: int(row[0]),
             )
     else:
         relationship_sql += " WHERE r.definition_set_id = ?"

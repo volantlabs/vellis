@@ -8,6 +8,7 @@ selection belongs to the slice that can resolve a revision and is not exercised 
 
 from __future__ import annotations
 
+import sqlite3
 from pathlib import Path
 
 import pytest
@@ -282,6 +283,33 @@ def test_an_unanswerable_selection_returns_findings_and_no_details(
         assert any(expected in each.summary for each in result.findings), result.findings
         assert result.anchor_details == ()
         assert result.evaluated_revision is None
+    finally:
+        system.close()
+
+
+def test_large_definition_selection_does_not_depend_on_sqlite_host_parameters(
+    tmp_path: Path,
+) -> None:
+    definitions = GraphDefinitionSet(
+        anchor_types=tuple(
+            AnchorTypeDefinition(f"type-{index}", f"Type {index}.") for index in range(50)
+        )
+    )
+    system = RTGSystem.open(tmp_path / "vellis.sqlite3")
+    assert system.initialize_fresh(
+        definitions,
+        provenance=Provenance(initiator="owner"),
+        initialization_summary="many definitions",
+    ).accepted
+    keys = tuple(value.type_key for value in definitions.anchor_types)
+    system.store._connection.setlimit(  # noqa: SLF001
+        sqlite3.SQLITE_LIMIT_VARIABLE_NUMBER, 32
+    )
+    try:
+        result = system.inspect_definitions(DefinitionInspectionRequest(keys))
+
+        assert result.accepted, result.findings
+        assert {value.anchor_type.type_key for value in result.anchor_details} == set(keys)
     finally:
         system.close()
 

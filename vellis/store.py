@@ -1004,6 +1004,19 @@ def _chunks(values: set[str], size: int = 400) -> Iterator[tuple[str, ...]]:
         yield tuple(ordered[start : start + size])
 
 
+def _sqlite_chunks(
+    connection: sqlite3.Connection,
+    values: set[str],
+    *,
+    reserved: int = 0,
+    repetitions: int = 1,
+) -> Iterator[tuple[str, ...]]:
+    """Yield deterministic batches within this connection's host-parameter limit."""
+    available = connection.getlimit(sqlite3.SQLITE_LIMIT_VARIABLE_NUMBER) - reserved
+    size = max(1, min(400, available // repetitions))
+    yield from _chunks(values, size)
+
+
 def _query_type_keys(query: GraphQuery) -> set[str]:
     return {
         *(key for group in query.anchor_groups for key in group.anchor_types),
@@ -1416,6 +1429,7 @@ class CanonicalStore:
                         constrained_type_keys=set(),
                     )
                     result = self._evaluate_sql_query_unlocked(query, definitions, revision)
+                    self._clear_query_filter_tables_unlocked()
                     self._connection.execute("COMMIT")
                     return result
                 except BaseException:
@@ -1449,6 +1463,7 @@ class CanonicalStore:
                     result = self._evaluate_sql_query_unlocked(
                         query, definitions, revision, historical_revision=revision
                     )
+                    self._clear_query_filter_tables_unlocked()
                     self._connection.execute("COMMIT")
                     return result
                 except BaseException:
@@ -1497,6 +1512,7 @@ class CanonicalStore:
                         revision,
                         prospective=True,
                     )
+                    self._clear_query_filter_tables_unlocked()
                     self._connection.execute("COMMIT")
                     return result
                 except BaseException:
@@ -1504,6 +1520,146 @@ class CanonicalStore:
                     raise
         except sqlite3.Error as error:
             raise StoreError(f"could not query the proposal at {self._path}: {error}") from error
+
+    def _prepare_query_filter_tables_unlocked(self, query: GraphQuery) -> None:
+        for table, columns in (
+            ("query_anchor_type_filter", "selector TEXT, type_key TEXT"),
+            ("query_anchor_uuid_filter", "selector TEXT, uuid TEXT"),
+            ("query_link_uuid_filter", "selector TEXT, uuid TEXT"),
+        ):
+            self._connection.execute(
+                f"CREATE TEMP TABLE IF NOT EXISTS {table} ({columns},"  # noqa: S608
+                " PRIMARY KEY (selector, "
+                + ("type_key" if "type_key" in columns else "uuid")
+                + ")) WITHOUT ROWID"
+            )
+            self._connection.execute(f"DELETE FROM {table}")  # noqa: S608
+        self._connection.executemany(
+            "INSERT OR IGNORE INTO query_anchor_type_filter VALUES (?, ?)",
+            (
+                (group.name, type_key)
+                for group in query.anchor_groups
+                for type_key in group.anchor_types
+            ),
+        )
+        self._connection.executemany(
+            "INSERT OR IGNORE INTO query_anchor_uuid_filter VALUES (?, ?)",
+            (
+                (group.name, uuid)
+                for group in query.anchor_groups
+                if group.uuid_filter is not None
+                for uuid in group.uuid_filter.uuids
+            ),
+        )
+        self._connection.executemany(
+            "INSERT OR IGNORE INTO query_link_uuid_filter VALUES (?, ?)",
+            (
+                (required.name, uuid)
+                for required in query.required_links
+                if required.uuid_filter is not None
+                for uuid in required.uuid_filter.uuids
+            ),
+        )
+
+    def _query_requires_relational_filters_unlocked(self, query: GraphQuery) -> bool:
+        from vellis.query import DataPropertyProjection
+
+        collection_parameters = sum(
+            len(group.anchor_types)
+            + (0 if group.uuid_filter is None else len(group.uuid_filter.uuids))
+            for group in query.anchor_groups
+        ) + sum(
+            0 if required.uuid_filter is None else len(required.uuid_filter.uuids)
+            for required in query.required_links
+        )
+        scalar_reserve = (
+            4
+            + len(query.anchor_groups)
+            + 2 * len(query.data_conditions)
+            + 8 * sum(len(condition.property_conditions) for condition in query.data_conditions)
+            + 2 * len(query.required_links)
+            + 4
+            * sum(
+                isinstance(projection, DataPropertyProjection)
+                for projection in query.return_shape.projections
+            )
+        )
+        return collection_parameters + scalar_reserve >= self._connection.getlimit(
+            sqlite3.SQLITE_LIMIT_VARIABLE_NUMBER
+        )
+
+    def _query_capacity_finding_unlocked(self, query: GraphQuery) -> ValidationFinding | None:
+        """Refuse a whole query before SQLite encounters a structural realization limit."""
+        from vellis.query import DataPropertyProjection
+
+        table_count = (
+            len(query.anchor_groups)
+            + 2 * len(query.data_conditions)
+            + sum(len(condition.property_conditions) for condition in query.data_conditions)
+            + len(query.required_links)
+        )
+        result_columns = sum(
+            4 if isinstance(projection, DataPropertyProjection) else 1
+            for projection in query.return_shape.projections
+        )
+        property_conditions = sum(
+            len(condition.property_conditions) for condition in query.data_conditions
+        )
+        expression_terms = (
+            4 * len(query.anchor_groups)
+            + 4 * len(query.data_conditions)
+            + 3 * property_conditions
+            + 5 * len(query.required_links)
+        )
+        scalar_parameters = (
+            2
+            + 2 * len(query.anchor_groups)
+            + sum(group.uuid_filter is not None for group in query.anchor_groups)
+            + 2 * len(query.data_conditions)
+            + 8 * property_conditions
+            + 2 * len(query.required_links)
+            + sum(required.uuid_filter is not None for required in query.required_links)
+            + 4
+            * sum(
+                isinstance(projection, DataPropertyProjection)
+                for projection in query.return_shape.projections
+            )
+        )
+        limits = (
+            (table_count, 64, "joined tables"),
+            (
+                result_columns,
+                self._connection.getlimit(sqlite3.SQLITE_LIMIT_COLUMN),
+                "result columns",
+            ),
+            (
+                expression_terms,
+                self._connection.getlimit(sqlite3.SQLITE_LIMIT_EXPR_DEPTH),
+                "expression depth",
+            ),
+            (
+                scalar_parameters,
+                self._connection.getlimit(sqlite3.SQLITE_LIMIT_VARIABLE_NUMBER),
+                "scalar parameters",
+            ),
+        )
+        for required, available, resource in limits:
+            if required > available:
+                return ValidationFinding(
+                    summary=(
+                        "the query structure exceeds this SQLite realization's complete-result"
+                        f" capacity ({required} {resource}, capacity {available})"
+                    )
+                )
+        return None
+
+    def _clear_query_filter_tables_unlocked(self) -> None:
+        for table in (
+            "query_anchor_type_filter",
+            "query_anchor_uuid_filter",
+            "query_link_uuid_filter",
+        ):
+            self._connection.execute(f"DROP TABLE IF EXISTS {table}")  # noqa: S608
 
     def _evaluate_sql_query_unlocked(
         self,
@@ -1546,6 +1702,8 @@ class CanonicalStore:
                     findings=findings,
                     query=response_query,
                 )
+            if self._query_requires_relational_filters_unlocked(query):
+                self._prepare_query_filter_tables_unlocked(query)
             projected = _projected_selector_names(query)
             projected_components: list[frozenset[str]] = []
             for component in _query_component_names(query):
@@ -1589,6 +1747,15 @@ class CanonicalStore:
             kept = set().union(*projected_components)
             query = _component_query(query, kept, projections=True)
 
+        capacity_finding = self._query_capacity_finding_unlocked(query)
+        if capacity_finding is not None:
+            return GraphQueryResult(
+                status=OperationStatus.REJECTED,
+                summary="the complete query exceeds this SQLite realization's structural capacity",
+                findings=(capacity_finding,),
+                query=response_query,
+            )
+
         prefix = ""
         prefix_parameters: list[object] = []
         graph_relation = "current_graph_object"
@@ -1619,18 +1786,40 @@ class CanonicalStore:
         where_parameters: list[object] = []
         select_parameters: list[object] = []
         selector_alias: dict[str, str] = {}
+        relational_filters = (
+            self._connection.execute(
+                "SELECT 1 FROM sqlite_temp_master"
+                " WHERE type = 'table' AND name = 'query_anchor_type_filter'"
+            ).fetchone()
+            is not None
+        )
         for index, group in enumerate(query.anchor_groups):
             alias = f"a{index}"
             selector_alias[group.name] = alias
             tables.append(f"{graph_relation} AS {alias}")
-            placeholders = ", ".join("?" for _ in group.anchor_types)
-            predicates.extend((f"{alias}.object_kind = ?", f"{alias}.type_key IN ({placeholders})"))
+            predicates.append(f"{alias}.object_kind = ?")
             where_parameters.append(ObjectKind.ANCHOR.value)
-            where_parameters.extend(group.anchor_types)
+            if relational_filters:
+                predicates.append(
+                    "EXISTS (SELECT 1 FROM query_anchor_type_filter AS qtf"
+                    f" WHERE qtf.selector = ? AND qtf.type_key = {alias}.type_key)"
+                )
+                where_parameters.append(group.name)
+            else:
+                placeholders = ", ".join("?" for _ in group.anchor_types)
+                predicates.append(f"{alias}.type_key IN ({placeholders})")
+                where_parameters.extend(group.anchor_types)
             if group.uuid_filter is not None:
-                placeholders = ", ".join("?" for _ in group.uuid_filter.uuids)
-                predicates.append(f"{alias}.uuid IN ({placeholders})")
-                where_parameters.extend(group.uuid_filter.uuids)
+                if relational_filters:
+                    predicates.append(
+                        "EXISTS (SELECT 1 FROM query_anchor_uuid_filter AS quf"
+                        f" WHERE quf.selector = ? AND quf.uuid = {alias}.uuid)"
+                    )
+                    where_parameters.append(group.name)
+                else:
+                    placeholders = ", ".join("?" for _ in group.uuid_filter.uuids)
+                    predicates.append(f"{alias}.uuid IN ({placeholders})")
+                    where_parameters.extend(group.uuid_filter.uuids)
 
         for index, condition in enumerate(query.data_conditions):
             alias, association = f"d{index}", f"da{index}"
@@ -1687,9 +1876,16 @@ class CanonicalStore:
             )
             where_parameters.extend((ObjectKind.LINK.value, required.link_type))
             if required.uuid_filter is not None:
-                placeholders = ", ".join("?" for _ in required.uuid_filter.uuids)
-                predicates.append(f"{alias}.uuid IN ({placeholders})")
-                where_parameters.extend(required.uuid_filter.uuids)
+                if relational_filters:
+                    predicates.append(
+                        "EXISTS (SELECT 1 FROM query_link_uuid_filter AS quf"
+                        f" WHERE quf.selector = ? AND quf.uuid = {alias}.uuid)"
+                    )
+                    where_parameters.append(required.name)
+                else:
+                    placeholders = ", ".join("?" for _ in required.uuid_filter.uuids)
+                    predicates.append(f"{alias}.uuid IN ({placeholders})")
+                    where_parameters.extend(required.uuid_filter.uuids)
 
         aggregates: tuple[AggregateBinding, ...] = ()
         if query.aggregations and not existence_only:
@@ -2025,38 +2221,51 @@ class CanonicalStore:
                 def placeholders(values: set[str]) -> str:
                     return ", ".join("?" for _ in values)
 
+                def parameter_chunks(
+                    values: set[str], *, reserved: int = 0, repetitions: int = 1
+                ) -> Iterator[tuple[str, ...]]:
+                    yield from _sqlite_chunks(
+                        self._connection,
+                        values,
+                        reserved=reserved,
+                        repetitions=repetitions,
+                    )
+
                 def resolve_types(keys: set[str]) -> None:
                     unresolved = keys - type_sources.keys() - absent_types
                     if not unresolved:
                         return
                     edited: set[str] = set()
                     if prospective:
-                        sql = (
-                            "SELECT type_key, operation, value_set_id"
-                            " FROM proposal_definition_type WHERE type_key IN ("
-                            + placeholders(unresolved)
-                            + ")"
-                        )
-                        for key, operation, value_set_id in self._connection.execute(
-                            sql, tuple(sorted(unresolved))
-                        ):
-                            text_key = str(key)
-                            edited.add(text_key)
-                            if operation == "upsert":
-                                type_sources[text_key] = str(value_set_id)
-                            else:
-                                absent_types.add(text_key)
+                        for chunk in parameter_chunks(unresolved):
+                            sql = (
+                                "SELECT type_key, operation, value_set_id"
+                                " FROM proposal_definition_type WHERE type_key IN ("
+                                + placeholders(set(chunk))
+                                + ")"
+                            )
+                            for key, operation, value_set_id in self._connection.execute(
+                                sql, chunk
+                            ):
+                                text_key = str(key)
+                                edited.add(text_key)
+                                if operation == "upsert":
+                                    type_sources[text_key] = str(value_set_id)
+                                else:
+                                    absent_types.add(text_key)
                     active_keys = unresolved - edited
                     if active_keys:
                         if revision is None:
-                            sql = (
-                                "SELECT type_key, value_set_id"
-                                " FROM current_definition_type_source WHERE type_key IN ("
-                                + placeholders(active_keys)
-                                + ")"
-                            )
                             found_rows = tuple(
-                                self._connection.execute(sql, tuple(sorted(active_keys)))
+                                row
+                                for chunk in parameter_chunks(active_keys)
+                                for row in self._connection.execute(
+                                    "SELECT type_key, value_set_id"
+                                    " FROM current_definition_type_source WHERE type_key IN ("
+                                    + placeholders(set(chunk))
+                                    + ")",
+                                    chunk,
+                                )
                             )
                         else:
                             found_rows = tuple(
@@ -2079,31 +2288,34 @@ class CanonicalStore:
                         return
                     edited: set[str] = set()
                     if prospective:
-                        sql = (
-                            "SELECT natural_key, operation, value_set_id"
-                            " FROM proposal_definition_relationship WHERE natural_key IN ("
-                            + placeholders(unresolved)
-                            + ")"
-                        )
-                        for key, operation, value_set_id in self._connection.execute(
-                            sql, tuple(sorted(unresolved))
-                        ):
-                            text_key = str(key)
-                            edited.add(text_key)
-                            if operation == "upsert":
-                                relationship_sources[text_key] = str(value_set_id)
-                            else:
-                                absent_relationships.add(text_key)
+                        for chunk in parameter_chunks(unresolved):
+                            sql = (
+                                "SELECT natural_key, operation, value_set_id"
+                                " FROM proposal_definition_relationship WHERE natural_key IN ("
+                                + placeholders(set(chunk))
+                                + ")"
+                            )
+                            for key, operation, value_set_id in self._connection.execute(
+                                sql, chunk
+                            ):
+                                text_key = str(key)
+                                edited.add(text_key)
+                                if operation == "upsert":
+                                    relationship_sources[text_key] = str(value_set_id)
+                                else:
+                                    absent_relationships.add(text_key)
                     active_keys = unresolved - edited
                     if active_keys:
                         if revision is None:
-                            sql = (
-                                "SELECT natural_key, value_set_id"
-                                " FROM current_definition_relationship_source"
-                                " WHERE natural_key IN (" + placeholders(active_keys) + ")"
-                            )
                             found_rows = tuple(
-                                self._connection.execute(sql, tuple(sorted(active_keys)))
+                                row
+                                for chunk in parameter_chunks(active_keys)
+                                for row in self._connection.execute(
+                                    "SELECT natural_key, value_set_id"
+                                    " FROM current_definition_relationship_source"
+                                    " WHERE natural_key IN (" + placeholders(set(chunk)) + ")",
+                                    chunk,
+                                )
                             )
                         else:
                             found_rows = tuple(
@@ -2141,32 +2353,33 @@ class CanonicalStore:
 
                 def historical_reverse_types(selected: set[str]) -> set[str]:
                     candidates: set[tuple[str, str]] = set()
-                    marks = placeholders(selected)
                     for source in (historical_base, *historical_chain):
-                        for sql in (
-                            "SELECT t.type_key, t.definition_set_id"
-                            " FROM definition_anchor_permission AS p"
-                            " INDEXED BY definition_anchor_permission_by_type"
-                            " JOIN definition_type AS t"
-                            " ON t.definition_set_id = p.definition_set_id"
-                            " AND t.occurrence = p.type_occurrence"
-                            " WHERE p.definition_set_id = ? AND p.anchor_type_key IN ("
-                            + marks
-                            + ")",
-                            "SELECT t.type_key, t.definition_set_id"
-                            " FROM definition_endpoint_permission AS p"
-                            " INDEXED BY definition_endpoint_permission_by_type"
-                            " JOIN definition_type AS t"
-                            " ON t.definition_set_id = p.definition_set_id"
-                            " AND t.occurrence = p.type_occurrence"
-                            " WHERE p.definition_set_id = ? AND p.type_key IN (" + marks + ")",
-                        ):
-                            candidates.update(
-                                (str(key), str(value_source))
-                                for key, value_source in self._connection.execute(
-                                    sql, (source, *sorted(selected))
+                        for chunk in parameter_chunks(selected, reserved=1):
+                            marks = placeholders(set(chunk))
+                            for sql in (
+                                "SELECT t.type_key, t.definition_set_id"
+                                " FROM definition_anchor_permission AS p"
+                                " INDEXED BY definition_anchor_permission_by_type"
+                                " JOIN definition_type AS t"
+                                " ON t.definition_set_id = p.definition_set_id"
+                                " AND t.occurrence = p.type_occurrence"
+                                " WHERE p.definition_set_id = ? AND p.anchor_type_key IN ("
+                                + marks
+                                + ")",
+                                "SELECT t.type_key, t.definition_set_id"
+                                " FROM definition_endpoint_permission AS p"
+                                " INDEXED BY definition_endpoint_permission_by_type"
+                                " JOIN definition_type AS t"
+                                " ON t.definition_set_id = p.definition_set_id"
+                                " AND t.occurrence = p.type_occurrence"
+                                " WHERE p.definition_set_id = ? AND p.type_key IN (" + marks + ")",
+                            ):
+                                candidates.update(
+                                    (str(key), str(value_source))
+                                    for key, value_source in self._connection.execute(
+                                        sql, (source, *chunk)
+                                    )
                                 )
-                            )
                     return {
                         key
                         for key, source in candidates
@@ -2178,21 +2391,23 @@ class CanonicalStore:
 
                 def historical_reverse_relationships(selected: set[str]) -> set[str]:
                     candidates: set[tuple[str, str]] = set()
-                    marks = placeholders(selected)
                     for source in (historical_base, *historical_chain):
-                        candidates.update(
-                            (str(key), str(value_source))
-                            for key, value_source in self._connection.execute(
-                                "SELECT r.natural_key, r.definition_set_id"
-                                " FROM definition_multiplicity_participant AS p"
-                                " INDEXED BY definition_multiplicity_participant_by_type"
-                                " JOIN definition_multiplicity_rule AS r"
-                                " ON r.definition_set_id = p.definition_set_id"
-                                " AND r.occurrence = p.rule_occurrence"
-                                " WHERE p.definition_set_id = ? AND p.type_key IN (" + marks + ")",
-                                (source, *sorted(selected)),
+                        for chunk in parameter_chunks(selected, reserved=1):
+                            candidates.update(
+                                (str(key), str(value_source))
+                                for key, value_source in self._connection.execute(
+                                    "SELECT r.natural_key, r.definition_set_id"
+                                    " FROM definition_multiplicity_participant AS p"
+                                    " INDEXED BY definition_multiplicity_participant_by_type"
+                                    " JOIN definition_multiplicity_rule AS r"
+                                    " ON r.definition_set_id = p.definition_set_id"
+                                    " AND r.occurrence = p.rule_occurrence"
+                                    " WHERE p.definition_set_id = ? AND p.type_key IN ("
+                                    + placeholders(set(chunk))
+                                    + ")",
+                                    (source, *chunk),
+                                )
                             )
-                        )
                     return {
                         key
                         for key, source in candidates
@@ -2213,7 +2428,6 @@ class CanonicalStore:
                     if not selected and not relationship_frontier:
                         break
                     if selected:
-                        selected_sql = placeholders(selected)
                         if revision is not None:
                             want_types(historical_reverse_types(selected))
                             want_relationships(historical_reverse_relationships(selected))
@@ -2231,95 +2445,106 @@ class CanonicalStore:
                             " proposal_definition_relationship AS e"
                             " WHERE e.natural_key = r.natural_key)"
                         )
-                        current_reverse_queries = (
-                            "SELECT DISTINCT t.type_key"
-                            " FROM current_definition_type_source AS s"
-                            " JOIN definition_anchor_permission AS p"
-                            " INDEXED BY definition_anchor_permission_by_type"
-                            " ON p.definition_set_id = s.value_set_id"
-                            " JOIN definition_type AS t"
-                            " ON t.definition_set_id = p.definition_set_id"
-                            " AND t.occurrence = p.type_occurrence"
-                            " AND t.type_key = s.type_key"
-                            " WHERE p.anchor_type_key IN ("
-                            + selected_sql
-                            + ")"
-                            + active_type_filter,
-                            "SELECT DISTINCT t.type_key"
-                            " FROM current_definition_type_source AS s"
-                            " JOIN definition_endpoint_permission AS p"
-                            " INDEXED BY definition_endpoint_permission_by_type"
-                            " ON p.definition_set_id = s.value_set_id"
-                            " JOIN definition_type AS t"
-                            " ON t.definition_set_id = p.definition_set_id"
-                            " AND t.occurrence = p.type_occurrence"
-                            " AND t.type_key = s.type_key"
-                            " WHERE p.type_key IN (" + selected_sql + ")" + active_type_filter,
-                        )
-                        for sql in () if revision is not None else current_reverse_queries:
-                            want_types(
-                                str(row[0])
-                                for row in self._connection.execute(sql, tuple(sorted(selected)))
-                            )
                         if revision is None:
-                            want_relationships(
-                                str(row[0])
-                                for row in self._connection.execute(
-                                    "SELECT DISTINCT r.natural_key"
-                                    " FROM current_definition_relationship_source AS s"
-                                    " JOIN definition_multiplicity_participant AS p"
-                                    " INDEXED BY definition_multiplicity_participant_by_type"
+                            for chunk in parameter_chunks(selected):
+                                selected_sql = placeholders(set(chunk))
+                                current_reverse_queries = (
+                                    "SELECT DISTINCT t.type_key"
+                                    " FROM current_definition_type_source AS s"
+                                    " JOIN definition_anchor_permission AS p"
+                                    " INDEXED BY definition_anchor_permission_by_type"
                                     " ON p.definition_set_id = s.value_set_id"
-                                    " JOIN definition_multiplicity_rule AS r"
-                                    " ON r.definition_set_id = p.definition_set_id"
-                                    " AND r.occurrence = p.rule_occurrence"
-                                    " AND r.natural_key = s.natural_key"
+                                    " JOIN definition_type AS t"
+                                    " ON t.definition_set_id = p.definition_set_id"
+                                    " AND t.occurrence = p.type_occurrence"
+                                    " AND t.type_key = s.type_key"
+                                    " WHERE p.anchor_type_key IN ("
+                                    + selected_sql
+                                    + ")"
+                                    + active_type_filter,
+                                    "SELECT DISTINCT t.type_key"
+                                    " FROM current_definition_type_source AS s"
+                                    " JOIN definition_endpoint_permission AS p"
+                                    " INDEXED BY definition_endpoint_permission_by_type"
+                                    " ON p.definition_set_id = s.value_set_id"
+                                    " JOIN definition_type AS t"
+                                    " ON t.definition_set_id = p.definition_set_id"
+                                    " AND t.occurrence = p.type_occurrence"
+                                    " AND t.type_key = s.type_key"
                                     " WHERE p.type_key IN ("
                                     + selected_sql
                                     + ")"
-                                    + active_relationship_filter,
-                                    tuple(sorted(selected)),
+                                    + active_type_filter,
                                 )
-                            )
+                                for sql in current_reverse_queries:
+                                    want_types(
+                                        str(row[0]) for row in self._connection.execute(sql, chunk)
+                                    )
+                        if revision is None:
+                            for chunk in parameter_chunks(selected):
+                                want_relationships(
+                                    str(row[0])
+                                    for row in self._connection.execute(
+                                        "SELECT DISTINCT r.natural_key"
+                                        " FROM current_definition_relationship_source AS s"
+                                        " JOIN definition_multiplicity_participant AS p"
+                                        " INDEXED BY definition_multiplicity_participant_by_type"
+                                        " ON p.definition_set_id = s.value_set_id"
+                                        " JOIN definition_multiplicity_rule AS r"
+                                        " ON r.definition_set_id = p.definition_set_id"
+                                        " AND r.occurrence = p.rule_occurrence"
+                                        " AND r.natural_key = s.natural_key"
+                                        " WHERE p.type_key IN ("
+                                        + placeholders(set(chunk))
+                                        + ")"
+                                        + active_relationship_filter,
+                                        chunk,
+                                    )
+                                )
                         if prospective:
-                            parameters = tuple(sorted(selected))
-                            for key, value_set_id in self._connection.execute(
-                                "SELECT e.type_key, e.value_set_id"
-                                " FROM proposal_definition_type AS e"
-                                " JOIN definition_type AS t ON t.definition_set_id = e.value_set_id"
-                                " JOIN definition_anchor_permission AS p"
-                                " ON p.definition_set_id = t.definition_set_id"
-                                " AND p.type_occurrence = t.occurrence"
-                                " WHERE e.operation = 'upsert' AND p.anchor_type_key IN ("
-                                + selected_sql
-                                + ") UNION SELECT e.type_key, e.value_set_id"
-                                " FROM proposal_definition_type AS e"
-                                " JOIN definition_type AS t ON t.definition_set_id = e.value_set_id"
-                                " JOIN definition_endpoint_permission AS p"
-                                " ON p.definition_set_id = t.definition_set_id"
-                                " AND p.type_occurrence = t.occurrence"
-                                " WHERE e.operation = 'upsert' AND p.type_key IN ("
-                                + selected_sql
-                                + ")",
-                                (*parameters, *parameters),
-                            ):
-                                want_types((str(key),))
-                                type_sources[str(key)] = str(value_set_id)
-                            for key, value_set_id in self._connection.execute(
-                                "SELECT e.natural_key, e.value_set_id"
-                                " FROM proposal_definition_relationship AS e"
-                                " JOIN definition_multiplicity_rule AS r"
-                                " ON r.definition_set_id = e.value_set_id"
-                                " JOIN definition_multiplicity_participant AS p"
-                                " ON p.definition_set_id = r.definition_set_id"
-                                " AND p.rule_occurrence = r.occurrence"
-                                " WHERE e.operation = 'upsert' AND p.type_key IN ("
-                                + selected_sql
-                                + ")",
-                                parameters,
-                            ):
-                                want_relationships((str(key),))
-                                relationship_sources[str(key)] = str(value_set_id)
+                            for chunk in parameter_chunks(selected, repetitions=2):
+                                selected_sql = placeholders(set(chunk))
+                                for key, value_set_id in self._connection.execute(
+                                    "SELECT e.type_key, e.value_set_id"
+                                    " FROM proposal_definition_type AS e"
+                                    " JOIN definition_type AS t"
+                                    " ON t.definition_set_id = e.value_set_id"
+                                    " JOIN definition_anchor_permission AS p"
+                                    " ON p.definition_set_id = t.definition_set_id"
+                                    " AND p.type_occurrence = t.occurrence"
+                                    " WHERE e.operation = 'upsert'"
+                                    " AND p.anchor_type_key IN ("
+                                    + selected_sql
+                                    + ") UNION SELECT e.type_key, e.value_set_id"
+                                    " FROM proposal_definition_type AS e"
+                                    " JOIN definition_type AS t"
+                                    " ON t.definition_set_id = e.value_set_id"
+                                    " JOIN definition_endpoint_permission AS p"
+                                    " ON p.definition_set_id = t.definition_set_id"
+                                    " AND p.type_occurrence = t.occurrence"
+                                    " WHERE e.operation = 'upsert' AND p.type_key IN ("
+                                    + selected_sql
+                                    + ")",
+                                    (*chunk, *chunk),
+                                ):
+                                    want_types((str(key),))
+                                    type_sources[str(key)] = str(value_set_id)
+                            for chunk in parameter_chunks(selected):
+                                for key, value_set_id in self._connection.execute(
+                                    "SELECT e.natural_key, e.value_set_id"
+                                    " FROM proposal_definition_relationship AS e"
+                                    " JOIN definition_multiplicity_rule AS r"
+                                    " ON r.definition_set_id = e.value_set_id"
+                                    " JOIN definition_multiplicity_participant AS p"
+                                    " ON p.definition_set_id = r.definition_set_id"
+                                    " AND p.rule_occurrence = r.occurrence"
+                                    " WHERE e.operation = 'upsert' AND p.type_key IN ("
+                                    + placeholders(set(chunk))
+                                    + ")",
+                                    chunk,
+                                ):
+                                    want_relationships((str(key),))
+                                    relationship_sources[str(key)] = str(value_set_id)
                     resolve_relationships(wanted_relationships)
                     for key in selected:
                         source = type_sources.get(key)
@@ -2365,16 +2590,22 @@ class CanonicalStore:
                 definitions = GraphDefinitionSet()
                 for source in sorted(set(type_sources.values())):
                     keys = {key for key, value in type_sources.items() if value == source}
-                    definitions = _merge_definition_sets(
-                        definitions,
-                        self._load_definition_set(source, type_keys=keys, relationship_keys=set()),
-                    )
+                    for chunk in parameter_chunks(keys):
+                        definitions = _merge_definition_sets(
+                            definitions,
+                            self._load_definition_set(
+                                source, type_keys=set(chunk), relationship_keys=set()
+                            ),
+                        )
                 for source in sorted(set(relationship_sources.values())):
                     keys = {key for key, value in relationship_sources.items() if value == source}
-                    definitions = _merge_definition_sets(
-                        definitions,
-                        self._load_definition_set(source, type_keys=set(), relationship_keys=keys),
-                    )
+                    for chunk in parameter_chunks(keys):
+                        definitions = _merge_definition_sets(
+                            definitions,
+                            self._load_definition_set(
+                                source, type_keys=set(), relationship_keys=set(chunk)
+                            ),
+                        )
                 return evaluated, definitions, delta_present
         except sqlite3.Error as error:
             raise StoreError(f"could not read from the store at {self._path}: {error}") from error
@@ -2427,19 +2658,22 @@ class CanonicalStore:
             constrained_type_keys=constrained_type_keys,
             relationship_keys=relationship_keys,
         )
-        type_rows = self._connection.execute(
-            "SELECT type_key, operation, value_set_id FROM proposal_definition_type"
-            + (
-                ""
-                if type_keys is None
-                else (
-                    " WHERE 0"
-                    if not type_keys
-                    else " WHERE type_key IN (" + ", ".join("?" for _ in type_keys) + ")"
+        if type_keys is None:
+            type_rows = self._connection.execute(
+                "SELECT type_key, operation, value_set_id FROM proposal_definition_type"
+            )
+        else:
+            type_rows = (
+                row
+                for chunk in _sqlite_chunks(self._connection, type_keys)
+                for row in self._connection.execute(
+                    "SELECT type_key, operation, value_set_id"
+                    " FROM proposal_definition_type WHERE type_key IN ("
+                    + ", ".join("?" for _ in chunk)
+                    + ")",
+                    chunk,
                 )
-            ),
-            () if type_keys is None else tuple(sorted(type_keys)),
-        )
+            )
         edited_types = {str(row[0]): row for row in type_rows}
         anchors = [each for each in active.anchor_types if each.type_key not in edited_types]
         data = [each for each in active.associated_data_types if each.type_key not in edited_types]
@@ -2457,37 +2691,49 @@ class CanonicalStore:
         )
         parameters: tuple[object, ...] = ()
         if relationship_keys is not None:
-            if not relationship_keys:
-                relationship_sql += " WHERE 0"
-            else:
-                relationship_sql += (
-                    " WHERE natural_key IN (" + ", ".join("?" for _ in relationship_keys) + ")"
+            relationship_rows: Iterable[tuple[object, ...]] = (
+                row
+                for chunk in _sqlite_chunks(self._connection, relationship_keys)
+                for row in self._connection.execute(
+                    relationship_sql
+                    + " WHERE natural_key IN ("
+                    + ", ".join("?" for _ in chunk)
+                    + ")",
+                    chunk,
                 )
-                parameters = tuple(sorted(relationship_keys))
+            )
         elif constrained_type_keys is not None:
             if not constrained_type_keys:
-                relationship_sql += " WHERE 0"
+                relationship_rows = ()
             else:
-                placeholders = ", ".join("?" for _ in constrained_type_keys)
-                relationship_sql += (
-                    " AS e WHERE (e.operation = 'upsert' AND EXISTS ("
-                    " SELECT 1 FROM definition_multiplicity_rule AS r"
-                    " JOIN definition_multiplicity_participant AS p"
-                    " ON p.definition_set_id = r.definition_set_id"
-                    " AND p.rule_occurrence = r.occurrence AND p.role = 'first'"
-                    " WHERE r.definition_set_id = e.value_set_id"
-                    f" AND p.type_key IN ({placeholders})))"
-                    " OR (e.operation = 'delete' AND EXISTS ("
-                    " SELECT 1 FROM definition_multiplicity_rule AS r"
-                    " JOIN definition_multiplicity_participant AS p"
-                    " ON p.definition_set_id = r.definition_set_id"
-                    " AND p.rule_occurrence = r.occurrence AND p.role = 'first'"
-                    " WHERE r.definition_set_id = ? AND r.natural_key = e.natural_key"
-                    f" AND p.type_key IN ({placeholders})))"
+                relationship_rows = (
+                    row
+                    for chunk in _sqlite_chunks(
+                        self._connection,
+                        constrained_type_keys,
+                        reserved=1,
+                        repetitions=2,
+                    )
+                    for row in self._connection.execute(
+                        relationship_sql + " AS e WHERE (e.operation = 'upsert' AND EXISTS ("
+                        " SELECT 1 FROM definition_multiplicity_rule AS r"
+                        " JOIN definition_multiplicity_participant AS p"
+                        " ON p.definition_set_id = r.definition_set_id"
+                        " AND p.rule_occurrence = r.occurrence AND p.role = 'first'"
+                        " WHERE r.definition_set_id = e.value_set_id AND p.type_key IN ("
+                        + ", ".join("?" for _ in chunk)
+                        + "))) OR (e.operation = 'delete' AND EXISTS ("
+                        " SELECT 1 FROM definition_multiplicity_rule AS r"
+                        " JOIN definition_multiplicity_participant AS p"
+                        " ON p.definition_set_id = r.definition_set_id"
+                        " AND p.rule_occurrence = r.occurrence AND p.role = 'first'"
+                        " WHERE r.definition_set_id = ? AND r.natural_key = e.natural_key"
+                        " AND p.type_key IN (" + ", ".join("?" for _ in chunk) + ")))",
+                        (*chunk, active_identity, *chunk),
+                    )
                 )
-                selected = tuple(sorted(constrained_type_keys))
-                parameters = (*selected, active_identity, *selected)
-        relationship_rows = self._connection.execute(relationship_sql, parameters)
+        else:
+            relationship_rows = self._connection.execute(relationship_sql, parameters)
         edited_relationships = {str(row[0]): row for row in relationship_rows}
         relationships = [
             each
@@ -4662,7 +4908,12 @@ class CanonicalStore:
         association_relation = (
             "assessment_effective_data_anchor" if prospective else "current_data_anchor"
         )
+        self._connection.execute(
+            "CREATE TEMP TABLE IF NOT EXISTS multiplicity_type_filter"
+            " (role TEXT, type_key TEXT, PRIMARY KEY (role, type_key)) WITHOUT ROWID"
+        )
         for constraint in definitions.relationship_constraints:
+            self._connection.execute("DELETE FROM multiplicity_type_filter")
             label = relationship_label(constraint)
             lower, upper = constraint.lower_bound, constraint.upper_bound
             if isinstance(constraint, LinkMultiplicityConstraint):
@@ -4676,17 +4927,25 @@ class CanonicalStore:
                 opposite = tuple(constraint.opposite_endpoint_type_keys)
                 if not constrained or not opposite:
                     continue
-                constrained_marks = ", ".join("?" for _ in constrained)
-                opposite_marks = ", ".join("?" for _ in opposite)
+                self._connection.executemany(
+                    "INSERT INTO multiplicity_type_filter VALUES ('constrained', ?)",
+                    ((value,) for value in constrained),
+                )
+                self._connection.executemany(
+                    "INSERT INTO multiplicity_type_filter VALUES ('opposite', ?)",
+                    ((value,) for value in opposite),
+                )
                 sql = (
                     f"SELECT e.uuid, e.type_key, count(f.uuid) FROM {object_relation} AS e"
                     f" LEFT JOIN {link_relation} AS l ON "
                     + ("1 = 1" if prospective else "l.object_kind = 'link'")
                     + f" AND l.type_key = ? AND l.{near} = e.uuid"
                     + f" LEFT JOIN {object_relation} AS f ON f.uuid = l.{far}"
-                    + f" AND f.type_key IN ({opposite_marks})"
+                    + " AND EXISTS (SELECT 1 FROM multiplicity_type_filter AS mtf"
+                    + " WHERE mtf.role = 'opposite' AND mtf.type_key = f.type_key)"
                     + " WHERE e.object_kind IN ('anchor', 'associatedData')"
-                    + f" AND e.type_key IN ({constrained_marks})"
+                    + " AND EXISTS (SELECT 1 FROM multiplicity_type_filter AS mtf"
+                    + " WHERE mtf.role = 'constrained' AND mtf.type_key = e.type_key)"
                     + (
                         " AND e.uuid IN (SELECT uuid FROM assessment_multiplicity_subject)"
                         if prospective
@@ -4694,8 +4953,7 @@ class CanonicalStore:
                     )
                     + " GROUP BY e.uuid, e.type_key ORDER BY e.uuid"
                 )
-                parameters = (constraint.link_type_key, *opposite, *constrained)
-                rows = self._connection.execute(sql, parameters)
+                rows = self._connection.execute(sql, (constraint.link_type_key,))
                 for uuid, type_key, count_value in rows:
                     count = int(count_value)
                     if count < lower or (upper is not None and count > upper):
@@ -4715,16 +4973,25 @@ class CanonicalStore:
             data_types = tuple(constraint.associated_data_type_keys)
             if not anchors or not data_types:
                 continue
-            anchor_marks = ", ".join("?" for _ in anchors)
-            data_marks = ", ".join("?" for _ in data_types)
+            self._connection.executemany(
+                "INSERT INTO multiplicity_type_filter VALUES ('anchor', ?)",
+                ((value,) for value in anchors),
+            )
+            self._connection.executemany(
+                "INSERT INTO multiplicity_type_filter VALUES ('data', ?)",
+                ((value,) for value in data_types),
+            )
             if constraint.constrained_end is DirectAssociationEnd.ANCHOR:
                 sql = (
                     f"SELECT a.uuid, count(DISTINCT d.uuid) FROM {object_relation} AS a"
                     f" LEFT JOIN {association_relation} AS da ON da.anchor_uuid = a.uuid"
                     f" LEFT JOIN {object_relation} AS d ON d.uuid = da.data_uuid"
-                    f" AND d.type_key IN ({data_marks})"
+                    " AND EXISTS (SELECT 1 FROM multiplicity_type_filter AS mtf"
+                    " WHERE mtf.role = 'data' AND mtf.type_key = d.type_key)"
                     " WHERE a.object_kind = 'anchor'"
-                    f" AND a.type_key IN ({anchor_marks}) GROUP BY a.uuid ORDER BY a.uuid"
+                    " AND EXISTS (SELECT 1 FROM multiplicity_type_filter AS mtf"
+                    " WHERE mtf.role = 'anchor' AND mtf.type_key = a.type_key)"
+                    " GROUP BY a.uuid ORDER BY a.uuid"
                 )
                 if prospective:
                     sql = sql.replace(
@@ -4732,15 +4999,18 @@ class CanonicalStore:
                         " AND a.uuid IN (SELECT uuid FROM assessment_multiplicity_subject)"
                         " GROUP BY",
                     )
-                rows = self._connection.execute(sql, (*data_types, *anchors))
+                rows = self._connection.execute(sql)
             else:
                 sql = (
                     f"SELECT d.uuid, count(DISTINCT a.uuid) FROM {object_relation} AS d"
                     f" LEFT JOIN {association_relation} AS da ON da.data_uuid = d.uuid"
                     f" LEFT JOIN {object_relation} AS a ON a.uuid = da.anchor_uuid"
-                    f" AND a.type_key IN ({anchor_marks})"
+                    " AND EXISTS (SELECT 1 FROM multiplicity_type_filter AS mtf"
+                    " WHERE mtf.role = 'anchor' AND mtf.type_key = a.type_key)"
                     " WHERE d.object_kind = 'associatedData'"
-                    f" AND d.type_key IN ({data_marks}) GROUP BY d.uuid ORDER BY d.uuid"
+                    " AND EXISTS (SELECT 1 FROM multiplicity_type_filter AS mtf"
+                    " WHERE mtf.role = 'data' AND mtf.type_key = d.type_key)"
+                    " GROUP BY d.uuid ORDER BY d.uuid"
                 )
                 if prospective:
                     sql = sql.replace(
@@ -4748,7 +5018,7 @@ class CanonicalStore:
                         " AND d.uuid IN (SELECT uuid FROM assessment_multiplicity_subject)"
                         " GROUP BY",
                     )
-                rows = self._connection.execute(sql, (*anchors, *data_types))
+                rows = self._connection.execute(sql)
             for uuid, count_value in rows:
                 count = int(count_value)
                 if count < lower or (upper is not None and count > upper):
@@ -5440,7 +5710,7 @@ class CanonicalStore:
 
     def _objects_for_uuids_unlocked(self, uuids: set[str]) -> tuple[GraphObject, ...]:
         objects: list[GraphObject] = []
-        for chunk in _chunks(uuids):
+        for chunk in _sqlite_chunks(self._connection, uuids):
             placeholders = ", ".join("?" for _ in chunk)
             rows = self._connection.execute(
                 "SELECT uuid, object_kind, type_key, source_uuid, target_uuid,"
@@ -5453,7 +5723,7 @@ class CanonicalStore:
 
     def _referencing_uuids_unlocked(self, uuids: set[str]) -> set[str]:
         references: set[str] = set()
-        for chunk in _chunks(uuids):
+        for chunk in _sqlite_chunks(self._connection, uuids, repetitions=2):
             placeholders = ", ".join("?" for _ in chunk)
             references.update(
                 str(row[0])
@@ -5476,7 +5746,7 @@ class CanonicalStore:
 
     def _incident_relationship_uuids_unlocked(self, participants: set[str]) -> set[str]:
         relationships = self._referencing_uuids_unlocked(participants)
-        for chunk in _chunks(participants):
+        for chunk in _sqlite_chunks(self._connection, participants):
             placeholders = ", ".join("?" for _ in chunk)
             relationships.update(
                 str(row[0])
@@ -5902,24 +6172,28 @@ class CanonicalStore:
             raise StoreError("the current graph has no maintained semantic summary")
         accumulator, entry_count = str(summary[0]), int(summary[1])
         if replaced:
-            placeholders = ", ".join("?" for _ in replaced)
-            removed = tuple(
-                graph_entry_digest(str(uuid), str(identity))
-                for uuid, identity in self._connection.execute(
-                    "SELECT c.uuid, v.content_identity FROM current_graph_object AS c"
-                    " JOIN object_value AS v ON v.id = c.object_value_id"
-                    f" WHERE c.uuid IN ({placeholders})",
-                    replaced,
+            removed: list[str] = []
+            for chunk in _sqlite_chunks(self._connection, set(replaced)):
+                placeholders = ", ".join("?" for _ in chunk)
+                removed.extend(
+                    graph_entry_digest(str(uuid), str(identity))
+                    for uuid, identity in self._connection.execute(
+                        "SELECT c.uuid, v.content_identity FROM current_graph_object AS c"
+                        " JOIN object_value AS v ON v.id = c.object_value_id"
+                        f" WHERE c.uuid IN ({placeholders})",
+                        chunk,
+                    )
                 )
-            )
             accumulator, entry_count = adjust_semantic_summary(
                 accumulator, entry_count, removed=removed
             )
-            self._connection.execute(
-                f"UPDATE graph_presence_interval SET valid_to_revision = ?"
-                f" WHERE valid_to_revision IS NULL AND uuid IN ({placeholders})",
-                (revision, *replaced),
-            )
+            for chunk in _sqlite_chunks(self._connection, set(replaced), reserved=1):
+                placeholders = ", ".join("?" for _ in chunk)
+                self._connection.execute(
+                    f"UPDATE graph_presence_interval SET valid_to_revision = ?"
+                    f" WHERE valid_to_revision IS NULL AND uuid IN ({placeholders})",
+                    (revision, *chunk),
+                )
         for _, graph_object in change.upserts():
             self._upsert_current_graph_object_unlocked(graph_object, revision)
             accumulator, entry_count = adjust_semantic_summary(
@@ -6746,71 +7020,86 @@ class CanonicalStore:
                     or relationship_keys is not None
                 )
             ):
-                type_sql = "SELECT type_key, value_set_id FROM current_definition_type_source"
-                current_type_parameters: tuple[object, ...] = ()
-                if type_keys is not None:
-                    if not type_keys:
-                        type_sql += " WHERE 0"
-                    else:
-                        marks = ", ".join("?" for _ in type_keys)
-                        type_sql += f" WHERE type_key IN ({marks})"
-                        current_type_parameters = tuple(sorted(type_keys))
-                relationship_sql = (
-                    "SELECT s.natural_key, s.value_set_id"
-                    " FROM current_definition_relationship_source AS s"
-                )
-                current_relationship_parameters: tuple[object, ...] = ()
+                definitions = GraphDefinitionSet()
+                type_sources: dict[str, set[str]] = {}
+                if type_keys is None:
+                    type_rows = self._connection.execute(
+                        "SELECT type_key, value_set_id FROM current_definition_type_source"
+                    )
+                else:
+                    type_rows = (
+                        row
+                        for chunk in _sqlite_chunks(self._connection, type_keys)
+                        for row in self._connection.execute(
+                            "SELECT type_key, value_set_id"
+                            " FROM current_definition_type_source WHERE type_key IN ("
+                            + ", ".join("?" for _ in chunk)
+                            + ")",
+                            chunk,
+                        )
+                    )
+                for key, source in type_rows:
+                    type_sources.setdefault(str(source), set()).add(str(key))
+                for source, keys in type_sources.items():
+                    for chunk in _sqlite_chunks(self._connection, keys):
+                        definitions = _merge_definition_sets(
+                            definitions,
+                            load_definition_set(
+                                self._connection,
+                                source,
+                                type_keys=set(chunk),
+                                relationship_keys=set(),
+                            ),
+                        )
+                relationship_sources: dict[str, set[str]] = {}
                 if relationship_keys is not None:
-                    if not relationship_keys:
-                        relationship_sql += " WHERE 0"
-                    else:
-                        marks = ", ".join("?" for _ in relationship_keys)
-                        relationship_sql += f" WHERE s.natural_key IN ({marks})"
-                        current_relationship_parameters = tuple(sorted(relationship_keys))
+                    relationship_rows = (
+                        row
+                        for chunk in _sqlite_chunks(self._connection, relationship_keys)
+                        for row in self._connection.execute(
+                            "SELECT natural_key, value_set_id"
+                            " FROM current_definition_relationship_source"
+                            " WHERE natural_key IN (" + ", ".join("?" for _ in chunk) + ")",
+                            chunk,
+                        )
+                    )
                 elif constrained_type_keys is not None:
-                    if not constrained_type_keys:
-                        relationship_sql += " WHERE 0"
-                    else:
-                        marks = ", ".join("?" for _ in constrained_type_keys)
-                        relationship_sql += (
+                    relationship_rows = (
+                        row
+                        for chunk in _sqlite_chunks(self._connection, constrained_type_keys)
+                        for row in self._connection.execute(
+                            "SELECT DISTINCT s.natural_key, s.value_set_id"
+                            " FROM current_definition_relationship_source AS s"
                             " JOIN definition_multiplicity_rule AS r"
                             " ON r.definition_set_id = s.value_set_id"
                             " AND r.natural_key = s.natural_key"
                             " JOIN definition_multiplicity_participant AS p"
                             " ON p.definition_set_id = r.definition_set_id"
                             " AND p.rule_occurrence = r.occurrence"
-                            " WHERE p.role = 'first' AND p.type_key IN (" + marks + ")"
+                            " WHERE p.role = 'first' AND p.type_key IN ("
+                            + ", ".join("?" for _ in chunk)
+                            + ")",
+                            chunk,
                         )
-                        current_relationship_parameters = tuple(sorted(constrained_type_keys))
-                definitions = GraphDefinitionSet()
-                type_sources: dict[str, set[str]] = {}
-                for key, source in self._connection.execute(type_sql, current_type_parameters):
-                    type_sources.setdefault(str(source), set()).add(str(key))
-                for source, keys in type_sources.items():
-                    definitions = _merge_definition_sets(
-                        definitions,
-                        load_definition_set(
-                            self._connection,
-                            source,
-                            type_keys=keys,
-                            relationship_keys=set(),
-                        ),
                     )
-                relationship_sources: dict[str, set[str]] = {}
-                for key, source in self._connection.execute(
-                    relationship_sql, current_relationship_parameters
-                ):
+                else:
+                    relationship_rows = self._connection.execute(
+                        "SELECT natural_key, value_set_id"
+                        " FROM current_definition_relationship_source"
+                    )
+                for key, source in relationship_rows:
                     relationship_sources.setdefault(str(source), set()).add(str(key))
                 for source, keys in relationship_sources.items():
-                    definitions = _merge_definition_sets(
-                        definitions,
-                        load_definition_set(
-                            self._connection,
-                            source,
-                            type_keys=set(),
-                            relationship_keys=keys,
-                        ),
-                    )
+                    for chunk in _sqlite_chunks(self._connection, keys):
+                        definitions = _merge_definition_sets(
+                            definitions,
+                            load_definition_set(
+                                self._connection,
+                                source,
+                                type_keys=set(),
+                                relationship_keys=set(chunk),
+                            ),
+                        )
                 return definitions
             overlay = self._connection.execute(
                 "SELECT base_definition_set_id FROM definition_set_overlay"
@@ -6833,16 +7122,18 @@ class CanonicalStore:
                 "SELECT type_key, operation, value_set_id"
                 " FROM definition_set_type_override WHERE definition_set_id = ?"
             )
-            type_parameters: tuple[object, ...] = (identity,)
-            if type_keys is not None:
-                if not type_keys:
-                    type_sql += " AND 0"
-                else:
-                    type_sql += " AND type_key IN (" + ", ".join("?" for _ in type_keys) + ")"
-                    type_parameters = (identity, *sorted(type_keys))
-            edited_types = {
-                str(row[0]): row for row in self._connection.execute(type_sql, type_parameters)
-            }
+            if type_keys is None:
+                type_rows = self._connection.execute(type_sql, (identity,))
+            else:
+                type_rows = (
+                    row
+                    for chunk in _sqlite_chunks(self._connection, type_keys, reserved=1)
+                    for row in self._connection.execute(
+                        type_sql + " AND type_key IN (" + ", ".join("?" for _ in chunk) + ")",
+                        (identity, *chunk),
+                    )
+                )
+            edited_types = {str(row[0]): row for row in type_rows}
             base = self._load_definition_set(
                 base_identity,
                 type_keys=type_keys,
@@ -6866,49 +7157,52 @@ class CanonicalStore:
                 "SELECT natural_key, operation, value_set_id"
                 " FROM definition_set_relationship_override WHERE definition_set_id = ?"
             )
-            relationship_parameters: tuple[object, ...] = (identity,)
             if relationship_keys is not None:
-                if not relationship_keys:
-                    relationship_sql += " AND 0"
-                else:
-                    relationship_sql += (
-                        " AND natural_key IN (" + ", ".join("?" for _ in relationship_keys) + ")"
+                relationship_rows = (
+                    row
+                    for chunk in _sqlite_chunks(self._connection, relationship_keys, reserved=1)
+                    for row in self._connection.execute(
+                        relationship_sql
+                        + " AND natural_key IN ("
+                        + ", ".join("?" for _ in chunk)
+                        + ")",
+                        (identity, *chunk),
                     )
-                    relationship_parameters = (identity, *sorted(relationship_keys))
+                )
             elif constrained_type_keys is not None:
                 if not constrained_type_keys:
-                    relationship_sql += " AND 0"
+                    relationship_rows = ()
                 else:
-                    marks = ", ".join("?" for _ in constrained_type_keys)
-                    relationship_sql += (
-                        " AND ((operation = 'upsert' AND EXISTS (SELECT 1"
-                        " FROM definition_multiplicity_rule AS r"
-                        " JOIN definition_multiplicity_participant AS p"
-                        " ON p.definition_set_id = r.definition_set_id"
-                        " AND p.rule_occurrence = r.occurrence AND p.role = 'first'"
-                        " WHERE r.definition_set_id = value_set_id"
-                        f" AND p.type_key IN ({marks})))"
-                        " OR (operation = 'delete' AND EXISTS (SELECT 1"
-                        " FROM definition_multiplicity_rule AS r"
-                        " JOIN definition_multiplicity_participant AS p"
-                        " ON p.definition_set_id = r.definition_set_id"
-                        " AND p.rule_occurrence = r.occurrence AND p.role = 'first'"
-                        " WHERE r.definition_set_id = ?"
-                        " AND r.natural_key ="
-                        " definition_set_relationship_override.natural_key"
-                        f" AND p.type_key IN ({marks}))))"
+                    relationship_rows = (
+                        row
+                        for chunk in _sqlite_chunks(
+                            self._connection,
+                            constrained_type_keys,
+                            reserved=2,
+                            repetitions=2,
+                        )
+                        for row in self._connection.execute(
+                            relationship_sql + " AND ((operation = 'upsert' AND EXISTS (SELECT 1"
+                            " FROM definition_multiplicity_rule AS r"
+                            " JOIN definition_multiplicity_participant AS p"
+                            " ON p.definition_set_id = r.definition_set_id"
+                            " AND p.rule_occurrence = r.occurrence AND p.role = 'first'"
+                            " WHERE r.definition_set_id = value_set_id AND p.type_key IN ("
+                            + ", ".join("?" for _ in chunk)
+                            + ")) OR (operation = 'delete' AND EXISTS (SELECT 1"
+                            " FROM definition_multiplicity_rule AS r"
+                            " JOIN definition_multiplicity_participant AS p"
+                            " ON p.definition_set_id = r.definition_set_id"
+                            " AND p.rule_occurrence = r.occurrence AND p.role = 'first'"
+                            " WHERE r.definition_set_id = ? AND r.natural_key ="
+                            " definition_set_relationship_override.natural_key"
+                            " AND p.type_key IN (" + ", ".join("?" for _ in chunk) + ")))",
+                            (identity, *chunk, base_identity, *chunk),
+                        )
                     )
-                    selected = tuple(sorted(constrained_type_keys))
-                    relationship_parameters = (
-                        identity,
-                        *selected,
-                        base_identity,
-                        *selected,
-                    )
-            edited_relationships = {
-                str(row[0]): row
-                for row in self._connection.execute(relationship_sql, relationship_parameters)
-            }
+            else:
+                relationship_rows = self._connection.execute(relationship_sql, (identity,))
+            edited_relationships = {str(row[0]): row for row in relationship_rows}
             relationships = [
                 v
                 for v in base.relationship_constraints
@@ -6950,26 +7244,29 @@ class _SQLiteQueryIndex:
     def _known_uuids(self, kind: ObjectKind, type_key: str, uuids: tuple[str, ...]) -> set[str]:
         if not uuids:
             return set()
-        placeholders = ", ".join("?" for _ in uuids)
-        if self._revision is not None:
-            return {
-                str(row[0])
-                for row in self._store._connection.execute(  # noqa: SLF001
+        connection = self._store._connection  # noqa: SLF001
+        reserved = 4 if self._revision is not None else 2
+        known: set[str] = set()
+        for chunk in _sqlite_chunks(connection, set(uuids), reserved=reserved):
+            placeholders = ", ".join("?" for _ in chunk)
+            if self._revision is not None:
+                rows = connection.execute(
                     "SELECT p.uuid FROM graph_presence_interval AS p"
                     " JOIN object_value AS v ON v.id = p.object_value_id"
                     " WHERE p.valid_from_revision <= ?"
                     " AND (p.valid_to_revision IS NULL OR p.valid_to_revision > ?)"
                     " AND v.object_kind = ? AND v.type_key = ?"
                     f" AND p.uuid IN ({placeholders})",
-                    (self._revision, self._revision, kind.value, type_key, *uuids),
+                    (self._revision, self._revision, kind.value, type_key, *chunk),
                 )
-            }
-        relation = "prospective_graph_object" if self._prospective else "current_graph_object"
-        return {
-            str(row[0])
-            for row in self._store._connection.execute(  # noqa: SLF001
-                f"SELECT uuid FROM {relation}"
-                f" WHERE object_kind = ? AND type_key = ? AND uuid IN ({placeholders})",
-                (kind.value, type_key, *uuids),
-            ).fetchall()
-        }
+            else:
+                relation = (
+                    "prospective_graph_object" if self._prospective else "current_graph_object"
+                )
+                rows = connection.execute(
+                    f"SELECT uuid FROM {relation}"  # noqa: S608
+                    f" WHERE object_kind = ? AND type_key = ? AND uuid IN ({placeholders})",
+                    (kind.value, type_key, *chunk),
+                )
+            known.update(str(row[0]) for row in rows)
+        return known

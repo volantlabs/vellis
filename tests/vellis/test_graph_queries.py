@@ -12,6 +12,7 @@ meaning they will have to agree with.
 
 from __future__ import annotations
 
+import sqlite3
 from dataclasses import replace
 from decimal import Decimal
 from pathlib import Path
@@ -23,7 +24,7 @@ from tests.vellis.oracle import _TestGraphIndex, evaluate_query, materialize_sta
 from tests.vellis.semantic_state import semantic_state_equal
 from vellis.canonical import Provenance
 from vellis.changes import GraphChange
-from vellis.definitions import AnchorTypeDefinition
+from vellis.definitions import AnchorTypeDefinition, GraphDefinitionSet
 from vellis.governance import DefinitionChange
 from vellis.graph import Anchor, AssociatedDataObject, Graph, Link
 from vellis.history import RevisionSelection
@@ -170,6 +171,168 @@ def _just_people(maximum_rows: int = 10, uuid_filter: AnchorUuidFilter | None = 
 
 def _bound_anchors(result) -> set[str]:
     return {binding.anchor.uuid for row in result.rows for binding in row.anchors}
+
+
+@pytest.mark.parametrize(
+    "state_scope",
+    [
+        EvaluatedStateScope.CURRENT,
+        EvaluatedStateScope.PROSPECTIVE,
+        EvaluatedStateScope.HISTORICAL,
+    ],
+)
+def test_large_uuid_filters_do_not_depend_on_sqlite_host_parameter_capacity(
+    system: RTGSystem, state_scope: EvaluatedStateScope
+) -> None:
+    added = tuple(Anchor(f"bulk-{index}", "person", f"Person {index}") for index in range(48))
+    outcome = system.apply_graph_change(GraphChange(anchor_upserts=added), provenance=_owner())
+    assert outcome.accepted and outcome.resulting_revision is not None
+    if state_scope is EvaluatedStateScope.PROSPECTIVE:
+        assert system.set_definition_delta(
+            DefinitionChange(
+                anchor_type_upserts=(
+                    AnchorTypeDefinition("query-capacity-fixture", "An unrelated type."),
+                )
+            ),
+            provenance=_owner(),
+        ).accepted
+    uuids = ("a-1", "a-2", *(anchor.uuid for anchor in added))
+    query = replace(
+        _just_people(maximum_rows=60, uuid_filter=AnchorUuidFilter(uuids)),
+        state_scope=state_scope,
+    )
+    selection = (
+        RevisionSelection(outcome.resulting_revision)
+        if state_scope is EvaluatedStateScope.HISTORICAL
+        else None
+    )
+    revision = system.store.current_revision()
+    system.store._connection.setlimit(sqlite3.SQLITE_LIMIT_VARIABLE_NUMBER, 32)  # noqa: SLF001
+
+    result = system.query_graph(query, selection=selection, provenance=_owner())
+
+    assert result.accepted, result.findings
+    assert _bound_anchors(result) == set(uuids)
+    assert system.store.current_revision() == revision
+
+
+def test_large_unknown_uuid_filters_keep_semantic_refusal(system: RTGSystem) -> None:
+    unknown = tuple(f"ghost-{index}" for index in range(40))
+    system.store._connection.setlimit(sqlite3.SQLITE_LIMIT_VARIABLE_NUMBER, 32)  # noqa: SLF001
+
+    result = system.query_graph(
+        _just_people(uuid_filter=AnchorUuidFilter(unknown)), provenance=_owner()
+    )
+
+    assert result.status is OperationStatus.REJECTED
+    assert result.rows == ()
+    assert result.evaluated_revision is None
+    assert any("unknown" in finding.summary for finding in result.findings)
+
+
+@pytest.mark.parametrize(
+    "state_scope",
+    [
+        EvaluatedStateScope.CURRENT,
+        EvaluatedStateScope.PROSPECTIVE,
+        EvaluatedStateScope.HISTORICAL,
+    ],
+)
+def test_large_type_filters_do_not_depend_on_sqlite_host_parameter_capacity(
+    tmp_path: Path, state_scope: EvaluatedStateScope
+) -> None:
+    definitions = GraphDefinitionSet(
+        anchor_types=tuple(
+            AnchorTypeDefinition(f"type-{index}", f"Type {index}.") for index in range(50)
+        )
+    )
+    system = _system_with(tmp_path, definitions)
+    try:
+        outcome = system.apply_graph_change(
+            GraphChange(anchor_upserts=(Anchor("selected", "type-0", "Selected"),)),
+            provenance=_owner(),
+        )
+        assert outcome.accepted and outcome.resulting_revision is not None
+        if state_scope is EvaluatedStateScope.PROSPECTIVE:
+            assert system.set_definition_delta(
+                DefinitionChange(
+                    anchor_type_upserts=(
+                        AnchorTypeDefinition("proposal-only", "An unrelated type."),
+                    )
+                ),
+                provenance=_owner(),
+            ).accepted
+        query = GraphQuery(
+            anchor_groups=(
+                AnchorGroup(
+                    "everything", tuple(value.type_key for value in definitions.anchor_types)
+                ),
+            ),
+            return_shape=ReturnShape((AnchorProjection("selected", "everything"),)),
+            maximum_rows=10,
+            state_scope=state_scope,
+        )
+        selection = (
+            RevisionSelection(outcome.resulting_revision)
+            if state_scope is EvaluatedStateScope.HISTORICAL
+            else None
+        )
+        system.store._connection.setlimit(  # noqa: SLF001
+            sqlite3.SQLITE_LIMIT_VARIABLE_NUMBER, 32
+        )
+
+        result = system.query_graph(query, selection=selection)
+
+        assert result.accepted, result.findings
+        assert _bound_anchors(result) == {"selected"}
+    finally:
+        system.close()
+
+
+def test_query_beyond_sqlite_join_capacity_is_refused_whole(tmp_path: Path) -> None:
+    from vellis.definitions import EndpointConstraint, GraphDefinitionSet, LinkTypeDefinition
+
+    definitions = GraphDefinitionSet(
+        anchor_types=(AnchorTypeDefinition("node", "A graph node."),),
+        link_types=(
+            LinkTypeDefinition(
+                "edge",
+                EndpointConstraint(("node",), ("node",), "Connects two nodes."),
+                "A graph edge.",
+            ),
+        ),
+    )
+    system = _system_with(tmp_path, definitions)
+    groups = tuple(AnchorGroup(f"node-{index}", ("node",)) for index in range(33))
+    links = tuple(
+        RequiredLink(
+            f"edge-{index}",
+            f"node-{index}",
+            f"node-{index + 1}",
+            "edge",
+        )
+        for index in range(32)
+    )
+    query = GraphQuery(
+        anchor_groups=groups,
+        required_links=links,
+        return_shape=ReturnShape((AnchorProjection("first", "node-0"),)),
+        maximum_rows=1,
+    )
+    revision = system.store.current_revision()
+    try:
+        result = system.query_graph(query, provenance=_owner())
+
+        assert result.status is OperationStatus.REJECTED
+        assert result.rows == () and result.aggregates == ()
+        assert result.evaluated_revision is None
+        assert "structural capacity" in result.summary
+        assert system.store.current_revision() == revision
+        activity = system.store.activity_records()
+        assert activity[-1].capability == "query"
+        assert activity[-1].outcome_category is OperationStatus.REJECTED
+    finally:
+        system.close()
 
 
 # --- Selection ------------------------------------------------------------------------

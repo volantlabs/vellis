@@ -17,10 +17,10 @@ baselines:
     checkpoint: git:17d2b2676400f530ff9eccf8ab653d54644f1beb
   target: &target
     model: sha256:adf05b52f9839b75f76240ee116c0ffba7ee452602c2083268d683c4b534b2c7
-    implementation: git:06802d8014669cbb0f7c76b2e143db9b24cc0f46
+    implementation: git:6d600908e25bc6a1d675ae0a134a060cdee02b0d
     language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
     execution_environment: sha256:d71473693aa50faef1a25a449aa5808490e21eaf2a987942d1fb134c773550d1
-    checkpoint: git:06802d8014669cbb0f7c76b2e143db9b24cc0f46
+    checkpoint: git:6d600908e25bc6a1d675ae0a134a060cdee02b0d
   observed: *target
 scope:
   authority_scope: [RTG::'Graph Query', RTGSystem::'Query graph', RTGSystem::'Assess graph conformance', VellisRequirements::querySafety, VellisRequirements::validationCoverage, VellisRequirements::historyIndependentCurrentWork, VellisVerification::semanticQuery, VellisVerification::currentWorkScaling]
@@ -47,10 +47,10 @@ findings:
     classification: implementation defect
     consequence: A valid high maximum can exhaust process memory even though the caller receives only one scalar per aggregation.
     authority_refs: [RTG::'Graph Query', VellisRequirements::querySafety, VellisRequirements::historyIndependentCurrentWork]
-    evidence_refs: [path:tests/vellis/test_graph_queries.py#test_aggregation_accepts_large_positive_bounds_without_canonical_effects]
-    disposition: implementation-work
+    evidence_refs: [path:tests/vellis/test_graph_queries.py#test_scalar_aggregation_streams_one_bounded_selection, path:tests/vellis/test_graph_queries.py#test_aggregation_accepts_large_positive_bounds_without_canonical_effects]
+    disposition: resolved
     owner_work_item_id: W002
-    implementation_status: conflicting
+    implementation_status: conforming
     nearest_wrong_system: The selection is bounded semantically but every matching row and value remains resident until reduction completes.
     compatibility_effect: Exact aggregate values, maximum-plus-one refusal, and public result shapes remain unchanged.
   - id: F003
@@ -81,8 +81,8 @@ decisions:
     reversible: true
     owner_work_item_id: W002
     evidence_intent: [Bound fetched batches independently of match count., Preserve exact count, sum, minimum, maximum, and refusal semantics in every state scope.]
-    implementation_status: not evaluated
-    evidence_refs: []
+    implementation_status: conforming
+    evidence_refs: [path:tests/vellis/test_graph_queries.py#test_scalar_aggregation_streams_one_bounded_selection, path:tests/vellis/test_graph_queries.py#test_aggregation_accepts_large_positive_bounds_without_canonical_effects]
   - id: D003
     summary: Bind public collections through indexed temporary relations or connection-aware chunks and reject structurally unexecutable queries whole.
     authority_refs: [VellisRequirements::querySafety, VellisRequirements::historyIndependentCurrentWork]
@@ -130,17 +130,17 @@ work_items:
     nearest_wrong_system: A scalar result is exact but its entire matching population remains resident in Python.
     compatibility_effect: All aggregate results and rejection boundaries remain unchanged.
     non_effects: [No public maximum, numeric semantics, query schema, or canonical effect changes.]
-    lifecycle: active
-    implementation_status: conflicting
-    evidence_refs: []
+    lifecycle: complete
+    implementation_status: conforming
+    evidence_refs: [path:tests/vellis/test_graph_queries.py#test_scalar_aggregation_streams_one_bounded_selection, path:tests/vellis/test_graph_queries.py#test_aggregation_accepts_large_positive_bounds_without_canonical_effects]
     blocker: null
-    checkpoint: null
+    checkpoint: git:6d600908e25bc6a1d675ae0a134a060cdee02b0d
   - id: W003
     order: 3
     label: Remove SQLite host-parameter thresholds from public collections
     kind: implementation
     dependencies: [W002]
-    planned_baseline: {dimension: implementation, identity: git:17d2b2676400f530ff9eccf8ab653d54644f1beb}
+    planned_baseline: {dimension: implementation, identity: git:6d600908e25bc6a1d675ae0a134a060cdee02b0d}
     finding_ids: [F003]
     decision_ids: [D003]
     authority:
@@ -151,7 +151,7 @@ work_items:
     nearest_wrong_system: Valid large filters or definition selections fail with too many SQL variables, or structural capacity returns a partial result.
     compatibility_effect: Large collections complete or receive the modeled whole-result rejection.
     non_effects: [No truncation or new public collection maximum., Unexpected database faults remain failed outcomes.]
-    lifecycle: pending
+    lifecycle: active
     implementation_status: conflicting
     evidence_refs: []
     blocker: null
