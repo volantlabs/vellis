@@ -29,6 +29,10 @@ def _tokens(source: str) -> tuple[_Token, ...]:
             index = len(source) if end < 0 else end
         elif source.startswith("/*", index):
             end = source.find("*/", index + 2)
+            content = source[index + 2 :] if end < 0 else source[index + 2 : end]
+            tokens.append(
+                _Token("<documentation-text>" if content.strip() else "<empty-comment>", index)
+            )
             index = len(source) if end < 0 else end + 2
         elif source[index] in {'"', "'"}:
             quote = source[index]
@@ -41,6 +45,8 @@ def _tokens(source: str) -> tuple[_Token, ...]:
                     break
                 else:
                     end += 1
+            if quote == "'":
+                tokens.append(_Token("<unrestricted-name>", index))
             index = end
         elif source[index].isalpha() or source[index] == "_":
             end = index + 1
@@ -48,7 +54,7 @@ def _tokens(source: str) -> tuple[_Token, ...]:
                 end += 1
             tokens.append(_Token(source[index:end], index))
             index = end
-        elif source[index] in "{};":
+        elif source[index] in "{};:":
             tokens.append(_Token(source[index], index))
             index += 1
         else:
@@ -88,6 +94,67 @@ def _body_depths(tokens: tuple[_Token, ...], opening: int, closing: int) -> dict
     return depths
 
 
+def _required_constraint_is_substantive(
+    tokens: tuple[_Token, ...],
+    closings: dict[int, int],
+    depths: dict[int, int],
+    required: int,
+    declaration_closing: int,
+) -> bool:
+    """Distinguish a real required constraint from an empty longhand shell."""
+    following = required + 1
+    if following >= declaration_closing:
+        return False
+    if tokens[following].text != "constraint":
+        # Shorthand ``require qualified::constraint`` references existing formal
+        # meaning. Its optional body only redefines parameters, so it need not carry
+        # local documentation or an expression.
+        return tokens[following].text not in {"{", "}", ";"}
+
+    saw_type_marker = False
+    type_names = 0
+    for index in range(following + 1, declaration_closing):
+        if depths.get(index) != 1:
+            continue
+        if tokens[index].text == ";":
+            # A usage explicitly typed by a constraint definition has formal meaning
+            # even without a body. A lone untyped usage name does not.
+            return saw_type_marker and type_names > 0
+        if tokens[index].text == "{":
+            block_closing = closings.get(index)
+            if block_closing is None:
+                return False
+            body_has_content = _constraint_block_has_content(tokens, index, block_closing)
+            return (saw_type_marker and type_names > 0) or body_has_content
+        if tokens[index].text == ":":
+            saw_type_marker = True
+        elif saw_type_marker:
+            type_names += 1
+    return False
+
+
+def _constraint_block_has_content(tokens: tuple[_Token, ...], opening: int, closing: int) -> bool:
+    """Recognize non-empty documentation or a local formal expression."""
+    index = opening + 1
+    while index < closing:
+        token = tokens[index].text
+        if token == "doc":
+            # Documentation can carry names, a short name, and a locale before its
+            # block comment. Those labels are not themselves an obligation.
+            index += 1
+            while index < closing and tokens[index].text not in {
+                "<documentation-text>",
+                "<empty-comment>",
+            }:
+                index += 1
+            if index < closing and tokens[index].text == "<documentation-text>":
+                return True
+        elif token not in {"{", "}", ";", ":", "<documentation-text>", "<empty-comment>"}:
+            return True
+        index += 1
+    return False
+
+
 def policy_findings(path: Path, source: str) -> tuple[str, ...]:
     tokens = _tokens(source)
     closings = _closing_braces(tokens)
@@ -122,13 +189,22 @@ def policy_findings(path: Path, source: str) -> tuple[str, ...]:
             for index in range(opening + 1, closing)
             if depths[index] == 1 and tokens[index].text == "require"
         ]
+        substantive_required = [
+            index
+            for index in required
+            if _required_constraint_is_substantive(tokens, closings, depths, index, closing)
+        ]
         bare_docs = [
             index
             for index in range(opening + 1, closing)
             if depths[index] == 1 and tokens[index].text == "doc"
         ]
-        if bare_docs and not required:
-            findings.append(f"{path}:{line}: {label} has no directly owned required constraint")
+        requires_local_obligation = label in {"requirement definition", "objective"} or bare_docs
+        if requires_local_obligation and not substantive_required:
+            findings.append(
+                f"{path}:{line}: {label} has no directly owned required constraint "
+                "with substantive content"
+            )
         if bare_docs:
             findings.append(
                 f"{path}:{line}: {label} owns normative documentation outside a required constraint"
