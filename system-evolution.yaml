@@ -6,7 +6,7 @@ evolution:
   lifecycle: active
   approval: {status: not-required, reason: "Accepted authority decides all five defects; the owner selected the bounded fail-closed POSIX realization.", checkpoint: null}
   blocker: null
-  checkpoint: git:85e027299758880234b4955e5bb86d8c7e27654e
+  checkpoint: git:1f674497ca02a2a5ce8fb93a0bf1ffc444fd2d69
 baselines:
   status: current
   source: &source
@@ -17,16 +17,16 @@ baselines:
     checkpoint: git:784a81bc30e7f8fdb857f4e8c1df3fb41d76f6bc
   target: &target
     model: sha256:adf05b52f9839b75f76240ee116c0ffba7ee452602c2083268d683c4b534b2c7
-    implementation: git:85e027299758880234b4955e5bb86d8c7e27654e
+    implementation: git:1f674497ca02a2a5ce8fb93a0bf1ffc444fd2d69
     language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
     execution_environment: sha256:d71473693aa50faef1a25a449aa5808490e21eaf2a987942d1fb134c773550d1
-    checkpoint: git:85e027299758880234b4955e5bb86d8c7e27654e
+    checkpoint: git:1f674497ca02a2a5ce8fb93a0bf1ffc444fd2d69
   observed:
     model: sha256:adf05b52f9839b75f76240ee116c0ffba7ee452602c2083268d683c4b534b2c7
-    implementation: git:85e027299758880234b4955e5bb86d8c7e27654e
+    implementation: git:1f674497ca02a2a5ce8fb93a0bf1ffc444fd2d69
     language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
     execution_environment: sha256:d71473693aa50faef1a25a449aa5808490e21eaf2a987942d1fb134c773550d1
-    checkpoint: git:85e027299758880234b4955e5bb86d8c7e27654e
+    checkpoint: git:1f674497ca02a2a5ce8fb93a0bf1ffc444fd2d69
 scope:
   authority_scope: [RTGSystem::'Query graph', RTGSystem::'Assess graph conformance', RTGSystem::'Activate proposed change', VellisRequirements::canonicalSemanticEquality, VellisRequirements::querySafety, VellisRequirements::validationCoverage, VellisRequirements::proposalIsolation, VellisRequirements::simpleIndividualOperation, VellisRequirements::mcpOutcomeIntegrity, VellisVerification]
   implementation_scope: [vellis/mcp.py, vellis/setup.py, vellis/store.py, vellis/streaming.py, vellis/v1_streaming.py, tests/vellis/, README.md, SECURITY.md, system-evolution.yaml]
@@ -219,7 +219,7 @@ work_items:
     label: Integrate evidence and close the prerelease candidate
     kind: closure
     dependencies: [W001, W002, W003]
-    planned_baseline: {dimension: implementation, identity: git:85e027299758880234b4955e5bb86d8c7e27654e}
+    planned_baseline: {dimension: implementation, identity: git:1f674497ca02a2a5ce8fb93a0bf1ffc444fd2d69}
     finding_ids: []
     decision_ids: []
     authority:
@@ -231,19 +231,33 @@ work_items:
     compatibility_effect: Release claims become evidence-backed without changing version or public identities.
     non_effects: [No release, tag, merge, or external client mutation., No owner data is inspected or changed.]
     lifecycle: active
-    implementation_status: not evaluated
-    evidence_refs: []
+    implementation_status: conforming
+    evidence_refs:
+      - command:just model-check
+      - command:just system-evolution-check
+      - command:just package-check
+      - command:just check
+      - path:README.md#implementation-status
+      - path:SECURITY.md#current-scope
     blocker: null
-    checkpoint: null
+    checkpoint: git:1f674497ca02a2a5ce8fb93a0bf1ffc444fd2d69
 closure:
   finding_disposition: open
   model_status: unchanged
-  implementation_status: not evaluated
-  integration_status: not evaluated
+  implementation_status: conforming
+  integration_status: conforming
   external_status: not applicable
-  compatibility: Accepted Vellis 2.0 meaning and public identities remain unchanged; compatibility effects are limited to rejecting unsafe POSIX stores and correcting previously invalid or failed behavior.
+  compatibility: Accepted Vellis 2.0 meaning, version, MCP schemas, persistence schema, snapshots, and v1 translation remain unchanged. Invalid prospective activation is rejected; exact large numbers and positive bounds now work. POSIX plaintext stores require private owner-only paths with repair guidance; Windows retains profile/default ACL behavior without a native ACL claim.
   reviews:
     - {lens: authority and conformance, status: pending, reviewer: null, checkpoint: null, evidence_refs: []}
     - {lens: engineering and evidence, status: pending, reviewer: null, checkpoint: null, evidence_refs: []}
-  evidence_refs: []
-  checkpoint: null
+  evidence_refs:
+    - command:just model-check
+    - command:just system-evolution-check
+    - command:just package-check
+    - command:just check
+    - path:tests/vellis/test_sqlite_prospective_state.py#test_endpoint_type_change_cannot_activate_an_incomplete_multiplicity_closure
+    - path:tests/vellis/test_mcp_boundary.py#test_raw_stdio_preserves_exact_fraction_and_large_integer_in_both_directions
+    - path:tests/vellis/test_graph_queries.py#test_aggregation_accepts_large_positive_bounds_without_canonical_effects
+    - path:tests/vellis/test_storage_permissions.py#test_setup_and_sqlite_companions_are_private_under_umask_022
+  checkpoint: git:1f674497ca02a2a5ce8fb93a0bf1ffc444fd2d69
