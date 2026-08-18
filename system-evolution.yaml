@@ -3,10 +3,10 @@ evolution:
   id: vellis-2-prerelease-review-remediation
   objective: Resolve five prerelease implementation defects without changing accepted Vellis 2.0 meaning or compatibility.
   observable_distinction: Prospective activation cannot admit invalid state, exact numbers and positive bounds remain usable, and local POSIX memory is private or refused before use.
-  lifecycle: active
+  lifecycle: complete
   approval: {status: not-required, reason: "Accepted authority decides all five defects; the owner selected the bounded fail-closed POSIX realization.", checkpoint: null}
   blocker: null
-  checkpoint: git:6275c26cec13c08ec22ed6ece6702e09de2261a8
+  checkpoint: git:16cb7dea56b0610369a241219625a95231ca5c1d
 baselines:
   status: current
   source: &source
@@ -17,16 +17,16 @@ baselines:
     checkpoint: git:784a81bc30e7f8fdb857f4e8c1df3fb41d76f6bc
   target: &target
     model: sha256:adf05b52f9839b75f76240ee116c0ffba7ee452602c2083268d683c4b534b2c7
-    implementation: git:6275c26cec13c08ec22ed6ece6702e09de2261a8
+    implementation: git:16cb7dea56b0610369a241219625a95231ca5c1d
     language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
     execution_environment: sha256:d71473693aa50faef1a25a449aa5808490e21eaf2a987942d1fb134c773550d1
-    checkpoint: git:6275c26cec13c08ec22ed6ece6702e09de2261a8
+    checkpoint: git:16cb7dea56b0610369a241219625a95231ca5c1d
   observed:
     model: sha256:adf05b52f9839b75f76240ee116c0ffba7ee452602c2083268d683c4b534b2c7
-    implementation: git:6275c26cec13c08ec22ed6ece6702e09de2261a8
+    implementation: git:16cb7dea56b0610369a241219625a95231ca5c1d
     language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
     execution_environment: sha256:d71473693aa50faef1a25a449aa5808490e21eaf2a987942d1fb134c773550d1
-    checkpoint: git:6275c26cec13c08ec22ed6ece6702e09de2261a8
+    checkpoint: git:16cb7dea56b0610369a241219625a95231ca5c1d
 scope:
   authority_scope: [RTGSystem::'Query graph', RTGSystem::'Assess graph conformance', RTGSystem::'Activate definition delta', VellisRequirements::canonicalSemanticEquality, VellisRequirements::querySafety, VellisRequirements::validationCoverage, VellisRequirements::nonDisruptiveDefinitionWork, VellisRequirements::ownerControlledMemory, VellisRequirements::mcpOutcomeIntegrity, VellisVerification]
   implementation_scope: [vellis/mcp.py, vellis/setup.py, vellis/store.py, vellis/streaming.py, vellis/v1_streaming.py, tools/system_evolution.py, tests/test_system_evolution.py, tests/vellis/, README.md, SECURITY.md, system-evolution.yaml]
@@ -230,7 +230,7 @@ work_items:
     nearest_wrong_system: Focused fixes pass while cross-cutting gates, documentation truth, or exact candidate review remains incomplete.
     compatibility_effect: Release claims become evidence-backed without changing version or public identities.
     non_effects: [No release, tag, merge, or external client mutation., No owner data is inspected or changed.]
-    lifecycle: active
+    lifecycle: complete
     implementation_status: conforming
     evidence_refs:
       - command:just model-check
@@ -241,17 +241,17 @@ work_items:
       - path:README.md#implementation-status
       - path:SECURITY.md#current-scope
     blocker: null
-    checkpoint: git:6275c26cec13c08ec22ed6ece6702e09de2261a8
+    checkpoint: git:16cb7dea56b0610369a241219625a95231ca5c1d
 closure:
-  finding_disposition: open
+  finding_disposition: complete
   model_status: unchanged
   implementation_status: conforming
   integration_status: conforming
   external_status: not applicable
   compatibility: Accepted Vellis 2.0 meaning, version, MCP schemas, persistence schema, snapshots, and v1 translation remain unchanged. Invalid prospective activation is rejected; exact large numbers and positive bounds now work. POSIX plaintext stores require private owner-only paths with repair guidance; Windows retains profile/default ACL behavior without a native ACL claim.
   reviews:
-    - {lens: authority and conformance, status: pending, reviewer: null, checkpoint: null, evidence_refs: []}
-    - {lens: engineering and evidence, status: pending, reviewer: null, checkpoint: null, evidence_refs: []}
+    - {lens: authority and conformance, status: clean, reviewer: agent:/root/prerelease_remediation_authority_review2, checkpoint: git:16cb7dea56b0610369a241219625a95231ca5c1d, evidence_refs: [command:just check]}
+    - {lens: engineering and evidence, status: clean, reviewer: agent:/root/prerelease_remediation_engineering_review2, checkpoint: git:16cb7dea56b0610369a241219625a95231ca5c1d, evidence_refs: [command:just check]}
   evidence_refs:
     - command:just model-check
     - command:just system-evolution-check
@@ -262,4 +262,4 @@ closure:
     - path:tests/vellis/test_mcp_boundary.py#test_raw_stdio_preserves_exact_fraction_and_large_integer_in_both_directions
     - path:tests/vellis/test_graph_queries.py#test_aggregation_accepts_large_positive_bounds_without_canonical_effects
     - path:tests/vellis/test_storage_permissions.py#test_setup_and_sqlite_companions_are_private_under_umask_022
-  checkpoint: git:6275c26cec13c08ec22ed6ece6702e09de2261a8
+  checkpoint: git:16cb7dea56b0610369a241219625a95231ca5c1d
