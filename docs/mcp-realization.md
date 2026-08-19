@@ -104,7 +104,7 @@ domain model: text and structured content communicate the same typed outcome, an
 changing advisory annotations cannot change authorization, validation, atomicity, or any promised
 failure non-effect.
 
-## Semantic work-locality trigger evidence
+## Semantic work-locality evidence
 
 The `vellis-2-semantic-work-locality` evolution began from a clean
 `ca6539e10393a5a52e2cd2f67d0af662e92cc010` checkout with all 1,192 existing tests passing. That
@@ -112,7 +112,7 @@ pass is evidence of missing discrimination, not evidence that the following shap
 
 - Aggregation's late `SELECT DISTINCT` in `vellis/store.py` first enumerates hidden flat-join
   witnesses. Distinct output therefore does not prevent a hidden cross-product.
-- The W004 implementation candidate derives active and prospective multiplicity work from exact
+- The reviewed W004 implementation derives active and prospective multiplicity work from exact
   old/proposed reasons. Hub-of-hubs degree 10, 20, and 40 produces one exact work tuple while SQLite
   steps and decoded lookup objects have sub-quadratic doubling ratios. Display-only edits produce
   zero multiplicity work independent of irrelevant-rule population, and K independent changes with
@@ -148,8 +148,8 @@ SQLite work was counted with `Connection.set_progress_handler(..., 1)` and decod
 `tests/vellis/characterization.py`. Each series rebuilt a fresh temporary database for each size and
 measured only the named operation after fixture construction.
 
-The remaining executable characterization is
-`uv run pytest tests/vellis/test_semantic_work_locality_triggers.py`. It rebuilds fresh databases,
+The permanent executable locality suite is
+`uv run pytest tests/vellis/test_semantic_work_locality.py`. It rebuilds fresh databases,
 resets the shared instrumentation boundary, and verifies exact active/prospective mutation work and
 sub-quadratic scaling for the former hub, irrelevant-rule, and independent-change shapes.
 Its query-capacity case now requires the same typed whole refusal for current, prospective, and
@@ -163,7 +163,9 @@ fixture or instrumentation must be invented from this prose.
 W002 and W003 have replaced their trigger recipes with permanent discriminating regression fixtures.
 W004 has replaced its old-cost assertions with exact-work and scaling evidence. W006 has replaced
 its temporary characterizations with snapshot and cleanup regressions; the final subtraction review
-removes any remaining evidence that asserts superseded implementation shapes.
+removed the transitional trigger filename and any remaining evidence that asserted superseded
+implementation shapes. Final differential evidence also checks structural/key equality agreement,
+broad-selector regex candidate locality, and exact/plus-one row bounds.
 
 The implemented query contract has exclusive row and aggregate outputs. Row identity preserves every
 projected source object, including the associated-data UUID behind a property value, while aggregate

@@ -561,7 +561,7 @@ the next invocation. Scale fixtures use a multi-object population so a constant-
 masquerade as cleanup. Restoration meaning, schema version, snapshots, replay, and canonical history
 remain unchanged.
 
-The W006 implementation candidate realizes this boundary with a deferred read transaction for each
+The reviewed W006 implementation realizes this boundary with a deferred read transaction for each
 public assessment page, transaction-owned cleanup before successful publication/restoration commits,
 and best-effort cleanup after rollback that preserves the original failure. Its permanent evidence
 accepts only a complete old assessment during an interleaved replacement and requires every extant
@@ -574,7 +574,7 @@ Run the documentation-sync workflow and reconcile `model/README.md`, `README.md`
 `docs/mcp-realization.md`, examples, and test descriptions with implemented truth. Remove obsolete
 workaround prose rather than memorializing it. Search model, source, tests, README, and docs for every
 deleted name and inverse claim. Confirm that the owning W002–W004 replacements have emptied or
-deleted `tests/vellis/test_semantic_work_locality_triggers.py` and that no source-shape or exact
+deleted `tests/vellis/test_semantic_work_locality.py` and that no source-shape or exact
 old-cost assertion survives.
 
 Confirm persistent schema/version and snapshot fixtures did not change and exactly ten MCP names
@@ -584,10 +584,10 @@ token and obtain fresh authority/conformance and engineering/evidence reviews at
 Only deterministic evolution bookkeeping may follow a clean pair; commit and independently validate
 the committed checkpoint.
 
-## Downstream rebaseline after W001
+## Accepted downstream rebaseline
 
-Before W001 can be accepted, every remaining work item is interpreted against the finite positive
-conjunction above, not the superseded tree or connected-only plans:
+Every downstream work item was interpreted against the accepted finite positive conjunction above,
+not the superseded tree or connected-only plans:
 
 - W002 is unchanged in meaning and remains a prerequisite that supplies canonical JSON keys without
   changing persistence or query topology.
@@ -611,16 +611,18 @@ and non-effects remain in force.
 
 ## Execution status
 
-W001 authority, W002 canonical collection equality, W003 query execution, and W007 permitted-value
-index reuse are complete. W003's
+W001 authority, W002 canonical collection equality, W003 query execution, W004 mutation impact,
+W006 transient-state lifetimes, and W007 permitted-value index reuse are complete. W003's
 closed public schema, independent brute-force oracle, conjunctive SQLite compiler,
 unified selector-member relation, bounded row/target identity materialization, compiled-statement
 capacity checks, tagged state integration, one-snapshot definition discovery, and legacy query-path
-deletion are independently reviewed. W004 now has an implementation candidate that shares one
+deletion are independently reviewed. W004 shares one
 old/proposed reason kernel between active and prospective validation, materializes exact
 `(rule, subject, constrained end)` work, keeps structural subjects separate from lookup-only
-identities, and replaces the three forbidden quadratic trigger shapes. W006 and final W005 closure
-retain the dependencies, evidence obligations, and deletion scope stated above.
+identities, and replaces the three forbidden quadratic shapes. W006 gives assessment pages one
+snapshot and clears completed assessment/restore populations. W005 adds the final equality,
+broad-regex-candidate, and row-bound differential evidence, removes transitional evidence naming,
+and synchronizes the implemented public truth.
 
 ## Resume and change control
 

@@ -1,7 +1,7 @@
-"""Executable trigger evidence for ``vellis-2-semantic-work-locality``.
+"""Permanent locality and lifecycle evidence for ``vellis-2-semantic-work-locality``.
 
-These tests retain reconstructible scaling triggers and their replacement target-conformance
-regressions. W005 removes assertions that depend on a superseded implementation shape.
+These tests reject forbidden population dependencies and transient-state lifetime regressions
+without freezing superseded implementation shapes or historical exact costs.
 """
 
 from __future__ import annotations

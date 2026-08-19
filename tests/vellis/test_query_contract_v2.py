@@ -352,6 +352,100 @@ def test_pattern_matching_visits_only_relationally_relevant_candidates(tmp_path:
         assert len({steps for steps, _ in costs}) == 1
 
 
+def test_broad_pattern_matching_scales_with_genuine_association_candidates(
+    tmp_path: Path,
+) -> None:
+    """A broad selector visits each candidate, but not same-property rows outside its type set."""
+    definitions = GraphDefinitionSet(
+        anchor_types=(
+            AnchorTypeDefinition("person", "A selected person."),
+            AnchorTypeDefinition("team", "An unselected team."),
+        ),
+        associated_data_types=(
+            AssociatedDataTypeDefinition(
+                "note",
+                permitted_anchor_type_keys=("person", "team"),
+                property_constraints=(
+                    PropertyConstraint("text", False, JsonKind.STRING, description="Note text."),
+                ),
+                description="A note.",
+            ),
+        ),
+    )
+
+    def measured(relevant: int, unrelated: int) -> tuple[int, int]:
+        system = RTGSystem.open(tmp_path / f"broad-pattern-{relevant}-{unrelated}.sqlite3")
+        owner = Provenance(initiator="owner")
+        assert system.initialize_fresh(
+            definitions, provenance=owner, initialization_summary="broad pattern locality"
+        ).accepted
+        people = tuple(Anchor(f"person-{index}", "person", "Person") for index in range(relevant))
+        teams = tuple(Anchor(f"team-{index}", "team", "Team") for index in range(unrelated))
+        notes = tuple(
+            AssociatedDataObject(
+                f"person-note-{index}", "note", (f"person-{index}",), {"text": "match"}
+            )
+            for index in range(relevant)
+        ) + tuple(
+            AssociatedDataObject(
+                f"team-note-{index}", "note", (f"team-{index}",), {"text": "match"}
+            )
+            for index in range(unrelated)
+        )
+        assert system.apply_graph_change(
+            GraphChange(anchor_upserts=people + teams, associated_data_upserts=notes),
+            provenance=owner,
+        ).accepted
+        calls = 0
+        steps = 0
+        compiled = compile_pattern("match")
+
+        def counted(value: object, expression: object) -> int:
+            nonlocal calls
+            calls += 1
+            return int(isinstance(value, str) and expression == "match" and compiled.matches(value))
+
+        def progress() -> int:
+            nonlocal steps
+            steps += 1
+            return 0
+
+        connection = system.store._connection  # noqa: SLF001
+        connection.create_function("vellis_re2_full_match", 2, counted, deterministic=True)
+        connection.set_progress_handler(progress, 1)
+        query = GraphQuery(
+            anchor_groups=(AnchorGroup("person", ("person",)),),
+            data_conditions=(
+                AssociatedDataCondition(
+                    "note",
+                    "person",
+                    "note",
+                    property_conditions=(
+                        DataPropertyCondition("text", PropertyComparison.MATCHES_PATTERN, "match"),
+                    ),
+                ),
+            ),
+            output=RowQueryOutput(
+                "rows",
+                (DataPropertyProjection("text", "note", "text"),),
+                relevant + 1,
+            ),
+        )
+        try:
+            result = system.store.evaluate_current_query(query)
+            assert result.accepted, result.findings
+            assert len(result.rows) == relevant
+            return steps, calls
+        finally:
+            connection.set_progress_handler(None, 0)
+            system.close()
+
+    unrelated_costs = [measured(3, unrelated) for unrelated in (10, 100, 500)]
+    assert [calls for _steps, calls in unrelated_costs] == [3, 3, 3]
+    assert len({steps for steps, _calls in unrelated_costs}) == 1
+    assert [measured(relevant, 100)[1] for relevant in (1, 10, 40)] == [1, 10, 40]
+
+
 def test_hidden_witness_fanout_does_not_form_a_quadratic_product(tmp_path: Path) -> None:
     """Two hidden link aliases stop after one joint witness for the projected identity."""
 
@@ -541,6 +635,7 @@ def test_fixed_seed_positive_patterns_match_the_independent_oracle(tmp_path: Pat
         GraphChange(anchor_upserts=anchors, associated_data_upserts=data, link_upserts=links),
         provenance=owner,
     ).accepted
+    saw_row_bound_refusal = False
     try:
         for case in range(12):
             groups = tuple(AnchorGroup(name, ("person",)) for name in ("x", "y", "z"))
@@ -588,14 +683,64 @@ def test_fixed_seed_positive_patterns_match_the_independent_oracle(tmp_path: Pat
                     kind="rows", projections=tuple(projections), maximum_rows=1_000
                 )
             query = GraphQuery(groups, output, required, conditions)
-            production = system.store.evaluate_current_query(query)
-            oracle = evaluate_query(query, _definitions(), graph, revision=1)
+            queries = (query,)
+            cardinality: int | None = None
+            if isinstance(output, RowQueryOutput):
+                complete = evaluate_query(query, _definitions(), graph, revision=1)
+                cardinality = len(complete.rows)
+                bounds = {max(1, cardinality - 1), max(1, cardinality), cardinality + 1}
+                queries = tuple(
+                    replace(query, output=replace(output, maximum_rows=bound))
+                    for bound in sorted(bounds)
+                )
+            for bounded_query in queries:
+                production = system.store.evaluate_current_query(bounded_query)
+                oracle = evaluate_query(bounded_query, _definitions(), graph, revision=1)
+                assert production.status is oracle.status
+                assert production.evaluated_revision == oracle.evaluated_revision
+                assert {oracle_row_identity(row) for row in production.rows} == {
+                    oracle_row_identity(row) for row in oracle.rows
+                }
+                assert production.aggregates == oracle.aggregates
+                if (
+                    isinstance(bounded_query.output, RowQueryOutput)
+                    and cardinality is not None
+                    and bounded_query.output.maximum_rows < cardinality
+                ):
+                    saw_row_bound_refusal = True
+                    assert production.status is OperationStatus.REJECTED
+                    assert production.rows == ()
+                    assert production.evaluated_revision is None
+        # The random cases also cover sparse and empty answers. Pin one generated-product
+        # boundary so this differential always exercises exact, plus-one, and refusal.
+        product_output = RowQueryOutput(
+            "rows",
+            (AnchorProjection("projectX", "x"), AnchorProjection("projectY", "y")),
+            9,
+        )
+        product = GraphQuery(
+            (AnchorGroup("x", ("person",)), AnchorGroup("y", ("person",))),
+            product_output,
+            required_links=(RequiredLink("edge", "x", "y", "relates"),),
+        )
+        for bound in (8, 9, 10):
+            bounded = replace(product, output=replace(product_output, maximum_rows=bound))
+            production = system.store.evaluate_current_query(bounded)
+            oracle = evaluate_query(bounded, _definitions(), graph, revision=1)
             assert production.status is oracle.status
             assert production.evaluated_revision == oracle.evaluated_revision
             assert {oracle_row_identity(row) for row in production.rows} == {
                 oracle_row_identity(row) for row in oracle.rows
             }
-            assert production.aggregates == oracle.aggregates
+            if bound == 8:
+                saw_row_bound_refusal = True
+                assert production.status is OperationStatus.REJECTED
+                assert production.rows == ()
+                assert production.evaluated_revision is None
+            else:
+                assert production.accepted
+                assert len(production.rows) == 9
+        assert saw_row_bound_refusal
     finally:
         system.close()
 

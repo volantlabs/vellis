@@ -36,6 +36,9 @@ from vellis.json_value import JsonValue, _json_equality_key, json_kind, value_si
 from vellis.outcomes import ValidationFinding
 from vellis.patterns import PatternError, compile_pattern
 
+# ``__all__`` is the supported external validation API. The underscored prepared-constraint
+# values below are an intentional package-private collaboration with ``vellis.store`` so repeated
+# SQLite-backed validation can share one immutable membership index without widening public API.
 __all__ = [
     "assess_object_neighborhood",
     "validate_property_value",

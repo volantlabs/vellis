@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from decimal import Decimal
 from pathlib import Path
+from random import Random
 
 import pytest
 
@@ -67,6 +68,46 @@ def test_signed_zero_has_one_exact_numeric_equality_identity() -> None:
     assert json_value_module._json_equality_key(positive) == (  # noqa: SLF001
         json_value_module._json_equality_key(negative)  # noqa: SLF001
     )
+
+
+def test_structural_equality_and_canonical_keys_agree_over_fixed_seed_values() -> None:
+    """Excludes two correct-looking equality paths disagreeing on a recursive JSON shape."""
+    rng = Random(0xE0A117)
+
+    def generated(depth: int = 0):
+        scalar = rng.randrange(5 if depth < 3 else 4)
+        if scalar == 0:
+            return None
+        if scalar == 1:
+            return bool(rng.randrange(2))
+        if scalar == 2:
+            coefficient = rng.randrange(-20, 21)
+            exponent = rng.randrange(-3, 4)
+            return Decimal(coefficient).scaleb(exponent)
+        if scalar == 3:
+            return rng.choice(("", "text", "é", "e\u0301", "0", "true"))
+        if rng.randrange(2):
+            return [generated(depth + 1) for _ in range(rng.randrange(4))]
+        keys = rng.sample(("a", "b", "é", "e\u0301"), rng.randrange(5))
+        return {key: generated(depth + 1) for key in keys}
+
+    values = [normalize(generated()) for _ in range(120)]
+    values.extend(
+        (
+            loads("0"),
+            loads("-0.0"),
+            loads("1"),
+            loads("1.00"),
+            loads('{"a":[1,true,null],"b":{"x":"é"}}'),
+            loads('{"b":{"x":"é"},"a":[1.0,true,null]}'),
+        )
+    )
+    for left in values:
+        for right in values:
+            assert json_equal(left, right) == (
+                json_value_module._json_equality_key(left)  # noqa: SLF001
+                == json_value_module._json_equality_key(right)  # noqa: SLF001
+            )
 
 
 def test_structural_json_equality_short_circuits_before_later_members(
