@@ -2054,3 +2054,18 @@ def test_evidence_lookup_survives_updating_the_baseline_that_tracks_the_reposito
     findings = implementation_campaign.validate_campaign(drifted)
     assert any("model_baseline.observed" in each for each in findings)
     assert not [each for each in findings if "does not resolve at checkpoint" in each]
+
+
+def test_completed_campaign_accepts_the_current_repository_observation_only() -> None:
+    """Later evolution moves observation without rewriting completed campaign meaning."""
+    campaign = implementation_campaign.load_campaign()
+    tracked = copy.deepcopy(campaign)
+    tracked["model_baseline"]["observed"] = {
+        **implementation_campaign.observed_baseline(),
+        "checkpoint": campaign["model_baseline"]["observed"]["checkpoint"],
+    }
+
+    assert implementation_campaign._without_observed_baseline(  # noqa: SLF001
+        tracked
+    ) == implementation_campaign._without_observed_baseline(campaign)  # noqa: SLF001
+    assert implementation_campaign.validate_campaign(tracked) == []

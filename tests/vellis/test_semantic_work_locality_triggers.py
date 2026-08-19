@@ -274,6 +274,7 @@ def test_permitted_value_trigger_reproduces_pairwise_equality(monkeypatch, count
     # Exercise the private rule directly so unrelated definition checks do not obscure
     # the exact uniqueness comparison count.
     findings = []
+    assert constraint.value_range is not None
     definitions_module._check_permitted_values(  # noqa: SLF001
         constraint, constraint.value_range, "choice", findings
     )
@@ -332,9 +333,7 @@ def test_historical_aggregate_reproduces_missing_limit_binding_preflight(tmp_pat
                 for index in range(len(people))
             ),
             return_shape=ReturnShape(()),
-            aggregations=(
-                QueryAggregation("count", AggregationOperator.COUNT, "notes"),
-            ),
+            aggregations=(QueryAggregation("count", AggregationOperator.COUNT, "notes"),),
             maximum_rows=20,
         )
         system.store._connection.setlimit(  # noqa: SLF001
@@ -369,12 +368,14 @@ def test_trigger_source_contains_late_distinct_false_oracle_and_manual_capacity(
 
     aggregation = store_source[store_source.index("def _aggregate_bindings_unlocked") :]
     capacity = store_source[
-        store_source.index("def _query_capacity_finding_unlocked") :
-        store_source.index("def _clear_query_filter_tables_unlocked")
+        store_source.index("def _query_capacity_finding_unlocked") : store_source.index(
+            "def _clear_query_filter_tables_unlocked"
+        )
     ]
     prospective = store_source[
-        store_source.index("def _iter_multiplicity_findings_unlocked") :
-        store_source.index("def _multiplicity_findings_unlocked")
+        store_source.index("def _iter_multiplicity_findings_unlocked") : store_source.index(
+            "def _multiplicity_findings_unlocked"
+        )
     ]
 
     assert "SELECT DISTINCT" in aggregation

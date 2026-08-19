@@ -53,6 +53,91 @@ Implement the accepted `GraphQuery` contract directly. Do not translate the old 
 Update query, definition-summary, and definition-inspection state inputs to the tagged selection
 family. Preserve the ten MCP tool names while regenerating typed schemas.
 
+The selected prerelease Python contract is exact realization guidance rather than SysML authority:
+
+```python
+@dataclass(frozen=True, slots=True)
+class UuidFilter:
+    uuids: tuple[str, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class CurrentSelection:
+    kind: Literal["current"] = "current"
+
+
+@dataclass(frozen=True, slots=True)
+class ProspectiveSelection:
+    kind: Literal["prospective"] = "prospective"
+
+
+@dataclass(frozen=True, slots=True)
+class RevisionSelection:
+    revision: int
+    kind: Literal["revision"] = "revision"
+
+
+@dataclass(frozen=True, slots=True)
+class TimeSelection:
+    time: datetime
+    kind: Literal["time"] = "time"
+
+
+EvaluatedStateSelection = (
+    CurrentSelection | ProspectiveSelection | RevisionSelection | TimeSelection
+)
+HistoricalSelection = RevisionSelection | TimeSelection
+
+
+@dataclass(frozen=True, slots=True)
+class RowQueryOutput:
+    projections: tuple[ReturnProjection, ...]
+    maximum_rows: int
+    kind: Literal["rows"] = "rows"
+
+
+@dataclass(frozen=True, slots=True)
+class QueryAggregation:
+    name: str
+    operator: AggregationOperator
+    property_name: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class AggregateQueryOutput:
+    data_condition: str
+    aggregations: tuple[QueryAggregation, ...]
+    maximum_matches: int
+    kind: Literal["aggregates"] = "aggregates"
+
+
+QueryOutput = RowQueryOutput | AggregateQueryOutput
+
+
+@dataclass(frozen=True, slots=True)
+class GraphQuery:
+    anchor_groups: tuple[AnchorGroup, ...]
+    output: QueryOutput
+    required_links: tuple[RequiredLink, ...] = ()
+    data_conditions: tuple[AssociatedDataCondition, ...] = ()
+    state: EvaluatedStateSelection = CurrentSelection()
+
+
+@dataclass(frozen=True, slots=True)
+class ReturnedProperty:
+    projection: str
+    associated_data_uuid: str
+    present: bool
+    value: JsonValue = None
+```
+
+`UuidFilter | None` is used by `AnchorGroup`, `AssociatedDataCondition`, and `RequiredLink`.
+`RTGSystem.query_graph`, definition summary, and definition inspection take no separate
+`selection=` argument. Restore and other inherently historical operations continue to use
+`HistoricalSelection`. Accepted row results populate only `rows`; accepted aggregate results
+populate only `aggregates`. Rejected or failed results contain neither, contain no evaluated
+revision, and echo the normalized query. Bound or encoding refusal is whole-result refusal.
+
 `vellis/query.py` owns public immutable values and one pure analyzer. `AnalyzedGraphQuery` contains:
 
 - validated selector lookup and references;
@@ -224,6 +309,30 @@ populations may legitimately be state-wide, set-based, and bounded in process me
    proposal tables/branches used only by the superseded expansion. Retain bounded referencing lookup
    only for structural dangling-reference checks.
 
+Decisive evidence covers link insertion, removal, endpoint change, type change, and tombstone;
+anchor/data type changes at either constrained end; data anchor-set changes; simultaneous endpoint
+and relationship changes; overlapping rules; rule addition, removal, and meaning change;
+description-only rules; display/property-only graph edits; active/prospective equivalence; exact
+lookup-only endpoints; atomic rejection; and preservation of the stored proposal during active
+validation. Rolled-back internal tests inspect exact reason and `(rule, subject, end)` work tuples.
+
+## Transitional evidence retirement
+
+The conflicting-baseline characterizations are temporary evidence, not permanent regressions or
+performance budgets. Retire them with the work that makes each old assertion false:
+
+- W002 replaces the pairwise-equality characterization with permanent canonical-key semantics and
+  linear key-construction evidence while retaining unrelated trigger cases.
+- W003 replaces historical-capacity and query/evaluator source-shape assertions with compiled-binding,
+  hidden-witness, and independent-oracle conformance evidence.
+- W004 replaces exact quadratic active/prospective costs with exact-work-cardinality and
+  sub-quadratic scaling regressions.
+- W005 verifies that no transitional source-shape or old-cost assertion remains; it does not defer
+  every replacement until closure.
+
+The exact old VM-step and decode counts remain pinned only until their owning work item replaces
+them. They characterize the selected execution environment and are not public budgets.
+
 ## Verification matrix
 
 Query evidence covers broad/multi-type and UUID-restricted anchors; UUID restrictions for all three
@@ -271,9 +380,9 @@ green.
 Run the documentation-sync workflow and reconcile `model/README.md`, `README.md`,
 `docs/mcp-realization.md`, examples, and test descriptions with implemented truth. Remove obsolete
 workaround prose rather than memorializing it. Search model, source, tests, README, and docs for every
-deleted name and inverse claim. The transitional trigger file
-`tests/vellis/test_semantic_work_locality_triggers.py` is replaced by target conformance/scaling
-evidence and deleted because it asserts superseded source shape and exact conflicting costs.
+deleted name and inverse claim. Confirm that the owning W002–W004 replacements have emptied or
+deleted `tests/vellis/test_semantic_work_locality_triggers.py` and that no source-shape or exact
+old-cost assertion survives.
 
 Confirm persistent schema/version and snapshot fixtures did not change and exactly ten MCP names
 remain. Run focused query/equality/mutation tests, `just model-check`,
