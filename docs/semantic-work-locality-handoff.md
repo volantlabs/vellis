@@ -378,23 +378,11 @@ and VM-step evidence instead of changing schema speculatively.
 
 ### W003 deletion inventory
 
-Delete, not merely bypass:
-
-- `QueryCandidateIndex`, `evaluate_indexed_query`, `_Assignment`, `_walk`, `_assignments`;
-- `_component_assignments`, `_distinct_component_assignments`, `_selector_components`;
-- both `_component_query` implementations, `_query_component_names`, and component reconstruction;
-- recursive SQL `validate=False` / `existence_only=True` paths and the legacy component-specific
-  disconnected-aggregation workaround;
-- `_SQLiteQueryIndex`, `_query_requires_relational_filters_unlocked`, and manual capacity formulas;
-- specialized query filter tables, conditional `IN (...)` collection compilation, and Python
-  post-hydration deduplication;
-- multi-target aggregation loops and `maximum_aggregation_batch_rows` /
-  `maximum_aggregation_reducer_count`;
-- `ReturnShape`, `EvaluatedStateScope`, `AnchorUuidFilter`, `LinkUuidFilter`, old root query fields,
-  per-aggregation target, query/inspection `selection=` overloads, legacy anchor spelling middleware,
-  and its registration/tests.
-
-Retain complete-return text screening, rewritten independently of the assignment evaluator.
+The completed subtraction removed the second assignment evaluator, disconnected-component
+reconstruction, recursive compatibility evaluation, threshold-specific collection paths, manual
+capacity formulas, post-hydration row deduplication, multi-target aggregation machinery, old request
+fields, selector overloads, and legacy payload middleware. Complete-return screening remains as an
+independent whole-result guard. No dormant fallback or translation path remains.
 
 ## W004 — exact active/prospective mutation impact
 
@@ -447,11 +435,11 @@ populations may legitimately be state-wide, set-based, and bounded in process me
    separate; prove display/property/description-only zero work.
 3. Normalize active changes into the transient overlay and reuse the kernel while preserving command
    conflicts, unknown removal, no cascade, atomic rejection, no-op detection, and concurrency checks.
-4. Compare active/prospective findings with complete small-state assessment oracles, then delete
-   `_affected_participants_unlocked`, `_incident_relationship_uuids_unlocked`, far-end promotion,
-   impacted-type rule triggers, participant-by-rule products, duplicated active calculation, and
-   proposal tables/branches used only by the superseded expansion. Retain bounded referencing lookup
-   only for structural dangling-reference checks.
+4. Compare active/prospective findings with complete small-state assessment oracles, then remove
+   generic affected-neighborhood expansion, far-end promotion, impacted-type rule triggers,
+   participant-by-rule products, duplicated active calculation, and proposal branches used only by
+   the superseded expansion. Retain bounded referencing lookup only for structural dangling-reference
+   checks.
 
 Decisive evidence covers link insertion, removal, endpoint change, type change, and tombstone;
 anchor/data type changes at either constrained end; data anchor-set changes; simultaneous endpoint
@@ -573,9 +561,10 @@ operations.
 Run the documentation-sync workflow and reconcile `model/README.md`, `README.md`,
 `docs/mcp-realization.md`, examples, and test descriptions with implemented truth. Remove obsolete
 workaround prose rather than memorializing it. Search model, source, tests, README, and docs for every
-deleted name and inverse claim. Confirm that the owning W002–W004 replacements have emptied or
-deleted `tests/vellis/test_semantic_work_locality.py` and that no source-shape or exact
-old-cost assertion survives.
+deleted name and inverse claim. Confirm that the former transitional
+`tests/vellis/test_semantic_work_locality_triggers.py` name and all obsolete source-shape or exact
+old-cost assertions are absent while the permanent `test_semantic_work_locality.py` regressions
+remain.
 
 Confirm persistent schema/version and snapshot fixtures did not change and exactly ten MCP names
 remain. Run focused query/equality/mutation tests, `just model-check`,

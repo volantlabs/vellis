@@ -106,47 +106,29 @@ failure non-effect.
 
 ## Semantic work-locality evidence
 
-The `vellis-2-semantic-work-locality` evolution began from a clean
-`ca6539e10393a5a52e2cd2f67d0af662e92cc010` checkout with all 1,192 existing tests passing. That
-pass is evidence of missing discrimination, not evidence that the following shapes conform:
+The completed `vellis-2-semantic-work-locality` evolution is backed by permanent semantic and
+work-locality regressions:
 
-- Aggregation's late `SELECT DISTINCT` in `vellis/store.py` first enumerates hidden flat-join
-  witnesses. Distinct output therefore does not prevent a hidden cross-product.
-- The reviewed W004 implementation derives active and prospective multiplicity work from exact
+- Row and aggregate queries bound distinct answer identities before hydration or arithmetic, and
+  hidden witnesses affect an answer only through existence.
+- Active and prospective multiplicity work derives from exact
   old/proposed reasons. Hub-of-hubs degree 10, 20, and 40 produces one exact work tuple while SQLite
   steps and decoded lookup objects have sub-quadratic doubling ratios. Display-only edits produce
   zero multiplicity work independent of irrelevant-rule population, and K independent changes with
   K independently applicable rules produce K work tuples rather than a participant-by-rule product.
-- Historical aggregation capacity accounting omitted the additional bound parameter compiled into
-  its `LIMIT`; at a SQLite variable limit of 32 the historical form failed after equivalent current
-  and prospective forms passed preflight.
-- Permitted-value validation scans every earlier accepted value. Valid collections of 500, 1,000,
-  2,000, and 4,000 values took 0.047, 0.174, 0.672, and 2.640 seconds; 8,000 took 10.455 seconds.
-- `vellis/query.py` contained an assignment evaluator used by `tests/vellis/oracle.py`; component
-  splitting was duplicated in query and store code, alongside specialized collection paths,
-  recursive component evaluation, manual capacity formulas, legacy state/payload channels, and
-  post-hydration row deduplication. W003 deletes those mechanisms and replaces their source-shape
-  triggers with independent-oracle, bounded-identity, compiled-capacity, and hidden-witness evidence.
-- The first selected tagged-union handoff used defaulted discriminators and open standard
-  dataclasses. The locked Pydantic realization accepted contradictory members by silently choosing
-  a union branch and discarding the other branch's fields. The revised handoff requires explicit
-  discriminators for supplied variants, discriminated unions, and closed state/output variants.
-- Definition discovery and assessment interval reads formerly executed related statements under a
-  connection-local lock but no SQLite read transaction. Summary, inspection, proposal discovery,
-  and bounded assessment pages now each use one read snapshot.
+- Compiled capacity evidence requires the same typed whole refusal for current, prospective, and
+  historical queries, including generated bound parameters and preparation limits.
+- Canonical JSON keys agree with structural equality across fixed-seed recursive values; permitted
+  collections and repeated graph validation use indexed key membership rather than pairwise work.
+- The independent query oracle shares no production evaluation, identity, pattern wrapper, or
+  aggregate reduction, and compares exact, plus-one, and refusing row bounds.
+- Summary, inspection, proposal discovery, and bounded assessment pages each use one read snapshot.
 - Assessment and restoration reuse connection-local temporary relation definitions but clear every
   population-bearing work row on successful and failed exits. Published assessments, canonical
   restoration effects, and their existing persistent histories remain unchanged.
 
-These measurements characterize forbidden dependency shapes; they are not public latency budgets.
-The successor evolution record owns their model, implementation, evidence, and deletion closure.
-
-The raw measurements used CPython 3.14.5, SQLite 3.53.1, macOS 15.7.8 arm64, and the repository's
-`uv.lock` identity `sha256:d71473693aa50faef1a25a449aa5808490e21eaf2a987942d1fb134c773550d1`.
-SQLite work was counted with `Connection.set_progress_handler(..., 1)` and decoded objects with
-`SQLiteStore.current_graph_object_decodes`, using the reusable measurement boundary in
-`tests/vellis/characterization.py`. Each series rebuilt a fresh temporary database for each size and
-measured only the named operation after fixture construction.
+SQLite VM-step ratios and decoded-object counts characterize forbidden dependency shapes; they are
+regression discriminators, not public latency budgets.
 
 The permanent executable locality suite is
 `uv run pytest tests/vellis/test_semantic_work_locality.py`. It rebuilds fresh databases,
@@ -160,12 +142,9 @@ schema rejection, and one-snapshot definition discovery. W006 evidence exercises
 assessment replacement and zero retained assessment/restore work after success and failure. No
 fixture or instrumentation must be invented from this prose.
 
-W002 and W003 have replaced their trigger recipes with permanent discriminating regression fixtures.
-W004 has replaced its old-cost assertions with exact-work and scaling evidence. W006 has replaced
-its temporary characterizations with snapshot and cleanup regressions; the final subtraction review
-removed the transitional trigger filename and any remaining evidence that asserted superseded
-implementation shapes. Final differential evidence also checks structural/key equality agreement,
-broad-selector regex candidate locality, and exact/plus-one row bounds.
+The final subtraction review removed transitional source-shape and exact old-cost assertions while
+retaining semantic scaling regressions. Differential evidence checks structural/key equality
+agreement, broad-selector regex candidate locality, and exact/plus-one row bounds.
 
 The implemented query contract has exclusive row and aggregate outputs. Row identity preserves every
 projected source object, including the associated-data UUID behind a property value, while aggregate
