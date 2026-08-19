@@ -123,9 +123,10 @@ work-locality regressions:
 - The independent query oracle shares no production evaluation, identity, pattern wrapper, or
   aggregate reduction, and compares exact, plus-one, and refusing row bounds.
 - Summary, inspection, proposal discovery, and bounded assessment pages each use one read snapshot.
-- Assessment and restoration reuse connection-local temporary relation definitions but clear every
-  population-bearing work row on successful and failed exits. Published assessments, canonical
-  restoration effects, and their existing persistent histories remain unchanged.
+- Active graph-change validation, assessment, and restoration reuse connection-local temporary
+  relation definitions but clear every population-bearing work row on successful and failed public
+  exits. Published assessments, canonical restoration effects, and their existing persistent
+  histories remain unchanged.
 
 SQLite VM-step ratios and decoded-object counts characterize forbidden dependency shapes; they are
 regression discriminators, not public latency budgets.
@@ -139,8 +140,10 @@ revision-selected aggregation. Permanent W003 evidence exercises positive patter
 source-preserving row identity, hidden-witness fanout, large relational filters, exact compiled
 bindings, VDBE capacity, regex locality, an independent oracle that catches a mutated compiler, MCP
 schema rejection, and one-snapshot definition discovery. W006 evidence exercises concurrent
-assessment replacement and zero retained assessment/restore work after success and failure. No
-fixture or instrumentation must be invented from this prose.
+assessment replacement and zero retained assessment/restore work after success and failure.
+Successor lifecycle evidence also requires empty multiplicity work after accepted, rejected, and
+failed active graph changes without losing exact-work scaling observation at the cleanup boundary.
+No fixture or instrumentation must be invented from this prose.
 
 The final subtraction review removed transitional source-shape and exact old-cost assertions while
 retaining semantic scaling regressions. Differential evidence checks structural/key equality

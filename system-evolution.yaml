@@ -36,10 +36,10 @@ findings:
     classification: implementation defect
     consequence: A long-lived connection retains rows from the largest prior active mutation until a later mutation or assessment happens to clear them.
     authority_refs: [VellisRequirements::historyIndependentCurrentWork, VellisRequirements::explicitGraphChangeSet]
-    evidence_refs: [path:tests/vellis/test_semantic_work_locality.py#test_assessment_and_restore_clear_population_work_after_success_and_failure]
-    disposition: implementation-work
+    evidence_refs: [path:tests/vellis/test_semantic_work_locality.py#test_active_graph_change_clears_multiplicity_work_after_every_exit]
+    disposition: resolved
     owner_work_item_id: W001
-    implementation_status: conflicting
+    implementation_status: conforming
     nearest_wrong_system: Active validation performs exact local work but commits while its reusable population rows remain resident.
     compatibility_effect: Active outcomes and canonical effects remain unchanged; only completed transient rows are cleared sooner.
   - id: F002
@@ -47,10 +47,10 @@ findings:
     classification: plan gap
     consequence: Fixing active cleanup breaks a test precondition, while no permanent evidence directly requires empty active-mutation work after every exit.
     authority_refs: [VellisVerification::currentWorkScaling]
-    evidence_refs: [path:tests/vellis/test_semantic_work_locality.py#test_assessment_and_restore_clear_population_work_after_success_and_failure]
-    disposition: plan-change
+    evidence_refs: [path:tests/vellis/test_semantic_work_locality.py#test_active_graph_change_clears_multiplicity_work_after_every_exit, path:tests/vellis/test_semantic_work_locality.py#test_assessment_and_restore_clear_population_work_after_success_and_failure]
+    disposition: resolved
     owner_work_item_id: W001
-    implementation_status: conflicting
+    implementation_status: conforming
     nearest_wrong_system: Assessment cleanup remains tested while active mutation can retain work indefinitely without a failing regression.
     compatibility_effect: Evidence changes from depending on residue to rejecting it; system meaning is unchanged.
 decisions:
@@ -61,8 +61,8 @@ decisions:
     reversible: true
     owner_work_item_id: W001
     evidence_intent: [Every multiplicity-prefixed relation is empty after accepted, rejected, and failed active changes., Internal rolled-back exact-work inspection remains available before the public boundary cleanup.]
-    implementation_status: partial
-    evidence_refs: []
+    implementation_status: conforming
+    evidence_refs: [path:tests/vellis/test_semantic_work_locality.py#test_active_graph_change_clears_multiplicity_work_after_every_exit, path:tests/vellis/test_semantic_work_locality.py#test_active_endpoint_type_work_scales_with_applicable_degree]
 work_items:
   - id: W001
     order: 1
@@ -79,8 +79,8 @@ work_items:
     compatibility_effect: No public result, transaction, persistence, or history meaning changes.
     non_effects: [No model edit., No persistent schema or snapshot change., No new cleanup abstraction., No owner-data or external-client access.]
     lifecycle: active
-    implementation_status: conflicting
-    evidence_refs: []
+    implementation_status: partial
+    evidence_refs: [path:tests/vellis/test_semantic_work_locality.py#test_active_graph_change_clears_multiplicity_work_after_every_exit, path:tests/vellis/test_semantic_work_locality.py#test_assessment_and_restore_clear_population_work_after_success_and_failure, path:tests/vellis/test_semantic_work_locality.py#test_active_endpoint_type_work_scales_with_applicable_degree, path:README.md#implementation-status, path:docs/mcp-realization.md#semantic-work-locality-evidence, command:just check]
     blocker: null
     checkpoint: null
 closure:
@@ -93,5 +93,5 @@ closure:
   reviews:
     - {lens: authority and conformance, status: pending, reviewer: null, checkpoint: null, evidence_refs: []}
     - {lens: engineering and evidence, status: pending, reviewer: null, checkpoint: null, evidence_refs: []}
-  evidence_refs: []
+  evidence_refs: [path:README.md#implementation-status, path:docs/mcp-realization.md#semantic-work-locality-evidence, command:just check]
   checkpoint: null

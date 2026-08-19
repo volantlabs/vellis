@@ -6038,10 +6038,12 @@ class CanonicalStore:
                 self._connection.execute("BEGIN")
                 try:
                     result = self._prepare_active_graph_change_unlocked(change)
+                    self._clear_transient_work_unlocked("multiplicity_")
                     self._connection.execute("COMMIT")
                     return result
                 except BaseException:
                     self._rollback_quietly()
+                    self._clear_transient_work_quietly("multiplicity_")
                     raise
         except sqlite3.Error as error:
             raise StoreError(

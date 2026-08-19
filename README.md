@@ -244,7 +244,9 @@ Use these words precisely:
   changed invariant subjects rather than unrelated rules or far endpoints. Explicit full assessment
   and broad definition cutover remain state-wide
   work, but execute set-wise with bounded process memory and store each finding once for paged
-  retrieval. The query implementation bounds source-preserving row identities or one aggregate
+  retrieval. Reusable active-validation, assessment, and restoration temporary relations retain
+  their connection-local definitions but no population rows after successful or failed public
+  exits. The query implementation bounds source-preserving row identities or one aggregate
   target population before hydration or arithmetic; hidden witnesses are existential and cannot
   multiply an answer. Scalar aggregation
   retains bounded match identities in an indexed SQLite temporary table and streams fixed-size

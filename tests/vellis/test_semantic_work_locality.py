@@ -90,7 +90,9 @@ class _InterleavingConnection:
         return getattr(self._connection, name)
 
 
-def _active_hub_cost(tmp_path: Path, degree: int) -> tuple[int, int, int]:
+def _active_hub_cost(
+    tmp_path: Path, degree: int, monkeypatch: pytest.MonkeyPatch
+) -> tuple[int, int, int]:
     central = AnchorTypeDefinition("central", "A central node.")
     other = AnchorTypeDefinition("other", "Another node.")
     spoke = AnchorTypeDefinition("spoke", "A spoke node.")
@@ -130,19 +132,32 @@ def _active_hub_cost(tmp_path: Path, degree: int) -> tuple[int, int, int]:
             GraphChange(anchor_upserts=tuple(anchors), link_upserts=tuple(links)),
             provenance=OWNER,
         ).accepted
-        measured = measure(
-            system,
-            lambda: system.apply_graph_change(
-                GraphChange(anchor_upserts=(Anchor("hub", "other", "Hub"),)),
-                provenance=OWNER,
-            ),
-        )
+        work_count: int | None = None
+        original_clear = system.store._clear_transient_work_unlocked  # noqa: SLF001
+
+        def capture_work_before_cleanup(*prefixes: str) -> None:
+            nonlocal work_count
+            if "multiplicity_" in prefixes:
+                work_count = int(
+                    system.store._connection.execute(  # noqa: SLF001
+                        "SELECT count(*) FROM multiplicity_work"
+                    ).fetchone()[0]
+                )
+            original_clear(*prefixes)
+
+        with monkeypatch.context() as patch:
+            patch.setattr(
+                system.store, "_clear_transient_work_unlocked", capture_work_before_cleanup
+            )
+            measured = measure(
+                system,
+                lambda: system.apply_graph_change(
+                    GraphChange(anchor_upserts=(Anchor("hub", "other", "Hub"),)),
+                    provenance=OWNER,
+                ),
+            )
         assert measured.value.accepted, measured.value.findings
-        work_count = int(
-            system.store._connection.execute(  # noqa: SLF001
-                "SELECT count(*) FROM multiplicity_work"
-            ).fetchone()[0]
-        )
+        assert work_count is not None
         return (
             measured.cost.sqlite_vm_steps,
             measured.cost.current_graph_object_decodes,
@@ -152,8 +167,10 @@ def _active_hub_cost(tmp_path: Path, degree: int) -> tuple[int, int, int]:
         system.close()
 
 
-def test_active_endpoint_type_work_scales_with_applicable_degree(tmp_path: Path) -> None:
-    costs = [_active_hub_cost(tmp_path, degree) for degree in (10, 20, 40)]
+def test_active_endpoint_type_work_scales_with_applicable_degree(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    costs = [_active_hub_cost(tmp_path, degree, monkeypatch) for degree in (10, 20, 40)]
 
     assert [work for _steps, _decodes, work in costs] == [1, 1, 1]
     for (small_steps, small_decodes, _), (large_steps, large_decodes, _) in zip(
@@ -629,6 +646,71 @@ def _temporary_work_counts(connection: sqlite3.Connection, prefix: str) -> dict[
     }
 
 
+def _seed_test_multiplicity_residue(connection: sqlite3.Connection) -> None:
+    """Populate reusable work relations explicitly for assessment-cleanup evidence."""
+    connection.execute(
+        "INSERT INTO multiplicity_impact_reason VALUES"
+        " ('test-rule', 'test-subject', 'source', 'subjectMembershipChanged')"
+    )
+    connection.execute(
+        "INSERT INTO multiplicity_work VALUES ('test-rule', 'test-subject', 'source')"
+    )
+
+
+@pytest.mark.parametrize("change_size", (50, 2_000))
+def test_active_graph_change_clears_multiplicity_work_after_every_exit(
+    tmp_path: Path, change_size: int
+) -> None:
+    system = RTGSystem.open(tmp_path / f"active-work-cleanup-{change_size}.sqlite3")
+    try:
+        assert system.initialize_fresh(
+            GraphDefinitionSet(anchor_types=(AnchorTypeDefinition("person", "A person."),)),
+            provenance=OWNER,
+            initialization_summary="active mutation work cleanup",
+        ).accepted
+        accepted = system.apply_graph_change(
+            GraphChange(
+                anchor_upserts=tuple(
+                    Anchor(f"person-{index}", "person", f"Person {index}")
+                    for index in range(change_size)
+                )
+            ),
+            provenance=OWNER,
+        )
+        assert accepted.accepted
+        connection = system.store._connection  # noqa: SLF001
+        counts = _temporary_work_counts(connection, "multiplicity_")
+        assert counts
+        assert all(count == 0 for count in counts.values())
+
+        rejected = system.apply_graph_change(
+            GraphChange(anchor_upserts=(Anchor("unknown", "unknown", "Unknown"),)),
+            provenance=OWNER,
+        )
+        assert rejected.status is OperationStatus.REJECTED
+        assert all(
+            count == 0 for count in _temporary_work_counts(connection, "multiplicity_").values()
+        )
+
+        _seed_test_multiplicity_residue(connection)
+        connection.execute(
+            "CREATE TEMP TRIGGER fail_active_validation_work BEFORE INSERT"
+            " ON multiplicity_subject_seed"
+            " BEGIN SELECT RAISE(ABORT, 'active validation failure'); END"
+        )
+        failed = system.apply_graph_change(
+            GraphChange(anchor_upserts=(Anchor("failure", "person", "Failure"),)),
+            provenance=OWNER,
+        )
+        assert failed.status is OperationStatus.FAILED
+        assert all(
+            count == 0 for count in _temporary_work_counts(connection, "multiplicity_").values()
+        )
+        connection.execute("DROP TRIGGER fail_active_validation_work")
+    finally:
+        system.close()
+
+
 def test_assessment_and_restore_clear_population_work_after_success_and_failure(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -652,6 +734,7 @@ def test_assessment_and_restore_clear_population_work_after_success_and_failure(
             provenance=OWNER,
         ).accepted
         connection = system.store._connection  # noqa: SLF001
+        _seed_test_multiplicity_residue(connection)
         initial_residue = _temporary_work_counts(connection, "multiplicity_")
         assert any(count > 0 for count in initial_residue.values())
 
@@ -676,12 +759,13 @@ def test_assessment_and_restore_clear_population_work_after_success_and_failure(
         )
         connection.execute("DROP TRIGGER fail_assessment_cleanup_evidence")
 
-        # Exercise the separate activity-observation failure branch from another
-        # reachable nonempty active-mutation residue.
+        # Exercise the separate activity-observation failure branch from deliberate
+        # test-owned residue rather than relying on completed active-mutation work.
         assert system.apply_graph_change(
             GraphChange(anchor_upserts=(Anchor("person-extra", "person", "Extra"),)),
             provenance=OWNER,
         ).accepted
+        _seed_test_multiplicity_residue(connection)
         activity_residue = _temporary_work_counts(connection, "multiplicity_")
         assert any(count > 0 for count in activity_residue.values())
 
