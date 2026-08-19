@@ -245,6 +245,13 @@ work_items:
     evidence_refs: [path:tests/vellis/test_semantic_work_locality_triggers.py#test_assessment_page_uses_one_snapshot_during_replacement, path:tests/vellis/test_semantic_work_locality_triggers.py#test_assessment_and_restore_clear_population_work_after_success_and_failure, command:just check]
     blocker: null
     checkpoint: git:3e1e08d38fc490ff2a0db21d2073919ec7bc493a
+  # W006 clean review pair at shared token git:1fbab3ee78ef543ad52be5ee8236634a87324f81;
+  # substantive checkpoint git:3e1e08d38fc490ff2a0db21d2073919ec7bc493a.
+  # /root/w006_authority_review2 — authority and conformance — clean.
+  # /root/w006_engineering_review2 — engineering and evidence — clean.
+  # Both reviewers independently passed focused W006 evidence, just system-evolution-check,
+  # just check (1,228 tests plus package build/install/exercise), and git diff --check;
+  # the authority reviewer also passed just model-check with the official Java pilot 0.60.1.
   - id: W007
     order: 4
     label: Reuse permitted-value indexes across graph validation
