@@ -604,14 +604,16 @@ and non-effects remain in force.
 
 ## Execution status
 
-W001 authority, W002 canonical collection equality, and W003 query execution are complete. W003's
+W001 authority, W002 canonical collection equality, W003 query execution, and W007 permitted-value
+index reuse are complete. W003's
 closed public schema, independent brute-force oracle, conjunctive SQLite compiler,
 unified selector-member relation, bounded row/target identity materialization, compiled-statement
 capacity checks, tagged state integration, one-snapshot definition discovery, and legacy query-path
-deletion are independently reviewed. W007 now has an implementation candidate that prepares each
-relevant permitted-value key index once per validation scope and reuses it across governed values.
-W004, W006, and final W005 closure retain the dependencies, evidence obligations, and deletion scope
-stated above.
+deletion are independently reviewed. W004 now has an implementation candidate that shares one
+old/proposed reason kernel between active and prospective validation, materializes exact
+`(rule, subject, constrained end)` work, keeps structural subjects separate from lookup-only
+identities, and replaces the three forbidden quadratic trigger shapes. W006 and final W005 closure
+retain the dependencies, evidence obligations, and deletion scope stated above.
 
 ## Resume and change control
 

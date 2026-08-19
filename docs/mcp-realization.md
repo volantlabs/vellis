@@ -94,7 +94,7 @@ full checks and broad cutovers use set-based scans and SQLite-backed findings. S
 and compatibility import are streaming or SQL set operations. These are Vellis realization choices,
 not portable RTG architecture.
 
-The W007 implementation candidate prepares the canonical permitted-value key set once for each
+The W007 implementation prepares the canonical permitted-value key set once for each
 relevant property constraint in a graph-validation scope. In-memory neighborhoods and normalized
 SQLite assessment then reuse that immutable set across governed values; unrelated data types do not
 cause their permitted collections to be prepared.
@@ -112,13 +112,11 @@ pass is evidence of missing discrimination, not evidence that the following shap
 
 - Aggregation's late `SELECT DISTINCT` in `vellis/store.py` first enumerates hidden flat-join
   witnesses. Distinct output therefore does not prevent a hidden cross-product.
-- Active endpoint-type validation obtains generic affected participants, loads every incident
-  relationship, and promotes both endpoints. Hub-of-hubs degree 10, 20, and 40 produced respectively
-  15,187, 52,857, and 200,389 SQLite steps and 231, 861, and 3,321 decoded objects.
-- Prospective multiplicity selection considers every rule mentioning a locally impacted type. An
-  isolated display rename with 10, 100, 500, and 1,000 irrelevant rules produced 8,434, 45,154,
-  208,354, and 412,354 SQLite steps. Independent K changes and K rules at K 5, 10, 20, and 40
-  produced 13,498, 31,543, 93,133, and 318,313 steps.
+- The W004 implementation candidate derives active and prospective multiplicity work from exact
+  old/proposed reasons. Hub-of-hubs degree 10, 20, and 40 produces one exact work tuple while SQLite
+  steps and decoded lookup objects have sub-quadratic doubling ratios. Display-only edits produce
+  zero multiplicity work independent of irrelevant-rule population, and K independent changes with
+  K independently applicable rules produce K work tuples rather than a participant-by-rule product.
 - Historical aggregation capacity accounting omitted the additional bound parameter compiled into
   its `LIMIT`; at a SQLite variable limit of 32 the historical form failed after equivalent current
   and prospective forms passed preflight.
@@ -137,7 +135,7 @@ pass is evidence of missing discrimination, not evidence that the following shap
   connection-local lock but no SQLite read transaction. W003 now gives summary, inspection, and
   proposal discovery one read snapshot. W006 still owns the independent assessment publication case.
 - Successful assessment and restoration leave population-sized rows in reusable temporary work
-  relations. A three-object fixture retained three effective/impacted/validation assessment rows and
+  relations. A three-object fixture retained three effective/materialized/validation assessment rows and
   three restore-candidate/current rows until another same-kind operation or connection close.
 
 These measurements characterize forbidden dependency shapes; they are not public latency budgets.
@@ -150,21 +148,21 @@ SQLite work was counted with `Connection.set_progress_handler(..., 1)` and decod
 `tests/vellis/characterization.py`. Each series rebuilt a fresh temporary database for each size and
 measured only the named operation after fixture construction.
 
-The remaining temporary executable characterization is
+The remaining executable characterization is
 `uv run pytest tests/vellis/test_semantic_work_locality_triggers.py`. It rebuilds fresh databases,
-resets the shared instrumentation boundary, and reproduces the active 10/20/40 hub series, the
-10/100/500/1,000 irrelevant-rule series, and the 5/10/20/40 independent-change-by-rule series.
+resets the shared instrumentation boundary, and verifies exact active/prospective mutation work and
+sub-quadratic scaling for the former hub, irrelevant-rule, and independent-change shapes.
 Its query-capacity case now requires the same typed whole refusal for current, prospective, and
 revision-selected aggregation. Permanent W003 evidence exercises positive pattern topologies,
 source-preserving row identity, hidden-witness fanout, large relational filters, exact compiled
 bindings, VDBE capacity, regex locality, an independent oracle that catches a mutated compiler, MCP
-schema rejection, and one-snapshot definition discovery. The remaining source-mechanism trigger pins
-only the mutation-locality paths owned by W004; assessment publication and retained work rows remain
-W006 triggers. No fixture or instrumentation must be invented from this prose.
+schema rejection, and one-snapshot definition discovery. Assessment publication and retained work
+rows remain W006 triggers. No fixture or instrumentation must be invented from this prose.
 
 W002 and W003 have replaced their trigger recipes with permanent discriminating regression fixtures.
-W004 and W006 own the remaining temporary characterizations; the final subtraction review removes
-any evidence that asserts their superseded implementation shapes.
+W004 has replaced its old-cost assertions with exact-work and scaling evidence. W006 owns the
+remaining temporary characterizations; the final subtraction review removes any evidence that
+asserts superseded implementation shapes.
 
 The implemented query contract has exclusive row and aggregate outputs. Row identity preserves every
 projected source object, including the associated-data UUID behind a property value, while aggregate

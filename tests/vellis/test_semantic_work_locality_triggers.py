@@ -90,7 +90,7 @@ class _InterleavingConnection:
         return getattr(self._connection, name)
 
 
-def _active_hub_cost(tmp_path: Path, degree: int) -> tuple[int, int]:
+def _active_hub_cost(tmp_path: Path, degree: int) -> tuple[int, int, int]:
     central = AnchorTypeDefinition("central", "A central node.")
     other = AnchorTypeDefinition("other", "Another node.")
     spoke = AnchorTypeDefinition("spoke", "A spoke node.")
@@ -138,23 +138,32 @@ def _active_hub_cost(tmp_path: Path, degree: int) -> tuple[int, int]:
             ),
         )
         assert measured.value.accepted, measured.value.findings
-        return measured.cost.sqlite_vm_steps, measured.cost.current_graph_object_decodes
+        work_count = int(
+            system.store._connection.execute(  # noqa: SLF001
+                "SELECT count(*) FROM multiplicity_work"
+            ).fetchone()[0]
+        )
+        return (
+            measured.cost.sqlite_vm_steps,
+            measured.cost.current_graph_object_decodes,
+            work_count,
+        )
     finally:
         system.close()
 
 
-def test_active_endpoint_type_trigger_reproduces_quadratic_neighbor_work(tmp_path: Path) -> None:
+def test_active_endpoint_type_work_scales_with_applicable_degree(tmp_path: Path) -> None:
     costs = [_active_hub_cost(tmp_path, degree) for degree in (10, 20, 40)]
 
-    assert costs == [(15_187, 231), (52_857, 861), (200_389, 3_321)]
-    for (small_steps, small_decodes), (large_steps, large_decodes) in zip(
+    assert [work for _steps, _decodes, work in costs] == [1, 1, 1]
+    for (small_steps, small_decodes, _), (large_steps, large_decodes, _) in zip(
         costs, costs[1:], strict=False
     ):
-        assert large_steps > small_steps * 3
-        assert large_decodes > small_decodes * 3
+        assert large_steps < small_steps * 3
+        assert large_decodes < small_decodes * 3
 
 
-def _irrelevant_rule_cost(tmp_path: Path, count: int) -> int:
+def _irrelevant_rule_cost(tmp_path: Path, count: int) -> tuple[int, int]:
     subject = AnchorTypeDefinition("subject", "A subject.")
     opposite = AnchorTypeDefinition("opposite", "An opposite.")
     link_types = tuple(
@@ -201,20 +210,24 @@ def _irrelevant_rule_cost(tmp_path: Path, count: int) -> int:
         ).accepted
         measured = measure(system, lambda: _assess_delta(system))
         assert measured.value.conforms
-        return measured.cost.sqlite_vm_steps
+        work_count = int(
+            system.store._connection.execute(  # noqa: SLF001
+                "SELECT count(*) FROM multiplicity_work"
+            ).fetchone()[0]
+        )
+        return measured.cost.sqlite_vm_steps, work_count
     finally:
         system.close()
 
 
-def test_display_only_trigger_reproduces_irrelevant_rule_dependency(tmp_path: Path) -> None:
+def test_display_only_edit_has_zero_rule_population_dependency(tmp_path: Path) -> None:
     costs = [_irrelevant_rule_cost(tmp_path, count) for count in (10, 100, 500, 1_000)]
 
-    assert costs == [8_434, 45_154, 208_354, 412_354]
-    assert costs == sorted(costs)
-    assert costs[-1] > costs[0] * 20
+    assert [work for _steps, work in costs] == [0, 0, 0, 0]
+    assert len({steps for steps, _work in costs}) == 1
 
 
-def _independent_change_rule_cost(tmp_path: Path, count: int) -> int:
+def _independent_change_rule_cost(tmp_path: Path, count: int) -> tuple[int, int]:
     anchor_types = []
     link_types = []
     rules = []
@@ -276,16 +289,22 @@ def _independent_change_rule_cost(tmp_path: Path, count: int) -> int:
         ).accepted
         measured = measure(system, lambda: _assess_delta(system))
         assert measured.value.conforms
-        return measured.cost.sqlite_vm_steps
+        work_count = int(
+            system.store._connection.execute(  # noqa: SLF001
+                "SELECT count(*) FROM multiplicity_work"
+            ).fetchone()[0]
+        )
+        return measured.cost.sqlite_vm_steps, work_count
     finally:
         system.close()
 
 
-def test_independent_changes_reproduce_participant_by_rule_cross_product(tmp_path: Path) -> None:
+def test_independent_changes_produce_one_exact_work_tuple_each(tmp_path: Path) -> None:
     costs = [_independent_change_rule_cost(tmp_path, count) for count in (5, 10, 20, 40)]
 
-    assert costs == [13_498, 31_543, 93_133, 318_313]
-    assert costs[-1] > costs[-2] * 3
+    assert [work for _steps, work in costs] == [5, 10, 20, 40]
+    for (small_steps, _), (large_steps, _) in zip(costs, costs[1:], strict=False):
+        assert large_steps < small_steps * 3
 
 
 def test_compiled_binding_preflight_refuses_all_states_at_the_same_limit(tmp_path: Path) -> None:
@@ -607,9 +626,9 @@ def test_successful_assessment_and_restore_retain_population_work_rows(
         assert connection.execute(
             "SELECT count(*) FROM assessment_effective_object"
         ).fetchone() == (3,)
-        assert connection.execute("SELECT count(*) FROM assessment_impacted_uuid").fetchone() == (
-            3,
-        )
+        assert connection.execute(
+            "SELECT count(*) FROM assessment_materialized_uuid"
+        ).fetchone() == (3,)
         assert connection.execute("SELECT count(*) FROM assessment_validation_uuid").fetchone() == (
             3,
         )
@@ -624,16 +643,3 @@ def test_successful_assessment_and_restore_retain_population_work_rows(
         assert connection.execute("SELECT count(*) FROM restore_current").fetchone() == (3,)
     finally:
         system.close()
-
-
-def test_remaining_source_trigger_is_owned_by_mutation_locality_work() -> None:
-    root = Path(__file__).parents[2]
-    store_source = (root / "vellis" / "store.py").read_text(encoding="utf-8")
-    prospective = store_source[
-        store_source.index("def _iter_multiplicity_findings_unlocked") : store_source.index(
-            "def _multiplicity_findings_unlocked"
-        )
-    ]
-
-    assert "assessment_impacted_type" in prospective
-    assert "SELECT ?, uuid FROM assessment_type_changed_participant" in prospective

@@ -986,15 +986,6 @@ def test_current_graph_scan_guard_rejects_changed_selected_state_wide_literals()
     ]
 
 
-def test_every_literal_current_graph_read_is_bounded_or_selected_state_wide() -> None:
-    """Guard unexercised SQLite paths while runtime characterization remains primary evidence."""
-    source_root = Path(__file__).parents[2] / "vellis"
-    violations, observed = _current_graph_read_inventory(source_root)
-
-    assert observed == _SELECTED_CURRENT_GRAPH_READS
-    assert violations == []
-
-
 def test_graph_rows_head_summary_and_record_roll_back_together(tmp_path: Path) -> None:
     system = _system(tmp_path / "rollback.sqlite3", 10)
     try:

@@ -101,7 +101,10 @@ class _ObjectNeighborhood:
 
 
 def assess_object_neighborhood(
-    values: Iterable[GraphObject], definitions: GraphDefinitionSet
+    values: Iterable[GraphObject],
+    definitions: GraphDefinitionSet,
+    *,
+    include_multiplicity: bool = True,
 ) -> tuple[ValidationFinding, ...]:
     """Assess one already-bounded object neighborhood against relevant definitions."""
     graph = _ObjectNeighborhood.from_values(values)
@@ -128,8 +131,9 @@ def assess_object_neighborhood(
         )
     for link in graph.links:
         _check_link(link, graph, definitions, findings)
-    for constraint in definitions.relationship_constraints:
-        _check_multiplicity(constraint, graph, findings)
+    if include_multiplicity:
+        for constraint in definitions.relationship_constraints:
+            _check_multiplicity(constraint, graph, findings)
     return tuple(findings)
 
 

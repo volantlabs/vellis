@@ -23,6 +23,7 @@ from vellis.definitions import (
     LinkEnd,
     LinkMultiplicityConstraint,
     LinkTypeDefinition,
+    relationship_identity,
     validate_definition_set,
 )
 from vellis.discovery import DefinitionInspectionRequest, DefinitionSummaryRequest
@@ -32,7 +33,7 @@ from vellis.governance import (
 )
 from vellis.graph import Anchor, AssociatedDataObject, Link, SystemMetadata
 from vellis.history import ProspectiveSelection
-from vellis.normalized import definition_identity
+from vellis.normalized import definition_identity, semantic_identity
 from vellis.outcomes import ValidationRequest, ValidationRequestKind, ValidationScope
 from vellis.query import (
     AnchorGroup,
@@ -1379,6 +1380,157 @@ def test_w004_transactions_roll_back_every_projection_family(tmp_path: Path) -> 
         assert not failed_activation.accepted
         assert system.store.current_revision() == revision
         assert system.definition_delta().proposed_definition_identity is not None
+    finally:
+        system.close()
+
+
+def test_active_and_prospective_share_exact_opposite_membership_work(tmp_path: Path) -> None:
+    subject = AnchorTypeDefinition("subject", "A constrained subject.")
+    eligible = AnchorTypeDefinition("eligible", "An eligible opposite.")
+    ineligible = AnchorTypeDefinition("ineligible", "An ineligible opposite.")
+    edge = LinkTypeDefinition(
+        "edge",
+        EndpointConstraint(("subject",), ("eligible", "ineligible"), "Endpoints."),
+        "An edge.",
+    )
+    rule = LinkMultiplicityConstraint(
+        "edge", LinkEnd.SOURCE, ("subject",), ("eligible",), 0, None, "Eligible edges."
+    )
+    system = RTGSystem.open(tmp_path / "exact-impact.sqlite3")
+    try:
+        assert system.initialize_fresh(
+            GraphDefinitionSet(
+                anchor_types=(subject, eligible, ineligible),
+                link_types=(edge,),
+                relationship_constraints=(rule,),
+            ),
+            provenance=OWNER,
+            initialization_summary="exact impact",
+        ).accepted
+        assert system.apply_graph_change(
+            GraphChange(
+                anchor_upserts=(
+                    Anchor("subject", "subject", "Subject"),
+                    Anchor("opposite", "eligible", "Opposite"),
+                ),
+                link_upserts=(Link("edge", "edge", "subject", "opposite"),),
+            ),
+            provenance=OWNER,
+        ).accepted
+        assert system.set_definition_delta(
+            DefinitionChange(anchor_type_upserts=(TEAM,)), provenance=OWNER
+        ).accepted
+        change = GraphChange(anchor_upserts=(Anchor("opposite", "ineligible", "Opposite"),))
+        connection = system.store._connection  # noqa: SLF001
+        proposal_before = tuple(connection.execute("SELECT * FROM proposal_entry ORDER BY uuid"))
+
+        connection.execute("BEGIN")
+        system.store._prepare_active_graph_change_unlocked(change)  # noqa: SLF001
+        active_reasons = tuple(
+            connection.execute(
+                "SELECT rule_key, subject_uuid, constrained_end, reason_kind"
+                " FROM multiplicity_impact_reason ORDER BY 1, 2, 3, 4"
+            )
+        )
+        active_work = tuple(
+            connection.execute(
+                "SELECT rule_key, subject_uuid, constrained_end"
+                " FROM multiplicity_work ORDER BY 1, 2, 3"
+            )
+        )
+        assert tuple(connection.execute("SELECT * FROM proposal_entry ORDER BY uuid")) == (
+            proposal_before
+        )
+        connection.execute("ROLLBACK")
+
+        proposal_identity = system.definition_delta().proposed_definition_identity
+        overlay_identity = system.definition_delta().graph_overlay_identity
+        assert system.apply_graph_change(
+            GraphChange(anchor_upserts=(Anchor("new", "subject", "New"),)),
+            provenance=OWNER,
+        ).accepted
+        assert system.definition_delta().proposed_definition_identity == proposal_identity
+        assert system.definition_delta().graph_overlay_identity == overlay_identity
+
+        assert system.apply_graph_change(
+            GraphChangeRequest(GraphChangeTarget.DEFINITION_DELTA, change), provenance=OWNER
+        ).accepted
+        assert _assess_delta(system).conforms
+        prospective_reasons = tuple(
+            connection.execute(
+                "SELECT rule_key, subject_uuid, constrained_end, reason_kind"
+                " FROM multiplicity_impact_reason ORDER BY 1, 2, 3, 4"
+            )
+        )
+        prospective_work = tuple(
+            connection.execute(
+                "SELECT rule_key, subject_uuid, constrained_end"
+                " FROM multiplicity_work ORDER BY 1, 2, 3"
+            )
+        )
+        expected_key = semantic_identity(relationship_identity(rule))
+
+        assert (
+            active_reasons
+            == prospective_reasons
+            == ((expected_key, "subject", "source", "oppositeMembershipChanged"),)
+        )
+        assert active_work == prospective_work == ((expected_key, "subject", "source"),)
+    finally:
+        system.close()
+
+
+def test_rule_meaning_change_enqueues_only_that_rules_applicable_subjects(tmp_path: Path) -> None:
+    subject = AnchorTypeDefinition("subject", "A subject.")
+    unrelated = AnchorTypeDefinition("unrelated", "An unrelated anchor.")
+    opposite = AnchorTypeDefinition("opposite", "An opposite.")
+    edge = LinkTypeDefinition(
+        "edge", EndpointConstraint(("subject",), ("opposite",), "Endpoints."), "An edge."
+    )
+    old_rule = LinkMultiplicityConstraint(
+        "edge", LinkEnd.SOURCE, ("subject",), ("opposite",), 0, 2, "At most two."
+    )
+    new_rule = LinkMultiplicityConstraint(
+        "edge", LinkEnd.SOURCE, ("subject",), ("opposite",), 0, 1, "At most one."
+    )
+    system = RTGSystem.open(tmp_path / "rule-meaning-impact.sqlite3")
+    try:
+        assert system.initialize_fresh(
+            GraphDefinitionSet(
+                anchor_types=(subject, unrelated, opposite),
+                link_types=(edge,),
+                relationship_constraints=(old_rule,),
+            ),
+            provenance=OWNER,
+            initialization_summary="rule meaning",
+        ).accepted
+        assert system.apply_graph_change(
+            GraphChange(
+                anchor_upserts=(
+                    Anchor("first", "subject", "First"),
+                    Anchor("second", "subject", "Second"),
+                    Anchor("other", "unrelated", "Other"),
+                )
+            ),
+            provenance=OWNER,
+        ).accepted
+        assert system.set_definition_delta(
+            DefinitionChange(relationship_constraint_upserts=(new_rule,)), provenance=OWNER
+        ).accepted
+
+        assert _assess_delta(system).conforms
+        key = semantic_identity(relationship_identity(new_rule))
+        reasons = tuple(
+            system.store._connection.execute(  # noqa: SLF001
+                "SELECT rule_key, subject_uuid, constrained_end, reason_kind"
+                " FROM multiplicity_impact_reason ORDER BY 1, 2, 3, 4"
+            )
+        )
+
+        assert reasons == (
+            (key, "first", "source", "ruleMeaningChanged"),
+            (key, "second", "source", "ruleMeaningChanged"),
+        )
     finally:
         system.close()
 

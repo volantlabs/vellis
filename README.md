@@ -126,11 +126,12 @@ revision, or time selection. SQLite bounds distinct answer identities before hyd
 and unreturned witnesses affect an answer only through existence. The prerelease request-schema break
 is intentional; the ten MCP tool names and persistence format are unchanged.
 
-Definition summary, focused inspection, and proposal discovery now read one SQLite snapshot. W007
-has an implementation candidate that prepares each relevant permitted-value index once per
-validation scope and reuses it across governed objects. Assessment-page snapshot consistency and
-cleanup of completed assessment/restore work remain W006, and reason-local multiplicity work remains
-W004. None requires a persistent migration.
+Definition summary, focused inspection, and proposal discovery now read one SQLite snapshot. Each
+relevant permitted-value index is prepared once per validation scope and reused across governed
+objects. Active and prospective mutation validation now share an implementation candidate that
+derives exact rule/subject/end multiplicity work while keeping structural subjects and lookup-only
+identities separate. Assessment-page snapshot consistency and cleanup of completed
+assessment/restore work remain W006. None requires a persistent migration.
 
 All seventeen original campaign slices and corrective slice S018 are complete. S018 implements the
 selected setup-program/public-CLI behavior with fake-client evidence. Closure confirmed both

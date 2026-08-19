@@ -85,6 +85,13 @@ from vellis.graph import (
     ObjectKind,
 )
 from vellis.json_value import json_equal
+from vellis.mutation_impact import (
+    ImpactNeighborhood,
+    MultiplicityImpactReason,
+    count_multiplicity_for_subjects,
+    derive_multiplicity_impact_reasons,
+    index_multiplicity_facts,
+)
 from vellis.normalized import (
     adjust_semantic_summary,
     definition_content_stats,
@@ -3915,7 +3922,7 @@ class CanonicalStore:
     def _prepare_prospective_assessment_scope_unlocked(self, active_identity: str) -> None:
         """Derive the changed-definition and staged-graph invariant closure in SQL."""
         self._connection.execute(
-            "CREATE TEMP TABLE IF NOT EXISTS assessment_impacted_type"
+            "CREATE TEMP TABLE IF NOT EXISTS assessment_structural_type"
             " (type_key TEXT PRIMARY KEY) WITHOUT ROWID"
         )
         self._connection.execute(
@@ -3923,7 +3930,7 @@ class CanonicalStore:
             " (type_key TEXT PRIMARY KEY) WITHOUT ROWID"
         )
         self._connection.execute(
-            "CREATE TEMP TABLE IF NOT EXISTS assessment_impacted_uuid"
+            "CREATE TEMP TABLE IF NOT EXISTS assessment_materialized_uuid"
             " (uuid TEXT PRIMARY KEY) WITHOUT ROWID"
         )
         self._connection.execute(
@@ -3935,15 +3942,15 @@ class CanonicalStore:
             " (natural_key TEXT PRIMARY KEY) WITHOUT ROWID"
         )
         self._connection.execute(
-            "CREATE TEMP TABLE IF NOT EXISTS assessment_impacted_relation"
+            "CREATE TEMP TABLE IF NOT EXISTS assessment_structural_relationship"
             " (uuid TEXT PRIMARY KEY) WITHOUT ROWID"
         )
-        self._connection.execute("DELETE FROM assessment_impacted_type")
+        self._connection.execute("DELETE FROM assessment_structural_type")
         self._connection.execute("DELETE FROM assessment_definition_type")
-        self._connection.execute("DELETE FROM assessment_impacted_uuid")
+        self._connection.execute("DELETE FROM assessment_materialized_uuid")
         self._connection.execute("DELETE FROM assessment_definition_relationship")
         self._connection.execute("DELETE FROM assessment_changed_multiplicity_rule")
-        self._connection.execute("DELETE FROM assessment_impacted_relation")
+        self._connection.execute("DELETE FROM assessment_structural_relationship")
         self._connection.execute(
             "INSERT OR IGNORE INTO assessment_definition_type"
             " SELECT type_key FROM proposal_definition_type"
@@ -3965,7 +3972,7 @@ class CanonicalStore:
                 proposed
             ):
                 self._connection.execute(
-                    "INSERT OR IGNORE INTO assessment_impacted_type VALUES (?)",
+                    "INSERT OR IGNORE INTO assessment_structural_type VALUES (?)",
                     (str(type_key),),
                 )
         # Include every effective type definition that refers to an edited type. A
@@ -4018,26 +4025,30 @@ class CanonicalStore:
         )
         # Multiplicity rules are reached the same way, and for the same reason: a rule
         # nobody has edited since an activation lives in the base set.
+        if self._connection.execute("SELECT 1 FROM proposal_definition_type LIMIT 1").fetchone():
+            self._connection.execute(
+                "INSERT OR IGNORE INTO assessment_definition_relationship"
+                " SELECT DISTINCT r.natural_key"
+                " FROM current_definition_relationship_source AS s"
+                " JOIN definition_multiplicity_rule AS r"
+                " ON r.definition_set_id = s.value_set_id AND r.natural_key = s.natural_key"
+                " JOIN definition_multiplicity_participant AS p"
+                " ON p.definition_set_id = r.definition_set_id"
+                " AND p.rule_occurrence = r.occurrence"
+                " WHERE p.type_key IN (SELECT type_key FROM proposal_definition_type)"
+                " AND NOT EXISTS (SELECT 1 FROM proposal_definition_relationship AS e"
+                " WHERE e.natural_key = r.natural_key)"
+                " UNION SELECT DISTINCT r.natural_key"
+                " FROM current_definition_relationship_source AS s"
+                " JOIN definition_multiplicity_rule AS r"
+                " ON r.definition_set_id = s.value_set_id AND r.natural_key = s.natural_key"
+                " WHERE r.link_type_key IN (SELECT type_key FROM proposal_definition_type)"
+                " AND NOT EXISTS (SELECT 1 FROM proposal_definition_relationship AS e"
+                " WHERE e.natural_key = r.natural_key)"
+            )
         self._connection.execute(
             "INSERT OR IGNORE INTO assessment_definition_relationship"
-            " SELECT DISTINCT r.natural_key"
-            " FROM current_definition_relationship_source AS s"
-            " JOIN definition_multiplicity_rule AS r"
-            " ON r.definition_set_id = s.value_set_id AND r.natural_key = s.natural_key"
-            " JOIN definition_multiplicity_participant AS p"
-            " ON p.definition_set_id = r.definition_set_id"
-            " AND p.rule_occurrence = r.occurrence"
-            " WHERE p.type_key IN (SELECT type_key FROM proposal_definition_type)"
-            " AND NOT EXISTS (SELECT 1 FROM proposal_definition_relationship AS e"
-            " WHERE e.natural_key = r.natural_key)"
-            " UNION SELECT DISTINCT r.natural_key"
-            " FROM current_definition_relationship_source AS s"
-            " JOIN definition_multiplicity_rule AS r"
-            " ON r.definition_set_id = s.value_set_id AND r.natural_key = s.natural_key"
-            " WHERE r.link_type_key IN (SELECT type_key FROM proposal_definition_type)"
-            " AND NOT EXISTS (SELECT 1 FROM proposal_definition_relationship AS e"
-            " WHERE e.natural_key = r.natural_key)"
-            " UNION SELECT natural_key FROM proposal_definition_relationship"
+            " SELECT natural_key FROM proposal_definition_relationship"
             " WHERE operation = 'upsert'"
         )
         self._connection.execute(
@@ -4067,38 +4078,22 @@ class CanonicalStore:
                 "INSERT OR IGNORE INTO assessment_changed_multiplicity_rule VALUES (?)",
                 (str(natural_key),),
             )
-            impacted_types: set[str] = set()
-            for rule in (
-                *active_rule.relationship_constraints,
-                *proposed_rule.relationship_constraints,
-            ):
-                if isinstance(rule, LinkMultiplicityConstraint):
-                    impacted_types.add(rule.link_type_key)
-                    impacted_types.update(rule.constrained_endpoint_type_keys)
-                    impacted_types.update(rule.opposite_endpoint_type_keys)
-                else:
-                    impacted_types.update(rule.anchor_type_keys)
-                    impacted_types.update(rule.associated_data_type_keys)
-            self._connection.executemany(
-                "INSERT OR IGNORE INTO assessment_impacted_type VALUES (?)",
-                ((type_key,) for type_key in impacted_types),
-            )
         self._connection.execute(
-            "INSERT OR IGNORE INTO assessment_impacted_uuid"
-            " SELECT g.uuid FROM assessment_impacted_type AS t"
+            "INSERT OR IGNORE INTO assessment_materialized_uuid"
+            " SELECT g.uuid FROM assessment_structural_type AS t"
             " CROSS JOIN graph_presence_interval AS g INDEXED BY graph_presence_current_type"
             " ON g.object_kind IN ('anchor', 'associatedData', 'link')"
             " AND g.type_key = t.type_key AND g.valid_to_revision IS NULL"
             " WHERE NOT EXISTS (SELECT 1 FROM proposal_entry AS p WHERE p.uuid = g.uuid)"
             " UNION SELECT v.uuid FROM proposal_entry AS p JOIN object_value AS v"
             " ON v.id = p.object_value_id WHERE p.operation = 'upsert'"
-            " AND v.type_key IN (SELECT type_key FROM assessment_impacted_type)"
+            " AND v.type_key IN (SELECT type_key FROM assessment_structural_type)"
         )
         self._connection.execute(
-            "INSERT OR IGNORE INTO assessment_impacted_uuid SELECT uuid FROM proposal_entry"
+            "INSERT OR IGNORE INTO assessment_materialized_uuid SELECT uuid FROM proposal_entry"
         )
         self._connection.execute(
-            "INSERT OR IGNORE INTO assessment_impacted_uuid"
+            "INSERT OR IGNORE INTO assessment_materialized_uuid"
             " SELECT source_uuid FROM object_value AS v JOIN proposal_entry AS p"
             " ON v.id IN (p.object_value_id, p.base_object_value_id)"
             " WHERE v.object_kind = 'link'"
@@ -4110,8 +4105,7 @@ class CanonicalStore:
         )
         for table in (
             "assessment_validation_uuid",
-            "assessment_changed_participant",
-            "assessment_type_changed_participant",
+            "assessment_endpoint_membership_change",
         ):
             self._connection.execute(
                 f"CREATE TEMP TABLE IF NOT EXISTS {table}"  # noqa: S608
@@ -4119,52 +4113,10 @@ class CanonicalStore:
             )
             self._connection.execute(f"DELETE FROM {table}")  # noqa: S608
         self._connection.execute(
-            "INSERT INTO assessment_validation_uuid SELECT uuid FROM assessment_impacted_uuid"
-        )
-
-        # Graph edits seed relationship work only when relationship membership can
-        # change. Display names, properties, and metadata remain local validation work.
-        self._connection.execute(
-            "INSERT OR IGNORE INTO assessment_changed_participant"
-            " SELECT p.uuid FROM proposal_entry AS p"
-            " LEFT JOIN object_value AS n ON n.id = p.object_value_id"
-            " LEFT JOIN object_value AS b ON b.id = p.base_object_value_id"
-            " WHERE p.object_kind = 'anchor' AND (p.operation = 'delete'"
-            " OR b.id IS NULL OR n.type_key IS NOT b.type_key)"
-            " UNION SELECT p.uuid FROM proposal_entry AS p"
-            " LEFT JOIN object_value AS n ON n.id = p.object_value_id"
-            " LEFT JOIN object_value AS b ON b.id = p.base_object_value_id"
-            " WHERE p.object_kind = 'link' AND (p.operation = 'delete' OR b.id IS NULL"
-            " OR n.type_key IS NOT b.type_key OR n.source_uuid IS NOT b.source_uuid"
-            " OR n.target_uuid IS NOT b.target_uuid)"
-            " UNION SELECT p.uuid FROM proposal_entry AS p"
-            " LEFT JOIN object_value AS n ON n.id = p.object_value_id"
-            " LEFT JOIN object_value AS b ON b.id = p.base_object_value_id"
-            " WHERE p.object_kind = 'associatedData' AND (p.operation = 'delete'"
-            " OR b.id IS NULL OR n.type_key IS NOT b.type_key"
-            " OR EXISTS (SELECT anchor_uuid FROM object_anchor WHERE object_value_id = n.id"
-            " EXCEPT SELECT anchor_uuid FROM object_anchor WHERE object_value_id = b.id)"
-            " OR EXISTS (SELECT anchor_uuid FROM object_anchor WHERE object_value_id = b.id"
-            " EXCEPT SELECT anchor_uuid FROM object_anchor WHERE object_value_id = n.id))"
+            "INSERT INTO assessment_validation_uuid SELECT uuid FROM assessment_materialized_uuid"
         )
         self._connection.execute(
-            "INSERT OR IGNORE INTO assessment_changed_participant"
-            " SELECT v.source_uuid FROM proposal_entry AS p JOIN object_value AS v"
-            " ON v.id IN (p.object_value_id, p.base_object_value_id)"
-            " WHERE p.uuid IN (SELECT uuid FROM assessment_changed_participant)"
-            " AND v.object_kind = 'link'"
-            " UNION SELECT v.target_uuid FROM proposal_entry AS p JOIN object_value AS v"
-            " ON v.id IN (p.object_value_id, p.base_object_value_id)"
-            " WHERE p.uuid IN (SELECT uuid FROM assessment_changed_participant)"
-            " AND v.object_kind = 'link'"
-            " UNION SELECT a.anchor_uuid FROM proposal_entry AS p JOIN object_value AS v"
-            " ON v.id IN (p.object_value_id, p.base_object_value_id)"
-            " JOIN object_anchor AS a ON a.object_value_id = v.id"
-            " WHERE p.uuid IN (SELECT uuid FROM assessment_changed_participant)"
-            " AND v.object_kind = 'associatedData'"
-        )
-        self._connection.execute(
-            "INSERT OR IGNORE INTO assessment_type_changed_participant"
+            "INSERT OR IGNORE INTO assessment_endpoint_membership_change"
             " SELECT p.uuid FROM proposal_entry AS p"
             " LEFT JOIN object_value AS n ON n.id = p.object_value_id"
             " LEFT JOIN object_value AS b ON b.id = p.base_object_value_id"
@@ -4172,12 +4124,6 @@ class CanonicalStore:
             " AND (p.operation = 'delete' OR b.id IS NULL"
             " OR n.type_key IS NOT b.type_key)"
         )
-
-        self._connection.execute(
-            "CREATE TEMP TABLE IF NOT EXISTS assessment_type_incident_relation"
-            " (uuid TEXT PRIMARY KEY) WITHOUT ROWID"
-        )
-        self._connection.execute("DELETE FROM assessment_type_incident_relation")
 
         def include_incident_relations(subject_table: str, relation_table: str) -> None:
             self._connection.execute(
@@ -4227,58 +4173,44 @@ class CanonicalStore:
         # relationship objects. Promote those relationships into local validation;
         # rule-specific multiplicity subjects are derived later without a second hop.
         include_incident_relations(
-            "assessment_type_changed_participant", "assessment_type_incident_relation"
+            "assessment_endpoint_membership_change", "assessment_structural_relationship"
         )
         self._connection.execute(
-            "INSERT OR IGNORE INTO assessment_impacted_relation"
-            " SELECT uuid FROM assessment_type_incident_relation"
-        )
-        self._connection.execute(
-            "INSERT OR IGNORE INTO assessment_impacted_uuid"
-            " SELECT uuid FROM assessment_impacted_relation"
-            " UNION SELECT g.source_uuid FROM assessment_impacted_relation AS r"
+            "INSERT OR IGNORE INTO assessment_materialized_uuid"
+            " SELECT uuid FROM assessment_structural_relationship"
+            " UNION SELECT g.source_uuid FROM assessment_structural_relationship AS r"
             " CROSS JOIN graph_presence_interval AS g INDEXED BY graph_presence_current_uuid"
             " ON g.uuid = r.uuid"
             " AND g.valid_to_revision IS NULL WHERE g.object_kind = 'link'"
-            " UNION SELECT g.target_uuid FROM assessment_impacted_relation AS r"
+            " UNION SELECT g.target_uuid FROM assessment_structural_relationship AS r"
             " CROSS JOIN graph_presence_interval AS g INDEXED BY graph_presence_current_uuid"
             " ON g.uuid = r.uuid"
             " AND g.valid_to_revision IS NULL WHERE g.object_kind = 'link'"
             " UNION SELECT v.source_uuid FROM proposal_entry AS p JOIN object_value AS v"
             " ON v.id = p.object_value_id WHERE p.operation = 'upsert'"
             " AND v.object_kind = 'link'"
-            " AND v.uuid IN (SELECT uuid FROM assessment_impacted_relation)"
+            " AND v.uuid IN (SELECT uuid FROM assessment_structural_relationship)"
             " UNION SELECT v.target_uuid FROM proposal_entry AS p JOIN object_value AS v"
             " ON v.id = p.object_value_id WHERE p.operation = 'upsert'"
             " AND v.object_kind = 'link'"
-            " AND v.uuid IN (SELECT uuid FROM assessment_impacted_relation)"
-            " UNION SELECT a.anchor_uuid FROM assessment_impacted_relation AS r"
+            " AND v.uuid IN (SELECT uuid FROM assessment_structural_relationship)"
+            " UNION SELECT a.anchor_uuid FROM assessment_structural_relationship AS r"
             " CROSS JOIN graph_presence_interval AS g INDEXED BY graph_presence_current_uuid"
             " ON g.uuid = r.uuid"
             " AND g.valid_to_revision IS NULL JOIN object_anchor AS a"
             " ON a.object_value_id = g.object_value_id"
-            " UNION SELECT a.anchor_uuid FROM assessment_impacted_relation AS r"
+            " UNION SELECT a.anchor_uuid FROM assessment_structural_relationship AS r"
             " JOIN proposal_entry AS p ON p.uuid = r.uuid JOIN object_anchor AS a"
             " ON a.object_value_id = p.object_value_id WHERE p.operation = 'upsert'"
         )
         self._connection.execute(
-            "INSERT OR IGNORE INTO assessment_impacted_type"
-            " SELECT v.type_key FROM assessment_impacted_uuid AS i"
-            " CROSS JOIN graph_presence_interval AS g INDEXED BY graph_presence_current_uuid"
-            " ON g.uuid = i.uuid AND g.valid_to_revision IS NULL"
-            " JOIN object_value AS v ON v.id = g.object_value_id"
-            " UNION SELECT v.type_key FROM proposal_entry AS p JOIN object_value AS v"
-            " ON v.id = p.object_value_id WHERE p.operation = 'upsert'"
-            " AND p.uuid IN (SELECT uuid FROM assessment_impacted_uuid)"
-        )
-        self._connection.execute(
             "INSERT OR IGNORE INTO assessment_validation_uuid"
-            " SELECT uuid FROM assessment_type_incident_relation"
+            " SELECT uuid FROM assessment_structural_relationship"
         )
         # Local relationship validation needs its unchanged endpoints for lookup, but
         # lookup-only participants do not themselves become validation work.
         self._connection.execute(
-            "INSERT OR IGNORE INTO assessment_impacted_uuid"
+            "INSERT OR IGNORE INTO assessment_materialized_uuid"
             " SELECT v.source_uuid FROM assessment_validation_uuid AS i"
             " CROSS JOIN graph_presence_interval AS g INDEXED BY graph_presence_current_uuid"
             " ON g.uuid = i.uuid AND g.valid_to_revision IS NULL"
@@ -4306,6 +4238,7 @@ class CanonicalStore:
             " JOIN object_anchor AS a ON a.object_value_id = p.object_value_id"
             " WHERE p.operation = 'upsert'"
         )
+        self._prepare_prospective_multiplicity_impact_unlocked(active_identity)
         self._prepare_effective_assessment_relations_unlocked()
 
     def _prepare_effective_assessment_relations_unlocked(self) -> None:
@@ -4314,7 +4247,7 @@ class CanonicalStore:
         self._connection.execute(
             "CREATE TEMP TABLE assessment_effective_object AS"
             " SELECT g.uuid, v.object_kind, v.type_key, v.source_uuid, v.target_uuid,"
-            " v.id AS object_value_id FROM assessment_impacted_uuid AS i"
+            " v.id AS object_value_id FROM assessment_materialized_uuid AS i"
             " CROSS JOIN graph_presence_interval AS g INDEXED BY graph_presence_current_uuid"
             " ON g.uuid = i.uuid AND g.valid_to_revision IS NULL"
             " JOIN object_value AS v ON v.id = g.object_value_id WHERE 1 = 1"
@@ -4323,7 +4256,7 @@ class CanonicalStore:
             " v.target_uuid, v.id FROM proposal_entry AS p"
             " JOIN object_value AS v ON v.id = p.object_value_id"
             " WHERE p.operation = 'upsert' AND p.uuid IN"
-            " (SELECT uuid FROM assessment_impacted_uuid)"
+            " (SELECT uuid FROM assessment_materialized_uuid)"
         )
         self._connection.execute(
             "CREATE UNIQUE INDEX assessment_effective_object_uuid"
@@ -4590,18 +4523,7 @@ class CanonicalStore:
             keys = ((key,) for key in self._effective_relationship_keys_unlocked(active_identity))
         else:
             keys = self._connection.execute(
-                "SELECT r.natural_key FROM current_definition_relationship_source AS s"
-                " JOIN definition_multiplicity_rule AS r"
-                " ON r.definition_set_id = s.value_set_id"
-                " AND r.natural_key = s.natural_key WHERE NOT EXISTS"
-                " (SELECT 1 FROM proposal_definition_relationship AS p"
-                " WHERE p.natural_key = r.natural_key)"
-                " AND EXISTS (SELECT 1 FROM definition_multiplicity_participant AS p"
-                " WHERE p.definition_set_id = r.definition_set_id"
-                " AND p.rule_occurrence = r.occurrence"
-                " AND p.type_key IN (SELECT type_key FROM assessment_impacted_type))"
-                " UNION ALL SELECT natural_key FROM proposal_definition_relationship"
-                " WHERE operation = 'upsert' ORDER BY 1"
+                "SELECT DISTINCT rule_key FROM multiplicity_work ORDER BY rule_key"
             )
         for (natural_key,) in keys:
             definitions = self._definitions_for_relation_unlocked(
@@ -4614,146 +4536,129 @@ class CanonicalStore:
                 relation, definitions, natural_key=str(natural_key)
             )
 
-    def _prepare_multiplicity_work_unlocked(
-        self,
-        natural_key: str,
-        constraint: LinkMultiplicityConstraint | DirectAssociationMultiplicityConstraint,
-    ) -> None:
-        """Materialize only subjects whose count under one rule can have changed."""
+    def _clear_multiplicity_impact_unlocked(self) -> None:
         self._connection.execute(
-            "CREATE TEMP TABLE IF NOT EXISTS assessment_multiplicity_work"
-            " (natural_key TEXT, uuid TEXT, PRIMARY KEY (natural_key, uuid)) WITHOUT ROWID"
+            "CREATE TEMP TABLE IF NOT EXISTS multiplicity_impact_reason"
+            " (rule_key TEXT NOT NULL, subject_uuid TEXT NOT NULL,"
+            " constrained_end TEXT NOT NULL, reason_kind TEXT NOT NULL,"
+            " PRIMARY KEY(rule_key, subject_uuid, constrained_end, reason_kind)) WITHOUT ROWID"
         )
         self._connection.execute(
-            "DELETE FROM assessment_multiplicity_work WHERE natural_key = ?", (natural_key,)
+            "CREATE TEMP TABLE IF NOT EXISTS multiplicity_work"
+            " (rule_key TEXT NOT NULL, subject_uuid TEXT NOT NULL,"
+            " constrained_end TEXT NOT NULL,"
+            " PRIMARY KEY(rule_key, subject_uuid, constrained_end)) WITHOUT ROWID"
         )
-        if isinstance(constraint, LinkMultiplicityConstraint):
-            near = "source_uuid" if constraint.constrained_end is LinkEnd.SOURCE else "target_uuid"
-            far = "target_uuid" if constraint.constrained_end is LinkEnd.SOURCE else "source_uuid"
-            # A staged relationship-shape change can alter the count of its old and new
-            # direct subjects. Property/display-only edits are absent from the reason set.
-            self._connection.execute(
-                "INSERT OR IGNORE INTO assessment_multiplicity_work"
-                f" SELECT ?, v.{near} FROM proposal_entry AS p"  # noqa: S608
-                " JOIN object_value AS v ON v.id IN"
-                " (p.object_value_id, p.base_object_value_id)"
-                " WHERE p.uuid IN (SELECT uuid FROM assessment_changed_participant)"
-                " AND v.object_kind = 'link' AND v.type_key = ?",
-                (natural_key, constraint.link_type_key),
-            )
-            # A participant's own type/membership change can change whether it is a
-            # constrained subject. If it is at the opposite end, only the near subject
-            # of that rule is promoted; sibling far-end neighborhoods are never walked.
-            self._connection.execute(
-                "INSERT OR IGNORE INTO assessment_multiplicity_work"
-                " SELECT ?, uuid FROM assessment_type_changed_participant",
-                (natural_key,),
-            )
-            self._connection.execute(
-                "INSERT OR IGNORE INTO assessment_multiplicity_work"
-                f" SELECT ?, g.{near} FROM assessment_type_changed_participant AS t"  # noqa: S608
-                " CROSS JOIN graph_presence_interval AS g"
-                f" INDEXED BY graph_presence_current_link_{far.removesuffix('_uuid')}"  # noqa: S608
-                f" ON g.{far} = t.uuid AND g.valid_to_revision IS NULL"  # noqa: S608
-                " WHERE g.object_kind = 'link' AND g.type_key = ?"
-                " AND NOT EXISTS (SELECT 1 FROM proposal_entry AS p WHERE p.uuid = g.uuid)"
-                f" UNION SELECT ?, v.{near} FROM assessment_type_changed_participant AS t"  # noqa: S608
-                " JOIN proposal_entry AS p JOIN object_value AS v ON v.id = p.object_value_id"
-                f" AND v.{far} = t.uuid WHERE p.operation = 'upsert'"  # noqa: S608
-                " AND v.object_kind = 'link' AND v.type_key = ?",
-                (
-                    natural_key,
-                    constraint.link_type_key,
-                    natural_key,
-                    constraint.link_type_key,
-                ),
-            )
-            if self._connection.execute(
-                "SELECT 1 FROM assessment_changed_multiplicity_rule WHERE natural_key = ?",
-                (natural_key,),
-            ).fetchone():
-                self._connection.execute(
-                    "INSERT OR IGNORE INTO assessment_multiplicity_work"
-                    " SELECT ?, uuid FROM prospective_graph_object AS e"
-                    " WHERE e.object_kind IN ('anchor', 'associatedData')"
-                    " AND EXISTS (SELECT 1 FROM multiplicity_type_filter AS mtf"
-                    " WHERE mtf.role = 'constrained' AND mtf.type_key = e.type_key)",
-                    (natural_key,),
-                )
-            self._prepare_multiplicity_relations_unlocked(natural_key, constraint)
-            return
+        self._connection.execute("DELETE FROM multiplicity_impact_reason")
+        self._connection.execute("DELETE FROM multiplicity_work")
 
-        assert isinstance(constraint, DirectAssociationMultiplicityConstraint)
-        anchor_end = constraint.constrained_end is DirectAssociationEnd.ANCHOR
-        # An association-set edit changes counts only for the edited data identity and
-        # its old/new anchors.
-        if anchor_end:
-            self._connection.execute(
-                "INSERT OR IGNORE INTO assessment_multiplicity_work"
-                " SELECT ?, a.anchor_uuid FROM proposal_entry AS p"
-                " JOIN object_anchor AS a ON a.object_value_id IN"
-                " (p.object_value_id, p.base_object_value_id)"
-                " WHERE p.object_kind = 'associatedData'"
-                " AND p.uuid IN (SELECT uuid FROM assessment_changed_participant)",
-                (natural_key,),
-            )
-        else:
-            self._connection.execute(
-                "INSERT OR IGNORE INTO assessment_multiplicity_work"
-                " SELECT ?, p.uuid FROM proposal_entry AS p"
-                " WHERE p.object_kind = 'associatedData'"
-                " AND p.uuid IN (SELECT uuid FROM assessment_changed_participant)",
-                (natural_key,),
-            )
-        # A subject type change affects that subject only. An opposite participant type
-        # change affects exactly the directly associated subjects for this rule.
-        self._connection.execute(
-            "INSERT OR IGNORE INTO assessment_multiplicity_work"
-            " SELECT ?, uuid FROM assessment_type_changed_participant",
-            (natural_key,),
+    def _record_multiplicity_reasons_unlocked(
+        self, reasons: Iterable[MultiplicityImpactReason]
+    ) -> None:
+        self._connection.executemany(
+            "INSERT OR IGNORE INTO multiplicity_impact_reason VALUES (?, ?, ?, ?)",
+            (
+                (
+                    reason.rule_key,
+                    reason.subject_uuid,
+                    reason.constrained_end,
+                    reason.reason_kind,
+                )
+                for reason in reasons
+            ),
         )
-        if anchor_end:
-            self._connection.execute(
-                "INSERT OR IGNORE INTO assessment_multiplicity_work"
-                " SELECT ?, a.anchor_uuid FROM assessment_type_changed_participant AS t"
-                " JOIN current_data_anchor AS a ON a.data_uuid = t.uuid"
-                " WHERE NOT EXISTS (SELECT 1 FROM proposal_entry AS p"
-                " WHERE p.uuid = a.data_uuid)"
-                " UNION SELECT ?, a.anchor_uuid"
-                " FROM assessment_type_changed_participant AS t"
-                " JOIN proposal_entry AS p ON p.uuid = t.uuid"
-                " JOIN object_anchor AS a ON a.object_value_id = p.object_value_id"
-                " WHERE p.operation = 'upsert' AND p.object_kind = 'associatedData'",
-                (natural_key, natural_key),
-            )
+
+    def _insert_rule_meaning_reasons_unlocked(
+        self,
+        rule: LinkMultiplicityConstraint | DirectAssociationMultiplicityConstraint,
+        relation: str,
+    ) -> None:
+        if relation not in {"current_graph_object", "prospective_graph_object"}:
+            raise ValueError("unknown rule-meaning state relation")
+        natural_key = semantic_identity(relationship_identity(rule))
+        if isinstance(rule, LinkMultiplicityConstraint):
+            kind_sql = "object_kind IN ('anchor', 'associatedData')"
+            constrained_types = rule.constrained_endpoint_type_keys
+        elif rule.constrained_end is DirectAssociationEnd.ANCHOR:
+            kind_sql = "object_kind = 'anchor'"
+            constrained_types = rule.anchor_type_keys
         else:
-            self._connection.execute(
-                "INSERT OR IGNORE INTO assessment_multiplicity_work"
-                " SELECT ?, a.data_uuid FROM assessment_type_changed_participant AS t"
-                " JOIN current_data_anchor AS a ON a.anchor_uuid = t.uuid"
-                " WHERE NOT EXISTS (SELECT 1 FROM proposal_entry AS p"
-                " WHERE p.uuid = a.data_uuid)"
-                " UNION SELECT ?, v.uuid FROM assessment_type_changed_participant AS t"
-                " JOIN proposal_entry AS p JOIN object_value AS v ON v.id = p.object_value_id"
-                " JOIN object_anchor AS a ON a.object_value_id = v.id AND a.anchor_uuid = t.uuid"
-                " WHERE p.operation = 'upsert' AND v.object_kind = 'associatedData'",
-                (natural_key, natural_key),
+            kind_sql = "object_kind = 'associatedData'"
+            constrained_types = rule.associated_data_type_keys
+        self._connection.execute(
+            "CREATE TEMP TABLE IF NOT EXISTS multiplicity_rule_subject_type"
+            " (type_key TEXT PRIMARY KEY) WITHOUT ROWID"
+        )
+        self._connection.execute("DELETE FROM multiplicity_rule_subject_type")
+        self._connection.executemany(
+            "INSERT INTO multiplicity_rule_subject_type VALUES (?)",
+            ((type_key,) for type_key in constrained_types),
+        )
+        self._connection.execute(
+            "INSERT OR IGNORE INTO multiplicity_impact_reason"
+            " (rule_key, subject_uuid, constrained_end, reason_kind)"
+            f" SELECT ?, uuid, ?, 'ruleMeaningChanged' FROM {relation}"  # noqa: S608
+            f" WHERE {kind_sql} AND type_key IN"  # noqa: S608
+            " (SELECT type_key FROM multiplicity_rule_subject_type)",
+            (natural_key, rule.constrained_end.value),
+        )
+
+    def _prepare_prospective_multiplicity_impact_unlocked(self, active_identity: str) -> None:
+        """Use the shared old/proposed kernel to derive exact prospective work."""
+        self._clear_multiplicity_impact_unlocked()
+        old_changed: dict[str, GraphObject] = {}
+        proposed_changed: dict[str, GraphObject] = {}
+        for uuid, base_value_id, value_id in self._connection.execute(
+            "SELECT uuid, base_object_value_id, object_value_id FROM proposal_entry"
+        ):
+            if base_value_id is not None:
+                old_changed[str(uuid)] = load_object_value(self._connection, int(base_value_id))
+            if value_id is not None:
+                proposed_changed[str(uuid)] = load_object_value(self._connection, int(value_id))
+        neighborhood = self._multiplicity_impact_neighborhood_unlocked(
+            old_changed,
+            proposed_changed,
+            proposed_relation="prospective_graph_object",
+        )
+        changed_rule_keys = {
+            str(row[0])
+            for row in self._connection.execute(
+                "SELECT natural_key FROM assessment_changed_multiplicity_rule"
             )
-        if self._connection.execute(
-            "SELECT 1 FROM assessment_changed_multiplicity_rule WHERE natural_key = ?",
-            (natural_key,),
-        ).fetchone():
-            kind = "anchor" if anchor_end else "associatedData"
-            role = "anchor" if anchor_end else "data"
-            self._connection.execute(
-                "INSERT OR IGNORE INTO assessment_multiplicity_work"
-                " SELECT ?, uuid FROM prospective_graph_object AS e"
-                " WHERE e.object_kind = ?"
-                " AND EXISTS (SELECT 1 FROM multiplicity_type_filter AS mtf"
-                " WHERE mtf.role = ? AND mtf.type_key = e.type_key)",
-                (natural_key, kind, role),
+        }
+        candidate_keys = self._candidate_multiplicity_rule_keys_unlocked(neighborhood)
+        candidate_keys.difference_update(changed_rule_keys)
+        if candidate_keys:
+            definitions = self._definitions_for_relation_unlocked(
+                "prospective_graph_object",
+                active_identity,
+                type_keys=set(),
+                relationship_keys=candidate_keys,
             )
-        self._prepare_multiplicity_relations_unlocked(natural_key, constraint)
+            self._record_multiplicity_reasons_unlocked(
+                derive_multiplicity_impact_reasons(
+                    neighborhood, definitions.relationship_constraints
+                )
+            )
+        for natural_key in changed_rule_keys:
+            old_definitions = self._load_definition_set(
+                active_identity, type_keys=set(), relationship_keys={natural_key}
+            )
+            proposed_definitions = self._definitions_for_relation_unlocked(
+                "prospective_graph_object",
+                active_identity,
+                type_keys=set(),
+                relationship_keys={natural_key},
+            )
+            for rule in old_definitions.relationship_constraints:
+                self._insert_rule_meaning_reasons_unlocked(rule, "current_graph_object")
+            for rule in proposed_definitions.relationship_constraints:
+                self._insert_rule_meaning_reasons_unlocked(rule, "prospective_graph_object")
+        self._connection.execute(
+            "INSERT INTO multiplicity_work"
+            " SELECT DISTINCT rule_key, subject_uuid, constrained_end"
+            " FROM multiplicity_impact_reason"
+        )
 
     def _prepare_multiplicity_relations_unlocked(
         self,
@@ -4800,8 +4705,8 @@ class CanonicalStore:
         self._connection.execute("DELETE FROM multiplicity_incident_link")
         self._connection.execute("DELETE FROM multiplicity_effective_data_anchor")
         self._connection.execute(
-            "INSERT INTO multiplicity_lookup_uuid SELECT uuid"
-            " FROM assessment_multiplicity_work WHERE natural_key = ?",
+            "INSERT INTO multiplicity_lookup_uuid SELECT subject_uuid"
+            " FROM multiplicity_work WHERE rule_key = ?",
             (natural_key,),
         )
         if not self._connection.execute(
@@ -4814,16 +4719,16 @@ class CanonicalStore:
             self._connection.execute(
                 "INSERT OR IGNORE INTO multiplicity_incident_link"
                 f" SELECT g.uuid, g.type_key, g.source_uuid, g.target_uuid"  # noqa: S608
-                " FROM assessment_multiplicity_work AS w"
+                " FROM multiplicity_work AS w"
                 " CROSS JOIN graph_presence_interval AS g"
                 f" INDEXED BY graph_presence_current_link_{near.removesuffix('_uuid')}"  # noqa: S608
-                f" ON g.{near} = w.uuid AND g.valid_to_revision IS NULL"  # noqa: S608
-                " WHERE w.natural_key = ? AND g.object_kind = 'link' AND g.type_key = ?"
+                f" ON g.{near} = w.subject_uuid AND g.valid_to_revision IS NULL"  # noqa: S608
+                " WHERE w.rule_key = ? AND g.object_kind = 'link' AND g.type_key = ?"
                 " AND NOT EXISTS (SELECT 1 FROM proposal_entry AS p WHERE p.uuid = g.uuid)"
                 " UNION SELECT v.uuid, v.type_key, v.source_uuid, v.target_uuid"
-                " FROM assessment_multiplicity_work AS w"
+                " FROM multiplicity_work AS w"
                 " JOIN proposal_entry AS p JOIN object_value AS v ON v.id = p.object_value_id"
-                f" AND v.{near} = w.uuid WHERE w.natural_key = ?"  # noqa: S608
+                f" AND v.{near} = w.subject_uuid WHERE w.rule_key = ?"  # noqa: S608
                 " AND p.operation = 'upsert' AND v.object_kind = 'link' AND v.type_key = ?",
                 (
                     natural_key,
@@ -4841,15 +4746,15 @@ class CanonicalStore:
                 self._connection.execute(
                     "INSERT OR IGNORE INTO multiplicity_effective_data_anchor"
                     " SELECT a.data_uuid, a.anchor_uuid"
-                    " FROM assessment_multiplicity_work AS w"
-                    " JOIN current_data_anchor AS a ON a.anchor_uuid = w.uuid"
-                    " WHERE w.natural_key = ? AND NOT EXISTS"
+                    " FROM multiplicity_work AS w"
+                    " JOIN current_data_anchor AS a ON a.anchor_uuid = w.subject_uuid"
+                    " WHERE w.rule_key = ? AND NOT EXISTS"
                     " (SELECT 1 FROM proposal_entry AS p WHERE p.uuid = a.data_uuid)"
                     " UNION SELECT v.uuid, a.anchor_uuid"
-                    " FROM assessment_multiplicity_work AS w"
+                    " FROM multiplicity_work AS w"
                     " JOIN proposal_entry AS p JOIN object_value AS v ON v.id = p.object_value_id"
                     " JOIN object_anchor AS a ON a.object_value_id = v.id"
-                    " AND a.anchor_uuid = w.uuid WHERE w.natural_key = ?"
+                    " AND a.anchor_uuid = w.subject_uuid WHERE w.rule_key = ?"
                     " AND p.operation = 'upsert' AND v.object_kind = 'associatedData'",
                     (natural_key, natural_key),
                 )
@@ -4861,16 +4766,16 @@ class CanonicalStore:
                 self._connection.execute(
                     "INSERT OR IGNORE INTO multiplicity_effective_data_anchor"
                     " SELECT a.data_uuid, a.anchor_uuid"
-                    " FROM assessment_multiplicity_work AS w"
-                    " JOIN current_data_anchor AS a ON a.data_uuid = w.uuid"
-                    " WHERE w.natural_key = ? AND NOT EXISTS"
+                    " FROM multiplicity_work AS w"
+                    " JOIN current_data_anchor AS a ON a.data_uuid = w.subject_uuid"
+                    " WHERE w.rule_key = ? AND NOT EXISTS"
                     " (SELECT 1 FROM proposal_entry AS p WHERE p.uuid = a.data_uuid)"
                     " UNION SELECT v.uuid, a.anchor_uuid"
-                    " FROM assessment_multiplicity_work AS w"
-                    " JOIN proposal_entry AS p ON p.uuid = w.uuid"
+                    " FROM multiplicity_work AS w"
+                    " JOIN proposal_entry AS p ON p.uuid = w.subject_uuid"
                     " JOIN object_value AS v ON v.id = p.object_value_id"
                     " JOIN object_anchor AS a ON a.object_value_id = v.id"
-                    " WHERE w.natural_key = ? AND p.operation = 'upsert'"
+                    " WHERE w.rule_key = ? AND p.operation = 'upsert'"
                     " AND v.object_kind = 'associatedData'",
                     (natural_key, natural_key),
                 )
@@ -4926,7 +4831,7 @@ class CanonicalStore:
                     ((value,) for value in opposite),
                 )
                 if prospective:
-                    self._prepare_multiplicity_work_unlocked(natural_key, constraint)
+                    self._prepare_multiplicity_relations_unlocked(natural_key, constraint)
                 sql = (
                     f"SELECT e.uuid, e.type_key, count(f.uuid) FROM {object_relation} AS e"
                     f" LEFT JOIN {link_relation} AS l ON "
@@ -4939,8 +4844,8 @@ class CanonicalStore:
                     + " AND EXISTS (SELECT 1 FROM multiplicity_type_filter AS mtf"
                     + " WHERE mtf.role = 'constrained' AND mtf.type_key = e.type_key)"
                     + (
-                        " AND e.uuid IN (SELECT uuid FROM assessment_multiplicity_work"
-                        " WHERE natural_key = ?)"
+                        " AND e.uuid IN (SELECT subject_uuid FROM multiplicity_work"
+                        " WHERE rule_key = ?)"
                         if prospective
                         else ""
                     )
@@ -4980,7 +4885,7 @@ class CanonicalStore:
                 ((value,) for value in data_types),
             )
             if prospective:
-                self._prepare_multiplicity_work_unlocked(natural_key, constraint)
+                self._prepare_multiplicity_relations_unlocked(natural_key, constraint)
             if constraint.constrained_end is DirectAssociationEnd.ANCHOR:
                 sql = (
                     f"SELECT a.uuid, count(DISTINCT d.uuid) FROM {object_relation} AS a"
@@ -4996,8 +4901,8 @@ class CanonicalStore:
                 if prospective:
                     sql = sql.replace(
                         " GROUP BY",
-                        " AND a.uuid IN (SELECT uuid FROM assessment_multiplicity_work"
-                        " WHERE natural_key = ?)"
+                        " AND a.uuid IN (SELECT subject_uuid FROM multiplicity_work"
+                        " WHERE rule_key = ?)"
                         " GROUP BY",
                     )
                 rows = self._connection.execute(sql, (natural_key,) if prospective else ())
@@ -5016,8 +4921,8 @@ class CanonicalStore:
                 if prospective:
                     sql = sql.replace(
                         " GROUP BY",
-                        " AND d.uuid IN (SELECT uuid FROM assessment_multiplicity_work"
-                        " WHERE natural_key = ?)"
+                        " AND d.uuid IN (SELECT subject_uuid FROM multiplicity_work"
+                        " WHERE rule_key = ?)"
                         " GROUP BY",
                     )
                 rows = self._connection.execute(sql, (natural_key,) if prospective else ())
@@ -5603,6 +5508,417 @@ class CanonicalStore:
         revision = _projection_revision(row)
         return revision
 
+    @staticmethod
+    def _multiplicity_relationship_shape(value: GraphObject | None) -> object | None:
+        """Return only graph meaning that can change a multiplicity contribution."""
+        if isinstance(value, Link):
+            return ("link", value.type_key, value.source_uuid, value.target_uuid)
+        if isinstance(value, AssociatedDataObject):
+            return ("association", value.type_key, frozenset(value.anchor_uuids))
+        return None
+
+    @staticmethod
+    def _multiplicity_participant_shape(value: GraphObject | None) -> object | None:
+        if isinstance(value, Anchor):
+            return (ObjectKind.ANCHOR.value, value.type_key)
+        if isinstance(value, AssociatedDataObject):
+            return (ObjectKind.ASSOCIATED_DATA.value, value.type_key)
+        return None
+
+    def _objects_from_relation_for_uuids_unlocked(
+        self, relation: str, uuids: set[str]
+    ) -> tuple[GraphObject, ...]:
+        if relation == "current_graph_object":
+            return self._objects_for_uuids_unlocked(uuids)
+        if relation != "prospective_graph_object":
+            raise ValueError("unknown impact object relation")
+        objects: list[GraphObject] = []
+        for chunk in _sqlite_chunks(self._connection, uuids):
+            placeholders = ", ".join("?" for _ in chunk)
+            for (value_id,) in self._connection.execute(
+                "SELECT object_value_id FROM prospective_graph_object"
+                f" WHERE uuid IN ({placeholders})",
+                tuple(chunk),
+            ):
+                objects.append(load_object_value(self._connection, int(value_id)))
+        return tuple(objects)
+
+    @staticmethod
+    def _referenced_impact_uuids(objects: Iterable[GraphObject]) -> set[str]:
+        referenced: set[str] = set()
+        for value in objects:
+            if isinstance(value, Link):
+                referenced.update((value.source_uuid, value.target_uuid))
+            elif isinstance(value, AssociatedDataObject):
+                referenced.update(value.anchor_uuids)
+        return referenced
+
+    def _multiplicity_impact_neighborhood_unlocked(
+        self,
+        old_changed: dict[str, GraphObject],
+        proposed_changed: dict[str, GraphObject],
+        *,
+        proposed_relation: str | None,
+    ) -> ImpactNeighborhood:
+        """Load exactly changed/incident relationships and their lookup identities."""
+        changed_uuids = set(old_changed) | set(proposed_changed)
+        changed_participants = {
+            uuid
+            for uuid in changed_uuids
+            if self._multiplicity_participant_shape(old_changed.get(uuid))
+            != self._multiplicity_participant_shape(proposed_changed.get(uuid))
+        }
+        changed_relationships = {
+            uuid
+            for uuid in changed_uuids
+            if self._multiplicity_relationship_shape(old_changed.get(uuid))
+            != self._multiplicity_relationship_shape(proposed_changed.get(uuid))
+        }
+        relationship_uuids = self._relationship_uuids_for_subjects_unlocked(changed_participants)
+        relationship_uuids.update(changed_relationships)
+
+        old_relationships = self._objects_for_uuids_unlocked(relationship_uuids)
+        if proposed_relation is None:
+            proposed_relationship_map = {value.uuid: value for value in old_relationships}
+            for uuid in relationship_uuids:
+                if uuid in proposed_changed:
+                    proposed_relationship_map[uuid] = proposed_changed[uuid]
+                elif uuid in old_changed:
+                    proposed_relationship_map.pop(uuid, None)
+            proposed_relationships = tuple(proposed_relationship_map.values())
+        else:
+            proposed_relationships = self._objects_from_relation_for_uuids_unlocked(
+                proposed_relation, relationship_uuids
+            )
+
+        old_lookup = self._referenced_impact_uuids(old_relationships) | changed_participants
+        proposed_lookup = (
+            self._referenced_impact_uuids(proposed_relationships) | changed_participants
+        )
+        old_objects = {
+            value.uuid: value
+            for value in self._objects_for_uuids_unlocked(old_lookup | relationship_uuids)
+        }
+        if proposed_relation is None:
+            proposed_objects = {
+                value.uuid: value
+                for value in self._objects_for_uuids_unlocked(proposed_lookup | relationship_uuids)
+            }
+            for uuid in old_changed:
+                proposed_objects.pop(uuid, None)
+            proposed_objects.update(proposed_changed)
+            proposed_objects.update({value.uuid: value for value in proposed_relationships})
+        else:
+            proposed_objects = {
+                value.uuid: value
+                for value in self._objects_from_relation_for_uuids_unlocked(
+                    proposed_relation, proposed_lookup | relationship_uuids
+                )
+            }
+        old_objects.update(old_changed)
+        proposed_objects.update(proposed_changed)
+        return ImpactNeighborhood(
+            old_objects,
+            proposed_objects,
+            frozenset(relationship_uuids),
+            frozenset(changed_relationships),
+            frozenset(changed_participants),
+        )
+
+    def _candidate_multiplicity_rule_keys_unlocked(
+        self, neighborhood: ImpactNeighborhood
+    ) -> set[str]:
+        """Select current rules that have an old/new contribution or subject-membership delta."""
+        self._connection.execute(
+            "CREATE TEMP TABLE IF NOT EXISTS multiplicity_link_seed"
+            " (link_type_key TEXT, source_type_key TEXT, target_type_key TEXT,"
+            " PRIMARY KEY(link_type_key, source_type_key, target_type_key)) WITHOUT ROWID"
+        )
+        self._connection.execute(
+            "CREATE TEMP TABLE IF NOT EXISTS multiplicity_association_seed"
+            " (anchor_type_key TEXT, data_type_key TEXT,"
+            " PRIMARY KEY(anchor_type_key, data_type_key)) WITHOUT ROWID"
+        )
+        self._connection.execute(
+            "CREATE TEMP TABLE IF NOT EXISTS multiplicity_subject_seed"
+            " (uuid TEXT PRIMARY KEY, object_kind TEXT, old_type_key TEXT, new_type_key TEXT)"
+            " WITHOUT ROWID"
+        )
+        self._connection.execute(
+            "CREATE TEMP TABLE IF NOT EXISTS multiplicity_subject_type_seed"
+            " (uuid TEXT, object_kind TEXT, side TEXT, type_key TEXT,"
+            " PRIMARY KEY(uuid, side)) WITHOUT ROWID"
+        )
+        self._connection.execute("DELETE FROM multiplicity_link_seed")
+        self._connection.execute("DELETE FROM multiplicity_association_seed")
+        self._connection.execute("DELETE FROM multiplicity_subject_seed")
+        self._connection.execute("DELETE FROM multiplicity_subject_type_seed")
+
+        link_seeds: set[tuple[str, str, str]] = set()
+        association_seeds: set[tuple[str, str]] = set()
+        for objects in (neighborhood.old_objects, neighborhood.proposed_objects):
+            for uuid in neighborhood.examined_relationship_uuids:
+                relationship = objects.get(uuid)
+                if isinstance(relationship, Link):
+                    source = objects.get(relationship.source_uuid)
+                    target = objects.get(relationship.target_uuid)
+                    if isinstance(source, (Anchor, AssociatedDataObject)) and isinstance(
+                        target, (Anchor, AssociatedDataObject)
+                    ):
+                        link_seeds.add((relationship.type_key, source.type_key, target.type_key))
+                elif isinstance(relationship, AssociatedDataObject):
+                    for anchor_uuid in relationship.anchor_uuids:
+                        anchor = objects.get(anchor_uuid)
+                        if isinstance(anchor, Anchor):
+                            association_seeds.add((anchor.type_key, relationship.type_key))
+        self._connection.executemany(
+            "INSERT OR IGNORE INTO multiplicity_link_seed VALUES (?, ?, ?)", link_seeds
+        )
+        self._connection.executemany(
+            "INSERT OR IGNORE INTO multiplicity_association_seed VALUES (?, ?)",
+            association_seeds,
+        )
+        subject_seeds = []
+        for uuid in neighborhood.changed_participant_uuids:
+            old = neighborhood.old_objects.get(uuid)
+            proposed = neighborhood.proposed_objects.get(uuid)
+            value = proposed if isinstance(proposed, (Anchor, AssociatedDataObject)) else old
+            assert isinstance(value, (Anchor, AssociatedDataObject))
+            subject_seeds.append(
+                (
+                    uuid,
+                    (
+                        ObjectKind.ANCHOR.value
+                        if isinstance(value, Anchor)
+                        else ObjectKind.ASSOCIATED_DATA.value
+                    ),
+                    old.type_key if isinstance(old, (Anchor, AssociatedDataObject)) else None,
+                    (
+                        proposed.type_key
+                        if isinstance(proposed, (Anchor, AssociatedDataObject))
+                        else None
+                    ),
+                )
+            )
+        self._connection.executemany(
+            "INSERT INTO multiplicity_subject_seed VALUES (?, ?, ?, ?)", subject_seeds
+        )
+        self._connection.executemany(
+            "INSERT INTO multiplicity_subject_type_seed VALUES (?, ?, ?, ?)",
+            (
+                (uuid, kind, side, type_key)
+                for uuid, kind, old_type, new_type in subject_seeds
+                for side, type_key in (("old", old_type), ("new", new_type))
+                if type_key is not None
+            ),
+        )
+
+        if not link_seeds and not association_seeds and not subject_seeds:
+            return set()
+
+        keys: set[str] = set()
+        if link_seeds:
+            keys.update(
+                str(row[0])
+                for row in self._connection.execute(
+                    "SELECT DISTINCT r.natural_key FROM multiplicity_link_seed AS l"
+                    " CROSS JOIN definition_multiplicity_participant AS first"
+                    " INDEXED BY definition_multiplicity_participant_by_type"
+                    " ON first.type_key IN (l.source_type_key, l.target_type_key)"
+                    " AND first.role = 'first'"
+                    " JOIN definition_multiplicity_rule AS r"
+                    " ON r.definition_set_id = first.definition_set_id"
+                    " AND r.occurrence = first.rule_occurrence"
+                    " JOIN current_definition_relationship_source AS s"
+                    " ON s.natural_key = r.natural_key"
+                    " AND s.value_set_id = r.definition_set_id"
+                    " WHERE r.rule_kind = 'linkMultiplicity'"
+                    " AND r.link_type_key = l.link_type_key"
+                    " AND ((r.constrained_end = 'source'"
+                    " AND first.type_key = l.source_type_key"
+                    " AND EXISTS (SELECT 1 FROM definition_multiplicity_participant AS p"
+                    " WHERE p.definition_set_id = r.definition_set_id"
+                    " AND p.rule_occurrence = r.occurrence AND p.role = 'second'"
+                    " AND p.type_key = l.target_type_key))"
+                    " OR (r.constrained_end = 'target'"
+                    " AND first.type_key = l.target_type_key"
+                    " AND EXISTS (SELECT 1 FROM definition_multiplicity_participant AS p"
+                    " WHERE p.definition_set_id = r.definition_set_id"
+                    " AND p.rule_occurrence = r.occurrence AND p.role = 'second'"
+                    " AND p.type_key = l.source_type_key)))"
+                )
+            )
+        if association_seeds:
+            keys.update(
+                str(row[0])
+                for row in self._connection.execute(
+                    "SELECT DISTINCT r.natural_key FROM multiplicity_association_seed AS a"
+                    " CROSS JOIN definition_multiplicity_participant AS first"
+                    " INDEXED BY definition_multiplicity_participant_by_type"
+                    " ON first.type_key = a.anchor_type_key AND first.role = 'first'"
+                    " JOIN definition_multiplicity_rule AS r"
+                    " ON r.definition_set_id = first.definition_set_id"
+                    " AND r.occurrence = first.rule_occurrence"
+                    " JOIN current_definition_relationship_source AS s"
+                    " ON s.natural_key = r.natural_key"
+                    " AND s.value_set_id = r.definition_set_id"
+                    " WHERE r.rule_kind = 'directAssociationMultiplicity'"
+                    " AND EXISTS (SELECT 1 FROM definition_multiplicity_participant AS p"
+                    " WHERE p.definition_set_id = r.definition_set_id"
+                    " AND p.rule_occurrence = r.occurrence AND p.role = 'second'"
+                    " AND p.type_key = a.data_type_key)"
+                )
+            )
+        if subject_seeds:
+            keys.update(
+                str(row[0])
+                for row in self._connection.execute(
+                    "SELECT DISTINCT r.natural_key"
+                    " FROM multiplicity_subject_type_seed AS t"
+                    " CROSS JOIN definition_multiplicity_participant AS p"
+                    " INDEXED BY definition_multiplicity_participant_by_type"
+                    " ON p.type_key = t.type_key"
+                    " JOIN definition_multiplicity_rule AS r"
+                    " ON r.definition_set_id = p.definition_set_id"
+                    " AND r.occurrence = p.rule_occurrence"
+                    " JOIN current_definition_relationship_source AS s"
+                    " ON s.natural_key = r.natural_key"
+                    " AND s.value_set_id = r.definition_set_id"
+                    " JOIN multiplicity_subject_seed AS c ON c.uuid = t.uuid"
+                    " WHERE p.role = CASE WHEN r.rule_kind = 'linkMultiplicity'"
+                    " OR r.constrained_end = 'anchor' THEN 'first' ELSE 'second' END"
+                    " AND (r.rule_kind = 'linkMultiplicity'"
+                    " OR (r.rule_kind = 'directAssociationMultiplicity'"
+                    " AND ((r.constrained_end = 'anchor' AND c.object_kind = 'anchor')"
+                    " OR (r.constrained_end = 'associatedData'"
+                    " AND c.object_kind = 'associatedData'))))"
+                    " AND (EXISTS (SELECT 1 FROM definition_multiplicity_participant AS x"
+                    " WHERE x.definition_set_id = r.definition_set_id"
+                    " AND x.rule_occurrence = r.occurrence AND x.role = p.role"
+                    " AND x.type_key = c.old_type_key)"
+                    " != EXISTS (SELECT 1 FROM definition_multiplicity_participant AS x"
+                    " WHERE x.definition_set_id = r.definition_set_id"
+                    " AND x.rule_occurrence = r.occurrence AND x.role = p.role"
+                    " AND x.type_key = c.new_type_key))"
+                )
+            )
+        return keys
+
+    def _prepare_active_multiplicity_impact_unlocked(
+        self,
+        active_identity: str,
+        old_changed: dict[str, GraphObject],
+        proposed_changed: dict[str, GraphObject],
+    ) -> tuple[ImpactNeighborhood, GraphDefinitionSet]:
+        self._clear_multiplicity_impact_unlocked()
+        neighborhood = self._multiplicity_impact_neighborhood_unlocked(
+            old_changed, proposed_changed, proposed_relation=None
+        )
+        candidate_keys = self._candidate_multiplicity_rule_keys_unlocked(neighborhood)
+        definitions = self._load_definition_set(
+            active_identity,
+            type_keys=set(),
+            relationship_keys=candidate_keys,
+        )
+        self._record_multiplicity_reasons_unlocked(
+            derive_multiplicity_impact_reasons(neighborhood, definitions.relationship_constraints)
+        )
+        self._connection.execute(
+            "INSERT INTO multiplicity_work"
+            " SELECT DISTINCT rule_key, subject_uuid, constrained_end"
+            " FROM multiplicity_impact_reason"
+        )
+        return neighborhood, definitions
+
+    def _active_multiplicity_evaluation_objects_unlocked(
+        self,
+        old_changed: dict[str, GraphObject],
+        proposed_changed: dict[str, GraphObject],
+        changed_relationships: frozenset[str],
+    ) -> tuple[dict[str, GraphObject], frozenset[str]]:
+        subject_uuids = {
+            str(row[0])
+            for row in self._connection.execute(
+                "SELECT DISTINCT subject_uuid FROM multiplicity_work"
+            )
+        }
+        relationship_uuids = self._relationship_uuids_for_subjects_unlocked(subject_uuids)
+        relationship_uuids.update(changed_relationships)
+        current_relationships = self._objects_for_uuids_unlocked(relationship_uuids)
+        proposed_relationships = {value.uuid: value for value in current_relationships}
+        for uuid in relationship_uuids:
+            if uuid in proposed_changed:
+                proposed_relationships[uuid] = proposed_changed[uuid]
+            elif uuid in old_changed:
+                proposed_relationships.pop(uuid, None)
+        referenced = self._referenced_impact_uuids(proposed_relationships.values())
+        objects = {
+            value.uuid: value
+            for value in self._objects_for_uuids_unlocked(
+                subject_uuids | relationship_uuids | referenced
+            )
+        }
+        for uuid in old_changed:
+            objects.pop(uuid, None)
+        objects.update(proposed_changed)
+        objects.update(proposed_relationships)
+        return objects, frozenset(relationship_uuids)
+
+    def _active_multiplicity_findings_unlocked(
+        self,
+        definitions: GraphDefinitionSet,
+        objects: dict[str, GraphObject],
+        relationship_uuids: frozenset[str],
+    ) -> tuple[ValidationFinding, ...]:
+        findings: list[ValidationFinding] = []
+        facts = index_multiplicity_facts(objects)
+        for constraint in definitions.relationship_constraints:
+            natural_key = semantic_identity(relationship_identity(constraint))
+            subjects = frozenset(
+                str(row[0])
+                for row in self._connection.execute(
+                    "SELECT subject_uuid FROM multiplicity_work WHERE rule_key = ?",
+                    (natural_key,),
+                )
+            )
+            counts = count_multiplicity_for_subjects(
+                constraint, facts, subjects, relationship_uuids
+            )
+            for uuid, count in sorted(counts.items()):
+                if count >= constraint.lower_bound and (
+                    constraint.upper_bound is None or count <= constraint.upper_bound
+                ):
+                    continue
+                bound = (
+                    f"{constraint.lower_bound}.."
+                    f"{'*' if constraint.upper_bound is None else constraint.upper_bound}"
+                )
+                if isinstance(constraint, LinkMultiplicityConstraint):
+                    value = objects[uuid]
+                    summary = (
+                        f"{value.type_key} {uuid!r} participates in {count}"
+                        f" {constraint.link_type_key!r} links at its"
+                        f" {constraint.constrained_end.value} end, outside {bound}"
+                    )
+                else:
+                    subject = (
+                        "anchor"
+                        if constraint.constrained_end is DirectAssociationEnd.ANCHOR
+                        else "associated data"
+                    )
+                    summary = (
+                        f"{subject} {uuid!r} has {count} matching direct associations,"
+                        f" outside {bound}"
+                    )
+                findings.append(
+                    ValidationFinding(
+                        summary=summary,
+                        implicated_definitions=(relationship_label(constraint),),
+                        implicated_objects=(uuid,),
+                    )
+                )
+        return tuple(findings)
+
     def prepare_active_graph_change(
         self, change: GraphChange
     ) -> tuple[
@@ -5663,52 +5979,57 @@ class CanonicalStore:
         existing_touched = {
             value.uuid: value for value in structural_objects if value.uuid in touched
         }
-        affected = self._affected_participants_unlocked(change, existing_touched)
-        closure_ids = set(touched) | affected
-        closure_ids.update(self._incident_relationship_uuids_unlocked(affected))
-        already_loaded = {value.uuid for value in structural_objects}
-        current_neighborhood = _merge_objects(
-            structural_objects,
-            self._objects_for_uuids_unlocked(closure_ids - already_loaded),
+        proposed_changed = {value.uuid: value for _, value in change.upserts()}
+        impact, multiplicity_definitions = self._prepare_active_multiplicity_impact_unlocked(
+            str(head[2]), existing_touched, proposed_changed
         )
-
-        referenced: set[str] = set()
-        values = (*current_neighborhood, *(v for _, v in change.upserts()))
-        for value in values:
-            if isinstance(value, AssociatedDataObject):
-                referenced.update(value.anchor_uuids)
-            elif isinstance(value, Link):
-                referenced.update((value.source_uuid, value.target_uuid))
+        unchanged_proposed_lookups = (
+            value for uuid, value in impact.proposed_objects.items() if uuid not in proposed_changed
+        )
+        current_neighborhood = _merge_objects(
+            _merge_objects(structural_objects, impact.old_objects.values()),
+            unchanged_proposed_lookups,
+        )
+        structural_references = self._referenced_impact_uuids(
+            (*current_neighborhood, *proposed_changed.values())
+        )
         known = {value.uuid for value in current_neighborhood}
-        missing_references = referenced - known
-        if missing_references:
-            current_neighborhood = _merge_objects(
-                current_neighborhood,
-                self._objects_for_uuids_unlocked(missing_references),
-            )
-
+        current_neighborhood = _merge_objects(
+            current_neighborhood,
+            self._objects_for_uuids_unlocked(structural_references - known),
+        )
         resulting = apply_change_to_objects(current_neighborhood, change)
-        relevant = closure_ids
+        structural_subjects = set(touched) | set(impact.examined_relationship_uuids)
         type_keys = {value.type_key for value in resulting}
-        constrained_type_keys = {
-            value.type_key
-            for value in resulting
-            if value.uuid in relevant and not isinstance(value, Link)
-        }
         definitions = self._load_definition_set(
             str(head[2]),
             type_keys=type_keys,
-            constrained_type_keys=constrained_type_keys,
+            constrained_type_keys=set(),
+            relationship_keys=set(),
         )
-        conformance = tuple(
+        structural_conformance = tuple(
             finding
-            for finding in assess_object_neighborhood(resulting, definitions)
-            if set(finding.implicated_objects) & relevant
+            for finding in assess_object_neighborhood(
+                resulting, definitions, include_multiplicity=False
+            )
+            if set(finding.implicated_objects) & structural_subjects
+        )
+        multiplicity_objects, multiplicity_relationships = (
+            self._active_multiplicity_evaluation_objects_unlocked(
+                existing_touched,
+                proposed_changed,
+                impact.changed_relationship_uuids,
+            )
+        )
+        multiplicity_conformance = self._active_multiplicity_findings_unlocked(
+            multiplicity_definitions,
+            multiplicity_objects,
+            multiplicity_relationships,
         )
         no_op = {value.uuid: object_identity(value) for value in resulting} == {
             value.uuid: object_identity(value) for value in current_neighborhood
         }
-        return revision, (), conformance, no_op
+        return revision, (), (*structural_conformance, *multiplicity_conformance), no_op
 
     def _objects_for_uuids_unlocked(self, uuids: set[str]) -> tuple[GraphObject, ...]:
         objects: list[GraphObject] = []
@@ -5746,9 +6067,10 @@ class CanonicalStore:
             )
         return references
 
-    def _incident_relationship_uuids_unlocked(self, participants: set[str]) -> set[str]:
-        relationships = self._referencing_uuids_unlocked(participants)
-        for chunk in _sqlite_chunks(self._connection, participants):
+    def _relationship_uuids_for_subjects_unlocked(self, subjects: set[str]) -> set[str]:
+        """Return direct relationship objects only; their other ends remain lookups."""
+        relationships = self._referencing_uuids_unlocked(subjects)
+        for chunk in _sqlite_chunks(self._connection, subjects):
             placeholders = ", ".join("?" for _ in chunk)
             relationships.update(
                 str(row[0])
@@ -5760,46 +6082,6 @@ class CanonicalStore:
                 )
             )
         return relationships
-
-    def _affected_participants_unlocked(
-        self, change: GraphChange, existing: dict[str, GraphObject]
-    ) -> set[str]:
-        """Return identities whose relationship counts may differ after ``change``."""
-        affected: set[str] = set()
-        changed_endpoint_types: set[str] = set()
-        for _, new in change.upserts():
-            old = existing.get(new.uuid)
-            if isinstance(old, AssociatedDataObject):
-                affected.update((old.uuid, *old.anchor_uuids))
-            elif isinstance(old, Link):
-                affected.update((old.source_uuid, old.target_uuid))
-            if isinstance(new, AssociatedDataObject):
-                affected.update((new.uuid, *new.anchor_uuids))
-            elif isinstance(new, Link):
-                affected.update((new.source_uuid, new.target_uuid))
-            else:
-                affected.add(new.uuid)
-            if old is not None and old.type_key != new.type_key and not isinstance(new, Link):
-                changed_endpoint_types.add(new.uuid)
-        for _, uuid in change.removals():
-            old = existing.get(uuid)
-            if isinstance(old, AssociatedDataObject):
-                affected.update((old.uuid, *old.anchor_uuids))
-                changed_endpoint_types.add(old.uuid)
-            elif isinstance(old, Link):
-                affected.update((old.source_uuid, old.target_uuid))
-            elif isinstance(old, Anchor):
-                affected.add(old.uuid)
-                changed_endpoint_types.add(old.uuid)
-
-        incident = self._incident_relationship_uuids_unlocked(changed_endpoint_types)
-        incident_objects = self._objects_for_uuids_unlocked(incident)
-        for relationship in incident_objects:
-            if isinstance(relationship, Link):
-                affected.update((relationship.source_uuid, relationship.target_uuid))
-            elif isinstance(relationship, AssociatedDataObject):
-                affected.update((relationship.uuid, *relationship.anchor_uuids))
-        return affected
 
     # --- Owned history base ---------------------------------------------------------
 
