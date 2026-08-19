@@ -15,16 +15,21 @@ baselines:
     language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
     execution_environment: sha256:d71473693aa50faef1a25a449aa5808490e21eaf2a987942d1fb134c773550d1
     checkpoint: git:29e60d41199a1810b0d758715066717cb987c4a9
-  target: null
-  observed:
+  target:
     model: sha256:5ce0b4cbcc0785f57980d709bf903717f3323ef116f40a9f58737e6f06ac9240
-    implementation: git:29e60d41199a1810b0d758715066717cb987c4a9
+    implementation: git:57b42f4e7d7c994abd94c7808e11d472da5ac7c2
     language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
     execution_environment: sha256:d71473693aa50faef1a25a449aa5808490e21eaf2a987942d1fb134c773550d1
-    checkpoint: git:29e60d41199a1810b0d758715066717cb987c4a9
+    checkpoint: git:57b42f4e7d7c994abd94c7808e11d472da5ac7c2
+  observed:
+    model: sha256:5ce0b4cbcc0785f57980d709bf903717f3323ef116f40a9f58737e6f06ac9240
+    implementation: git:57b42f4e7d7c994abd94c7808e11d472da5ac7c2
+    language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
+    execution_environment: sha256:d71473693aa50faef1a25a449aa5808490e21eaf2a987942d1fb134c773550d1
+    checkpoint: git:57b42f4e7d7c994abd94c7808e11d472da5ac7c2
 scope:
-  authority_scope: [VellisRequirements::historyIndependentCurrentWork, VellisRequirements::explicitGraphChangeSet, VellisVerification::currentWorkScaling]
-  implementation_scope: [vellis/store.py, tests/vellis/test_semantic_work_locality.py, README.md, docs/mcp-realization.md, system-evolution.yaml]
+  authority_scope: [VellisRequirements::historyIndependentCurrentWork, VellisRequirements::explicitGraphChangeSet, VellisVerification::currentWorkScaling, AGENTS.md]
+  implementation_scope: [vellis/store.py, tests/vellis/test_semantic_work_locality.py, tests/test_system_evolution.py, README.md, docs/mcp-realization.md, system-evolution.yaml]
   review_lenses: [authority and conformance, engineering and evidence]
   non_goals:
     - Change graph-change validity, findings, revision, transaction, activity, persistence, snapshot, replay, restore, query, or MCP meaning.
@@ -53,6 +58,17 @@ findings:
     implementation_status: conforming
     nearest_wrong_system: Assessment cleanup remains tested while active mutation can retain work indefinitely without a failing regression.
     compatibility_effect: Evidence changes from depending on residue to rejecting it; system meaning is unchanged.
+  - id: F003
+    summary: Evolution-validator tests assume the live evolution contains a dependent work item.
+    classification: plan gap
+    consequence: A valid single-item successor fails the full gate before exercising the validator rule each test names.
+    authority_refs: [AGENTS.md]
+    evidence_refs: [path:tests/test_system_evolution.py#test_only_one_work_item_may_be_active, path:tests/test_system_evolution.py#test_executable_work_requires_complete_dependencies]
+    disposition: resolved
+    owner_work_item_id: W001
+    implementation_status: conforming
+    nearest_wrong_system: Tests claim record-shape independence while using positional or mandatory-dependent access to the live record.
+    compatibility_effect: Validator behavior is unchanged; tests synthesize the dependency topology their individual rule requires.
 decisions:
   - id: D001
     summary: Clear the existing multiplicity work family at the public active-validation transaction boundary.
@@ -69,18 +85,18 @@ work_items:
     label: Clear completed active-mutation validation work
     kind: implementation
     dependencies: []
-    planned_baseline: {dimension: implementation, identity: git:29e60d41199a1810b0d758715066717cb987c4a9}
-    finding_ids: [F001, F002]
+    planned_baseline: {dimension: implementation, identity: git:57b42f4e7d7c994abd94c7808e11d472da5ac7c2}
+    finding_ids: [F001, F002, F003]
     decision_ids: [D001]
     authority:
-      - {refs: [VellisRequirements::historyIndependentCurrentWork, VellisRequirements::explicitGraphChangeSet, VellisVerification::currentWorkScaling], coverage: full, remaining_work_item_ids: []}
+      - {refs: [VellisRequirements::historyIndependentCurrentWork, VellisRequirements::explicitGraphChangeSet, VellisVerification::currentWorkScaling, AGENTS.md], coverage: full, remaining_work_item_ids: []}
     approval: {status: not-required, reason: "This is a model-preserving cleanup and evidence correction under accepted work-locality authority.", checkpoint: null}
     nearest_wrong_system: Validation rows are exact and bounded during the operation but remain populated after one public exit path.
     compatibility_effect: No public result, transaction, persistence, or history meaning changes.
     non_effects: [No model edit., No persistent schema or snapshot change., No new cleanup abstraction., No owner-data or external-client access.]
     lifecycle: active
     implementation_status: partial
-    evidence_refs: [path:tests/vellis/test_semantic_work_locality.py#test_active_graph_change_clears_multiplicity_work_after_every_exit, path:tests/vellis/test_semantic_work_locality.py#test_assessment_and_restore_clear_population_work_after_success_and_failure, path:tests/vellis/test_semantic_work_locality.py#test_active_endpoint_type_work_scales_with_applicable_degree, path:README.md#implementation-status, path:docs/mcp-realization.md#semantic-work-locality-evidence, command:just check]
+    evidence_refs: [path:tests/vellis/test_semantic_work_locality.py#test_active_graph_change_clears_multiplicity_work_after_every_exit, path:tests/vellis/test_semantic_work_locality.py#test_assessment_and_restore_clear_population_work_after_success_and_failure, path:tests/vellis/test_semantic_work_locality.py#test_active_endpoint_type_work_scales_with_applicable_degree, path:tests/test_system_evolution.py#test_only_one_work_item_may_be_active, path:tests/test_system_evolution.py#test_executable_work_requires_complete_dependencies, path:README.md#implementation-status, path:docs/mcp-realization.md#semantic-work-locality-evidence, command:just check]
     blocker: null
     checkpoint: null
 closure:

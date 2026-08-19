@@ -26,10 +26,30 @@ def _root_work(record: dict[str, object]) -> dict[str, Any]:
 
 
 def _dependent_work(record: dict[str, object]) -> dict[str, Any]:
-    """Return the work item that depends on the root."""
+    """Return or synthesize one work item that depends on the root."""
     items = cast(list[dict[str, Any]], record["work_items"])
     root = _root_work(record)
-    return next(item for item in items if root["id"] in item["dependencies"])
+    existing = next(
+        (item for item in items if root["id"] in item["dependencies"]),
+        None,
+    )
+    if existing is not None:
+        return existing
+    dependent = copy.deepcopy(root)
+    dependent.update(
+        id="W_TEST_DEPENDENT",
+        order=max(int(item["order"]) for item in items) + 1,
+        dependencies=[root["id"]],
+        finding_ids=[],
+        decision_ids=[],
+        lifecycle="pending",
+        implementation_status="not evaluated",
+        evidence_refs=[],
+        blocker=None,
+        checkpoint=None,
+    )
+    items.append(dependent)
+    return dependent
 
 
 def _owned_finding(record: dict[str, object], work_id: str) -> dict[str, Any]:
@@ -144,8 +164,8 @@ def test_pending_approval_cannot_enter_execution() -> None:
 
 def test_only_one_work_item_may_be_active() -> None:
     record = copy.deepcopy(_record())
-    record["work_items"][0]["lifecycle"] = "active"  # type: ignore[index]
-    record["work_items"][1]["lifecycle"] = "active"  # type: ignore[index]
+    _root_work(record)["lifecycle"] = "active"
+    _dependent_work(record)["lifecycle"] = "active"
     findings = system_evolution.validate_record(record)  # type: ignore[arg-type]
     assert "more than one work item is active" in findings
 
