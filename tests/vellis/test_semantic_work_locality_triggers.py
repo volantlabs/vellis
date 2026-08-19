@@ -46,6 +46,7 @@ from vellis.query import (
     RequiredLink,
     UuidFilter,
 )
+from vellis.store import ActivityAppendError
 from vellis.system import RTGSystem
 
 
@@ -629,7 +630,7 @@ def _temporary_work_counts(connection: sqlite3.Connection, prefix: str) -> dict[
 
 
 def test_assessment_and_restore_clear_population_work_after_success_and_failure(
-    tmp_path: Path,
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     system = RTGSystem.open(tmp_path / "retained-work-rows.sqlite3")
     try:
@@ -650,22 +651,9 @@ def test_assessment_and_restore_clear_population_work_after_success_and_failure(
             DefinitionChange(type_removals=("person",)),
             provenance=OWNER,
         ).accepted
-        assessment = system.check(
-            ValidationRequest(
-                ValidationRequestKind.ASSESS,
-                ValidationScope.DEFINITION_DELTA,
-                maximum_findings=10,
-            ),
-            provenance=OWNER,
-        )
-        assert assessment.accepted
-
         connection = system.store._connection  # noqa: SLF001
-        assessment_counts = _temporary_work_counts(connection, "assessment_")
-        multiplicity_counts = _temporary_work_counts(connection, "multiplicity_")
-        assert assessment_counts
-        assert all(count == 0 for count in assessment_counts.values())
-        assert all(count == 0 for count in multiplicity_counts.values())
+        initial_residue = _temporary_work_counts(connection, "multiplicity_")
+        assert any(count > 0 for count in initial_residue.values())
 
         connection.execute(
             "CREATE TRIGGER fail_assessment_cleanup_evidence BEFORE INSERT"
@@ -687,6 +675,51 @@ def test_assessment_and_restore_clear_population_work_after_success_and_failure(
             count == 0 for count in _temporary_work_counts(connection, "multiplicity_").values()
         )
         connection.execute("DROP TRIGGER fail_assessment_cleanup_evidence")
+
+        # Exercise the separate activity-observation failure branch from another
+        # reachable nonempty active-mutation residue.
+        assert system.apply_graph_change(
+            GraphChange(anchor_upserts=(Anchor("person-extra", "person", "Extra"),)),
+            provenance=OWNER,
+        ).accepted
+        activity_residue = _temporary_work_counts(connection, "multiplicity_")
+        assert any(count > 0 for count in activity_residue.values())
+
+        def fail_activity(_record: object) -> None:
+            raise ActivityAppendError("injected assessment activity failure")
+
+        with monkeypatch.context() as patch:
+            patch.setattr(system.store, "_append_activity_unlocked", fail_activity)
+            with pytest.raises(ActivityAppendError, match="injected assessment activity failure"):
+                system.check(
+                    ValidationRequest(
+                        ValidationRequestKind.ASSESS,
+                        ValidationScope.DEFINITION_DELTA,
+                        maximum_findings=10,
+                    ),
+                    provenance=OWNER,
+                )
+        assert all(
+            count == 0 for count in _temporary_work_counts(connection, "assessment_").values()
+        )
+        assert all(
+            count == 0 for count in _temporary_work_counts(connection, "multiplicity_").values()
+        )
+
+        assessment = system.check(
+            ValidationRequest(
+                ValidationRequestKind.ASSESS,
+                ValidationScope.DEFINITION_DELTA,
+                maximum_findings=10,
+            ),
+            provenance=OWNER,
+        )
+        assert assessment.accepted
+        assessment_counts = _temporary_work_counts(connection, "assessment_")
+        multiplicity_counts = _temporary_work_counts(connection, "multiplicity_")
+        assert assessment_counts
+        assert all(count == 0 for count in assessment_counts.values())
+        assert all(count == 0 for count in multiplicity_counts.values())
 
         assert system.discard_definition_delta(provenance=OWNER).accepted
         connection.execute(
