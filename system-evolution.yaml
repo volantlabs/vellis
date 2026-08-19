@@ -6,7 +6,7 @@ evolution:
   lifecycle: ready
   approval: {status: accepted, reason: "The query language, output and row identity, state selection, compatibility, and mutation locality change accepted meaning.", checkpoint: git:f3bfd25c6f814e745add11b99b7e48bef8168773}
   blocker: null
-  checkpoint: git:0acd39e83c8b4ce2ca0e4ecd705698ac60b3d0ac
+  checkpoint: git:3e1e08d38fc490ff2a0db21d2073919ec7bc493a
 baselines:
   status: current
   source:
@@ -17,16 +17,16 @@ baselines:
     checkpoint: git:ca6539e10393a5a52e2cd2f67d0af662e92cc010
   target:
     model: sha256:5ce0b4cbcc0785f57980d709bf903717f3323ef116f40a9f58737e6f06ac9240
-    implementation: git:0acd39e83c8b4ce2ca0e4ecd705698ac60b3d0ac
+    implementation: git:3e1e08d38fc490ff2a0db21d2073919ec7bc493a
     language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
     execution_environment: sha256:d71473693aa50faef1a25a449aa5808490e21eaf2a987942d1fb134c773550d1
-    checkpoint: git:0acd39e83c8b4ce2ca0e4ecd705698ac60b3d0ac
+    checkpoint: git:3e1e08d38fc490ff2a0db21d2073919ec7bc493a
   observed:
     model: sha256:5ce0b4cbcc0785f57980d709bf903717f3323ef116f40a9f58737e6f06ac9240
-    implementation: git:0acd39e83c8b4ce2ca0e4ecd705698ac60b3d0ac
+    implementation: git:3e1e08d38fc490ff2a0db21d2073919ec7bc493a
     language: sha256:054aab62276a55c43860e3d2daad5fae864db550b3a58ab110074f8b293996ff
     execution_environment: sha256:d71473693aa50faef1a25a449aa5808490e21eaf2a987942d1fb134c773550d1
-    checkpoint: git:0acd39e83c8b4ce2ca0e4ecd705698ac60b3d0ac
+    checkpoint: git:3e1e08d38fc490ff2a0db21d2073919ec7bc493a
 scope:
   authority_scope: [RTG::'Graph Query', RTG::'Property Comparison', RTG::'Evaluated State Selection', RTG::'Definition Summary Request', RTG::'Definition Inspection Request', RTGSystem::'Query graph', RTGSystem::'Discover evaluated graph definitions', VellisRequirements::semanticQueryMeaning, VellisRequirements::querySafety, VellisRequirements::stringPatternValidation, VellisRequirements::explicitGraphChangeSet, VellisRequirements::validationCoverage, VellisRequirements::historyIndependentCurrentWork, VellisRequirements::canonicalSemanticEquality, VellisRequirements::historicalStateCorrectness, VellisRequirements::agentDefinitionDiscoverability, VellisRequirements::mcpAgentToolContract, VellisRequirements::mcpOutcomeIntegrity, VellisVerification::semanticQuery, VellisVerification::invalidQuery, VellisVerification::stringPatterns, VellisVerification::validationCoverage, VellisVerification::currentWorkScaling, VellisVerification::historyGrowth]
   implementation_scope: [vellis/query.py, vellis/sqlite_query.py, vellis/store.py, vellis/system.py, vellis/mcp.py, vellis/json_value.py, vellis/definitions.py, tests/vellis/, tests/test_implementation_campaign.py, model/, README.md, docs/mcp-realization.md, docs/semantic-work-locality-handoff.md, implementation-campaign.yaml, system-evolution.yaml]
@@ -244,7 +244,7 @@ work_items:
     implementation_status: conforming
     evidence_refs: [path:tests/vellis/test_semantic_work_locality_triggers.py#test_assessment_page_uses_one_snapshot_during_replacement, path:tests/vellis/test_semantic_work_locality_triggers.py#test_assessment_and_restore_clear_population_work_after_success_and_failure, command:just check]
     blocker: null
-    checkpoint: git:0acd39e83c8b4ce2ca0e4ecd705698ac60b3d0ac
+    checkpoint: git:3e1e08d38fc490ff2a0db21d2073919ec7bc493a
   - id: W007
     order: 4
     label: Reuse permitted-value indexes across graph validation
