@@ -15,7 +15,6 @@ from typing import Any, cast
 
 import pytest
 
-import vellis.definitions as definitions_module
 from tests.vellis.characterization import OWNER, measure
 from tests.vellis.conftest import build_rich_definitions, build_rich_graph
 from tests.vellis.test_sqlite_prospective_state import _assess_delta
@@ -24,18 +23,13 @@ from vellis.definitions import (
     AnchorTypeDefinition,
     EndpointConstraint,
     GraphDefinitionSet,
-    JsonKind,
     LinkEnd,
     LinkMultiplicityConstraint,
     LinkTypeDefinition,
-    PropertyConstraint,
-    ValueRange,
-    validate_definition_set,
 )
 from vellis.governance import ActivateDefinitionDeltaRequest, DefinitionChange
 from vellis.graph import Anchor, Link
 from vellis.history import RevisionSelection
-from vellis.json_value import normalize
 from vellis.outcomes import (
     OperationStatus,
     ValidationFinding,
@@ -293,43 +287,6 @@ def test_independent_changes_reproduce_participant_by_rule_cross_product(tmp_pat
 
     assert costs == [13_498, 31_543, 93_133, 318_313]
     assert costs[-1] > costs[-2] * 3
-
-
-@pytest.mark.parametrize("count", [500, 1_000, 2_000, 4_000, 8_000])
-def test_permitted_value_trigger_reproduces_pairwise_equality(monkeypatch, count: int) -> None:
-    calls = 0
-    original = definitions_module.json_equal
-
-    def counted(left, right):
-        nonlocal calls
-        calls += 1
-        return original(left, right)
-
-    monkeypatch.setattr(definitions_module, "json_equal", counted)
-    constraint = PropertyConstraint(
-        property_name="choice",
-        required=False,
-        json_kind=JsonKind.STRING,
-        value_range=ValueRange(
-            permitted_values=tuple(normalize(f"value-{index}") for index in range(count))
-        ),
-        description="A choice.",
-    )
-    graph_definitions = GraphDefinitionSet(
-        anchor_types=(AnchorTypeDefinition("anchor", "An anchor."),),
-    )
-
-    # Exercise the private rule directly so unrelated definition checks do not obscure
-    # the exact uniqueness comparison count.
-    findings = []
-    assert constraint.value_range is not None
-    definitions_module._check_permitted_values(  # noqa: SLF001
-        constraint, constraint.value_range, "choice", findings
-    )
-
-    assert not findings
-    assert calls == count * (count - 1) // 2
-    assert not validate_definition_set(graph_definitions)
 
 
 def test_historical_aggregate_reproduces_missing_limit_binding_preflight(tmp_path: Path) -> None:

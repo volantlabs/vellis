@@ -25,6 +25,7 @@ from vellis.json_value import (
     MAXIMUM_STORED_INTEGER_EXPONENT,
     JsonKind,
     JsonValue,
+    _json_equality_key,
     json_equal,
     json_kind,
     normalize,
@@ -288,18 +289,10 @@ def relationship_label(constraint: RelationshipConstraint) -> str:
 # --- Canonical semantic equality ----------------------------------------------------
 
 
-def _json_values_equal_as_set(left: Sequence[JsonValue], right: Sequence[JsonValue]) -> bool:
-    if len(left) != len(right):
-        return False
-    unmatched = list(right)
-    for value in left:
-        for index, candidate in enumerate(unmatched):
-            if json_equal(value, candidate):
-                del unmatched[index]
-                break
-        else:
-            return False
-    return True
+def _json_value_multisets_equal(left: Sequence[JsonValue], right: Sequence[JsonValue]) -> bool:
+    return Counter(_json_equality_key(value) for value in left) == Counter(
+        _json_equality_key(value) for value in right
+    )
 
 
 def _optional_json_equal(left: JsonValue | None, right: JsonValue | None) -> bool:
@@ -314,7 +307,7 @@ def _value_range_equal(left: ValueRange | None, right: ValueRange | None) -> boo
     return (
         _optional_json_equal(left.lower_bound, right.lower_bound)
         and _optional_json_equal(left.upper_bound, right.upper_bound)
-        and _json_values_equal_as_set(left.permitted_values, right.permitted_values)
+        and _json_value_multisets_equal(left.permitted_values, right.permitted_values)
     )
 
 
@@ -760,7 +753,7 @@ def _check_permitted_values(
     label: str,
     findings: list[ValidationFinding],
 ) -> None:
-    accepted: list[JsonValue] = []
+    accepted: set[tuple[object, ...]] = set()
     for value in value_range.permitted_values:
         if json_kind(value) is not constraint.json_kind:
             findings.append(
@@ -773,7 +766,8 @@ def _check_permitted_values(
                 )
             )
             continue
-        if any(json_equal(value, seen) for seen in accepted):
+        key = _json_equality_key(value)
+        if key in accepted:
             findings.append(
                 ValidationFinding(
                     summary=f"{label} lists a duplicate permitted value",
@@ -781,7 +775,7 @@ def _check_permitted_values(
                 )
             )
             continue
-        accepted.append(value)
+        accepted.add(key)
 
 
 def _check_pattern(

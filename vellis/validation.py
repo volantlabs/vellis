@@ -32,7 +32,7 @@ from vellis.definitions import (
     relationship_label,
 )
 from vellis.graph import Anchor, AssociatedDataObject, GraphObject, Link, ObjectKind
-from vellis.json_value import JsonValue, json_equal, json_kind, value_size
+from vellis.json_value import JsonValue, _json_equality_key, json_kind, value_size
 from vellis.outcomes import ValidationFinding
 from vellis.patterns import PatternError, compile_pattern
 
@@ -311,9 +311,9 @@ def _range_reasons(constraint: PropertyConstraint, value: JsonValue) -> list[str
             reasons.append(f"is below its inclusive lower bound {lower}")
         if isinstance(upper, Decimal) and value > upper:
             reasons.append(f"is above its inclusive upper bound {upper}")
-    if value_range.permitted_values and not any(
-        json_equal(value, permitted) for permitted in value_range.permitted_values
-    ):
+    if value_range.permitted_values and _json_equality_key(value) not in {
+        _json_equality_key(permitted) for permitted in value_range.permitted_values
+    }:
         reasons.append("is not one of its permitted values")
     return reasons
 

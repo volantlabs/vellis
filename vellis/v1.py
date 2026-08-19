@@ -63,7 +63,7 @@ from vellis.json_value import (
     JsonKind,
     JsonValue,
     JsonValueError,
-    json_equal,
+    _json_equality_key,
     json_kind,
     normalize,
 )
@@ -1113,10 +1113,14 @@ def _translated_range(
         )
         lower = upper = None
     kept: list[JsonValue] = []
+    kept_keys: set[tuple[object, ...]] = set()
     for value in permitted:
-        if json_kind(normalize(value)) is kind:
-            if not any(json_equal(normalize(value), normalize(each)) for each in kept):
+        normalized = normalize(value)
+        if json_kind(normalized) is kind:
+            key = _json_equality_key(normalized)
+            if key not in kept_keys:
                 kept.append(value)
+                kept_keys.add(key)
             continue
         findings.append(
             RecoveryFinding(

@@ -191,27 +191,41 @@ def json_kind(value: JsonValue) -> JsonKind:
 
 def json_equal(left: JsonValue, right: JsonValue) -> bool:
     """Compare two normalized JSON values by canonical semantic equality."""
-    left_kind = json_kind(left)
-    if left_kind is not json_kind(right):
-        return False
-    if left_kind is JsonKind.NULL:
-        return True
-    if left_kind is JsonKind.BOOLEAN:
-        return left is right
-    if left_kind is JsonKind.NUMBER:
-        assert isinstance(left, Decimal) and isinstance(right, Decimal)
-        return left.compare(right) == 0
-    if left_kind is JsonKind.STRING:
-        return left == right
-    if left_kind is JsonKind.ARRAY:
-        assert isinstance(left, list) and isinstance(right, list)
-        return len(left) == len(right) and all(
-            json_equal(element, other) for element, other in zip(left, right, strict=True)
-        )
-    assert isinstance(left, dict) and isinstance(right, dict)
-    if left.keys() != right.keys():
-        return False
-    return all(json_equal(member, right[name]) for name, member in left.items())
+    return _json_equality_key(left) == _json_equality_key(right)
+
+
+def _json_equality_key(value: JsonValue) -> tuple[object, ...]:
+    """Return the immutable key for canonical semantic JSON equality.
+
+    This is deliberately a value key, not a serialization or persisted identity.
+    Its kind tag keeps Booleans distinct from Python-equal numbers, while Decimal's
+    exact numeric equality makes equivalent spellings such as ``1`` and ``1.0``
+    share a key. Arrays retain order and object members are ordered only inside the
+    key because their declaration order has no meaning.
+
+    Callers use one key construction per collection member for set and counter work;
+    recursive construction visits each nested member once.
+    """
+    kind = json_kind(value)
+    if kind is JsonKind.NULL:
+        return (kind,)
+    if kind is JsonKind.BOOLEAN:
+        assert isinstance(value, bool)
+        return (kind, value)
+    if kind is JsonKind.NUMBER:
+        assert isinstance(value, Decimal)
+        return (kind, value)
+    if kind is JsonKind.STRING:
+        assert isinstance(value, str)
+        return (kind, value)
+    if kind is JsonKind.ARRAY:
+        assert isinstance(value, list)
+        return (kind, tuple(_json_equality_key(element) for element in value))
+    assert isinstance(value, dict)
+    return (
+        kind,
+        tuple((name, _json_equality_key(member)) for name, member in sorted(value.items())),
+    )
 
 
 def value_size(value: JsonValue) -> int | None:

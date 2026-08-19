@@ -10,6 +10,7 @@ from decimal import Decimal
 
 import pytest
 
+import vellis.definitions as definitions_module
 from tests.vellis.semantic_state import DefinitionDelta, SemanticState, semantic_state_equal
 from vellis.definitions import (
     AnchorTypeDefinition,
@@ -24,9 +25,11 @@ from vellis.definitions import (
     ValueRange,
     ValueShape,
     definition_set_equal,
+    validate_definition_set,
 )
 from vellis.graph import Anchor, AssociatedDataObject, Graph, Link, graph_equal
 from vellis.json_value import JsonKind, json_equal, json_kind, loads, normalize, value_size
+from vellis.validation import validate_property_value
 
 COMPOSED_E_ACUTE = "\u00e9"
 DECOMPOSED_E_ACUTE = "e\u0301"
@@ -157,6 +160,141 @@ def test_permitted_value_order_does_not_decide_definition_equality() -> None:
     )
     assert not definition_set_equal(
         _data_type_with_permitted(("a", "b")), _data_type_with_permitted(("a", "c"))
+    )
+
+
+def test_permitted_value_counter_preserves_nested_duplicate_multiplicity() -> None:
+    """Excludes collapsing an invalid duplicate collection while comparing drafts."""
+
+    def permitting(*values: object) -> GraphDefinitionSet:
+        return GraphDefinitionSet(
+            anchor_types=(_described(),),
+            associated_data_types=(
+                AssociatedDataTypeDefinition(
+                    type_key="note",
+                    permitted_anchor_type_keys=("person",),
+                    property_constraints=(
+                        PropertyConstraint(
+                            property_name="payload",
+                            required=False,
+                            json_kind=JsonKind.OBJECT,
+                            description="A permitted nested payload.",
+                            value_range=ValueRange(
+                                permitted_values=tuple(normalize(each) for each in values)
+                            ),
+                        ),
+                    ),
+                    description="A note about a person.",
+                ),
+            ),
+        )
+
+    nested = {"items": [1, {"flag": True}], "label": "same"}
+    reordered = {"label": "same", "items": [1.0, {"flag": True}]}
+    assert definition_set_equal(permitting(nested, nested), permitting(reordered, nested))
+    assert not definition_set_equal(permitting(nested, nested), permitting(reordered))
+
+
+@pytest.mark.parametrize("count", [500, 1_000, 2_000, 4_000, 8_000])
+def test_permitted_value_uniqueness_constructs_one_key_per_input(
+    monkeypatch: pytest.MonkeyPatch, count: int
+) -> None:
+    """Excludes the former growing pairwise equality scan at every required scale."""
+    calls = 0
+    original = definitions_module._json_equality_key  # noqa: SLF001
+
+    def counted(value):
+        nonlocal calls
+        calls += 1
+        return original(value)
+
+    def pairwise_equality_is_forbidden(*_args):
+        raise AssertionError("permitted-value uniqueness must not scan pairs")
+
+    monkeypatch.setattr(definitions_module, "_json_equality_key", counted)
+    monkeypatch.setattr(definitions_module, "json_equal", pairwise_equality_is_forbidden)
+    constraint = PropertyConstraint(
+        property_name="choice",
+        required=False,
+        json_kind=JsonKind.STRING,
+        value_range=ValueRange(
+            permitted_values=tuple(normalize(f"value-{index}") for index in range(count))
+        ),
+        description="A choice.",
+    )
+    definitions = GraphDefinitionSet(
+        anchor_types=(_described(),),
+        associated_data_types=(
+            AssociatedDataTypeDefinition(
+                type_key="note",
+                permitted_anchor_type_keys=("person",),
+                property_constraints=(constraint,),
+                description="A note.",
+            ),
+        ),
+    )
+
+    assert validate_definition_set(definitions) == ()
+    assert calls == count
+
+
+def test_permitted_value_key_detects_nested_and_numeric_duplicates() -> None:
+    """Excludes textual or shallow keys for recursive JSON equality."""
+    constraint = PropertyConstraint(
+        property_name="payload",
+        required=False,
+        json_kind=JsonKind.OBJECT,
+        value_range=ValueRange(
+            permitted_values=(
+                normalize({"number": 1, "members": [True, None]}),
+                normalize({"members": [True, None], "number": 1.0}),
+            )
+        ),
+        description="A payload.",
+    )
+    definitions = GraphDefinitionSet(
+        anchor_types=(_described(),),
+        associated_data_types=(
+            AssociatedDataTypeDefinition(
+                type_key="note",
+                permitted_anchor_type_keys=("person",),
+                property_constraints=(constraint,),
+                description="A note.",
+            ),
+        ),
+    )
+
+    assert any(
+        "duplicate permitted value" in finding.summary
+        for finding in validate_definition_set(definitions)
+    )
+
+
+def test_permitted_value_membership_uses_recursive_canonical_equality() -> None:
+    """Excludes hashing serialized spelling or Python equality during membership."""
+    numeric = PropertyConstraint(
+        property_name="number",
+        required=False,
+        json_kind=JsonKind.NUMBER,
+        value_range=ValueRange(permitted_values=(normalize(1),)),
+        description="A permitted number.",
+    )
+    nested = PropertyConstraint(
+        property_name="payload",
+        required=False,
+        json_kind=JsonKind.OBJECT,
+        value_range=ValueRange(
+            permitted_values=(normalize({"number": 1, "members": [True, None]}),)
+        ),
+        description="A permitted nested payload.",
+    )
+
+    assert validate_property_value(numeric, normalize(1.0)) == ()
+    assert (
+        validate_property_value(nested, normalize({"members": [True, None], "number": 1.0})) == ()
+    )
+    assert validate_property_value(nested, normalize({"members": [1, None], "number": 1.0})) == (
+        "is not one of its permitted values",
     )
 
 
