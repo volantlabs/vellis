@@ -72,6 +72,25 @@ def _assess_delta(system: RTGSystem, maximum: int = 10):
     )
 
 
+def _capture_assessment_queries(
+    system: RTGSystem,
+    monkeypatch: pytest.MonkeyPatch,
+    queries: dict[str, str],
+) -> dict[str, tuple[tuple[object, ...], ...]]:
+    """Capture exact transient evidence immediately before W006 clears it."""
+    captured: dict[str, tuple[tuple[object, ...], ...]] = {}
+    original = system.store._clear_assessment_work_unlocked  # noqa: SLF001
+
+    def capture_then_clear() -> None:
+        connection = system.store._connection  # noqa: SLF001
+        for name, sql in queries.items():
+            captured[name] = tuple(connection.execute(sql))
+        original()
+
+    monkeypatch.setattr(system.store, "_clear_assessment_work_unlocked", capture_then_clear)
+    return captured
+
+
 def _complete_prospective_graph_findings(system: RTGSystem):
     connection = system.store._connection  # noqa: SLF001
     active_identity = str(
@@ -523,7 +542,7 @@ def test_reassessment_reports_stale_base_until_identity_is_restaged(tmp_path: Pa
 
 
 def test_stale_proposal_base_does_not_hide_prospective_multiplicity_findings(
-    tmp_path: Path,
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     subject = AnchorTypeDefinition("subject", "A constrained subject.")
     eligible = AnchorTypeDefinition("eligible", "An eligible opposite.")
@@ -581,6 +600,16 @@ def test_stale_proposal_base_does_not_hide_prospective_multiplicity_findings(
             provenance=OWNER,
         ).accepted
 
+        captured = _capture_assessment_queries(
+            system,
+            monkeypatch,
+            {
+                "work": (
+                    "SELECT rule_key, subject_uuid, constrained_end FROM multiplicity_work"
+                    " ORDER BY 1, 2, 3"
+                )
+            },
+        )
         assessment = _assess_delta(system)
         summaries = tuple(finding.summary for finding in assessment.returned_findings)
         complete_summaries = {
@@ -590,11 +619,7 @@ def test_stale_proposal_base_does_not_hide_prospective_multiplicity_findings(
         assert any("participates in 2 'edge' links" in summary for summary in summaries)
         assert complete_summaries <= set(summaries)
         key = semantic_identity(relationship_identity(rule))
-        assert tuple(
-            system.store._connection.execute(  # noqa: SLF001
-                "SELECT rule_key, subject_uuid, constrained_end FROM multiplicity_work"
-            )
-        ) == ((key, "subject", "source"),)
+        assert captured["work"] == ((key, "subject", "source"),)
         assert assessment.assessment_id is not None
         assert not system.activate_definition_delta(
             ActivateDefinitionDeltaRequest(assessment.assessment_id), provenance=OWNER
@@ -604,7 +629,7 @@ def test_stale_proposal_base_does_not_hide_prospective_multiplicity_findings(
 
 
 def test_stale_proposal_base_does_not_hide_structural_relationship_findings(
-    tmp_path: Path,
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     first = AnchorTypeDefinition("first", "The original endpoint type.")
     second = AnchorTypeDefinition("second", "The current endpoint type.")
@@ -652,6 +677,14 @@ def test_stale_proposal_base_does_not_hide_structural_relationship_findings(
             provenance=OWNER,
         ).accepted
 
+        captured = _capture_assessment_queries(
+            system,
+            monkeypatch,
+            {
+                "relationships": ("SELECT uuid FROM assessment_structural_relationship ORDER BY 1"),
+                "validation": "SELECT uuid FROM assessment_validation_uuid ORDER BY 1",
+            },
+        )
         assessment = _assess_delta(system)
         summaries = tuple(finding.summary for finding in assessment.returned_findings)
         complete_summaries = {
@@ -660,11 +693,8 @@ def test_stale_proposal_base_does_not_hide_structural_relationship_findings(
         assert any("stale active base" in summary for summary in summaries)
         assert any("endpoint constraint does not permit" in summary for summary in summaries)
         assert complete_summaries <= set(summaries)
-        connection = system.store._connection  # noqa: SLF001
-        assert tuple(connection.execute("SELECT uuid FROM assessment_structural_relationship")) == (
-            ("edge",),
-        )
-        assert ("edge",) in tuple(connection.execute("SELECT uuid FROM assessment_validation_uuid"))
+        assert captured["relationships"] == (("edge",),)
+        assert ("edge",) in captured["validation"]
         assert assessment.assessment_id is not None
         assert not system.activate_definition_delta(
             ActivateDefinitionDeltaRequest(assessment.assessment_id), provenance=OWNER
@@ -1574,7 +1604,9 @@ def test_w004_transactions_roll_back_every_projection_family(tmp_path: Path) -> 
         system.close()
 
 
-def test_active_and_prospective_share_exact_opposite_membership_work(tmp_path: Path) -> None:
+def test_active_and_prospective_share_exact_opposite_membership_work(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     subject = AnchorTypeDefinition("subject", "A constrained subject.")
     eligible = AnchorTypeDefinition("eligible", "An eligible opposite.")
     ineligible = AnchorTypeDefinition("ineligible", "An ineligible opposite.")
@@ -1597,6 +1629,20 @@ def test_active_and_prospective_share_exact_opposite_membership_work(tmp_path: P
             provenance=OWNER,
             initialization_summary="exact impact",
         ).accepted
+        captured = _capture_assessment_queries(
+            system,
+            monkeypatch,
+            {
+                "reasons": (
+                    "SELECT rule_key, subject_uuid, constrained_end, reason_kind"
+                    " FROM multiplicity_impact_reason ORDER BY 1, 2, 3, 4"
+                ),
+                "work": (
+                    "SELECT rule_key, subject_uuid, constrained_end"
+                    " FROM multiplicity_work ORDER BY 1, 2, 3"
+                ),
+            },
+        )
         assert system.apply_graph_change(
             GraphChange(
                 anchor_upserts=(
@@ -1646,18 +1692,8 @@ def test_active_and_prospective_share_exact_opposite_membership_work(tmp_path: P
             GraphChangeRequest(GraphChangeTarget.DEFINITION_DELTA, change), provenance=OWNER
         ).accepted
         assert _assess_delta(system).conforms
-        prospective_reasons = tuple(
-            connection.execute(
-                "SELECT rule_key, subject_uuid, constrained_end, reason_kind"
-                " FROM multiplicity_impact_reason ORDER BY 1, 2, 3, 4"
-            )
-        )
-        prospective_work = tuple(
-            connection.execute(
-                "SELECT rule_key, subject_uuid, constrained_end"
-                " FROM multiplicity_work ORDER BY 1, 2, 3"
-            )
-        )
+        prospective_reasons = captured["reasons"]
+        prospective_work = captured["work"]
         expected_key = semantic_identity(relationship_identity(rule))
 
         assert (
@@ -1672,7 +1708,7 @@ def test_active_and_prospective_share_exact_opposite_membership_work(tmp_path: P
 
 @pytest.mark.parametrize("removal", (False, True))
 def test_active_and_prospective_share_exact_relationship_membership_work(
-    tmp_path: Path, removal: bool
+    tmp_path: Path, removal: bool, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     subject = AnchorTypeDefinition("subject", "A constrained subject.")
     opposite = AnchorTypeDefinition("opposite", "An opposite.")
@@ -1694,6 +1730,16 @@ def test_active_and_prospective_share_exact_relationship_membership_work(
             initialization_summary="relationship impact",
         ).accepted
         initial_link = (Link("edge", "edge", "subject", "opposite"),) if removal else ()
+        captured = _capture_assessment_queries(
+            system,
+            monkeypatch,
+            {
+                "reasons": (
+                    "SELECT rule_key, subject_uuid, constrained_end, reason_kind"
+                    " FROM multiplicity_impact_reason ORDER BY 1, 2, 3, 4"
+                )
+            },
+        )
         assert system.apply_graph_change(
             GraphChange(
                 anchor_upserts=(
@@ -1727,12 +1773,7 @@ def test_active_and_prospective_share_exact_relationship_membership_work(
             GraphChangeRequest(GraphChangeTarget.DEFINITION_DELTA, change), provenance=OWNER
         ).accepted
         assert _assess_delta(system).conforms
-        prospective = tuple(
-            connection.execute(
-                "SELECT rule_key, subject_uuid, constrained_end, reason_kind"
-                " FROM multiplicity_impact_reason ORDER BY 1, 2, 3, 4"
-            )
-        )
+        prospective = captured["reasons"]
         key = semantic_identity(relationship_identity(rule))
         assert (
             active == prospective == ((key, "subject", "source", "relationshipMembershipChanged"),)
@@ -1741,7 +1782,9 @@ def test_active_and_prospective_share_exact_relationship_membership_work(
         system.close()
 
 
-def test_active_and_prospective_share_exact_subject_membership_work(tmp_path: Path) -> None:
+def test_active_and_prospective_share_exact_subject_membership_work(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     subject = AnchorTypeDefinition("subject", "A constrained subject.")
     other = AnchorTypeDefinition("other", "Another endpoint type.")
     opposite = AnchorTypeDefinition("opposite", "An opposite.")
@@ -1762,6 +1805,16 @@ def test_active_and_prospective_share_exact_subject_membership_work(tmp_path: Pa
             provenance=OWNER,
             initialization_summary="subject membership",
         ).accepted
+        captured = _capture_assessment_queries(
+            system,
+            monkeypatch,
+            {
+                "reasons": (
+                    "SELECT rule_key, subject_uuid, constrained_end, reason_kind"
+                    " FROM multiplicity_impact_reason ORDER BY 1, 2, 3, 4"
+                )
+            },
+        )
         assert system.apply_graph_change(
             GraphChange(anchor_upserts=(Anchor("subject", "subject", "Subject"),)),
             provenance=OWNER,
@@ -1785,12 +1838,7 @@ def test_active_and_prospective_share_exact_subject_membership_work(tmp_path: Pa
             GraphChangeRequest(GraphChangeTarget.DEFINITION_DELTA, change), provenance=OWNER
         ).accepted
         assert _assess_delta(system).conforms
-        prospective = tuple(
-            connection.execute(
-                "SELECT rule_key, subject_uuid, constrained_end, reason_kind"
-                " FROM multiplicity_impact_reason ORDER BY 1, 2, 3, 4"
-            )
-        )
+        prospective = captured["reasons"]
         key = semantic_identity(relationship_identity(rule))
         assert active == prospective == ((key, "subject", "source", "subjectMembershipChanged"),)
     finally:
@@ -1801,7 +1849,7 @@ def test_active_and_prospective_share_exact_subject_membership_work(tmp_path: Pa
     "constrained_end", (DirectAssociationEnd.ANCHOR, DirectAssociationEnd.ASSOCIATED_DATA)
 )
 def test_active_and_prospective_share_direct_association_opposite_membership_work(
-    tmp_path: Path, constrained_end: DirectAssociationEnd
+    tmp_path: Path, constrained_end: DirectAssociationEnd, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     eligible_anchor = AnchorTypeDefinition("eligibleAnchor", "An eligible anchor.")
     outside_anchor = AnchorTypeDefinition("outsideAnchor", "Another anchor.")
@@ -1830,6 +1878,16 @@ def test_active_and_prospective_share_direct_association_opposite_membership_wor
             provenance=OWNER,
             initialization_summary="direct opposite membership",
         ).accepted
+        captured = _capture_assessment_queries(
+            system,
+            monkeypatch,
+            {
+                "reasons": (
+                    "SELECT rule_key, subject_uuid, constrained_end, reason_kind"
+                    " FROM multiplicity_impact_reason ORDER BY 1, 2, 3, 4"
+                )
+            },
+        )
         assert system.apply_graph_change(
             GraphChange(
                 anchor_upserts=(Anchor("anchor", "eligibleAnchor", "Anchor"),),
@@ -1866,12 +1924,7 @@ def test_active_and_prospective_share_direct_association_opposite_membership_wor
             GraphChangeRequest(GraphChangeTarget.DEFINITION_DELTA, change), provenance=OWNER
         ).accepted
         assert _assess_delta(system).conforms
-        prospective = tuple(
-            connection.execute(
-                "SELECT rule_key, subject_uuid, constrained_end, reason_kind"
-                " FROM multiplicity_impact_reason ORDER BY 1, 2, 3, 4"
-            )
-        )
+        prospective = captured["reasons"]
         key = semantic_identity(relationship_identity(rule))
         subject_uuid = "anchor" if constrained_end is DirectAssociationEnd.ANCHOR else "data"
         assert (
@@ -1973,7 +2026,9 @@ def test_accepted_incremental_mutations_agree_with_complete_conformance(
         system.close()
 
 
-def test_rule_meaning_change_enqueues_only_that_rules_applicable_subjects(tmp_path: Path) -> None:
+def test_rule_meaning_change_enqueues_only_that_rules_applicable_subjects(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     subject = AnchorTypeDefinition("subject", "A subject.")
     unrelated = AnchorTypeDefinition("unrelated", "An unrelated anchor.")
     opposite = AnchorTypeDefinition("opposite", "An opposite.")
@@ -2011,14 +2066,19 @@ def test_rule_meaning_change_enqueues_only_that_rules_applicable_subjects(tmp_pa
             DefinitionChange(relationship_constraint_upserts=(new_rule,)), provenance=OWNER
         ).accepted
 
+        captured = _capture_assessment_queries(
+            system,
+            monkeypatch,
+            {
+                "reasons": (
+                    "SELECT rule_key, subject_uuid, constrained_end, reason_kind"
+                    " FROM multiplicity_impact_reason ORDER BY 1, 2, 3, 4"
+                )
+            },
+        )
         assert _assess_delta(system).conforms
         key = semantic_identity(relationship_identity(new_rule))
-        reasons = tuple(
-            system.store._connection.execute(  # noqa: SLF001
-                "SELECT rule_key, subject_uuid, constrained_end, reason_kind"
-                " FROM multiplicity_impact_reason ORDER BY 1, 2, 3, 4"
-            )
-        )
+        reasons = captured["reasons"]
 
         assert reasons == (
             (key, "first", "source", "ruleMeaningChanged"),

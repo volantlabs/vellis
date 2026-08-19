@@ -561,6 +561,13 @@ the next invocation. Scale fixtures use a multi-object population so a constant-
 masquerade as cleanup. Restoration meaning, schema version, snapshots, replay, and canonical history
 remain unchanged.
 
+The W006 implementation candidate realizes this boundary with a deferred read transaction for each
+public assessment page, transaction-owned cleanup before successful publication/restoration commits,
+and best-effort cleanup after rollback that preserves the original failure. Its permanent evidence
+accepts only a complete old assessment during an interleaved replacement and requires every extant
+assessment, multiplicity, and restore work relation to contain zero rows after successful and failed
+operations.
+
 ## W005 closure and subtraction
 
 Run the documentation-sync workflow and reconcile `model/README.md`, `README.md`,

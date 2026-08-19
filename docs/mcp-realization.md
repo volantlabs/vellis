@@ -131,12 +131,12 @@ pass is evidence of missing discrimination, not evidence that the following shap
   dataclasses. The locked Pydantic realization accepted contradictory members by silently choosing
   a union branch and discarding the other branch's fields. The revised handoff requires explicit
   discriminators for supplied variants, discriminated unions, and closed state/output variants.
-- Definition discovery and assessment interval reads executed related statements under a
-  connection-local lock but no SQLite read transaction. W003 now gives summary, inspection, and
-  proposal discovery one read snapshot. W006 still owns the independent assessment publication case.
-- Successful assessment and restoration leave population-sized rows in reusable temporary work
-  relations. A three-object fixture retained three effective/materialized/validation assessment rows and
-  three restore-candidate/current rows until another same-kind operation or connection close.
+- Definition discovery and assessment interval reads formerly executed related statements under a
+  connection-local lock but no SQLite read transaction. Summary, inspection, proposal discovery,
+  and bounded assessment pages now each use one read snapshot.
+- Assessment and restoration reuse connection-local temporary relation definitions but clear every
+  population-bearing work row on successful and failed exits. Published assessments, canonical
+  restoration effects, and their existing persistent histories remain unchanged.
 
 These measurements characterize forbidden dependency shapes; they are not public latency budgets.
 The successor evolution record owns their model, implementation, evidence, and deletion closure.
@@ -156,13 +156,14 @@ Its query-capacity case now requires the same typed whole refusal for current, p
 revision-selected aggregation. Permanent W003 evidence exercises positive pattern topologies,
 source-preserving row identity, hidden-witness fanout, large relational filters, exact compiled
 bindings, VDBE capacity, regex locality, an independent oracle that catches a mutated compiler, MCP
-schema rejection, and one-snapshot definition discovery. Assessment publication and retained work
-rows remain W006 triggers. No fixture or instrumentation must be invented from this prose.
+schema rejection, and one-snapshot definition discovery. W006 evidence exercises concurrent
+assessment replacement and zero retained assessment/restore work after success and failure. No
+fixture or instrumentation must be invented from this prose.
 
 W002 and W003 have replaced their trigger recipes with permanent discriminating regression fixtures.
-W004 has replaced its old-cost assertions with exact-work and scaling evidence. W006 owns the
-remaining temporary characterizations; the final subtraction review removes any evidence that
-asserts superseded implementation shapes.
+W004 has replaced its old-cost assertions with exact-work and scaling evidence. W006 has replaced
+its temporary characterizations with snapshot and cleanup regressions; the final subtraction review
+removes any remaining evidence that asserts superseded implementation shapes.
 
 The implemented query contract has exclusive row and aggregate outputs. Row identity preserves every
 projected source object, including the associated-data UUID behind a property value, while aggregate

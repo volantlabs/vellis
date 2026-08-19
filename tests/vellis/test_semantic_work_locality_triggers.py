@@ -1,8 +1,7 @@
 """Executable trigger evidence for ``vellis-2-semantic-work-locality``.
 
-These tests characterize the conflicting baseline so W001 evidence is reconstructible.
-W002-W004 and W006 replace them with target-conformance regressions; W005 removes assertions that
-depend on a superseded implementation shape.
+These tests retain reconstructible scaling triggers and their replacement target-conformance
+regressions. W005 removes assertions that depend on a superseded implementation shape.
 """
 
 from __future__ import annotations
@@ -208,14 +207,24 @@ def _irrelevant_rule_cost(tmp_path: Path, count: int) -> tuple[int, int]:
             ),
             provenance=OWNER,
         ).accepted
+        work_counts: list[int] = []
+        original_clear = system.store._clear_assessment_work_unlocked  # noqa: SLF001
+
+        def capture_then_clear() -> None:
+            work_counts.append(
+                int(
+                    system.store._connection.execute(  # noqa: SLF001
+                        "SELECT count(*) FROM multiplicity_work"
+                    ).fetchone()[0]
+                )
+            )
+            original_clear()
+
+        system.store._clear_assessment_work_unlocked = capture_then_clear  # type: ignore[method-assign]  # noqa: SLF001
         measured = measure(system, lambda: _assess_delta(system))
         assert measured.value.conforms
-        work_count = int(
-            system.store._connection.execute(  # noqa: SLF001
-                "SELECT count(*) FROM multiplicity_work"
-            ).fetchone()[0]
-        )
-        return measured.cost.sqlite_vm_steps, work_count
+        assert work_counts
+        return measured.cost.sqlite_vm_steps, work_counts[-1]
     finally:
         system.close()
 
@@ -287,14 +296,24 @@ def _independent_change_rule_cost(tmp_path: Path, count: int) -> tuple[int, int]
             ),
             provenance=OWNER,
         ).accepted
+        work_counts: list[int] = []
+        original_clear = system.store._clear_assessment_work_unlocked  # noqa: SLF001
+
+        def capture_then_clear() -> None:
+            work_counts.append(
+                int(
+                    system.store._connection.execute(  # noqa: SLF001
+                        "SELECT count(*) FROM multiplicity_work"
+                    ).fetchone()[0]
+                )
+            )
+            original_clear()
+
+        system.store._clear_assessment_work_unlocked = capture_then_clear  # type: ignore[method-assign]  # noqa: SLF001
         measured = measure(system, lambda: _assess_delta(system))
         assert measured.value.conforms
-        work_count = int(
-            system.store._connection.execute(  # noqa: SLF001
-                "SELECT count(*) FROM multiplicity_work"
-            ).fetchone()[0]
-        )
-        return measured.cost.sqlite_vm_steps, work_count
+        assert work_counts
+        return measured.cost.sqlite_vm_steps, work_counts[-1]
     finally:
         system.close()
 
@@ -531,7 +550,7 @@ def test_proposal_discovery_uses_one_committed_snapshot(
         second.close()
 
 
-def test_assessment_page_trigger_reproduces_mixed_publication(
+def test_assessment_page_uses_one_snapshot_during_replacement(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     path = tmp_path / "mixed-assessment-page.sqlite3"
@@ -582,15 +601,34 @@ def test_assessment_page_trigger_reproduces_mixed_publication(
         assert report is not None
         assert report.assessment_id == prior.assessment_id
         assert report.finding_count == 3
-        assert report.returned_findings == ()
-        assert report.returned_start_ordinal is None
-        assert report.more_findings
+        assert tuple(finding.summary for finding in report.returned_findings) == (
+            "first",
+            "second",
+            "third",
+        )
+        assert report.returned_start_ordinal == 1
+        assert not report.more_findings
     finally:
         first.close()
         second.close()
 
 
-def test_successful_assessment_and_restore_retain_population_work_rows(
+def _temporary_work_counts(connection: sqlite3.Connection, prefix: str) -> dict[str, int]:
+    names = tuple(
+        str(row[0])
+        for row in connection.execute(
+            "SELECT name FROM sqlite_temp_master WHERE type = 'table' AND name LIKE ?"
+            " ORDER BY name",
+            (f"{prefix}%",),
+        )
+    )
+    return {
+        name: int(connection.execute(f'SELECT count(*) FROM "{name}"').fetchone()[0])
+        for name in names
+    }
+
+
+def test_assessment_and_restore_clear_population_work_after_success_and_failure(
     tmp_path: Path,
 ) -> None:
     system = RTGSystem.open(tmp_path / "retained-work-rows.sqlite3")
@@ -623,23 +661,54 @@ def test_successful_assessment_and_restore_retain_population_work_rows(
         assert assessment.accepted
 
         connection = system.store._connection  # noqa: SLF001
-        assert connection.execute(
-            "SELECT count(*) FROM assessment_effective_object"
-        ).fetchone() == (3,)
-        assert connection.execute(
-            "SELECT count(*) FROM assessment_materialized_uuid"
-        ).fetchone() == (3,)
-        assert connection.execute("SELECT count(*) FROM assessment_validation_uuid").fetchone() == (
-            3,
+        assessment_counts = _temporary_work_counts(connection, "assessment_")
+        multiplicity_counts = _temporary_work_counts(connection, "multiplicity_")
+        assert assessment_counts
+        assert all(count == 0 for count in assessment_counts.values())
+        assert all(count == 0 for count in multiplicity_counts.values())
+
+        connection.execute(
+            "CREATE TRIGGER fail_assessment_cleanup_evidence BEFORE INSERT"
+            " ON current_assessment BEGIN SELECT RAISE(ABORT, 'assessment failure'); END"
         )
+        failed_assessment = system.check(
+            ValidationRequest(
+                ValidationRequestKind.ASSESS,
+                ValidationScope.DEFINITION_DELTA,
+                maximum_findings=10,
+            ),
+            provenance=OWNER,
+        )
+        assert not failed_assessment.accepted
+        assert all(
+            count == 0 for count in _temporary_work_counts(connection, "assessment_").values()
+        )
+        assert all(
+            count == 0 for count in _temporary_work_counts(connection, "multiplicity_").values()
+        )
+        connection.execute("DROP TRIGGER fail_assessment_cleanup_evidence")
 
         assert system.discard_definition_delta(provenance=OWNER).accepted
+        connection.execute(
+            "CREATE TRIGGER fail_restore_cleanup_evidence BEFORE INSERT"
+            " ON canonical_graph_event"
+            " BEGIN SELECT RAISE(ABORT, 'restore failure'); END"
+        )
+        failed_restore = system.restore_historical_state(
+            RevisionSelection(kind="revision", revision=0),
+            provenance=OWNER,
+        )
+        assert not failed_restore.accepted
+        assert all(count == 0 for count in _temporary_work_counts(connection, "restore_").values())
+        connection.execute("DROP TRIGGER fail_restore_cleanup_evidence")
+
         restored = system.restore_historical_state(
             RevisionSelection(kind="revision", revision=0),
             provenance=OWNER,
         )
         assert restored.accepted
-        assert connection.execute("SELECT count(*) FROM restore_candidate").fetchone() == (3,)
-        assert connection.execute("SELECT count(*) FROM restore_current").fetchone() == (3,)
+        restore_counts = _temporary_work_counts(connection, "restore_")
+        assert set(restore_counts) == {"restore_candidate", "restore_current", "restore_target"}
+        assert all(count == 0 for count in restore_counts.values())
     finally:
         system.close()

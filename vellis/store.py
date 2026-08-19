@@ -3309,7 +3309,23 @@ class CanonicalStore:
         if start_ordinal < 1 or maximum_findings < 1:
             return None
         with self._lock:
-            return self._assessment_report_unlocked(assessment_id, start_ordinal, maximum_findings)
+            if self._connection.in_transaction:
+                return self._assessment_report_unlocked(
+                    assessment_id, start_ordinal, maximum_findings
+                )
+            try:
+                # The header, finding interval, and each finding's references form one
+                # modeled page. A deferred read transaction pins one SQLite snapshot
+                # while still allowing a concurrent connection to publish a replacement.
+                self._connection.execute("BEGIN")
+                report = self._assessment_report_unlocked(
+                    assessment_id, start_ordinal, maximum_findings
+                )
+                self._connection.execute("COMMIT")
+                return report
+            except Exception as error:
+                self._rollback_quietly()
+                raise StoreError(f"could not read validation assessment: {error}") from error
 
     def _assessment_report_unlocked(
         self, assessment_id: str, start_ordinal: int, maximum_findings: int
@@ -3394,10 +3410,12 @@ class CanonicalStore:
                     proposed_identity=proposed_identity,
                     overlay_identity=overlay_identity,
                 )
+                self._clear_assessment_work_unlocked()
                 self._connection.execute("COMMIT")
                 return report
             except Exception as error:
                 self._rollback_quietly()
+                self._clear_transient_work_quietly("assessment_", "multiplicity_")
                 raise StoreError(f"could not publish validation assessment: {error}") from error
 
     def assess_and_publish(
@@ -3439,13 +3457,16 @@ class CanonicalStore:
                         evaluated_revision=report.evaluated_revision,
                     )
                 )
+                self._clear_assessment_work_unlocked()
                 self._connection.execute("COMMIT")
                 return report
             except ActivityAppendError:
                 self._rollback_quietly()
+                self._clear_transient_work_quietly("assessment_", "multiplicity_")
                 raise
             except Exception as error:
                 self._rollback_quietly()
+                self._clear_transient_work_quietly("assessment_", "multiplicity_")
                 raise StoreError(f"could not publish validation assessment: {error}") from error
 
     def _publish_assessment_unlocked(
@@ -3508,9 +3529,31 @@ class CanonicalStore:
         )
         if prior is not None:
             self._delete_assessment_unlocked(str(prior[0]))
-        report = self.assessment_page(assessment_id, 1, maximum_findings)
+        report = self._assessment_report_unlocked(assessment_id, 1, maximum_findings)
         assert report is not None
         return report
+
+    def _clear_transient_work_unlocked(self, *prefixes: str) -> None:
+        """Clear reusable temporary work relations selected by closed internal prefixes."""
+        rows = self._connection.execute(
+            "SELECT name FROM sqlite_temp_master WHERE type = 'table' ORDER BY name"
+        )
+        for (raw_name,) in rows:
+            name = str(raw_name)
+            if not any(name.startswith(prefix) for prefix in prefixes):
+                continue
+            quoted_name = name.replace('"', '""')
+            self._connection.execute(f'DELETE FROM "{quoted_name}"')  # noqa: S608
+
+    def _clear_transient_work_quietly(self, *prefixes: str) -> None:
+        """Best-effort cleanup after rollback without replacing the original failure."""
+        try:
+            self._clear_transient_work_unlocked(*prefixes)
+        except Exception:
+            pass
+
+    def _clear_assessment_work_unlocked(self) -> None:
+        self._clear_transient_work_unlocked("assessment_", "multiplicity_")
 
     def conformance_context(
         self, scope: ValidationScope
@@ -5341,6 +5384,7 @@ class CanonicalStore:
                     raise NotInitializedError("no canonical state is established")
                 if head[2] is not None:
                     self._connection.execute("ROLLBACK")
+                    self._clear_restore_work_unlocked()
                     return RevisionedOutcome(
                         OperationStatus.REJECTED,
                         "a proposal is in flight; activate or discard it before restoring",
@@ -5353,16 +5397,25 @@ class CanonicalStore:
                 ).fetchone()
                 if target_definition is None:
                     self._connection.execute("ROLLBACK")
+                    self._clear_restore_work_unlocked()
                     return RevisionedOutcome(
                         OperationStatus.REJECTED,
                         f"revision {selected_revision} is not established by this ledger",
                     )
-                self._connection.execute("DROP TABLE IF EXISTS temp.restore_candidate")
-                self._connection.execute("DROP TABLE IF EXISTS temp.restore_current")
-                self._connection.execute("DROP TABLE IF EXISTS temp.restore_target")
                 self._connection.execute(
-                    "CREATE TEMP TABLE restore_candidate (uuid TEXT PRIMARY KEY)"
+                    "CREATE TEMP TABLE IF NOT EXISTS restore_candidate (uuid TEXT PRIMARY KEY)"
                 )
+                self._connection.execute(
+                    "CREATE TEMP TABLE IF NOT EXISTS restore_current"
+                    " (uuid TEXT PRIMARY KEY, object_kind TEXT NOT NULL,"
+                    " object_value_id INTEGER NOT NULL)"
+                )
+                self._connection.execute(
+                    "CREATE TEMP TABLE IF NOT EXISTS restore_target"
+                    " (uuid TEXT PRIMARY KEY, object_kind TEXT NOT NULL,"
+                    " object_value_id INTEGER NOT NULL)"
+                )
+                self._clear_restore_work_unlocked()
                 self._connection.execute(
                     "INSERT OR IGNORE INTO restore_candidate"
                     " SELECT uuid FROM canonical_graph_event"
@@ -5370,7 +5423,7 @@ class CanonicalStore:
                     (selected_revision, int(head[0])),
                 )
                 self._connection.execute(
-                    "CREATE TEMP TABLE restore_current AS"
+                    "INSERT INTO restore_current"
                     " SELECT c.uuid, v.object_kind, g.object_value_id"
                     " FROM restore_candidate AS c"
                     " CROSS JOIN graph_presence_interval AS g"
@@ -5379,10 +5432,7 @@ class CanonicalStore:
                     " JOIN object_value AS v ON v.id = g.object_value_id"
                 )
                 self._connection.execute(
-                    "CREATE UNIQUE INDEX restore_current_uuid ON restore_current(uuid)"
-                )
-                self._connection.execute(
-                    "CREATE TEMP TABLE restore_target AS"
+                    "INSERT INTO restore_target"
                     " SELECT c.uuid, v.object_kind, p.object_value_id"
                     " FROM restore_candidate AS c"
                     " CROSS JOIN graph_presence_interval AS p"
@@ -5391,9 +5441,6 @@ class CanonicalStore:
                     " ON v.id = p.object_value_id WHERE p.valid_from_revision <= ?"
                     " AND (p.valid_to_revision IS NULL OR p.valid_to_revision > ?)",
                     (selected_revision, selected_revision),
-                )
-                self._connection.execute(
-                    "CREATE UNIQUE INDEX restore_target_uuid ON restore_target(uuid)"
                 )
                 difference = self._connection.execute(
                     "SELECT uuid, object_value_id FROM (SELECT uuid, object_value_id"
@@ -5404,6 +5451,7 @@ class CanonicalStore:
                 ).fetchone()
                 if difference is None and str(head[1]) == str(target_definition[0]):
                     self._connection.execute("ROLLBACK")
+                    self._clear_restore_work_unlocked()
                     return RevisionedOutcome(
                         OperationStatus.ACCEPTED,
                         f"revision {selected_revision} is already current; nothing was restored",
@@ -5528,6 +5576,7 @@ class CanonicalStore:
                     (resulting, target_definition[0]),
                 )
                 self._seal_record_identity_unlocked(resulting)
+                self._clear_restore_work_unlocked()
                 self._connection.execute("COMMIT")
                 return RevisionedOutcome(
                     OperationStatus.ACCEPTED,
@@ -5536,12 +5585,17 @@ class CanonicalStore:
                 )
             except StoreError:
                 self._rollback_quietly()
+                self._clear_transient_work_quietly("restore_")
                 raise
             except Exception as error:
                 self._rollback_quietly()
+                self._clear_transient_work_quietly("restore_")
                 raise StoreError(
                     f"could not restore revision {selected_revision}: {error}"
                 ) from error
+
+    def _clear_restore_work_unlocked(self) -> None:
+        self._clear_transient_work_unlocked("restore_")
 
     def current_revision(self) -> int:
         """Read the established current revision without materializing any state facet."""
