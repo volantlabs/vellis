@@ -3,10 +3,10 @@ evolution:
   id: vellis-2-semantic-work-locality
   objective: Replace locally optimized query and validation paths with one finite positive conjunctive-pattern meaning and one exact reason-aware invariant-impact meaning.
   observable_distinction: Hidden query witnesses cannot multiply answer work, and ordinary mutation contains only exact applicable rule-subject-end work rather than broad neighborhoods.
-  lifecycle: active
+  lifecycle: complete
   approval: {status: accepted, reason: "The query language, output and row identity, state selection, compatibility, and mutation locality change accepted meaning.", checkpoint: git:f3bfd25c6f814e745add11b99b7e48bef8168773}
   blocker: null
-  checkpoint: null
+  checkpoint: git:da019ff028af2b3367db369e72afac869a50dd98
 baselines:
   status: current
   source:
@@ -220,11 +220,11 @@ work_items:
     nearest_wrong_system: Focused fixes pass while obsolete code or claims retain the prior accidental model.
     compatibility_effect: The prerelease break is documented while persistence and tool names remain stable.
     non_effects: [No release, tag, merge, external client mutation, or owner-data access.]
-    lifecycle: active
-    implementation_status: partial
+    lifecycle: complete
+    implementation_status: conforming
     evidence_refs: [path:tests/vellis/test_canonical_equality.py#test_structural_equality_and_canonical_keys_agree_over_fixed_seed_values, path:tests/vellis/test_query_contract_v2.py#test_broad_pattern_matching_scales_with_genuine_association_candidates, path:tests/vellis/test_query_contract_v2.py#test_fixed_seed_positive_patterns_match_the_independent_oracle, path:tests/vellis/test_semantic_work_locality.py#test_active_endpoint_type_work_scales_with_applicable_degree, path:README.md#implementation-status, path:docs/mcp-realization.md#semantic-work-locality-evidence, command:just model-check, command:just system-evolution-check, command:just package-check, command:just check]
     blocker: null
-    checkpoint: null
+    checkpoint: git:da019ff028af2b3367db369e72afac869a50dd98
   - id: W006
     order: 6
     label: Bound transient read and work-state lifetimes
@@ -276,15 +276,23 @@ work_items:
   # /root/w007_engineering_review2 — engineering and evidence — clean.
   # Both reviewers independently passed just check (1,233 tests plus package build/install/smoke),
   # focused W007 evidence, just system-evolution-check, and git diff --check.
+# W005 final clean review pair inspected shared frozen token
+# git:29091d2745f3482211a38f23a56dc7001f05ed30 and substantive target
+# git:da019ff028af2b3367db369e72afac869a50dd98.
+# /root/w005_authority_review4 — authority and conformance — clean.
+# /root/w005_engineering_review4 — engineering and evidence — clean.
+# Both reviewers passed just model-check, just system-evolution-check, just package-check,
+# just check (1,230 tests plus package build/install/exercise), and git diff --check;
+# the engineering reviewer also passed 102 focused evidence cases.
 closure:
-  finding_disposition: open
+  finding_disposition: complete
   model_status: accepted
-  implementation_status: partial
-  integration_status: partial
+  implementation_status: conforming
+  integration_status: conforming
   external_status: not applicable
   compatibility: Intentional prerelease break for query payloads and property row identity; mixed-output questions are removed, while disconnected, parallel, self-link, and cyclic finite positive patterns remain valid; persistence, snapshots, restore, v1 initialization, and ten MCP names remain unchanged.
   reviews:
-    - {lens: authority and conformance, status: pending, reviewer: null, checkpoint: null, evidence_refs: []}
-    - {lens: engineering and evidence, status: pending, reviewer: null, checkpoint: null, evidence_refs: []}
+    - {lens: authority and conformance, status: clean, reviewer: /root/w005_authority_review4, checkpoint: git:da019ff028af2b3367db369e72afac869a50dd98, evidence_refs: [command:just check]}
+    - {lens: engineering and evidence, status: clean, reviewer: /root/w005_engineering_review4, checkpoint: git:da019ff028af2b3367db369e72afac869a50dd98, evidence_refs: [command:just check]}
   evidence_refs: [path:README.md#implementation-status, path:docs/mcp-realization.md#semantic-work-locality-evidence, command:just model-check, command:just system-evolution-check, command:just package-check, command:just check]
-  checkpoint: null
+  checkpoint: git:da019ff028af2b3367db369e72afac869a50dd98
