@@ -72,6 +72,42 @@ def _assess_delta(system: RTGSystem, maximum: int = 10):
     )
 
 
+def _complete_prospective_graph_findings(system: RTGSystem):
+    connection = system.store._connection  # noqa: SLF001
+    active_identity = str(
+        connection.execute(
+            "SELECT active_definition_set_id FROM state_head WHERE id = 0"
+        ).fetchone()[0]
+    )
+    type_keys = {
+        str(row[0])
+        for row in connection.execute(
+            "SELECT type_key FROM current_definition_type_source"
+            " UNION SELECT type_key FROM proposal_definition_type"
+        )
+    }
+    relationship_keys = {
+        str(row[0])
+        for row in connection.execute(
+            "SELECT natural_key FROM current_definition_relationship_source"
+            " UNION SELECT natural_key FROM proposal_definition_relationship"
+        )
+    }
+    definitions = system.store._effective_proposed_definitions_unlocked(  # noqa: SLF001
+        active_identity,
+        type_keys=type_keys,
+        constrained_type_keys=set(),
+        relationship_keys=relationship_keys,
+    )
+    objects = tuple(
+        system.store._load_object_value(int(value_id))  # noqa: SLF001
+        for (value_id,) in connection.execute(
+            "SELECT object_value_id FROM prospective_graph_object ORDER BY uuid"
+        )
+    )
+    return assess_object_neighborhood(objects, definitions)
+
+
 def test_large_multiplicity_participant_sets_are_bound_relationally(tmp_path: Path) -> None:
     anchors = tuple(
         AnchorTypeDefinition(f"anchor-{index}", f"Anchor {index}.") for index in range(40)
@@ -547,14 +583,22 @@ def test_stale_proposal_base_does_not_hide_prospective_multiplicity_findings(
 
         assessment = _assess_delta(system)
         summaries = tuple(finding.summary for finding in assessment.returned_findings)
+        complete_summaries = {
+            finding.summary for finding in _complete_prospective_graph_findings(system)
+        }
         assert any("stale active base" in summary for summary in summaries)
         assert any("participates in 2 'edge' links" in summary for summary in summaries)
+        assert complete_summaries <= set(summaries)
         key = semantic_identity(relationship_identity(rule))
         assert tuple(
             system.store._connection.execute(  # noqa: SLF001
                 "SELECT rule_key, subject_uuid, constrained_end FROM multiplicity_work"
             )
         ) == ((key, "subject", "source"),)
+        assert assessment.assessment_id is not None
+        assert not system.activate_definition_delta(
+            ActivateDefinitionDeltaRequest(assessment.assessment_id), provenance=OWNER
+        ).accepted
     finally:
         system.close()
 
@@ -610,13 +654,21 @@ def test_stale_proposal_base_does_not_hide_structural_relationship_findings(
 
         assessment = _assess_delta(system)
         summaries = tuple(finding.summary for finding in assessment.returned_findings)
+        complete_summaries = {
+            finding.summary for finding in _complete_prospective_graph_findings(system)
+        }
         assert any("stale active base" in summary for summary in summaries)
         assert any("endpoint constraint does not permit" in summary for summary in summaries)
+        assert complete_summaries <= set(summaries)
         connection = system.store._connection  # noqa: SLF001
         assert tuple(connection.execute("SELECT uuid FROM assessment_structural_relationship")) == (
             ("edge",),
         )
         assert ("edge",) in tuple(connection.execute("SELECT uuid FROM assessment_validation_uuid"))
+        assert assessment.assessment_id is not None
+        assert not system.activate_definition_delta(
+            ActivateDefinitionDeltaRequest(assessment.assessment_id), provenance=OWNER
+        ).accepted
     finally:
         system.close()
 
@@ -1741,6 +1793,92 @@ def test_active_and_prospective_share_exact_subject_membership_work(tmp_path: Pa
         )
         key = semantic_identity(relationship_identity(rule))
         assert active == prospective == ((key, "subject", "source", "subjectMembershipChanged"),)
+    finally:
+        system.close()
+
+
+@pytest.mark.parametrize(
+    "constrained_end", (DirectAssociationEnd.ANCHOR, DirectAssociationEnd.ASSOCIATED_DATA)
+)
+def test_active_and_prospective_share_direct_association_opposite_membership_work(
+    tmp_path: Path, constrained_end: DirectAssociationEnd
+) -> None:
+    eligible_anchor = AnchorTypeDefinition("eligibleAnchor", "An eligible anchor.")
+    outside_anchor = AnchorTypeDefinition("outsideAnchor", "Another anchor.")
+    eligible_data = AssociatedDataTypeDefinition(
+        "eligibleData", ("eligibleAnchor", "outsideAnchor"), description="Eligible data."
+    )
+    outside_data = AssociatedDataTypeDefinition(
+        "outsideData", ("eligibleAnchor", "outsideAnchor"), description="Other data."
+    )
+    rule = DirectAssociationMultiplicityConstraint(
+        constrained_end,
+        ("eligibleAnchor",),
+        ("eligibleData",),
+        0,
+        None,
+        "Eligible associations.",
+    )
+    system = RTGSystem.open(tmp_path / f"direct-opposite-{constrained_end.value}.sqlite3")
+    try:
+        assert system.initialize_fresh(
+            GraphDefinitionSet(
+                anchor_types=(eligible_anchor, outside_anchor),
+                associated_data_types=(eligible_data, outside_data),
+                relationship_constraints=(rule,),
+            ),
+            provenance=OWNER,
+            initialization_summary="direct opposite membership",
+        ).accepted
+        assert system.apply_graph_change(
+            GraphChange(
+                anchor_upserts=(Anchor("anchor", "eligibleAnchor", "Anchor"),),
+                associated_data_upserts=(
+                    AssociatedDataObject("data", "eligibleData", ("anchor",), {}),
+                ),
+            ),
+            provenance=OWNER,
+        ).accepted
+        assert system.set_definition_delta(
+            DefinitionChange(anchor_type_upserts=(TEAM,)), provenance=OWNER
+        ).accepted
+        change = (
+            GraphChange(
+                associated_data_upserts=(
+                    AssociatedDataObject("data", "outsideData", ("anchor",), {}),
+                )
+            )
+            if constrained_end is DirectAssociationEnd.ANCHOR
+            else GraphChange(anchor_upserts=(Anchor("anchor", "outsideAnchor", "Anchor"),))
+        )
+        connection = system.store._connection  # noqa: SLF001
+        connection.execute("BEGIN")
+        system.store._prepare_active_graph_change_unlocked(change)  # noqa: SLF001
+        active = tuple(
+            connection.execute(
+                "SELECT rule_key, subject_uuid, constrained_end, reason_kind"
+                " FROM multiplicity_impact_reason ORDER BY 1, 2, 3, 4"
+            )
+        )
+        connection.execute("ROLLBACK")
+
+        assert system.apply_graph_change(
+            GraphChangeRequest(GraphChangeTarget.DEFINITION_DELTA, change), provenance=OWNER
+        ).accepted
+        assert _assess_delta(system).conforms
+        prospective = tuple(
+            connection.execute(
+                "SELECT rule_key, subject_uuid, constrained_end, reason_kind"
+                " FROM multiplicity_impact_reason ORDER BY 1, 2, 3, 4"
+            )
+        )
+        key = semantic_identity(relationship_identity(rule))
+        subject_uuid = "anchor" if constrained_end is DirectAssociationEnd.ANCHOR else "data"
+        assert (
+            active
+            == prospective
+            == ((key, subject_uuid, constrained_end.value, "oppositeMembershipChanged"),)
+        )
     finally:
         system.close()
 

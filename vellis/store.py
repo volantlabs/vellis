@@ -5557,7 +5557,9 @@ class CanonicalStore:
         if isinstance(value, Link):
             return ("link", value.type_key, value.source_uuid, value.target_uuid)
         if isinstance(value, AssociatedDataObject):
-            return ("association", value.type_key, frozenset(value.anchor_uuids))
+            # Its type is participant membership, not direct-association identity.
+            # Insertion, removal, and anchor-set changes alter the relationship itself.
+            return ("association", frozenset(value.anchor_uuids))
         return None
 
     @staticmethod

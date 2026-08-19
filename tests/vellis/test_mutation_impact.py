@@ -121,3 +121,31 @@ def test_direct_association_move_enqueues_only_old_and_new_anchors() -> None:
         (key, "first", "anchor", "relationshipMembershipChanged"),
         (key, "second", "anchor", "relationshipMembershipChanged"),
     )
+
+
+def test_direct_association_opposite_type_change_is_not_a_relationship_change() -> None:
+    rule = DirectAssociationMultiplicityConstraint(
+        DirectAssociationEnd.ANCHOR,
+        ("anchor",),
+        ("eligible",),
+        0,
+        None,
+        "Eligible data associations.",
+    )
+    anchor = Anchor("anchor", "anchor", "Anchor")
+    old_data = AssociatedDataObject("data", "eligible", ("anchor",), {})
+    new_data = AssociatedDataObject("data", "ineligible", ("anchor",), {})
+    key = semantic_identity(relationship_identity(rule))
+
+    reasons = _reason_rows(
+        ImpactNeighborhood(
+            {"anchor": anchor, "data": old_data},
+            {"anchor": anchor, "data": new_data},
+            frozenset({"data"}),
+            frozenset(),
+            frozenset({"data"}),
+        ),
+        rule,
+    )
+
+    assert reasons == ((key, "anchor", "anchor", "oppositeMembershipChanged"),)
