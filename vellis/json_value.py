@@ -191,7 +191,27 @@ def json_kind(value: JsonValue) -> JsonKind:
 
 def json_equal(left: JsonValue, right: JsonValue) -> bool:
     """Compare two normalized JSON values by canonical semantic equality."""
-    return _json_equality_key(left) == _json_equality_key(right)
+    left_kind = json_kind(left)
+    if left_kind is not json_kind(right):
+        return False
+    if left_kind is JsonKind.NULL:
+        return True
+    if left_kind is JsonKind.BOOLEAN:
+        return left is right
+    if left_kind is JsonKind.NUMBER:
+        assert isinstance(left, Decimal) and isinstance(right, Decimal)
+        return left.compare(right) == 0
+    if left_kind is JsonKind.STRING:
+        return left == right
+    if left_kind is JsonKind.ARRAY:
+        assert isinstance(left, list) and isinstance(right, list)
+        return len(left) == len(right) and all(
+            json_equal(element, other) for element, other in zip(left, right, strict=True)
+        )
+    assert isinstance(left, dict) and isinstance(right, dict)
+    if left.keys() != right.keys():
+        return False
+    return all(json_equal(member, right[name]) for name, member in left.items())
 
 
 def _json_equality_key(value: JsonValue) -> tuple[object, ...]:
@@ -224,7 +244,10 @@ def _json_equality_key(value: JsonValue) -> tuple[object, ...]:
     assert isinstance(value, dict)
     return (
         kind,
-        tuple((name, _json_equality_key(member)) for name, member in sorted(value.items())),
+        tuple(
+            (name, _json_equality_key(member))
+            for name, member in sorted(value.items(), key=lambda item: item[0])
+        ),
     )
 
 

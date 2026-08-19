@@ -90,6 +90,8 @@ findings:
   - {id: F022, summary: "The query comparison vocabulary omits owner-required regular-expression filtering of string data.", classification: model gap, consequence: "A named data selector cannot express a must-exist string pattern and must over-return values for client-side filtering.", authority_refs: [RTG::'Property Comparison', VellisRequirements::semanticQueryMeaning, VellisRequirements::stringPatternValidation], evidence_refs: [path:docs/semantic-work-locality-handoff.md#public-contract-and-analyzer], disposition: accepted, owner_work_item_id: W001, implementation_status: conflicting, nearest_wrong_system: "The structural query reset succeeds while lower-level data constraints remain less expressive than the owner's pattern model.", compatibility_effect: "matchesPattern adds RE2 Unicode whole-string filtering for present string properties without a general expression language."}
   - {id: F023, summary: "The selected compiled-capacity plan does not inventory every SQLite limit exercised by generated statements, parameters, and temporary rows.", classification: plan gap, consequence: "Deterministic structural excess can surface as untyped SQL-too-big, recursion, or preparation-memory failures instead of the planned whole-result refusal.", authority_refs: [VellisRequirements::querySafety], evidence_refs: [path:docs/semantic-work-locality-handoff.md#exact-capacity-and-preparation], disposition: resolved, owner_work_item_id: W001, implementation_status: conforming, nearest_wrong_system: "A longer list of manual counts replaces the old formula while parameter/row length and preparation-only parser or VDBE limits remain unclassified.", compatibility_effect: "No query meaning changes; W003 inventories, avoids, or probes every relevant active limit and distinguishes deterministic refusal from genuine execution failure."}
   - {id: F024, summary: "The query plan lacks decisive work-locality evidence for non-sargable matchesPattern comparisons.", classification: plan gap, consequence: "Answers can be correct while RE2 work scans unrelated objects carrying the same property name and kind.", authority_refs: [VellisRequirements::querySafety, VellisRequirements::stringPatternValidation], evidence_refs: [path:docs/semantic-work-locality-handoff.md#compiler-and-conjunctive-answer-relation, path:docs/semantic-work-locality-handoff.md#verification-matrix], disposition: resolved, owner_work_item_id: W001, implementation_status: conforming, nearest_wrong_system: "Generic unrelated-population evidence passes while regex evaluation still grows with property rows outside the selector's association candidates.", compatibility_effect: "No query meaning changes; W003 ties regex calls and property visits to relevant candidates without prescribing physical predicate order."}
+  - {id: F025, summary: "Canonical json_equal now constructs complete recursive keys and loses structural short-circuiting.", classification: implementation defect, consequence: "Cheap kind or early-member mismatches perform full nested traversal per graph comparison and per SQLite equality-predicate row.", authority_refs: [VellisRequirements::canonicalSemanticEquality, VellisRequirements::querySafety], evidence_refs: [path:tests/vellis/test_canonical_equality.py#test_structural_json_equality_short_circuits_before_later_members], disposition: implementation-work, owner_work_item_id: W003, implementation_status: conflicting, nearest_wrong_system: "Set/counter keys become the only equality algorithm and make mismatches cost the same traversal as matches.", compatibility_effect: "No equality meaning changes; structural equality short-circuits while collection operations retain canonical keys."}
+  - {id: F026, summary: "Graph property validation rebuilds one permitted-value key set for every validated object value.", classification: implementation defect, consequence: "Validating N objects against K permitted values performs N times K key construction instead of one index plus N lookups.", authority_refs: [VellisRequirements::canonicalSemanticEquality, VellisRequirements::historyIndependentCurrentWork], evidence_refs: [path:tests/vellis/test_canonical_equality.py#test_permitted_value_membership_uses_recursive_canonical_equality], disposition: implementation-work, owner_work_item_id: W007, implementation_status: conflicting, nearest_wrong_system: "Pairwise definition validation is removed while the same permitted collection is rebuilt for every governed graph value.", compatibility_effect: "No validation or equality result changes; one prepared permitted-value index is reused for its validation scope."}
 decisions:
   - {id: D001, summary: "Public graph queries are finite positive conjunctive patterns with no topology restriction.", authority_refs: [RTG::'Graph Query'], alternatives: [Restrict patterns to connected graphs., Restrict patterns to trees.], reversible: false, owner_work_item_id: W001, evidence_intent: [Accept disconnected projected combinations and hidden existence gates., Accept paths, stars, parallel predicates, self-links, and cycles under one joint assignment.], implementation_status: not applicable, evidence_refs: []}
   - {id: D002, summary: "Row and aggregate output are exclusive with no grouping.", authority_refs: [RTG::'Query Output'], alternatives: [Retain mixed output.], reversible: false, owner_work_item_id: W001, evidence_intent: [Reject mixed output., Preserve one-target arithmetic.], implementation_status: not applicable, evidence_refs: []}
@@ -102,6 +104,8 @@ decisions:
   - {id: D009, summary: "The query oracle is test-only and shares no production evaluation or reduction.", authority_refs: [VellisVerification::semanticQuery], alternatives: [Import production evaluation.], reversible: true, owner_work_item_id: W003, evidence_intent: [Detect deliberately mutated compiler results.], implementation_status: not evaluated, evidence_refs: []}
   - {id: D010, summary: "MCP query request objects are closed to extra members, and explicit state and output variants use required discriminators.", authority_refs: [VellisRequirements::mcpOutcomeIntegrity], alternatives: [Default discriminators with ignored extra members.], reversible: true, owner_work_item_id: W003, evidence_intent: [Reject untagged, mismatched, cross-mode, removed, and extra members before domain dispatch.], implementation_status: not evaluated, evidence_refs: []}
   - {id: D011, summary: "Query matchesPattern reuses Google RE2 Unicode whole-string semantics for present string properties.", authority_refs: [VellisRequirements::semanticQueryMeaning, VellisRequirements::stringPatternValidation], alternatives: [Require client-side regex filtering., Add a general expression language.], reversible: true, owner_work_item_id: W001, evidence_intent: [Match complete string values and reject malformed, unsupported, or non-string pattern comparisons.], implementation_status: not applicable, evidence_refs: []}
+  - {id: D012, summary: "Structural json_equal remains short-circuiting; immutable equality keys are used only for set, counter, and indexed membership work.", authority_refs: [VellisRequirements::canonicalSemanticEquality, VellisRequirements::querySafety], alternatives: [Implement every equality comparison by constructing two complete keys.], reversible: true, owner_work_item_id: W003, evidence_intent: [Early nested mismatches stop before later members., SQLite equality predicates retain exact meaning without full-key construction.], implementation_status: not evaluated, evidence_refs: []}
+  - {id: D013, summary: "A permitted-value key index is prepared once per constraint validation scope and reused across governed object values.", authority_refs: [VellisRequirements::canonicalSemanticEquality, VellisRequirements::historyIndependentCurrentWork], alternatives: [Rebuild the full key set inside every value check.], reversible: true, owner_work_item_id: W007, evidence_intent: [K permitted values and N governed values construct K plus N top-level keys rather than N times K.], implementation_status: not evaluated, evidence_refs: []}
 work_items:
   - id: W001
     order: 1
@@ -147,8 +151,8 @@ work_items:
     kind: implementation
     dependencies: [W002]
     planned_baseline: {dimension: model, identity: sha256:5ce0b4cbcc0785f57980d709bf903717f3323ef116f40a9f58737e6f06ac9240}
-    finding_ids: [F003, F004, F009, F018]
-    decision_ids: [D003, D004, D005, D009, D010]
+    finding_ids: [F003, F004, F009, F018, F025]
+    decision_ids: [D003, D004, D005, D009, D010, D012]
     authority: [{refs: [RTG::'Graph Query', RTG::'Property Comparison', RTG::'Evaluated State Selection', RTG::'Definition Summary Request', RTG::'Definition Inspection Request', RTGSystem::'Query graph', RTGSystem::'Discover evaluated graph definitions', VellisRequirements::semanticQueryMeaning, VellisRequirements::querySafety, VellisRequirements::stringPatternValidation, VellisRequirements::historicalStateCorrectness, VellisRequirements::agentDefinitionDiscoverability, VellisRequirements::mcpAgentToolContract], coverage: full, remaining_work_item_ids: []}]
     approval: {status: not-required, reason: "W001 acceptance governs changed public meaning; this realizes it.", checkpoint: null}
     nearest_wrong_system: A new compiler exists while a legacy evaluator, component path, late distinct, or manual capacity formula remains reachable.
@@ -160,10 +164,10 @@ work_items:
     blocker: null
     checkpoint: null
   - id: W004
-    order: 4
+    order: 5
     label: Unify active and prospective invariant impact
     kind: implementation
-    dependencies: [W003]
+    dependencies: [W003, W007]
     planned_baseline: {dimension: model, identity: sha256:5ce0b4cbcc0785f57980d709bf903717f3323ef116f40a9f58737e6f06ac9240}
     finding_ids: [F007, F008]
     decision_ids: [D008]
@@ -178,10 +182,10 @@ work_items:
     blocker: null
     checkpoint: null
   - id: W005
-    order: 6
+    order: 7
     label: Integrate evidence, synchronize documentation, and close the evolution
     kind: closure
-    dependencies: [W001, W002, W003, W004, W006]
+    dependencies: [W001, W002, W003, W004, W006, W007]
     planned_baseline: {dimension: model, identity: sha256:5ce0b4cbcc0785f57980d709bf903717f3323ef116f40a9f58737e6f06ac9240}
     finding_ids: [F011]
     decision_ids: []
@@ -196,7 +200,7 @@ work_items:
     blocker: null
     checkpoint: null
   - id: W006
-    order: 5
+    order: 6
     label: Bound transient read and work-state lifetimes
     kind: implementation
     dependencies: [W004]
@@ -210,6 +214,24 @@ work_items:
     nearest_wrong_system: "Each SQL statement is locally correct and temporary tables are reusable, but reads mix publications and completed populations remain resident."
     compatibility_effect: "Assessment paging and restore meaning remain unchanged."
     non_effects: [No persistent schema or snapshot change., No replay or restore semantic change., No new public request or result.]
+    lifecycle: pending
+    implementation_status: conflicting
+    evidence_refs: []
+    blocker: null
+    checkpoint: null
+  - id: W007
+    order: 4
+    label: Reuse permitted-value indexes across graph validation
+    kind: implementation
+    dependencies: [W003]
+    planned_baseline: {dimension: model, identity: sha256:5ce0b4cbcc0785f57980d709bf903717f3323ef116f40a9f58737e6f06ac9240}
+    finding_ids: [F026]
+    decision_ids: [D013]
+    authority: [{refs: [VellisRequirements::canonicalSemanticEquality, VellisRequirements::historyIndependentCurrentWork], coverage: partial, remaining_work_item_ids: [W005]}]
+    approval: {status: not-required, reason: "Accepted equality and work-locality authority already decides index reuse without changing validation meaning.", checkpoint: null}
+    nearest_wrong_system: Correct key membership remains but reconstructs the complete permitted collection for every governed object.
+    compatibility_effect: No semantic, persistence, snapshot, or validation-finding change.
+    non_effects: [No persistent cache or schema change., No public request or result change.]
     lifecycle: pending
     implementation_status: conflicting
     evidence_refs: []

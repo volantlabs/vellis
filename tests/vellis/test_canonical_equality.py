@@ -11,6 +11,7 @@ from decimal import Decimal
 import pytest
 
 import vellis.definitions as definitions_module
+import vellis.json_value as json_value_module
 from tests.vellis.semantic_state import DefinitionDelta, SemanticState, semantic_state_equal
 from vellis.definitions import (
     AnchorTypeDefinition,
@@ -50,6 +51,36 @@ def test_numbers_compare_by_exact_mathematical_value() -> None:
     assert json_equal(loads("1"), loads("1.0"))
     assert json_equal(loads("1.50"), loads("1.5"))
     assert not json_equal(loads("1"), loads("1.0000000000000001"))
+
+
+def test_signed_zero_has_one_exact_numeric_equality_identity() -> None:
+    """Excludes treating a Decimal sign bit as JSON numeric meaning."""
+    positive = loads("0")
+    negative = loads("-0.0")
+
+    assert json_equal(positive, negative)
+    assert json_value_module._json_equality_key(positive) == (  # noqa: SLF001
+        json_value_module._json_equality_key(negative)  # noqa: SLF001
+    )
+
+
+def test_structural_json_equality_short_circuits_before_later_members(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Excludes rebuilding complete equality keys for a cheap early mismatch."""
+    calls = 0
+    original = json_value_module.json_equal
+
+    def counted(left, right):
+        nonlocal calls
+        calls += 1
+        return original(left, right)
+
+    monkeypatch.setattr(json_value_module, "json_equal", counted)
+    later = list(range(200))
+
+    assert not original(normalize({"a": 0, "later": later}), normalize({"a": 1, "later": later}))
+    assert calls == 1
 
 
 def test_binary_floating_point_noise_does_not_decide_equality() -> None:
