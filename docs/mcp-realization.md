@@ -153,8 +153,7 @@ measured only the named operation after fixture construction.
 The remaining temporary executable characterization is
 `uv run pytest tests/vellis/test_semantic_work_locality_triggers.py`. It rebuilds fresh databases,
 resets the shared instrumentation boundary, and reproduces the active 10/20/40 hub series, the
-10/100/500/1,000 irrelevant-rule series, and the 5/10/20/40 independent-change-by-rule series. It
-also counts the exact pairwise equality calls for 500/1,000/2,000/4,000/8,000 permitted values.
+10/100/500/1,000 irrelevant-rule series, and the 5/10/20/40 independent-change-by-rule series.
 Its query-capacity case now requires the same typed whole refusal for current, prospective, and
 revision-selected aggregation. Permanent W003 evidence exercises positive pattern topologies,
 source-preserving row identity, hidden-witness fanout, large relational filters, exact compiled
@@ -163,15 +162,15 @@ schema rejection, and one-snapshot definition discovery. The remaining source-me
 only the mutation-locality paths owned by W004; assessment publication and retained work rows remain
 W006 triggers. No fixture or instrumentation must be invented from this prose.
 
-W002 through W004 and W006 replace these trigger recipes with permanent discriminating regression
-fixtures; the final subtraction review removes any evidence that asserts the superseded
-implementation shape.
+W002 and W003 have replaced their trigger recipes with permanent discriminating regression fixtures.
+W004 and W006 own the remaining temporary characterizations; the final subtraction review removes
+any evidence that asserts their superseded implementation shapes.
 
-The proposed target instead has exclusive row and aggregate outputs. Row identity preserves every
+The implemented query contract has exclusive row and aggregate outputs. Row identity preserves every
 projected source object, including the associated-data UUID behind a property value, while aggregate
 output operates on one distinct associated-data target population. Equal property values from
-different source objects therefore remain different rows. Implementation work deletes the old
-return-shape advice and translation paths; callers needing distinct values may deduplicate a complete
+different source objects therefore remain different rows. The old return-shape advice and
+translation paths are absent; callers needing distinct values may deduplicate a complete
 bounded row result. The query itself remains a finite must-exist pattern: disconnected, parallel,
 self-link, and cyclic predicates are ordinary conjunctions rather than invalid shapes.
 

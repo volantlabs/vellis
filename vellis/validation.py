@@ -37,26 +37,23 @@ from vellis.outcomes import ValidationFinding
 from vellis.patterns import PatternError, compile_pattern
 
 __all__ = [
-    "PreparedPropertyConstraint",
     "assess_object_neighborhood",
-    "prepare_property_constraint",
-    "validate_prepared_property_value",
     "validate_property_value",
 ]
 
 
 @dataclass(frozen=True, slots=True)
-class PreparedPropertyConstraint:
+class _PreparedPropertyConstraint:
     """One immutable constraint with collection membership indexed for a validation scope."""
 
     constraint: PropertyConstraint
     permitted_value_keys: frozenset[tuple[object, ...]]
 
 
-def prepare_property_constraint(constraint: PropertyConstraint) -> PreparedPropertyConstraint:
+def _prepare_property_constraint(constraint: PropertyConstraint) -> _PreparedPropertyConstraint:
     """Prepare constant membership work once for repeated validation under ``constraint``."""
     permitted = () if constraint.value_range is None else constraint.value_range.permitted_values
-    return PreparedPropertyConstraint(
+    return _PreparedPropertyConstraint(
         constraint,
         frozenset(_json_equality_key(value) for value in permitted),
     )
@@ -111,7 +108,7 @@ def assess_object_neighborhood(
     relevant_data_types = {data.type_key for data in graph.associated_data}
     prepared_properties = {
         definition.type_key: tuple(
-            prepare_property_constraint(constraint)
+            _prepare_property_constraint(constraint)
             for constraint in definition.property_constraints
         )
         for definition in definitions.associated_data_types
@@ -210,7 +207,7 @@ def _check_associated_data(
     data: AssociatedDataObject,
     graph: _ObjectNeighborhood,
     definitions: GraphDefinitionSet,
-    prepared_constraints: tuple[PreparedPropertyConstraint, ...],
+    prepared_constraints: tuple[_PreparedPropertyConstraint, ...],
     findings: list[ValidationFinding],
 ) -> None:
     if not _check_type_key_resolves(
@@ -271,7 +268,7 @@ def _check_associated_data(
 
 def _check_properties(
     data: AssociatedDataObject,
-    constraints: tuple[PreparedPropertyConstraint, ...],
+    constraints: tuple[_PreparedPropertyConstraint, ...],
     findings: list[ValidationFinding],
 ) -> None:
     declared = {prepared.constraint.property_name: prepared for prepared in constraints}
@@ -300,7 +297,7 @@ def _check_properties(
                     )
                 )
             continue
-        for reason in validate_prepared_property_value(prepared, data.properties[name]):
+        for reason in _validate_prepared_property_value(prepared, data.properties[name]):
             findings.append(
                 ValidationFinding(
                     summary=f"associated data {data.uuid!r} property {name!r} {reason}",
@@ -315,11 +312,11 @@ def validate_property_value(constraint: PropertyConstraint, value: JsonValue) ->
 
     Requiredness, kind, shape, range, and pattern apply conjunctively.
     """
-    return validate_prepared_property_value(prepare_property_constraint(constraint), value)
+    return _validate_prepared_property_value(_prepare_property_constraint(constraint), value)
 
 
-def validate_prepared_property_value(
-    prepared: PreparedPropertyConstraint, value: JsonValue
+def _validate_prepared_property_value(
+    prepared: _PreparedPropertyConstraint, value: JsonValue
 ) -> tuple[str, ...]:
     """Validate one value while reusing its scope's prepared collection membership."""
     constraint = prepared.constraint
@@ -348,7 +345,7 @@ def _shape_reasons(constraint: PropertyConstraint, value: JsonValue) -> list[str
     return reasons
 
 
-def _range_reasons(prepared: PreparedPropertyConstraint, value: JsonValue) -> list[str]:
+def _range_reasons(prepared: _PreparedPropertyConstraint, value: JsonValue) -> list[str]:
     constraint = prepared.constraint
     value_range = constraint.value_range
     if value_range is None:

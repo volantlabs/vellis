@@ -237,13 +237,13 @@ Use these words precisely:
   row visits, decoded values, affected neighborhoods, streamed buffer sizes, and query candidates.
   Returned projections, definition-discovery details, and history entries legitimately require
   output-sized memory; summary and focused inspection decode no graph and no unrelated definitions.
-  The proposed target requires ordinary mutation and prospective validation to scale with exact
+  The accepted target requires ordinary mutation and prospective validation to scale with exact
   changed invariant subjects rather than unrelated rules or far endpoints. Explicit full assessment
   and broad definition cutover remain state-wide
   work, but execute set-wise with bounded process memory and store each finding once for paged
-  retrieval. The target query implementation will bound source-preserving row identities or one
-  aggregate target population before hydration or arithmetic. The current query implementation has
-  known hidden-witness and late-deduplication scaling defects. Scalar aggregation currently
+  retrieval. The query implementation bounds source-preserving row identities or one aggregate
+  target population before hydration or arithmetic; hidden witnesses are existential and cannot
+  multiply an answer. Scalar aggregation
   retains bounded match identities in an indexed SQLite temporary table and streams fixed-size
   property batches through exact reducers, so resident Python memory follows batch size, reducer
   count, and final scalar size rather than matched population; varied exponents and their

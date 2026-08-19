@@ -116,10 +116,10 @@ from vellis.outcomes import (
 )
 from vellis.patterns import PatternError, compile_pattern
 from vellis.validation import (
-    PreparedPropertyConstraint,
+    _prepare_property_constraint,
+    _PreparedPropertyConstraint,
+    _validate_prepared_property_value,
     assess_object_neighborhood,
-    prepare_property_constraint,
-    validate_prepared_property_value,
 )
 
 _MAXIMUM_SQLITE_INTEGER = 2**63 - 1
@@ -3583,7 +3583,7 @@ class CanonicalStore:
         )
         cached_type_key: str | None = None
         cached_definitions = GraphDefinitionSet()
-        cached_property_constraints: dict[str, PreparedPropertyConstraint] = {}
+        cached_property_constraints: dict[str, _PreparedPropertyConstraint] = {}
         for uuid_value, value_id, kind_value, type_key_value, source, target in rows:
             uuid = str(uuid_value)
             kind = ObjectKind(str(kind_value))
@@ -3602,7 +3602,7 @@ class CanonicalStore:
                     {}
                     if data_definition is None
                     else {
-                        constraint.property_name: prepare_property_constraint(constraint)
+                        constraint.property_name: _prepare_property_constraint(constraint)
                         for constraint in data_definition.property_constraints
                     }
                 )
@@ -3744,7 +3744,7 @@ class CanonicalStore:
                     )
                     continue
                 value = json_storage_value(json_kind_value, boolean, number, text_value)
-                for reason in validate_prepared_property_value(prepared, value):
+                for reason in _validate_prepared_property_value(prepared, value):
                     yield ValidationFinding(
                         summary=f"associated data {uuid!r} property {property_name!r} {reason}",
                         implicated_definitions=(f"property:{type_key}.{property_name}",),
