@@ -4606,15 +4606,37 @@ class CanonicalStore:
     def _prepare_prospective_multiplicity_impact_unlocked(self, active_identity: str) -> None:
         """Use the shared old/proposed kernel to derive exact prospective work."""
         self._clear_multiplicity_impact_unlocked()
-        old_changed: dict[str, GraphObject] = {}
-        proposed_changed: dict[str, GraphObject] = {}
-        for uuid, base_value_id, value_id in self._connection.execute(
-            "SELECT uuid, base_object_value_id, object_value_id FROM proposal_entry"
-        ):
-            if base_value_id is not None:
-                old_changed[str(uuid)] = load_object_value(self._connection, int(base_value_id))
-            if value_id is not None:
-                proposed_changed[str(uuid)] = load_object_value(self._connection, int(value_id))
+        changed_uuids = {
+            str(row[0])
+            for row in self._connection.execute(
+                "SELECT p.uuid FROM proposal_entry AS p"
+                " LEFT JOIN graph_presence_interval AS g INDEXED BY graph_presence_current_uuid"
+                " ON g.uuid = p.uuid AND g.valid_to_revision IS NULL"
+                " LEFT JOIN object_value AS c ON c.id = g.object_value_id"
+                " LEFT JOIN object_value AS n ON n.id = p.object_value_id"
+                " WHERE (c.id IS NULL) != (n.id IS NULL)"
+                " OR c.object_kind IS NOT n.object_kind OR c.type_key IS NOT n.type_key"
+                " OR c.source_uuid IS NOT n.source_uuid OR c.target_uuid IS NOT n.target_uuid"
+                " OR EXISTS (SELECT anchor_uuid FROM object_anchor"
+                " WHERE object_value_id = c.id EXCEPT SELECT anchor_uuid"
+                " FROM object_anchor WHERE object_value_id = n.id)"
+                " OR EXISTS (SELECT anchor_uuid FROM object_anchor"
+                " WHERE object_value_id = n.id EXCEPT SELECT anchor_uuid"
+                " FROM object_anchor WHERE object_value_id = c.id)"
+            )
+        }
+        # A proposal entry's stored base is conflict-detection evidence. Active work may
+        # subsequently change that identity, so prospective meaning must compare the
+        # evaluated current object with the proposal overlay rather than the stale base.
+        old_changed = {
+            value.uuid: value for value in self._objects_for_uuids_unlocked(changed_uuids)
+        }
+        proposed_changed = {
+            value.uuid: value
+            for value in self._objects_from_relation_for_uuids_unlocked(
+                "prospective_graph_object", changed_uuids
+            )
+        }
         neighborhood = self._multiplicity_impact_neighborhood_unlocked(
             old_changed,
             proposed_changed,

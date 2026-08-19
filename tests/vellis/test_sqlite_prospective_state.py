@@ -483,6 +483,79 @@ def test_reassessment_reports_stale_base_until_identity_is_restaged(tmp_path: Pa
         system.close()
 
 
+def test_stale_proposal_base_does_not_hide_prospective_multiplicity_findings(
+    tmp_path: Path,
+) -> None:
+    subject = AnchorTypeDefinition("subject", "A constrained subject.")
+    eligible = AnchorTypeDefinition("eligible", "An eligible opposite.")
+    ineligible = AnchorTypeDefinition("ineligible", "An ineligible opposite.")
+    edge = LinkTypeDefinition(
+        "edge",
+        EndpointConstraint(("subject",), ("eligible", "ineligible"), "Endpoints."),
+        "An edge.",
+    )
+    rule = LinkMultiplicityConstraint(
+        "edge", LinkEnd.SOURCE, ("subject",), ("eligible",), 0, 1, "At most one."
+    )
+    system = RTGSystem.open(tmp_path / "stale-impact-base.sqlite3")
+    try:
+        assert system.initialize_fresh(
+            GraphDefinitionSet(
+                anchor_types=(subject, eligible, ineligible),
+                link_types=(edge,),
+                relationship_constraints=(rule,),
+            ),
+            provenance=OWNER,
+            initialization_summary="stale impact base",
+        ).accepted
+        assert system.apply_graph_change(
+            GraphChange(
+                anchor_upserts=(
+                    Anchor("subject", "subject", "Subject"),
+                    Anchor("opposite", "eligible", "Opposite"),
+                ),
+                link_upserts=(Link("first", "edge", "subject", "opposite"),),
+            ),
+            provenance=OWNER,
+        ).accepted
+        assert system.set_definition_delta(
+            DefinitionChange(anchor_type_upserts=(TEAM,)), provenance=OWNER
+        ).accepted
+        assert system.apply_graph_change(
+            GraphChangeRequest(
+                GraphChangeTarget.DEFINITION_DELTA,
+                GraphChange(anchor_upserts=(Anchor("opposite", "eligible", "Staged display"),)),
+            ),
+            provenance=OWNER,
+        ).accepted
+
+        # Current meaning remains conforming: the staged identity becomes ineligible while
+        # a new eligible opposite replaces its contribution.
+        assert system.apply_graph_change(
+            GraphChange(
+                anchor_upserts=(
+                    Anchor("opposite", "ineligible", "Current"),
+                    Anchor("replacement", "eligible", "Replacement"),
+                ),
+                link_upserts=(Link("second", "edge", "subject", "replacement"),),
+            ),
+            provenance=OWNER,
+        ).accepted
+
+        assessment = _assess_delta(system)
+        summaries = tuple(finding.summary for finding in assessment.returned_findings)
+        assert any("stale active base" in summary for summary in summaries)
+        assert any("participates in 2 'edge' links" in summary for summary in summaries)
+        key = semantic_identity(relationship_identity(rule))
+        assert tuple(
+            system.store._connection.execute(  # noqa: SLF001
+                "SELECT rule_key, subject_uuid, constrained_end FROM multiplicity_work"
+            )
+        ) == ((key, "subject", "source"),)
+    finally:
+        system.close()
+
+
 def test_type_upsert_replaces_the_prior_kind_at_shared_natural_identity(tmp_path: Path) -> None:
     system = RTGSystem.open(tmp_path / "kind-change.sqlite3")
     try:
