@@ -297,7 +297,9 @@ independent semantic reference. The compiler realizes an equivalent relation wit
 
 Identity includes projection name plus anchor/link/data UUID. A property identity includes
 projection name, source associated-data UUID, presence, and canonical value. Equal values from
-different sources remain distinct; hidden witnesses do not distinguish rows.
+different sources remain distinct; hidden witnesses do not distinguish rows. Physically, the selected
+object-value ID for that source functionally determines its UUID, property presence, and value at one
+evaluated state, so the temporary identity key need not copy the JSON value before the bound passes.
 
 For aggregate output, the named data condition is the sole answer selector. Populate one temporary
 target table keyed by its data UUID with every other variable existential under the same
@@ -309,14 +311,55 @@ SQLite may push any selective type, UUID, association, link, or property predica
 constraint is elimination of forbidden logical witness bags, not a prescribed physical order or a
 new general-purpose optimizer.
 
-### Exact capacity
+`matchesPattern` is intentionally non-sargable. It filters the present string properties of the
+associated-data UUIDs in that selector's logical candidate relation; it does not generate candidates
+or license a scan of same-named properties on unrelated types or associations. A genuinely broad
+candidate relation may require one RE2 evaluation per candidate carrying the property. The compiler
+may choose any equivalent physical order, but its relation and indexes must keep regex work tied to
+that relevant candidate population.
 
-Preflight actual compiled statements and parameter sequences against variable, result-column,
-table-per-scope, expression/subquery-depth, SQL-text byte-length, and integer-limit capacities. The
-UTF-8 byte length of each generated statement is compared with the connection's
-`SQLITE_LIMIT_SQL_LENGTH`; public values remain bound parameters and never inflate generated SQL.
-Historical predicates and answer `LIMIT` bindings are present automatically. Delete hand-maintained
-field-count estimates. Capacity excess is a typed whole-result rejection before answer execution.
+### Exact capacity and preparation
+
+Do not replace the old field-count formulas with a longer set of guessed formulas. W003 begins by
+inventorying every active SQLite limit category exercised by generated statements, bound parameters,
+or temporary query rows. Each `CompiledStatement` carries its exact SQL, parameters, and structural
+profile. A preparation-only probe of that same statement under the connection's active limits—using
+`EXPLAIN` or an equivalent non-stepping preparation boundary—complements properties known directly
+from the compiled artifact. No answer statement executes until every statement prepares.
+
+The inventory has these dispositions:
+
+- `SQLITE_LIMIT_SQL_LENGTH`: compare each generated statement's UTF-8 byte length exactly;
+- `SQLITE_LIMIT_VARIABLE_NUMBER`: compare the actual highest sequential parameter index and retain
+  the historical-state and answer-limit bindings naturally;
+- `SQLITE_LIMIT_COLUMN`: cover generated table/index columns, result columns, `INSERT` values, and
+  ordering/grouping terms rather than only public projections;
+- the 64-table join limit and `SQLITE_LIMIT_EXPR_DEPTH`: derive each generated `SELECT` scope and
+  expression/subquery depth from the compiled statement;
+- `SQLITE_LIMIT_PARSER_DEPTH` and `SQLITE_LIMIT_VDBE_OP`: use the preparation probe, including a
+  capability-gated parser-depth category when SQLite exposes it before Python gives it a symbolic
+  constant. A parser recursion failure or bare prepare-time memory error is called a configured-limit
+  rejection only when a controlled retry under the connection's hard parser or VDBE limit proves that
+  cause; restore every temporarily changed limit in `finally`. Otherwise it remains an execution or
+  allocation failure, not a guessed rejection;
+- `SQLITE_LIMIT_LENGTH`: preflight bound text/blob byte lengths, retain only integer object-value IDs
+  and bounded scalar metadata in temporary identity rows, and translate deterministic
+  `SQLITE_TOOBIG` while populating selector/answer work inside the rollback boundary into typed
+  whole-result refusal;
+- `SQLITE_LIMIT_FUNCTION_ARG`: generated functions have fixed arity, including the two-argument RE2
+  predicate, and preparation proves that arity fits the active limit;
+- `SQLITE_LIMIT_COMPOUND_SELECT` and `SQLITE_LIMIT_LIKE_PATTERN_LENGTH`: the compiler emits no
+  compound select and no `LIKE`/`GLOB`; RE2 does not inherit the `LIKE` limit; and
+- attached-database, trigger-depth, and worker-thread limits are not query-shape drivers because the
+  compiler attaches no database, installs or invokes no trigger, and requests no worker.
+
+Maximum values and `maximum + 1` arithmetic must also fit SQLite's integer range. Historical
+predicates and answer `LIMIT` bindings are present automatically. Delete every hand-maintained
+query-field estimate. A confirmed deterministic request-shape or generated-statement capacity excess
+is a typed `REJECTED` whole result before hydration or arithmetic, with no payload or evaluated
+revision. Actual I/O, locking, corruption, or allocation failures remain safely reportable `FAILED`
+outcomes—or unexpected boundary failures when no domain result can safely be formed—rather than
+being mislabeled as semantic capacity refusal.
 
 ### Oracle and integration
 
@@ -451,9 +494,13 @@ invariance.
 Invalidity evidence covers empty/duplicate names, unknown references/types, empty/duplicate UUID
 filters, malformed or unsupported RE2 expressions, pattern comparisons on
 non-string properties, empty outputs/aggregations, bad aggregate target/property/operator, nonpositive bounds,
-prospective without delta, unknown revision, naive time, and structural SQLite excess including a
-lowered SQL-text byte limit. Every refusal preserves graph, definitions, delta, revision, and
-canonical history and returns no partial answer or evaluated revision.
+prospective without delta, unknown revision, naive time, and structural SQLite excess. Lower each
+applicable SQL-length, bound-value/row-length, variable, column, expression, parser, VDBE-op, and
+function-argument limit around one generated boundary and exercise the nonconfigurable table
+boundary; each deterministic excess is typed `REJECTED` before hydration/arithmetic, with no partial
+answer or evaluated revision and every canonical non-effect. Avoided categories are verified absent
+from compiled statements rather than assigned synthetic tests. Inject genuine preparation allocation
+and execution faults separately so they are not mislabeled as semantic refusal.
 
 Aggregation evidence covers zero/nonzero count, exact and cancelling sums, numeric/string extrema,
 missing/all-missing properties, several operations/properties on one target, hidden witness
@@ -473,6 +520,10 @@ Scaling evidence uses SQLite VM steps and decoded-object counts, not wall-clock 
 - genuine projected combinations grow only as answer mathematics requires and refuse at the bound;
 - unrelated populations leave results/decodes fixed with indexed lookup plans;
 - aggregate hidden witnesses leave target count fixed;
+- regex locality holds relevant selector/association candidates and answers fixed while unrelated
+  objects carrying the same property name and string kind grow: RE2 calls and property-row visits stay
+  tied to relevant candidates and VM-step growth remains indexed; a broad relevant population is
+  separately allowed to require one RE2 call per present candidate value;
 - active hub-of-hubs 10/20/40 has exact work proportional to applicable degree and ratios below three;
 - display-only edits across 10/100/500/1,000 irrelevant rules produce zero multiplicity work;
 - K independent changes/rules at 5/10/20/40 produce K exact tuples, not K squared;
@@ -525,6 +576,31 @@ remain. Run focused query/equality/mutation tests, `just model-check`,
 token and obtain fresh authority/conformance and engineering/evidence reviews at that same token.
 Only deterministic evolution bookkeeping may follow a clean pair; commit and independently validate
 the committed checkpoint.
+
+## Downstream rebaseline after W001
+
+Before W001 can be accepted, every remaining work item is interpreted against the finite positive
+conjunction above, not the superseded tree or connected-only plans:
+
+- W002 is unchanged in meaning and remains a prerequisite that supplies canonical JSON keys without
+  changing persistence or query topology.
+- W003 owns the entire atomic query cutover: closed request values, topology-independent analyzer and
+  oracle, one relational compiler, regex candidate locality, complete compiled/preparation capacity
+  handling, read-snapshot repair, public integration, and deletion of the old evaluator/component
+  paths. Its sections above are resumable internal phases, not separately conforming product states;
+  no phase may introduce an adapter, feature flag, fallback evaluator, or second public language.
+- W004 remains the exact active/prospective mutation-impact kernel. None of its work, evidence, or
+  locality rules may infer selector trees, query components, or query-planner abstractions.
+- W006 remains the independent assessment/restore read-snapshot and temporary-work-lifetime repair;
+  it neither reopens query semantics nor absorbs W003 work.
+- W005 must search model, source, tests, and documentation for stale `tree`, `connected-only`,
+  `backbone`, component-reconstruction, legacy capacity-formula, and regex-unrelated-population claims,
+  in addition to the deletion inventory already listed. It closes only after the implemented system
+  and public truth reflect this rebased handoff.
+
+This rebaseline supersedes the earlier detailed plan wherever it required connected acyclic selector
+graphs, answer-relevant backbones, or removal of disconnected queries. All other accepted non-goals
+and non-effects remain in force.
 
 ## Resume and change control
 
