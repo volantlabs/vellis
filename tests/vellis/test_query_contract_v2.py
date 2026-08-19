@@ -12,6 +12,7 @@ import pytest
 from pydantic import TypeAdapter, ValidationError
 
 from tests.vellis.oracle import evaluate_query
+from tests.vellis.oracle import row_identity as oracle_row_identity
 from vellis.canonical import Provenance
 from vellis.changes import GraphChange
 from vellis.definitions import (
@@ -577,8 +578,8 @@ def test_fixed_seed_positive_patterns_match_the_independent_oracle(tmp_path: Pat
             oracle = evaluate_query(query, _definitions(), graph, revision=1)
             assert production.status is oracle.status
             assert production.evaluated_revision == oracle.evaluated_revision
-            assert {semantic_row_identity(row) for row in production.rows} == {
-                semantic_row_identity(row) for row in oracle.rows
+            assert {oracle_row_identity(row) for row in production.rows} == {
+                oracle_row_identity(row) for row in oracle.rows
             }
             assert production.aggregates == oracle.aggregates
     finally:

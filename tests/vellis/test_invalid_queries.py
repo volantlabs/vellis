@@ -714,3 +714,25 @@ def test_production_property_return_screen_walks_source_and_nested_value(
 
     assert reason is not None
     assert "returned property cannot be returned" in reason
+
+
+def test_complete_return_refusal_is_observed_before_the_result_leaves_the_system(
+    system: RTGSystem, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The store screen determines the domain outcome before activity observation."""
+    import vellis.query as query_module
+
+    monkeypatch.setattr(
+        query_module,
+        "_unreturnable_reason",
+        lambda rows: "a returned property cannot be returned: test boundary",
+    )
+
+    result = system.query_graph(_query(), provenance=_owner())
+
+    assert result.status is OperationStatus.REJECTED
+    assert result.rows == ()
+    assert result.evaluated_revision is None
+    recorded = system.store.activity_records()[-1]
+    assert recorded.capability == "query"
+    assert recorded.outcome_category is OperationStatus.REJECTED

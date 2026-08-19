@@ -11,6 +11,8 @@ from decimal import Decimal, DecimalException
 from itertools import product
 from typing import cast
 
+import re2
+
 from tests.vellis.semantic_state import DefinitionDelta, SemanticState
 from vellis.changes import GraphChange
 from vellis.definitions import (
@@ -25,7 +27,6 @@ from vellis.graph import Anchor, AssociatedDataObject, Graph, GraphObject, Link,
 from vellis.json_value import JsonValue, json_kind
 from vellis.normalized import load_object_value
 from vellis.outcomes import OperationStatus, ValidationFinding
-from vellis.patterns import compile_pattern
 from vellis.query import (
     AggregateBinding,
     AggregationOperator,
@@ -103,7 +104,7 @@ def evaluate_query(
             continue
         if isinstance(query.output, RowQueryOutput):
             row = _oracle_project(query, assignment)
-            row_by_identity.setdefault(_oracle_row_identity(row), row)
+            row_by_identity.setdefault(row_identity(row), row)
             if len(row_by_identity) > query.output.maximum_rows:
                 return _oracle_bound_refusal(query, query.output.maximum_rows)
         else:
@@ -189,7 +190,7 @@ def _property_matches(
         return (
             isinstance(value, str)
             and isinstance(expected, str)
-            and compile_pattern(expected).matches(value)
+            and _oracle_pattern_matches(expected, value)
         )
     if not isinstance(value, (Decimal, str)) or isinstance(value, bool):
         return False
@@ -238,7 +239,8 @@ def _oracle_project(query: GraphQuery, assignment: dict[str, GraphObject]) -> Gr
     return GraphQueryRow(tuple(anchors), tuple(links), tuple(data), tuple(properties))
 
 
-def _oracle_row_identity(row: GraphQueryRow) -> tuple[object, ...]:
+def row_identity(row: GraphQueryRow) -> tuple[object, ...]:
+    """Return test-only row identity without production query helpers."""
     return (
         tuple((binding.projection, binding.anchor.uuid) for binding in row.anchors),
         tuple((binding.projection, binding.link.uuid) for binding in row.links),
@@ -255,6 +257,16 @@ def _oracle_row_identity(row: GraphQueryRow) -> tuple[object, ...]:
             for binding in row.properties
         ),
     )
+
+
+def _oracle_pattern_matches(expression: str, value: str) -> bool:
+    """Evaluate selected RE2 whole-string meaning without the production wrapper."""
+    options = re2.Options()
+    options.log_errors = False
+    try:
+        return re2.compile(expression, options).fullmatch(value) is not None
+    except re2.error, UnicodeEncodeError:
+        return False
 
 
 def _oracle_unreturnable_reason(rows: tuple[GraphQueryRow, ...]) -> str | None:
