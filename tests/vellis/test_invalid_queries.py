@@ -38,6 +38,7 @@ from vellis.query import (
     PropertyComparison,
     QueryAggregation,
     RequiredLink,
+    ReturnedProperty,
     RowQueryOutput,
     UuidFilter,
 )
@@ -658,3 +659,58 @@ def test_no_field_of_a_returned_link_escapes_the_completeness_screen(
     assert result.status is OperationStatus.REJECTED, field
     assert result.rows == ()
     assert any("cannot be returned" in each.summary for each in result.findings)
+
+
+def test_no_field_of_a_returned_property_escapes_the_completeness_screen() -> None:
+    """Source identity is part of a property row and must pass the same whole-result guard."""
+    from tests.vellis.oracle import evaluate_query
+
+    graph = Graph(
+        anchors=(ADA,),
+        associated_data=(
+            AssociatedDataObject(
+                uuid="n\ud800-1",
+                type_key="note",
+                anchor_uuids=("a-1",),
+                properties={"title": "First"},
+            ),
+        ),
+    )
+    query = _query(
+        data_conditions=(_notes(),),
+        projections=(
+            DataPropertyProjection(
+                name="title",
+                data_condition="notes",
+                property_name="title",
+            ),
+        ),
+    )
+
+    result = evaluate_query(query, build_rich_definitions(), graph, revision=1)
+
+    assert result.status is OperationStatus.REJECTED
+    assert result.rows == ()
+    assert result.evaluated_revision is None
+    assert any("returned property cannot be returned" in each.summary for each in result.findings)
+
+
+@pytest.mark.parametrize(
+    "property_binding",
+    (
+        ReturnedProperty("ti\ud800tle", "n-1", True, "First"),
+        ReturnedProperty("title", "n\ud800-1", True, "First"),
+        ReturnedProperty("title", "n-1", True, {"nested": ["Gr\ud800ce"]}),
+        ReturnedProperty("title", "n-1", True, {"ne\ud800sted": ["Grace"]}),
+    ),
+    ids=["projection", "source-uuid", "nested-value", "nested-member-name"],
+)
+def test_production_property_return_screen_walks_source_and_nested_value(
+    property_binding: ReturnedProperty,
+) -> None:
+    from vellis.query import GraphQueryRow, _unreturnable_reason
+
+    reason = _unreturnable_reason((GraphQueryRow(properties=(property_binding,)),))
+
+    assert reason is not None
+    assert "returned property cannot be returned" in reason

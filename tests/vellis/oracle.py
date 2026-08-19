@@ -261,32 +261,49 @@ def _oracle_unreturnable_reason(rows: tuple[GraphQueryRow, ...]) -> str | None:
     for row in rows:
         for binding in row.anchors:
             values = (
+                binding.projection,
                 binding.anchor.uuid,
+                binding.anchor.type_key,
                 binding.anchor.display_name,
-                *binding.anchor.system_metadata.members,
             )
-            if any(_not_utf8(value) for value in values if value is not None):
-                return f"anchor '{binding.anchor.uuid}' cannot be returned"
+            if any(_not_utf8(value) for value in values) or _oracle_mapping_not_utf8(
+                binding.anchor.system_metadata.members
+            ):
+                return "a returned anchor cannot be returned"
         for binding in row.associated_data:
             value = binding.associated_data
             values = (
+                binding.projection,
                 value.uuid,
+                value.type_key,
                 *value.anchor_uuids,
-                *value.properties,
-                *value.system_metadata.members,
             )
-            if any(_not_utf8(member) for member in values):
-                return f"associated data '{value.uuid}' cannot be returned"
+            if (
+                any(_not_utf8(member) for member in values)
+                or _oracle_mapping_not_utf8(value.properties)
+                or _oracle_mapping_not_utf8(value.system_metadata.members)
+            ):
+                return "returned associated data cannot be returned"
         for binding in row.links:
             value = binding.link
             values = (
+                binding.projection,
                 value.uuid,
+                value.type_key,
                 value.source_uuid,
                 value.target_uuid,
-                *value.system_metadata.members,
             )
-            if any(_not_utf8(member) for member in values):
-                return f"link '{value.uuid}' cannot be returned"
+            if any(_not_utf8(member) for member in values) or _oracle_mapping_not_utf8(
+                value.system_metadata.members
+            ):
+                return "a returned link cannot be returned"
+        for binding in row.properties:
+            if (
+                _not_utf8(binding.projection)
+                or _not_utf8(binding.associated_data_uuid)
+                or (binding.present and _oracle_value_not_utf8(binding.value))
+            ):
+                return "a returned property cannot be returned"
     return None
 
 
@@ -295,6 +312,20 @@ def _not_utf8(value: str) -> bool:
         value.encode("utf-8")
     except UnicodeEncodeError:
         return True
+    return False
+
+
+def _oracle_mapping_not_utf8(value: dict[str, JsonValue]) -> bool:
+    return any(_not_utf8(name) or _oracle_value_not_utf8(member) for name, member in value.items())
+
+
+def _oracle_value_not_utf8(value: JsonValue) -> bool:
+    if isinstance(value, str):
+        return _not_utf8(value)
+    if isinstance(value, list):
+        return any(_oracle_value_not_utf8(member) for member in value)
+    if isinstance(value, dict):
+        return _oracle_mapping_not_utf8(value)
     return False
 
 

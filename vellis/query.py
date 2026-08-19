@@ -1083,32 +1083,73 @@ def _unreturnable_reason(rows: tuple[GraphQueryRow, ...]) -> str | None:
         for anchor_binding in row.anchors:
             anchor = anchor_binding.anchor
             reason = _first_unencodable(
-                anchor.uuid, anchor.display_name, *anchor.system_metadata.members
+                anchor_binding.projection, anchor.uuid, anchor.type_key, anchor.display_name
             )
+            reason = reason or _mapping_unreturnable_reason(anchor.system_metadata.members)
             if reason is not None:
-                return f"anchor '{anchor.uuid}' cannot be returned: {reason}"
+                return f"a returned anchor cannot be returned: {reason}"
         for data_binding in row.associated_data:
             data = data_binding.associated_data
             reason = _first_unencodable(
+                data_binding.projection,
                 data.uuid,
+                data.type_key,
                 *data.anchor_uuids,
-                *data.properties,
-                *data.system_metadata.members,
             )
+            reason = reason or _mapping_unreturnable_reason(data.properties)
+            reason = reason or _mapping_unreturnable_reason(data.system_metadata.members)
             if reason is not None:
-                return f"associated data '{data.uuid}' cannot be returned: {reason}"
+                return f"returned associated data cannot be returned: {reason}"
         for link_binding in row.links:
             link = link_binding.link
             reason = _first_unencodable(
-                link.uuid, link.source_uuid, link.target_uuid, *link.system_metadata.members
+                link_binding.projection,
+                link.uuid,
+                link.type_key,
+                link.source_uuid,
+                link.target_uuid,
             )
+            reason = reason or _mapping_unreturnable_reason(link.system_metadata.members)
             if reason is not None:
-                return f"link '{link.uuid}' cannot be returned: {reason}"
+                return f"a returned link cannot be returned: {reason}"
+        for property_binding in row.properties:
+            reason = _first_unencodable(
+                property_binding.projection, property_binding.associated_data_uuid
+            )
+            if reason is None and property_binding.present:
+                reason = _json_unreturnable_reason(property_binding.value)
+            if reason is not None:
+                return f"a returned property cannot be returned: {reason}"
     return None
 
 
 def _first_unencodable(*values: str) -> str | None:
     return next((r for r in (unencodable_reason(each) for each in values) if r is not None), None)
+
+
+def _mapping_unreturnable_reason(values: dict[str, JsonValue]) -> str | None:
+    for name, value in values.items():
+        reason = unencodable_reason(name) or _json_unreturnable_reason(value)
+        if reason is not None:
+            return reason
+    return None
+
+
+def _json_unreturnable_reason(value: JsonValue) -> str | None:
+    if isinstance(value, str):
+        return unencodable_reason(value)
+    if isinstance(value, list):
+        return next(
+            (
+                reason
+                for member in value
+                if (reason := _json_unreturnable_reason(member)) is not None
+            ),
+            None,
+        )
+    if isinstance(value, dict):
+        return _mapping_unreturnable_reason(value)
+    return None
 
 
 def _decimal_term(value: Decimal) -> tuple[int, int, int]:
