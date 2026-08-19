@@ -247,6 +247,12 @@ work_items:
     evidence_refs: [path:tests/vellis/test_canonical_equality.py#test_graph_validation_prepares_one_permitted_index_per_constraint_scope, path:tests/vellis/test_canonical_equality.py#test_permitted_value_membership_uses_recursive_canonical_equality, command:just check]
     blocker: null
     checkpoint: git:531fed673bb1c2f2491d6d988695bdbad4234f3f
+  # W007 clean review pair at shared token git:3f62719a57a6cf2fd9193c548879abfaf08d0e8b;
+  # substantive checkpoint git:531fed673bb1c2f2491d6d988695bdbad4234f3f.
+  # /root/w007_authority_review2 — authority and conformance — clean.
+  # /root/w007_engineering_review2 — engineering and evidence — clean.
+  # Both reviewers independently passed just check (1,233 tests plus package build/install/smoke),
+  # focused W007 evidence, just system-evolution-check, and git diff --check.
 closure:
   finding_disposition: open
   model_status: not evaluated
