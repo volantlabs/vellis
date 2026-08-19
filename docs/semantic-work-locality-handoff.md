@@ -528,19 +528,20 @@ variants. Each malformed case proves that no domain operation or observation ran
 
 ## W006 — bounded transient read and work-state lifetimes
 
-After W004 has replaced prospective assessment internals, close the two lifecycle gaps that are not
-query or multiplicity semantics:
+W006 closed the two lifecycle gaps outside query and multiplicity semantics after W004 replaced the
+prospective assessment internals:
 
-- Read every published assessment interval in one explicit SQLite read transaction. A concurrent
+- Every published assessment interval is read in one explicit SQLite read transaction. A concurrent
   replacement may occur before or after that transaction, but cannot combine an old assessment
   header/count with missing or newer finding rows.
-- Clear every population-bearing `assessment_*` working relation after successful assessment and
-  after failure. Preserve only the normalized published assessment and its bounded retrieval rows.
-- Clear `restore_candidate`, `restore_current`, and every other population-bearing `restore_*`
-  working relation after successful restoration and after failure. Preserve the committed restored
-  current projection and canonical transition, not the transient comparison population.
-- Keep temporary relation definitions connection-local for reuse; clear their rows. Cleanup is part
-  of the owning transaction/failure discipline and must not hide the original operation error.
+- Every population-bearing `assessment_*` working relation is cleared after successful assessment
+  and after failure. Only the normalized published assessment and its bounded retrieval rows remain.
+- `restore_candidate`, `restore_current`, and every other population-bearing `restore_*` working
+  relation are cleared after successful restoration and after failure. The committed restored
+  current projection and canonical transition remain, not the transient comparison population.
+- Temporary relation definitions remain connection-local for reuse while their rows are cleared.
+  Cleanup belongs to the owning transaction/failure discipline and does not hide the original
+  operation error.
 
 Deterministic two-connection evidence replaces a published assessment between the header and
 finding reads and accepts only a complete old or complete new interval. Success/failure fixtures
