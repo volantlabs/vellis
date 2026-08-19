@@ -3,10 +3,10 @@ evolution:
   id: vellis-2-active-work-lifetime
   objective: Clear population-sized active-mutation validation work at the end of every public validation attempt.
   observable_distinction: A successful, rejected, or failed active graph change leaves every reusable multiplicity work relation empty rather than retaining rows proportional to the prior change.
-  lifecycle: active
+  lifecycle: complete
   approval: {status: not-required, reason: "Accepted bounded-work authority already decides this internal resource-lifetime correction without changing public meaning.", checkpoint: null}
   blocker: null
-  checkpoint: null
+  checkpoint: git:d1c91842fcf97a38771926a547033e4f3f842bf5
 baselines:
   status: current
   source:
@@ -94,20 +94,27 @@ work_items:
     nearest_wrong_system: Validation rows are exact and bounded during the operation but remain populated after one public exit path.
     compatibility_effect: No public result, transaction, persistence, or history meaning changes.
     non_effects: [No model edit., No persistent schema or snapshot change., No new cleanup abstraction., No owner-data or external-client access.]
-    lifecycle: active
-    implementation_status: partial
+    lifecycle: complete
+    implementation_status: conforming
     evidence_refs: [path:tests/vellis/test_semantic_work_locality.py#test_active_graph_change_clears_multiplicity_work_after_every_exit, path:tests/vellis/test_semantic_work_locality.py#test_assessment_and_restore_clear_population_work_after_success_and_failure, path:tests/vellis/test_semantic_work_locality.py#test_active_endpoint_type_work_scales_with_applicable_degree, path:tests/test_system_evolution.py#test_only_one_work_item_may_be_active, path:tests/test_system_evolution.py#test_executable_work_requires_complete_dependencies, path:README.md#implementation-status, path:docs/mcp-realization.md#semantic-work-locality-evidence, command:just check]
     blocker: null
-    checkpoint: null
+    checkpoint: git:d1c91842fcf97a38771926a547033e4f3f842bf5
+# Final clean review pair inspected shared frozen token
+# git:1e4484514d628e55760f2ba82020f5eacb0e0abc and substantive target
+# git:d1c91842fcf97a38771926a547033e4f3f842bf5.
+# /root/active_work_authority_review — authority and conformance — clean.
+# /root/active_work_engineering_review — engineering and evidence — clean.
+# Both reviewers passed focused evidence, just model-check, just system-evolution-check,
+# just package-check, just check (1,232 tests plus package exercise), and git diff --check.
 closure:
-  finding_disposition: open
+  finding_disposition: complete
   model_status: unchanged
-  implementation_status: conflicting
-  integration_status: partial
+  implementation_status: conforming
+  integration_status: conforming
   external_status: not applicable
   compatibility: No public or persistent compatibility effect; active validation releases its temporary multiplicity rows at operation exit.
   reviews:
-    - {lens: authority and conformance, status: pending, reviewer: null, checkpoint: null, evidence_refs: []}
-    - {lens: engineering and evidence, status: pending, reviewer: null, checkpoint: null, evidence_refs: []}
+    - {lens: authority and conformance, status: clean, reviewer: /root/active_work_authority_review, checkpoint: git:d1c91842fcf97a38771926a547033e4f3f842bf5, evidence_refs: [command:just check]}
+    - {lens: engineering and evidence, status: clean, reviewer: /root/active_work_engineering_review, checkpoint: git:d1c91842fcf97a38771926a547033e4f3f842bf5, evidence_refs: [command:just check]}
   evidence_refs: [path:README.md#implementation-status, path:docs/mcp-realization.md#semantic-work-locality-evidence, command:just check]
-  checkpoint: null
+  checkpoint: git:d1c91842fcf97a38771926a547033e4f3f842bf5
