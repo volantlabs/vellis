@@ -4095,13 +4095,27 @@ class CanonicalStore:
         self._connection.execute(
             "INSERT OR IGNORE INTO assessment_materialized_uuid"
             " SELECT source_uuid FROM object_value AS v JOIN proposal_entry AS p"
-            " ON v.id IN (p.object_value_id, p.base_object_value_id)"
+            " ON v.id = p.object_value_id"
             " WHERE v.object_kind = 'link'"
             " UNION SELECT target_uuid FROM object_value AS v JOIN proposal_entry AS p"
-            " ON v.id IN (p.object_value_id, p.base_object_value_id)"
+            " ON v.id = p.object_value_id"
             " WHERE v.object_kind = 'link'"
             " UNION SELECT a.anchor_uuid FROM object_anchor AS a JOIN proposal_entry AS p"
-            " ON a.object_value_id IN (p.object_value_id, p.base_object_value_id)"
+            " ON a.object_value_id = p.object_value_id"
+            " UNION SELECT v.source_uuid FROM proposal_entry AS p"
+            " CROSS JOIN graph_presence_interval AS g INDEXED BY graph_presence_current_uuid"
+            " ON g.uuid = p.uuid AND g.valid_to_revision IS NULL"
+            " JOIN object_value AS v ON v.id = g.object_value_id"
+            " WHERE v.object_kind = 'link'"
+            " UNION SELECT v.target_uuid FROM proposal_entry AS p"
+            " CROSS JOIN graph_presence_interval AS g INDEXED BY graph_presence_current_uuid"
+            " ON g.uuid = p.uuid AND g.valid_to_revision IS NULL"
+            " JOIN object_value AS v ON v.id = g.object_value_id"
+            " WHERE v.object_kind = 'link'"
+            " UNION SELECT a.anchor_uuid FROM proposal_entry AS p"
+            " CROSS JOIN graph_presence_interval AS g INDEXED BY graph_presence_current_uuid"
+            " ON g.uuid = p.uuid AND g.valid_to_revision IS NULL"
+            " JOIN object_anchor AS a ON a.object_value_id = g.object_value_id"
         )
         for table in (
             "assessment_validation_uuid",
@@ -4113,16 +4127,23 @@ class CanonicalStore:
             )
             self._connection.execute(f"DELETE FROM {table}")  # noqa: S608
         self._connection.execute(
-            "INSERT INTO assessment_validation_uuid SELECT uuid FROM assessment_materialized_uuid"
+            "INSERT INTO assessment_validation_uuid SELECT uuid FROM proposal_entry"
+            " UNION SELECT g.uuid FROM assessment_structural_type AS t"
+            " CROSS JOIN graph_presence_interval AS g INDEXED BY graph_presence_current_type"
+            " ON g.object_kind IN ('anchor', 'associatedData', 'link')"
+            " AND g.type_key = t.type_key AND g.valid_to_revision IS NULL"
+            " WHERE NOT EXISTS (SELECT 1 FROM proposal_entry AS p WHERE p.uuid = g.uuid)"
         )
         self._connection.execute(
             "INSERT OR IGNORE INTO assessment_endpoint_membership_change"
             " SELECT p.uuid FROM proposal_entry AS p"
+            " LEFT JOIN graph_presence_interval AS g INDEXED BY graph_presence_current_uuid"
+            " ON g.uuid = p.uuid AND g.valid_to_revision IS NULL"
+            " LEFT JOIN object_value AS c ON c.id = g.object_value_id"
             " LEFT JOIN object_value AS n ON n.id = p.object_value_id"
-            " LEFT JOIN object_value AS b ON b.id = p.base_object_value_id"
             " WHERE p.object_kind IN ('anchor', 'associatedData')"
-            " AND (p.operation = 'delete' OR b.id IS NULL"
-            " OR n.type_key IS NOT b.type_key)"
+            " AND ((c.id IS NULL) != (n.id IS NULL)"
+            " OR c.object_kind IS NOT n.object_kind OR c.type_key IS NOT n.type_key)"
         )
 
         def include_incident_relations(subject_table: str, relation_table: str) -> None:

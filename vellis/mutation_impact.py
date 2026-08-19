@@ -71,7 +71,7 @@ def index_multiplicity_facts(objects: dict[str, GraphObject]) -> IndexedMultipli
             participants.setdefault(value.type_key, set()).add(uuid)
         if isinstance(value, Link):
             links.setdefault(value.type_key, set()).add(uuid)
-        elif isinstance(value, AssociatedDataObject):
+        if isinstance(value, AssociatedDataObject):
             data.setdefault(value.type_key, set()).add(uuid)
     return IndexedMultiplicityFacts(
         objects,

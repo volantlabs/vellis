@@ -1,8 +1,11 @@
 """Evidence for SQLite-native prospective state, stored assessments, and cutover."""
 
+import random
 import sqlite3
 from decimal import Decimal
 from pathlib import Path
+
+import pytest
 
 from tests.vellis.oracle import materialize_definitions, materialize_replay, materialize_state
 from tests.vellis.semantic_state import (
@@ -552,6 +555,68 @@ def test_stale_proposal_base_does_not_hide_prospective_multiplicity_findings(
                 "SELECT rule_key, subject_uuid, constrained_end FROM multiplicity_work"
             )
         ) == ((key, "subject", "source"),)
+    finally:
+        system.close()
+
+
+def test_stale_proposal_base_does_not_hide_structural_relationship_findings(
+    tmp_path: Path,
+) -> None:
+    first = AnchorTypeDefinition("first", "The original endpoint type.")
+    second = AnchorTypeDefinition("second", "The current endpoint type.")
+    target = AnchorTypeDefinition("target", "A target.")
+    old_edge = LinkTypeDefinition(
+        "oldEdge", EndpointConstraint(("first",), ("target",), "Old endpoints."), "Old."
+    )
+    new_edge = LinkTypeDefinition(
+        "newEdge", EndpointConstraint(("second",), ("target",), "New endpoints."), "New."
+    )
+    system = RTGSystem.open(tmp_path / "stale-structural-base.sqlite3")
+    try:
+        assert system.initialize_fresh(
+            GraphDefinitionSet(
+                anchor_types=(first, second, target), link_types=(old_edge, new_edge)
+            ),
+            provenance=OWNER,
+            initialization_summary="stale structural base",
+        ).accepted
+        assert system.apply_graph_change(
+            GraphChange(
+                anchor_upserts=(
+                    Anchor("endpoint", "first", "Endpoint"),
+                    Anchor("target", "target", "Target"),
+                ),
+                link_upserts=(Link("edge", "oldEdge", "endpoint", "target"),),
+            ),
+            provenance=OWNER,
+        ).accepted
+        assert system.set_definition_delta(
+            DefinitionChange(anchor_type_upserts=(TEAM,)), provenance=OWNER
+        ).accepted
+        assert system.apply_graph_change(
+            GraphChangeRequest(
+                GraphChangeTarget.DEFINITION_DELTA,
+                GraphChange(anchor_upserts=(Anchor("endpoint", "first", "Staged display"),)),
+            ),
+            provenance=OWNER,
+        ).accepted
+        assert system.apply_graph_change(
+            GraphChange(
+                anchor_upserts=(Anchor("endpoint", "second", "Current"),),
+                link_upserts=(Link("edge", "newEdge", "endpoint", "target"),),
+            ),
+            provenance=OWNER,
+        ).accepted
+
+        assessment = _assess_delta(system)
+        summaries = tuple(finding.summary for finding in assessment.returned_findings)
+        assert any("stale active base" in summary for summary in summaries)
+        assert any("endpoint constraint does not permit" in summary for summary in summaries)
+        connection = system.store._connection  # noqa: SLF001
+        assert tuple(connection.execute("SELECT uuid FROM assessment_structural_relationship")) == (
+            ("edge",),
+        )
+        assert ("edge",) in tuple(connection.execute("SELECT uuid FROM assessment_validation_uuid"))
     finally:
         system.close()
 
@@ -1549,6 +1614,223 @@ def test_active_and_prospective_share_exact_opposite_membership_work(tmp_path: P
             == ((expected_key, "subject", "source", "oppositeMembershipChanged"),)
         )
         assert active_work == prospective_work == ((expected_key, "subject", "source"),)
+    finally:
+        system.close()
+
+
+@pytest.mark.parametrize("removal", (False, True))
+def test_active_and_prospective_share_exact_relationship_membership_work(
+    tmp_path: Path, removal: bool
+) -> None:
+    subject = AnchorTypeDefinition("subject", "A constrained subject.")
+    opposite = AnchorTypeDefinition("opposite", "An opposite.")
+    edge = LinkTypeDefinition(
+        "edge", EndpointConstraint(("subject",), ("opposite",), "Endpoints."), "An edge."
+    )
+    rule = LinkMultiplicityConstraint(
+        "edge", LinkEnd.SOURCE, ("subject",), ("opposite",), 0, None, "Edges."
+    )
+    system = RTGSystem.open(tmp_path / f"relationship-impact-{removal}.sqlite3")
+    try:
+        assert system.initialize_fresh(
+            GraphDefinitionSet(
+                anchor_types=(subject, opposite),
+                link_types=(edge,),
+                relationship_constraints=(rule,),
+            ),
+            provenance=OWNER,
+            initialization_summary="relationship impact",
+        ).accepted
+        initial_link = (Link("edge", "edge", "subject", "opposite"),) if removal else ()
+        assert system.apply_graph_change(
+            GraphChange(
+                anchor_upserts=(
+                    Anchor("subject", "subject", "Subject"),
+                    Anchor("opposite", "opposite", "Opposite"),
+                ),
+                link_upserts=initial_link,
+            ),
+            provenance=OWNER,
+        ).accepted
+        assert system.set_definition_delta(
+            DefinitionChange(anchor_type_upserts=(TEAM,)), provenance=OWNER
+        ).accepted
+        change = (
+            GraphChange(link_removals=("edge",))
+            if removal
+            else GraphChange(link_upserts=(Link("edge", "edge", "subject", "opposite"),))
+        )
+        connection = system.store._connection  # noqa: SLF001
+        connection.execute("BEGIN")
+        system.store._prepare_active_graph_change_unlocked(change)  # noqa: SLF001
+        active = tuple(
+            connection.execute(
+                "SELECT rule_key, subject_uuid, constrained_end, reason_kind"
+                " FROM multiplicity_impact_reason ORDER BY 1, 2, 3, 4"
+            )
+        )
+        connection.execute("ROLLBACK")
+
+        assert system.apply_graph_change(
+            GraphChangeRequest(GraphChangeTarget.DEFINITION_DELTA, change), provenance=OWNER
+        ).accepted
+        assert _assess_delta(system).conforms
+        prospective = tuple(
+            connection.execute(
+                "SELECT rule_key, subject_uuid, constrained_end, reason_kind"
+                " FROM multiplicity_impact_reason ORDER BY 1, 2, 3, 4"
+            )
+        )
+        key = semantic_identity(relationship_identity(rule))
+        assert (
+            active == prospective == ((key, "subject", "source", "relationshipMembershipChanged"),)
+        )
+    finally:
+        system.close()
+
+
+def test_active_and_prospective_share_exact_subject_membership_work(tmp_path: Path) -> None:
+    subject = AnchorTypeDefinition("subject", "A constrained subject.")
+    other = AnchorTypeDefinition("other", "Another endpoint type.")
+    opposite = AnchorTypeDefinition("opposite", "An opposite.")
+    edge = LinkTypeDefinition(
+        "edge", EndpointConstraint(("subject", "other"), ("opposite",), "Endpoints."), "Edge."
+    )
+    rule = LinkMultiplicityConstraint(
+        "edge", LinkEnd.SOURCE, ("subject",), ("opposite",), 0, None, "Edges."
+    )
+    system = RTGSystem.open(tmp_path / "subject-membership-impact.sqlite3")
+    try:
+        assert system.initialize_fresh(
+            GraphDefinitionSet(
+                anchor_types=(subject, other, opposite),
+                link_types=(edge,),
+                relationship_constraints=(rule,),
+            ),
+            provenance=OWNER,
+            initialization_summary="subject membership",
+        ).accepted
+        assert system.apply_graph_change(
+            GraphChange(anchor_upserts=(Anchor("subject", "subject", "Subject"),)),
+            provenance=OWNER,
+        ).accepted
+        assert system.set_definition_delta(
+            DefinitionChange(anchor_type_upserts=(TEAM,)), provenance=OWNER
+        ).accepted
+        change = GraphChange(anchor_upserts=(Anchor("subject", "other", "Subject"),))
+        connection = system.store._connection  # noqa: SLF001
+        connection.execute("BEGIN")
+        system.store._prepare_active_graph_change_unlocked(change)  # noqa: SLF001
+        active = tuple(
+            connection.execute(
+                "SELECT rule_key, subject_uuid, constrained_end, reason_kind"
+                " FROM multiplicity_impact_reason ORDER BY 1, 2, 3, 4"
+            )
+        )
+        connection.execute("ROLLBACK")
+
+        assert system.apply_graph_change(
+            GraphChangeRequest(GraphChangeTarget.DEFINITION_DELTA, change), provenance=OWNER
+        ).accepted
+        assert _assess_delta(system).conforms
+        prospective = tuple(
+            connection.execute(
+                "SELECT rule_key, subject_uuid, constrained_end, reason_kind"
+                " FROM multiplicity_impact_reason ORDER BY 1, 2, 3, 4"
+            )
+        )
+        key = semantic_identity(relationship_identity(rule))
+        assert active == prospective == ((key, "subject", "source", "subjectMembershipChanged"),)
+    finally:
+        system.close()
+
+
+def test_accepted_incremental_mutations_agree_with_complete_conformance(
+    tmp_path: Path,
+) -> None:
+    subject = AnchorTypeDefinition("subject", "A constrained subject.")
+    eligible = AnchorTypeDefinition("eligible", "An eligible opposite.")
+    ineligible = AnchorTypeDefinition("ineligible", "An ineligible opposite.")
+    link_types = tuple(
+        LinkTypeDefinition(
+            f"edge-{index}",
+            EndpointConstraint(("subject",), ("eligible", "ineligible"), "Endpoints."),
+            "An edge.",
+        )
+        for index in range(2)
+    )
+    rules = tuple(
+        LinkMultiplicityConstraint(
+            value.type_key,
+            LinkEnd.SOURCE,
+            ("subject",),
+            ("eligible",),
+            0,
+            1,
+            "At most one eligible opposite.",
+        )
+        for value in link_types
+    )
+    system = RTGSystem.open(tmp_path / "incremental-complete-differential.sqlite3")
+    try:
+        assert system.initialize_fresh(
+            GraphDefinitionSet(
+                anchor_types=(subject, eligible, ineligible),
+                link_types=link_types,
+                relationship_constraints=rules,
+            ),
+            provenance=OWNER,
+            initialization_summary="incremental complete differential",
+        ).accepted
+        subjects = ("subject-0", "subject-1")
+        opposites = ("opposite-0", "opposite-1", "opposite-2")
+        opposite_types: dict[str, str] = dict.fromkeys(opposites, "eligible")
+        assert system.apply_graph_change(
+            GraphChange(
+                anchor_upserts=tuple(Anchor(uuid, "subject", uuid) for uuid in subjects)
+                + tuple(Anchor(uuid, "eligible", uuid) for uuid in opposites)
+            ),
+            provenance=OWNER,
+        ).accepted
+
+        rng = random.Random(20260819)
+        present_links: set[str] = set()
+        rejection_count = 0
+        for _ in range(120):
+            if rng.randrange(4):
+                link_type = rng.choice(link_types).type_key
+                source = rng.choice(subjects)
+                target = rng.choice(opposites)
+                uuid = f"{link_type}:{source}:{target}"
+                if uuid in present_links:
+                    change = GraphChange(link_removals=(uuid,))
+                else:
+                    change = GraphChange(link_upserts=(Link(uuid, link_type, source, target),))
+            else:
+                target = rng.choice(opposites)
+                next_type = "ineligible" if opposite_types[target] == "eligible" else "eligible"
+                change = GraphChange(anchor_upserts=(Anchor(target, next_type, target),))
+
+            outcome = system.apply_graph_change(change, provenance=OWNER)
+            if outcome.accepted:
+                if change.link_removals:
+                    present_links.remove(change.link_removals[0])
+                elif change.link_upserts:
+                    present_links.add(change.link_upserts[0].uuid)
+                elif change.anchor_upserts:
+                    value = change.anchor_upserts[0]
+                    opposite_types[value.uuid] = value.type_key
+                complete = system.check(
+                    ValidationRequest(
+                        ValidationRequestKind.ASSESS,
+                        ValidationScope.GRAPH_CONFORMANCE,
+                        100,
+                    )
+                )
+                assert complete.conforms, complete.returned_findings
+            else:
+                rejection_count += 1
+        assert rejection_count >= 10
     finally:
         system.close()
 
