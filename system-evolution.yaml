@@ -3,7 +3,7 @@ evolution:
   id: vellis-2-semantic-work-locality
   objective: Replace locally optimized query and validation paths with one finite positive conjunctive-pattern meaning and one exact reason-aware invariant-impact meaning.
   observable_distinction: Hidden query witnesses cannot multiply answer work, and ordinary mutation contains only exact applicable rule-subject-end work rather than broad neighborhoods.
-  lifecycle: ready
+  lifecycle: active
   approval: {status: accepted, reason: "The query language, output and row identity, state selection, compatibility, and mutation locality change accepted meaning.", checkpoint: git:f3bfd25c6f814e745add11b99b7e48bef8168773}
   blocker: null
   checkpoint: git:925fd96d0f0d72bd2707c3fb2c6cb77742d30d1b
@@ -154,7 +154,7 @@ work_items:
     nearest_wrong_system: A new compiler exists while a legacy evaluator, component path, late distinct, or manual capacity formula remains reachable.
     compatibility_effect: Only new prerelease schemas remain under unchanged tool names.
     non_effects: [No persistent migration., No fallback evaluator., Queries do not mutate canonical state.]
-    lifecycle: ready
+    lifecycle: active
     implementation_status: conflicting
     evidence_refs: []
     blocker: null
