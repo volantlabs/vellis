@@ -415,16 +415,16 @@ def _data_candidate_semijoins(
     aliases: dict[str, str],
     answer: frozenset[str],
 ) -> tuple[_Predicate, ...]:
-    """Drive visible data identities from a hidden grounding anchor when possible.
+    """Drive visible data identities from their indexed grounding association.
 
     A property predicate is intentionally non-sargable.  This indexed membership relation
-    keeps it downstream of the data UUIDs reachable from the hidden anchor selector instead
-    of scanning every same-type property before testing association.
+    keeps it downstream of the data UUIDs reachable from its anchor selector instead of
+    scanning every same-type property before testing association.
     """
     groups = {group.name: group for group in query.anchor_groups}
     predicates: list[_Predicate] = []
     for index, condition in enumerate(query.data_conditions):
-        if condition.name not in answer or condition.anchor_group in answer:
+        if condition.name not in answer:
             continue
         group = groups[condition.anchor_group]
         anchor_alias = f"ca{index}"

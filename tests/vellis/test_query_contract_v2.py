@@ -259,8 +259,9 @@ def test_sqlite_compiler_matches_parallel_self_and_cyclic_pattern(tmp_path: Path
 def test_pattern_matching_visits_only_relationally_relevant_candidates(tmp_path: Path) -> None:
     """Same-type, same-property rows outside the selected anchor add no query work."""
 
-    def measured(population: int) -> tuple[int, int]:
-        system = RTGSystem.open(tmp_path / f"pattern-locality-{population}.sqlite3")
+    def measured(population: int, *, project_anchor: bool) -> tuple[int, int]:
+        mode = "projected" if project_anchor else "hidden"
+        system = RTGSystem.open(tmp_path / f"pattern-locality-{mode}-{population}.sqlite3")
         owner = Provenance(initiator="owner")
         assert system.initialize_fresh(
             _definitions(), provenance=owner, initialization_summary="pattern locality"
@@ -298,6 +299,9 @@ def test_pattern_matching_visits_only_relationally_relevant_candidates(tmp_path:
             "vellis_re2_full_match", 2, counted, deterministic=True
         )
         system.store._connection.set_progress_handler(progress, 1)  # noqa: SLF001
+        projections: tuple[ReturnProjection, ...] = (DataPropertyProjection("text", "d", "text"),)
+        if project_anchor:
+            projections = (AnchorProjection("anchor", "a"), *projections)
         query = GraphQuery(
             anchor_groups=(AnchorGroup("a", ("person",), UuidFilter(("a",))),),
             data_conditions=(
@@ -312,7 +316,7 @@ def test_pattern_matching_visits_only_relationally_relevant_candidates(tmp_path:
             ),
             output=RowQueryOutput(
                 kind="rows",
-                projections=(DataPropertyProjection("text", "d", "text"),),
+                projections=projections,
                 maximum_rows=2,
             ),
         )
@@ -325,9 +329,12 @@ def test_pattern_matching_visits_only_relationally_relevant_candidates(tmp_path:
             system.store._connection.set_progress_handler(None, 0)  # noqa: SLF001
             system.close()
 
-    costs = [measured(population) for population in (10, 100, 500)]
-    assert [calls for _, calls in costs] == [1, 1, 1]
-    assert len({steps for steps, _ in costs}) == 1
+    for project_anchor in (False, True):
+        costs = [
+            measured(population, project_anchor=project_anchor) for population in (10, 100, 500)
+        ]
+        assert [calls for _, calls in costs] == [1, 1, 1]
+        assert len({steps for steps, _ in costs}) == 1
 
 
 def test_hidden_witness_fanout_does_not_form_a_quadratic_product(tmp_path: Path) -> None:

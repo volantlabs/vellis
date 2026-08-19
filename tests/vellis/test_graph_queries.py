@@ -2137,14 +2137,13 @@ def _rating_query(*aggregations: QueryAggregation, maximum: int = 20) -> GraphQu
     )
 
 
-def test_aggregation_counts_matching_objects_not_distinct_projected_tuples(
+def test_aggregation_counts_matching_objects_with_equal_property_values(
     tmp_path: Path,
 ) -> None:
-    """The whole reason to aggregate in the system is that projections deduplicate.
+    """Equal values keep separate sources and aggregation reduces that target population.
 
-    Two notes carrying the same rating are one projected tuple and two objects. Summing a
-    projection of those values silently answers a smaller question, and nothing about the
-    result says so, which is why the arithmetic belongs here.
+    Two notes carrying the same rating remain separate property rows because their source
+    UUIDs differ. Aggregate output counts and computes directly over those target objects.
     """
     system = RTGSystem.open(tmp_path / "vellis.sqlite3")
     try:
