@@ -86,7 +86,7 @@ async def test_published_input_schemas_carry_their_whole_meaning(client: Client)
 
 
 @pytest.mark.anyio
-async def test_query_discovery_explains_identity_counts_and_multi_type_grounding(
+async def test_query_discovery_explains_source_identity_and_multi_type_grounding(
     client: Client,
 ) -> None:
     async with client:
@@ -94,9 +94,15 @@ async def test_query_discovery_explains_identity_counts_and_multi_type_grounding
     query = next(tool for tool in tools if tool.name == "rtg_query")
     query_description = " ".join((query.description or "").split())
 
-    assert "identity-bearing anchor" in query_description
-    assert "anchor-only return shape" in query_description
-    assert "count distinct projected anchor UUIDs" in query_description
+    assert "property projection carries its source associated-data UUID" in query_description
+    assert "Equal property values from distinct source objects" in query_description
+    assert "remain distinct rows" in query_description
+    assert "extra hidden witnesses do not distinguish rows" in query_description
+    assert "Aggregate output instead reduces one bounded" in query_description
+    assert (
+        "Two objects with the same projected values are therefore one row" not in query_description
+    )
+    assert "project the identity-bearing anchor" not in query_description
     assert "permits every anchor type" in query_description
     assert "query each type separately" in query_description
     assert "accepted per-type result is complete" in query_description

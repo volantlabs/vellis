@@ -443,19 +443,17 @@ def build_server(system: RTGSystem, *, name: str = "vellis") -> FastMCP:
         )
 
     def rtg_query(query: GraphQuery) -> GraphQueryResult:
-        """Query current, prospective, or historical graph meaning, bounded, with optional totals.
+        """Query current, prospective, or historical graph meaning with one bounded output mode.
 
-        Rows carry exactly the projections asked for, and identical projected tuples occur
-        once. Two objects with the same projected values are therefore one row, so adding
-        up a projection does not total the objects — use an aggregation for that, or
-        project the identity-bearing anchor or data object alongside the values. An
-        anchor-only return shape has one row per matching anchor, even when visible values
-        match. When other projections can produce several tuples per anchor, count distinct
-        projected anchor UUIDs instead of rows. A data condition grounded on a multi-type
-        anchor group is valid only when its associated-data type permits every anchor type
-        in that group; otherwise query each type separately. Each accepted per-type result
-        is complete because exceeding its maximum is refused whole, so merge only accepted
-        results and apply any desired bound to the combined presentation.
+        Row output carries exactly the requested projections. Object projections retain
+        UUID identity, and each property projection carries its source associated-data UUID,
+        presence, and value. Equal property values from distinct source objects therefore
+        remain distinct rows, while extra hidden witnesses do not distinguish rows. Aggregate
+        output instead reduces one bounded associated-data target population. A data condition
+        grounded on a multi-type anchor group is valid only when its associated-data type
+        permits every anchor type in that group; otherwise query each type separately. Each
+        accepted per-type result is complete because exceeding its maximum is refused whole,
+        so merge only accepted results and apply any desired bound to the combined presentation.
         """
         return _result(
             system.query_graph(query, provenance=_agent()),
