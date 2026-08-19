@@ -2,13 +2,13 @@
 
 This is the durable execution handoff for evolution `vellis-2-semantic-work-locality`. Product
 meaning remains authoritative in `model/`; `system-evolution.yaml` owns lifecycle and evidence.
-This document records selected realization, deletion, and verification work so a cold agent can
-resume W002–W006 without reconstructing decisions from a conversation.
+This document records the accepted realization, completed deletion, and verification work so a cold
+agent can reconstruct the evolution without this conversation.
 
-The proposed authority baseline is model digest
+The accepted authority baseline is model digest
 `sha256:5ce0b4cbcc0785f57980d709bf903717f3323ef116f40a9f58737e6f06ac9240`.
-Implementation must not begin until the owner accepts the exact checkpoint recorded in the
-evolution record. This is a prerelease schema break, not a compatibility-middleware campaign.
+The owner accepted its exact checkpoint before implementation began. This is an intentional
+prerelease schema break, not a compatibility-middleware campaign.
 
 ## Completion boundary
 
@@ -558,20 +558,18 @@ operations.
 
 ## W005 closure and subtraction
 
-Run the documentation-sync workflow and reconcile `model/README.md`, `README.md`,
-`docs/mcp-realization.md`, examples, and test descriptions with implemented truth. Remove obsolete
-workaround prose rather than memorializing it. Search model, source, tests, README, and docs for every
-deleted name and inverse claim. Confirm that the former transitional
-`tests/vellis/test_semantic_work_locality_triggers.py` name and all obsolete source-shape or exact
-old-cost assertions are absent while the permanent `test_semantic_work_locality.py` regressions
-remain.
+The documentation-sync workflow reconciled `model/README.md`, `README.md`,
+`docs/mcp-realization.md`, examples, and test descriptions with implemented truth. The subtraction
+review removed the former transitional module name, obsolete source-shape claims, exact old-cost
+assertions, and inverse compatibility claims while retaining the permanent
+`test_semantic_work_locality.py` regressions.
 
-Confirm persistent schema/version and snapshot fixtures did not change and exactly ten MCP names
-remain. Run focused query/equality/mutation tests, `just model-check`,
-`just system-evolution-check`, `just package-check`, `just check`, and `git diff --check`. Freeze one
-token and obtain fresh authority/conformance and engineering/evidence reviews at that same token.
-Only deterministic evolution bookkeeping may follow a clean pair; commit and independently validate
-the committed checkpoint.
+Closure evidence confirms that persistent schema/version and snapshot fixtures did not change and
+that exactly ten MCP names remain. Focused query/equality/mutation tests, `just model-check`,
+`just system-evolution-check`, `just package-check`, `just check`, and `git diff --check` form the
+final gate. The final review protocol freezes one token for fresh authority/conformance and
+engineering/evidence reviews; only deterministic evolution bookkeeping may follow a clean pair,
+after which the committed checkpoint is independently validated.
 
 ## Accepted downstream rebaseline
 
@@ -589,10 +587,10 @@ not the superseded tree or connected-only plans:
   locality rules may infer selector trees, query components, or query-planner abstractions.
 - W006 remains the independent assessment/restore read-snapshot and temporary-work-lifetime repair;
   it neither reopens query semantics nor absorbs W003 work.
-- W005 must search model, source, tests, and documentation for stale `tree`, `connected-only`,
-  `backbone`, component-reconstruction, legacy capacity-formula, and regex-unrelated-population claims,
-  in addition to the deletion inventory already listed. It closes only after the implemented system
-  and public truth reflect this rebased handoff.
+- W005 searched model, source, tests, and documentation for stale `tree`, `connected-only`,
+  `backbone`, component-reconstruction, legacy capacity-formula, and regex-unrelated-population
+  claims in addition to the deletion inventory already listed. The implemented system and public
+  truth reflect this rebased handoff.
 
 This rebaseline supersedes the earlier detailed plan wherever it required connected acyclic selector
 graphs, answer-relevant backbones, or removal of disconnected queries. All other accepted non-goals
