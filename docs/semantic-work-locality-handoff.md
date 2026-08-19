@@ -252,9 +252,9 @@ filter tables and small/large-list branch.
 ### Compiler and conjunctive answer relation
 
 Add `vellis/sqlite_query.py`. `CompiledQuery` owns ordered statements, exact ordered parameters for
-each statement, per-`SELECT` table counts, selected-column counts, generated expression/subquery
-depth, identity/hydration columns, output bound and kind, and cleanup needs. Compilation and
-preflight finish before answer SQL executes.
+each statement, each statement's UTF-8 byte length, per-`SELECT` table counts, selected-column
+counts, generated expression/subquery depth, identity/hydration columns, output bound and kind, and
+cleanup needs. Compilation and preflight finish before answer SQL executes.
 
 Compile the query as one positive conjunction over named identity variables:
 
@@ -312,9 +312,11 @@ new general-purpose optimizer.
 ### Exact capacity
 
 Preflight actual compiled statements and parameter sequences against variable, result-column,
-table-per-scope, expression/subquery-depth, and integer-limit capacities. Historical predicates and
-answer `LIMIT` bindings are present automatically. Delete hand-maintained field-count estimates.
-Capacity excess is a typed whole-result rejection before answer execution.
+table-per-scope, expression/subquery-depth, SQL-text byte-length, and integer-limit capacities. The
+UTF-8 byte length of each generated statement is compared with the connection's
+`SQLITE_LIMIT_SQL_LENGTH`; public values remain bound parameters and never inflate generated SQL.
+Historical predicates and answer `LIMIT` bindings are present automatically. Delete hand-maintained
+field-count estimates. Capacity excess is a typed whole-result rejection before answer execution.
 
 ### Oracle and integration
 
@@ -449,9 +451,9 @@ invariance.
 Invalidity evidence covers empty/duplicate names, unknown references/types, empty/duplicate UUID
 filters, malformed or unsupported RE2 expressions, pattern comparisons on
 non-string properties, empty outputs/aggregations, bad aggregate target/property/operator, nonpositive bounds,
-prospective without delta, unknown revision, naive time, and structural SQLite excess. Every refusal
-preserves graph, definitions, delta, revision, and canonical history and returns no partial answer or
-evaluated revision.
+prospective without delta, unknown revision, naive time, and structural SQLite excess including a
+lowered SQL-text byte limit. Every refusal preserves graph, definitions, delta, revision, and
+canonical history and returns no partial answer or evaluated revision.
 
 Aggregation evidence covers zero/nonzero count, exact and cancelling sums, numeric/string extrema,
 missing/all-missing properties, several operations/properties on one target, hidden witness
