@@ -36,7 +36,30 @@ from vellis.json_value import JsonValue, _json_equality_key, json_kind, value_si
 from vellis.outcomes import ValidationFinding
 from vellis.patterns import PatternError, compile_pattern
 
-__all__ = ["assess_object_neighborhood", "validate_property_value"]
+__all__ = [
+    "PreparedPropertyConstraint",
+    "assess_object_neighborhood",
+    "prepare_property_constraint",
+    "validate_prepared_property_value",
+    "validate_property_value",
+]
+
+
+@dataclass(frozen=True, slots=True)
+class PreparedPropertyConstraint:
+    """One immutable constraint with collection membership indexed for a validation scope."""
+
+    constraint: PropertyConstraint
+    permitted_value_keys: frozenset[tuple[object, ...]]
+
+
+def prepare_property_constraint(constraint: PropertyConstraint) -> PreparedPropertyConstraint:
+    """Prepare constant membership work once for repeated validation under ``constraint``."""
+    permitted = () if constraint.value_range is None else constraint.value_range.permitted_values
+    return PreparedPropertyConstraint(
+        constraint,
+        frozenset(_json_equality_key(value) for value in permitted),
+    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -85,12 +108,27 @@ def assess_object_neighborhood(
 ) -> tuple[ValidationFinding, ...]:
     """Assess one already-bounded object neighborhood against relevant definitions."""
     graph = _ObjectNeighborhood.from_values(values)
+    relevant_data_types = {data.type_key for data in graph.associated_data}
+    prepared_properties = {
+        definition.type_key: tuple(
+            prepare_property_constraint(constraint)
+            for constraint in definition.property_constraints
+        )
+        for definition in definitions.associated_data_types
+        if definition.type_key in relevant_data_types
+    }
     findings: list[ValidationFinding] = []
     _check_unique_identity(graph, findings)
     for anchor in graph.anchors:
         _check_anchor(anchor, definitions, findings)
     for data in graph.associated_data:
-        _check_associated_data(data, graph, definitions, findings)
+        _check_associated_data(
+            data,
+            graph,
+            definitions,
+            prepared_properties.get(data.type_key, ()),
+            findings,
+        )
     for link in graph.links:
         _check_link(link, graph, definitions, findings)
     for constraint in definitions.relationship_constraints:
@@ -172,6 +210,7 @@ def _check_associated_data(
     data: AssociatedDataObject,
     graph: _ObjectNeighborhood,
     definitions: GraphDefinitionSet,
+    prepared_constraints: tuple[PreparedPropertyConstraint, ...],
     findings: list[ValidationFinding],
 ) -> None:
     if not _check_type_key_resolves(
@@ -227,15 +266,15 @@ def _check_associated_data(
                     implicated_objects=(data.uuid, anchor_uuid),
                 )
             )
-    _check_properties(data, definition.property_constraints, findings)
+    _check_properties(data, prepared_constraints, findings)
 
 
 def _check_properties(
     data: AssociatedDataObject,
-    constraints: tuple[PropertyConstraint, ...],
+    constraints: tuple[PreparedPropertyConstraint, ...],
     findings: list[ValidationFinding],
 ) -> None:
-    declared = {constraint.property_name: constraint for constraint in constraints}
+    declared = {prepared.constraint.property_name: prepared for prepared in constraints}
     for name in data.properties:
         if name not in declared:
             findings.append(
@@ -248,7 +287,8 @@ def _check_properties(
                     implicated_objects=(data.uuid,),
                 )
             )
-    for name, constraint in declared.items():
+    for name, prepared in declared.items():
+        constraint = prepared.constraint
         label = f"property:{data.type_key}.{name}"
         if name not in data.properties:
             if constraint.required:
@@ -260,7 +300,7 @@ def _check_properties(
                     )
                 )
             continue
-        for reason in validate_property_value(constraint, data.properties[name]):
+        for reason in validate_prepared_property_value(prepared, data.properties[name]):
             findings.append(
                 ValidationFinding(
                     summary=f"associated data {data.uuid!r} property {name!r} {reason}",
@@ -275,12 +315,20 @@ def validate_property_value(constraint: PropertyConstraint, value: JsonValue) ->
 
     Requiredness, kind, shape, range, and pattern apply conjunctively.
     """
+    return validate_prepared_property_value(prepare_property_constraint(constraint), value)
+
+
+def validate_prepared_property_value(
+    prepared: PreparedPropertyConstraint, value: JsonValue
+) -> tuple[str, ...]:
+    """Validate one value while reusing its scope's prepared collection membership."""
+    constraint = prepared.constraint
     kind = json_kind(value)
     if kind is not constraint.json_kind:
         return (f"is {kind.value} but is declared {constraint.json_kind.value}",)
     reasons: list[str] = []
     reasons.extend(_shape_reasons(constraint, value))
-    reasons.extend(_range_reasons(constraint, value))
+    reasons.extend(_range_reasons(prepared, value))
     reasons.extend(_pattern_reasons(constraint, value))
     return tuple(reasons)
 
@@ -300,7 +348,8 @@ def _shape_reasons(constraint: PropertyConstraint, value: JsonValue) -> list[str
     return reasons
 
 
-def _range_reasons(constraint: PropertyConstraint, value: JsonValue) -> list[str]:
+def _range_reasons(prepared: PreparedPropertyConstraint, value: JsonValue) -> list[str]:
+    constraint = prepared.constraint
     value_range = constraint.value_range
     if value_range is None:
         return []
@@ -311,9 +360,9 @@ def _range_reasons(constraint: PropertyConstraint, value: JsonValue) -> list[str
             reasons.append(f"is below its inclusive lower bound {lower}")
         if isinstance(upper, Decimal) and value > upper:
             reasons.append(f"is above its inclusive upper bound {upper}")
-    if value_range.permitted_values and _json_equality_key(value) not in {
-        _json_equality_key(permitted) for permitted in value_range.permitted_values
-    }:
+    if prepared.permitted_value_keys and _json_equality_key(value) not in (
+        prepared.permitted_value_keys
+    ):
         reasons.append("is not one of its permitted values")
     return reasons
 

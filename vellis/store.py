@@ -115,7 +115,12 @@ from vellis.outcomes import (
     ValidationScope,
 )
 from vellis.patterns import PatternError, compile_pattern
-from vellis.validation import assess_object_neighborhood, validate_property_value
+from vellis.validation import (
+    PreparedPropertyConstraint,
+    assess_object_neighborhood,
+    prepare_property_constraint,
+    validate_prepared_property_value,
+)
 
 _MAXIMUM_SQLITE_INTEGER = 2**63 - 1
 _AGGREGATION_BATCH_SIZE = 256
@@ -3578,6 +3583,7 @@ class CanonicalStore:
         )
         cached_type_key: str | None = None
         cached_definitions = GraphDefinitionSet()
+        cached_property_constraints: dict[str, PreparedPropertyConstraint] = {}
         for uuid_value, value_id, kind_value, type_key_value, source, target in rows:
             uuid = str(uuid_value)
             kind = ObjectKind(str(kind_value))
@@ -3591,6 +3597,15 @@ class CanonicalStore:
                     relationship_keys=set(),
                 )
                 cached_type_key = type_key
+                data_definition = cached_definitions.associated_data_type(type_key)
+                cached_property_constraints = (
+                    {}
+                    if data_definition is None
+                    else {
+                        constraint.property_name: prepare_property_constraint(constraint)
+                        for constraint in data_definition.property_constraints
+                    }
+                )
             definitions = cached_definitions
             resolved = {
                 ObjectKind.ANCHOR: definitions.anchor_type(type_key) is not None,
@@ -3708,7 +3723,7 @@ class CanonicalStore:
                         implicated_definitions=(f"associatedDataType:{type_key}",),
                         implicated_objects=(uuid, anchor_id),
                     )
-            declared = {rule.property_name: rule for rule in definition.property_constraints}
+            declared = cached_property_constraints
             present: set[str] = set()
             for name, json_kind_value, boolean, number, text_value in self._connection.execute(
                 "SELECT name, json_kind, boolean_value, number_value, text_value"
@@ -3717,8 +3732,8 @@ class CanonicalStore:
             ):
                 property_name = str(name)
                 present.add(property_name)
-                rule = declared.get(property_name)
-                if rule is None:
+                prepared = declared.get(property_name)
+                if prepared is None:
                     yield ValidationFinding(
                         summary=(
                             f"associated data {uuid!r} carries property {property_name!r}, which "
@@ -3729,14 +3744,14 @@ class CanonicalStore:
                     )
                     continue
                 value = json_storage_value(json_kind_value, boolean, number, text_value)
-                for reason in validate_property_value(rule, value):
+                for reason in validate_prepared_property_value(prepared, value):
                     yield ValidationFinding(
                         summary=f"associated data {uuid!r} property {property_name!r} {reason}",
                         implicated_definitions=(f"property:{type_key}.{property_name}",),
                         implicated_objects=(uuid,),
                     )
-            for name, rule in declared.items():
-                if rule.required and name not in present:
+            for name, prepared in declared.items():
+                if prepared.constraint.required and name not in present:
                     yield ValidationFinding(
                         summary=f"associated data {uuid!r} omits required property {name!r}",
                         implicated_definitions=(f"property:{type_key}.{name}",),

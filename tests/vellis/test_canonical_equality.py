@@ -7,12 +7,16 @@ these distinctions are exactly the ones a convenient library default erases.
 from __future__ import annotations
 
 from decimal import Decimal
+from pathlib import Path
 
 import pytest
 
 import vellis.definitions as definitions_module
 import vellis.json_value as json_value_module
+import vellis.validation as validation_module
 from tests.vellis.semantic_state import DefinitionDelta, SemanticState, semantic_state_equal
+from vellis.canonical import Provenance
+from vellis.changes import GraphChange
 from vellis.definitions import (
     AnchorTypeDefinition,
     AssociatedDataTypeDefinition,
@@ -30,7 +34,8 @@ from vellis.definitions import (
 )
 from vellis.graph import Anchor, AssociatedDataObject, Graph, Link, graph_equal
 from vellis.json_value import JsonKind, json_equal, json_kind, loads, normalize, value_size
-from vellis.validation import validate_property_value
+from vellis.system import RTGSystem
+from vellis.validation import assess_object_neighborhood, validate_property_value
 
 COMPOSED_E_ACUTE = "\u00e9"
 DECOMPOSED_E_ACUTE = "e\u0301"
@@ -327,6 +332,82 @@ def test_permitted_value_membership_uses_recursive_canonical_equality() -> None:
     assert validate_property_value(nested, normalize({"members": [1, None], "number": 1.0})) == (
         "is not one of its permitted values",
     )
+
+
+def test_graph_validation_prepares_one_permitted_index_per_constraint_scope(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """K permitted values and N governed objects construct K + N keys, not N times K."""
+    permitted_count = 500
+    object_count = 40
+    constraint = PropertyConstraint(
+        property_name="tag",
+        required=True,
+        json_kind=JsonKind.STRING,
+        value_range=ValueRange(
+            permitted_values=tuple(normalize(f"value-{index}") for index in range(permitted_count))
+        ),
+        description="One indexed permitted collection.",
+    )
+    definitions = GraphDefinitionSet(
+        anchor_types=(_described(),),
+        associated_data_types=(
+            AssociatedDataTypeDefinition(
+                type_key="note",
+                permitted_anchor_type_keys=("person",),
+                property_constraints=(constraint,),
+                description="A governed note.",
+            ),
+            AssociatedDataTypeDefinition(
+                type_key="unused",
+                permitted_anchor_type_keys=("person",),
+                property_constraints=(constraint,),
+                description="An unrelated type with the same large collection.",
+            ),
+        ),
+    )
+    anchor = Anchor("a-1", "person", "Ada")
+    data = tuple(
+        AssociatedDataObject(
+            f"note-{index}",
+            "note",
+            (anchor.uuid,),
+            {"tag": "value-0"},
+        )
+        for index in range(object_count)
+    )
+    calls = 0
+    original = validation_module._json_equality_key  # noqa: SLF001
+
+    def counted(value):
+        nonlocal calls
+        calls += 1
+        return original(value)
+
+    monkeypatch.setattr(validation_module, "_json_equality_key", counted)
+
+    assert assess_object_neighborhood((anchor, *data), definitions) == ()
+    assert calls == permitted_count + object_count
+
+    system = RTGSystem.open(tmp_path / "permitted-index.sqlite3")
+    try:
+        owner = Provenance(initiator="owner")
+        assert system.initialize_fresh(
+            definitions, provenance=owner, initialization_summary="prepared membership"
+        ).accepted
+        assert system.apply_graph_change(
+            GraphChange(anchor_upserts=(anchor,), associated_data_upserts=data),
+            provenance=owner,
+        ).accepted
+        calls = 0
+
+        report = system.check(provenance=owner)
+
+        assert report.accepted
+        assert report.conforms is True
+        assert calls == permitted_count + object_count
+    finally:
+        system.close()
 
 
 def _data_type_with_permitted(values: tuple[str, ...]) -> GraphDefinitionSet:

@@ -604,13 +604,14 @@ and non-effects remain in force.
 
 ## Execution status
 
-W001 authority and W002 canonical collection equality are complete. W003 now has an implementation
-candidate: the closed public schema, independent brute-force oracle, conjunctive SQLite compiler,
+W001 authority, W002 canonical collection equality, and W003 query execution are complete. W003's
+closed public schema, independent brute-force oracle, conjunctive SQLite compiler,
 unified selector-member relation, bounded row/target identity materialization, compiled-statement
 capacity checks, tagged state integration, one-snapshot definition discovery, and legacy query-path
-deletion are present and locally evidenced. W003 remains active until its clean review pair and
-checkpoint bookkeeping complete. W007, W004, W006, and final W005 closure retain the dependencies,
-evidence obligations, and deletion scope stated above.
+deletion are independently reviewed. W007 now has an implementation candidate that prepares each
+relevant permitted-value key index once per validation scope and reuses it across governed values.
+W004, W006, and final W005 closure retain the dependencies, evidence obligations, and deletion scope
+stated above.
 
 ## Resume and change control
 

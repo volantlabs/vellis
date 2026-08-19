@@ -119,17 +119,18 @@ Useful commands:
 
 ## Implementation status
 
-The accepted finite positive must-exist query language now has an implementation candidate under
-W003 review. It supports every finite pattern topology, uses exclusive row or aggregate output,
+The accepted finite positive must-exist query language is implemented and independently reviewed.
+It supports every finite pattern topology, uses exclusive row or aggregate output,
 preserves the source identity of projected properties, and carries one tagged current, prospective,
 revision, or time selection. SQLite bounds distinct answer identities before hydration or arithmetic,
 and unreturned witnesses affect an answer only through existence. The prerelease request-schema break
 is intentional; the ten MCP tool names and persistence format are unchanged.
 
-Definition summary, focused inspection, and proposal discovery now read one SQLite snapshot under
-W003. Assessment-page snapshot consistency and cleanup of completed assessment/restore work remain
-owned by W006; reason-local multiplicity work remains W004, and reuse of permitted-value indexes
-across governed objects remains W007. None requires a persistent migration.
+Definition summary, focused inspection, and proposal discovery now read one SQLite snapshot. W007
+has an implementation candidate that prepares each relevant permitted-value index once per
+validation scope and reuses it across governed objects. Assessment-page snapshot consistency and
+cleanup of completed assessment/restore work remain W006, and reason-local multiplicity work remains
+W004. None requires a persistent migration.
 
 All seventeen original campaign slices and corrective slice S018 are complete. S018 implements the
 selected setup-program/public-CLI behavior with fake-client evidence. Closure confirmed both

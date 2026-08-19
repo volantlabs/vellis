@@ -80,7 +80,7 @@ projections, revision/time indexes, definition checkpoints, caches, and snapshot
 realization choices, not selected architecture. Conformance should use semantic record-access counts
 or equivalent traces; wall-clock targets wait for representative runtime, hardware, and owner data.
 
-The current query implementation candidate stores normalized object values, definition entries, presence
+The reviewed query implementation stores normalized object values, definition entries, presence
 intervals, proposal entries, assessments, canonical events, and activity records in shared SQLite
 tables. The state head carries transactionally maintained current-graph and proposal summaries, so
 ordinary transition identity is derived without a population scan. Queries analyze one positive
@@ -93,6 +93,11 @@ snapshot. Ordinary mutation validation still derives the affected invariant clos
 full checks and broad cutovers use set-based scans and SQLite-backed findings. Snapshot, tail, restore,
 and compatibility import are streaming or SQL set operations. These are Vellis realization choices,
 not portable RTG architecture.
+
+The W007 implementation candidate prepares the canonical permitted-value key set once for each
+relevant property constraint in a graph-validation scope. In-memory neighborhoods and normalized
+SQLite assessment then reuse that immutable set across governed values; unrelated data types do not
+cause their permitted collections to be prepared.
 
 Implementation evidence verifies two realization-only properties that do not belong in the RTG
 domain model: text and structured content communicate the same typed outcome, and removing or
