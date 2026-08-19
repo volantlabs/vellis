@@ -602,6 +602,16 @@ This rebaseline supersedes the earlier detailed plan wherever it required connec
 graphs, answer-relevant backbones, or removal of disconnected queries. All other accepted non-goals
 and non-effects remain in force.
 
+## Execution status
+
+W001 authority and W002 canonical collection equality are complete. W003 now has an implementation
+candidate: the closed public schema, independent brute-force oracle, conjunctive SQLite compiler,
+unified selector-member relation, bounded row/target identity materialization, compiled-statement
+capacity checks, tagged state integration, one-snapshot definition discovery, and legacy query-path
+deletion are present and locally evidenced. W003 remains active until its clean review pair and
+checkpoint bookkeeping complete. W007, W004, W006, and final W005 closure retain the dependencies,
+evidence obligations, and deletion scope stated above.
+
 ## Resume and change control
 
 At every resumed turn, confirm path/status/worktrees, validate the evolution record, confirm the sole

@@ -29,7 +29,7 @@ from vellis.definitions import (
 )
 from vellis.governance import ActivateDefinitionDeltaRequest, DefinitionChange
 from vellis.graph import Anchor, Link
-from vellis.history import RevisionSelection
+from vellis.history import ProspectiveSelection, RevisionSelection
 from vellis.outcomes import (
     OperationStatus,
     ValidationFinding,
@@ -38,15 +38,14 @@ from vellis.outcomes import (
     ValidationScope,
 )
 from vellis.query import (
+    AggregateQueryOutput,
     AggregationOperator,
     AnchorGroup,
-    AnchorUuidFilter,
     AssociatedDataCondition,
-    EvaluatedStateScope,
     GraphQuery,
     QueryAggregation,
     RequiredLink,
-    ReturnShape,
+    UuidFilter,
 )
 from vellis.system import RTGSystem
 
@@ -289,7 +288,7 @@ def test_independent_changes_reproduce_participant_by_rule_cross_product(tmp_pat
     assert costs[-1] > costs[-2] * 3
 
 
-def test_historical_aggregate_reproduces_missing_limit_binding_preflight(tmp_path: Path) -> None:
+def test_compiled_binding_preflight_refuses_all_states_at_the_same_limit(tmp_path: Path) -> None:
     system = RTGSystem.open(tmp_path / "historical-capacity.sqlite3")
     try:
         assert system.initialize_fresh(
@@ -326,7 +325,7 @@ def test_historical_aggregate_reproduces_missing_limit_binding_preflight(tmp_pat
             AnchorGroup(
                 f"person{index}",
                 ("person",),
-                AnchorUuidFilter((person.uuid,)) if index < 2 else None,
+                UuidFilter((person.uuid,)) if index < 2 else None,
             )
             for index, person in enumerate(people)
         ) + (AnchorGroup("project", ("project",)),)
@@ -337,9 +336,12 @@ def test_historical_aggregate_reproduces_missing_limit_binding_preflight(tmp_pat
                 RequiredLink(f"link{index}", f"person{index}", "project", "worksOn")
                 for index in range(len(people))
             ),
-            return_shape=ReturnShape(()),
-            aggregations=(QueryAggregation("count", AggregationOperator.COUNT, "notes"),),
-            maximum_rows=20,
+            output=AggregateQueryOutput(
+                kind="aggregates",
+                data_condition="notes",
+                aggregations=(QueryAggregation("count", AggregationOperator.COUNT),),
+                maximum_matches=20,
+            ),
         )
         system.store._connection.setlimit(  # noqa: SLF001
             sqlite3.SQLITE_LIMIT_VARIABLE_NUMBER, 32
@@ -347,25 +349,26 @@ def test_historical_aggregate_reproduces_missing_limit_binding_preflight(tmp_pat
 
         current = system.query_graph(query, provenance=OWNER)
         prospective = system.query_graph(
-            replace(query, state_scope=EvaluatedStateScope.PROSPECTIVE), provenance=OWNER
+            replace(query, state=ProspectiveSelection(kind="prospective")), provenance=OWNER
         )
         historical = system.query_graph(
-            replace(query, state_scope=EvaluatedStateScope.HISTORICAL),
-            selection=RevisionSelection(applied.resulting_revision),
+            replace(
+                query,
+                state=RevisionSelection(kind="revision", revision=applied.resulting_revision),
+            ),
             provenance=OWNER,
         )
 
-        assert current.status is OperationStatus.ACCEPTED
-        assert prospective.status is OperationStatus.ACCEPTED
-        assert historical.status is OperationStatus.FAILED
-        assert "too many SQL variables" in historical.findings[0].summary
-        assert not historical.rows and not historical.aggregates
-        assert historical.evaluated_revision is None
+        for result in (current, prospective, historical):
+            assert result.status is OperationStatus.REJECTED
+            assert not result.rows and not result.aggregates
+            assert result.evaluated_revision is None
+            assert "parameters" in result.findings[0].summary
     finally:
         system.close()
 
 
-def test_definition_summary_trigger_reproduces_mixed_revision_read(
+def test_definition_summary_uses_one_committed_snapshot(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     path = tmp_path / "mixed-definition-summary.sqlite3"
@@ -410,8 +413,99 @@ def test_definition_summary_trigger_reproduces_mixed_revision_read(
         evaluated_revision, rows, delta_present = first.store.definition_summary_rows()
 
         assert evaluated_revision == 1
-        assert rows == (("person", "A person."), ("team", "A team."))
+        assert rows == (("person", "A person."),)
         assert delta_present
+        assert first.store.current_revision() == 2
+    finally:
+        first.close()
+        second.close()
+
+
+def test_definition_inspection_source_uses_one_committed_snapshot(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    path = tmp_path / "definition-neighborhood-snapshot.sqlite3"
+    first = RTGSystem.open(path)
+    second = RTGSystem.open(path)
+    try:
+        assert first.initialize_fresh(
+            GraphDefinitionSet(anchor_types=(AnchorTypeDefinition("person", "Before"),)),
+            provenance=OWNER,
+            initialization_summary="definition neighborhood snapshot",
+        ).accepted
+        assert first.set_definition_delta(
+            DefinitionChange(anchor_type_upserts=(AnchorTypeDefinition("person", "After"),)),
+            provenance=OWNER,
+        ).accepted
+        original = first.store._definition_selection_context_unlocked  # noqa: SLF001
+
+        def interleaved(*, prospective: bool, revision: int | None):
+            context = original(prospective=prospective, revision=revision)
+            assessment = second.check(
+                ValidationRequest(
+                    ValidationRequestKind.ASSESS,
+                    ValidationScope.DEFINITION_DELTA,
+                    maximum_findings=10,
+                ),
+                provenance=OWNER,
+            )
+            assert assessment.assessment_id is not None
+            assert second.activate_definition_delta(
+                ActivateDefinitionDeltaRequest(assessment.assessment_id), provenance=OWNER
+            ).accepted
+            return context
+
+        monkeypatch.setattr(first.store, "_definition_selection_context_unlocked", interleaved)
+        revision, definitions, delta_present = first.store.definition_neighborhood(("person",))
+
+        assert revision == 1 and delta_present
+        assert definitions.anchor_types == (AnchorTypeDefinition("person", "Before"),)
+        assert first.store.current_revision() == 2
+    finally:
+        first.close()
+        second.close()
+
+
+def test_proposal_discovery_uses_one_committed_snapshot(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    path = tmp_path / "proposal-discovery-snapshot.sqlite3"
+    first = RTGSystem.open(path)
+    second = RTGSystem.open(path)
+    try:
+        assert first.initialize_fresh(
+            GraphDefinitionSet(anchor_types=(AnchorTypeDefinition("person", "A person."),)),
+            provenance=OWNER,
+            initialization_summary="proposal discovery snapshot",
+        ).accepted
+        assert first.set_definition_delta(
+            DefinitionChange(anchor_type_upserts=(AnchorTypeDefinition("team", "A team."),)),
+            provenance=OWNER,
+        ).accepted
+        assessment = second.check(
+            ValidationRequest(
+                ValidationRequestKind.ASSESS,
+                ValidationScope.DEFINITION_DELTA,
+                maximum_findings=10,
+            ),
+            provenance=OWNER,
+        )
+        assessment_id = assessment.assessment_id
+        assert assessment_id is not None
+        original = first.store._overlay_identity_unlocked  # noqa: SLF001
+
+        def interleaved() -> str:
+            identity = original()
+            assert second.activate_definition_delta(
+                ActivateDefinitionDeltaRequest(assessment_id), provenance=OWNER
+            ).accepted
+            return identity
+
+        monkeypatch.setattr(first.store, "_overlay_identity_unlocked", interleaved)
+        state = first.store.proposal_state()
+
+        assert state.revision == 1
+        assert state.proposed_definition_identity is not None
         assert first.store.current_revision() == 2
     finally:
         first.close()
@@ -522,7 +616,7 @@ def test_successful_assessment_and_restore_retain_population_work_rows(
 
         assert system.discard_definition_delta(provenance=OWNER).accepted
         restored = system.restore_historical_state(
-            RevisionSelection(0),
+            RevisionSelection(kind="revision", revision=0),
             provenance=OWNER,
         )
         assert restored.accepted
@@ -532,28 +626,14 @@ def test_successful_assessment_and_restore_retain_population_work_rows(
         system.close()
 
 
-def test_trigger_source_contains_late_distinct_false_oracle_and_manual_capacity() -> None:
+def test_remaining_source_trigger_is_owned_by_mutation_locality_work() -> None:
     root = Path(__file__).parents[2]
     store_source = (root / "vellis" / "store.py").read_text(encoding="utf-8")
-    query_source = (root / "vellis" / "query.py").read_text(encoding="utf-8")
-    oracle_source = (root / "tests" / "vellis" / "oracle.py").read_text(encoding="utf-8")
-
-    aggregation = store_source[store_source.index("def _aggregate_bindings_unlocked") :]
-    capacity = store_source[
-        store_source.index("def _query_capacity_finding_unlocked") : store_source.index(
-            "def _clear_query_filter_tables_unlocked"
-        )
-    ]
     prospective = store_source[
         store_source.index("def _iter_multiplicity_findings_unlocked") : store_source.index(
             "def _multiplicity_findings_unlocked"
         )
     ]
 
-    assert "SELECT DISTINCT" in aggregation
-    assert "LIMIT ?" in aggregation
-    assert "historical_selection" not in capacity
     assert "assessment_impacted_type" in prospective
     assert "SELECT ?, uuid FROM assessment_type_changed_participant" in prospective
-    assert "def evaluate_indexed_query" in query_source
-    assert "evaluate_indexed_query" in oracle_source

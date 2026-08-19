@@ -29,9 +29,8 @@ from vellis.outcomes import ValidationRequest, ValidationRequestKind, Validation
 from vellis.query import (
     AnchorGroup,
     AnchorProjection,
-    EvaluatedStateScope,
     GraphQuery,
-    ReturnShape,
+    RowQueryOutput,
 )
 from vellis.store import CanonicalStore, StoreError
 from vellis.streaming import export_ndjson, export_tail_ndjson, import_ndjson
@@ -197,8 +196,9 @@ def test_import_rebuilds_live_meaning_on_one_fresh_history_base(
     system = _source(source_path)
     query = GraphQuery(
         (AnchorGroup("people", ("person",)),),
-        ReturnShape((AnchorProjection("person", "people"),)),
-        maximum_rows=26,
+        RowQueryOutput(
+            kind="rows", projections=(AnchorProjection("person", "people"),), maximum_rows=26
+        ),
     )
     expected_rows = system.query_graph(query).rows
     source_ledger_identity = system.store.ledger_identity()
@@ -374,8 +374,9 @@ def test_sql_replay_verification_and_restore_construct_no_graph(tmp_path: Path) 
     try:
         query = GraphQuery(
             (AnchorGroup("people", ("person",)),),
-            ReturnShape((AnchorProjection("person", "people"),)),
-            maximum_rows=3,
+            RowQueryOutput(
+                kind="rows", projections=(AnchorProjection("person", "people"),), maximum_rows=3
+            ),
         )
         expected_rows = system.query_graph(query).rows
         assert system.store.verify_projection_from_ledger() == ()
@@ -387,7 +388,7 @@ def test_sql_replay_verification_and_restore_construct_no_graph(tmp_path: Path) 
             provenance=Provenance("owner"),
         ).accepted
         restored = system.restore_historical_state(
-            RevisionSelection(1), provenance=Provenance("owner")
+            RevisionSelection(kind="revision", revision=1), provenance=Provenance("owner")
         )
         assert restored.accepted
         assert system.store.verify_projection_from_ledger() == ()
@@ -552,9 +553,9 @@ def test_streamed_tail_reconstructs_later_graph_and_activation_atomically(
         assert rebuilt.revision == written_tail.through_revision == final_revision
         query = GraphQuery(
             (AnchorGroup("teams", ("team",)),),
-            ReturnShape((AnchorProjection("team", "teams"),)),
-            maximum_rows=2,
-            state_scope=EvaluatedStateScope.CURRENT,
+            RowQueryOutput(
+                kind="rows", projections=(AnchorProjection("team", "teams"),), maximum_rows=2
+            ),
         )
         assert len(target.query_graph(query).rows) == 1
         assert target.store.canonical_record_count() == 1

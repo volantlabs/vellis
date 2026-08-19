@@ -42,7 +42,9 @@ here pretends otherwise.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+
+from pydantic import ConfigDict
 
 from vellis.definitions import (
     AnchorTypeDefinition,
@@ -54,9 +56,8 @@ from vellis.definitions import (
     LinkTypeDefinition,
     RelationshipConstraint,
 )
-from vellis.history import HistoricalSelection
+from vellis.history import CurrentSelection, EvaluatedStateSelection
 from vellis.outcomes import OperationStatus, ValidationFinding
-from vellis.query import EvaluatedStateScope
 
 __all__ = [
     "AnchorDefinitionDetail",
@@ -69,6 +70,8 @@ __all__ = [
     "inspection_findings",
     "summarize_anchor_types",
 ]
+
+_CLOSED_REQUEST = ConfigDict(extra="forbid")
 
 
 @dataclass(frozen=True, slots=True)
@@ -86,8 +89,9 @@ class AnchorTypeSummary:
 class DefinitionSummaryRequest:
     """Select current, prospective, or historical shallow definition meaning."""
 
-    historical_selection: HistoricalSelection | None = None
-    state_scope: EvaluatedStateScope = EvaluatedStateScope.CURRENT
+    state: EvaluatedStateSelection = field(default_factory=lambda: CurrentSelection(kind="current"))
+
+    __pydantic_config__ = _CLOSED_REQUEST
 
 
 @dataclass(frozen=True, slots=True)
@@ -121,8 +125,9 @@ class DefinitionInspectionRequest:
     """
 
     anchor_type_keys: tuple[str, ...]
-    historical_selection: HistoricalSelection | None = None
-    state_scope: EvaluatedStateScope = EvaluatedStateScope.CURRENT
+    state: EvaluatedStateSelection = field(default_factory=lambda: CurrentSelection(kind="current"))
+
+    __pydantic_config__ = _CLOSED_REQUEST
 
 
 @dataclass(frozen=True, slots=True)

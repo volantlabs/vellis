@@ -31,15 +31,14 @@ from vellis.governance import (
     DefinitionChange,
 )
 from vellis.graph import Anchor, AssociatedDataObject, Link, SystemMetadata
-from vellis.history import RevisionSelection
+from vellis.history import ProspectiveSelection
 from vellis.normalized import definition_identity
 from vellis.outcomes import ValidationRequest, ValidationRequestKind, ValidationScope
 from vellis.query import (
     AnchorGroup,
     AnchorProjection,
-    EvaluatedStateScope,
     GraphQuery,
-    ReturnShape,
+    RowQueryOutput,
 )
 from vellis.system import RTGSystem
 from vellis.validation import assess_object_neighborhood
@@ -160,16 +159,22 @@ def test_prospective_overlay_isolated_queryable_and_activates_atomically(tmp_pat
         current = system.query_graph(
             GraphQuery(
                 (AnchorGroup("people", ("person",)),),
-                ReturnShape((AnchorProjection("person-result", "people"),)),
-                2,
+                RowQueryOutput(
+                    kind="rows",
+                    projections=(AnchorProjection("person-result", "people"),),
+                    maximum_rows=2,
+                ),
             )
         )
         prospective = system.query_graph(
             GraphQuery(
                 (AnchorGroup("teams", ("team",)),),
-                ReturnShape((AnchorProjection("team-result", "teams"),)),
-                2,
-                state_scope=EvaluatedStateScope.PROSPECTIVE,
+                RowQueryOutput(
+                    kind="rows",
+                    projections=(AnchorProjection("team-result", "teams"),),
+                    maximum_rows=2,
+                ),
+                state=ProspectiveSelection(kind="prospective"),
             )
         )
         assert current.accepted and current.rows[0].anchors[0].anchor.type_key == "person"
@@ -316,10 +321,13 @@ def test_prospective_definition_discovery_uses_the_proposed_vocabulary(tmp_path:
             provenance=OWNER,
         ).accepted
         summary = system.definition_summary(
-            DefinitionSummaryRequest(state_scope=EvaluatedStateScope.PROSPECTIVE)
+            DefinitionSummaryRequest(state=ProspectiveSelection(kind="prospective"))
         )
         detail = system.inspect_definitions(
-            DefinitionInspectionRequest(("team",), state_scope=EvaluatedStateScope.PROSPECTIVE)
+            DefinitionInspectionRequest(
+                ("team",),
+                state=ProspectiveSelection(kind="prospective"),
+            )
         )
         assert [each.type_key for each in summary.anchor_types] == ["team"]
         assert detail.accepted and detail.anchor_details[0].anchor_type == TEAM
@@ -347,10 +355,13 @@ def test_definition_discovery_never_decodes_the_large_graph_overlay(tmp_path: Pa
         system.store.reset_instrumentation()
 
         summary = system.definition_summary(
-            DefinitionSummaryRequest(state_scope=EvaluatedStateScope.PROSPECTIVE)
+            DefinitionSummaryRequest(state=ProspectiveSelection(kind="prospective"))
         )
         detail = system.inspect_definitions(
-            DefinitionInspectionRequest(("team",), state_scope=EvaluatedStateScope.PROSPECTIVE)
+            DefinitionInspectionRequest(
+                ("team",),
+                state=ProspectiveSelection(kind="prospective"),
+            )
         )
 
         assert summary.accepted and detail.accepted
@@ -491,7 +502,7 @@ def test_type_upsert_replaces_the_prior_kind_at_shared_natural_identity(tmp_path
             provenance=OWNER,
         ).accepted
         summary = system.definition_summary(
-            DefinitionSummaryRequest(state_scope=EvaluatedStateScope.PROSPECTIVE)
+            DefinitionSummaryRequest(state=ProspectiveSelection(kind="prospective"))
         )
         assessment = _assess_delta(system)
         assert [value.type_key for value in summary.anchor_types] == ["base", "shared"]
@@ -1811,52 +1822,6 @@ def test_invalid_sparse_rule_is_validated_once_not_per_unrelated_type(tmp_path: 
         assert not report.conforms
         assert report.finding_count == 3
         assert len(report.returned_findings) == 3
-    finally:
-        system.close()
-
-
-def test_definition_summary_enforces_state_scope_truth_table_and_observes_rejections(
-    tmp_path: Path,
-) -> None:
-    system = _system(tmp_path)
-    try:
-        before = system.store.activity_record_count()
-
-        missing = system.definition_summary(
-            DefinitionSummaryRequest(state_scope=EvaluatedStateScope.HISTORICAL), provenance=OWNER
-        )
-        inconsistent = system.definition_summary(
-            DefinitionSummaryRequest(RevisionSelection(0), EvaluatedStateScope.CURRENT),
-            provenance=OWNER,
-        )
-
-        assert not missing.accepted and not inconsistent.accepted
-        assert system.store.activity_record_count() == before + 2
-    finally:
-        system.close()
-
-
-def test_query_and_inspection_reject_two_historical_selector_channels(tmp_path: Path) -> None:
-    system = _system(tmp_path)
-    try:
-        query = GraphQuery(
-            anchor_groups=(AnchorGroup("people", ("person",)),),
-            return_shape=ReturnShape((AnchorProjection("person", "people"),)),
-            maximum_rows=10,
-            historical_selection=RevisionSelection(0),
-            state_scope=EvaluatedStateScope.HISTORICAL,
-        )
-        inspection = DefinitionInspectionRequest(
-            ("person",),
-            historical_selection=RevisionSelection(0),
-            state_scope=EvaluatedStateScope.HISTORICAL,
-        )
-
-        query_result = system.query_graph(query, selection=RevisionSelection(0))
-        inspection_result = system.inspect_definitions(inspection, selection=RevisionSelection(0))
-
-        assert not query_result.accepted and query_result.rows == ()
-        assert not inspection_result.accepted and inspection_result.anchor_details == ()
     finally:
         system.close()
 

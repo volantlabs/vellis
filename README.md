@@ -119,19 +119,17 @@ Useful commands:
 
 ## Implementation status
 
-The existing v2 prerelease implementation remains runnable, but this branch now contains a proposed
-query-semantics and work-locality authority change awaiting owner acceptance. That target treats one
-query as a finite positive must-exist pattern with no topology restriction, makes row and aggregate
-output exclusive, preserves the source
-identity of projected properties, and requires exact rule-subject-end mutation work. The current
-runtime does not yet conform to that proposed target; implementation begins only after its exact
-model checkpoint is accepted.
+The accepted finite positive must-exist query language now has an implementation candidate under
+W003 review. It supports every finite pattern topology, uses exclusive row or aggregate output,
+preserves the source identity of projected properties, and carries one tagged current, prospective,
+revision, or time selection. SQLite bounds distinct answer identities before hydration or arithmetic,
+and unreturned witnesses affect an answer only through existence. The prerelease request-schema break
+is intentional; the ten MCP tool names and persistence format are unchanged.
 
-The pre-approval release review also found that related definition-discovery and assessment-page
-statements do not yet share one SQLite read snapshot, and that successful assessment/restore work
-can leave population-bearing temporary rows resident until reuse or connection close. The accepted
-model already excludes those states; W003 and W006 own the implementation corrections without a
-persistent migration or restore-semantics change.
+Definition summary, focused inspection, and proposal discovery now read one SQLite snapshot under
+W003. Assessment-page snapshot consistency and cleanup of completed assessment/restore work remain
+owned by W006; reason-local multiplicity work remains W004, and reuse of permitted-value indexes
+across governed objects remains W007. None requires a persistent migration.
 
 All seventeen original campaign slices and corrective slice S018 are complete. S018 implements the
 selected setup-program/public-CLI behavior with fake-client evidence. Closure confirmed both
@@ -167,16 +165,13 @@ Use these words precisely:
   its complete definition while untouched keys remain, a working proposal may temporarily carry
   findings, and an exact non-stale clean assessment gates atomic activation; and the optional
   Everyday Life starter vocabulary as an ordinary, owner-governable definition set; and bounded
-  semantic query over current state — named anchor and associated-data groups, required directed
-  links, structured property comparisons, and a shaped result refused whole rather than truncated
-  when it would exceed the caller's row bound, with indexed identity, type, direct-association, and
-  directed-link joins constraining candidates before property filtering; exact count, sum, minimum,
-  and maximum aggregation over current, prospective, and historical selections, with bounded match
-  identities and sparse exact-sum terms retained in SQLite while property values stream through
-  fixed-size reducer batches;
-  public UUID and type collections are bound relationally or in connection-aware chunks, while a
-  query beyond SQLite's structural plan capacity is rejected whole with no partial result; and a
-  separated
+  semantic query over current, prospective, revision, or time state — named anchor and
+  associated-data selectors, required directed links, exact and ordered property comparisons, and
+  whole-string RE2 matching under one positive conjunction; exclusive row output preserves projected
+  object identity while exclusive aggregate output reduces one bounded associated-data population;
+  one relational selector-member mechanism handles UUID and type collections, hidden witnesses are
+  existential, distinct answer identities are bounded before hydration or arithmetic, and confirmed
+  SQLite structural excess is rejected whole with no partial result; and a separated
   observational ledger — reads,
   validation, and refused operations leave a bounded record carrying capability, outcome,
   provenance, evaluated revision and scope but no result rows, over which the owner may read a

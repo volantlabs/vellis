@@ -8,6 +8,7 @@ import io
 import sqlite3
 from collections import Counter
 from collections.abc import Callable
+from dataclasses import replace
 from pathlib import Path
 from typing import cast
 
@@ -350,8 +351,10 @@ def test_historical_frontier_uses_definition_membership_at_that_revision(
         ).accepted
 
         historical = system.inspect_definitions(
-            DefinitionInspectionRequest(("person",)),
-            selection=RevisionSelection(0),
+            replace(
+                DefinitionInspectionRequest(("person",)),
+                state=RevisionSelection(kind="revision", revision=0),
+            ),
         )
         assert historical.accepted
         assert {value.type_key for value in historical.anchor_details[0].link_types} == {"friend"}
@@ -519,7 +522,9 @@ def test_adjacent_restore_depends_on_changed_tail_uuids_not_population(
         ).accepted
         steps = _steps(
             system,
-            lambda: system.restore_historical_state(RevisionSelection(1), provenance=OWNER),
+            lambda: system.restore_historical_state(
+                RevisionSelection(kind="revision", revision=1), provenance=OWNER
+            ),
         )
         assert steps < 2_000
     finally:
@@ -680,7 +685,7 @@ _SELECTED_CURRENT_GRAPH_READS = Counter(
         ("store.py", "", "612fc13a8a811b1f48d3312765e07f1ff9387e08809074c0ee6ed99e234a0f2a", 3): 1,
         (
             "store.py",
-            "_evaluate_sql_query_unlocked",
+            "_evaluate_compiled_query_unlocked",
             "1955bafb8db41dd91b583f4bfdffe6e4472caef5224e4eef96b07ecbbb0fe7cb",
             1,
         ): 1,
@@ -699,12 +704,6 @@ _SELECTED_CURRENT_GRAPH_READS = Counter(
         (
             "store.py",
             "_iter_multiplicity_findings_unlocked",
-            "1955bafb8db41dd91b583f4bfdffe6e4472caef5224e4eef96b07ecbbb0fe7cb",
-            1,
-        ): 1,
-        (
-            "store.py",
-            "_known_uuids",
             "1955bafb8db41dd91b583f4bfdffe6e4472caef5224e4eef96b07ecbbb0fe7cb",
             1,
         ): 1,

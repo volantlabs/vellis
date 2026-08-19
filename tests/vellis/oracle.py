@@ -5,6 +5,12 @@ CanonicalState. Small conformance fixtures still benefit from an independent rea
 oracle, so tests assemble those values directly from normalized SQLite rows here.
 """
 
+from __future__ import annotations
+
+from decimal import Decimal, DecimalException
+from itertools import product
+from typing import cast
+
 from tests.vellis.semantic_state import DefinitionDelta, SemanticState
 from vellis.changes import GraphChange
 from vellis.definitions import (
@@ -15,100 +21,342 @@ from vellis.definitions import (
     RelationshipConstraint,
 )
 from vellis.everyday_life import everyday_life_entries
-from vellis.graph import Anchor, AssociatedDataObject, Graph, Link, ObjectKind
+from vellis.graph import Anchor, AssociatedDataObject, Graph, GraphObject, Link, ObjectKind
+from vellis.json_value import JsonValue, json_kind
 from vellis.normalized import load_object_value
+from vellis.outcomes import OperationStatus, ValidationFinding
+from vellis.patterns import compile_pattern
 from vellis.query import (
-    AnchorGroup,
+    AggregateBinding,
+    AggregationOperator,
+    AnchorBinding,
+    AnchorProjection,
+    AssociatedDataBinding,
+    AssociatedDataProjection,
+    DataPropertyProjection,
     GraphQuery,
     GraphQueryResult,
-    RequiredLink,
-    evaluate_indexed_query,
+    GraphQueryRow,
+    LinkBinding,
+    LinkProjection,
+    PropertyComparison,
+    ReturnedProperty,
+    RowQueryOutput,
 )
 from vellis.store import CanonicalStore
 from vellis.system import RTGSystem
 
 
-class _TestGraphIndex:
-    """Test-only hash index over an explicitly materialized semantic fixture."""
-
-    def __init__(self, graph: Graph) -> None:
-        self.anchors = {value.uuid: value for value in graph.anchors}
-        self.links = {value.uuid: value for value in graph.links}
-        self.data = graph.associated_data
-
-    def known_anchor_uuids(self, anchor_type: str, uuids: tuple[str, ...]) -> set[str]:
-        return {
-            uuid
-            for uuid in uuids
-            if (value := self.anchors.get(uuid)) is not None and value.type_key == anchor_type
-        }
-
-    def known_link_uuids(self, link_type: str, uuids: tuple[str, ...]) -> set[str]:
-        return {
-            uuid
-            for uuid in uuids
-            if (value := self.links.get(uuid)) is not None and value.type_key == link_type
-        }
-
-    def anchor_candidates(
-        self, group: AnchorGroup, allowed_uuids: frozenset[str] | None = None
-    ) -> tuple[Anchor, ...]:
-        requested = None if group.uuid_filter is None else frozenset(group.uuid_filter.uuids)
-        permitted = (
-            allowed_uuids
-            if requested is None
-            else requested
-            if allowed_uuids is None
-            else requested & allowed_uuids
-        )
-        return tuple(
-            value
-            for value in self.anchors.values()
-            if value.type_key in group.anchor_types
-            and (permitted is None or value.uuid in permitted)
-        )
-
-    def associated_data_candidates(
-        self,
-        associated_data_type: str,
-        anchor_uuid: str,
-        allowed_uuids: frozenset[str] | None = None,
-    ) -> tuple[AssociatedDataObject, ...]:
-        return tuple(
-            value
-            for value in self.data
-            if value.type_key == associated_data_type
-            and anchor_uuid in value.anchor_uuids
-            and (allowed_uuids is None or value.uuid in allowed_uuids)
-        )
-
-    def link_candidates(
-        self, required: RequiredLink, source_uuid: str, target_uuid: str
-    ) -> tuple[Link, ...]:
-        allowed = None if required.uuid_filter is None else frozenset(required.uuid_filter.uuids)
-        return tuple(
-            value
-            for value in self.links.values()
-            if value.type_key == required.link_type
-            and value.source_uuid == source_uuid
-            and value.target_uuid == target_uuid
-            and (allowed is None or value.uuid in allowed)
-        )
-
-    def link_endpoint_pairs(self, required: RequiredLink) -> frozenset[tuple[str, str]]:
-        allowed = None if required.uuid_filter is None else frozenset(required.uuid_filter.uuids)
-        return frozenset(
-            (value.source_uuid, value.target_uuid)
-            for value in self.links.values()
-            if value.type_key == required.link_type and (allowed is None or value.uuid in allowed)
-        )
-
-
 def evaluate_query(
     query: GraphQuery, definitions: GraphDefinitionSet, graph: Graph, revision: int
 ) -> GraphQueryResult:
-    """Evaluate a small aggregate fixture independently of production storage."""
-    return evaluate_indexed_query(query, definitions, _TestGraphIndex(graph), revision)
+    """Brute-force a small positive pattern without production query implementation."""
+    del definitions  # Valid generated fixtures already carry definition-conformant operands.
+    variables: list[tuple[str, tuple[GraphObject, ...]]] = []
+    for group in query.anchor_groups:
+        allowed = None if group.uuid_filter is None else frozenset(group.uuid_filter.uuids)
+        variables.append(
+            (
+                group.name,
+                tuple(
+                    anchor
+                    for anchor in graph.anchors
+                    if anchor.type_key in group.anchor_types
+                    and (allowed is None or anchor.uuid in allowed)
+                ),
+            )
+        )
+    for condition in query.data_conditions:
+        allowed = None if condition.uuid_filter is None else frozenset(condition.uuid_filter.uuids)
+        variables.append(
+            (
+                condition.name,
+                tuple(
+                    value
+                    for value in graph.associated_data
+                    if value.type_key == condition.associated_data_type
+                    and (allowed is None or value.uuid in allowed)
+                ),
+            )
+        )
+    for required in query.required_links:
+        allowed = None if required.uuid_filter is None else frozenset(required.uuid_filter.uuids)
+        variables.append(
+            (
+                required.name,
+                tuple(
+                    link
+                    for link in graph.links
+                    if link.type_key == required.link_type
+                    and (allowed is None or link.uuid in allowed)
+                ),
+            )
+        )
+
+    row_by_identity: dict[tuple[object, ...], GraphQueryRow] = {}
+    aggregate_targets: dict[str, AssociatedDataObject] = {}
+    names = tuple(name for name, _ in variables)
+    populations = tuple(values for _, values in variables)
+    for values in product(*populations):
+        assignment = dict(zip(names, values, strict=True))
+        if not _assignment_matches(query, assignment):
+            continue
+        if isinstance(query.output, RowQueryOutput):
+            row = _oracle_project(query, assignment)
+            row_by_identity.setdefault(_oracle_row_identity(row), row)
+            if len(row_by_identity) > query.output.maximum_rows:
+                return _oracle_bound_refusal(query, query.output.maximum_rows)
+        else:
+            target = cast(AssociatedDataObject, assignment[query.output.data_condition])
+            aggregate_targets[target.uuid] = target
+            if len(aggregate_targets) > query.output.maximum_matches:
+                return _oracle_bound_refusal(query, query.output.maximum_matches)
+
+    if isinstance(query.output, RowQueryOutput):
+        rows = tuple(row_by_identity.values())
+        if reason := _oracle_unreturnable_reason(rows):
+            return GraphQueryResult(
+                OperationStatus.REJECTED,
+                "the complete result could not be returned, so none of it was",
+                query,
+                findings=(ValidationFinding(summary=reason),),
+            )
+        return GraphQueryResult(
+            OperationStatus.ACCEPTED,
+            f"{len(rows)} rows at revision {revision}",
+            query,
+            evaluated_revision=revision,
+            rows=rows,
+        )
+    try:
+        aggregates = tuple(
+            _oracle_aggregate(aggregation, tuple(aggregate_targets.values()))
+            for aggregation in query.output.aggregations
+        )
+    except ArithmeticError as error:
+        return GraphQueryResult(
+            OperationStatus.REJECTED,
+            "the complete aggregate could not be returned",
+            query,
+            findings=(ValidationFinding(summary=str(error)),),
+        )
+    return GraphQueryResult(
+        OperationStatus.ACCEPTED,
+        f"{len(aggregates)} aggregates at revision {revision}",
+        query,
+        evaluated_revision=revision,
+        aggregates=aggregates,
+    )
+
+
+def _assignment_matches(query: GraphQuery, assignment: dict[str, GraphObject]) -> bool:
+    for condition in query.data_conditions:
+        data = cast(AssociatedDataObject, assignment[condition.name])
+        anchor = assignment[condition.anchor_group]
+        if anchor.uuid not in data.anchor_uuids:
+            return False
+        if any(
+            not _property_matches(
+                data,
+                comparison.property_name,
+                comparison.comparison,
+                comparison.expected_value,
+            )
+            for comparison in condition.property_conditions
+        ):
+            return False
+    for required in query.required_links:
+        link = cast(Link, assignment[required.name])
+        if (
+            link.source_uuid != assignment[required.source_group].uuid
+            or link.target_uuid != assignment[required.target_group].uuid
+        ):
+            return False
+    return True
+
+
+def _property_matches(
+    data: AssociatedDataObject, name: str, comparison: PropertyComparison, expected: JsonValue
+) -> bool:
+    if name not in data.properties:
+        return False
+    value = data.properties[name]
+    if comparison is PropertyComparison.EQUAL:
+        return _oracle_value_key(value) == _oracle_value_key(expected)
+    if comparison is PropertyComparison.NOT_EQUAL:
+        return _oracle_value_key(value) != _oracle_value_key(expected)
+    if comparison is PropertyComparison.MATCHES_PATTERN:
+        return (
+            isinstance(value, str)
+            and isinstance(expected, str)
+            and compile_pattern(expected).matches(value)
+        )
+    if not isinstance(value, (Decimal, str)) or isinstance(value, bool):
+        return False
+    if comparison is PropertyComparison.LESS_THAN:
+        return value < expected  # type: ignore[operator]
+    if comparison is PropertyComparison.LESS_THAN_OR_EQUAL:
+        return value <= expected  # type: ignore[operator]
+    if comparison is PropertyComparison.GREATER_THAN:
+        return value > expected  # type: ignore[operator]
+    return value >= expected  # type: ignore[operator]
+
+
+def _oracle_project(query: GraphQuery, assignment: dict[str, GraphObject]) -> GraphQueryRow:
+    assert isinstance(query.output, RowQueryOutput)
+    anchors: list[AnchorBinding] = []
+    links: list[LinkBinding] = []
+    data: list[AssociatedDataBinding] = []
+    properties: list[ReturnedProperty] = []
+    for projection in query.output.projections:
+        if isinstance(projection, AnchorProjection):
+            anchors.append(
+                AnchorBinding(projection.name, cast(Anchor, assignment[projection.anchor_group]))
+            )
+        elif isinstance(projection, LinkProjection):
+            links.append(
+                LinkBinding(projection.name, cast(Link, assignment[projection.required_link]))
+            )
+        elif isinstance(projection, AssociatedDataProjection):
+            data.append(
+                AssociatedDataBinding(
+                    projection.name,
+                    cast(AssociatedDataObject, assignment[projection.data_condition]),
+                )
+            )
+        else:
+            assert isinstance(projection, DataPropertyProjection)
+            source = cast(AssociatedDataObject, assignment[projection.data_condition])
+            properties.append(
+                ReturnedProperty(
+                    projection.name,
+                    source.uuid,
+                    projection.property_name in source.properties,
+                    source.properties.get(projection.property_name),
+                )
+            )
+    return GraphQueryRow(tuple(anchors), tuple(links), tuple(data), tuple(properties))
+
+
+def _oracle_row_identity(row: GraphQueryRow) -> tuple[object, ...]:
+    return (
+        tuple((binding.projection, binding.anchor.uuid) for binding in row.anchors),
+        tuple((binding.projection, binding.link.uuid) for binding in row.links),
+        tuple(
+            (binding.projection, binding.associated_data.uuid) for binding in row.associated_data
+        ),
+        tuple(
+            (
+                binding.projection,
+                binding.associated_data_uuid,
+                binding.present,
+                _oracle_value_key(binding.value),
+            )
+            for binding in row.properties
+        ),
+    )
+
+
+def _oracle_unreturnable_reason(rows: tuple[GraphQueryRow, ...]) -> str | None:
+    for row in rows:
+        for binding in row.anchors:
+            values = (
+                binding.anchor.uuid,
+                binding.anchor.display_name,
+                *binding.anchor.system_metadata.members,
+            )
+            if any(_not_utf8(value) for value in values if value is not None):
+                return f"anchor '{binding.anchor.uuid}' cannot be returned"
+        for binding in row.associated_data:
+            value = binding.associated_data
+            values = (
+                value.uuid,
+                *value.anchor_uuids,
+                *value.properties,
+                *value.system_metadata.members,
+            )
+            if any(_not_utf8(member) for member in values):
+                return f"associated data '{value.uuid}' cannot be returned"
+        for binding in row.links:
+            value = binding.link
+            values = (
+                value.uuid,
+                value.source_uuid,
+                value.target_uuid,
+                *value.system_metadata.members,
+            )
+            if any(_not_utf8(member) for member in values):
+                return f"link '{value.uuid}' cannot be returned"
+    return None
+
+
+def _not_utf8(value: str) -> bool:
+    try:
+        value.encode("utf-8")
+    except UnicodeEncodeError:
+        return True
+    return False
+
+
+def _oracle_value_key(value: JsonValue) -> object:
+    kind = json_kind(value).value
+    if isinstance(value, list):
+        return kind, tuple(_oracle_value_key(member) for member in value)
+    if isinstance(value, dict):
+        return kind, tuple(
+            (name, _oracle_value_key(member)) for name, member in sorted(value.items())
+        )
+    return kind, value
+
+
+def _oracle_aggregate(aggregation, targets: tuple[AssociatedDataObject, ...]) -> AggregateBinding:
+    if aggregation.operator is AggregationOperator.COUNT:
+        return AggregateBinding(aggregation.name, True, Decimal(len(targets)))
+    values = tuple(
+        target.properties[str(aggregation.property_name)]
+        for target in targets
+        if str(aggregation.property_name) in target.properties
+    )
+    if not values:
+        return AggregateBinding(aggregation.name, False)
+    if aggregation.operator is AggregationOperator.SUM:
+        total = _oracle_exact_decimal_sum(tuple(cast(Decimal, value) for value in values))
+        return AggregateBinding(aggregation.name, True, total)
+    ordered = sorted(values)  # type: ignore[type-var]
+    value = ordered[0] if aggregation.operator is AggregationOperator.MINIMUM else ordered[-1]
+    return AggregateBinding(aggregation.name, True, value)
+
+
+def _oracle_exact_decimal_sum(values: tuple[Decimal, ...]) -> Decimal:
+    """Add finite decimals exactly with a small-fixture integer coefficient oracle."""
+    tuples = tuple(value.as_tuple() for value in values)
+    exponent = min((value.exponent for value in tuples), default=0)
+    if any(int(value.exponent) - int(exponent) > 100_000 for value in tuples):
+        raise ArithmeticError("exact sum would require expanding compact numeric inputs")
+    coefficient = 0
+    for value in tuples:
+        digits = int("".join(str(digit) for digit in value.digits) or "0")
+        signed = -digits if value.sign else digits
+        coefficient += signed * 10 ** (int(value.exponent) - int(exponent))
+    if coefficient == 0:
+        return Decimal(0)
+    sign = int(coefficient < 0)
+    digits = tuple(int(digit) for digit in str(abs(coefficient)))
+    try:
+        return Decimal((sign, digits, int(exponent)))
+    except DecimalException as error:
+        raise ArithmeticError(
+            "exact aggregate is outside the finite decimal result range"
+        ) from error
+
+
+def _oracle_bound_refusal(query: GraphQuery, maximum: int) -> GraphQueryResult:
+    return GraphQueryResult(
+        OperationStatus.REJECTED,
+        f"the complete result exceeds the maximum of {maximum}",
+        query,
+        findings=(ValidationFinding(summary=f"the complete result exceeds {maximum}"),),
+    )
 
 
 def materialize_everyday_life() -> GraphDefinitionSet:

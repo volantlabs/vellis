@@ -30,7 +30,12 @@ from vellis.outcomes import (
     ValidationRequestKind,
     ValidationScope,
 )
-from vellis.query import AnchorGroup, AnchorProjection, GraphQuery, ReturnShape
+from vellis.query import (
+    AnchorGroup,
+    AnchorProjection,
+    GraphQuery,
+    RowQueryOutput,
+)
 from vellis.store import ActivityAppendError, StoreError
 from vellis.system import RTGSystem
 
@@ -57,10 +62,11 @@ def system(tmp_path: Path):
 def _anyone() -> GraphQuery:
     return GraphQuery(
         anchor_groups=(AnchorGroup(name="people", anchor_types=("person",)),),
-        return_shape=ReturnShape(
-            projections=(AnchorProjection(name="who", anchor_group="people"),)
+        output=RowQueryOutput(
+            kind="rows",
+            projections=(AnchorProjection(name="who", anchor_group="people"),),
+            maximum_rows=10,
         ),
-        maximum_rows=10,
     )
 
 
@@ -94,10 +100,11 @@ def test_a_validation_a_rejection_and_a_failure_are_each_recorded(system: RTGSys
     refused = system.query_graph(
         GraphQuery(
             anchor_groups=(AnchorGroup(name="people", anchor_types=("unheard-of",)),),
-            return_shape=ReturnShape(
-                projections=(AnchorProjection(name="who", anchor_group="people"),)
+            output=RowQueryOutput(
+                kind="rows",
+                projections=(AnchorProjection(name="who", anchor_group="people"),),
+                maximum_rows=10,
             ),
-            maximum_rows=10,
         ),
         provenance=_owner(),
     )
@@ -658,10 +665,11 @@ def test_activity_append_failure_prevents_a_refusal_from_completing(
     _fail_activity_append(monkeypatch, system)
     invalid = GraphQuery(
         anchor_groups=(AnchorGroup(name="people", anchor_types=("unknown",)),),
-        return_shape=ReturnShape(
-            projections=(AnchorProjection(name="who", anchor_group="people"),)
+        output=RowQueryOutput(
+            kind="rows",
+            projections=(AnchorProjection(name="who", anchor_group="people"),),
+            maximum_rows=10,
         ),
-        maximum_rows=10,
     )
 
     with pytest.raises(ActivityAppendError, match="injected activity append failure"):

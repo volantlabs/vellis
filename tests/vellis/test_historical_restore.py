@@ -25,7 +25,6 @@ from vellis.discovery import DefinitionSummaryRequest
 from vellis.graph import Anchor, graph_equal
 from vellis.history import RevisionSelection, TimeSelection
 from vellis.outcomes import OperationStatus
-from vellis.query import EvaluatedStateScope
 from vellis.system import RTGSystem
 
 WIDER = GraphDefinitionSet(
@@ -79,7 +78,9 @@ def _records(system: RTGSystem):
 
 def test_restoring_commits_the_selected_state_as_a_new_revision(system: RTGSystem) -> None:
     """Asserted against what revision 2 actually held, not against a rebuild of it."""
-    outcome = system.restore_historical_state(RevisionSelection(2), provenance=_owner())
+    outcome = system.restore_historical_state(
+        RevisionSelection(kind="revision", revision=2), provenance=_owner()
+    )
 
     assert outcome.accepted, outcome.findings
     assert outcome.resulting_revision == 4
@@ -93,7 +94,9 @@ def test_every_earlier_record_is_left_exactly_as_it_was(system: RTGSystem) -> No
     """Excludes rewriting history to make the past current."""
     before = _records(system)
 
-    assert system.restore_historical_state(RevisionSelection(1), provenance=_owner()).accepted
+    assert system.restore_historical_state(
+        RevisionSelection(kind="revision", revision=1), provenance=_owner()
+    ).accepted
 
     after = _records(system)
     assert after[: len(before)] == before
@@ -105,10 +108,14 @@ def test_the_restored_state_can_itself_be_left_behind(system: RTGSystem) -> None
     """An owner who went back by mistake is not stuck there."""
     before = materialize_state(system)
 
-    assert system.restore_historical_state(RevisionSelection(1), provenance=_owner()).accepted
+    assert system.restore_historical_state(
+        RevisionSelection(kind="revision", revision=1), provenance=_owner()
+    ).accepted
     assert materialize_state(system).graph.anchor("a-2") is None
 
-    assert system.restore_historical_state(RevisionSelection(3), provenance=_owner()).accepted
+    assert system.restore_historical_state(
+        RevisionSelection(kind="revision", revision=3), provenance=_owner()
+    ).accepted
 
     restored = materialize_state(system)
     assert restored.revision == 5
@@ -125,14 +132,18 @@ def test_restoring_by_time_selects_the_same_state(system: RTGSystem) -> None:
         ).canonical_entries
         if entry.revision == 2
     )
-    assert system.restore_historical_state(TimeSelection(at_two), provenance=_owner()).accepted
+    assert system.restore_historical_state(
+        TimeSelection(kind="time", time=at_two), provenance=_owner()
+    ).accepted
 
     assert {anchor.uuid for anchor in materialize_state(system).graph.anchors} == {"a-1", "a-2"}
 
 
 def test_a_restored_state_replays_from_the_ledger(system: RTGSystem) -> None:
     """A restoration is an ordinary record: replay reaches the same place."""
-    assert system.restore_historical_state(RevisionSelection(1), provenance=_owner()).accepted
+    assert system.restore_historical_state(
+        RevisionSelection(kind="revision", revision=1), provenance=_owner()
+    ).accepted
 
     assert semantic_state_equal(materialize_state(system), materialize_replay(system))
 
@@ -147,7 +158,9 @@ def test_a_restoration_survives_an_ordinary_restart(tmp_path: Path) -> None:
         assert system.apply_graph_change(
             GraphChange(anchor_upserts=(Anchor("a-1", "person", "Ada"),)), provenance=_owner()
         ).accepted
-        assert system.restore_historical_state(RevisionSelection(0), provenance=_owner()).accepted
+        assert system.restore_historical_state(
+            RevisionSelection(kind="revision", revision=0), provenance=_owner()
+        ).accepted
         expected = materialize_state(system)
     finally:
         system.close()
@@ -169,7 +182,9 @@ def test_a_proposal_in_flight_blocks_restoration(system: RTGSystem) -> None:
     before = materialize_state(system)
     records = _records(system)
 
-    outcome = system.restore_historical_state(RevisionSelection(1), provenance=_owner())
+    outcome = system.restore_historical_state(
+        RevisionSelection(kind="revision", revision=1), provenance=_owner()
+    )
 
     assert outcome.status is OperationStatus.REJECTED
     assert outcome.resulting_revision is None
@@ -180,18 +195,25 @@ def test_a_proposal_in_flight_blocks_restoration(system: RTGSystem) -> None:
 
 def test_restoring_after_the_proposal_is_resolved_succeeds(system: RTGSystem) -> None:
     assert stage_complete_fixture(system, WIDER, provenance=_owner()).accepted
-    assert not system.restore_historical_state(RevisionSelection(1), provenance=_owner()).accepted
+    assert not system.restore_historical_state(
+        RevisionSelection(kind="revision", revision=1), provenance=_owner()
+    ).accepted
 
     assert system.discard_definition_delta(provenance=_owner()).accepted
 
-    assert system.restore_historical_state(RevisionSelection(1), provenance=_owner()).accepted
+    assert system.restore_historical_state(
+        RevisionSelection(kind="revision", revision=1), provenance=_owner()
+    ).accepted
 
 
 @pytest.mark.parametrize(
     ("selection", "expected"),
     (
-        (RevisionSelection(99), "no record in this ledger established revision 99"),
-        (RevisionSelection(-1), "names a committed revision"),
+        (
+            RevisionSelection(kind="revision", revision=99),
+            "no record in this ledger established revision 99",
+        ),
+        (RevisionSelection(kind="revision", revision=-1), "names a committed revision"),
     ),
     ids=["unknown-revision", "negative-revision"],
 )
@@ -214,7 +236,9 @@ def test_a_refused_restoration_is_observed(system: RTGSystem) -> None:
     from vellis.activity import HistoryKind, HistoryQuery
 
     assert stage_complete_fixture(system, WIDER, provenance=_owner()).accepted
-    assert not system.restore_historical_state(RevisionSelection(1), provenance=_owner()).accepted
+    assert not system.restore_historical_state(
+        RevisionSelection(kind="revision", revision=1), provenance=_owner()
+    ).accepted
 
     entries = system.history(
         HistoryQuery(kind=HistoryKind.ACTIVITY, maximum_records=100)
@@ -229,7 +253,9 @@ def test_an_accepted_restoration_is_canonical_authority_not_an_observation(
 ) -> None:
     before = system.store.activity_record_count()
 
-    assert system.restore_historical_state(RevisionSelection(1), provenance=_owner()).accepted
+    assert system.restore_historical_state(
+        RevisionSelection(kind="revision", revision=1), provenance=_owner()
+    ).accepted
 
     assert system.store.activity_record_count() == before
 
@@ -269,7 +295,9 @@ def test_restoring_takes_the_vocabulary_back_as_well_as_the_graph(widened: RTGSy
     changed between the two revisions, an implementation that kept the current one would
     be indistinguishable.
     """
-    assert widened.restore_historical_state(RevisionSelection(1), provenance=_owner()).accepted
+    assert widened.restore_historical_state(
+        RevisionSelection(kind="revision", revision=1), provenance=_owner()
+    ).accepted
 
     current = materialize_state(widened)
     assert {each.type_key for each in current.active_definitions.anchor_types} == {
@@ -281,7 +309,9 @@ def test_restoring_takes_the_vocabulary_back_as_well_as_the_graph(widened: RTGSy
 
 def test_the_committed_record_carries_the_historical_vocabulary(widened: RTGSystem) -> None:
     """Excludes a record that says one thing while the projection says another."""
-    assert widened.restore_historical_state(RevisionSelection(1), provenance=_owner()).accepted
+    assert widened.restore_historical_state(
+        RevisionSelection(kind="revision", revision=1), provenance=_owner()
+    ).accepted
 
     record = widened.store._connection.execute(  # noqa: SLF001
         "SELECT record_kind FROM canonical_record ORDER BY ordinal DESC LIMIT 1"
@@ -300,11 +330,13 @@ def test_the_committed_record_carries_the_historical_vocabulary(widened: RTGSyst
 def test_a_historical_summary_after_a_restoration_reports_the_restored_vocabulary(
     widened: RTGSystem,
 ) -> None:
-    assert widened.restore_historical_state(RevisionSelection(1), provenance=_owner()).accepted
+    assert widened.restore_historical_state(
+        RevisionSelection(kind="revision", revision=1), provenance=_owner()
+    ).accepted
 
     summary = widened.definition_summary(
         DefinitionSummaryRequest(
-            RevisionSelection(materialize_state(widened).revision), EvaluatedStateScope.HISTORICAL
+            state=RevisionSelection(kind="revision", revision=materialize_state(widened).revision)
         ),
         provenance=_owner(),
     )
@@ -323,7 +355,9 @@ def test_restoring_the_state_already_current_creates_neither_revision_nor_record
     before = materialize_state(system)
     records = _records(system)
 
-    outcome = system.restore_historical_state(RevisionSelection(3), provenance=_owner())
+    outcome = system.restore_historical_state(
+        RevisionSelection(kind="revision", revision=3), provenance=_owner()
+    )
 
     assert outcome.status is OperationStatus.ACCEPTED
     assert outcome.resulting_revision is None
@@ -332,10 +366,14 @@ def test_restoring_the_state_already_current_creates_neither_revision_nor_record
 
 
 def test_restoring_twice_over_moves_only_once(system: RTGSystem) -> None:
-    assert system.restore_historical_state(RevisionSelection(1), provenance=_owner()).accepted
+    assert system.restore_historical_state(
+        RevisionSelection(kind="revision", revision=1), provenance=_owner()
+    ).accepted
     after_first = _records(system)
 
-    second = system.restore_historical_state(RevisionSelection(1), provenance=_owner())
+    second = system.restore_historical_state(
+        RevisionSelection(kind="revision", revision=1), provenance=_owner()
+    )
 
     assert second.accepted, second.findings
     assert second.resulting_revision is None
@@ -348,7 +386,9 @@ def test_restoring_twice_over_moves_only_once(system: RTGSystem) -> None:
 def test_restoring_before_a_system_exists_is_refused(tmp_path: Path) -> None:
     system = RTGSystem.open(tmp_path / "vellis.sqlite3")
     try:
-        outcome = system.restore_historical_state(RevisionSelection(0), provenance=_owner())
+        outcome = system.restore_historical_state(
+            RevisionSelection(kind="revision", revision=0), provenance=_owner()
+        )
 
         assert outcome.status is OperationStatus.REJECTED
         assert outcome.resulting_revision is None
@@ -376,7 +416,9 @@ def test_a_time_selection_is_named_in_its_observation(system: RTGSystem) -> None
 
     assert stage_complete_fixture(system, WIDER, provenance=_owner()).accepted
     moment = now()
-    assert not system.restore_historical_state(TimeSelection(moment), provenance=_owner()).accepted
+    assert not system.restore_historical_state(
+        TimeSelection(kind="time", time=moment), provenance=_owner()
+    ).accepted
 
     entries = system.history(
         HistoryQuery(kind=HistoryKind.ACTIVITY, maximum_records=100)
@@ -393,7 +435,9 @@ def test_a_refused_restoration_replays_nothing(system: RTGSystem) -> None:
     assert stage_complete_fixture(system, WIDER, provenance=_owner()).accepted
 
     system.store.reset_instrumentation()
-    assert not system.restore_historical_state(RevisionSelection(1), provenance=_owner()).accepted
+    assert not system.restore_historical_state(
+        RevisionSelection(kind="revision", revision=1), provenance=_owner()
+    ).accepted
 
     assert system.store.record_reads == 0
 

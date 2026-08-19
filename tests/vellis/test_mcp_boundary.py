@@ -198,13 +198,14 @@ async def test_a_stored_value_keeps_the_json_kind_the_caller_sent(valued_client:
                             "associated_data_type": "person.stats",
                         }
                     ],
-                    "return_shape": {
+                    "output": {
+                        "kind": "rows",
                         "projections": [
                             {"name": name, "data_condition": "stats", "property_name": name}
                             for name in sent
-                        ]
+                        ],
+                        "maximum_rows": 2,
                     },
-                    "maximum_rows": 2,
                 }
             },
         )
@@ -275,16 +276,17 @@ async def test_large_integral_number_remains_exact_and_query_activity_is_accepte
                                 "associated_data_type": "person.stats",
                             }
                         ],
-                        "return_shape": {
+                        "output": {
+                            "kind": "rows",
                             "projections": [
                                 {
                                     "name": "count",
                                     "data_condition": "stats",
                                     "property_name": "count",
                                 }
-                            ]
+                            ],
+                            "maximum_rows": 2,
                         },
-                        "maximum_rows": 2,
                     }
                 },
             )
@@ -422,7 +424,8 @@ def test_raw_stdio_preserves_exact_fraction_and_large_integer_in_both_directions
                                     "associated_data_type": "person.stats",
                                 }
                             ],
-                            "return_shape": {
+                            "output": {
+                                "kind": "rows",
                                 "projections": [
                                     {
                                         "name": "ratio",
@@ -434,9 +437,9 @@ def test_raw_stdio_preserves_exact_fraction_and_large_integer_in_both_directions
                                         "data_condition": "stats",
                                         "property_name": "count",
                                     },
-                                ]
+                                ],
+                                "maximum_rows": 2,
                             },
-                            "maximum_rows": 2,
                         }
                     },
                 },
@@ -489,15 +492,16 @@ async def test_typed_current_change_and_bounded_query_round_trip(client: Client)
             {
                 "query": {
                     "anchor_groups": [{"name": "people", "anchor_types": ["person"]}],
-                    "return_shape": {
+                    "output": {
+                        "kind": "rows",
                         "projections": [
                             {
                                 "name": "person",
                                 "anchor_group": "people",
                             }
-                        ]
+                        ],
+                        "maximum_rows": 2,
                     },
-                    "maximum_rows": 2,
                 }
             },
         )
@@ -509,26 +513,60 @@ async def test_typed_current_change_and_bounded_query_round_trip(client: Client)
 
 
 @pytest.mark.anyio
-async def test_the_former_single_anchor_type_spelling_remains_callable(client: Client) -> None:
-    """A multi-type extension must not invalidate already accepted singleton requests."""
+async def test_the_former_single_anchor_type_spelling_is_not_translated(client: Client) -> None:
+    """The prerelease query break leaves one canonical wire spelling."""
     async with client:
         queried = await client.call_tool(
             "rtg_query",
             {
                 "query": {
                     "anchor_groups": [{"name": "people", "anchor_type": "person"}],
-                    "return_shape": {"projections": [{"name": "person", "anchor_group": "people"}]},
-                    "maximum_rows": 2,
+                    "output": {
+                        "kind": "rows",
+                        "projections": [{"name": "person", "anchor_group": "people"}],
+                        "maximum_rows": 2,
+                    },
                 }
             },
             raise_on_error=False,
         )
-    assert not queried.is_error
-    assert queried.structured_content is not None
-    assert queried.structured_content["status"] == "accepted"
-    returned_query = queried.structured_content["query"]
-    assert returned_query["anchor_groups"][0]["anchor_types"] == ["person"]
-    assert "anchor_type" not in returned_query["anchor_groups"][0]
+    assert queried.is_error
+    assert queried.structured_content is None
+
+
+@pytest.mark.anyio
+async def test_removed_or_cross_variant_query_members_stop_before_domain_dispatch(
+    client: Client, system: RTGSystem
+) -> None:
+    base = {
+        "anchor_groups": [{"name": "people", "anchor_types": ["person"]}],
+        "output": {
+            "kind": "rows",
+            "projections": [{"name": "person", "anchor_group": "people"}],
+            "maximum_rows": 2,
+        },
+    }
+    malformed = (
+        {**base, "maximum_rows": 2},
+        {
+            "anchor_groups": base["anchor_groups"],
+            "return_shape": {"projections": [{"name": "person", "anchor_group": "people"}]},
+            "maximum_rows": 2,
+        },
+        {**base, "state": {}},
+        {**base, "state": {"kind": "current", "revision": 0}},
+        {**base, "output": {**base["output"], "aggregations": []}},
+        {**base, "output": {key: value for key, value in base["output"].items() if key != "kind"}},
+    )
+    before = system.store.activity_record_count()
+    async with client:
+        results = [
+            await client.call_tool("rtg_query", {"query": payload}, raise_on_error=False)
+            for payload in malformed
+        ]
+
+    assert all(result.is_error and result.structured_content is None for result in results)
+    assert system.store.activity_record_count() == before
 
 
 @pytest.mark.anyio

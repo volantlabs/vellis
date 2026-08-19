@@ -80,17 +80,16 @@ projections, revision/time indexes, definition checkpoints, caches, and snapshot
 realization choices, not selected architecture. Conformance should use semantic record-access counts
 or equivalent traces; wall-clock targets wait for representative runtime, hardware, and owner data.
 
-The currently implemented, target-conflicting query realization stores normalized object values,
-definition entries, presence
+The current query implementation candidate stores normalized object values, definition entries, presence
 intervals, proposal entries, assessments, canonical events, and activity records in shared SQLite
 tables. The state head carries transactionally maintained current-graph and proposal summaries, so
-ordinary transition identity is derived without a population scan. Before this evolution is
-implemented, projected queries compile to
-parameterized joins and `EXISTS` expressions, then stream raw candidate rows through semantic
-identity until `maximumRows + 1` unique rows are found or the cursor is exhausted; they do not ask
-SQLite to materialize a global serialized `DISTINCT` set. The old aggregate shape uses a limited SQL `DISTINCT`
-over matched object identities and refuse the whole result after `maximumRows + 1`. Ordinary mutation
-validation derives the affected invariant closure; explicit
+ordinary transition identity is derived without a population scan. Queries analyze one positive
+conjunction, populate one indexed selector-member relation, compile unreturned variables as existence
+conditions, and materialize at most the requested bound plus one distinct answer identities before
+hydration or aggregation. Row and aggregate output are exclusive, and aggregate output has one
+associated-data target population. Compiled statements carry their actual bindings and structural
+profile and prepare before answer execution. Definition discovery reads each result from one SQLite
+snapshot. Ordinary mutation validation still derives the affected invariant closure; explicit
 full checks and broad cutovers use set-based scans and SQLite-backed findings. Snapshot, tail, restore,
 and compatibility import are streaming or SQL set operations. These are Vellis realization choices,
 not portable RTG architecture.
@@ -120,19 +119,18 @@ pass is evidence of missing discrimination, not evidence that the following shap
   and prospective forms passed preflight.
 - Permitted-value validation scans every earlier accepted value. Valid collections of 500, 1,000,
   2,000, and 4,000 values took 0.047, 0.174, 0.672, and 2.640 seconds; 8,000 took 10.455 seconds.
-- `vellis/query.py` contains an assignment evaluator used by `tests/vellis/oracle.py`; component
-  splitting is duplicated in query and store code; query execution also retains specialized
-  collection paths, recursive component evaluation, manual capacity formulas, legacy state and
-  payload channels, and post-hydration row deduplication.
+- `vellis/query.py` contained an assignment evaluator used by `tests/vellis/oracle.py`; component
+  splitting was duplicated in query and store code, alongside specialized collection paths,
+  recursive component evaluation, manual capacity formulas, legacy state/payload channels, and
+  post-hydration row deduplication. W003 deletes those mechanisms and replaces their source-shape
+  triggers with independent-oracle, bounded-identity, compiled-capacity, and hidden-witness evidence.
 - The first selected tagged-union handoff used defaulted discriminators and open standard
   dataclasses. The locked Pydantic realization accepted contradictory members by silently choosing
   a union branch and discarding the other branch's fields. The revised handoff requires explicit
   discriminators for supplied variants, discriminated unions, and closed state/output variants.
-- Definition discovery and assessment interval reads execute related statements under a
-  connection-local lock but no SQLite read transaction. Deterministic two-connection interleaving
-  returned a definition summary with revision 1 and delta present while including a type activated
-  only at revision 2; replacing a published assessment between its header and finding reads returned
-  an old count of three with no findings.
+- Definition discovery and assessment interval reads executed related statements under a
+  connection-local lock but no SQLite read transaction. W003 now gives summary, inspection, and
+  proposal discovery one read snapshot. W006 still owns the independent assessment publication case.
 - Successful assessment and restoration leave population-sized rows in reusable temporary work
   relations. A three-object fixture retained three effective/impacted/validation assessment rows and
   three restore-candidate/current rows until another same-kind operation or connection close.
@@ -147,19 +145,18 @@ SQLite work was counted with `Connection.set_progress_handler(..., 1)` and decod
 `tests/vellis/characterization.py`. Each series rebuilt a fresh temporary database for each size and
 measured only the named operation after fixture construction.
 
-The temporary executable characterization is
+The remaining temporary executable characterization is
 `uv run pytest tests/vellis/test_semantic_work_locality_triggers.py`. It rebuilds fresh databases,
 resets the shared instrumentation boundary, and reproduces the active 10/20/40 hub series, the
 10/100/500/1,000 irrelevant-rule series, and the 5/10/20/40 independent-change-by-rule series. It
 also counts the exact pairwise equality calls for 500/1,000/2,000/4,000/8,000 permitted values.
-Its historical-capacity case exercises the exact variable-limit boundary where current and
-prospective aggregation pass but revision-selected aggregation reaches SQLite with one unaccounted
-binding. The final source-mechanism case additionally pins the late aggregate `SELECT DISTINCT`,
-the impacted-type and participant-by-rule expansion, and the production evaluator imported by the
-nominal oracle. Thus every recorded trigger is either rebuilt and measured or bound to the exact
-conflicting mechanism. Additional cases reproduce the mixed-revision definition summary, the mixed
-assessment publication, and retained assessment/restore work rows. No fixture or instrumentation
-must be invented from this prose.
+Its query-capacity case now requires the same typed whole refusal for current, prospective, and
+revision-selected aggregation. Permanent W003 evidence exercises positive pattern topologies,
+source-preserving row identity, hidden-witness fanout, large relational filters, exact compiled
+bindings, VDBE capacity, regex locality, an independent oracle that catches a mutated compiler, MCP
+schema rejection, and one-snapshot definition discovery. The remaining source-mechanism trigger pins
+only the mutation-locality paths owned by W004; assessment publication and retained work rows remain
+W006 triggers. No fixture or instrumentation must be invented from this prose.
 
 W002 through W004 and W006 replace these trigger recipes with permanent discriminating regression
 fixtures; the final subtraction review removes any evidence that asserts the superseded

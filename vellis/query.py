@@ -11,41 +11,45 @@ only to constrain the answer and never appear in it. What comes back is one row 
 jointly satisfying assignment, carrying exactly the requested names and nothing else.
 
 Meaning is stated over sets, not over an evaluation order, so nothing here may depend on
-the order groups were written in. Evaluation asks a realization-neutral candidate index
-for identity/type, direct-association, and directed-link joins, then applies property
-comparisons. An in-memory graph supplies hash indexes; the selected durable realization
-supplies database indexes. The join enumerates in declaration order because some order is
-needed to walk it; the result is the same set of rows under any other.
+the order groups were written in. The pure analyzer describes one positive conjunction;
+the selected durable realization compiles it relationally, while tests use an independent
+small brute-force oracle.
 
 The bound is on the whole answer rather than on a page of it. A result larger than the
 caller asked for is refused entire, because a truncated answer to a question about what
 exists is not a smaller true answer — it is a different, false one. Nothing here paginates
 or sorts, and the model deliberately leaves both out.
 
-Historical selection belongs to the slice that can resolve a revision. A query evaluates
-current state until then, and this module does not pretend to offer the choice.
+One tagged selection chooses current, prospective, revision, or time state. Resolution and
+transaction ownership remain outside these pure request values.
 """
 
 from __future__ import annotations
 
-from collections.abc import Callable, Iterable, Iterator, Sequence
+from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass, field
 from decimal import Decimal, InvalidOperation
 from enum import Enum
-from typing import Protocol
+from typing import Annotated, Literal
+
+from pydantic import ConfigDict, Field
 
 from vellis.definitions import AssociatedDataTypeDefinition, GraphDefinitionSet
-from vellis.graph import Anchor, AssociatedDataObject, Link, LinkEndpoint
-from vellis.history import HistoricalSelection
+from vellis.graph import Anchor, AssociatedDataObject, Link
+from vellis.history import (
+    CurrentSelection,
+    EvaluatedStateSelection,
+)
 from vellis.json_value import (
     MAXIMUM_STORED_INTEGER_EXPONENT,
     JsonKind,
     JsonValue,
-    json_equal,
+    _json_equality_key,
     json_kind,
     unencodable_reason,
 )
 from vellis.outcomes import OperationStatus, ValidationFinding
+from vellis.patterns import PatternError, compile_pattern
 
 __all__ = [
     "AggregateBinding",
@@ -53,29 +57,30 @@ __all__ = [
     "AnchorBinding",
     "AnchorGroup",
     "AnchorProjection",
-    "AnchorUuidFilter",
+    "AggregateQueryOutput",
+    "AnalyzedGraphQuery",
     "AssociatedDataBinding",
     "AssociatedDataCondition",
     "AssociatedDataProjection",
     "DataPropertyCondition",
     "DataPropertyProjection",
-    "EvaluatedStateScope",
     "GraphQuery",
     "GraphQueryResult",
     "GraphQueryRow",
     "LinkBinding",
     "LinkProjection",
-    "LinkUuidFilter",
     "PropertyComparison",
     "QueryAggregation",
-    "QueryCandidateIndex",
     "RequiredLink",
-    "ReturnShape",
+    "QueryOutput",
+    "RowQueryOutput",
     "ReturnProjection",
     "ReturnedProperty",
-    "evaluate_indexed_query",
-    "indexed_query_findings",
+    "UuidFilter",
+    "analyze_graph_query",
 ]
+
+_CLOSED_REQUEST = ConfigDict(extra="forbid")
 
 
 class PropertyComparison(Enum):
@@ -87,10 +92,16 @@ class PropertyComparison(Enum):
     LESS_THAN_OR_EQUAL = "lessThanOrEqual"
     GREATER_THAN = "greaterThan"
     GREATER_THAN_OR_EQUAL = "greaterThanOrEqual"
+    MATCHES_PATTERN = "matchesPattern"
 
     @property
     def ordered(self) -> bool:
-        return self not in {PropertyComparison.EQUAL, PropertyComparison.NOT_EQUAL}
+        return self in {
+            PropertyComparison.LESS_THAN,
+            PropertyComparison.LESS_THAN_OR_EQUAL,
+            PropertyComparison.GREATER_THAN,
+            PropertyComparison.GREATER_THAN_OR_EQUAL,
+        }
 
 
 # The kinds that carry an order of their own. A number orders by exact mathematical value
@@ -102,27 +113,16 @@ class PropertyComparison(Enum):
 ORDERABLE_KINDS = frozenset({JsonKind.NUMBER, JsonKind.STRING})
 
 
-class EvaluatedStateScope(Enum):
-    CURRENT = "current"
-    PROSPECTIVE = "prospective"
-    HISTORICAL = "historical"
-
-
 # --- What a query asks ---------------------------------------------------------------
 
 
 @dataclass(frozen=True, slots=True)
-class AnchorUuidFilter:
-    """Narrows one anchor group to known anchor identities."""
+class UuidFilter:
+    """Narrows one selector variable to known identities of its required kind and type."""
 
     uuids: tuple[str, ...]
 
-
-@dataclass(frozen=True, slots=True)
-class LinkUuidFilter:
-    """Narrows one required link to known link identities."""
-
-    uuids: tuple[str, ...]
+    __pydantic_config__ = _CLOSED_REQUEST
 
 
 @dataclass(frozen=True, slots=True)
@@ -136,7 +136,9 @@ class AnchorGroup:
 
     name: str
     anchor_types: tuple[str, ...]
-    uuid_filter: AnchorUuidFilter | None = None
+    uuid_filter: UuidFilter | None = None
+
+    __pydantic_config__ = _CLOSED_REQUEST
 
 
 @dataclass(frozen=True, slots=True)
@@ -146,6 +148,8 @@ class DataPropertyCondition:
     property_name: str
     comparison: PropertyComparison
     expected_value: JsonValue
+
+    __pydantic_config__ = _CLOSED_REQUEST
 
 
 @dataclass(frozen=True, slots=True)
@@ -160,6 +164,9 @@ class AssociatedDataCondition:
     anchor_group: str
     associated_data_type: str
     property_conditions: tuple[DataPropertyCondition, ...] = ()
+    uuid_filter: UuidFilter | None = None
+
+    __pydantic_config__ = _CLOSED_REQUEST
 
 
 @dataclass(frozen=True, slots=True)
@@ -170,7 +177,9 @@ class RequiredLink:
     source_group: str
     target_group: str
     link_type: str
-    uuid_filter: LinkUuidFilter | None = None
+    uuid_filter: UuidFilter | None = None
+
+    __pydantic_config__ = _CLOSED_REQUEST
 
 
 @dataclass(frozen=True, slots=True)
@@ -180,6 +189,8 @@ class AnchorProjection:
     name: str
     anchor_group: str
 
+    __pydantic_config__ = _CLOSED_REQUEST
+
 
 @dataclass(frozen=True, slots=True)
 class LinkProjection:
@@ -187,6 +198,8 @@ class LinkProjection:
 
     name: str
     required_link: str
+
+    __pydantic_config__ = _CLOSED_REQUEST
 
 
 @dataclass(frozen=True, slots=True)
@@ -196,6 +209,8 @@ class AssociatedDataProjection:
     name: str
     data_condition: str
 
+    __pydantic_config__ = _CLOSED_REQUEST
+
 
 @dataclass(frozen=True, slots=True)
 class DataPropertyProjection:
@@ -204,6 +219,8 @@ class DataPropertyProjection:
     name: str
     data_condition: str
     property_name: str
+
+    __pydantic_config__ = _CLOSED_REQUEST
 
 
 ReturnProjection = (
@@ -242,15 +259,38 @@ class QueryAggregation:
 
     name: str
     operator: AggregationOperator
-    data_condition: str
     property_name: str | None = None
+
+    __pydantic_config__ = _CLOSED_REQUEST
 
 
 @dataclass(frozen=True, slots=True)
-class ReturnShape:
-    """The named bindings a query wants back."""
+class RowQueryOutput:
+    """One complete bounded set of projected rows."""
 
+    kind: Literal["rows"]
     projections: tuple[ReturnProjection, ...]
+    maximum_rows: int
+
+    __pydantic_config__ = _CLOSED_REQUEST
+
+
+@dataclass(frozen=True, slots=True)
+class AggregateQueryOutput:
+    """Arithmetic over one bounded distinct associated-data population."""
+
+    kind: Literal["aggregates"]
+    data_condition: str
+    aggregations: tuple[QueryAggregation, ...]
+    maximum_matches: int
+
+    __pydantic_config__ = _CLOSED_REQUEST
+
+
+QueryOutput = Annotated[
+    RowQueryOutput | AggregateQueryOutput,
+    Field(discriminator="kind"),
+]
 
 
 @dataclass(frozen=True, slots=True)
@@ -258,18 +298,12 @@ class GraphQuery:
     """A complete bounded question about the graph."""
 
     anchor_groups: tuple[AnchorGroup, ...]
-    return_shape: ReturnShape
-    maximum_rows: int
-    aggregations: tuple[QueryAggregation, ...] = ()
+    output: QueryOutput
     required_links: tuple[RequiredLink, ...] = ()
     data_conditions: tuple[AssociatedDataCondition, ...] = ()
-    historical_selection: HistoricalSelection | None = None
-    state_scope: EvaluatedStateScope = EvaluatedStateScope.CURRENT
-    """Absent evaluates current state; present evaluates the state it names.
+    state: EvaluatedStateSelection = field(default_factory=lambda: CurrentSelection(kind="current"))
 
-    Part of the question rather than beside it, so one query object means one complete
-    request whichever state it is asked of.
-    """
+    __pydantic_config__ = _CLOSED_REQUEST
 
 
 # --- What a query answers with -------------------------------------------------------
@@ -302,6 +336,7 @@ class ReturnedProperty:
     """
 
     projection: str
+    associated_data_uuid: str
     present: bool
     value: JsonValue = None
 
@@ -351,77 +386,238 @@ class GraphQueryResult:
         return self.status is OperationStatus.ACCEPTED
 
 
-class QueryValidationIndex(Protocol):
-    """Bounded identity checks needed before SQL evaluation."""
+@dataclass(frozen=True, slots=True)
+class AtomicQueryPredicate:
+    """One positive predicate and the named variables whose binding it restricts."""
 
-    def known_anchor_uuids(self, anchor_type: str, uuids: tuple[str, ...]) -> set[str]: ...
+    kind: str
+    variables: tuple[str, ...]
+    name: str
+    property_name: str | None = None
 
-    def known_link_uuids(self, link_type: str, uuids: tuple[str, ...]) -> set[str]: ...
+
+@dataclass(frozen=True, slots=True)
+class OutputIdentityColumn:
+    """One ordered component of a distinct row or aggregate-target identity."""
+
+    projection: str
+    kind: str
+    variable: str
+    property_name: str | None = None
 
 
-class QueryCandidateIndex(QueryValidationIndex, Protocol):
-    """Candidate joins used only by an explicitly selected evaluation realization."""
+@dataclass(frozen=True, slots=True)
+class AnalyzedGraphQuery:
+    """Pure, immutable semantic analysis consumed by the SQLite compiler."""
 
-    def anchor_candidates(
-        self, group: AnchorGroup, allowed_uuids: frozenset[str] | None = None
-    ) -> tuple[Anchor, ...]: ...
-
-    def associated_data_candidates(
-        self,
-        associated_data_type: str,
-        anchor_uuid: str,
-        allowed_uuids: frozenset[str] | None = None,
-    ) -> tuple[AssociatedDataObject, ...]: ...
-
-    def link_candidates(
-        self, required: RequiredLink, source_uuid: str, target_uuid: str
-    ) -> tuple[Link, ...]: ...
-
-    def link_endpoint_pairs(self, required: RequiredLink) -> frozenset[tuple[str, str]]: ...
+    query: GraphQuery
+    selector_kinds: tuple[tuple[str, str], ...]
+    answer_variables: tuple[str, ...]
+    existential_variables: tuple[str, ...]
+    existential_links: tuple[str, ...]
+    aggregate_target: str | None
+    predicates: tuple[AtomicQueryPredicate, ...]
+    referenced_type_keys: tuple[str, ...]
+    referenced_property_keys: tuple[tuple[str, str], ...]
+    identity_columns: tuple[OutputIdentityColumn, ...]
 
 
 # --- Whether a query means anything --------------------------------------------------
 
 
-def indexed_query_findings(
-    query: GraphQuery, definitions: GraphDefinitionSet, index: QueryValidationIndex
-) -> tuple[ValidationFinding, ...]:
-    """Validate query meaning with a realization-provided identity index."""
-    return _query_findings(query, definitions, index)
+def analyze_graph_query(
+    query: GraphQuery, definitions: GraphDefinitionSet
+) -> tuple[AnalyzedGraphQuery | None, tuple[ValidationFinding, ...]]:
+    """Validate state-independent meaning and describe its positive conjunction.
+
+    UUID existence, kind, and evaluated-state type membership deliberately remain for
+    relational validation after selector members are populated. Everything else here is
+    pure: no graph candidates, storage, indexes, or object construction are consulted.
+    """
+    findings = _query_findings(query, definitions)
+    if findings:
+        return None, findings
+
+    selector_kinds = tuple((group.name, "anchor") for group in query.anchor_groups) + tuple(
+        (condition.name, "associatedData") for condition in query.data_conditions
+    )
+    projected_variables: list[str] = []
+    projected_links: set[str] = set()
+    identity_columns: list[OutputIdentityColumn] = []
+    if isinstance(query.output, RowQueryOutput):
+        for projection in query.output.projections:
+            if isinstance(projection, AnchorProjection):
+                variable, kind, property_name = projection.anchor_group, "anchor", None
+            elif isinstance(projection, LinkProjection):
+                variable, kind, property_name = projection.required_link, "link", None
+                projected_links.add(variable)
+            elif isinstance(projection, AssociatedDataProjection):
+                variable, kind, property_name = (
+                    projection.data_condition,
+                    "associatedData",
+                    None,
+                )
+            else:
+                variable, kind, property_name = (
+                    projection.data_condition,
+                    "property",
+                    projection.property_name,
+                )
+            projected_variables.append(variable)
+            identity_columns.append(
+                OutputIdentityColumn(projection.name, kind, variable, property_name)
+            )
+        aggregate_target = None
+    else:
+        aggregate_target = query.output.data_condition
+        projected_variables.append(aggregate_target)
+        identity_columns.append(
+            OutputIdentityColumn(aggregate_target, "associatedData", aggregate_target)
+        )
+
+    answer_variables = tuple(dict.fromkeys(projected_variables))
+    selector_names = tuple(name for name, _ in selector_kinds)
+    predicates: list[AtomicQueryPredicate] = []
+    for group in query.anchor_groups:
+        predicates.append(AtomicQueryPredicate("anchorType", (group.name,), group.name))
+        if group.uuid_filter is not None:
+            predicates.append(AtomicQueryPredicate("anchorUuid", (group.name,), group.name))
+    for condition in query.data_conditions:
+        predicates.append(AtomicQueryPredicate("dataType", (condition.name,), condition.name))
+        if condition.uuid_filter is not None:
+            predicates.append(AtomicQueryPredicate("dataUuid", (condition.name,), condition.name))
+        predicates.append(
+            AtomicQueryPredicate(
+                "directAssociation",
+                (condition.anchor_group, condition.name),
+                condition.name,
+            )
+        )
+        predicates.extend(
+            AtomicQueryPredicate(
+                "property", (condition.name,), condition.name, comparison.property_name
+            )
+            for comparison in condition.property_conditions
+        )
+    predicates.extend(
+        AtomicQueryPredicate(
+            "requiredLink",
+            (required.name, required.source_group, required.target_group),
+            required.name,
+        )
+        for required in query.required_links
+    )
+    referenced_types = tuple(
+        dict.fromkeys(
+            type_key
+            for values in (
+                *(group.anchor_types for group in query.anchor_groups),
+                *((condition.associated_data_type,) for condition in query.data_conditions),
+                *((required.link_type,) for required in query.required_links),
+            )
+            for type_key in values
+        )
+    )
+    referenced_properties = tuple(
+        dict.fromkeys(
+            (condition.associated_data_type, property_name)
+            for condition in query.data_conditions
+            for property_name in (
+                *(comparison.property_name for comparison in condition.property_conditions),
+                *(
+                    projection.property_name
+                    for projection in (
+                        query.output.projections if isinstance(query.output, RowQueryOutput) else ()
+                    )
+                    if isinstance(projection, DataPropertyProjection)
+                    and projection.data_condition == condition.name
+                ),
+                *(
+                    aggregation.property_name
+                    for aggregation in (
+                        query.output.aggregations
+                        if isinstance(query.output, AggregateQueryOutput)
+                        and query.output.data_condition == condition.name
+                        else ()
+                    )
+                    if aggregation.property_name is not None
+                ),
+            )
+        )
+    )
+    return (
+        AnalyzedGraphQuery(
+            query=query,
+            selector_kinds=selector_kinds,
+            answer_variables=answer_variables,
+            existential_variables=tuple(
+                name for name in selector_names if name not in answer_variables
+            ),
+            existential_links=tuple(
+                required.name
+                for required in query.required_links
+                if required.name not in projected_links
+            ),
+            aggregate_target=aggregate_target,
+            predicates=tuple(predicates),
+            referenced_type_keys=referenced_types,
+            referenced_property_keys=referenced_properties,
+            identity_columns=tuple(identity_columns),
+        ),
+        (),
+    )
 
 
 def _query_findings(
-    query: GraphQuery, definitions: GraphDefinitionSet, index: QueryValidationIndex
+    query: GraphQuery,
+    definitions: GraphDefinitionSet,
 ) -> tuple[ValidationFinding, ...]:
     findings: list[ValidationFinding] = []
     names = _name_findings(query, findings)
-    _group_findings(query, definitions, index, findings)
+    _group_findings(query, definitions, findings)
     _condition_findings(query, definitions, names, findings)
-    _link_findings(query, definitions, index, names, findings)
+    _link_findings(query, definitions, names, findings)
     _projection_findings(query, definitions, names, findings)
     _aggregation_findings(query, definitions, findings)
     if not query.anchor_groups:
         findings.append(ValidationFinding(summary="a query must select at least one anchor group"))
-    if not query.return_shape.projections and not query.aggregations:
-        findings.append(
-            ValidationFinding(
-                summary="a query must request at least one binding or one aggregation"
+    if isinstance(query.output, RowQueryOutput):
+        if not query.output.projections:
+            findings.append(ValidationFinding(summary="row output must request a projection"))
+        if query.output.maximum_rows < 1:
+            findings.append(
+                ValidationFinding(
+                    summary=f"maximum rows must be positive, not {query.output.maximum_rows}"
+                )
             )
-        )
-    if query.maximum_rows < 1:
-        findings.append(
-            ValidationFinding(summary=f"maximum rows must be positive, not {query.maximum_rows}")
-        )
+    else:
+        if not query.output.aggregations:
+            findings.append(
+                ValidationFinding(summary="aggregate output must request an aggregation")
+            )
+        if query.output.maximum_matches < 1:
+            findings.append(
+                ValidationFinding(
+                    summary=(
+                        "maximum aggregate matches must be positive, not "
+                        f"{query.output.maximum_matches}"
+                    )
+                )
+            )
     return tuple(findings)
 
 
 def _named(query: GraphQuery) -> list[tuple[str, str]]:
+    output_names = (
+        ((projection.name, "projection") for projection in query.output.projections)
+        if isinstance(query.output, RowQueryOutput)
+        else ((aggregation.name, "aggregation") for aggregation in query.output.aggregations)
+    )
     return [
         *((group.name, "anchor group") for group in query.anchor_groups),
         *((condition.name, "data condition") for condition in query.data_conditions),
         *((link.name, "required link") for link in query.required_links),
-        *((projection.name, "projection") for projection in query.return_shape.projections),
-        *((aggregation.name, "aggregation") for aggregation in query.aggregations),
+        *output_names,
     ]
 
 
@@ -446,7 +642,6 @@ def _name_findings(query: GraphQuery, findings: list[ValidationFinding]) -> dict
 def _group_findings(
     query: GraphQuery,
     definitions: GraphDefinitionSet,
-    index: QueryValidationIndex,
     findings: list[ValidationFinding],
 ) -> None:
     for group in query.anchor_groups:
@@ -470,15 +665,9 @@ def _group_findings(
                         )
                     )
                 )
-        known: set[str] = set()
-        if group.uuid_filter is not None:
-            for type_key in group.anchor_types:
-                known |= set(index.known_anchor_uuids(type_key, group.uuid_filter.uuids))
         _uuid_filter_findings(
             group.uuid_filter.uuids if group.uuid_filter is not None else None,
             label=f"anchor group '{group.name}'",
-            known=known,
-            kind="anchor",
             findings=findings,
         )
 
@@ -503,8 +692,6 @@ def _uuid_filter_findings(
     uuids: tuple[str, ...] | None,
     *,
     label: str,
-    known: set[str],
-    kind: str,
     findings: list[ValidationFinding],
 ) -> None:
     if uuids is None:
@@ -518,10 +705,6 @@ def _uuid_filter_findings(
             findings.append(
                 ValidationFinding(summary=f"{label} restricts UUID '{uuid}' more than once")
             )
-        elif uuid not in known:
-            findings.append(
-                ValidationFinding(summary=f"{label} restricts unknown {kind} UUID '{uuid}'")
-            )
         seen.add(uuid)
 
 
@@ -532,6 +715,11 @@ def _condition_findings(
     findings: list[ValidationFinding],
 ) -> None:
     for condition in query.data_conditions:
+        _uuid_filter_findings(
+            condition.uuid_filter.uuids if condition.uuid_filter is not None else None,
+            label=f"data condition '{condition.name}'",
+            findings=findings,
+        )
         if names.get(condition.anchor_group) != "anchor group":
             findings.append(
                 ValidationFinding(
@@ -602,6 +790,30 @@ def _comparison_findings(
             )
         )
         return
+    if property_condition.comparison is PropertyComparison.MATCHES_PATTERN:
+        if constraint.json_kind is not JsonKind.STRING:
+            findings.append(
+                ValidationFinding(
+                    summary=(
+                        f"{label} pattern-matches property "
+                        f"'{property_condition.property_name}', which is declared "
+                        f"{constraint.json_kind.value}; pattern comparison is valid only "
+                        "for string-valued properties"
+                    )
+                )
+            )
+        if isinstance(property_condition.expected_value, str):
+            try:
+                compile_pattern(property_condition.expected_value)
+            except PatternError as error:
+                findings.append(
+                    ValidationFinding(
+                        summary=(
+                            f"{label} has an invalid query pattern for "
+                            f"'{property_condition.property_name}': {error}"
+                        )
+                    )
+                )
     if property_condition.comparison.ordered and constraint.json_kind not in ORDERABLE_KINDS:
         findings.append(
             ValidationFinding(
@@ -632,7 +844,6 @@ def _comparison_findings(
 def _link_findings(
     query: GraphQuery,
     definitions: GraphDefinitionSet,
-    index: QueryValidationIndex,
     names: dict[str, str],
     findings: list[ValidationFinding],
 ) -> None:
@@ -683,12 +894,6 @@ def _link_findings(
         _uuid_filter_findings(
             link.uuid_filter.uuids if link.uuid_filter is not None else None,
             label=f"required link '{link.name}'",
-            known=(
-                set()
-                if link.uuid_filter is None
-                else index.known_link_uuids(link.link_type, link.uuid_filter.uuids)
-            ),
-            kind="link",
             findings=findings,
         )
 
@@ -699,15 +904,18 @@ def _aggregation_findings(
     findings: list[ValidationFinding],
 ) -> None:
     """Report why an aggregation cannot be computed, before any of it is."""
+    if not isinstance(query.output, AggregateQueryOutput):
+        return
     conditions = {condition.name: condition for condition in query.data_conditions}
-    for aggregation in query.aggregations:
+    target = query.output.data_condition
+    for aggregation in query.output.aggregations:
         label = f"aggregation '{aggregation.name}'"
-        condition = conditions.get(aggregation.data_condition)
+        condition = conditions.get(target)
         if condition is None:
             findings.append(
                 ValidationFinding(
                     summary=(
-                        f"{label} names '{aggregation.data_condition}', which is not a data "
+                        f"aggregate output names '{target}', which is not a data "
                         "condition in this query"
                     )
                 )
@@ -790,7 +998,9 @@ def _projection_findings(
     findings: list[ValidationFinding],
 ) -> None:
     conditions = {condition.name: condition for condition in query.data_conditions}
-    for projection in query.return_shape.projections:
+    if not isinstance(query.output, RowQueryOutput):
+        return
+    for projection in query.output.projections:
         label = f"projection '{projection.name}'"
         match projection:
             case AnchorProjection():
@@ -857,102 +1067,6 @@ def _projected_property_findings(
 # --- What a query returns ------------------------------------------------------------
 
 
-@dataclass(frozen=True, slots=True)
-class _Assignment:
-    """One partial binding of query-local names to graph objects."""
-
-    endpoints: dict[str, LinkEndpoint] = field(default_factory=dict)
-    links: dict[str, Link] = field(default_factory=dict)
-
-
-def evaluate_indexed_query(
-    query: GraphQuery,
-    definitions: GraphDefinitionSet,
-    index: QueryCandidateIndex,
-    revision: int,
-) -> GraphQueryResult:
-    """Evaluate with candidates supplied by identity/type/relationship indexes."""
-    findings = _query_findings(query, definitions, index)
-    if findings:
-        return GraphQueryResult(
-            status=OperationStatus.REJECTED,
-            summary=f"the query was not evaluated ({len(findings)} findings)",
-            findings=findings,
-            query=query,
-        )
-
-    rows, matches = _walk(query, index)
-    over_selection = next(
-        (
-            (name, len(objects))
-            for name, objects in matches.items()
-            if len(objects) > query.maximum_rows
-        ),
-        None,
-    )
-    if over_selection is not None:
-        name, _ = over_selection
-        # The bound means the same work it means for a projected result. Returning one
-        # number is not a reason to have read a population the caller did not permit.
-        return GraphQueryResult(
-            status=OperationStatus.REJECTED,
-            summary=(
-                f"the selection aggregated by '{name}' has more than {query.maximum_rows} "
-                "matches; it is refused whole rather than aggregated in part"
-            ),
-            findings=(
-                ValidationFinding(
-                    summary=(f"the matches of '{name}' exceed the maximum of {query.maximum_rows}")
-                ),
-            ),
-            query=query,
-        )
-    unreturnable = _unreturnable_reason(rows)
-    if unreturnable is not None:
-        return GraphQueryResult(
-            status=OperationStatus.REJECTED,
-            summary="the complete result could not be returned, so none of it was",
-            findings=(ValidationFinding(summary=unreturnable),),
-            query=query,
-        )
-    if len(rows) > query.maximum_rows:
-        return GraphQueryResult(
-            status=OperationStatus.REJECTED,
-            summary=(
-                f"the result has more than {query.maximum_rows} rows; it is refused whole "
-                "rather than truncated"
-            ),
-            findings=(
-                ValidationFinding(
-                    summary=f"the complete result exceeds the maximum of {query.maximum_rows}"
-                ),
-            ),
-            query=query,
-        )
-    try:
-        aggregates = _aggregates(query, definitions, matches)
-    except ArithmeticError as error:
-        return GraphQueryResult(
-            status=OperationStatus.REJECTED,
-            summary="the complete aggregate could not be returned, so none of it was",
-            findings=(ValidationFinding(summary=str(error)),),
-            query=query,
-        )
-    counts = []
-    if query.return_shape.projections:
-        counts.append(f"{len(rows)} rows")
-    if aggregates:
-        counts.append(f"{len(aggregates)} aggregates")
-    return GraphQueryResult(
-        status=OperationStatus.ACCEPTED,
-        summary=f"{' and '.join(counts)} at revision {revision}",
-        query=query,
-        evaluated_revision=revision,
-        rows=rows,
-        aggregates=aggregates,
-    )
-
-
 def _unreturnable_reason(rows: tuple[GraphQueryRow, ...]) -> str | None:
     """Return why the complete result cannot be handed back, or ``None``.
 
@@ -997,123 +1111,6 @@ def _first_unencodable(*values: str) -> str | None:
     return next((r for r in (unencodable_reason(each) for each in values) if r is not None), None)
 
 
-def _walk(
-    query: GraphQuery, index: QueryCandidateIndex
-) -> tuple[tuple[GraphQueryRow, ...], dict[str, dict[str, AssociatedDataObject]]]:
-    """Enumerate satisfying assignments once, collecting rows and aggregated matches.
-
-    Rows keep identical projected tuples once, as they always have. Matches keep each
-    object once by identity, which is a different thing and is the whole reason an
-    aggregate exists: two transactions of the same amount in the same category are one
-    row and two matches, and only the second reading answers "how much".
-
-    Stops one past the maximum on whichever the query actually asked for. Knowing an
-    answer is too large is all a refusal needs.
-    """
-    aggregated = {aggregation.data_condition for aggregation in query.aggregations}
-    matches: dict[str, dict[str, AssociatedDataObject]] = {name: {} for name in aggregated}
-    wants_rows = bool(query.return_shape.projections)
-    seen: set[tuple[object, ...]] = set()
-    rows: list[GraphQueryRow] = []
-    for assignment in _assignments(query, index):
-        if wants_rows and len(rows) <= query.maximum_rows:
-            row = _project(query, assignment)
-            key = semantic_row_identity(row)
-            if key not in seen:
-                seen.add(key)
-                rows.append(row)
-        for name in aggregated:
-            bound = assignment.endpoints.get(name)
-            if isinstance(bound, AssociatedDataObject):
-                matches[name][bound.uuid] = bound
-        if any(len(objects) > query.maximum_rows for objects in matches.values()):
-            break
-        if wants_rows and len(rows) > query.maximum_rows:
-            break
-    return tuple(rows), matches
-
-
-def _aggregates(
-    query: GraphQuery,
-    definitions: GraphDefinitionSet,
-    matches: dict[str, dict[str, AssociatedDataObject]],
-) -> tuple[AggregateBinding, ...]:
-    """Compute each aggregation over the objects its condition matched."""
-    conditions = {condition.name: condition for condition in query.data_conditions}
-    bindings: list[AggregateBinding] = []
-    for aggregation in query.aggregations:
-        objects = tuple(matches.get(aggregation.data_condition, {}).values())
-        if aggregation.operator is AggregationOperator.COUNT:
-            bindings.append(
-                AggregateBinding(
-                    aggregation=aggregation.name, present=True, value=Decimal(len(objects))
-                )
-            )
-            continue
-        condition = conditions[aggregation.data_condition]
-        data_type = definitions.associated_data_type(condition.associated_data_type)
-        declared = next(
-            (
-                rule.json_kind
-                for rule in (data_type.property_constraints if data_type else ())
-                if rule.property_name == aggregation.property_name
-            ),
-            None,
-        )
-        # Only values of the declared kind take part. A conforming graph has no others,
-        # and on one that does not conform this refuses to invent an order between kinds.
-        values = [
-            value
-            for each in objects
-            if (value := each.properties.get(aggregation.property_name or "")) is not None
-            or aggregation.property_name in each.properties
-            if json_kind(value) is declared
-        ]
-        if not values:
-            bindings.append(AggregateBinding(aggregation=aggregation.name, present=False))
-            continue
-        bindings.append(
-            AggregateBinding(
-                aggregation=aggregation.name,
-                present=True,
-                value=_aggregate_value(aggregation.operator, values),
-            )
-        )
-    return tuple(bindings)
-
-
-def _aggregate_value(operator: AggregationOperator, values: list[JsonValue]) -> JsonValue:
-    """Reduce values of one kind, ordering exactly as an ordered comparison does."""
-    if operator is AggregationOperator.SUM:
-        return _exact_decimal_sum(values)
-    ordered = sorted(values)  # pyright: ignore[reportArgumentType]
-    return ordered[0] if operator is AggregationOperator.MINIMUM else ordered[-1]
-
-
-@dataclass(slots=True)
-class _ExactDecimalAccumulator:
-    """Retain sparse exact coefficients for the in-memory reference evaluator."""
-
-    coefficients: dict[int, int] = field(default_factory=dict)
-    input_digits: int = 0
-    count: int = 0
-
-    def add(self, value: Decimal) -> None:
-        exponent, coefficient, digits = _decimal_term(value)
-        self.input_digits += digits
-        self.count += 1
-        updated = self.coefficients.get(exponent, 0) + coefficient
-        if updated:
-            self.coefficients[exponent] = updated
-        else:
-            self.coefficients.pop(exponent, None)
-
-    def result(self) -> Decimal:
-        if not self.count:
-            return Decimal(0)
-        return _exact_decimal_result(self.coefficients, self.input_digits, self.count)
-
-
 def _decimal_term(value: Decimal) -> tuple[int, int, int]:
     """Return one finite decimal's normalized exponent, signed coefficient, and digits."""
     shape = value.as_tuple()
@@ -1126,19 +1123,6 @@ def _decimal_term(value: Decimal) -> tuple[int, int, int]:
         coefficient //= 10
         exponent += 1
     return exponent, (-coefficient if shape.sign else coefficient), len(shape.digits)
-
-
-def _exact_decimal_sum(values: Sequence[JsonValue]) -> Decimal:
-    """Add finite decimals with context-free integer coefficient arithmetic."""
-    accumulator = _ExactDecimalAccumulator()
-    for value in values:
-        assert isinstance(value, Decimal)
-        accumulator.add(value)
-    return accumulator.result()
-
-
-def _exact_decimal_result(coefficients: dict[int, int], input_digits: int, count: int) -> Decimal:
-    return _exact_decimal_streamed_result(lambda: coefficients.items(), input_digits, count)
 
 
 def _exact_decimal_streamed_result(
@@ -1220,362 +1204,6 @@ def _integer_from_text(value: str) -> int:
     return sign * result
 
 
-def _distinct_rows(query: GraphQuery, index: QueryCandidateIndex) -> tuple[GraphQueryRow, ...]:
-    """Project satisfying assignments, keeping identical projected tuples once.
-
-    Stops one row past the caller's maximum. Knowing the answer is too large is all a
-    refusal needs, and enumerating the rest of a join that will be thrown away is work
-    the owner asked not to have done.
-    """
-    seen: set[tuple[object, ...]] = set()
-    rows: list[GraphQueryRow] = []
-    for assignment in _assignments(query, index):
-        row = _project(query, assignment)
-        key = semantic_row_identity(row)
-        if key in seen:
-            continue
-        seen.add(key)
-        rows.append(row)
-        if len(rows) > query.maximum_rows:
-            break
-    return tuple(rows)
-
-
-def _assignments(query: GraphQuery, index: QueryCandidateIndex):
-    """Enumerate result-bearing assignments without multiplying irrelevant components.
-
-    A disconnected component with neither a projection nor an aggregation is an
-    existence condition: zero satisfying assignments removes every result, while one or
-    a million have the same effect. Result-bearing components are deduplicated by their
-    own projected tuple and aggregated object identities before they are combined, so
-    variation that can change neither answer cannot manufacture repeated global
-    assignments either.
-    """
-    result_components: list[GraphQuery] = []
-    for names in _selector_components(query):
-        component = _component_query(query, names)
-        if not component.return_shape.projections and not component.aggregations:
-            if next(_component_assignments(component, index), None) is None:
-                return
-            continue
-        # Establish emptiness once before combining components. Without this check an
-        # empty later component would make an earlier one run to exhaustion without ever
-        # yielding an assignment to _walk, where the caller's bound is enforced.
-        if next(_component_assignments(component, index), None) is None:
-            return
-        result_components.append(component)
-
-    def combine(position: int, assignment: _Assignment):
-        if position == len(result_components):
-            yield assignment
-            return
-        # This is deliberately a fresh lazy stream for each outer assignment. Caching a
-        # whole component would make an over-bound aggregation consume and retain its
-        # entire population before _walk could refuse one past the caller's maximum.
-        for component_assignment in _distinct_component_assignments(
-            result_components[position], index
-        ):
-            yield from combine(
-                position + 1,
-                _Assignment(
-                    endpoints={**assignment.endpoints, **component_assignment.endpoints},
-                    links={**assignment.links, **component_assignment.links},
-                ),
-            )
-
-    yield from combine(0, _Assignment())
-
-
-def _selector_components(query: GraphQuery) -> tuple[frozenset[str], ...]:
-    """Return connected endpoint-selector components in declaration order."""
-    names = [
-        *(group.name for group in query.anchor_groups),
-        *(condition.name for condition in query.data_conditions),
-    ]
-    adjacent = {name: set[str]() for name in names}
-    for condition in query.data_conditions:
-        adjacent[condition.name].add(condition.anchor_group)
-        adjacent[condition.anchor_group].add(condition.name)
-    for required in query.required_links:
-        adjacent[required.source_group].add(required.target_group)
-        adjacent[required.target_group].add(required.source_group)
-
-    components: list[frozenset[str]] = []
-    visited: set[str] = set()
-    for name in names:
-        if name in visited:
-            continue
-        pending = [name]
-        members: set[str] = set()
-        while pending:
-            current = pending.pop()
-            if current in members:
-                continue
-            members.add(current)
-            pending.extend(adjacent[current] - members)
-        visited.update(members)
-        components.append(frozenset(members))
-    return tuple(components)
-
-
-def _component_query(query: GraphQuery, names: frozenset[str]) -> GraphQuery:
-    """Project one selector component into a self-contained internal query."""
-    links = tuple(
-        required
-        for required in query.required_links
-        if required.source_group in names and required.target_group in names
-    )
-    link_names = {required.name for required in links}
-    projections = tuple(
-        projection
-        for projection in query.return_shape.projections
-        if (
-            isinstance(projection, AnchorProjection)
-            and projection.anchor_group in names
-            or isinstance(projection, (AssociatedDataProjection, DataPropertyProjection))
-            and projection.data_condition in names
-            or isinstance(projection, LinkProjection)
-            and projection.required_link in link_names
-        )
-    )
-    return GraphQuery(
-        anchor_groups=tuple(group for group in query.anchor_groups if group.name in names),
-        data_conditions=tuple(
-            condition for condition in query.data_conditions if condition.name in names
-        ),
-        required_links=links,
-        return_shape=ReturnShape(projections=projections),
-        aggregations=tuple(
-            aggregation for aggregation in query.aggregations if aggregation.data_condition in names
-        ),
-        maximum_rows=query.maximum_rows,
-        historical_selection=query.historical_selection,
-        state_scope=query.state_scope,
-    )
-
-
-def _distinct_component_assignments(
-    query: GraphQuery, index: QueryCandidateIndex
-) -> Iterator[_Assignment]:
-    """Keep assignments that can change a projection or aggregated population."""
-    aggregated_conditions = tuple(
-        dict.fromkeys(aggregation.data_condition for aggregation in query.aggregations)
-    )
-    seen: set[tuple[object, ...]] = set()
-    for assignment in _component_assignments(query, index):
-        key = (
-            semantic_row_identity(_project(query, assignment)),
-            tuple(
-                (
-                    name,
-                    bound.uuid if (bound := assignment.endpoints.get(name)) is not None else None,
-                )
-                for name in aggregated_conditions
-            ),
-        )
-        if key in seen:
-            continue
-        seen.add(key)
-        yield assignment
-
-
-def _component_assignments(query: GraphQuery, index: QueryCandidateIndex):
-    """Enumerate satisfying assignments within one connected selector component."""
-    link_pair_maps: dict[str, tuple[dict[str, set[str]], dict[str, set[str]]]] = {}
-    allowed_by_endpoint: dict[str, frozenset[str]] = {}
-    for required in query.required_links:
-        targets_by_source: dict[str, set[str]] = {}
-        sources_by_target: dict[str, set[str]] = {}
-        for source_uuid, target_uuid in index.link_endpoint_pairs(required):
-            targets_by_source.setdefault(source_uuid, set()).add(target_uuid)
-            sources_by_target.setdefault(target_uuid, set()).add(source_uuid)
-        link_pair_maps[required.name] = (targets_by_source, sources_by_target)
-        for group_name, permitted in (
-            (required.source_group, frozenset(targets_by_source)),
-            (required.target_group, frozenset(sources_by_target)),
-        ):
-            prior = allowed_by_endpoint.get(group_name)
-            allowed_by_endpoint[group_name] = permitted if prior is None else prior & permitted
-    anchor_candidates = {
-        group.name: index.anchor_candidates(group, allowed_by_endpoint.get(group.name))
-        for group in query.anchor_groups
-    }
-
-    def walk_groups(position: int, assignment: _Assignment):
-        if position == len(query.anchor_groups):
-            yield from walk_conditions(0, assignment)
-            return
-        group = query.anchor_groups[position]
-        permitted = {anchor.uuid for anchor in anchor_candidates[group.name]}
-        for required in query.required_links:
-            pair_maps = link_pair_maps.get(required.name)
-            if pair_maps is None:
-                continue
-            targets_by_source, sources_by_target = pair_maps
-            if (
-                required.target_group == group.name
-                and required.source_group in assignment.endpoints
-            ):
-                source_uuid = assignment.endpoints[required.source_group].uuid
-                permitted &= targets_by_source.get(source_uuid, set())
-            elif (
-                required.source_group == group.name
-                and required.target_group in assignment.endpoints
-            ):
-                target_uuid = assignment.endpoints[required.target_group].uuid
-                permitted &= sources_by_target.get(target_uuid, set())
-        for anchor in anchor_candidates[group.name]:
-            if anchor.uuid not in permitted:
-                continue
-            yield from walk_groups(
-                position + 1,
-                _Assignment(
-                    endpoints={**assignment.endpoints, group.name: anchor}, links=assignment.links
-                ),
-            )
-
-    def walk_conditions(position: int, assignment: _Assignment):
-        if position == len(query.data_conditions):
-            yield from walk_links(0, assignment)
-            return
-        condition = query.data_conditions[position]
-        anchor = assignment.endpoints[condition.anchor_group]
-        permitted = allowed_by_endpoint.get(condition.name)
-        for required in query.required_links:
-            pair_maps = link_pair_maps[required.name]
-            targets_by_source, sources_by_target = pair_maps
-            if (
-                required.target_group == condition.name
-                and required.source_group in assignment.endpoints
-            ):
-                source_uuid = assignment.endpoints[required.source_group].uuid
-                linked = frozenset(targets_by_source.get(source_uuid, ()))
-                permitted = linked if permitted is None else permitted & linked
-            elif (
-                required.source_group == condition.name
-                and required.target_group in assignment.endpoints
-            ):
-                target_uuid = assignment.endpoints[required.target_group].uuid
-                linked = frozenset(sources_by_target.get(target_uuid, ()))
-                permitted = linked if permitted is None else permitted & linked
-        for data in index.associated_data_candidates(
-            condition.associated_data_type, anchor.uuid, permitted
-        ):
-            if not all(_satisfies(each, data) for each in condition.property_conditions):
-                continue
-            yield from walk_conditions(
-                position + 1,
-                _Assignment(
-                    endpoints={**assignment.endpoints, condition.name: data},
-                    links=assignment.links,
-                ),
-            )
-
-    def walk_links(position: int, assignment: _Assignment):
-        if position == len(query.required_links):
-            yield assignment
-            return
-        required = query.required_links[position]
-        source = assignment.endpoints[required.source_group]
-        target = assignment.endpoints[required.target_group]
-        for link in index.link_candidates(required, source.uuid, target.uuid):
-            yield from walk_links(
-                position + 1,
-                _Assignment(
-                    endpoints=assignment.endpoints,
-                    links={**assignment.links, required.name: link},
-                ),
-            )
-
-    yield from walk_groups(0, _Assignment())
-
-
-def _satisfies(condition: DataPropertyCondition, data: AssociatedDataObject) -> bool:
-    """A comparison matches only against a present property.
-
-    Omission is not a value, so it cannot be equal or unequal to one; that keeps an
-    absent property distinct from a stored JSON null under every comparison.
-    """
-    if condition.property_name not in data.properties:
-        return False
-    stored = data.properties[condition.property_name]
-    match condition.comparison:
-        case PropertyComparison.EQUAL:
-            return json_equal(stored, condition.expected_value)
-        case PropertyComparison.NOT_EQUAL:
-            return not json_equal(stored, condition.expected_value)
-    # The expected value is already known to be a number or a string, and to share the
-    # property's kind: an ordered comparison against anything else was refused. A stored
-    # value of another kind, or of the other orderable kind, can only reach here from a
-    # graph that does not conform to its own definitions, and a false answer is the one
-    # that claims least about it. Comparing a Decimal with a str would raise instead.
-    expected = condition.expected_value
-    if isinstance(stored, Decimal) and isinstance(expected, Decimal):
-        return _ordered_holds(condition.comparison, stored, expected)
-    if isinstance(stored, str) and isinstance(expected, str):
-        # Python orders str by code point, which is what the model asks for: no locale
-        # collation, no case folding, no normalization — the same basis as equality.
-        return _ordered_holds(condition.comparison, stored, expected)
-    return False
-
-
-def _ordered_holds[T: (Decimal, str)](
-    comparison: PropertyComparison, stored: T, expected: T
-) -> bool:
-    """Apply one ordered comparison to two values of the same orderable kind."""
-    match comparison:
-        case PropertyComparison.LESS_THAN:
-            return stored < expected
-        case PropertyComparison.LESS_THAN_OR_EQUAL:
-            return stored <= expected
-        case PropertyComparison.GREATER_THAN:
-            return stored > expected
-        case _:
-            return stored >= expected
-
-
-def _project(query: GraphQuery, assignment: _Assignment) -> GraphQueryRow:
-    anchors: list[AnchorBinding] = []
-    links: list[LinkBinding] = []
-    associated_data: list[AssociatedDataBinding] = []
-    properties: list[ReturnedProperty] = []
-    for projection in query.return_shape.projections:
-        match projection:
-            case AnchorProjection():
-                bound = assignment.endpoints[projection.anchor_group]
-                assert isinstance(bound, Anchor)
-                anchors.append(AnchorBinding(projection=projection.name, anchor=bound))
-            case LinkProjection():
-                links.append(
-                    LinkBinding(
-                        projection=projection.name, link=assignment.links[projection.required_link]
-                    )
-                )
-            case AssociatedDataProjection():
-                bound = assignment.endpoints[projection.data_condition]
-                assert isinstance(bound, AssociatedDataObject)
-                associated_data.append(
-                    AssociatedDataBinding(projection=projection.name, associated_data=bound)
-                )
-            case DataPropertyProjection():
-                bound = assignment.endpoints[projection.data_condition]
-                assert isinstance(bound, AssociatedDataObject)
-                present = projection.property_name in bound.properties
-                properties.append(
-                    ReturnedProperty(
-                        projection=projection.name,
-                        present=present,
-                        value=bound.properties.get(projection.property_name),
-                    )
-                )
-    return GraphQueryRow(
-        anchors=tuple(anchors),
-        links=tuple(links),
-        associated_data=tuple(associated_data),
-        properties=tuple(properties),
-    )
-
-
 def semantic_row_identity(row: GraphQueryRow) -> tuple[object, ...]:
     """Identify a row by its projected bindings, including property presence.
 
@@ -1587,22 +1215,12 @@ def semantic_row_identity(row: GraphQueryRow) -> tuple[object, ...]:
         tuple((each.projection, each.link.uuid) for each in row.links),
         tuple((each.projection, each.associated_data.uuid) for each in row.associated_data),
         tuple(
-            (each.projection, each.present, _value_identity(each.value)) for each in row.properties
+            (
+                each.projection,
+                each.associated_data_uuid,
+                each.present,
+                _json_equality_key(each.value),
+            )
+            for each in row.properties
         ),
     )
-
-
-def _value_identity(value: JsonValue) -> object:
-    """A hashable stand-in that agrees with canonical JSON equality."""
-    match value:
-        case None | bool() | str():
-            return (json_kind(value).value, value)
-        case Decimal():
-            return (JsonKind.NUMBER.value, value)
-        case list():
-            return (JsonKind.ARRAY.value, tuple(_value_identity(each) for each in value))
-        case _:
-            return (
-                JsonKind.OBJECT.value,
-                tuple(sorted((k, _value_identity(v)) for k, v in value.items())),
-            )

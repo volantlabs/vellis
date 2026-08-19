@@ -29,7 +29,6 @@ collaborators.
 from __future__ import annotations
 
 from collections.abc import Iterable
-from dataclasses import replace
 from datetime import datetime
 from pathlib import Path
 from typing import TextIO
@@ -73,8 +72,11 @@ from vellis.governance import (
 )
 from vellis.history import (
     MAXIMUM_REVISION,
+    CurrentSelection,
     HistoricalSelection,
+    ProspectiveSelection,
     RevisionSelection,
+    TimeSelection,
     selection_findings,
 )
 from vellis.json_value import unencodable_reason
@@ -87,7 +89,7 @@ from vellis.outcomes import (
     ValidationRequestKind,
     ValidationScope,
 )
-from vellis.query import EvaluatedStateScope, GraphQuery, GraphQueryResult
+from vellis.query import GraphQuery, GraphQueryResult
 from vellis.store import (
     ActivityAppendError,
     AlreadyInitializedError,
@@ -324,23 +326,8 @@ class RTGSystem:
         between the two reads.
         """
         selected_request = DefinitionSummaryRequest() if request is None else request
-        selection = selected_request.historical_selection
-        state_scope = selected_request.state_scope
-        if state_scope is EvaluatedStateScope.PROSPECTIVE:
-            if selection is not None:
-                result = DefinitionSummaryResult(
-                    OperationStatus.REJECTED,
-                    "prospective definition discovery forbids historical selection",
-                    findings=(ValidationFinding(summary="state selection is inconsistent"),),
-                )
-                self._observe(
-                    "definitionSummary",
-                    result.status,
-                    scope="every prospective anchor type",
-                    summary=result.summary,
-                    provenance=provenance,
-                )
-                return result
+        state = selected_request.state
+        if isinstance(state, ProspectiveSelection):
             try:
                 revision, rows, _ = self._store.definition_summary_rows(prospective=True)
             except StoreError as error:
@@ -373,22 +360,8 @@ class RTGSystem:
                 evaluated_revision=revision,
             )
             return result
-        if state_scope is EvaluatedStateScope.HISTORICAL:
-            if selection is None:
-                result = DefinitionSummaryResult(
-                    OperationStatus.REJECTED,
-                    "historical definition discovery requires one historical selection",
-                    findings=(ValidationFinding(summary="no historical selection was provided"),),
-                )
-                self._observe(
-                    "definitionSummary",
-                    result.status,
-                    scope="every active anchor type at a selected state",
-                    summary=result.summary,
-                    provenance=provenance,
-                )
-                return result
-            result = self._historical_summary(selection)
+        if isinstance(state, (RevisionSelection, TimeSelection)):
+            result = self._historical_summary(state)
             self._observe(
                 "definitionSummary",
                 result.status,
@@ -398,20 +371,7 @@ class RTGSystem:
                 evaluated_revision=result.evaluated_revision,
             )
             return result
-        if selection is not None:
-            result = DefinitionSummaryResult(
-                OperationStatus.REJECTED,
-                "current definition discovery forbids historical selection",
-                findings=(ValidationFinding(summary="state selection is inconsistent"),),
-            )
-            self._observe(
-                "definitionSummary",
-                result.status,
-                scope="every active anchor type",
-                summary=result.summary,
-                provenance=provenance,
-            )
-            return result
+        assert isinstance(state, CurrentSelection)
         try:
             revision, rows, delta_present = self._store.definition_summary_rows()
         except StoreError as error:
@@ -449,7 +409,6 @@ class RTGSystem:
         self,
         request: DefinitionInspectionRequest,
         *,
-        selection: HistoricalSelection | None = None,
         provenance: Provenance = UNATTRIBUTED,
     ) -> DefinitionInspectionResult:
         """Return the complete neighborhood of each selected anchor type, then or now.
@@ -458,20 +417,7 @@ class RTGSystem:
         details that happened to resolve — because a partial answer would read as a
         complete one.
         """
-        if selection is not None and request.historical_selection is not None:
-            result = DefinitionInspectionResult(
-                OperationStatus.REJECTED,
-                "an inspection carries more than one historical selector",
-                request,
-                findings=(ValidationFinding(summary="state selection is inconsistent"),),
-            )
-        else:
-            effective_request = (
-                replace(request, state_scope=EvaluatedStateScope.HISTORICAL)
-                if selection is not None
-                else request
-            )
-            result = self._inspect(effective_request, selection or request.historical_selection)
+        result = self._inspect(request)
         self._observe(
             "definitionInspection",
             result.status,
@@ -482,17 +428,8 @@ class RTGSystem:
         )
         return result
 
-    def _inspect(
-        self, request: DefinitionInspectionRequest, selection: HistoricalSelection | None = None
-    ) -> DefinitionInspectionResult:
-        if request.state_scope is EvaluatedStateScope.PROSPECTIVE:
-            if selection is not None:
-                return DefinitionInspectionResult(
-                    OperationStatus.REJECTED,
-                    "prospective inspection forbids historical selection",
-                    request,
-                    findings=(ValidationFinding(summary="state selection is inconsistent"),),
-                )
+    def _inspect(self, request: DefinitionInspectionRequest) -> DefinitionInspectionResult:
+        if isinstance(request.state, ProspectiveSelection):
             try:
                 revision, definitions, _ = self._store.definition_neighborhood(
                     request.anchor_type_keys, prospective=True
@@ -504,23 +441,10 @@ class RTGSystem:
                     request,
                     findings=(ValidationFinding(summary=str(error)),),
                 )
-        elif selection is not None:
-            if request.state_scope is not EvaluatedStateScope.HISTORICAL:
-                return DefinitionInspectionResult(
-                    OperationStatus.REJECTED,
-                    "historical selection requires historical state scope",
-                    request,
-                    findings=(ValidationFinding(summary="state selection is inconsistent"),),
-                )
-            return self._historical_inspection(request, selection)
+        elif isinstance(request.state, (RevisionSelection, TimeSelection)):
+            return self._historical_inspection(request, request.state)
         else:
-            if request.state_scope is EvaluatedStateScope.HISTORICAL:
-                return DefinitionInspectionResult(
-                    OperationStatus.REJECTED,
-                    "historical inspection requires one historical selection",
-                    request,
-                    findings=(ValidationFinding(summary="no historical selection was provided"),),
-                )
+            assert isinstance(request.state, CurrentSelection)
             try:
                 revision, definitions, _ = self._store.definition_neighborhood(
                     request.anchor_type_keys
@@ -758,7 +682,6 @@ class RTGSystem:
         self,
         query: GraphQuery,
         *,
-        selection: HistoricalSelection | None = None,
         provenance: Provenance = UNATTRIBUTED,
     ) -> GraphQueryResult:
         """Answer one bounded semantic query, or refuse it whole.
@@ -767,42 +690,16 @@ class RTGSystem:
         record either; a historical one replays the transitions it needs, which is the
         cost the model permits reconstruction and denies current work.
         """
-        if selection is not None and query.historical_selection is not None:
-            result = GraphQueryResult(
-                status=OperationStatus.REJECTED,
-                summary="a query carries more than one historical selector",
-                query=query,
-                findings=(ValidationFinding(summary="state selection is inconsistent"),),
-            )
-            self._observe(
-                "query",
-                result.status,
-                scope=_query_scope(query),
-                summary=result.summary,
-                provenance=provenance,
-            )
-            return result
-        if selection is not None:
-            query = replace(query, state_scope=EvaluatedStateScope.HISTORICAL)
-        chosen = selection or query.historical_selection
-        if query.state_scope is EvaluatedStateScope.PROSPECTIVE:
-            if chosen is not None:
+        if isinstance(query.state, ProspectiveSelection):
+            try:
+                result = self._store.evaluate_prospective_query(query)
+            except StoreError as error:
                 result = GraphQueryResult(
-                    status=OperationStatus.REJECTED,
-                    summary="prospective queries cannot carry a historical selection",
+                    status=OperationStatus.FAILED,
+                    summary=f"the prospective query could not be evaluated: {error}",
+                    findings=(ValidationFinding(summary=str(error)),),
                     query=query,
-                    findings=(ValidationFinding(summary="state selection is inconsistent"),),
                 )
-            else:
-                try:
-                    result = self._store.evaluate_prospective_query(query)
-                except StoreError as error:
-                    result = GraphQueryResult(
-                        status=OperationStatus.FAILED,
-                        summary=f"the prospective query could not be evaluated: {error}",
-                        findings=(ValidationFinding(summary=str(error)),),
-                        query=query,
-                    )
             self._observe(
                 "query",
                 result.status,
@@ -812,23 +709,8 @@ class RTGSystem:
                 evaluated_revision=result.evaluated_revision,
             )
             return result
-        if chosen is not None:
-            if query.state_scope is not EvaluatedStateScope.HISTORICAL:
-                result = GraphQueryResult(
-                    status=OperationStatus.REJECTED,
-                    summary="a historical selection requires historical state scope",
-                    query=query,
-                    findings=(ValidationFinding(summary="state selection is inconsistent"),),
-                )
-                self._observe(
-                    "query",
-                    result.status,
-                    scope=_query_scope(query),
-                    summary=result.summary,
-                    provenance=provenance,
-                )
-                return result
-            result = self._historical_query(query, chosen)
+        if isinstance(query.state, (RevisionSelection, TimeSelection)):
+            result = self._historical_query(query, query.state)
             self._observe(
                 "query",
                 result.status,
@@ -838,21 +720,7 @@ class RTGSystem:
                 evaluated_revision=result.evaluated_revision,
             )
             return result
-        if query.state_scope is EvaluatedStateScope.HISTORICAL:
-            result = GraphQueryResult(
-                status=OperationStatus.REJECTED,
-                summary="historical state scope requires one historical selection",
-                query=query,
-                findings=(ValidationFinding(summary="no historical selection was provided"),),
-            )
-            self._observe(
-                "query",
-                result.status,
-                scope=_query_scope(query),
-                summary=result.summary,
-                provenance=provenance,
-            )
-            return result
+        assert isinstance(query.state, CurrentSelection)
         try:
             result = self._store.evaluate_current_query(query)
         except NotInitializedError as error:

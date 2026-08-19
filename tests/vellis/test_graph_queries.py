@@ -16,40 +16,39 @@ import sqlite3
 import tracemalloc
 from dataclasses import replace
 from decimal import Decimal
+from enum import Enum
 from pathlib import Path
 
 import pytest
 from conftest import build_rich_definitions
 
-from tests.vellis.oracle import _TestGraphIndex, evaluate_query, materialize_state
+from tests.vellis.oracle import evaluate_query, materialize_state
 from tests.vellis.semantic_state import semantic_state_equal
 from vellis.canonical import Provenance
 from vellis.changes import GraphChange
 from vellis.definitions import AnchorTypeDefinition, GraphDefinitionSet
 from vellis.governance import DefinitionChange
 from vellis.graph import Anchor, AssociatedDataObject, Graph, Link
-from vellis.history import RevisionSelection
+from vellis.history import CurrentSelection, ProspectiveSelection, RevisionSelection
 from vellis.json_value import normalize
 from vellis.outcomes import OperationStatus
 from vellis.query import (
+    AggregateQueryOutput,
     AggregationOperator,
     AnchorGroup,
     AnchorProjection,
-    AnchorUuidFilter,
     AssociatedDataCondition,
     AssociatedDataProjection,
     DataPropertyCondition,
     DataPropertyProjection,
-    EvaluatedStateScope,
     GraphQuery,
     GraphQueryResult,
     LinkProjection,
-    LinkUuidFilter,
     PropertyComparison,
     QueryAggregation,
     RequiredLink,
-    ReturnShape,
-    evaluate_indexed_query,
+    RowQueryOutput,
+    UuidFilter,
 )
 from vellis.system import RTGSystem
 
@@ -57,6 +56,20 @@ ADA = Anchor(uuid="a-1", type_key="person", display_name="Ada")
 GRACE = Anchor(uuid="a-2", type_key="person", display_name="Grace")
 ORBIT = Anchor(uuid="p-1", type_key="project", display_name="Orbit")
 COMPILER = Anchor(uuid="p-2", type_key="project", display_name="Compiler")
+
+
+class _StateCase(Enum):
+    CURRENT = "current"
+    PROSPECTIVE = "prospective"
+    HISTORICAL = "historical"
+
+
+def _query_state(case: _StateCase, revision: int):
+    if case is _StateCase.PROSPECTIVE:
+        return ProspectiveSelection(kind="prospective")
+    if case is _StateCase.HISTORICAL:
+        return RevisionSelection(kind="revision", revision=revision)
+    return CurrentSelection(kind="current")
 
 
 def _note(uuid: str, anchors: tuple[str, ...], **properties: object) -> AssociatedDataObject:
@@ -158,15 +171,16 @@ def _people(name: str = "people", **overrides: object) -> AnchorGroup:
     return AnchorGroup(name=name, anchor_types=("person",), **overrides)  # pyright: ignore[reportArgumentType]
 
 
-def _just_people(maximum_rows: int = 10, uuid_filter: AnchorUuidFilter | None = None) -> GraphQuery:
+def _just_people(maximum_rows: int = 10, uuid_filter: UuidFilter | None = None) -> GraphQuery:
     return GraphQuery(
         anchor_groups=(
             AnchorGroup(name="people", anchor_types=("person",), uuid_filter=uuid_filter),
         ),
-        return_shape=ReturnShape(
-            projections=(AnchorProjection(name="who", anchor_group="people"),)
+        output=RowQueryOutput(
+            kind="rows",
+            projections=(AnchorProjection(name="who", anchor_group="people"),),
+            maximum_rows=maximum_rows,
         ),
-        maximum_rows=maximum_rows,
     )
 
 
@@ -175,20 +189,20 @@ def _bound_anchors(result) -> set[str]:
 
 
 @pytest.mark.parametrize(
-    "state_scope",
+    "state_case",
     [
-        EvaluatedStateScope.CURRENT,
-        EvaluatedStateScope.PROSPECTIVE,
-        EvaluatedStateScope.HISTORICAL,
+        _StateCase.CURRENT,
+        _StateCase.PROSPECTIVE,
+        _StateCase.HISTORICAL,
     ],
 )
 def test_large_uuid_filters_do_not_depend_on_sqlite_host_parameter_capacity(
-    system: RTGSystem, state_scope: EvaluatedStateScope
+    system: RTGSystem, state_case: _StateCase
 ) -> None:
     added = tuple(Anchor(f"bulk-{index}", "person", f"Person {index}") for index in range(48))
     outcome = system.apply_graph_change(GraphChange(anchor_upserts=added), provenance=_owner())
     assert outcome.accepted and outcome.resulting_revision is not None
-    if state_scope is EvaluatedStateScope.PROSPECTIVE:
+    if state_case is _StateCase.PROSPECTIVE:
         assert system.set_definition_delta(
             DefinitionChange(
                 anchor_type_upserts=(
@@ -199,18 +213,13 @@ def test_large_uuid_filters_do_not_depend_on_sqlite_host_parameter_capacity(
         ).accepted
     uuids = ("a-1", "a-2", *(anchor.uuid for anchor in added))
     query = replace(
-        _just_people(maximum_rows=60, uuid_filter=AnchorUuidFilter(uuids)),
-        state_scope=state_scope,
-    )
-    selection = (
-        RevisionSelection(outcome.resulting_revision)
-        if state_scope is EvaluatedStateScope.HISTORICAL
-        else None
+        _just_people(maximum_rows=60, uuid_filter=UuidFilter(uuids)),
+        state=_query_state(state_case, outcome.resulting_revision),
     )
     revision = system.store.current_revision()
     system.store._connection.setlimit(sqlite3.SQLITE_LIMIT_VARIABLE_NUMBER, 32)  # noqa: SLF001
 
-    result = system.query_graph(query, selection=selection, provenance=_owner())
+    result = system.query_graph(query, provenance=_owner())
 
     assert result.accepted, result.findings
     assert _bound_anchors(result) == set(uuids)
@@ -221,9 +230,7 @@ def test_large_unknown_uuid_filters_keep_semantic_refusal(system: RTGSystem) -> 
     unknown = tuple(f"ghost-{index}" for index in range(40))
     system.store._connection.setlimit(sqlite3.SQLITE_LIMIT_VARIABLE_NUMBER, 32)  # noqa: SLF001
 
-    result = system.query_graph(
-        _just_people(uuid_filter=AnchorUuidFilter(unknown)), provenance=_owner()
-    )
+    result = system.query_graph(_just_people(uuid_filter=UuidFilter(unknown)), provenance=_owner())
 
     assert result.status is OperationStatus.REJECTED
     assert result.rows == ()
@@ -232,15 +239,15 @@ def test_large_unknown_uuid_filters_keep_semantic_refusal(system: RTGSystem) -> 
 
 
 @pytest.mark.parametrize(
-    "state_scope",
+    "state_case",
     [
-        EvaluatedStateScope.CURRENT,
-        EvaluatedStateScope.PROSPECTIVE,
-        EvaluatedStateScope.HISTORICAL,
+        _StateCase.CURRENT,
+        _StateCase.PROSPECTIVE,
+        _StateCase.HISTORICAL,
     ],
 )
 def test_large_type_filters_do_not_depend_on_sqlite_host_parameter_capacity(
-    tmp_path: Path, state_scope: EvaluatedStateScope
+    tmp_path: Path, state_case: _StateCase
 ) -> None:
     definitions = GraphDefinitionSet(
         anchor_types=tuple(
@@ -254,7 +261,7 @@ def test_large_type_filters_do_not_depend_on_sqlite_host_parameter_capacity(
             provenance=_owner(),
         )
         assert outcome.accepted and outcome.resulting_revision is not None
-        if state_scope is EvaluatedStateScope.PROSPECTIVE:
+        if state_case is _StateCase.PROSPECTIVE:
             assert system.set_definition_delta(
                 DefinitionChange(
                     anchor_type_upserts=(
@@ -269,20 +276,18 @@ def test_large_type_filters_do_not_depend_on_sqlite_host_parameter_capacity(
                     "everything", tuple(value.type_key for value in definitions.anchor_types)
                 ),
             ),
-            return_shape=ReturnShape((AnchorProjection("selected", "everything"),)),
-            maximum_rows=10,
-            state_scope=state_scope,
+            output=RowQueryOutput(
+                kind="rows",
+                projections=(AnchorProjection("selected", "everything"),),
+                maximum_rows=10,
+            ),
         )
-        selection = (
-            RevisionSelection(outcome.resulting_revision)
-            if state_scope is EvaluatedStateScope.HISTORICAL
-            else None
-        )
+        query = replace(query, state=_query_state(state_case, outcome.resulting_revision))
         system.store._connection.setlimit(  # noqa: SLF001
             sqlite3.SQLITE_LIMIT_VARIABLE_NUMBER, 32
         )
 
-        result = system.query_graph(query, selection=selection)
+        result = system.query_graph(query)
 
         assert result.accepted, result.findings
         assert _bound_anchors(result) == {"selected"}
@@ -304,7 +309,7 @@ def test_query_beyond_sqlite_join_capacity_is_refused_whole(tmp_path: Path) -> N
         ),
     )
     system = _system_with(tmp_path, definitions)
-    groups = tuple(AnchorGroup(f"node-{index}", ("node",)) for index in range(33))
+    groups = tuple(AnchorGroup(f"node-{index}", ("node",)) for index in range(66))
     links = tuple(
         RequiredLink(
             f"edge-{index}",
@@ -312,13 +317,14 @@ def test_query_beyond_sqlite_join_capacity_is_refused_whole(tmp_path: Path) -> N
             f"node-{index + 1}",
             "edge",
         )
-        for index in range(32)
+        for index in range(65)
     )
     query = GraphQuery(
         anchor_groups=groups,
         required_links=links,
-        return_shape=ReturnShape((AnchorProjection("first", "node-0"),)),
-        maximum_rows=1,
+        output=RowQueryOutput(
+            kind="rows", projections=(AnchorProjection("first", "node-0"),), maximum_rows=1
+        ),
     )
     revision = system.store.current_revision()
     try:
@@ -327,7 +333,7 @@ def test_query_beyond_sqlite_join_capacity_is_refused_whole(tmp_path: Path) -> N
         assert result.status is OperationStatus.REJECTED
         assert result.rows == () and result.aggregates == ()
         assert result.evaluated_revision is None
-        assert "structural capacity" in result.summary
+        assert "capacity" in result.summary
         assert system.store.current_revision() == revision
         activity = system.store.activity_records()
         assert activity[-1].capability == "query"
@@ -342,7 +348,7 @@ def test_disconnected_unprojected_capacity_refusal_is_propagated_whole(tmp_path:
     definitions = GraphDefinitionSet(
         anchor_types=(AnchorTypeDefinition("focus", "A projected focus."),)
         + tuple(
-            AnchorTypeDefinition(f"node-{index}", f"Graph node {index}.") for index in range(34)
+            AnchorTypeDefinition(f"node-{index}", f"Graph node {index}.") for index in range(65)
         ),
         link_types=tuple(
             LinkTypeDefinition(
@@ -354,12 +360,12 @@ def test_disconnected_unprojected_capacity_refusal_is_propagated_whole(tmp_path:
                 ),
                 f"Graph edge {index}.",
             )
-            for index in range(33)
+            for index in range(64)
         ),
     )
     system = _system_with(tmp_path, definitions)
     anchors = (Anchor("focus", "focus", "Focus"),) + tuple(
-        Anchor(f"chain-{index}", f"node-{index}", f"Chain {index}") for index in range(34)
+        Anchor(f"chain-{index}", f"node-{index}", f"Chain {index}") for index in range(65)
     )
     links = tuple(
         Link(
@@ -368,18 +374,18 @@ def test_disconnected_unprojected_capacity_refusal_is_propagated_whole(tmp_path:
             f"chain-{index}",
             f"chain-{index + 1}",
         )
-        for index in range(33)
+        for index in range(64)
     )
     assert system.apply_graph_change(
         GraphChange(anchor_upserts=anchors, link_upserts=links), provenance=_owner()
     ).accepted
-    groups = (AnchorGroup("focus", ("focus",), AnchorUuidFilter(("focus",))),) + tuple(
+    groups = (AnchorGroup("focus", ("focus",), UuidFilter(("focus",))),) + tuple(
         AnchorGroup(
             f"chain-node-{index}",
             (f"node-{index}",),
-            AnchorUuidFilter((f"chain-{index}",)),
+            UuidFilter((f"chain-{index}",)),
         )
-        for index in range(34)
+        for index in range(65)
     )
     required = tuple(
         RequiredLink(
@@ -387,15 +393,16 @@ def test_disconnected_unprojected_capacity_refusal_is_propagated_whole(tmp_path:
             f"chain-node-{index}",
             f"chain-node-{index + 1}",
             f"edge-{index}",
-            LinkUuidFilter((f"chain-edge-{index}",)),
+            UuidFilter((f"chain-edge-{index}",)),
         )
-        for index in range(33)
+        for index in range(64)
     )
     query = GraphQuery(
         anchor_groups=groups,
         required_links=required,
-        return_shape=ReturnShape((AnchorProjection("projected", "focus"),)),
-        maximum_rows=1,
+        output=RowQueryOutput(
+            kind="rows", projections=(AnchorProjection("projected", "focus"),), maximum_rows=1
+        ),
     )
     revision = system.store.current_revision()
     try:
@@ -404,7 +411,7 @@ def test_disconnected_unprojected_capacity_refusal_is_propagated_whole(tmp_path:
         assert result.status is OperationStatus.REJECTED
         assert result.rows == () and result.aggregates == ()
         assert result.evaluated_revision is None
-        assert "structural capacity" in result.summary
+        assert "capacity" in result.summary
         assert system.store.current_revision() == revision
         assert system.store.activity_records()[-1].outcome_category is OperationStatus.REJECTED
     finally:
@@ -475,7 +482,7 @@ def test_sqlite_candidate_joins_have_matching_indexes(system: RTGSystem) -> None
 
 
 def test_known_uuids_narrow_an_anchor_group(system: RTGSystem) -> None:
-    result = system.query_graph(_just_people(uuid_filter=AnchorUuidFilter(uuids=("a-2",))))
+    result = system.query_graph(_just_people(uuid_filter=UuidFilter(uuids=("a-2",))))
 
     assert result.accepted, result.findings
     assert _bound_anchors(result) == {"a-2"}
@@ -492,10 +499,11 @@ def test_associated_data_selects_by_type_and_direct_association_alone(
                 name="notes", anchor_group="people", associated_data_type="note"
             ),
         ),
-        return_shape=ReturnShape(
-            projections=(AnchorProjection(name="who", anchor_group="people"),)
+        output=RowQueryOutput(
+            kind="rows",
+            projections=(AnchorProjection(name="who", anchor_group="people"),),
+            maximum_rows=10,
         ),
-        maximum_rows=10,
     )
 
     result = system.query_graph(query)
@@ -522,13 +530,14 @@ def test_a_structured_comparison_narrows_associated_data(system: RTGSystem) -> N
                 ),
             ),
         ),
-        return_shape=ReturnShape(
+        output=RowQueryOutput(
+            kind="rows",
             projections=(
                 AnchorProjection(name="who", anchor_group="people"),
                 AssociatedDataProjection(name="note", data_condition="notes"),
-            )
+            ),
+            maximum_rows=10,
         ),
-        maximum_rows=10,
     )
 
     result = system.query_graph(query)
@@ -590,8 +599,8 @@ def test_multiple_assigned_link_restrictions_are_intersected_before_data_filteri
     ).accepted
     query = GraphQuery(
         anchor_groups=(
-            _people("first", uuid_filter=AnchorUuidFilter(("a-1",))),
-            _people("second", uuid_filter=AnchorUuidFilter(("a-2",))),
+            _people("first", uuid_filter=UuidFilter(("a-1",))),
+            _people("second", uuid_filter=UuidFilter(("a-2",))),
             AnchorGroup("projects", ("project",)),
         ),
         data_conditions=(
@@ -610,8 +619,9 @@ def test_multiple_assigned_link_restrictions_are_intersected_before_data_filteri
             RequiredLink("firstWork", "first", "projects", "worksOn"),
             RequiredLink("secondWork", "second", "projects", "worksOn"),
         ),
-        return_shape=ReturnShape((AnchorProjection("project", "projects"),)),
-        maximum_rows=10,
+        output=RowQueryOutput(
+            kind="rows", projections=(AnchorProjection("project", "projects"),), maximum_rows=10
+        ),
     )
     system.store.reset_instrumentation()
 
@@ -624,7 +634,7 @@ def test_multiple_assigned_link_restrictions_are_intersected_before_data_filteri
     assert system.store.current_graph_object_decodes == 1
 
 
-def _worked_on(uuid_filter: LinkUuidFilter | None = None) -> GraphQuery:
+def _worked_on(uuid_filter: UuidFilter | None = None) -> GraphQuery:
     return GraphQuery(
         anchor_groups=(_people(), AnchorGroup(name="projects", anchor_types=("project",))),
         required_links=(
@@ -636,18 +646,19 @@ def _worked_on(uuid_filter: LinkUuidFilter | None = None) -> GraphQuery:
                 uuid_filter=uuid_filter,
             ),
         ),
-        return_shape=ReturnShape(
+        output=RowQueryOutput(
+            kind="rows",
             projections=(
                 AnchorProjection(name="who", anchor_group="people"),
                 AnchorProjection(name="what", anchor_group="projects"),
-            )
+            ),
+            maximum_rows=10,
         ),
-        maximum_rows=10,
     )
 
 
 def test_known_link_uuids_narrow_a_required_link(system: RTGSystem) -> None:
-    result = system.query_graph(_worked_on(LinkUuidFilter(uuids=("l-3",))))
+    result = system.query_graph(_worked_on(UuidFilter(uuids=("l-3",))))
 
     assert result.accepted, result.findings
     assert {(row.anchors[0].anchor.uuid, row.anchors[1].anchor.uuid) for row in result.rows} == {
@@ -691,13 +702,14 @@ def test_an_associated_data_group_may_be_a_link_endpoint(tmp_path: Path) -> None
                     link_type="mentions",
                 ),
             ),
-            return_shape=ReturnShape(
+            output=RowQueryOutput(
+                kind="rows",
                 projections=(
                     AnchorProjection(name="who", anchor_group="people"),
                     AssociatedDataProjection(name="note", data_condition="projectNotes"),
-                )
+                ),
+                maximum_rows=10,
             ),
-            maximum_rows=10,
         )
 
         result = system.query_graph(query)
@@ -741,8 +753,11 @@ def test_sparse_links_prune_associated_data_before_property_comparison(tmp_path:
                 ),
             ),
             required_links=(RequiredLink("mentions", "people", "projectNotes", "mentions"),),
-            return_shape=ReturnShape((AssociatedDataProjection("note", "projectNotes"),)),
-            maximum_rows=10,
+            output=RowQueryOutput(
+                kind="rows",
+                projections=(AssociatedDataProjection("note", "projectNotes"),),
+                maximum_rows=10,
+            ),
         )
         system.store.reset_instrumentation()
 
@@ -777,10 +792,11 @@ def test_a_row_carries_only_the_requested_projections(system: RTGSystem) -> None
                 name="works", source_group="people", target_group="projects", link_type="worksOn"
             ),
         ),
-        return_shape=ReturnShape(
-            projections=(AnchorProjection(name="who", anchor_group="people"),)
+        output=RowQueryOutput(
+            kind="rows",
+            projections=(AnchorProjection(name="who", anchor_group="people"),),
+            maximum_rows=10,
         ),
-        maximum_rows=10,
     )
 
     result = system.query_graph(query)
@@ -815,10 +831,11 @@ def test_identical_projected_tuples_occur_once(system: RTGSystem) -> None:
                 name="notes", anchor_group="people", associated_data_type="note"
             ),
         ),
-        return_shape=ReturnShape(
-            projections=(AnchorProjection(name="who", anchor_group="people"),)
+        output=RowQueryOutput(
+            kind="rows",
+            projections=(AnchorProjection(name="who", anchor_group="people"),),
+            maximum_rows=10,
         ),
-        maximum_rows=10,
     )
 
     result = system.query_graph(query)
@@ -855,15 +872,16 @@ def _projected_notes(maximum_rows: int = 10, property_name: str = "rating") -> G
                 name="notes", anchor_group="people", associated_data_type="note"
             ),
         ),
-        return_shape=ReturnShape(
+        output=RowQueryOutput(
+            kind="rows",
             projections=(
                 AssociatedDataProjection(name="note", data_condition="notes"),
                 DataPropertyProjection(
                     name="value", data_condition="notes", property_name=property_name
                 ),
-            )
+            ),
+            maximum_rows=maximum_rows,
         ),
-        maximum_rows=maximum_rows,
     )
 
 
@@ -899,15 +917,16 @@ def test_a_missing_optional_property_binds_absent_rather_than_null(tmp_path: Pat
                         name="notes", anchor_group="people", associated_data_type="note"
                     ),
                 ),
-                return_shape=ReturnShape(
+                output=RowQueryOutput(
+                    kind="rows",
                     projections=(
                         AssociatedDataProjection(name="note", data_condition="notes"),
                         DataPropertyProjection(
                             name="value", data_condition="notes", property_name="marker"
                         ),
-                    )
+                    ),
+                    maximum_rows=10,
                 ),
-                maximum_rows=10,
             )
         )
 
@@ -940,8 +959,7 @@ def test_alternative_evaluation_orders_produce_equivalent_rows(system: RTGSystem
     reversed_groups = GraphQuery(
         anchor_groups=(AnchorGroup(name="projects", anchor_types=("project",)), _people()),
         required_links=forward.required_links,
-        return_shape=forward.return_shape,
-        maximum_rows=forward.maximum_rows,
+        output=forward.output,
     )
 
     first = system.query_graph(forward)
@@ -965,10 +983,11 @@ def test_unprojected_disconnected_population_does_not_multiply_projection_work(
             AnchorGroup(name="people", anchor_types=("person",)),
             AnchorGroup(name="projects", anchor_types=("project",)),
         ),
-        return_shape=ReturnShape(
-            projections=(AnchorProjection(name="who", anchor_group="people"),)
+        output=RowQueryOutput(
+            kind="rows",
+            projections=(AnchorProjection(name="who", anchor_group="people"),),
+            maximum_rows=100,
         ),
-        maximum_rows=100,
     )
 
     def measured_steps() -> tuple[GraphQueryResult, int]:
@@ -1014,10 +1033,11 @@ def test_unsatisfied_unprojected_component_still_removes_every_row(tmp_path: Pat
                     AnchorGroup(name="people", anchor_types=("person",)),
                     AnchorGroup(name="projects", anchor_types=("project",)),
                 ),
-                return_shape=ReturnShape(
-                    projections=(AnchorProjection(name="who", anchor_group="people"),)
+                output=RowQueryOutput(
+                    kind="rows",
+                    projections=(AnchorProjection(name="who", anchor_group="people"),),
+                    maximum_rows=10,
                 ),
-                maximum_rows=10,
             )
         )
 
@@ -1041,49 +1061,46 @@ def test_unsatisfied_disconnected_component_keeps_empty_aggregate_bindings(
             provenance=_owner(),
         ).accepted
         state = materialize_state(system)
-        for projections in (
-            (),
-            (AnchorProjection(name="who", anchor_group="people"),),
-        ):
-            query = GraphQuery(
-                anchor_groups=(
-                    AnchorGroup(name="people", anchor_types=("person",)),
-                    AnchorGroup(name="projects", anchor_types=("project",)),
+        query = GraphQuery(
+            anchor_groups=(
+                AnchorGroup(name="people", anchor_types=("person",)),
+                AnchorGroup(name="projects", anchor_types=("project",)),
+            ),
+            data_conditions=(
+                AssociatedDataCondition(
+                    name="notes",
+                    anchor_group="people",
+                    associated_data_type="note",
                 ),
-                data_conditions=(
-                    AssociatedDataCondition(
-                        name="notes",
-                        anchor_group="people",
-                        associated_data_type="note",
-                    ),
-                ),
-                return_shape=ReturnShape(projections=projections),
+            ),
+            output=AggregateQueryOutput(
+                kind="aggregates",
+                data_condition="notes",
                 aggregations=(
                     QueryAggregation(
                         name="howMany",
                         operator=AggregationOperator.COUNT,
-                        data_condition="notes",
                     ),
                     QueryAggregation(
                         name="total",
                         operator=AggregationOperator.SUM,
-                        data_condition="notes",
                         property_name="rating",
                     ),
                 ),
-                maximum_rows=10,
-            )
+                maximum_matches=10,
+            ),
+        )
 
-            stored = system.query_graph(query)
-            in_memory = evaluate_query(query, state.active_definitions, state.graph, state.revision)
+        stored = system.query_graph(query)
+        oracle = evaluate_query(query, state.active_definitions, state.graph, state.revision)
 
-            assert stored.status is OperationStatus.ACCEPTED, stored.findings
-            assert stored.rows == in_memory.rows == ()
-            assert stored.aggregates == in_memory.aggregates
-            assert [(one.aggregation, one.present, one.value) for one in stored.aggregates] == [
-                ("howMany", True, Decimal(0)),
-                ("total", False, None),
-            ]
+        assert stored.status is OperationStatus.ACCEPTED, stored.findings
+        assert stored.rows == oracle.rows == ()
+        assert stored.aggregates == oracle.aggregates
+        assert [(one.aggregation, one.present, one.value) for one in stored.aggregates] == [
+            ("howMany", True, Decimal(0)),
+            ("total", False, None),
+        ]
     finally:
         system.close()
 
@@ -1228,13 +1245,14 @@ def _between(link_type: str = "knows") -> GraphQuery:
         required_links=(
             RequiredLink(name="edge", source_group="from", target_group="to", link_type=link_type),
         ),
-        return_shape=ReturnShape(
+        output=RowQueryOutput(
+            kind="rows",
             projections=(
                 AnchorProjection(name="a", anchor_group="from"),
                 AnchorProjection(name="b", anchor_group="to"),
-            )
+            ),
+            maximum_rows=10,
         ),
-        maximum_rows=10,
     )
 
 
@@ -1270,10 +1288,11 @@ def _grounded_in(data_type: str = "note") -> GraphQuery:
                 name="data", anchor_group="people", associated_data_type=data_type
             ),
         ),
-        return_shape=ReturnShape(
-            projections=(AnchorProjection(name="who", anchor_group="people"),)
+        output=RowQueryOutput(
+            kind="rows",
+            projections=(AnchorProjection(name="who", anchor_group="people"),),
+            maximum_rows=10,
         ),
-        maximum_rows=10,
     )
 
 
@@ -1314,10 +1333,11 @@ def _compared(
                 ),
             ),
         ),
-        return_shape=ReturnShape(
-            projections=(AssociatedDataProjection(name="note", data_condition="notes"),)
+        output=RowQueryOutput(
+            kind="rows",
+            projections=(AssociatedDataProjection(name="note", data_condition="notes"),),
+            maximum_rows=10,
         ),
-        maximum_rows=10,
     )
 
 
@@ -1442,8 +1462,11 @@ def test_a_projected_link_returns_the_link_that_satisfied_it(sharp: RTGSystem) -
         required_links=(
             RequiredLink(name="edge", source_group="from", target_group="to", link_type="knows"),
         ),
-        return_shape=ReturnShape(projections=(LinkProjection(name="link", required_link="edge"),)),
-        maximum_rows=10,
+        output=RowQueryOutput(
+            kind="rows",
+            projections=(LinkProjection(name="link", required_link="edge"),),
+            maximum_rows=10,
+        ),
     )
 
     result = sharp.query_graph(query)
@@ -1510,7 +1533,7 @@ def test_a_query_that_matches_nothing_is_accepted_with_no_rows(system: RTGSystem
                 AnchorGroup(
                     name="people",
                     anchor_types=("person",),
-                    uuid_filter=AnchorUuidFilter(uuids=("a-1",)),
+                    uuid_filter=UuidFilter(uuids=("a-1",)),
                 ),
                 AnchorGroup(name="projects", anchor_types=("project",)),
             ),
@@ -1522,13 +1545,14 @@ def test_a_query_that_matches_nothing_is_accepted_with_no_rows(system: RTGSystem
                     source_group="people",
                     target_group="projects",
                     link_type="worksOn",
-                    uuid_filter=LinkUuidFilter(uuids=("l-3",)),
+                    uuid_filter=UuidFilter(uuids=("l-3",)),
                 ),
             ),
-            return_shape=ReturnShape(
-                projections=(AnchorProjection(name="who", anchor_group="people"),)
+            output=RowQueryOutput(
+                kind="rows",
+                projections=(AnchorProjection(name="who", anchor_group="people"),),
+                maximum_rows=10,
             ),
-            maximum_rows=10,
         )
     )
 
@@ -1561,14 +1585,15 @@ def _one_property(property_name: str = "rating") -> GraphQuery:
                 name="notes", anchor_group="people", associated_data_type="note"
             ),
         ),
-        return_shape=ReturnShape(
+        output=RowQueryOutput(
+            kind="rows",
             projections=(
                 DataPropertyProjection(
                     name="value", data_condition="notes", property_name=property_name
                 ),
-            )
+            ),
+            maximum_rows=10,
         ),
-        maximum_rows=10,
     )
 
 
@@ -1621,18 +1646,18 @@ def test_a_projected_property_participates_in_row_identity(rated: RTGSystem) -> 
     ids=["nested-object-number", "nested-array-number"],
 )
 @pytest.mark.parametrize(
-    "state_scope",
+    "state_case",
     [
-        EvaluatedStateScope.CURRENT,
-        EvaluatedStateScope.PROSPECTIVE,
-        EvaluatedStateScope.HISTORICAL,
+        _StateCase.CURRENT,
+        _StateCase.PROSPECTIVE,
+        _StateCase.HISTORICAL,
     ],
     ids=["current", "prospective", "historical"],
 )
-def test_nested_numeric_spellings_are_one_bounded_semantic_row(
-    tmp_path: Path, values: tuple[object, object], state_scope: EvaluatedStateScope
+def test_equal_nested_values_from_distinct_sources_remain_distinct_rows(
+    tmp_path: Path, values: tuple[object, object], state_case: _StateCase
 ) -> None:
-    """Storage spelling cannot turn one JSON value into an over-limit answer."""
+    """Canonical value equality does not erase the projected property's source identity."""
     from vellis.json_value import JsonKind
 
     kind = JsonKind.ARRAY if isinstance(values[0], list) else JsonKind.OBJECT
@@ -1654,7 +1679,7 @@ def test_nested_numeric_spellings_are_one_bounded_semantic_row(
             provenance=_owner(),
         )
         assert outcome.accepted and outcome.resulting_revision is not None
-        if state_scope is EvaluatedStateScope.PROSPECTIVE:
+        if state_case is _StateCase.PROSPECTIVE:
             assert system.set_definition_delta(
                 DefinitionChange(
                     anchor_type_upserts=(
@@ -1663,30 +1688,25 @@ def test_nested_numeric_spellings_are_one_bounded_semantic_row(
                 ),
                 provenance=_owner(),
             ).accepted
-        selection = (
-            RevisionSelection(outcome.resulting_revision)
-            if state_scope is EvaluatedStateScope.HISTORICAL
-            else None
-        )
         query = replace(
             _one_property("payload"),
-            maximum_rows=1,
-            state_scope=state_scope,
-            historical_selection=selection,
+            output=replace(_one_property("payload").output, maximum_rows=2),
+            state=_query_state(state_case, outcome.resulting_revision),
         )
 
         result = system.query_graph(query)
 
         assert result.accepted, result.findings
-        assert len(result.rows) == 1
+        assert len(result.rows) == 2
+        assert {row.properties[0].associated_data_uuid for row in result.rows} == {"n-1", "n-2"}
     finally:
         system.close()
 
 
-def test_many_serialized_spellings_stream_without_a_global_sql_distinct_set(
+def test_many_equal_values_keep_source_rows_without_a_global_witness_distinct_set(
     tmp_path: Path,
 ) -> None:
-    """Semantic duplicates cannot create an unbounded SQLite DISTINCT materialization."""
+    """Source-distinct rows are bounded identities, not a late witness-bag DISTINCT."""
     from vellis.json_value import JsonKind
 
     system = _system_with(tmp_path, _nested_property_definitions(JsonKind.OBJECT))
@@ -1709,15 +1729,18 @@ def test_many_serialized_spellings_stream_without_a_global_sql_distinct_set(
             provenance=_owner(),
         )
         assert outcome.accepted
-        query = replace(_one_property("payload"), maximum_rows=1)
+        base = _one_property("payload")
+        query = replace(base, output=replace(base.output, maximum_rows=len(spellings)))
         system.store._connection.set_trace_callback(statements.append)  # noqa: SLF001
 
         result = system.query_graph(query)
 
         assert result.accepted, result.findings
-        assert len(result.rows) == 1
+        assert len(result.rows) == len(spellings)
         projection_statements = [
-            statement for statement in statements if "object_property AS pp0" in statement
+            statement
+            for statement in statements
+            if "INSERT OR IGNORE INTO query_answer" in statement
         ]
         assert len(projection_statements) == 1, [
             statement for statement in statements if "object_property" in statement
@@ -1751,7 +1774,8 @@ def test_maximum_rows_rejects_genuinely_unequal_nested_values(tmp_path: Path) ->
             provenance=_owner(),
         ).accepted
 
-        result = system.query_graph(replace(_one_property("payload"), maximum_rows=1))
+        base = _one_property("payload")
+        result = system.query_graph(replace(base, output=replace(base.output, maximum_rows=1)))
 
         assert result.status is OperationStatus.REJECTED
         assert result.rows == ()
@@ -1760,7 +1784,7 @@ def test_maximum_rows_rejects_genuinely_unequal_nested_values(tmp_path: Path) ->
         system.close()
 
 
-def test_semantic_projection_deduplication_does_not_change_object_aggregation(
+def test_source_preserving_rows_and_object_aggregation_both_count_distinct_sources(
     tmp_path: Path,
 ) -> None:
     from vellis.json_value import JsonKind
@@ -1781,20 +1805,25 @@ def test_semantic_projection_deduplication_does_not_change_object_aggregation(
             ),
             provenance=_owner(),
         ).accepted
-        query = replace(
-            _one_property("payload"),
-            aggregations=(
-                QueryAggregation(
-                    name="note-count", operator=AggregationOperator.COUNT, data_condition="notes"
+        row_query = _one_property("payload")
+        aggregate_query = GraphQuery(
+            anchor_groups=row_query.anchor_groups,
+            data_conditions=row_query.data_conditions,
+            output=AggregateQueryOutput(
+                kind="aggregates",
+                data_condition="notes",
+                aggregations=(
+                    QueryAggregation(name="note-count", operator=AggregationOperator.COUNT),
                 ),
+                maximum_matches=2,
             ),
-            maximum_rows=2,
         )
 
-        result = system.query_graph(query)
+        rows = system.query_graph(row_query)
+        result = system.query_graph(aggregate_query)
 
         assert result.accepted, result.findings
-        assert len(result.rows) == 1
+        assert rows.accepted and len(rows.rows) == 2
         assert result.aggregates[0].value == Decimal(2)
     finally:
         system.close()
@@ -1852,8 +1881,11 @@ def test_a_projected_link_participates_in_row_identity(sharp: RTGSystem) -> None
         required_links=(
             RequiredLink(name="edge", source_group="from", target_group="to", link_type="knows"),
         ),
-        return_shape=ReturnShape(projections=(LinkProjection(name="link", required_link="edge"),)),
-        maximum_rows=10,
+        output=RowQueryOutput(
+            kind="rows",
+            projections=(LinkProjection(name="link", required_link="edge"),),
+            maximum_rows=10,
+        ),
     )
 
     result = sharp.query_graph(query)
@@ -1910,14 +1942,15 @@ def test_a_string_property_orders_by_code_point(tmp_path: Path) -> None:
                             ),
                         ),
                     ),
-                    return_shape=ReturnShape(
+                    output=RowQueryOutput(
+                        kind="rows",
                         projections=(
                             DataPropertyProjection(
                                 name="year", data_condition="notes", property_name="year"
                             ),
-                        )
+                        ),
+                        maximum_rows=20,
                     ),
-                    maximum_rows=20,
                 )
             )
             assert result.status is OperationStatus.ACCEPTED, result.findings
@@ -1980,14 +2013,15 @@ def test_string_ordering_agrees_between_the_stored_and_replayed_graph(tmp_path: 
                         ),
                     ),
                 ),
-                return_shape=ReturnShape(
+                output=RowQueryOutput(
+                    kind="rows",
                     projections=(
                         DataPropertyProjection(
                             name="title", data_condition="notes", property_name="title"
                         ),
-                    )
+                    ),
+                    maximum_rows=20,
                 ),
-                maximum_rows=20,
             )
         )
         assert selected.status is OperationStatus.ACCEPTED, selected.findings
@@ -2010,10 +2044,11 @@ def test_an_anchor_group_may_name_several_types(system: RTGSystem) -> None:
     both = system.query_graph(
         GraphQuery(
             anchor_groups=(AnchorGroup(name="things", anchor_types=("person", "project")),),
-            return_shape=ReturnShape(
-                projections=(AnchorProjection(name="thing", anchor_group="things"),)
+            output=RowQueryOutput(
+                kind="rows",
+                projections=(AnchorProjection(name="thing", anchor_group="things"),),
+                maximum_rows=20,
             ),
-            maximum_rows=20,
         )
     )
     assert both.status is OperationStatus.ACCEPTED, both.findings
@@ -2022,10 +2057,11 @@ def test_an_anchor_group_may_name_several_types(system: RTGSystem) -> None:
         one = system.query_graph(
             GraphQuery(
                 anchor_groups=(AnchorGroup(name="things", anchor_types=(type_key,)),),
-                return_shape=ReturnShape(
-                    projections=(AnchorProjection(name="thing", anchor_group="things"),)
+                output=RowQueryOutput(
+                    kind="rows",
+                    projections=(AnchorProjection(name="thing", anchor_group="things"),),
+                    maximum_rows=20,
                 ),
-                maximum_rows=20,
             )
         )
         assert one.status is OperationStatus.ACCEPTED, one.findings
@@ -2068,13 +2104,14 @@ def test_anchor_count_uses_distinct_identity_when_other_projections_repeat_it(
                     name="notes", anchor_group="people", associated_data_type="note"
                 ),
             ),
-            return_shape=ReturnShape(
+            output=RowQueryOutput(
+                kind="rows",
                 projections=(
                     AnchorProjection(name="person", anchor_group="people"),
                     AssociatedDataProjection(name="note", data_condition="notes"),
-                )
+                ),
+                maximum_rows=10,
             ),
-            maximum_rows=10,
         )
     )
 
@@ -2091,9 +2128,12 @@ def _rating_query(*aggregations: QueryAggregation, maximum: int = 20) -> GraphQu
                 name="notes", anchor_group="people", associated_data_type="note"
             ),
         ),
-        return_shape=ReturnShape(projections=()),
-        aggregations=aggregations,
-        maximum_rows=maximum,
+        output=AggregateQueryOutput(
+            kind="aggregates",
+            data_condition="notes",
+            aggregations=aggregations,
+            maximum_matches=maximum,
+        ),
     )
 
 
@@ -2127,24 +2167,22 @@ def test_aggregation_counts_matching_objects_not_distinct_projected_tuples(
         result = system.query_graph(
             _rating_query(
                 QueryAggregation(
-                    name="howMany", operator=AggregationOperator.COUNT, data_condition="notes"
+                    name="howMany",
+                    operator=AggregationOperator.COUNT,
                 ),
                 QueryAggregation(
                     name="total",
                     operator=AggregationOperator.SUM,
-                    data_condition="notes",
                     property_name="rating",
                 ),
                 QueryAggregation(
                     name="lowest",
                     operator=AggregationOperator.MINIMUM,
-                    data_condition="notes",
                     property_name="rating",
                 ),
                 QueryAggregation(
                     name="highest",
                     operator=AggregationOperator.MAXIMUM,
-                    data_condition="notes",
                     property_name="rating",
                 ),
             )
@@ -2187,24 +2225,20 @@ def test_scalar_aggregation_streams_one_bounded_selection(tmp_path: Path, popula
                     QueryAggregation(
                         name="howMany",
                         operator=AggregationOperator.COUNT,
-                        data_condition="notes",
                     ),
                     QueryAggregation(
                         name="total",
                         operator=AggregationOperator.SUM,
-                        data_condition="notes",
                         property_name="rating",
                     ),
                     QueryAggregation(
                         name="lowest",
                         operator=AggregationOperator.MINIMUM,
-                        data_condition="notes",
                         property_name="rating",
                     ),
                     QueryAggregation(
                         name="highest",
                         operator=AggregationOperator.MAXIMUM,
-                        data_condition="notes",
                         property_name="rating",
                     ),
                     maximum=population,
@@ -2222,14 +2256,8 @@ def test_scalar_aggregation_streams_one_bounded_selection(tmp_path: Path, popula
             "lowest": Decimal(1),
             "highest": Decimal(5),
         }
-        assert system.store.maximum_aggregation_batch_rows <= 256
-        assert system.store.maximum_aggregation_reducer_count == 3
         assert (
-            sum(
-                "INSERT OR IGNORE INTO query_aggregate_match" in statement
-                for statement in statements
-            )
-            == 1
+            sum("INSERT OR IGNORE INTO query_answer" in statement for statement in statements) == 1
         )
     finally:
         system.close()
@@ -2277,7 +2305,6 @@ def test_cancelling_exponents_keep_python_sum_memory_bounded(tmp_path: Path) -> 
                         QueryAggregation(
                             name="total",
                             operator=AggregationOperator.SUM,
-                            data_condition="notes",
                             property_name="rating",
                         ),
                         maximum=pair_count * 2,
@@ -2288,8 +2315,6 @@ def test_cancelling_exponents_keep_python_sum_memory_bounded(tmp_path: Path) -> 
                 tracemalloc.stop()
             assert result.accepted, result.findings
             assert result.aggregates[0].value == Decimal(0)
-            assert system.store.maximum_aggregation_batch_rows <= 256
-            assert system.store.maximum_aggregation_reducer_count == 1
             return peak
         finally:
             system.close()
@@ -2304,19 +2329,19 @@ def test_cancelling_exponents_keep_python_sum_memory_bounded(tmp_path: Path) -> 
 
 @pytest.mark.parametrize("maximum", [2**63 - 1, 2**100])
 @pytest.mark.parametrize(
-    "state_scope",
+    "state_case",
     [
-        EvaluatedStateScope.CURRENT,
-        EvaluatedStateScope.PROSPECTIVE,
-        EvaluatedStateScope.HISTORICAL,
+        _StateCase.CURRENT,
+        _StateCase.PROSPECTIVE,
+        _StateCase.HISTORICAL,
     ],
 )
-def test_aggregation_accepts_large_positive_bounds_without_canonical_effects(
+def test_aggregation_rejects_bounds_whose_refusal_sentinel_exceeds_sqlite_integer_range(
     system: RTGSystem,
     maximum: int,
-    state_scope: EvaluatedStateScope,
+    state_case: _StateCase,
 ) -> None:
-    if state_scope is EvaluatedStateScope.PROSPECTIVE:
+    if state_case is _StateCase.PROSPECTIVE:
         assert system.set_definition_delta(
             DefinitionChange(
                 anchor_type_upserts=(
@@ -2331,22 +2356,22 @@ def test_aggregation_accepts_large_positive_bounds_without_canonical_effects(
             QueryAggregation(
                 name="howMany",
                 operator=AggregationOperator.COUNT,
-                data_condition="notes",
             )
         ),
-        maximum_rows=maximum,
-        state_scope=state_scope,
-        historical_selection=(
-            RevisionSelection(revision) if state_scope is EvaluatedStateScope.HISTORICAL else None
+        output=replace(
+            _rating_query(QueryAggregation("howMany", AggregationOperator.COUNT)).output,
+            maximum_matches=maximum,
         ),
+        state=_query_state(state_case, revision),
     )
 
     result = system.query_graph(query, provenance=_owner())
 
-    assert result.accepted, result.findings
-    assert result.aggregates[0].value == Decimal(3)
+    assert result.status is OperationStatus.REJECTED
+    assert result.aggregates == () and result.evaluated_revision is None
+    assert "integer range" in result.findings[0].summary
     assert system.store.current_revision() == revision
-    assert system.store.activity_records()[-1].outcome_category is OperationStatus.ACCEPTED
+    assert system.store.activity_records()[-1].outcome_category is OperationStatus.REJECTED
 
 
 def test_sum_preserves_exact_numbers_beyond_the_decimal_context(tmp_path: Path) -> None:
@@ -2384,19 +2409,18 @@ def test_sum_preserves_exact_numbers_beyond_the_decimal_context(tmp_path: Path) 
             QueryAggregation(
                 name="total",
                 operator=AggregationOperator.SUM,
-                data_condition="notes",
                 property_name="rating",
             )
         )
 
         stored = system.query_graph(query)
         state = materialize_state(system)
-        in_memory = evaluate_query(query, definitions, state.graph, state.revision)
+        oracle = evaluate_query(query, definitions, state.graph, state.revision)
         exact = Decimal("123456789012345678901234567891")
 
         assert stored.status is OperationStatus.ACCEPTED, stored.findings
         assert stored.aggregates[0].value == exact
-        assert in_memory.aggregates[0].value == exact
+        assert oracle.aggregates[0].value == exact
     finally:
         system.close()
 
@@ -2429,11 +2453,10 @@ def test_sum_preserves_exact_numbers_at_the_decimal_exponent_boundary(tmp_path: 
         QueryAggregation(
             name="total",
             operator=AggregationOperator.SUM,
-            data_condition="notes",
             property_name="rating",
         )
     )
-    in_memory = evaluate_query(query, definitions, graph, 0)
+    oracle = evaluate_query(query, definitions, graph, 0)
 
     system = RTGSystem.open(tmp_path / "vellis.sqlite3")
     try:
@@ -2451,7 +2474,7 @@ def test_sum_preserves_exact_numbers_at_the_decimal_exponent_boundary(tmp_path: 
     finally:
         system.close()
 
-    for result in (in_memory, stored):
+    for result in (oracle, stored):
         assert result.status is OperationStatus.REJECTED
         assert not result.rows and not result.aggregates
         assert "could not be returned" in result.summary
@@ -2479,7 +2502,6 @@ def test_sum_refuses_compact_inputs_that_require_population_sized_expansion() ->
             QueryAggregation(
                 name="total",
                 operator=AggregationOperator.SUM,
-                data_condition="notes",
                 property_name="rating",
             )
         ),
@@ -2499,8 +2521,8 @@ def test_sum_refuses_compact_inputs_that_require_population_sized_expansion() ->
     assert "expanding compact numeric inputs" in result.findings[0].summary
 
 
-def test_aggregation_agrees_between_the_stored_and_in_memory_graph(tmp_path: Path) -> None:
-    """Component pruning must retain every identity that can change an aggregate."""
+def test_aggregation_matches_the_independent_semantic_oracle(tmp_path: Path) -> None:
+    """The SQLite compiler retains every identity that can change an aggregate."""
     system = RTGSystem.open(tmp_path / "vellis.sqlite3")
     try:
         definitions = build_rich_definitions()
@@ -2519,105 +2541,42 @@ def test_aggregation_agrees_between_the_stored_and_in_memory_graph(tmp_path: Pat
         ).accepted
         query = _rating_query(
             QueryAggregation(
-                name="howMany", operator=AggregationOperator.COUNT, data_condition="notes"
+                name="howMany",
+                operator=AggregationOperator.COUNT,
             ),
             QueryAggregation(
                 name="total",
                 operator=AggregationOperator.SUM,
-                data_condition="notes",
                 property_name="rating",
             ),
             QueryAggregation(
                 name="lowest",
                 operator=AggregationOperator.MINIMUM,
-                data_condition="notes",
                 property_name="rating",
             ),
             QueryAggregation(
                 name="highest",
                 operator=AggregationOperator.MAXIMUM,
-                data_condition="notes",
                 property_name="rating",
             ),
         )
 
         stored = system.query_graph(query)
         state = materialize_state(system)
-        in_memory = evaluate_query(query, definitions, state.graph, state.revision)
+        oracle = evaluate_query(query, definitions, state.graph, state.revision)
 
         assert stored.status is OperationStatus.ACCEPTED, stored.findings
-        assert in_memory.status is OperationStatus.ACCEPTED, in_memory.findings
-        assert in_memory.aggregates == stored.aggregates
-        assert [(each.aggregation, each.present, each.value) for each in in_memory.aggregates] == [
+        assert oracle.status is OperationStatus.ACCEPTED, oracle.findings
+        assert oracle.aggregates == stored.aggregates
+        assert [(each.aggregation, each.present, each.value) for each in oracle.aggregates] == [
             ("howMany", True, Decimal(2)),
             ("total", True, Decimal(7)),
             ("lowest", True, Decimal(2)),
             ("highest", True, Decimal(5)),
         ]
 
-        mixed = GraphQuery(
-            anchor_groups=query.anchor_groups,
-            data_conditions=query.data_conditions,
-            return_shape=ReturnShape(
-                projections=(AssociatedDataProjection(name="note", data_condition="notes"),)
-            ),
-            aggregations=query.aggregations,
-            maximum_rows=query.maximum_rows,
-        )
-        stored_mixed = system.query_graph(mixed)
-        in_memory_mixed = evaluate_query(mixed, definitions, state.graph, state.revision)
-
-        assert stored_mixed.status is OperationStatus.ACCEPTED, stored_mixed.findings
-        assert stored_mixed.rows == in_memory_mixed.rows
-        assert stored_mixed.aggregates == in_memory_mixed.aggregates
-        assert len(stored_mixed.rows) == 2
-        assert len(stored_mixed.aggregates) == 4
     finally:
         system.close()
-
-
-class _GuardedCandidateTuple(tuple[AssociatedDataObject, ...]):
-    """Fail if one candidate stream is consumed past an aggregation's decision point."""
-
-    def __iter__(self):
-        for position, value in enumerate(super().__iter__()):
-            if position >= 5:
-                raise AssertionError("aggregation consumed candidates after its bound was decided")
-            yield value
-
-
-class _BoundedAggregationIndex(_TestGraphIndex):
-    def associated_data_candidates(
-        self,
-        associated_data_type: str,
-        anchor_uuid: str,
-        allowed_uuids: frozenset[str] | None = None,
-    ) -> tuple[AssociatedDataObject, ...]:
-        candidates = super().associated_data_candidates(
-            associated_data_type, anchor_uuid, allowed_uuids
-        )
-        return _GuardedCandidateTuple(candidates)
-
-
-def test_in_memory_aggregation_stops_when_the_maximum_is_decided() -> None:
-    """Refusal at five matches must not retain or walk the remaining population."""
-    definitions = build_rich_definitions()
-    graph = Graph(
-        anchors=(ADA,),
-        associated_data=tuple(_note(f"n-{index}", ("a-1",), rating=index) for index in range(100)),
-    )
-    query = _rating_query(
-        QueryAggregation(
-            name="howMany", operator=AggregationOperator.COUNT, data_condition="notes"
-        ),
-        maximum=4,
-    )
-
-    result = evaluate_indexed_query(query, definitions, _BoundedAggregationIndex(graph), revision=1)
-
-    assert result.status is OperationStatus.REJECTED
-    assert result.aggregates == ()
-    assert any("exceed the maximum" in finding.summary for finding in result.findings)
 
 
 def test_an_aggregate_is_absent_when_nothing_carries_the_property(tmp_path: Path) -> None:
@@ -2635,12 +2594,12 @@ def test_an_aggregate_is_absent_when_nothing_carries_the_property(tmp_path: Path
         result = system.query_graph(
             _rating_query(
                 QueryAggregation(
-                    name="howMany", operator=AggregationOperator.COUNT, data_condition="notes"
+                    name="howMany",
+                    operator=AggregationOperator.COUNT,
                 ),
                 QueryAggregation(
                     name="total",
                     operator=AggregationOperator.SUM,
-                    data_condition="notes",
                     property_name="rating",
                 ),
             )
@@ -2681,13 +2640,14 @@ def test_an_aggregated_selection_larger_than_the_maximum_is_refused_whole(
         result = system.query_graph(
             _rating_query(
                 QueryAggregation(
-                    name="howMany", operator=AggregationOperator.COUNT, data_condition="notes"
+                    name="howMany",
+                    operator=AggregationOperator.COUNT,
                 ),
                 maximum=4,
             )
         )
         assert result.status is OperationStatus.REJECTED
         assert result.aggregates == ()
-        assert any("exceed the maximum" in each.summary for each in result.findings)
+        assert any("exceeds the maximum" in each.summary for each in result.findings)
     finally:
         system.close()

@@ -25,21 +25,21 @@ from vellis.graph import Anchor, AssociatedDataObject, Graph, Link, SystemMetada
 from vellis.json_value import normalize
 from vellis.outcomes import OperationStatus
 from vellis.query import (
+    AggregateQueryOutput,
     AggregationOperator,
     AnchorGroup,
     AnchorProjection,
-    AnchorUuidFilter,
     AssociatedDataCondition,
     AssociatedDataProjection,
     DataPropertyCondition,
     DataPropertyProjection,
     GraphQuery,
     LinkProjection,
-    LinkUuidFilter,
     PropertyComparison,
     QueryAggregation,
     RequiredLink,
-    ReturnShape,
+    RowQueryOutput,
+    UuidFilter,
 )
 from vellis.system import RTGSystem
 
@@ -83,15 +83,31 @@ def _people(**overrides: object) -> AnchorGroup:
     return AnchorGroup(name="people", anchor_types=("person",), **overrides)  # pyright: ignore[reportArgumentType]
 
 
-def _who(name: str = "who", group: str = "people") -> ReturnShape:
-    return ReturnShape(projections=(AnchorProjection(name=name, anchor_group=group),))
+def _who(name: str = "who", group: str = "people"):
+    return (AnchorProjection(name=name, anchor_group=group),)
 
 
 def _query(**overrides: object) -> GraphQuery:
+    projections = overrides.pop("projections", _who())
+    maximum = overrides.pop("maximum_rows", 10)
+    aggregations = overrides.pop("aggregations", None)
+    output = (
+        AggregateQueryOutput(
+            kind="aggregates",
+            data_condition=str(overrides.pop("aggregate_target", "notes")),
+            aggregations=aggregations,  # pyright: ignore[reportArgumentType]
+            maximum_matches=maximum,  # pyright: ignore[reportArgumentType]
+        )
+        if aggregations is not None
+        else RowQueryOutput(
+            kind="rows",
+            projections=projections,  # pyright: ignore[reportArgumentType]
+            maximum_rows=maximum,  # pyright: ignore[reportArgumentType]
+        )
+    )
     fields: dict[str, object] = {
         "anchor_groups": (_people(),),
-        "return_shape": _who(),
-        "maximum_rows": 10,
+        "output": output,
     }
     fields.update(overrides)
     return GraphQuery(**fields)  # pyright: ignore[reportArgumentType]
@@ -164,7 +180,7 @@ INVALID: tuple[tuple[str, GraphQuery, str], ...] = (
     ),
     (
         "out-of-query-projection",
-        _query(return_shape=_who(group="nobody")),
+        _query(projections=_who(group="nobody")),
         "not an anchor group in this query",
     ),
     (
@@ -177,30 +193,30 @@ INVALID: tuple[tuple[str, GraphQuery, str], ...] = (
     ),
     (
         "unknown-anchor-uuid",
-        _query(anchor_groups=(_people(uuid_filter=AnchorUuidFilter(uuids=("a-9",))),)),
+        _query(anchor_groups=(_people(uuid_filter=UuidFilter(uuids=("a-9",))),)),
         "restricts unknown anchor UUID",
     ),
     (
         "anchor-uuid-of-another-type",
-        _query(anchor_groups=(_people(uuid_filter=AnchorUuidFilter(uuids=("p-1",))),)),
+        _query(anchor_groups=(_people(uuid_filter=UuidFilter(uuids=("p-1",))),)),
         "restricts unknown anchor UUID",
     ),
     (
         "unknown-link-uuid",
         _query(
             anchor_groups=(_people(), PROJECTS),
-            required_links=(_link(uuid_filter=LinkUuidFilter(uuids=("l-9",))),),
+            required_links=(_link(uuid_filter=UuidFilter(uuids=("l-9",))),),
         ),
         "restricts unknown link UUID",
     ),
     (
         "duplicate-anchor-uuid",
-        _query(anchor_groups=(_people(uuid_filter=AnchorUuidFilter(uuids=("a-1", "a-1"))),)),
+        _query(anchor_groups=(_people(uuid_filter=UuidFilter(uuids=("a-1", "a-1"))),)),
         "more than once",
     ),
     (
         "empty-uuid-restriction",
-        _query(anchor_groups=(_people(uuid_filter=AnchorUuidFilter(uuids=())),)),
+        _query(anchor_groups=(_people(uuid_filter=UuidFilter(uuids=())),)),
         "empty UUID restriction",
     ),
     (
@@ -242,7 +258,8 @@ INVALID: tuple[tuple[str, GraphQuery, str], ...] = (
         _query(
             aggregations=(
                 QueryAggregation(
-                    name="total", operator=AggregationOperator.COUNT, data_condition="nowhere"
+                    name="total",
+                    operator=AggregationOperator.COUNT,
                 ),
             )
         ),
@@ -254,7 +271,8 @@ INVALID: tuple[tuple[str, GraphQuery, str], ...] = (
             data_conditions=(_notes(),),
             aggregations=(
                 QueryAggregation(
-                    name="total", operator=AggregationOperator.SUM, data_condition="notes"
+                    name="total",
+                    operator=AggregationOperator.SUM,
                 ),
             ),
         ),
@@ -268,7 +286,6 @@ INVALID: tuple[tuple[str, GraphQuery, str], ...] = (
                 QueryAggregation(
                     name="total",
                     operator=AggregationOperator.SUM,
-                    data_condition="notes",
                     property_name="unheard-of",
                 ),
             ),
@@ -283,7 +300,6 @@ INVALID: tuple[tuple[str, GraphQuery, str], ...] = (
                 QueryAggregation(
                     name="total",
                     operator=AggregationOperator.SUM,
-                    data_condition="notes",
                     property_name="title",
                 ),
             ),
@@ -298,7 +314,6 @@ INVALID: tuple[tuple[str, GraphQuery, str], ...] = (
                 QueryAggregation(
                     name="biggest",
                     operator=AggregationOperator.MAXIMUM,
-                    data_condition="notes",
                     property_name="details",
                 ),
             ),
@@ -326,12 +341,10 @@ INVALID: tuple[tuple[str, GraphQuery, str], ...] = (
         "projected-property-that-is-not-defined",
         _query(
             data_conditions=(_notes(),),
-            return_shape=ReturnShape(
-                projections=(
-                    DataPropertyProjection(
-                        name="value", data_condition="notes", property_name="unheard-of"
-                    ),
-                )
+            projections=(
+                DataPropertyProjection(
+                    name="value", data_condition="notes", property_name="unheard-of"
+                ),
             ),
         ),
         "does not define",
@@ -340,19 +353,13 @@ INVALID: tuple[tuple[str, GraphQuery, str], ...] = (
         "projection-of-the-wrong-selector-kind",
         _query(
             data_conditions=(_notes(),),
-            return_shape=ReturnShape(
-                projections=(AssociatedDataProjection(name="note", data_condition="people"),)
-            ),
+            projections=(AssociatedDataProjection(name="note", data_condition="people"),),
         ),
         "not a data condition in this query",
     ),
     (
         "link-projection-without-its-link",
-        _query(
-            return_shape=ReturnShape(
-                projections=(LinkProjection(name="works", required_link="works"),)
-            )
-        ),
+        _query(projections=(LinkProjection(name="works", required_link="works"),)),
         "not a required link in this query",
     ),
     (
@@ -393,8 +400,8 @@ INVALID: tuple[tuple[str, GraphQuery, str], ...] = (
     ("no-anchor-groups", _query(anchor_groups=()), "at least one anchor group"),
     (
         "no-projections",
-        _query(return_shape=ReturnShape(projections=())),
-        "at least one binding",
+        _query(projections=()),
+        "row output must request a projection",
     ),
     ("zero-maximum", _query(maximum_rows=0), "maximum rows must be positive"),
     ("negative-maximum", _query(maximum_rows=-1), "maximum rows must be positive"),
@@ -507,7 +514,7 @@ def test_a_grounding_the_active_definitions_forbid_is_refused(tmp_path: Path) ->
             _query(
                 anchor_groups=(PROJECTS,),
                 data_conditions=(_notes(anchor_group="projects"),),
-                return_shape=_who(group="projects"),
+                projections=_who(group="projects"),
             )
         )
 
@@ -598,9 +605,7 @@ def test_no_field_of_returned_associated_data_escapes_the_completeness_screen(
 
     query = _query(
         data_conditions=(_notes(),),
-        return_shape=ReturnShape(
-            projections=(AssociatedDataProjection(name="note", data_condition="notes"),)
-        ),
+        projections=(AssociatedDataProjection(name="note", data_condition="notes"),),
     )
 
     result = evaluate_query(query, build_rich_definitions(), graph, revision=1)
@@ -645,7 +650,7 @@ def test_no_field_of_a_returned_link_escapes_the_completeness_screen(
     query = _query(
         anchor_groups=(_people(), PROJECTS),
         required_links=(_link(),),
-        return_shape=ReturnShape(projections=(LinkProjection(name="edge", required_link="works"),)),
+        projections=(LinkProjection(name="edge", required_link="works"),),
     )
 
     result = evaluate_query(query, build_rich_definitions(), graph, revision=1)

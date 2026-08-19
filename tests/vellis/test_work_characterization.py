@@ -20,6 +20,7 @@ set one says so itself.
 
 from __future__ import annotations
 
+from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
@@ -46,10 +47,9 @@ from vellis.outcomes import OperationStatus
 from vellis.query import (
     AnchorGroup,
     AnchorProjection,
-    AnchorUuidFilter,
-    EvaluatedStateScope,
     GraphQuery,
-    ReturnShape,
+    RowQueryOutput,
+    UuidFilter,
 )
 from vellis.system import RTGSystem
 
@@ -62,10 +62,11 @@ ARRIVAL = Anchor(uuid="arrival", type_key="person", display_name="New")
 def _people(maximum_rows: int = 100) -> GraphQuery:
     return GraphQuery(
         anchor_groups=(AnchorGroup(name="people", anchor_types=("person",)),),
-        return_shape=ReturnShape(
-            projections=(AnchorProjection(name="who", anchor_group="people"),)
+        output=RowQueryOutput(
+            kind="rows",
+            projections=(AnchorProjection(name="who", anchor_group="people"),),
+            maximum_rows=maximum_rows,
         ),
-        maximum_rows=maximum_rows,
     )
 
 
@@ -243,9 +244,8 @@ def test_a_returned_result_is_bounded_without_scanning_or_hydrating_the_matching
         assert measured.value.status is OperationStatus.REJECTED
         assert not measured.value.rows
         assert measured.cost.canonical_record_visits == 0
-        # Raw candidates stream into the bounded semantic identity set, so the evaluator
-        # decodes only the first maximumRows + 1 unique rows before refusing here.
-        assert measured.cost.current_graph_object_decodes == 3
+        # Identity bounding precedes hydration, so a refused answer decodes no object.
+        assert measured.cost.current_graph_object_decodes == 0
         assert measured.cost.sqlite_vm_steps < 1_000
     finally:
         system.close()
@@ -487,18 +487,14 @@ def test_resolving_a_revision_or_a_time_does_not_depend_on_ledger_length(
         by_revision = measure(
             system,
             lambda: system.definition_summary(
-                DefinitionSummaryRequest(
-                    RevisionSelection(revision=wanted), EvaluatedStateScope.HISTORICAL
-                ),
+                DefinitionSummaryRequest(state=RevisionSelection(kind="revision", revision=wanted)),
                 provenance=OWNER,
             ),
         )
         by_time = measure(
             system,
             lambda: system.definition_summary(
-                DefinitionSummaryRequest(
-                    TimeSelection(time=moment), EvaluatedStateScope.HISTORICAL
-                ),
+                DefinitionSummaryRequest(state=TimeSelection(kind="time", time=moment)),
                 provenance=OWNER,
             ),
         )
@@ -531,7 +527,7 @@ def test_a_historical_vocabulary_does_not_pay_for_unrelated_graph_transitions(
             system,
             lambda: system.definition_summary(
                 DefinitionSummaryRequest(
-                    RevisionSelection(revision=revision), EvaluatedStateScope.HISTORICAL
+                    state=RevisionSelection(kind="revision", revision=revision)
                 ),
                 provenance=OWNER,
             ),
@@ -539,7 +535,8 @@ def test_a_historical_vocabulary_does_not_pay_for_unrelated_graph_transitions(
         inspection = measure(
             system,
             lambda: system.inspect_definitions(
-                request, selection=RevisionSelection(revision=revision), provenance=OWNER
+                replace(request, state=RevisionSelection(kind="revision", revision=revision)),
+                provenance=OWNER,
             ),
         )
 
@@ -561,7 +558,8 @@ def test_a_historical_query_uses_intervals_not_transition_replay(tmp_path: Path)
         measured = measure(
             system,
             lambda: system.query_graph(
-                _people(), selection=RevisionSelection(revision=revision), provenance=OWNER
+                replace(_people(), state=RevisionSelection(kind="revision", revision=revision)),
+                provenance=OWNER,
             ),
         )
 
@@ -592,11 +590,13 @@ def test_a_narrow_historical_query_does_not_materialize_the_revision_population(
             system,
             lambda: system.query_graph(
                 GraphQuery(
-                    anchor_groups=(AnchorGroup("person", ("person",), AnchorUuidFilter(("a-0",))),),
-                    return_shape=ReturnShape((AnchorProjection("returned-person", "person"),)),
-                    maximum_rows=1,
-                    historical_selection=RevisionSelection(revision=1),
-                    state_scope=EvaluatedStateScope.HISTORICAL,
+                    anchor_groups=(AnchorGroup("person", ("person",), UuidFilter(("a-0",))),),
+                    output=RowQueryOutput(
+                        kind="rows",
+                        projections=(AnchorProjection("returned-person", "person"),),
+                        maximum_rows=1,
+                    ),
+                    state=RevisionSelection(kind="revision", revision=1),
                 ),
                 provenance=OWNER,
             ),
@@ -621,7 +621,7 @@ def test_restoring_a_past_state_uses_set_difference_not_ledger_replay(
         measured = measure(
             system,
             lambda: system.restore_historical_state(
-                RevisionSelection(revision=selected_revision), provenance=OWNER
+                RevisionSelection(kind="revision", revision=selected_revision), provenance=OWNER
             ),
         )
 

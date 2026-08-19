@@ -133,11 +133,11 @@ def _restore(
 
     selection: HistoricalSelection
     if arguments.revision is not None:
-        selection = RevisionSelection(revision=arguments.revision)
+        selection = RevisionSelection(kind="revision", revision=arguments.revision)
         named = f"revision {arguments.revision}"
     else:
         try:
-            selection = TimeSelection(time=datetime.fromisoformat(arguments.time))
+            selection = TimeSelection(kind="time", time=datetime.fromisoformat(arguments.time))
         except ValueError:
             _report(
                 ConnectionStage.RESTORE_STATE,

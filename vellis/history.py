@@ -24,33 +24,72 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
+from typing import Annotated, Literal
+
+from pydantic import ConfigDict, Field
 
 from vellis.outcomes import ValidationFinding
 
 __all__ = [
     "MAXIMUM_REVISION",
+    "CurrentSelection",
+    "EvaluatedStateSelection",
     "HistoricalSelection",
+    "ProspectiveSelection",
     "RevisionSelection",
     "TimeSelection",
     "selection_findings",
 ]
+
+_CLOSED_REQUEST = ConfigDict(extra="forbid")
+
+
+@dataclass(frozen=True, slots=True)
+class CurrentSelection:
+    """Select the currently active canonical state."""
+
+    kind: Literal["current"]
+
+    __pydantic_config__ = _CLOSED_REQUEST
+
+
+@dataclass(frozen=True, slots=True)
+class ProspectiveSelection:
+    """Select the sole effective prospective overlay."""
+
+    kind: Literal["prospective"]
+
+    __pydantic_config__ = _CLOSED_REQUEST
 
 
 @dataclass(frozen=True, slots=True)
 class RevisionSelection:
     """Selects one committed revision directly."""
 
+    kind: Literal["revision"]
     revision: int
+
+    __pydantic_config__ = _CLOSED_REQUEST
 
 
 @dataclass(frozen=True, slots=True)
 class TimeSelection:
     """Selects the greatest revision committed at or before one instant."""
 
+    kind: Literal["time"]
     time: datetime
 
+    __pydantic_config__ = _CLOSED_REQUEST
 
-HistoricalSelection = RevisionSelection | TimeSelection
+
+EvaluatedStateSelection = Annotated[
+    CurrentSelection | ProspectiveSelection | RevisionSelection | TimeSelection,
+    Field(discriminator="kind"),
+]
+HistoricalSelection = Annotated[
+    RevisionSelection | TimeSelection,
+    Field(discriminator="kind"),
+]
 
 # The largest revision a ledger can bind, which is what the store can hold in one column.
 MAXIMUM_REVISION = 2**63 - 1

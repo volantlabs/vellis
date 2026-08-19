@@ -63,7 +63,6 @@ import anyio.lowlevel
 import mcp_types
 from fastmcp import FastMCP
 from fastmcp.server.context import reset_transport, set_transport
-from fastmcp.server.middleware import CallNext, Middleware, MiddlewareContext
 from fastmcp.tools.base import ToolResult
 from fastmcp.utilities.cli import log_server_banner
 from fastmcp.utilities.json_schema import dereference_refs
@@ -77,7 +76,7 @@ from mcp.shared._context_streams import (
 )
 from mcp.shared._stream_protocols import WriteStream
 from mcp.shared.message import SessionMessage
-from mcp.types import CallToolRequestParams, CallToolResult, TextContent
+from mcp.types import CallToolResult, TextContent
 
 from vellis.activity import HistoryQuery, HistoryResult
 from vellis.canonical import Provenance
@@ -404,7 +403,6 @@ def build_server(system: RTGSystem, *, name: str = "vellis") -> FastMCP:
     agent has to learn.
     """
     server: FastMCP = _VellisMCP(name)
-    server.add_middleware(_LegacyAnchorTypeCompatibility())
 
     def rtg_definition_summary(
         request: DefinitionSummaryRequest,
@@ -555,56 +553,6 @@ def build_server(system: RTGSystem, *, name: str = "vellis") -> FastMCP:
         registered.parameters = _self_contained(registered.parameters)
 
     return server
-
-
-class _LegacyAnchorTypeCompatibility(Middleware):
-    """Accept the former single-type query spelling at the selected wire boundary.
-
-    ``anchor_types`` remains the one canonical domain member and the only spelling
-    discovery publishes. Existing clients that send ``anchor_type`` still mean the
-    singleton collection they meant before multi-type groups were introduced. Keeping
-    the translation here prevents a retired serialization detail from becoming RTG
-    domain state or appearing in returned query objects.
-    """
-
-    async def on_call_tool(
-        self,
-        context: MiddlewareContext[CallToolRequestParams],
-        call_next: CallNext[CallToolRequestParams, ToolResult],
-    ) -> ToolResult:
-        message = context.message
-        if message.name != "rtg_query" or message.arguments is None:
-            return await call_next(context)
-        query = message.arguments.get("query")
-        if not isinstance(query, Mapping):
-            return await call_next(context)
-        groups = query.get("anchor_groups")
-        if not isinstance(groups, Sequence) or isinstance(groups, (str, bytes)):
-            return await call_next(context)
-
-        changed = False
-        compatible_groups: list[object] = []
-        for group in groups:
-            if (
-                isinstance(group, Mapping)
-                and "anchor_types" not in group
-                and isinstance(group.get("anchor_type"), str)
-            ):
-                compatible = dict(group)
-                compatible["anchor_types"] = [compatible.pop("anchor_type")]
-                compatible_groups.append(compatible)
-                changed = True
-            else:
-                compatible_groups.append(group)
-        if not changed:
-            return await call_next(context)
-
-        compatible_query = dict(query)
-        compatible_query["anchor_groups"] = compatible_groups
-        compatible_arguments = dict(message.arguments)
-        compatible_arguments["query"] = compatible_query
-        compatible_message = message.model_copy(update={"arguments": compatible_arguments})
-        return await call_next(context.copy(message=compatible_message))
 
 
 # What a recursive value stands for once it can no longer stand for itself. The real

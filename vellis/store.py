@@ -39,6 +39,7 @@ from contextlib import closing, contextmanager
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from decimal import Decimal, InvalidOperation
+from functools import lru_cache
 from pathlib import Path
 from threading import Lock, RLock
 from typing import TYPE_CHECKING
@@ -83,7 +84,7 @@ from vellis.graph import (
     Link,
     ObjectKind,
 )
-from vellis.json_value import JsonKind, json_equal
+from vellis.json_value import json_equal
 from vellis.normalized import (
     adjust_semantic_summary,
     definition_content_stats,
@@ -94,7 +95,6 @@ from vellis.normalized import (
     insert_definition_entries,
     insert_definition_entry,
     insert_object_value,
-    json_storage_fields,
     json_storage_value,
     load_definition_set,
     load_object_value,
@@ -114,6 +114,7 @@ from vellis.outcomes import (
     ValidationReport,
     ValidationScope,
 )
+from vellis.patterns import PatternError, compile_pattern
 from vellis.validation import assess_object_neighborhood, validate_property_value
 
 _MAXIMUM_SQLITE_INTEGER = 2**63 - 1
@@ -634,44 +635,19 @@ def _stored_json_equal(
     return int(json_equal(left, right))
 
 
-def _property_comparison_sql(
-    alias: str,
-    operation: str,
-    kind: str,
-    boolean: int | None,
-    number: str | None,
-    text: str | None,
-    parameters: list[object],
-) -> str:
-    """Compile one typed property comparison and append its SQL parameters."""
-    if operation in {"equal", "notEqual"}:
-        parameters.extend((kind, boolean, number, text))
-        predicate = (
-            f"vellis_json_equal({alias}.json_kind, {alias}.boolean_value,"
-            f" {alias}.number_value, {alias}.text_value, ?, ?, ?, ?)"
-        )
-        return f"{predicate} = {1 if operation == 'equal' else 0}"
-    operators = {
-        "lessThan": "<",
-        "lessThanOrEqual": "<=",
-        "greaterThan": ">",
-        "greaterThanOrEqual": ">=",
-    }
-    if kind == JsonKind.STRING.value:
-        # Stored text is UTF-8 and the column carries no collation, so SQLite's BINARY
-        # comparison is byte-wise — and UTF-8 byte order is code-point order, which is
-        # what the model asks for and what the in-memory path does. A collation here
-        # would silently make the two realizations disagree.
-        parameters.append(text)
-        return (
-            f"({alias}.json_kind = '{JsonKind.STRING.value}' AND "
-            f"{alias}.text_value {operators[operation]} ?)"
-        )
-    parameters.append(number)
-    return (
-        f"({alias}.json_kind = '{JsonKind.NUMBER.value}' AND "
-        f"vellis_decimal_cmp({alias}.number_value, ?) {operators[operation]} 0)"
-    )
+@lru_cache(maxsize=256)
+def _compiled_query_pattern(expression: str):
+    return compile_pattern(expression)
+
+
+def _stored_pattern_matches(value: object, expression: object) -> int:
+    """Apply one already validated RE2 query pattern to one stored string value."""
+    if not isinstance(value, str) or not isinstance(expression, str):
+        return 0
+    try:
+        return int(_compiled_query_pattern(expression).matches(value))
+    except PatternError:
+        return 0
 
 
 def _projection_revision(row: tuple[object, ...]) -> int:
@@ -1025,109 +1001,6 @@ def _query_type_keys(query: GraphQuery) -> set[str]:
     }
 
 
-def _query_component_names(query: GraphQuery) -> tuple[frozenset[str], ...]:
-    names = [
-        *(group.name for group in query.anchor_groups),
-        *(condition.name for condition in query.data_conditions),
-    ]
-    adjacent = {name: set[str]() for name in names}
-    for condition in query.data_conditions:
-        adjacent[condition.name].add(condition.anchor_group)
-        adjacent[condition.anchor_group].add(condition.name)
-    for required in query.required_links:
-        adjacent[required.source_group].add(required.target_group)
-        adjacent[required.target_group].add(required.source_group)
-    components: list[frozenset[str]] = []
-    visited: set[str] = set()
-    for name in names:
-        if name in visited:
-            continue
-        pending = [name]
-        members: set[str] = set()
-        while pending:
-            current = pending.pop()
-            if current in members:
-                continue
-            members.add(current)
-            pending.extend(adjacent[current] - members)
-        visited.update(members)
-        components.append(frozenset(members))
-    return tuple(components)
-
-
-def _projected_selector_names(query: GraphQuery) -> set[str]:
-    from vellis.query import (
-        AnchorProjection,
-        AssociatedDataProjection,
-        DataPropertyProjection,
-        LinkProjection,
-    )
-
-    required = {link.name: link for link in query.required_links}
-    names: set[str] = set()
-    for projection in query.return_shape.projections:
-        if isinstance(projection, AnchorProjection):
-            names.add(projection.anchor_group)
-        elif isinstance(projection, (AssociatedDataProjection, DataPropertyProjection)):
-            names.add(projection.data_condition)
-        elif isinstance(projection, LinkProjection):
-            link = required[projection.required_link]
-            names.update((link.source_group, link.target_group))
-    # An aggregated condition decides the answer as surely as a projected one, so its
-    # component may not be pruned to a mere existence check.
-    names.update(aggregation.data_condition for aggregation in query.aggregations)
-    return names
-
-
-def _component_query(query: GraphQuery, names: set[str], *, projections: bool) -> GraphQuery:
-    from vellis.query import (
-        AnchorProjection,
-        AssociatedDataProjection,
-        DataPropertyProjection,
-        GraphQuery,
-        LinkProjection,
-        ReturnShape,
-    )
-
-    links = tuple(
-        link
-        for link in query.required_links
-        if link.source_group in names and link.target_group in names
-    )
-    link_names = {link.name for link in links}
-    selected = (
-        tuple(
-            projection
-            for projection in query.return_shape.projections
-            if (
-                isinstance(projection, AnchorProjection)
-                and projection.anchor_group in names
-                or isinstance(projection, (AssociatedDataProjection, DataPropertyProjection))
-                and projection.data_condition in names
-                or isinstance(projection, LinkProjection)
-                and projection.required_link in link_names
-            )
-        )
-        if projections
-        else ()
-    )
-    return GraphQuery(
-        anchor_groups=tuple(group for group in query.anchor_groups if group.name in names),
-        data_conditions=tuple(
-            condition for condition in query.data_conditions if condition.name in names
-        ),
-        required_links=links,
-        return_shape=ReturnShape(selected),
-        aggregations=tuple(
-            aggregation
-            for aggregation in (query.aggregations if projections else ())
-            if aggregation.data_condition in names
-        ),
-        maximum_rows=query.maximum_rows,
-        historical_selection=query.historical_selection,
-    )
-
-
 def _merge_objects(
     first: Iterable[GraphObject], second: Iterable[GraphObject]
 ) -> tuple[GraphObject, ...]:
@@ -1185,8 +1058,6 @@ class CanonicalStore:
         self._current_graph_decodes = 0
         self._current_graph_object_decodes = 0
         self._current_definition_decodes = 0
-        self._maximum_aggregation_batch_rows = 0
-        self._maximum_aggregation_reducer_count = 0
         try:
             # One owner, one process, one connection — but not necessarily one thread:
             # a tool boundary answers on whichever worker it is called from. The
@@ -1198,6 +1069,9 @@ class CanonicalStore:
             )
             self._connection.create_function(
                 "vellis_json_equal", 8, _stored_json_equal, deterministic=True
+            )
+            self._connection.create_function(
+                "vellis_re2_full_match", 2, _stored_pattern_matches, deterministic=True
             )
             self._lock = RLock()
         except sqlite3.Error as error:
@@ -1236,8 +1110,6 @@ class CanonicalStore:
         store._current_graph_decodes = 0
         store._current_graph_object_decodes = 0
         store._current_definition_decodes = 0
-        store._maximum_aggregation_batch_rows = 0
-        store._maximum_aggregation_reducer_count = 0
         return store
 
     # --- Lifecycle ------------------------------------------------------------------
@@ -1340,16 +1212,6 @@ class CanonicalStore:
         """Addressable graph-object decodes since the last instrumentation reset."""
         return self._current_graph_object_decodes
 
-    @property
-    def maximum_aggregation_batch_rows(self) -> int:
-        """Largest aggregate property batch retained since the last reset."""
-        return self._maximum_aggregation_batch_rows
-
-    @property
-    def maximum_aggregation_reducer_count(self) -> int:
-        """Largest aggregate scalar-reducer set retained since the last reset."""
-        return self._maximum_aggregation_reducer_count
-
     def reset_instrumentation(self) -> None:
         self._record_reads = 0
         self._activity_reads = 0
@@ -1357,8 +1219,6 @@ class CanonicalStore:
         self._current_graph_decodes = 0
         self._current_graph_object_decodes = 0
         self._current_definition_decodes = 0
-        self._maximum_aggregation_batch_rows = 0
-        self._maximum_aggregation_reducer_count = 0
 
     # --- Current projection ---------------------------------------------------------
 
@@ -1428,8 +1288,8 @@ class CanonicalStore:
                         type_keys=_query_type_keys(query),
                         constrained_type_keys=set(),
                     )
-                    result = self._evaluate_sql_query_unlocked(query, definitions, revision)
-                    self._clear_query_filter_tables_unlocked()
+                    result = self._evaluate_compiled_query_unlocked(query, definitions, revision)
+                    self._clear_query_temporaries_unlocked()
                     self._connection.execute("COMMIT")
                     return result
                 except BaseException:
@@ -1460,10 +1320,10 @@ class CanonicalStore:
                         type_keys=_query_type_keys(query),
                         constrained_type_keys=set(),
                     )
-                    result = self._evaluate_sql_query_unlocked(
+                    result = self._evaluate_compiled_query_unlocked(
                         query, definitions, revision, historical_revision=revision
                     )
-                    self._clear_query_filter_tables_unlocked()
+                    self._clear_query_temporaries_unlocked()
                     self._connection.execute("COMMIT")
                     return result
                 except BaseException:
@@ -1506,13 +1366,13 @@ class CanonicalStore:
                         type_keys=_query_type_keys(query),
                         constrained_type_keys=set(),
                     )
-                    result = self._evaluate_sql_query_unlocked(
+                    result = self._evaluate_compiled_query_unlocked(
                         query,
                         definitions,
                         revision,
                         prospective=True,
                     )
-                    self._clear_query_filter_tables_unlocked()
+                    self._clear_query_temporaries_unlocked()
                     self._connection.execute("COMMIT")
                     return result
                 except BaseException:
@@ -1521,147 +1381,32 @@ class CanonicalStore:
         except sqlite3.Error as error:
             raise StoreError(f"could not query the proposal at {self._path}: {error}") from error
 
-    def _prepare_query_filter_tables_unlocked(self, query: GraphQuery) -> None:
-        for table, columns in (
-            ("query_anchor_type_filter", "selector TEXT, type_key TEXT"),
-            ("query_anchor_uuid_filter", "selector TEXT, uuid TEXT"),
-            ("query_link_uuid_filter", "selector TEXT, uuid TEXT"),
-        ):
-            self._connection.execute(
-                f"CREATE TEMP TABLE IF NOT EXISTS {table} ({columns},"  # noqa: S608
-                " PRIMARY KEY (selector, "
-                + ("type_key" if "type_key" in columns else "uuid")
-                + ")) WITHOUT ROWID"
-            )
-            self._connection.execute(f"DELETE FROM {table}")  # noqa: S608
+    def _populate_query_selector_members_unlocked(self, query: GraphQuery) -> None:
+        from vellis.sqlite_query import selector_members
+
+        self._connection.execute(
+            "CREATE TEMP TABLE IF NOT EXISTS query_selector_member ("
+            " member_kind TEXT NOT NULL, selector_name TEXT NOT NULL, value TEXT NOT NULL,"
+            " PRIMARY KEY (member_kind, selector_name, value)) WITHOUT ROWID"
+        )
+        self._connection.execute("DELETE FROM query_selector_member")
         self._connection.executemany(
-            "INSERT OR IGNORE INTO query_anchor_type_filter VALUES (?, ?)",
+            "INSERT INTO query_selector_member VALUES (?, ?, ?)",
             (
-                (group.name, type_key)
-                for group in query.anchor_groups
-                for type_key in group.anchor_types
-            ),
-        )
-        self._connection.executemany(
-            "INSERT OR IGNORE INTO query_anchor_uuid_filter VALUES (?, ?)",
-            (
-                (group.name, uuid)
-                for group in query.anchor_groups
-                if group.uuid_filter is not None
-                for uuid in group.uuid_filter.uuids
-            ),
-        )
-        self._connection.executemany(
-            "INSERT OR IGNORE INTO query_link_uuid_filter VALUES (?, ?)",
-            (
-                (required.name, uuid)
-                for required in query.required_links
-                if required.uuid_filter is not None
-                for uuid in required.uuid_filter.uuids
+                (member.member_kind, member.selector_name, member.value)
+                for member in selector_members(query)
             ),
         )
 
-    def _query_requires_relational_filters_unlocked(self, query: GraphQuery) -> bool:
-        from vellis.query import DataPropertyProjection
+    def _clear_query_temporaries_unlocked(self) -> None:
+        self._connection.execute("DROP TABLE IF EXISTS query_answer")
+        present = self._connection.execute(
+            "SELECT 1 FROM sqlite_temp_master WHERE name = 'query_selector_member'"
+        ).fetchone()
+        if present is not None:
+            self._connection.execute("DELETE FROM query_selector_member")
 
-        collection_parameters = sum(
-            len(group.anchor_types)
-            + (0 if group.uuid_filter is None else len(group.uuid_filter.uuids))
-            for group in query.anchor_groups
-        ) + sum(
-            0 if required.uuid_filter is None else len(required.uuid_filter.uuids)
-            for required in query.required_links
-        )
-        scalar_reserve = (
-            4
-            + len(query.anchor_groups)
-            + 2 * len(query.data_conditions)
-            + 8 * sum(len(condition.property_conditions) for condition in query.data_conditions)
-            + 2 * len(query.required_links)
-            + 4
-            * sum(
-                isinstance(projection, DataPropertyProjection)
-                for projection in query.return_shape.projections
-            )
-        )
-        return collection_parameters + scalar_reserve >= self._connection.getlimit(
-            sqlite3.SQLITE_LIMIT_VARIABLE_NUMBER
-        )
-
-    def _query_capacity_finding_unlocked(self, query: GraphQuery) -> ValidationFinding | None:
-        """Refuse a whole query before SQLite encounters a structural realization limit."""
-        from vellis.query import DataPropertyProjection
-
-        table_count = (
-            len(query.anchor_groups)
-            + 2 * len(query.data_conditions)
-            + sum(len(condition.property_conditions) for condition in query.data_conditions)
-            + len(query.required_links)
-        )
-        result_columns = sum(
-            4 if isinstance(projection, DataPropertyProjection) else 1
-            for projection in query.return_shape.projections
-        )
-        property_conditions = sum(
-            len(condition.property_conditions) for condition in query.data_conditions
-        )
-        expression_terms = (
-            4 * len(query.anchor_groups)
-            + 4 * len(query.data_conditions)
-            + 3 * property_conditions
-            + 5 * len(query.required_links)
-        )
-        scalar_parameters = (
-            2
-            + 2 * len(query.anchor_groups)
-            + sum(group.uuid_filter is not None for group in query.anchor_groups)
-            + 2 * len(query.data_conditions)
-            + 8 * property_conditions
-            + 2 * len(query.required_links)
-            + sum(required.uuid_filter is not None for required in query.required_links)
-            + 4
-            * sum(
-                isinstance(projection, DataPropertyProjection)
-                for projection in query.return_shape.projections
-            )
-        )
-        limits = (
-            (table_count, 64, "joined tables"),
-            (
-                result_columns,
-                self._connection.getlimit(sqlite3.SQLITE_LIMIT_COLUMN),
-                "result columns",
-            ),
-            (
-                expression_terms,
-                self._connection.getlimit(sqlite3.SQLITE_LIMIT_EXPR_DEPTH),
-                "expression depth",
-            ),
-            (
-                scalar_parameters,
-                self._connection.getlimit(sqlite3.SQLITE_LIMIT_VARIABLE_NUMBER),
-                "scalar parameters",
-            ),
-        )
-        for required, available, resource in limits:
-            if required > available:
-                return ValidationFinding(
-                    summary=(
-                        "the query structure exceeds this SQLite realization's complete-result"
-                        f" capacity ({required} {resource}, capacity {available})"
-                    )
-                )
-        return None
-
-    def _clear_query_filter_tables_unlocked(self) -> None:
-        for table in (
-            "query_anchor_type_filter",
-            "query_anchor_uuid_filter",
-            "query_link_uuid_filter",
-        ):
-            self._connection.execute(f"DROP TABLE IF EXISTS {table}")  # noqa: S608
-
-    def _evaluate_sql_query_unlocked(
+    def _evaluate_compiled_query_unlocked(
         self,
         query: GraphQuery,
         definitions: GraphDefinitionSet,
@@ -1669,12 +1414,10 @@ class CanonicalStore:
         *,
         historical_revision: int | None = None,
         prospective: bool = False,
-        validate: bool = True,
-        existence_only: bool = False,
     ) -> GraphQueryResult:
+        """Evaluate one analyzed conjunction and hydrate only its bounded identities."""
         from vellis.query import (
-            AggregateBinding,
-            AggregationOperator,
+            AggregateQueryOutput,
             AnchorBinding,
             AnchorProjection,
             AssociatedDataBinding,
@@ -1685,381 +1428,368 @@ class CanonicalStore:
             LinkBinding,
             LinkProjection,
             ReturnedProperty,
-            ReturnProjection,
-            indexed_query_findings,
-            semantic_row_identity,
+            RowQueryOutput,
+            _unreturnable_reason,
+            analyze_graph_query,
         )
+        from vellis.sqlite_query import QueryRelations, compile_query, selector_members
 
-        response_query = query
-        if validate:
-            findings = indexed_query_findings(
-                query, definitions, _SQLiteQueryIndex(self, historical_revision, prospective)
-            )
-            if findings:
-                return GraphQueryResult(
-                    status=OperationStatus.REJECTED,
-                    summary=f"the query was not evaluated ({len(findings)} findings)",
-                    findings=findings,
-                    query=response_query,
-                )
-            if self._query_requires_relational_filters_unlocked(query):
-                self._prepare_query_filter_tables_unlocked(query)
-            projected = _projected_selector_names(query)
-            projected_components: list[frozenset[str]] = []
-            for component in _query_component_names(query):
-                if component & projected:
-                    projected_components.append(component)
-                    continue
-                existence = self._evaluate_sql_query_unlocked(
-                    _component_query(query, set(component), projections=False),
-                    definitions,
-                    revision,
-                    historical_revision=historical_revision,
-                    prospective=prospective,
-                    validate=False,
-                    existence_only=True,
-                )
-                if existence.status is not OperationStatus.ACCEPTED:
-                    return GraphQueryResult(
-                        status=existence.status,
-                        summary=existence.summary,
-                        findings=existence.findings,
-                        query=response_query,
-                    )
-                if not existence.rows:
-                    empty_aggregates = tuple(
-                        AggregateBinding(
-                            aggregation=aggregation.name,
-                            present=aggregation.operator is AggregationOperator.COUNT,
-                            value=(
-                                Decimal(0)
-                                if aggregation.operator is AggregationOperator.COUNT
-                                else None
-                            ),
-                        )
-                        for aggregation in response_query.aggregations
-                    )
-                    counts = []
-                    if response_query.return_shape.projections:
-                        counts.append("0 rows")
-                    if empty_aggregates:
-                        counts.append(f"{len(empty_aggregates)} aggregates")
-                    return GraphQueryResult(
-                        status=OperationStatus.ACCEPTED,
-                        summary=f"{' and '.join(counts)} at revision {revision}",
-                        query=response_query,
-                        evaluated_revision=revision,
-                        aggregates=empty_aggregates,
-                    )
-            kept = set().union(*projected_components)
-            query = _component_query(query, kept, projections=True)
-
-        capacity_finding = self._query_capacity_finding_unlocked(query)
-        if capacity_finding is not None:
+        analysis, findings = analyze_graph_query(query, definitions)
+        if findings:
             return GraphQueryResult(
                 status=OperationStatus.REJECTED,
-                summary="the complete query exceeds this SQLite realization's structural capacity",
-                findings=(capacity_finding,),
-                query=response_query,
+                summary=f"the query was not evaluated ({len(findings)} findings)",
+                findings=findings,
+                query=query,
             )
+        assert analysis is not None
 
-        prefix = ""
-        prefix_parameters: list[object] = []
-        graph_relation = "current_graph_object"
-        association_relation = "current_data_anchor"
-        if prospective:
-            graph_relation = "prospective_graph_object"
-            association_relation = "prospective_data_anchor"
-        if historical_revision is not None:
-            graph_relation = "selected_graph_object"
-            association_relation = "selected_data_anchor"
-            prefix = (
-                "WITH selected_graph_object AS NOT MATERIALIZED ("
-                "SELECT p.uuid, v.object_kind, v.type_key, v.source_uuid, v.target_uuid,"
-                " v.id AS object_value_id FROM graph_presence_interval AS p"
-                " JOIN object_value AS v ON v.id = p.object_value_id"
-                " WHERE p.valid_from_revision <= ? AND"
-                " (p.valid_to_revision IS NULL OR p.valid_to_revision > ?)),"
-                " selected_data_anchor AS NOT MATERIALIZED ("
-                "SELECT c.uuid AS data_uuid, a.anchor_uuid"
-                " FROM selected_graph_object AS c"
-                " JOIN object_anchor AS a ON a.object_value_id = c.object_value_id"
-                " WHERE c.object_kind = 'associatedData') "
+        if historical_revision is None:
+            relations = QueryRelations(
+                graph="prospective_graph_object" if prospective else "current_graph_object",
+                association=("prospective_data_anchor" if prospective else "current_data_anchor"),
             )
-            prefix_parameters.extend((historical_revision, historical_revision))
-
-        tables: list[str] = []
-        predicates: list[str] = []
-        where_parameters: list[object] = []
-        select_parameters: list[object] = []
-        selector_alias: dict[str, str] = {}
-        relational_filters = (
-            self._connection.execute(
-                "SELECT 1 FROM sqlite_temp_master"
-                " WHERE type = 'table' AND name = 'query_anchor_type_filter'"
-            ).fetchone()
-            is not None
+        else:
+            relations = QueryRelations(
+                graph="selected_graph_object",
+                association="selected_data_anchor",
+                prefix=(
+                    "WITH selected_graph_object AS NOT MATERIALIZED ("
+                    "SELECT p.uuid, v.object_kind, v.type_key, v.source_uuid, v.target_uuid,"
+                    " v.id AS object_value_id FROM graph_presence_interval AS p"
+                    " JOIN object_value AS v ON v.id = p.object_value_id"
+                    " WHERE p.valid_from_revision <= ? AND"
+                    " (p.valid_to_revision IS NULL OR p.valid_to_revision > ?)),"
+                    " selected_data_anchor AS NOT MATERIALIZED ("
+                    "SELECT c.uuid AS data_uuid, a.anchor_uuid"
+                    " FROM selected_graph_object AS c"
+                    " JOIN object_anchor AS a ON a.object_value_id = c.object_value_id"
+                    " WHERE c.object_kind = 'associatedData') "
+                ),
+                prefix_parameters=(historical_revision, historical_revision),
+            )
+        compiled = compile_query(analysis, relations)
+        maximum_length = self._connection.getlimit(sqlite3.SQLITE_LIMIT_LENGTH)
+        oversized = next(
+            (
+                member
+                for member in selector_members(query)
+                if sum(
+                    len(value.encode("utf-8"))
+                    for value in (member.member_kind, member.selector_name, member.value)
+                )
+                > maximum_length
+            ),
+            None,
         )
-        for index, group in enumerate(query.anchor_groups):
-            alias = f"a{index}"
-            selector_alias[group.name] = alias
-            tables.append(f"{graph_relation} AS {alias}")
-            predicates.append(f"{alias}.object_kind = ?")
-            where_parameters.append(ObjectKind.ANCHOR.value)
-            if relational_filters:
-                predicates.append(
-                    "EXISTS (SELECT 1 FROM query_anchor_type_filter AS qtf"
-                    f" WHERE qtf.selector = ? AND qtf.type_key = {alias}.type_key)"
-                )
-                where_parameters.append(group.name)
-            else:
-                placeholders = ", ".join("?" for _ in group.anchor_types)
-                predicates.append(f"{alias}.type_key IN ({placeholders})")
-                where_parameters.extend(group.anchor_types)
-            if group.uuid_filter is not None:
-                if relational_filters:
-                    predicates.append(
-                        "EXISTS (SELECT 1 FROM query_anchor_uuid_filter AS quf"
-                        f" WHERE quf.selector = ? AND quf.uuid = {alias}.uuid)"
-                    )
-                    where_parameters.append(group.name)
-                else:
-                    placeholders = ", ".join("?" for _ in group.uuid_filter.uuids)
-                    predicates.append(f"{alias}.uuid IN ({placeholders})")
-                    where_parameters.extend(group.uuid_filter.uuids)
+        if oversized is not None:
+            return GraphQueryResult(
+                status=OperationStatus.REJECTED,
+                summary="the complete query exceeds this SQLite realization's capacity",
+                findings=(
+                    ValidationFinding(
+                        summary=(
+                            f"selector '{oversized.selector_name}' carries a member larger than"
+                            f" SQLite's {maximum_length}-byte value capacity"
+                        )
+                    ),
+                ),
+                query=query,
+            )
+        capacity = self._compiled_query_capacity_finding_unlocked(compiled)
+        if capacity is not None:
+            return GraphQueryResult(
+                status=OperationStatus.REJECTED,
+                summary="the complete query exceeds this SQLite realization's capacity",
+                findings=(capacity,),
+                query=query,
+            )
 
-        for index, condition in enumerate(query.data_conditions):
-            alias, association = f"d{index}", f"da{index}"
-            selector_alias[condition.name] = alias
-            tables.extend(
-                (f"{graph_relation} AS {alias}", f"{association_relation} AS {association}")
+        try:
+            self._populate_query_selector_members_unlocked(query)
+        except sqlite3.Error as error:
+            if error.sqlite_errorcode != sqlite3.SQLITE_TOOBIG:
+                raise
+            return GraphQueryResult(
+                status=OperationStatus.REJECTED,
+                summary="the complete query exceeds this SQLite realization's capacity",
+                findings=(ValidationFinding(summary="a selector-member row is too large"),),
+                query=query,
             )
-            predicates.extend(
-                (
-                    f"{alias}.object_kind = ?",
-                    f"{alias}.type_key = ?",
-                    f"{association}.data_uuid = {alias}.uuid",
-                    f"{association}.anchor_uuid = {selector_alias[condition.anchor_group]}.uuid",
-                )
+        preparation = self._prepare_compiled_statements_unlocked(
+            (compiled.reset_answer, compiled.create_answer)
+        )
+        if preparation is not None:
+            return GraphQueryResult(
+                status=OperationStatus.REJECTED,
+                summary="the complete query exceeds this SQLite realization's capacity",
+                findings=(preparation,),
+                query=query,
             )
-            where_parameters.extend(
-                (ObjectKind.ASSOCIATED_DATA.value, condition.associated_data_type)
+        self._connection.execute(compiled.reset_answer.sql)
+        self._connection.execute(compiled.create_answer.sql)
+        preparation = self._prepare_compiled_statements_unlocked(
+            (
+                *(validation.statement for validation in compiled.uuid_validations),
+                compiled.populate_answer,
+                compiled.read_answer,
             )
-            for rule_index, comparison in enumerate(condition.property_conditions):
-                property_alias = f"pc{index}_{rule_index}"
-                tables.append(f"object_property AS {property_alias}")
-                predicates.extend(
-                    (
-                        f"{property_alias}.object_value_id = {alias}.object_value_id",
-                        f"{property_alias}.name = ?",
-                    )
-                )
-                where_parameters.append(comparison.property_name)
-                kind, boolean, number, text = json_storage_fields(comparison.expected_value)
-                predicates.append(
-                    _property_comparison_sql(
-                        property_alias,
-                        comparison.comparison.value,
-                        kind,
-                        boolean,
-                        number,
-                        text,
-                        where_parameters,
-                    )
-                )
-
-        link_alias: dict[str, str] = {}
-        for index, required in enumerate(query.required_links):
-            alias = f"l{index}"
-            link_alias[required.name] = alias
-            tables.append(f"{graph_relation} AS {alias}")
-            predicates.extend(
-                (
-                    f"{alias}.object_kind = ?",
-                    f"{alias}.type_key = ?",
-                    f"{alias}.source_uuid = {selector_alias[required.source_group]}.uuid",
-                    f"{alias}.target_uuid = {selector_alias[required.target_group]}.uuid",
-                )
+        )
+        if preparation is not None:
+            return GraphQueryResult(
+                status=OperationStatus.REJECTED,
+                summary="the complete query exceeds this SQLite realization's capacity",
+                findings=(preparation,),
+                query=query,
             )
-            where_parameters.extend((ObjectKind.LINK.value, required.link_type))
-            if required.uuid_filter is not None:
-                if relational_filters:
-                    predicates.append(
-                        "EXISTS (SELECT 1 FROM query_link_uuid_filter AS quf"
-                        f" WHERE quf.selector = ? AND quf.uuid = {alias}.uuid)"
-                    )
-                    where_parameters.append(required.name)
-                else:
-                    placeholders = ", ".join("?" for _ in required.uuid_filter.uuids)
-                    predicates.append(f"{alias}.uuid IN ({placeholders})")
-                    where_parameters.extend(required.uuid_filter.uuids)
-
-        aggregates: tuple[AggregateBinding, ...] = ()
-        if query.aggregations and not existence_only:
-            aggregated = self._aggregate_bindings_unlocked(
-                query,
-                definitions,
-                selector_alias,
-                prefix=prefix,
-                prefix_parameters=prefix_parameters,
-                tables=tables,
-                predicates=predicates,
-                where_parameters=where_parameters,
-            )
-            if isinstance(aggregated, ValidationFinding):
-                over_bound = "exceed the maximum" in aggregated.summary
+        for validation in compiled.uuid_validations:
+            invalid = self._connection.execute(
+                validation.statement.sql, validation.statement.parameters
+            ).fetchall()
+            if invalid:
+                uuid = str(invalid[0][0])
                 return GraphQueryResult(
                     status=OperationStatus.REJECTED,
-                    summary=(
-                        f"the aggregated selection has more than {query.maximum_rows} matches; "
-                        "it is refused whole rather than aggregated in part"
-                        if over_bound
-                        else "the complete aggregate could not be returned, so none of it was"
+                    summary="the query was not evaluated (invalid UUID restriction)",
+                    findings=(
+                        ValidationFinding(
+                            summary=(
+                                f"{validation.label} restricts unknown "
+                                f"{validation.object_kind} UUID '{uuid}'"
+                            )
+                        ),
                     ),
-                    findings=(aggregated,),
-                    query=response_query,
-                )
-            aggregates = aggregated
-            if not query.return_shape.projections:
-                # Nothing was projected, so there is no row query to run at all.
-                return GraphQueryResult(
-                    status=OperationStatus.ACCEPTED,
-                    summary=f"{len(aggregates)} aggregates at revision {revision}",
-                    query=response_query,
-                    evaluated_revision=revision,
-                    aggregates=aggregates,
+                    query=query,
                 )
 
-        selected: list[str] = ["1"] if existence_only else []
-        column_shapes: list[tuple[str, ReturnProjection]] = []
-        for projection_index, projection in enumerate(query.return_shape.projections):
-            if isinstance(projection, AnchorProjection):
-                selected.append(f"{selector_alias[projection.anchor_group]}.object_value_id")
-                column_shapes.append(("anchor", projection))
-            elif isinstance(projection, LinkProjection):
-                selected.append(f"{link_alias[projection.required_link]}.object_value_id")
-                column_shapes.append(("link", projection))
-            elif isinstance(projection, AssociatedDataProjection):
-                selected.append(f"{selector_alias[projection.data_condition]}.object_value_id")
-                column_shapes.append(("data", projection))
-            else:
-                assert isinstance(projection, DataPropertyProjection)
-                alias = selector_alias[projection.data_condition]
-                for column in ("json_kind", "boolean_value", "number_value", "text_value"):
-                    selected.append(
-                        "(SELECT "
-                        f"pp{projection_index}.{column} FROM object_property"
-                        f" AS pp{projection_index}"
-                        f" WHERE pp{projection_index}.object_value_id = {alias}.object_value_id"
-                        f" AND pp{projection_index}.name = ? LIMIT 1)"
-                    )
-                    select_parameters.append(projection.property_name)
-                column_shapes.append(("property", projection))
-
-        sql = (
-            prefix
-            + "SELECT "
-            + ", ".join(selected)
-            + " FROM "
-            + ", ".join(tables)
-            + " WHERE "
-            + " AND ".join(predicates)
-            + (" LIMIT 1" if existence_only else "")
-        )
-        parameters = [
-            *prefix_parameters,
-            *select_parameters,
-            *where_parameters,
-        ]
-        cursor = self._connection.execute(sql, tuple(parameters))
-
-        if existence_only:
-            raw_rows = cursor.fetchmany(1)
+        try:
+            self._connection.execute(
+                compiled.populate_answer.sql, compiled.populate_answer.parameters
+            )
+        except sqlite3.Error as error:
+            if error.sqlite_errorcode != sqlite3.SQLITE_TOOBIG:
+                raise
             return GraphQueryResult(
-                status=OperationStatus.ACCEPTED,
-                summary=f"{int(bool(raw_rows))} existence rows at revision {revision}",
-                query=response_query,
-                evaluated_revision=revision,
-                rows=(GraphQueryRow(),) if raw_rows else (),
+                status=OperationStatus.REJECTED,
+                summary="the complete query exceeds this SQLite realization's capacity",
+                findings=(ValidationFinding(summary="an answer-identity row is too large"),),
+                query=query,
+            )
+        matched = int(self._connection.execute("SELECT count(*) FROM query_answer").fetchone()[0])
+        if matched > compiled.bound:
+            noun = "rows" if compiled.bound_kind == "rows" else "matches"
+            return GraphQueryResult(
+                status=OperationStatus.REJECTED,
+                summary=(
+                    f"the result has more than {compiled.bound} {noun}; it is refused whole"
+                    " rather than truncated"
+                ),
+                findings=(
+                    ValidationFinding(
+                        summary=f"the complete result exceeds the maximum of {compiled.bound}"
+                    ),
+                ),
+                query=query,
             )
 
+        if isinstance(query.output, AggregateQueryOutput):
+            aggregates = self._aggregate_compiled_answer_unlocked(query, definitions, matched)
+            if isinstance(aggregates, ValidationFinding):
+                return GraphQueryResult(
+                    status=OperationStatus.REJECTED,
+                    summary="the complete aggregate could not be returned, so none of it was",
+                    findings=(aggregates,),
+                    query=query,
+                )
+            return GraphQueryResult(
+                status=OperationStatus.ACCEPTED,
+                summary=f"{len(aggregates)} aggregates at revision {revision}",
+                query=query,
+                evaluated_revision=revision,
+                aggregates=aggregates,
+            )
+
+        assert isinstance(query.output, RowQueryOutput)
         rows: list[GraphQueryRow] = []
-        row_identities: set[tuple[object, ...]] = set()
-        for raw in cursor:
-            offset = 0
+        for raw in self._connection.execute(
+            compiled.read_answer.sql, compiled.read_answer.parameters
+        ):
             anchors: list[AnchorBinding] = []
             links: list[LinkBinding] = []
             data: list[AssociatedDataBinding] = []
             properties: list[ReturnedProperty] = []
-            for shape, projection in column_shapes:
-                if shape == "property":
-                    assert isinstance(projection, DataPropertyProjection)
-                    stored = raw[offset : offset + 4]
-                    offset += 4
+            for projection, stored_id in zip(query.output.projections, raw, strict=True):
+                object_value_id = int(stored_id)
+                if isinstance(projection, DataPropertyProjection):
+                    source = self._connection.execute(
+                        "SELECT uuid FROM object_value WHERE id = ?", (object_value_id,)
+                    ).fetchone()
+                    assert source is not None
+                    stored = self._connection.execute(
+                        "SELECT json_kind, boolean_value, number_value, text_value"
+                        " FROM object_property WHERE object_value_id = ? AND name = ? LIMIT 1",
+                        (object_value_id, projection.property_name),
+                    ).fetchone()
                     properties.append(
                         ReturnedProperty(
                             projection=projection.name,
-                            present=stored[0] is not None,
-                            value=(None if stored[0] is None else json_storage_value(*stored)),
+                            associated_data_uuid=str(source[0]),
+                            present=stored is not None,
+                            value=(None if stored is None else json_storage_value(*stored)),
                         )
                     )
                     continue
-                value = self._load_object_value(int(raw[offset]))
+                value = self._load_object_value(object_value_id)
                 self._current_graph_object_decodes += 1
-                offset += 1
-                if shape == "anchor":
-                    assert isinstance(projection, AnchorProjection)
+                if isinstance(projection, AnchorProjection):
                     assert isinstance(value, Anchor)
                     anchors.append(AnchorBinding(projection.name, value))
-                elif shape == "link":
-                    assert isinstance(projection, LinkProjection)
+                elif isinstance(projection, LinkProjection):
                     assert isinstance(value, Link)
                     links.append(LinkBinding(projection.name, value))
                 else:
                     assert isinstance(projection, AssociatedDataProjection)
                     assert isinstance(value, AssociatedDataObject)
                     data.append(AssociatedDataBinding(projection.name, value))
-            row = GraphQueryRow(tuple(anchors), tuple(links), tuple(data), tuple(properties))
-            identity = semantic_row_identity(row)
-            if identity in row_identities:
-                continue
-            row_identities.add(identity)
-            rows.append(row)
-            if len(rows) > query.maximum_rows:
-                return GraphQueryResult(
-                    status=OperationStatus.REJECTED,
-                    summary=(
-                        f"the result has more than {query.maximum_rows} rows; it is refused whole "
-                        "rather than truncated"
-                    ),
-                    findings=(
-                        ValidationFinding(
-                            summary=(
-                                f"the complete result exceeds the maximum of {query.maximum_rows}"
-                            )
-                        ),
-                    ),
-                    query=response_query,
-                )
+            rows.append(GraphQueryRow(tuple(anchors), tuple(links), tuple(data), tuple(properties)))
+        returned = tuple(rows)
+        unreturnable = _unreturnable_reason(returned)
+        if unreturnable is not None:
+            return GraphQueryResult(
+                status=OperationStatus.REJECTED,
+                summary="the complete result could not be returned, so none of it was",
+                findings=(ValidationFinding(summary=unreturnable),),
+                query=query,
+            )
         return GraphQueryResult(
             status=OperationStatus.ACCEPTED,
-            summary=(
-                f"{len(rows)} rows and {len(aggregates)} aggregates at revision {revision}"
-                if aggregates
-                else f"{len(rows)} rows at revision {revision}"
-            ),
-            query=response_query,
+            summary=f"{len(returned)} rows at revision {revision}",
+            query=query,
             evaluated_revision=revision,
-            rows=tuple(rows),
-            aggregates=aggregates,
+            rows=returned,
         )
+
+    def _compiled_query_capacity_finding_unlocked(self, compiled) -> ValidationFinding | None:
+        """Compare exact compiled artifacts with directly inspectable SQLite limits."""
+        limits = {
+            "SQL bytes": self._connection.getlimit(sqlite3.SQLITE_LIMIT_SQL_LENGTH),
+            "parameters": self._connection.getlimit(sqlite3.SQLITE_LIMIT_VARIABLE_NUMBER),
+            "columns": self._connection.getlimit(sqlite3.SQLITE_LIMIT_COLUMN),
+            "expression depth": self._connection.getlimit(sqlite3.SQLITE_LIMIT_EXPR_DEPTH),
+            "function arguments": self._connection.getlimit(sqlite3.SQLITE_LIMIT_FUNCTION_ARG),
+        }
+        for statement in compiled.statements:
+            checks = (
+                (statement.utf8_bytes, limits["SQL bytes"], "SQL bytes"),
+                (statement.parameter_count, limits["parameters"], "parameters"),
+                (statement.selected_columns, limits["columns"], "columns"),
+                (statement.maximum_tables_in_select, 64, "tables in one SELECT"),
+                (
+                    statement.maximum_function_arguments,
+                    limits["function arguments"],
+                    "arguments to one SQL function",
+                ),
+            )
+            if limits["expression depth"] > 0:
+                checks = (
+                    *checks,
+                    (
+                        statement.expression_depth,
+                        limits["expression depth"],
+                        "expression depth",
+                    ),
+                )
+            for required, available, resource in checks:
+                if required > available:
+                    return ValidationFinding(
+                        summary=(
+                            f"the compiled query requires {required} {resource}, but this"
+                            f" SQLite connection permits {available}"
+                        )
+                    )
+            for parameter in statement.parameters:
+                if isinstance(parameter, str) and len(parameter.encode("utf-8")) > (
+                    self._connection.getlimit(sqlite3.SQLITE_LIMIT_LENGTH)
+                ):
+                    return ValidationFinding(
+                        summary=(
+                            "the compiled query contains a bound value larger than SQLite permits"
+                        )
+                    )
+        if compiled.bound >= _MAXIMUM_SQLITE_INTEGER:
+            return ValidationFinding(
+                summary="the query bound plus its refusal sentinel exceeds SQLite's integer range"
+            )
+        return None
+
+    def _prepare_compiled_statements_unlocked(self, statements) -> ValidationFinding | None:
+        """Prepare generated statements without stepping an answer row."""
+        for statement in statements:
+            try:
+                self._connection.execute("EXPLAIN " + statement.sql, statement.parameters)
+            except sqlite3.Error as error:
+                message = str(error).lower()
+                if "recursion limit" in message:
+                    try:
+                        prior = self._connection.setlimit(12, 2_147_483_647)
+                    except sqlite3.Error:
+                        raise
+                    try:
+                        self._connection.execute("EXPLAIN " + statement.sql, statement.parameters)
+                    except sqlite3.Error as retry_error:
+                        raise StoreError(
+                            "SQLite could not prepare the compiled query"
+                        ) from retry_error
+                    finally:
+                        self._connection.setlimit(12, prior)
+                    return ValidationFinding(
+                        summary=(
+                            "the compiled query exceeds this SQLite connection's parser-depth"
+                            " capacity"
+                        )
+                    )
+                capacity_markers = (
+                    "too many sql variables",
+                    "at most 64 tables",
+                    "expression tree is too large",
+                    "too many columns",
+                    "statement too long",
+                    "too many arguments",
+                )
+                if not any(marker in message for marker in capacity_markers):
+                    raise
+                return ValidationFinding(
+                    summary=f"SQLite could not prepare the compiled query: {error}"
+                )
+            except MemoryError:
+                # SQLite reports a deliberately lowered VDBE-operation limit as a bare
+                # allocation failure. Retry only the preparation with the connection's
+                # compiled maximum: success proves structural excess; another failure is
+                # an actual allocation problem and remains a store failure.
+                category = sqlite3.SQLITE_LIMIT_VDBE_OP
+                prior = self._connection.setlimit(category, 2_147_483_647)
+                try:
+                    self._connection.execute("EXPLAIN " + statement.sql, statement.parameters)
+                except (MemoryError, sqlite3.Error) as retry_error:
+                    raise StoreError(
+                        "SQLite could not allocate the compiled query plan"
+                    ) from retry_error
+                finally:
+                    self._connection.setlimit(category, prior)
+                return ValidationFinding(
+                    summary=(
+                        "the compiled query exceeds this SQLite connection's virtual-machine"
+                        " operation capacity"
+                    )
+                )
+        return None
 
     def definition_summary_rows(
         self, *, prospective: bool = False, revision: int | None = None
     ) -> tuple[int, tuple[tuple[str, str | None], ...], bool]:
         """Return the shallow anchor vocabulary without constructing a definition set."""
         try:
-            with self._lock:
+            with self.read_snapshot():
                 evaluated, active_identity, delta_present = (
                     self._definition_selection_context_unlocked(
                         prospective=prospective, revision=revision
@@ -2201,7 +1931,7 @@ class CanonicalStore:
     ) -> tuple[int, GraphDefinitionSet, bool]:
         """Load the indexed transitive definition frontier for selected types."""
         try:
-            with self._lock:
+            with self.read_snapshot():
                 evaluated, active_identity, delta_present = (
                     self._definition_selection_context_unlocked(
                         prospective=prospective, revision=revision
@@ -3119,7 +2849,7 @@ class CanonicalStore:
     def proposal_state(self) -> ProposalState:
         """Return bounded identities, counts, and exact current assessment for the delta."""
         try:
-            with self._lock:
+            with self.read_snapshot():
                 row = self._connection.execute(
                     "SELECT revision, established_by, proposed_definition_set_id"
                     " FROM state_head WHERE id = 0"
@@ -4013,22 +3743,17 @@ class CanonicalStore:
                         implicated_objects=(uuid,),
                     )
 
-    def _aggregate_bindings_unlocked(
+    def _aggregate_compiled_answer_unlocked(
         self,
         query: GraphQuery,
         definitions: GraphDefinitionSet,
-        selector_alias: dict[str, str],
-        *,
-        prefix: str,
-        prefix_parameters: list[object],
-        tables: list[str],
-        predicates: list[str],
-        where_parameters: list[object],
+        matched_count: int,
     ) -> tuple[AggregateBinding, ...] | ValidationFinding:
-        """Reduce bounded match identities without retaining their values as a population."""
-        from vellis.json_value import JsonValue, json_kind
+        """Stream exact reducers over the one already bounded target population."""
+        from vellis.json_value import JsonValue, json_kind, unencodable_reason
         from vellis.query import (
             AggregateBinding,
+            AggregateQueryOutput,
             AggregationOperator,
             _decimal_term,
             _exact_decimal_streamed_result,
@@ -4036,195 +3761,141 @@ class CanonicalStore:
             _integer_text,
         )
 
+        assert isinstance(query.output, AggregateQueryOutput)
+        output = query.output
         conditions = {condition.name: condition for condition in query.data_conditions}
-        condition_names = tuple(
-            dict.fromkeys(aggregation.data_condition for aggregation in query.aggregations)
+        condition = conditions[output.data_condition]
+        data_type = definitions.associated_data_type(condition.associated_data_type)
+        declared = {
+            rule.property_name: rule.json_kind
+            for rule in (data_type.property_constraints if data_type else ())
+        }
+        bindings: dict[str, AggregateBinding] = {}
+        for aggregation in output.aggregations:
+            if aggregation.operator is AggregationOperator.COUNT:
+                bindings[aggregation.name] = AggregateBinding(
+                    aggregation=aggregation.name,
+                    present=True,
+                    value=Decimal(matched_count),
+                )
+
+        property_aggregations = tuple(
+            aggregation
+            for aggregation in output.aggregations
+            if aggregation.operator is not AggregationOperator.COUNT
         )
-        self._connection.execute(
-            "CREATE TEMP TABLE IF NOT EXISTS query_aggregate_match"
-            " (uuid TEXT PRIMARY KEY, object_value_id INTEGER NOT NULL) WITHOUT ROWID"
-        )
-        self._connection.execute(
-            "CREATE TEMP TABLE IF NOT EXISTS query_aggregate_property"
-            " (name TEXT PRIMARY KEY) WITHOUT ROWID"
-        )
+        if not property_aggregations:
+            return tuple(bindings[aggregation.name] for aggregation in output.aggregations)
+
+        operations: dict[str, set[AggregationOperator]] = {}
+        for aggregation in property_aggregations:
+            operations.setdefault(str(aggregation.property_name), set()).add(aggregation.operator)
+        sum_counts = {
+            name: 0
+            for name, operators in operations.items()
+            if AggregationOperator.SUM in operators
+        }
+        sum_input_digits = dict.fromkeys(sum_counts, 0)
+        extrema: dict[tuple[str, AggregationOperator], JsonValue] = {}
         self._connection.execute(
             "CREATE TEMP TABLE IF NOT EXISTS query_aggregate_sum_term"
             " (name TEXT, exponent INTEGER, coefficient TEXT NOT NULL,"
             " PRIMARY KEY (name, exponent)) WITHOUT ROWID"
         )
-        bindings: dict[str, AggregateBinding] = {}
+        self._connection.execute("DELETE FROM query_aggregate_sum_term")
         try:
-            for condition_name in condition_names:
-                aggregations = [
-                    aggregation
-                    for aggregation in query.aggregations
-                    if aggregation.data_condition == condition_name
-                ]
-                self._connection.execute("DELETE FROM query_aggregate_match")
-                self._connection.execute("DELETE FROM query_aggregate_property")
-                self._connection.execute("DELETE FROM query_aggregate_sum_term")
-                alias = selector_alias[condition_name]
-                sql = (
-                    prefix
-                    + "INSERT OR IGNORE INTO query_aggregate_match"
-                    + f" SELECT DISTINCT {alias}.uuid, {alias}.object_value_id FROM "
-                    + ", ".join(tables)
-                    + " WHERE "
-                    + " AND ".join(predicates)
-                    + " LIMIT ?"
-                )
-                sql_limit = min(query.maximum_rows + 1, _MAXIMUM_SQLITE_INTEGER)
-                self._connection.execute(sql, (*prefix_parameters, *where_parameters, sql_limit))
-                matched_count = int(
-                    self._connection.execute(
-                        "SELECT count(*) FROM query_aggregate_match"
-                    ).fetchone()[0]
-                )
-                if matched_count > query.maximum_rows:
-                    return ValidationFinding(
-                        summary=(
-                            f"the matches of '{condition_name}' exceed the maximum "
-                            f"of {query.maximum_rows}"
-                        )
-                    )
-                for aggregation in aggregations:
-                    if aggregation.operator is AggregationOperator.COUNT:
-                        bindings[aggregation.name] = AggregateBinding(
-                            aggregation=aggregation.name,
-                            present=True,
-                            value=Decimal(matched_count),
-                        )
-
-                property_aggregations = [
-                    aggregation
-                    for aggregation in aggregations
-                    if aggregation.operator is not AggregationOperator.COUNT
-                ]
-                if not property_aggregations:
-                    continue
-                property_names = {
-                    str(aggregation.property_name) for aggregation in property_aggregations
-                }
-                self._connection.executemany(
-                    "INSERT INTO query_aggregate_property VALUES (?)",
-                    ((name,) for name in sorted(property_names)),
-                )
-                condition = conditions[condition_name]
-                data_type = definitions.associated_data_type(condition.associated_data_type)
-                declared = {
-                    rule.property_name: rule.json_kind
-                    for rule in (data_type.property_constraints if data_type else ())
-                }
-                operations: dict[str, set[AggregationOperator]] = {}
-                for aggregation in property_aggregations:
-                    operations.setdefault(str(aggregation.property_name), set()).add(
-                        aggregation.operator
-                    )
-                reducer_count = sum(len(each) for each in operations.values())
-                self._maximum_aggregation_reducer_count = max(
-                    self._maximum_aggregation_reducer_count, reducer_count
-                )
-                sum_counts = {
-                    name: 0
-                    for name, operators in operations.items()
-                    if AggregationOperator.SUM in operators
-                }
-                sum_input_digits = dict.fromkeys(sum_counts, 0)
-                extrema: dict[tuple[str, AggregationOperator], JsonValue] = {}
-                cursor = self._connection.execute(
-                    "SELECT p.name, p.json_kind, p.boolean_value, p.number_value,"
-                    " p.text_value FROM query_aggregate_match AS m"
-                    " JOIN object_property AS p ON p.object_value_id = m.object_value_id"
-                    " JOIN query_aggregate_property AS r ON r.name = p.name"
-                )
-                while batch := cursor.fetchmany(_AGGREGATION_BATCH_SIZE):
-                    self._maximum_aggregation_batch_rows = max(
-                        self._maximum_aggregation_batch_rows, len(batch)
-                    )
-                    for name_value, kind, boolean, number, text_value in batch:
-                        name = str(name_value)
-                        value = json_storage_value(kind, boolean, number, text_value)
-                        if json_kind(value) is not declared.get(name):
+            cursor = self._connection.execute(
+                "SELECT p.name, p.json_kind, p.boolean_value, p.number_value, p.text_value"
+                " FROM query_answer AS m"
+                " JOIN object_property AS p ON p.object_value_id = m.c0"
+                " JOIN query_selector_member AS r ON r.member_kind = 'aggregateProperty'"
+                " AND r.selector_name = ? AND r.value = p.name",
+                (output.data_condition,),
+            )
+            while batch := cursor.fetchmany(_AGGREGATION_BATCH_SIZE):
+                for name_value, kind, boolean, number, text_value in batch:
+                    name = str(name_value)
+                    value = json_storage_value(kind, boolean, number, text_value)
+                    if json_kind(value) is not declared.get(name):
+                        continue
+                    for operator in operations[name]:
+                        if operator is AggregationOperator.SUM:
+                            assert isinstance(value, Decimal)
+                            exponent, coefficient, digits = _decimal_term(value)
+                            sum_counts[name] += 1
+                            sum_input_digits[name] += digits
+                            while coefficient:
+                                while coefficient % 10 == 0:
+                                    coefficient //= 10
+                                    exponent += 1
+                                row = self._connection.execute(
+                                    "SELECT coefficient FROM query_aggregate_sum_term"
+                                    " WHERE name = ? AND exponent = ?",
+                                    (name, exponent),
+                                ).fetchone()
+                                if row is None:
+                                    break
+                                self._connection.execute(
+                                    "DELETE FROM query_aggregate_sum_term"
+                                    " WHERE name = ? AND exponent = ?",
+                                    (name, exponent),
+                                )
+                                coefficient += _integer_from_text(str(row[0]))
+                            if coefficient:
+                                self._connection.execute(
+                                    "INSERT INTO query_aggregate_sum_term VALUES (?, ?, ?)",
+                                    (name, exponent, _integer_text(coefficient)),
+                                )
                             continue
-                        for operator in operations[name]:
-                            if operator is AggregationOperator.SUM:
-                                assert isinstance(value, Decimal)
-                                exponent, coefficient, digits = _decimal_term(value)
-                                sum_counts[name] += 1
-                                sum_input_digits[name] += digits
-                                while coefficient:
-                                    while coefficient % 10 == 0:
-                                        coefficient //= 10
-                                        exponent += 1
-                                    row = self._connection.execute(
-                                        "SELECT coefficient FROM query_aggregate_sum_term"
-                                        " WHERE name = ? AND exponent = ?",
-                                        (name, exponent),
-                                    ).fetchone()
-                                    if row is None:
-                                        break
-                                    self._connection.execute(
-                                        "DELETE FROM query_aggregate_sum_term"
-                                        " WHERE name = ? AND exponent = ?",
-                                        (name, exponent),
-                                    )
-                                    coefficient += _integer_from_text(str(row[0]))
-                                if coefficient:
-                                    self._connection.execute(
-                                        "INSERT INTO query_aggregate_sum_term VALUES (?, ?, ?)",
-                                        (name, exponent, _integer_text(coefficient)),
-                                    )
-                                continue
-                            key = (name, operator)
-                            if key not in extrema:
-                                extrema[key] = value
-                            elif operator is AggregationOperator.MINIMUM:
-                                if value < extrema[key]:  # pyright: ignore[reportOperatorIssue]
-                                    extrema[key] = value
-                            elif value > extrema[key]:  # pyright: ignore[reportOperatorIssue]
-                                extrema[key] = value
-
-                for aggregation in property_aggregations:
-                    name = str(aggregation.property_name)
-                    if aggregation.operator is AggregationOperator.SUM:
-                        if not sum_counts[name]:
-                            bindings[aggregation.name] = AggregateBinding(
-                                aggregation=aggregation.name, present=False
-                            )
-                            continue
-                        try:
-                            reduced: JsonValue = _exact_decimal_streamed_result(
-                                lambda name=name: (
-                                    (int(exponent), _integer_from_text(str(coefficient)))
-                                    for exponent, coefficient in self._connection.execute(
-                                        "SELECT exponent, coefficient"
-                                        " FROM query_aggregate_sum_term WHERE name = ?"
-                                        " ORDER BY exponent",
-                                        (name,),
-                                    )
-                                ),
-                                sum_input_digits[name],
-                                sum_counts[name],
-                            )
-                        except ArithmeticError as error:
-                            return ValidationFinding(summary=str(error))
-                    else:
-                        key = (name, aggregation.operator)
+                        key = (name, operator)
                         if key not in extrema:
-                            bindings[aggregation.name] = AggregateBinding(
-                                aggregation=aggregation.name, present=False
-                            )
-                            continue
-                        reduced = extrema[key]
-                    bindings[aggregation.name] = AggregateBinding(
-                        aggregation=aggregation.name, present=True, value=reduced
-                    )
+                            extrema[key] = value
+                        elif operator is AggregationOperator.MINIMUM:
+                            if value < extrema[key]:  # pyright: ignore[reportOperatorIssue]
+                                extrema[key] = value
+                        elif value > extrema[key]:  # pyright: ignore[reportOperatorIssue]
+                            extrema[key] = value
+
+            for aggregation in property_aggregations:
+                name = str(aggregation.property_name)
+                if aggregation.operator is AggregationOperator.SUM:
+                    if not sum_counts[name]:
+                        bindings[aggregation.name] = AggregateBinding(
+                            aggregation=aggregation.name, present=False
+                        )
+                        continue
+                    try:
+                        reduced: JsonValue = _exact_decimal_streamed_result(
+                            lambda name=name: (
+                                (int(exponent), _integer_from_text(str(coefficient)))
+                                for exponent, coefficient in self._connection.execute(
+                                    "SELECT exponent, coefficient"
+                                    " FROM query_aggregate_sum_term WHERE name = ?"
+                                    " ORDER BY exponent",
+                                    (name,),
+                                )
+                            ),
+                            sum_input_digits[name],
+                            sum_counts[name],
+                        )
+                    except ArithmeticError as error:
+                        return ValidationFinding(summary=str(error))
+                else:
+                    key = (name, aggregation.operator)
+                    if key not in extrema:
+                        bindings[aggregation.name] = AggregateBinding(
+                            aggregation=aggregation.name, present=False
+                        )
+                        continue
+                    reduced = extrema[key]
+                if isinstance(reduced, str) and (reason := unencodable_reason(reduced)) is not None:
+                    return ValidationFinding(summary=reason)
+                bindings[aggregation.name] = AggregateBinding(
+                    aggregation=aggregation.name, present=True, value=reduced
+                )
         finally:
-            self._connection.execute("DELETE FROM query_aggregate_match")
-            self._connection.execute("DELETE FROM query_aggregate_property")
             self._connection.execute("DELETE FROM query_aggregate_sum_term")
-        return tuple(bindings[aggregation.name] for aggregation in query.aggregations)
+        return tuple(bindings[aggregation.name] for aggregation in output.aggregations)
 
     def _prepare_prospective_assessment_scope_unlocked(self, active_identity: str) -> None:
         """Derive the changed-definition and staged-graph invariant closure in SQL."""
@@ -7539,50 +7210,3 @@ class CanonicalStore:
             )
         except (ValueError, ArithmeticError) as error:
             raise StoreError(f"stored definitions do not decode: {error}") from error
-
-
-class _SQLiteQueryIndex:
-    """Query-local access through the durable projection's identity indexes."""
-
-    def __init__(
-        self, store: CanonicalStore, revision: int | None = None, prospective: bool = False
-    ) -> None:
-        self._store = store
-        self._revision = revision
-        self._prospective = prospective
-
-    def known_anchor_uuids(self, anchor_type: str, uuids: tuple[str, ...]) -> set[str]:
-        return self._known_uuids(ObjectKind.ANCHOR, anchor_type, uuids)
-
-    def known_link_uuids(self, link_type: str, uuids: tuple[str, ...]) -> set[str]:
-        return self._known_uuids(ObjectKind.LINK, link_type, uuids)
-
-    def _known_uuids(self, kind: ObjectKind, type_key: str, uuids: tuple[str, ...]) -> set[str]:
-        if not uuids:
-            return set()
-        connection = self._store._connection  # noqa: SLF001
-        reserved = 4 if self._revision is not None else 2
-        known: set[str] = set()
-        for chunk in _sqlite_chunks(connection, set(uuids), reserved=reserved):
-            placeholders = ", ".join("?" for _ in chunk)
-            if self._revision is not None:
-                rows = connection.execute(
-                    "SELECT p.uuid FROM graph_presence_interval AS p"
-                    " JOIN object_value AS v ON v.id = p.object_value_id"
-                    " WHERE p.valid_from_revision <= ?"
-                    " AND (p.valid_to_revision IS NULL OR p.valid_to_revision > ?)"
-                    " AND v.object_kind = ? AND v.type_key = ?"
-                    f" AND p.uuid IN ({placeholders})",
-                    (self._revision, self._revision, kind.value, type_key, *chunk),
-                )
-            else:
-                relation = (
-                    "prospective_graph_object" if self._prospective else "current_graph_object"
-                )
-                rows = connection.execute(
-                    f"SELECT uuid FROM {relation}"  # noqa: S608
-                    f" WHERE object_kind = ? AND type_key = ? AND uuid IN ({placeholders})",
-                    (kind.value, type_key, *chunk),
-                )
-            known.update(str(row[0]) for row in rows)
-        return known

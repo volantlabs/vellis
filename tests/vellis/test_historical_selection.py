@@ -12,6 +12,7 @@ can ask about a moment when nothing happened and still get one definite answer.
 
 from __future__ import annotations
 
+from dataclasses import replace
 from datetime import timedelta
 from pathlib import Path
 
@@ -36,9 +37,8 @@ from vellis.outcomes import OperationStatus
 from vellis.query import (
     AnchorGroup,
     AnchorProjection,
-    EvaluatedStateScope,
     GraphQuery,
-    ReturnShape,
+    RowQueryOutput,
 )
 from vellis.system import RTGSystem
 
@@ -98,16 +98,22 @@ def system(tmp_path: Path):
 def _people() -> GraphQuery:
     return GraphQuery(
         anchor_groups=(AnchorGroup(name="who", anchor_types=("person",)),),
-        return_shape=ReturnShape(projections=(AnchorProjection(name="p", anchor_group="who"),)),
-        maximum_rows=10,
+        output=RowQueryOutput(
+            kind="rows",
+            projections=(AnchorProjection(name="p", anchor_group="who"),),
+            maximum_rows=10,
+        ),
     )
 
 
 def _rituals() -> GraphQuery:
     return GraphQuery(
         anchor_groups=(AnchorGroup(name="what", anchor_types=("ritual",)),),
-        return_shape=ReturnShape(projections=(AnchorProjection(name="r", anchor_group="what"),)),
-        maximum_rows=10,
+        output=RowQueryOutput(
+            kind="rows",
+            projections=(AnchorProjection(name="r", anchor_group="what"),),
+            maximum_rows=10,
+        ),
     )
 
 
@@ -115,7 +121,10 @@ def _rituals() -> GraphQuery:
 
 
 def test_a_query_at_a_selected_revision_sees_that_state(system: RTGSystem) -> None:
-    at_two = system.query_graph(_rituals(), selection=RevisionSelection(2), provenance=_owner())
+    at_two = system.query_graph(
+        replace(_rituals(), state=RevisionSelection(kind="revision", revision=2)),
+        provenance=_owner(),
+    )
 
     assert at_two.accepted, at_two.findings
     assert at_two.evaluated_revision == 2
@@ -124,7 +133,10 @@ def test_a_query_at_a_selected_revision_sees_that_state(system: RTGSystem) -> No
 
 def test_the_same_query_at_a_later_revision_sees_the_later_state(system: RTGSystem) -> None:
     """Excludes evaluating every selection against current state."""
-    at_three = system.query_graph(_rituals(), selection=RevisionSelection(3), provenance=_owner())
+    at_three = system.query_graph(
+        replace(_rituals(), state=RevisionSelection(kind="revision", revision=3)),
+        provenance=_owner(),
+    )
 
     assert at_three.accepted, at_three.findings
     assert at_three.rows == ()
@@ -134,7 +146,10 @@ def test_a_query_uses_the_definitions_in_force_at_the_selected_revision(
     system: RTGSystem,
 ) -> None:
     """The ritual type is retired now, so the same query is refused against current state."""
-    historical = system.query_graph(_rituals(), selection=RevisionSelection(2), provenance=_owner())
+    historical = system.query_graph(
+        replace(_rituals(), state=RevisionSelection(kind="revision", revision=2)),
+        provenance=_owner(),
+    )
     current = system.query_graph(_rituals(), provenance=_owner())
 
     assert historical.accepted, historical.findings
@@ -145,12 +160,17 @@ def test_a_query_uses_the_definitions_in_force_at_the_selected_revision(
 def test_historical_evaluation_keeps_current_query_semantics(system: RTGSystem) -> None:
     """The bound, the shaping, and the refusals are the ones a current query would give."""
     over_bound = system.query_graph(
-        GraphQuery(
-            anchor_groups=(AnchorGroup(name="who", anchor_types=("person",)),),
-            return_shape=ReturnShape(projections=(AnchorProjection(name="p", anchor_group="who"),)),
-            maximum_rows=0,
+        replace(
+            GraphQuery(
+                anchor_groups=(AnchorGroup(name="who", anchor_types=("person",)),),
+                output=RowQueryOutput(
+                    kind="rows",
+                    projections=(AnchorProjection(name="p", anchor_group="who"),),
+                    maximum_rows=0,
+                ),
+            ),
+            state=RevisionSelection(kind="revision", revision=2),
         ),
-        selection=RevisionSelection(2),
         provenance=_owner(),
     )
 
@@ -176,7 +196,7 @@ def test_a_time_resolves_to_the_greatest_revision_at_or_before_it(system: RTGSys
     between = _recorded_at(system, 2) + timedelta(microseconds=1)
 
     result = system.definition_summary(
-        DefinitionSummaryRequest(TimeSelection(between), EvaluatedStateScope.HISTORICAL),
+        DefinitionSummaryRequest(state=TimeSelection(kind="time", time=between)),
         provenance=_owner(),
     )
 
@@ -188,7 +208,7 @@ def test_a_time_exactly_at_a_commit_selects_that_revision(system: RTGSystem) -> 
     at_two = _recorded_at(system, 2)
 
     result = system.definition_summary(
-        DefinitionSummaryRequest(TimeSelection(at_two), EvaluatedStateScope.HISTORICAL),
+        DefinitionSummaryRequest(state=TimeSelection(kind="time", time=at_two)),
         provenance=_owner(),
     )
 
@@ -200,7 +220,7 @@ def test_a_time_before_anything_was_committed_resolves_to_nothing(system: RTGSys
     before = _recorded_at(system, 0) - timedelta(days=1)
 
     result = system.definition_summary(
-        DefinitionSummaryRequest(TimeSelection(before), EvaluatedStateScope.HISTORICAL),
+        DefinitionSummaryRequest(state=TimeSelection(kind="time", time=before)),
         provenance=_owner(),
     )
 
@@ -216,7 +236,7 @@ def test_a_summarys_resolved_revision_can_be_reused_for_inspection_and_query(
     """The arc the verification case names: resolve once by time, then ask by revision."""
     between = _recorded_at(system, 2) + timedelta(microseconds=1)
     summary = system.definition_summary(
-        DefinitionSummaryRequest(TimeSelection(between), EvaluatedStateScope.HISTORICAL),
+        DefinitionSummaryRequest(state=TimeSelection(kind="time", time=between)),
         provenance=_owner(),
     )
     assert summary.accepted, summary.findings
@@ -224,12 +244,15 @@ def test_a_summarys_resolved_revision_can_be_reused_for_inspection_and_query(
     assert resolved is not None
 
     inspection = system.inspect_definitions(
-        DefinitionInspectionRequest(anchor_type_keys=("ritual",)),
-        selection=RevisionSelection(resolved),
+        replace(
+            DefinitionInspectionRequest(anchor_type_keys=("ritual",)),
+            state=RevisionSelection(kind="revision", revision=resolved),
+        ),
         provenance=_owner(),
     )
     query = system.query_graph(
-        _rituals(), selection=RevisionSelection(resolved), provenance=_owner()
+        replace(_rituals(), state=RevisionSelection(kind="revision", revision=resolved)),
+        provenance=_owner(),
     )
 
     assert inspection.accepted, inspection.findings
@@ -245,7 +268,7 @@ def test_a_summarys_resolved_revision_can_be_reused_for_inspection_and_query(
 def test_a_cold_agent_discovers_definitions_later_retired(system: RTGSystem) -> None:
     """Excludes answering historical discovery from the current vocabulary."""
     then = system.definition_summary(
-        DefinitionSummaryRequest(RevisionSelection(2), EvaluatedStateScope.HISTORICAL),
+        DefinitionSummaryRequest(state=RevisionSelection(kind="revision", revision=2)),
         provenance=_owner(),
     )
     current = system.definition_summary(provenance=_owner())
@@ -261,21 +284,21 @@ def test_a_historical_summary_reports_delta_presence_at_that_state(
     """A proposal stood at revision 4 and was activated at 5."""
     assert (
         system.definition_summary(
-            DefinitionSummaryRequest(RevisionSelection(4), EvaluatedStateScope.HISTORICAL),
+            DefinitionSummaryRequest(state=RevisionSelection(kind="revision", revision=4)),
             provenance=_owner(),
         ).delta_present
         is True
     )
     assert (
         system.definition_summary(
-            DefinitionSummaryRequest(RevisionSelection(3), EvaluatedStateScope.HISTORICAL),
+            DefinitionSummaryRequest(state=RevisionSelection(kind="revision", revision=3)),
             provenance=_owner(),
         ).delta_present
         is False
     )
     assert (
         system.definition_summary(
-            DefinitionSummaryRequest(RevisionSelection(5), EvaluatedStateScope.HISTORICAL),
+            DefinitionSummaryRequest(state=RevisionSelection(kind="revision", revision=5)),
             provenance=_owner(),
         ).delta_present
         is False
@@ -286,8 +309,10 @@ def test_a_historical_inspection_returns_the_neighborhood_as_it_was(
     system: RTGSystem,
 ) -> None:
     result = system.inspect_definitions(
-        DefinitionInspectionRequest(anchor_type_keys=("ritual",)),
-        selection=RevisionSelection(0),
+        replace(
+            DefinitionInspectionRequest(anchor_type_keys=("ritual",)),
+            state=RevisionSelection(kind="revision", revision=0),
+        ),
         provenance=_owner(),
     )
 
@@ -313,8 +338,11 @@ def test_an_inspection_of_a_type_not_yet_retired_is_refused_against_current_stat
 @pytest.mark.parametrize(
     ("selection", "expected"),
     (
-        (RevisionSelection(99), "no record in this ledger established revision 99"),
-        (RevisionSelection(-1), "names a committed revision"),
+        (
+            RevisionSelection(kind="revision", revision=99),
+            "no record in this ledger established revision 99",
+        ),
+        (RevisionSelection(kind="revision", revision=-1), "names a committed revision"),
     ),
     ids=["unknown-revision", "negative-revision"],
 )
@@ -324,14 +352,13 @@ def test_an_unresolved_selection_returns_no_content_and_no_evaluated_revision(
     before = materialize_state(system)
 
     summary = system.definition_summary(
-        DefinitionSummaryRequest(selection, EvaluatedStateScope.HISTORICAL), provenance=_owner()
+        DefinitionSummaryRequest(state=selection), provenance=_owner()
     )
     inspection = system.inspect_definitions(
-        DefinitionInspectionRequest(anchor_type_keys=("person",)),
-        selection=selection,
+        replace(DefinitionInspectionRequest(anchor_type_keys=("person",)), state=selection),
         provenance=_owner(),
     )
-    query = system.query_graph(_people(), selection=selection, provenance=_owner())
+    query = system.query_graph(replace(_people(), state=selection), provenance=_owner())
 
     for result in (summary, inspection, query):
         assert result.status is OperationStatus.REJECTED
@@ -347,9 +374,7 @@ def test_a_time_selector_without_a_zone_is_refused(system: RTGSystem) -> None:
     from datetime import datetime
 
     result = system.definition_summary(
-        DefinitionSummaryRequest(
-            TimeSelection(datetime(2020, 1, 1)), EvaluatedStateScope.HISTORICAL
-        ),
+        DefinitionSummaryRequest(state=TimeSelection(kind="time", time=datetime(2020, 1, 1))),
         provenance=_owner(),
     )
 
@@ -362,10 +387,11 @@ def test_a_historical_read_changes_no_canonical_state(system: RTGSystem) -> None
     records = system.store.canonical_record_count()
 
     assert system.query_graph(
-        _people(), selection=RevisionSelection(1), provenance=_owner()
+        replace(_people(), state=RevisionSelection(kind="revision", revision=1)),
+        provenance=_owner(),
     ).accepted
     assert system.definition_summary(
-        DefinitionSummaryRequest(RevisionSelection(1), EvaluatedStateScope.HISTORICAL),
+        DefinitionSummaryRequest(state=RevisionSelection(kind="revision", revision=1)),
         provenance=_owner(),
     ).accepted
 
@@ -416,7 +442,7 @@ def test_a_historical_summary_skips_the_graph_work_between_definition_changes(
             system.store.reset_instrumentation()
             result = system.definition_summary(
                 DefinitionSummaryRequest(
-                    RevisionSelection(selected), EvaluatedStateScope.HISTORICAL
+                    state=RevisionSelection(kind="revision", revision=selected)
                 ),
                 provenance=_owner(),
             )
@@ -462,7 +488,7 @@ def test_resolving_a_time_selector_does_not_walk_the_ledger(tmp_path: Path) -> N
 
         system.store.reset_instrumentation()
         result = system.definition_summary(
-            DefinitionSummaryRequest(TimeSelection(early), EvaluatedStateScope.HISTORICAL),
+            DefinitionSummaryRequest(state=TimeSelection(kind="time", time=early)),
             provenance=_owner(),
         )
 
@@ -481,11 +507,11 @@ def test_the_vocabulary_at_a_revision_is_the_one_in_force_then(system: RTGSystem
     moves the active set.
     """
     before = system.definition_summary(
-        DefinitionSummaryRequest(RevisionSelection(4), EvaluatedStateScope.HISTORICAL),
+        DefinitionSummaryRequest(state=RevisionSelection(kind="revision", revision=4)),
         provenance=_owner(),
     )
     after = system.definition_summary(
-        DefinitionSummaryRequest(RevisionSelection(5), EvaluatedStateScope.HISTORICAL),
+        DefinitionSummaryRequest(state=RevisionSelection(kind="revision", revision=5)),
         provenance=_owner(),
     )
 
@@ -498,8 +524,10 @@ def test_a_historical_inspection_is_bounded_the_same_way(system: RTGSystem) -> N
 
     system.store.reset_instrumentation()
     result = system.inspect_definitions(
-        DefinitionInspectionRequest(anchor_type_keys=("ritual",)),
-        selection=RevisionSelection(2),
+        replace(
+            DefinitionInspectionRequest(anchor_type_keys=("ritual",)),
+            state=RevisionSelection(kind="revision", revision=2),
+        ),
         provenance=_owner(),
     )
 
@@ -518,7 +546,7 @@ def test_a_time_bound_in_another_zone_resolves_to_the_same_revision(
 
     assert (
         system.definition_summary(
-            DefinitionSummaryRequest(TimeSelection(elsewhere), EvaluatedStateScope.HISTORICAL),
+            DefinitionSummaryRequest(state=TimeSelection(kind="time", time=elsewhere)),
             provenance=_owner(),
         ).evaluated_revision
         == 2
@@ -531,9 +559,12 @@ def test_a_historical_query_at_a_selected_time_means_what_a_revision_query_means
     """``semanticQuery``: current, a selected revision, and a selected time all agree."""
     at_two = _recorded_at(system, 2)
 
-    by_time = system.query_graph(_rituals(), selection=TimeSelection(at_two), provenance=_owner())
+    by_time = system.query_graph(
+        replace(_rituals(), state=TimeSelection(kind="time", time=at_two)), provenance=_owner()
+    )
     by_revision = system.query_graph(
-        _rituals(), selection=RevisionSelection(2), provenance=_owner()
+        replace(_rituals(), state=RevisionSelection(kind="revision", revision=2)),
+        provenance=_owner(),
     )
 
     assert by_time.accepted and by_revision.accepted
@@ -546,8 +577,10 @@ def test_a_historical_query_at_a_selected_time_means_what_a_revision_query_means
 def test_a_historical_inspection_returns_no_partial_details(system: RTGSystem) -> None:
     """One resolvable type and one retired by the selected revision; neither comes back."""
     result = system.inspect_definitions(
-        DefinitionInspectionRequest(anchor_type_keys=("person", "ritual")),
-        selection=RevisionSelection(5),
+        replace(
+            DefinitionInspectionRequest(anchor_type_keys=("person", "ritual")),
+            state=RevisionSelection(kind="revision", revision=5),
+        ),
         provenance=_owner(),
     )
 
@@ -562,11 +595,12 @@ def test_a_historical_read_is_observed_with_the_revision_it_reached(
     from vellis.activity import HistoryKind, HistoryQuery
 
     assert system.definition_summary(
-        DefinitionSummaryRequest(RevisionSelection(2), EvaluatedStateScope.HISTORICAL),
+        DefinitionSummaryRequest(state=RevisionSelection(kind="revision", revision=2)),
         provenance=_owner(),
     ).accepted
     assert system.query_graph(
-        _rituals(), selection=RevisionSelection(2), provenance=_owner()
+        replace(_rituals(), state=RevisionSelection(kind="revision", revision=2)),
+        provenance=_owner(),
     ).accepted
 
     entries = system.history(
@@ -586,10 +620,13 @@ def test_a_store_that_cannot_answer_a_historical_read_reports_a_failure(
 
     # Revision 5 can answer from normalized definition rows; revision 2 needs graph rows.
     summary = system.definition_summary(
-        DefinitionSummaryRequest(RevisionSelection(5), EvaluatedStateScope.HISTORICAL),
+        DefinitionSummaryRequest(state=RevisionSelection(kind="revision", revision=5)),
         provenance=_owner(),
     )
-    query = system.query_graph(_rituals(), selection=RevisionSelection(2), provenance=_owner())
+    query = system.query_graph(
+        replace(_rituals(), state=RevisionSelection(kind="revision", revision=2)),
+        provenance=_owner(),
+    )
 
     assert summary.accepted
     assert query.status is OperationStatus.FAILED
@@ -607,7 +644,7 @@ def test_delta_retrieval_answers_about_now_however_far_back_was_just_read(
     """
     assert (
         system.definition_summary(
-            DefinitionSummaryRequest(RevisionSelection(4), EvaluatedStateScope.HISTORICAL),
+            DefinitionSummaryRequest(state=RevisionSelection(kind="revision", revision=4)),
             provenance=_owner(),
         ).delta_present
         is True
